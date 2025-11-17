@@ -6,10 +6,10 @@
   <meta name="description" content="Pokemon D&D Trainer Management Tool">
   <title>Pokemon D&D Trainer Tool</title>
 
-  <!-- PWA Support -->
-  <link rel="manifest" href="manifest.json">
+  <!-- PWA Support - Commented out until assets are added -->
+  <!-- <link rel="manifest" href="manifest.json"> -->
   <meta name="theme-color" content="#FF6B6B">
-  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <!-- <link rel="apple-touch-icon" href="assets/icon-192.png"> -->
 
   <!-- Styles -->
   <link rel="stylesheet" href="css/styles.css">
@@ -29,7 +29,7 @@
     <!-- Navigation -->
     <nav class="main-nav">
       <div class="nav-brand">
-        <img src="assets/pokeball.svg" alt="Pokeball" class="nav-logo">
+        <img src="assets/Pokeball.png" alt="Pokeball" class="nav-logo" onerror="this.style.display='none'">
         <h1>Pokemon D&D</h1>
       </div>
 
@@ -65,7 +65,8 @@
   <!-- Scripts -->
   <script type="module" src="js/main.js"></script>
 
-  <!-- Service Worker Registration -->
+  <!-- Service Worker Registration - Commented out until sw.js is created -->
+  <!--
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -75,5 +76,6 @@
       });
     }
   </script>
+  -->
 </body>
 </html>

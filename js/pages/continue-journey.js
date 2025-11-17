@@ -266,16 +266,16 @@ export function attachContinueJourneyListeners() {
           const gameData = await import('../api.js').then(m => m.GameDataAPI.getAll());
 
           // Store game data in session storage
-          sessionStorage.setItem('items', JSON.stringify(gameData.data.itemsData.items));
-          sessionStorage.setItem('trainerPaths', JSON.stringify(gameData.data.trainerPaths));
-          sessionStorage.setItem('specializations', JSON.stringify(gameData.data.specializations));
-          sessionStorage.setItem('affinities', JSON.stringify(gameData.data.affinities));
-          sessionStorage.setItem('moves', JSON.stringify(gameData.data.moves));
-          sessionStorage.setItem('natures', JSON.stringify(gameData.data.natures));
-          sessionStorage.setItem('trainerFeats', JSON.stringify(gameData.data.trainerFeatsData.trainerFeats));
-          sessionStorage.setItem('skills', JSON.stringify(gameData.data.skillsData.skills));
-          sessionStorage.setItem('pokemonFeats', JSON.stringify(gameData.data.pokemonFeatsData.pokemonFeats));
-          sessionStorage.setItem('nationalities', JSON.stringify(gameData.data.nationalitiesData.nationalities));
+          sessionStorage.setItem('items', JSON.stringify(gameData.itemsData.items));
+          sessionStorage.setItem('trainerPaths', JSON.stringify(gameData.trainerPaths));
+          sessionStorage.setItem('specializations', JSON.stringify(gameData.specializations));
+          sessionStorage.setItem('affinities', JSON.stringify(gameData.affinities));
+          sessionStorage.setItem('moves', JSON.stringify(gameData.moves));
+          sessionStorage.setItem('natures', JSON.stringify(gameData.natures));
+          sessionStorage.setItem('trainerFeats', JSON.stringify(gameData.trainerFeatsData.trainerFeats));
+          sessionStorage.setItem('skills', JSON.stringify(gameData.skillsData.skills));
+          sessionStorage.setItem('pokemonFeats', JSON.stringify(gameData.pokemonFeatsData.pokemonFeats));
+          sessionStorage.setItem('nationalities', JSON.stringify(gameData.nationalitiesData.nationalities));
 
           // Navigate to trainer card
           window.dispatchEvent(new CustomEvent('navigate', {
@@ -286,14 +286,14 @@ export function attachContinueJourneyListeners() {
           const conduitData = await import('../api.js').then(m => m.GameDataAPI.getConduit());
 
           // Store conduit data in session storage
-          sessionStorage.setItem('items', JSON.stringify(conduitData.data.itemsData.items));
-          sessionStorage.setItem('conduitFeatures', JSON.stringify(conduitData.data.conduitFeatures));
-          sessionStorage.setItem('battleStyles', JSON.stringify(conduitData.data.battleStyles));
-          sessionStorage.setItem('typeAwakenings', JSON.stringify(conduitData.data.typeAwakening));
-          sessionStorage.setItem('moves', JSON.stringify(conduitData.data.moves));
-          sessionStorage.setItem('natures', JSON.stringify(conduitData.data.natures));
-          sessionStorage.setItem('pokemonFeats', JSON.stringify(conduitData.data.pokemonFeatsData.pokemonFeats));
-          sessionStorage.setItem('nationalities', JSON.stringify(conduitData.data.nationalitiesData.nationalities));
+          sessionStorage.setItem('items', JSON.stringify(conduitData.itemsData.items));
+          sessionStorage.setItem('conduitFeatures', JSON.stringify(conduitData.conduitFeatures));
+          sessionStorage.setItem('battleStyles', JSON.stringify(conduitData.battleStyles));
+          sessionStorage.setItem('typeAwakenings', JSON.stringify(conduitData.typeAwakening));
+          sessionStorage.setItem('moves', JSON.stringify(conduitData.moves));
+          sessionStorage.setItem('natures', JSON.stringify(conduitData.natures));
+          sessionStorage.setItem('pokemonFeats', JSON.stringify(conduitData.pokemonFeatsData.pokemonFeats));
+          sessionStorage.setItem('nationalities', JSON.stringify(conduitData.nationalitiesData.nationalities));
 
           // Navigate to conduit card
           window.dispatchEvent(new CustomEvent('navigate', {

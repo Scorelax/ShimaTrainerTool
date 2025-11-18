@@ -1,4 +1,4 @@
-// Pokemon Card Page - Detailed Pokemon Information Display
+// Pokemon Card Page - Detailed Pokemon Information Display with Info/Battle Pages
 
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
@@ -25,6 +25,7 @@ export function renderPokemonCard(pokemonName) {
   const level = pokemonData[4] || 1;
   const type1 = pokemonData[5] || '';
   const type2 = pokemonData[6] || '';
+  const hd = pokemonData[9] || 0;
   const ac = pokemonData[10] || 10;
   const vd = pokemonData[11] || 0;
   const hp = pokemonData[12] || 0;
@@ -37,6 +38,9 @@ export function renderPokemonCard(pokemonName) {
   const cha = pokemonData[20] || 10;
   const savingThrow = pokemonData[21] || 'None';
   const skills = pokemonData[22] || '';
+  const proficiency = pokemonData[23] || 2;
+  const speed = pokemonData[24] || 30;
+  const initiative = pokemonData[25] || 0;
   const loyalty = pokemonData[33] || 0;
   const heldItem = pokemonData[35] || 'None';
   const nickname = pokemonData[36] || '';
@@ -87,6 +91,9 @@ export function renderPokemonCard(pokemonName) {
   const displayName = nickname ? `${name} / ${nickname}` : name;
   const typingText = type2 ? `${type1} / ${type2}` : type1;
 
+  // Calculate STAB (Same Type Attack Bonus) - proficiency bonus
+  const stab = `+${proficiency}`;
+
   const html = `
     <div class="pokemon-card-page">
       <style>
@@ -109,275 +116,443 @@ export function renderPokemonCard(pokemonName) {
           font-size: 2.5rem;
         }
 
+        /* Page visibility classes */
+        .hidden-page {
+          display: none !important;
+        }
+
+        .active-page {
+          display: grid !important;
+        }
+
+        /* Info Page Styles */
         .card-container {
-          display: grid;
           grid-template-columns: 350px 1fr;
-          grid-template-rows: auto auto 1fr;
-          gap: 2rem;
-          width: 100%;
+          grid-template-rows: auto auto;
+          gap: 20px;
+          width: 80%;
           max-width: 1200px;
+          margin-top: 20px;
           position: relative;
         }
 
         .image-container {
           grid-column: 1 / 2;
           grid-row: 1 / 2;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          justify-content: flex-start;
           width: 350px;
           height: 350px;
+          border-radius: 20px;
+          overflow: visible;
+          background-color: transparent;
+          z-index: 3;
+          margin-bottom: 10px;
         }
 
         .image-container img {
-          width: 100%;
-          height: 100%;
+          width: 350px;
+          height: 350px;
           border-radius: 20px;
           object-fit: contain;
-          border: 4px solid #333;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-          background: white;
+          cursor: pointer;
         }
 
         .new-details-container {
           grid-column: 1 / 2;
           grid-row: 2 / 3;
-          background: white;
-          padding: 1.5rem;
-          border-radius: 15px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          justify-content: flex-start;
+          gap: 10px;
+          margin-top: -80px;
+          width: 350px;
+          padding-left: 0;
+          margin-left: 0;
         }
 
         .stat-item {
           display: flex;
-          justify-content: space-between;
-          padding: 0.5rem 0;
-          border-bottom: 1px solid #ddd;
-          font-size: 1.3rem;
+          flex-direction: row;
+          align-items: center;
+          gap: 5px;
+          margin-bottom: 15px;
+          text-align: left;
+          font-size: 1.5rem;
+          width: 100%;
+          max-width: 350px;
         }
 
         .stat-label {
           font-weight: bold;
-          color: #333;
-        }
-
-        .stat-value {
-          color: #666;
+          color: black;
+          min-width: 80px;
         }
 
         .dex-entry::before {
           content: " #";
+          margin-left: 5px;
+        }
+
+        .stat-value {
+          color: black;
+          word-wrap: break-word;
+          flex-grow: 1;
+        }
+
+        .flavor-text-container {
+          position: absolute;
+          top: 10%;
+          left: 60%;
+          transform: translateX(-25%);
+          width: 40%;
+          text-align: left;
+          color: black;
+          z-index: 1;
+        }
+
+        .flavor-text {
+          font-size: 1.2rem;
+          line-height: 1.3;
+          color: black;
+        }
+
+        .skills-container {
+          grid-column: 2 / 3;
+          grid-row: 2 / 3;
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          gap: 10px;
+          margin-top: 220px;
+          font-size: 1rem;
+          transform: scale(0.9);
+          transform-origin: top left;
+          margin-left: 0px;
+          z-index: 2;
+          color: black;
+        }
+
+        .skills-container h2 {
+          font-size: 2.5rem;
+          margin-left: 200px;
+        }
+
+        .skills-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 10px;
+          border: 2px solid black;
+          padding: 20px;
+          border-radius: 5px;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .skill-item {
+          padding: 10px;
+          border: 1px solid black;
+          border-radius: 5px;
+          margin-bottom: 10px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          height: 75px;
+          font-size: 1.5rem;
+        }
+
+        .skill-item .modifier {
+          margin-top: 1px;
+          font-size: 1.2rem;
+        }
+
+        .skill-item.highlight {
+          background-color: white;
+          color: black;
+          font-weight: bold;
+        }
+
+        .skill-item.extra-strong {
+          background-color: #fff200;
+          color: black;
+          font-weight: bold;
+        }
+
+        .checkbox-container {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 10px;
+          margin-top: 20px;
+          margin-left: 10px;
+          font-size: 1.5rem;
+        }
+
+        .checkbox-container label {
+          font-weight: bold;
+          color: black;
+          margin-bottom: 5px;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+          width: 40px;
+          height: 40px;
+          border: 2px solid black;
+          background-color: white;
+          color: black;
+          cursor: pointer;
+        }
+
+        /* Battle Page Styles */
+        .battle-page-container {
+          grid-template-columns: 1fr 1fr;
+          grid-template-rows: auto auto 1fr;
+          gap: 20px;
+          width: 80%;
+          max-width: 1200px;
+          margin-top: 20px;
+        }
+
+        .battle-page-container .image-container {
+          grid-column: 1 / 2;
+          grid-row: 1 / 3;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-start;
+          width: 350px;
+          height: 350px;
+          border-radius: 20px;
+          overflow: visible;
+          background-color: transparent;
+          z-index: 3;
+          margin-bottom: 10px;
         }
 
         .ac-hp-vp-container {
           grid-column: 2 / 3;
           grid-row: 1 / 2;
           display: flex;
-          justify-content: space-around;
-          gap: 1rem;
+          justify-content: space-between;
+          gap: 10px;
+          width: 100%;
+          margin-bottom: 0;
         }
 
-        .stat-block {
+        .ac-hp-vp-container .stat-block,
+        .stats-container .stat-block {
           display: flex;
           flex-direction: column;
           align-items: center;
+          text-align: center;
         }
 
-        .stat-label-box {
-          font-weight: bold;
+        .ac-hp-vp-container .stat-label,
+        .stats-container .stat-label {
+          margin-bottom: 5px;
+          text-align: center;
           font-size: 1.3rem;
-          margin-bottom: 0.5rem;
-          color: black;
+          font-weight: bold;
         }
 
-        .stat-value-box {
-          width: 80px;
-          height: 80px;
+        .ac-hp-vp-container .stat-value-box {
+          width: 70px;
+          height: 70px;
           background-color: #f44336;
           color: black;
           border-radius: 10px;
           border: 3px solid black;
-          font-size: 2rem;
-          font-weight: 700;
+          text-align: center;
+          font-size: 1.9rem;
+          font-weight: 650;
           box-shadow: 3px 3px 0 #000;
           display: flex;
-          align-items: center;
           justify-content: center;
+          align-items: center;
         }
 
         .stats-container {
           grid-column: 2 / 3;
           grid-row: 2 / 3;
           display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          gap: 1rem;
-          background: white;
-          padding: 1.5rem;
-          border-radius: 15px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+          margin-top: 0;
+          width: 100%;
+          margin-bottom: 10px;
         }
 
-        .ability-group {
+        .stats-container .stat-block {
           display: flex;
           flex-direction: column;
           align-items: center;
+          gap: 5px;
         }
 
-        .ability-label {
-          font-weight: bold;
-          font-size: 1rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .ability-box {
+        .stats-container .stat-value-box {
           width: 60px;
           height: 60px;
           background-color: #f44336;
           color: black;
           border-radius: 10px;
           border: 3px solid black;
+          text-align: center;
           font-size: 1.8rem;
           box-shadow: 3px 3px 0 #000;
           display: flex;
-          align-items: center;
           justify-content: center;
+          align-items: center;
         }
 
-        .modifier-box {
+        .stats-container .stat-modifier-box {
           width: 50px;
           height: 50px;
           background-color: #f44336;
           color: white;
           border-radius: 10px;
           border: 3px solid black;
+          text-align: center;
           font-size: 1.6rem;
           font-weight: 900;
           box-shadow: 3px 3px 0 #000;
-          margin-top: -10px;
           display: flex;
-          align-items: center;
           justify-content: center;
+          align-items: center;
+          margin-top: -10px;
+          position: relative;
+          z-index: 1;
         }
 
-        .skills-container {
-          grid-column: 1 / 3;
+        .moves-container {
+          grid-column: 2 / 3;
           grid-row: 3 / 4;
-          background: white;
-          padding: 2rem;
-          border-radius: 15px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+          margin-top: 50px;
+          margin-left: -10px;
         }
 
-        .skills-container h2 {
-          margin-bottom: 1.5rem;
-          color: #333;
+        .moves-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          width: 100%;
+          justify-content: flex-start;
         }
 
-        .skills-grid {
-          display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          gap: 1rem;
-          border: 2px solid #333;
-          padding: 1.5rem;
+        .move-item {
+          padding: 8px;
+          border: 2px solid black;
           border-radius: 5px;
-        }
-
-        .skill-item {
-          padding: 1rem;
-          border: 1px solid #333;
-          border-radius: 5px;
+          background-color: #ffffff;
+          color: black;
           text-align: center;
+          font-size: 1.1rem;
           display: flex;
           flex-direction: column;
           justify-content: center;
+          white-space: nowrap;
+          width: auto;
+          flex: 1 1 calc(25% - 10px);
+          max-width: 100%;
+          box-sizing: border-box;
           height: 75px;
-          font-size: 1.2rem;
         }
 
-        .skill-item.highlight {
-          background-color: #fff200;
-          font-weight: bold;
-        }
-
-        .skill-item.extra-strong {
-          background-color: #4CAF50;
-          color: white;
-          font-weight: bold;
-        }
-
-        .skill-item .modifier {
-          font-size: 1rem;
-          margin-top: 0.25rem;
-        }
-
-        .checkbox-container {
+        .battle-page-container .new-details-container {
+          grid-column: 1 / 2;
+          grid-row: 3 / 4;
           display: flex;
-          gap: 2rem;
-          margin-top: 1.5rem;
-          padding-top: 1.5rem;
-          border-top: 2px solid #ddd;
+          flex-direction: column;
+          align-items: flex-start;
+          justify-content: flex-start;
+          gap: 5px;
+          margin-top: -95px;
+          width: 250px;
+          padding-left: 0;
+          margin-left: -40px;
         }
 
-        .checkbox-item {
+        .stat-pair-container {
           display: flex;
-          align-items: center;
-          gap: 0.75rem;
+          justify-content: space-between;
+          width: 100%;
+          gap: 10px;
         }
 
-        .checkbox-item input[type="checkbox"] {
-          width: 30px;
-          height: 30px;
+        .stat-item.multi-line {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          width: 200%;
+        }
+
+        .stat-item.multi-line .stat-label {
+          display: inline;
+          margin-right: 5px;
+        }
+
+        .stat-item.multi-line .stat-value {
+          display: inline;
+          margin-top: 0;
+          word-wrap: break-word;
+          max-width: 100%;
+        }
+
+        /* Navigation Arrows */
+        .arrow-button {
+          font-size: 2.5rem;
+          padding: 5px 15px;
+          background-color: white;
+          color: black;
+          border: 2px solid black;
+          border-radius: 5px;
           cursor: pointer;
+          transition: background-color 0.3s;
+          position: absolute;
+          bottom: 5%;
+          z-index: 1;
         }
 
-        .checkbox-item label {
-          font-size: 1.2rem;
-          font-weight: bold;
-          cursor: pointer;
+        .arrow-button:hover {
+          background-color: #f0f0f0;
         }
 
-        .button-group {
-          display: flex;
-          gap: 1rem;
-          margin-top: 2rem;
+        #nextPage {
+          right: calc(20%);
         }
 
-        .button {
-          padding: 1rem 2rem;
+        #prevPage {
+          left: calc(20%);
+          display: none;
+        }
+
+        .edit-button {
+          background-color: #bfbfbf;
+          color: black;
           border: none;
           border-radius: 5px;
-          font-size: 1.2rem;
-          font-weight: bold;
+          padding: 10px 20px;
+          font-size: 1.5rem;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: background-color 0.3s;
+          margin-top: 10px;
+          display: block;
         }
 
-        .button-primary {
-          background-color: #4CAF50;
-          color: white;
-        }
-
-        .button-primary:hover {
-          background-color: #45a049;
-        }
-
-        .button-secondary {
-          background-color: gray;
-          color: white;
-        }
-
-        .button-secondary:hover {
-          background-color: darkgray;
-        }
-
-        .button-danger {
-          background-color: #f44336;
-          color: white;
-        }
-
-        .button-danger:hover {
+        .edit-button:hover {
           background-color: #d32f2f;
         }
 
         @media (max-width: 1024px) {
-          .card-container {
+          .card-container,
+          .battle-page-container {
             grid-template-columns: 1fr;
             grid-template-rows: auto;
           }
@@ -386,133 +561,70 @@ export function renderPokemonCard(pokemonName) {
           .new-details-container,
           .ac-hp-vp-container,
           .stats-container,
-          .skills-container {
+          .skills-container,
+          .moves-container {
             grid-column: 1 / 2;
           }
 
           .skills-grid {
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
           }
         }
       </style>
 
       <h1>Pokemon Card</h1>
 
-      <div class="card-container">
-        <!-- Pokemon Image -->
+      <!-- Info Page -->
+      <div id="infoPage" class="card-container active-page">
         <div class="image-container">
           <img id="pokemonImage" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
         </div>
 
-        <!-- Pokemon Details -->
         <div class="new-details-container">
           <div class="stat-item">
-            <span class="stat-label">Name:</span>
-            <span class="stat-value">
-              ${displayName}
-              <span class="dex-entry">${dexEntry}</span>
-            </span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Level:</span>
-            <span class="stat-value">${level}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Type:</span>
-            <span class="stat-value">${typingText}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Loyalty:</span>
-            <span class="stat-value">${loyalty}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Saving Throw:</span>
-            <span class="stat-value">${savingThrow}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Held Item:</span>
-            <span class="stat-value">${heldItem}</span>
-          </div>
-          ${flavorText ? `
-            <div class="stat-item">
-              <span class="stat-label">Flavor:</span>
-              <span class="stat-value">${flavorText}</span>
+            <div class="stat-label">Name:</div>
+            <div class="stat-value">
+              <span id="pokemonName">${displayName}</span>
+              <span id="pokemonDexEntry" class="dex-entry">${dexEntry}</span>
             </div>
-          ` : ''}
-
-          <!-- Checkboxes -->
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Level:</div>
+            <div id="pokemonLevel" class="stat-value">${level}</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Typing:</div>
+            <div id="pokemonTyping" class="stat-value">${typingText}</div>
+          </div>
+          <div class="stat-item multi-line">
+            <div class="stat-label">Saving Throw(s):</div>
+            <div id="pokemonSavingThrow" class="stat-value">${savingThrow}</div>
+          </div>
+          <div class="stat-item multi-line">
+            <div class="stat-label">Senses:</div>
+            <div id="sensesValue" class="stat-value">${senses || 'None'}</div>
+          </div>
           <div class="checkbox-container">
-            <div class="checkbox-item">
-              <input type="checkbox" id="inActiveParty" ${inActiveParty ? 'checked' : ''} />
-              <label for="inActiveParty">Active Party</label>
-            </div>
-            <div class="checkbox-item">
-              <input type="checkbox" id="inUtilitySlot" ${inUtilitySlot ? 'checked' : ''} />
-              <label for="inUtilitySlot">Utility Slot</label>
-            </div>
+            <label for="inActiveParty">Active Party</label>
+            <input type="checkbox" id="inActiveParty" ${inActiveParty ? 'checked' : ''}>
+            <label for="inUtilitySlot">Utility Slot</label>
+            <input type="checkbox" id="inUtilitySlot" ${inUtilitySlot ? 'checked' : ''}>
           </div>
 
-          <!-- Buttons -->
-          <div class="button-group">
-            <button class="button button-primary" id="editPokemonButton">Edit Pokemon</button>
-            <button class="button button-danger" id="backButton">Back</button>
+          <div style="margin-top: 10px;">
+            <button class="edit-button" id="editPokemonButton">Edit Pokémon</button>
           </div>
         </div>
 
-        <!-- AC, HP, VP -->
-        <div class="ac-hp-vp-container">
-          <div class="stat-block">
-            <div class="stat-label-box">AC</div>
-            <div class="stat-value-box">${ac}</div>
+        ${flavorText ? `
+          <div class="flavor-text-container">
+            <p id="flavorText" class="flavor-text">${flavorText}</p>
           </div>
-          <div class="stat-block">
-            <div class="stat-label-box">HP</div>
-            <div class="stat-value-box">${hp}</div>
-          </div>
-          <div class="stat-block">
-            <div class="stat-label-box">VP</div>
-            <div class="stat-value-box">${vp}</div>
-          </div>
-        </div>
+        ` : ''}
 
-        <!-- Ability Scores -->
-        <div class="stats-container">
-          <div class="ability-group">
-            <div class="ability-label">STR</div>
-            <div class="ability-box">${str}</div>
-            <div class="modifier-box">${strMod >= 0 ? '+' : ''}${strMod}</div>
-          </div>
-          <div class="ability-group">
-            <div class="ability-label">DEX</div>
-            <div class="ability-box">${dex}</div>
-            <div class="modifier-box">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
-          </div>
-          <div class="ability-group">
-            <div class="ability-label">CON</div>
-            <div class="ability-box">${con}</div>
-            <div class="modifier-box">${conMod >= 0 ? '+' : ''}${conMod}</div>
-          </div>
-          <div class="ability-group">
-            <div class="ability-label">INT</div>
-            <div class="ability-box">${int}</div>
-            <div class="modifier-box">${intMod >= 0 ? '+' : ''}${intMod}</div>
-          </div>
-          <div class="ability-group">
-            <div class="ability-label">WIS</div>
-            <div class="ability-box">${wis}</div>
-            <div class="modifier-box">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
-          </div>
-          <div class="ability-group">
-            <div class="ability-label">CHA</div>
-            <div class="ability-box">${cha}</div>
-            <div class="modifier-box">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
-          </div>
-        </div>
-
-        <!-- Skills -->
         <div class="skills-container">
           <h2>Skills</h2>
-          <div class="skills-grid">
+          <div id="skills" class="skills-grid">
             ${allSkills.map(skill => {
               const skillKey = skill.name.toLowerCase();
               const proficiencyLevel = skillCounts[skillKey] || 0;
@@ -529,6 +641,120 @@ export function renderPokemonCard(pokemonName) {
           </div>
         </div>
       </div>
+
+      <!-- Battle Page -->
+      <div id="battlePage" class="battle-page-container hidden-page">
+        <div class="image-container">
+          <img id="pokemonImageBattle" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+        </div>
+
+        <div class="ac-hp-vp-container">
+          <div class="stat-block">
+            <div class="stat-label">AC</div>
+            <div class="stat-value-box" id="acValue">${ac}</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">HP</div>
+            <div class="stat-value-box" id="hpValue">${hp}</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">VP</div>
+            <div class="stat-value-box" id="vpValue">${vp}</div>
+          </div>
+        </div>
+
+        <div class="stats-container">
+          <div class="stat-block">
+            <div class="stat-label">STR</div>
+            <div class="stat-value-box" id="strValue">${str}</div>
+            <div class="stat-modifier-box" id="strModifierValue">${strMod >= 0 ? '+' : ''}${strMod}</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">DEX</div>
+            <div class="stat-value-box" id="dexValue">${dex}</div>
+            <div class="stat-modifier-box" id="dexModifierValue">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">CON</div>
+            <div class="stat-value-box" id="conValue">${con}</div>
+            <div class="stat-modifier-box" id="conModifierValue">${conMod >= 0 ? '+' : ''}${conMod}</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">INT</div>
+            <div class="stat-value-box" id="intValue">${int}</div>
+            <div class="stat-modifier-box" id="intModifierValue">${intMod >= 0 ? '+' : ''}${intMod}</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">WIS</div>
+            <div class="stat-value-box" id="wisValue">${wis}</div>
+            <div class="stat-modifier-box" id="wisModifierValue">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">CHA</div>
+            <div class="stat-value-box" id="chaValue">${cha}</div>
+            <div class="stat-modifier-box" id="chaModifierValue">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
+          </div>
+        </div>
+
+        <div class="moves-container">
+          <div class="moves-grid" id="movesGrid">
+            <!-- Moves will be populated here - for now showing placeholder -->
+            <div class="move-item">Move 1</div>
+            <div class="move-item">Move 2</div>
+            <div class="move-item">Move 3</div>
+            <div class="move-item">Move 4</div>
+          </div>
+        </div>
+
+        <div class="new-details-container">
+          <div class="stat-pair-container">
+            <div class="stat-item">
+              <div class="stat-label">HD:</div>
+              <div id="hdValue" class="stat-value">${hd}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">VD:</div>
+              <div id="vdValue" class="stat-value">${vd}</div>
+            </div>
+          </div>
+          <div class="stat-pair-container">
+            <div class="stat-item">
+              <div class="stat-label">STAB:</div>
+              <div id="stabValue" class="stat-value">${stab}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Proficiency:</div>
+              <div id="proficiencyValue" class="stat-value">+${proficiency}</div>
+            </div>
+          </div>
+          <div class="stat-pair-container">
+            <div class="stat-item">
+              <div class="stat-label">Initiative:</div>
+              <div id="initiativeValue" class="stat-value">${initiative >= 0 ? '+' : ''}${initiative}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Loyalty:</div>
+              <div id="loyaltyValue" class="stat-value">${loyalty}</div>
+            </div>
+          </div>
+          <div class="stat-item multi-line">
+            <span class="stat-label">Ability: <span id="abilityName">None</span></span>
+            <div id="abilityEffect" class="stat-value">No ability data available</div>
+          </div>
+          <div class="stat-item multi-line">
+            <span class="stat-label">Held Item: <span id="heldItemName">${heldItem}</span></span>
+            <div id="heldItemEffect" class="stat-value">No item effect available</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Movement:</div>
+            <div id="movementValue" class="stat-value">${speed} ft</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Arrows -->
+      <button id="nextPage" class="arrow-button">&#x2192;</button>
+      <button id="prevPage" class="arrow-button">&#x2190;</button>
     </div>
   `;
 
@@ -540,17 +766,40 @@ export function attachPokemonCardListeners() {
   const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
 
+  // Page toggle function
+  function togglePage() {
+    const infoPage = document.getElementById('infoPage');
+    const battlePage = document.getElementById('battlePage');
+    const nextButton = document.getElementById('nextPage');
+    const prevButton = document.getElementById('prevPage');
+
+    if (infoPage.classList.contains('active-page')) {
+      // Switch to battle page
+      infoPage.classList.remove('active-page');
+      infoPage.classList.add('hidden-page');
+      battlePage.classList.remove('hidden-page');
+      battlePage.classList.add('active-page');
+      nextButton.style.display = 'none';
+      prevButton.style.display = 'block';
+    } else {
+      // Switch to info page
+      battlePage.classList.remove('active-page');
+      battlePage.classList.add('hidden-page');
+      infoPage.classList.remove('hidden-page');
+      infoPage.classList.add('active-page');
+      nextButton.style.display = 'block';
+      prevButton.style.display = 'none';
+    }
+  }
+
+  // Navigation arrow buttons
+  document.getElementById('nextPage')?.addEventListener('click', togglePage);
+  document.getElementById('prevPage')?.addEventListener('click', togglePage);
+
   // Edit Pokemon button
   document.getElementById('editPokemonButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'edit-pokemon', pokemonName: pokemonName }
-    }));
-  });
-
-  // Back button
-  document.getElementById('backButton')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('navigate', {
-      detail: { route: 'trainer-card' }
     }));
   });
 

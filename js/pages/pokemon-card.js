@@ -94,6 +94,20 @@ export function renderPokemonCard(pokemonName) {
   // Calculate STAB (Same Type Attack Bonus) - proficiency bonus
   const stab = `+${proficiency}`;
 
+  // Parse senses data (comma-separated string)
+  const sensesData = senses || '';
+  const sensesValues = sensesData.split(',').map(value => value.trim());
+  const sensesTypes = ['Sight', 'Hearing', 'Smell', 'Tremorsense', 'Echolocation', 'Telepathy', 'Blindsight', 'Darkvision', 'Truesight'];
+  const sensesDisplay = sensesValues
+    .map((value, index) => {
+      if (value && value !== '-') {
+        return `${sensesTypes[index]}: ${value}`;
+      }
+      return null;
+    })
+    .filter(s => s !== null)
+    .join(', ') || 'None';
+
   const html = `
     <div class="pokemon-card-page">
       <style>
@@ -227,7 +241,7 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           justify-content: flex-start;
           gap: 10px;
-          margin-top: 220px;
+          margin-top: 80px;
           font-size: 1rem;
           transform: scale(0.9);
           transform-origin: top left;
@@ -239,6 +253,7 @@ export function renderPokemonCard(pokemonName) {
         .skills-container h2 {
           font-size: 2.5rem;
           margin-left: 200px;
+          margin-bottom: 0.5rem;
         }
 
         .skills-grid {
@@ -602,7 +617,7 @@ export function renderPokemonCard(pokemonName) {
           </div>
           <div class="stat-item multi-line">
             <div class="stat-label">Senses:</div>
-            <div id="sensesValue" class="stat-value">${senses || 'None'}</div>
+            <div id="sensesValue" class="stat-value">${sensesDisplay}</div>
           </div>
           <div class="checkbox-container">
             <label for="inActiveParty">Active Party</label>

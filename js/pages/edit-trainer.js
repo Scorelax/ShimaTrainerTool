@@ -1,7 +1,7 @@
 // Edit Trainer Page - Form for editing trainer stats
 
 import { TrainerAPI } from '../api.js';
-import { showNotification } from '../utils/notifications.js';
+import { showToast, showSuccess, showError } from '../utils/notifications.js';
 
 export function renderEditTrainer() {
   // Load trainer data from session storage
@@ -448,7 +448,7 @@ async function handleFormSubmit() {
     await TrainerAPI.update(trainerData);
 
     // Show success message
-    showNotification(`${trainerData[1]}'s info is updated!`, 'success');
+    showSuccess(`${trainerData[1]}'s info is updated!`);
 
     // Navigate back to trainer info
     setTimeout(() => {
@@ -459,7 +459,7 @@ async function handleFormSubmit() {
 
   } catch (error) {
     console.error('Error updating trainer:', error);
-    showNotification('Failed to update trainer data', 'error');
+    showError('Failed to update trainer data');
 
     // Reload the form
     setTimeout(() => {

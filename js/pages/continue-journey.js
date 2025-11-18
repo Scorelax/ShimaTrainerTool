@@ -264,18 +264,25 @@ export function attachContinueJourneyListeners() {
         if (trainerClass === "Pokemon Trainer") {
           // Load game data for Pokemon Trainer
           const gameData = await import('../api.js').then(m => m.GameDataAPI.getAll());
+          console.log('Game data response:', gameData);
+          console.log('gameData keys:', Object.keys(gameData));
+          console.log('Has .data property?', 'data' in gameData);
+
+          // Check structure and use appropriate path
+          const actualData = gameData.data || gameData;
+          console.log('actualData keys:', Object.keys(actualData));
 
           // Store game data in session storage
-          sessionStorage.setItem('items', JSON.stringify(gameData.itemsData.items));
-          sessionStorage.setItem('trainerPaths', JSON.stringify(gameData.trainerPaths));
-          sessionStorage.setItem('specializations', JSON.stringify(gameData.specializations));
-          sessionStorage.setItem('affinities', JSON.stringify(gameData.affinities));
-          sessionStorage.setItem('moves', JSON.stringify(gameData.moves));
-          sessionStorage.setItem('natures', JSON.stringify(gameData.natures));
-          sessionStorage.setItem('trainerFeats', JSON.stringify(gameData.trainerFeatsData.trainerFeats));
-          sessionStorage.setItem('skills', JSON.stringify(gameData.skillsData.skills));
-          sessionStorage.setItem('pokemonFeats', JSON.stringify(gameData.pokemonFeatsData.pokemonFeats));
-          sessionStorage.setItem('nationalities', JSON.stringify(gameData.nationalitiesData.nationalities));
+          sessionStorage.setItem('items', JSON.stringify(actualData.itemsData.items));
+          sessionStorage.setItem('trainerPaths', JSON.stringify(actualData.trainerPaths));
+          sessionStorage.setItem('specializations', JSON.stringify(actualData.specializations));
+          sessionStorage.setItem('affinities', JSON.stringify(actualData.affinities));
+          sessionStorage.setItem('moves', JSON.stringify(actualData.moves));
+          sessionStorage.setItem('natures', JSON.stringify(actualData.natures));
+          sessionStorage.setItem('trainerFeats', JSON.stringify(actualData.trainerFeatsData.trainerFeats));
+          sessionStorage.setItem('skills', JSON.stringify(actualData.skillsData.skills));
+          sessionStorage.setItem('pokemonFeats', JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
+          sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));
 
           // Navigate to trainer card
           window.dispatchEvent(new CustomEvent('navigate', {
@@ -284,16 +291,22 @@ export function attachContinueJourneyListeners() {
         } else {
           // Load conduit data
           const conduitData = await import('../api.js').then(m => m.GameDataAPI.getConduit());
+          console.log('Conduit data response:', conduitData);
+          console.log('conduitData keys:', Object.keys(conduitData));
+
+          // Check structure and use appropriate path
+          const actualData = conduitData.data || conduitData;
+          console.log('actualData keys:', Object.keys(actualData));
 
           // Store conduit data in session storage
-          sessionStorage.setItem('items', JSON.stringify(conduitData.itemsData.items));
-          sessionStorage.setItem('conduitFeatures', JSON.stringify(conduitData.conduitFeatures));
-          sessionStorage.setItem('battleStyles', JSON.stringify(conduitData.battleStyles));
-          sessionStorage.setItem('typeAwakenings', JSON.stringify(conduitData.typeAwakening));
-          sessionStorage.setItem('moves', JSON.stringify(conduitData.moves));
-          sessionStorage.setItem('natures', JSON.stringify(conduitData.natures));
-          sessionStorage.setItem('pokemonFeats', JSON.stringify(conduitData.pokemonFeatsData.pokemonFeats));
-          sessionStorage.setItem('nationalities', JSON.stringify(conduitData.nationalitiesData.nationalities));
+          sessionStorage.setItem('items', JSON.stringify(actualData.itemsData.items));
+          sessionStorage.setItem('conduitFeatures', JSON.stringify(actualData.conduitFeatures));
+          sessionStorage.setItem('battleStyles', JSON.stringify(actualData.battleStyles));
+          sessionStorage.setItem('typeAwakenings', JSON.stringify(actualData.typeAwakening));
+          sessionStorage.setItem('moves', JSON.stringify(actualData.moves));
+          sessionStorage.setItem('natures', JSON.stringify(actualData.natures));
+          sessionStorage.setItem('pokemonFeats', JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
+          sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));
 
           // Navigate to conduit card
           window.dispatchEvent(new CustomEvent('navigate', {
@@ -303,7 +316,14 @@ export function attachContinueJourneyListeners() {
 
       } catch (err) {
         console.error('Error loading trainer:', err);
-        document.getElementById('pinError').textContent = 'Failed to load trainer data';
+        // Show error in content area since modal is closed
+        document.getElementById('content').innerHTML = `
+          <div class="error" style="text-align: center; padding: 2rem; color: red;">
+            <h2>Failed to load trainer data</h2>
+            <p>${err.message}</p>
+            <button onclick="window.location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem;">Retry</button>
+          </div>
+        `;
       }
 
     } else {

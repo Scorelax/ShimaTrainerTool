@@ -3,6 +3,8 @@ import { PokemonAPI, TrainerAPI, GameDataAPI, OfflineManager } from './api.js';
 import { renderIndex } from './pages/index.js';
 import { renderContinueJourney, attachContinueJourneyListeners } from './pages/continue-journey.js';
 import { renderTrainerCard, attachTrainerCardListeners } from './pages/trainer-card.js';
+import { renderTrainerInfo, attachTrainerInfoListeners } from './pages/trainer-info.js';
+import { renderEditTrainer, attachEditTrainerListeners } from './pages/edit-trainer.js';
 import { showToast, showError } from './utils/notifications.js';
 
 // ============================================================================
@@ -28,6 +30,7 @@ class Router {
       'trainer-card': this.renderTrainerCard.bind(this),
       'conduit-card': this.renderConduitCard.bind(this),
       'trainer-info': this.renderTrainerInfo.bind(this),
+      'edit-trainer': this.renderEditTrainer.bind(this),
       'my-pokemon': this.renderMyPokemon.bind(this),
       'pokemon-card': this.renderPokemonCard.bind(this),
       'new-journey': this.renderNewJourney.bind(this)
@@ -140,14 +143,16 @@ class Router {
 
   async renderTrainerInfo(params) {
     const content = document.getElementById('content');
-    // TODO: Create trainer-info page
-    content.innerHTML = `
-      <div class="error">
-        <h2>Trainer Info</h2>
-        <p>Coming soon!</p>
-        <button data-route="trainer-card">Back to Trainer Card</button>
-      </div>
-    `;
+    const html = renderTrainerInfo();
+    content.innerHTML = html;
+    attachTrainerInfoListeners();
+  }
+
+  async renderEditTrainer(params) {
+    const content = document.getElementById('content');
+    const html = renderEditTrainer();
+    content.innerHTML = html;
+    attachEditTrainerListeners();
   }
 
   async renderMyPokemon(params) {

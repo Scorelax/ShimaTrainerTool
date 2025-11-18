@@ -5,6 +5,8 @@ import { renderContinueJourney, attachContinueJourneyListeners } from './pages/c
 import { renderTrainerCard, attachTrainerCardListeners } from './pages/trainer-card.js';
 import { renderTrainerInfo, attachTrainerInfoListeners } from './pages/trainer-info.js';
 import { renderEditTrainer, attachEditTrainerListeners } from './pages/edit-trainer.js';
+import { renderPokemonCard, attachPokemonCardListeners } from './pages/pokemon-card.js';
+import { renderEditPokemon, attachEditPokemonListeners } from './pages/edit-pokemon.js';
 import { showToast, showError } from './utils/notifications.js';
 
 // ============================================================================
@@ -33,6 +35,7 @@ class Router {
       'edit-trainer': this.renderEditTrainer.bind(this),
       'my-pokemon': this.renderMyPokemon.bind(this),
       'pokemon-card': this.renderPokemonCard.bind(this),
+      'edit-pokemon': this.renderEditPokemon.bind(this),
       'new-journey': this.renderNewJourney.bind(this)
     };
 
@@ -169,15 +172,18 @@ class Router {
 
   async renderPokemonCard(params) {
     const content = document.getElementById('content');
-    // TODO: Create pokemon-card page
-    content.innerHTML = `
-      <div class="error">
-        <h2>Pokemon Card</h2>
-        <p>Pokemon: ${params.pokemonName || 'Unknown'}</p>
-        <p>Coming soon!</p>
-        <button data-route="trainer-card">Back to Trainer Card</button>
-      </div>
-    `;
+    const pokemonName = params.pokemonName || '';
+    const html = renderPokemonCard(pokemonName);
+    content.innerHTML = html;
+    attachPokemonCardListeners();
+  }
+
+  async renderEditPokemon(params) {
+    const content = document.getElementById('content');
+    const pokemonName = params.pokemonName || '';
+    const html = renderEditPokemon(pokemonName);
+    content.innerHTML = html;
+    attachEditPokemonListeners();
   }
 
   async renderNewJourney() {

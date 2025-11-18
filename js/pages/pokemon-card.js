@@ -98,15 +98,15 @@ export function renderPokemonCard(pokemonName) {
   const sensesData = senses || '';
   const sensesValues = sensesData.split(',').map(value => value.trim());
   const sensesTypes = ['Sight', 'Hearing', 'Smell', 'Tremorsense', 'Echolocation', 'Telepathy', 'Blindsight', 'Darkvision', 'Truesight'];
-  const sensesDisplay = sensesValues
+  const sensesArray = sensesValues
     .map((value, index) => {
       if (value && value !== '-') {
         return `${sensesTypes[index]}: ${value}`;
       }
       return null;
     })
-    .filter(s => s !== null)
-    .join(', ') || 'None';
+    .filter(s => s !== null);
+  const sensesDisplay = sensesArray.join(', ');
 
   const html = `
     <div class="pokemon-card-page">
@@ -615,10 +615,12 @@ export function renderPokemonCard(pokemonName) {
             <div class="stat-label">Saving Throw(s):</div>
             <div id="pokemonSavingThrow" class="stat-value">${savingThrow}</div>
           </div>
-          <div class="stat-item multi-line">
-            <div class="stat-label">Senses:</div>
-            <div id="sensesValue" class="stat-value">${sensesDisplay}</div>
-          </div>
+          ${sensesArray.length > 0 ? `
+            <div class="stat-item multi-line">
+              <div class="stat-label">Senses:</div>
+              <div id="sensesValue" class="stat-value">${sensesDisplay}</div>
+            </div>
+          ` : ''}
           <div class="checkbox-container">
             <label for="inActiveParty">Active Party</label>
             <input type="checkbox" id="inActiveParty" ${inActiveParty ? 'checked' : ''}>

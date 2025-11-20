@@ -1,0 +1,2944 @@
+<style>
+    .card-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto 1fr;
+        gap: 20px;
+        width: 80%;
+        max-width: 1200px;
+        margin-top: 20px;
+        z-index: 1;
+    }
+
+    .image-container {
+        grid-column: 1 / 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start; /* Aligns image to the left */
+        justify-content: flex-start;
+        width: 350px;
+        height: 350px;
+        border-radius: 20px;
+        overflow: visible;
+        background-color: transparent;
+        z-index: 3;
+        margin-bottom: 10px;
+    }
+
+    .image-container img {
+        width: 350px;
+        height: 350px;
+        border-radius: 20px;
+        object-fit: contain;
+        cursor: pointer; /* Change the cursor to indicate it's clickable */
+    }
+
+    .image-container img:hover {
+        opacity: 0.8; /* Optional: Add hover effect to give visual feedback */
+        transition: opacity 0.3s;
+    }
+
+    .new-details-container {
+        grid-column: 1 / 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start; /* Ensures left alignment */
+        justify-content: flex-start;
+        gap: 10px;
+        margin-top: -80px;
+        width: 350px;
+        padding-left: 0;
+        margin-left: 0;
+    }
+
+    .stat-item {
+        display: flex;  /* Ensures label and value are in the same line */
+        flex-direction: row;  /* Horizontally aligns the content */
+        align-items: center;  /* Aligns the label and value vertically */
+        gap: 5px;  /* Adds spacing between the label and value */
+        margin-bottom: 15px;
+        text-align: left;
+        font-size: 1.5rem;
+        width: 100%;
+        max-width: 350px;
+    }
+
+    .stat-label {
+        font-weight: bold;
+        color: black;
+        min-width: 80px;  /* Optional: Set a minimum width to align labels properly */
+    }
+
+    .dex-entry::before {
+        content: " #";
+        margin-left: 5px; /* Adjust spacing between the name and dex entry */
+    }
+
+    .stat-value {
+        color: black;
+        word-wrap: break-word;
+        flex-grow: 1;
+    }
+
+    .ac-hp-vp-container {
+        grid-column: 2 / 3;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    /* Center the labels above the value boxes */
+    .ac-hp-vp-container .stat-block,
+    .stats-container .stat-block {
+        display: flex;
+        flex-direction: column; /* Stack label above the value */
+        align-items: center; /* Center-align both label and value */
+        text-align: center; /* Center text inside the block */
+    }
+
+    .ac-hp-vp-container .stat-label,
+    .stats-container .stat-label {
+        margin-bottom: 5px; /* Space between label and value box */
+        text-align: center; /* Center text */
+        font-size: 1.3rem; /* Adjust this size as needed */
+        font-weight: bold; /* Optional: To make the labels stand out more */
+    }
+
+    .ac-hp-vp-container .stat-value-box {
+        width: 70px;
+        height: 70px;
+        background-color: #f44336;
+        color: black;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        font-size: 1.9rem;
+        font-weight: 650;
+        box-shadow: 3px 3px 0 #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .stats-container {
+        grid-column: 2 / 3;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 0;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .stats-container .stat-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .stats-container .stat-value-box {
+        width: 60px;
+        height: 60px;
+        background-color: #f44336;
+        color: black;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        font-size: 1.8rem;
+        box-shadow: 3px 3px 0 #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .stats-container .stat-modifier-box {
+        width: 50px;
+        height: 50px;
+        background-color: #f44336;
+        color: white;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        font-size: 1.6rem;
+        font-weight: 900;
+        box-shadow: 3px 3px 0 #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: -10px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .flavor-text-container {
+        position: absolute;
+        top: 10%; /* Aligns with the top of the image */
+        left: 60%; /* Starts at 50% of the container */
+        transform: translateX(-25%); /* Adjusts to ensure the text is centered */
+        width: 40%; /* Restrict width to prevent overflow */
+        text-align: left;
+        color: black;
+        z-index: 1;
+    }
+
+    .flavor-text {
+        font-size: 1.2rem;
+        line-height: 1.3;
+        color: black;
+    }
+
+    .skills-container {
+        grid-column: 2 / 3;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 10px;
+        margin-top: 220px;
+        font-size: 1rem;
+        transform: scale(0.9);
+        transform-origin: top left;
+        margin-left: 0px;
+        z-index: 2;
+        color: black;
+    }
+
+    .skills-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px;
+        border: 2px solid black;
+        padding: 20px;
+        border-radius: 5px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .skill-item {
+        padding: 10px;
+        border: 1px solid black;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 75px;
+        font-size: 1.5rem;
+    }
+
+    .skill-item .modifier {
+        margin-top: 1px;
+        font-size: 1.2rem;
+    }
+
+    .highlight {
+        background-color: white;
+        color: black;
+        font-weight: bold;
+    }
+
+    .extra-strong {
+        background-color: #fff200;
+        color: black;
+        font-weight: bold;
+    }
+
+    .skills-container h2 {
+        font-size: 2.5rem;
+        margin-left: 200px;
+    }
+
+    .stat-boosted {
+        color: #fff200 !important;
+        font-size: 1.7rem !important;
+        font-weight: bold !important;
+        -webkit-text-stroke: 0.5px black !important;
+    }
+
+    .stat-nerfed {
+        color: #0d32d6 !important;
+        font-size: 1.2rem !important;
+        -webkit-text-stroke: 0.5px black !important;
+    }
+
+    .checkbox-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        margin-top: 20px;
+        margin-left: 10px;
+        font-size: 1.5rem;
+    }
+
+    .checkbox-container label {
+        font-weight: bold;
+        color: black;
+        margin-bottom: 5px;
+    }
+
+    .checkbox-container input[type="checkbox"] {
+        width: 40px;
+        height: 40px;
+        border: 2px solid black;
+        background-color: white;
+        color: black;
+    }
+
+    .arrow-button {
+        font-size: 2.5rem;
+        padding: 5px 15px;
+        background-color: white;
+        color: black;
+        border: 2px solid black;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        position: absolute;
+        bottom: 5%;
+        z-index: 1;
+    }
+
+    .arrow-button:hover {
+        background-color: #f0f0f0;
+    }
+
+    .evolve-button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 1.5rem;
+        cursor: pointer;
+        margin-top: 10px;
+        transition: background-color 0.3s;
+    }
+
+    .evolve-button {
+        display: none;
+    }
+
+    .hidden-page {
+        display: none !important;
+    }
+
+    .active-page {
+        display: grid !important;
+        grid-template-columns: 1fr 2fr;
+        grid-template-rows: auto 1fr;
+        gap: 20px;
+        width: 80%;
+        max-width: 1200px;
+        margin-top: 20px;
+    }
+
+    .moves-container {
+        grid-column: 2 / 3;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        margin-top: 50px;
+        margin-left: -10px;
+    }
+
+    .moves-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .move-item {
+        padding: 8px;
+        border: 2px solid black;
+        border-radius: 5px;
+        background-color: #ffffff;
+        color: black;
+        text-align: center;
+        font-size: 1.1rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        white-space: nowrap;
+        width: auto;
+        flex: 1 1 calc(25% - 10px);
+        max-width: 100%;
+        box-sizing: border-box;
+        height: 75px;
+    }
+
+    .stat-pair-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        gap: 10px;
+    }
+
+    .stat-item.multi-line {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 200%;
+    }
+
+    .stat-item.multi-line .stat-label {
+        display: inline;
+        margin-right: 5px;
+    }
+
+    .stat-item.multi-line .stat-value {
+        display: inline;
+        margin-top: 0;
+        word-wrap: break-word;
+        max-width: 100%;
+    }
+
+    #nextPage {
+        right: calc(20%);
+    }
+
+    #prevPage {
+        left: calc(20%);
+        display: none;
+    }
+
+    .battle-page-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto 1fr;
+        gap: 20px;
+        width: 80%;
+        max-width: 1200px;
+        margin-top: 20px;
+    }
+
+    .battle-page-container .image-container {
+        grid-column: 1 / 2;
+        grid-row: 1 / 3;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        width: 350px;
+        height: 350px;
+        border-radius: 20px;
+        overflow: visible;
+        background-color: transparent;
+        z-index: 3;
+        margin-bottom: 10px;
+    }
+
+    .battle-page-container .ac-hp-vp-container {
+        grid-column: 2 / 3;
+        grid-row: 1 / 2;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    .battle-page-container .stats-container {
+        grid-column: 2 / 3;
+        grid-row: 2 / 3;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 0;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .battle-page-container .new-details-container {
+        grid-column: 1 / 2;
+        grid-row: 3 / 4;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 5px;
+        margin-top: -95px;
+        width: 250px;
+        padding-left: 0;
+        margin-left: -40px;
+    }
+
+    #battlePage .stat-item.movement {
+        display: flex;
+        flex-direction: column; /* Stack label and value vertically */
+        align-items: flex-start;
+    }
+
+    .action-buttons-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .action-button {
+        background-color: #b8b8b8;
+        color: black;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 1.5rem;
+        cursor: pointer;
+        margin-top: 10px;
+        transition: background-color 0.3s;
+    }
+
+    .action-button:hover {
+        background-color: #b8b8b8;
+    }
+
+    .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+        display: none; /* Hidden by default */
+        z-index: 9999; /* Ensure it appears above all content */
+    }
+
+    .popup-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%); /* Center the box */
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        z-index: 10000;
+    }
+
+    .popup-box h2 {
+        font-size: 1.8rem;
+        margin-bottom: 20px;
+    }
+
+    .popup-box button {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 1.2rem;
+        cursor: pointer;
+        border-radius: 5px;
+        margin: 10px;
+    }
+
+    .popup-box button:hover {
+        background-color: #d32f2f;
+    }
+
+    .popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 20px;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 10000;
+        width: 80%;
+        max-width: 500px;
+        display: none;
+        overflow-y: auto; /* Ensure scrollability for content */
+    }
+
+    /* Feats / comment container */
+    /* Limit the height of the popup to 70% of the viewport */
+    #featsPopup,
+    #commentPopup,
+    #gearPopup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-height: 70vh; /* Limit height to 70% of the viewport */
+        background-color: #cfcfcf;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 1000;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        padding: 0;
+        display: none; /* Default is hidden */
+        flex-direction: column;
+        overflow: hidden; /* Prevent overflowing */
+    }
+
+    /* Add padding to make sure content is not blocked by the button */
+    #featsContainer,
+    #commentContainer,
+    #gearContainer {
+        flex: 1; /* Make the content area take up available space */
+        overflow-y: auto; /* Enable scrolling within this area */
+        max-height: 70vh; /* Set a maximum height to trigger scrolling */
+        padding: 20px;
+        box-sizing: border-box; /* Ensure padding is included in the width/height calculation */
+    }
+
+    #featsPopup .footer,
+    #gearPopup .footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: sticky;
+        bottom: 0;
+        padding: 10px;
+        background-color: #cfcfcf;
+        border-top: 1px solid #ccc;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    #commentPopup .footer {
+        display: flex;
+        justify-content: space-between; /* Space between Add Comment and Close buttons */
+        align-items: center;
+        position: sticky;
+        padding: 10px 20px;
+        background-color: #cfcfcf;
+        border-top: 1px solid #ccc;
+        width: 100%;
+        box-sizing: border-box;
+        text-align: center; /* Ensure text is centered in both buttons */
+    }
+
+    #featsPopup .close-button,
+    #gearPopup .close-button {
+        background-color: #f44336; /* Red color for both buttons */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        width: 100px; /* Ensure uniform width */
+    }
+
+    #commentPopup .close-button,
+    #commentPopup .add-comment-button {
+        background-color: #f44336; /* Red color for both buttons */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        width: 200px; /* Ensure uniform width */
+        text-align: center; /* Ensure text is centered in both buttons */
+        margin: 0; /* Reset any default margin that might affect placement */
+    }
+
+    #featsPopup .close-button:hover,
+    #commentPopup .close-button:hover,
+    #gearPopup .close-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .comment-item-container .edit-button,
+    .comment-item-container .delete-button {
+        padding: 5px 10px; /* Adjust padding for button size */
+        font-size: 1rem; /* Adjust font size */
+        cursor: pointer;
+        border-radius: 5px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        margin: 0;
+    }
+
+    .comment-item-container .button-container {
+        display: flex;
+        justify-content: space-between; /* Space the buttons apart */
+        align-items: center; /* Vertically align the buttons */
+        gap: 10px; /* Space between the buttons */
+    }
+
+    .comment-item-container .delete-button {
+        margin-left: auto; /* Push the delete button to the right */
+    }
+
+    .comment-item-container .edit-button {
+        margin-right: auto; /* Ensure edit button stays on the left */
+    }
+
+    .comment-item-container .delete-button:hover {
+        background-color: #d32f2f;
+    }
+
+    /* Ensure last skill box is fully visible before cutting */
+    #featsContainer .feats-item-container:last-child,
+    #commentContainer .comment-item-container:last-child,
+    #gearContainer .gear-item-container:last-child {
+        margin-bottom: 140px; /* Add some margin to ensure it's not cut off */
+    }
+
+    #commentPopup .add-comment-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .feats-item-container,
+    .comment-item-container,
+    .gear-item-container {
+        border: 2px solid black;
+        border-radius: 10px;
+        margin: 10px;
+        padding: 10px;
+        width: 95%;
+        box-sizing: border-box; /* Ensures padding doesn’t overflow */
+        background-color: #fff; /* Ensure consistent background */
+    }
+
+    .feats-name-header,
+    .comment-name-header,
+    .gear-name-header {
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: black; /* Same as Buffs */
+    }
+
+    .feats-effect-box,
+    .comment-effect-box,
+    .gear-effect-box {
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 10px;
+        text-align: left;
+        height: auto;
+        background-color: #f9f9f9; /* Background color */
+        color: black; /* Same color as Buffs */
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Add subtle shadow */
+    }
+
+    .feats-comments-buttons-container,
+    .combat-gear-buttons-container {
+        display: flex;
+        gap: 10px; /* Space between Feats and Comments buttons */
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+
+    .feats-comments-buttons-container .action-button,
+    .combat-gear-buttons-container .action-button {
+        display: inline-block; /* Allows dynamic sizing based on text */
+        background-color: white;
+        color: black;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 15px; /* Adjusted padding for better fit */
+        font-size: 1.5rem;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        white-space: nowrap;
+    }
+
+    .feats-comments-buttons-container .action-button:hover,
+    .combat-gear-buttons-container .action-button:hover {
+        background-color: #d32f2f;
+    }
+
+    /* Add Comment Modal Styles */
+    #addCommentModal.visible {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #addCommentModal .popup-box {
+        width: 80%;
+        max-width: 400px;
+        padding: 20px;
+        background-color: white;
+        border: 2px solid black;
+        border-radius: 10px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    #addCommentModal textarea {
+        width: 100%;
+        padding: 10px;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        resize: vertical;
+    }
+
+    #addCommentModal .footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    #addCommentModal .close-button {
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 1rem;
+        cursor: pointer;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+    }
+
+    #addCommentModal .close-button:hover {
+        background-color: #45a049;
+    }
+
+    #newCommentText {
+        width: 100%;
+        max-width: 100%; /* Ensure the textarea does not exceed the width of the modal */
+        box-sizing: border-box; /* Include padding and border in the element's width */
+        word-wrap: break-word; /* Ensure long text breaks and wraps properly */
+        resize: vertical; /* Allow vertical resizing only */
+    }
+
+    .popup .footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: sticky;
+        bottom: 0;
+        padding: 10px;
+        background-color: white;
+        border-top: 1px solid #ccc;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .popup .close-button {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        width: 100px;
+    }
+
+    .popup .close-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .popup h2 {
+        text-align: center;
+    }
+
+    .edit-button {
+        background-color: #bfbfbf;
+        color: black;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 1.5rem;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        margin-top: 10px;
+        display: block;
+    }
+
+    .edit-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .close-button {
+        display: block;
+        margin: 0 auto;
+        padding: 10px 20px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+
+    .move-popup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 20px;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 10000;
+        width: 80%;
+        max-width: 500px;
+        display: none;
+    }
+
+    .move-popup-content {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        font-size: 1.2rem;
+    }
+
+    .move-popup-content h2 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        text-align: center;
+        align-self: center;
+        width: 100%;
+    }
+
+    .move-popup-content p,
+    .move-popup-content span {
+        text-align: left;
+        width: 100%;
+    }
+
+    .move-popup-content button {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 1.2rem;
+        cursor: pointer;
+        align-self: center;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .visible {
+        display: block !important;
+    }
+
+    .custom-message-box {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 300px;
+        padding: 20px;
+        background-color: white;
+        border: 2px solid #f44336;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        text-align: center;
+        display: none;
+    }
+
+    .custom-message-box h2 {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+        color: #f44336;
+    }
+
+    .custom-message-box p {
+        font-size: 1rem;
+        margin-bottom: 20px;
+    }
+
+    .custom-message-box button {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 1rem;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+    .custom-message-box button:hover {
+        background-color: #d32f2f;
+    }
+
+    .popup-button {
+        background-color: #f44336; /* Red color */
+        color: white; /* White text */
+        border: none;
+        padding: 10px 15px;
+        text-align: center;
+        border-radius: 5px; /* Rounded corners */
+        font-size: 1.1rem;
+        cursor: pointer;
+    }
+
+    .popup-button:hover {
+        background-color: #d32f2f; /* Darker red on hover */
+    }
+
+    #combatTrackerPopup {
+        max-width: 90%;
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+
+    /* Section headers */
+    .section-header {
+        text-align: center;
+        width: 100%;
+        color: black;
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+        font-weight: bold;
+        background-color: #e0e0e0;
+        padding: 8px;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Divider */
+    .stats-divider {
+        width: 80%;
+        height: 2px;
+        background-color: #333;
+        margin: 20px 0;
+    }
+
+    /* Consistent styling for input fields */
+    .stat-input {
+        width: 80px;
+        padding: 8px;
+        font-size: 1.3rem;
+        border-radius: 5px;
+        text-align: center;
+        border: 1px solid #ccc;
+    }
+
+    .stat-display {
+        width: 80px;
+        padding: 8px;
+        background-color: #f0f0f0;
+        font-size: 1.3rem;
+        border-radius: 5px;
+        text-align: center;
+        border: 1px solid #aaa;
+    }
+
+    /* Buttons with hover effects */
+    .stat-button {
+        width: 80px;
+        padding: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        font-size: 1.1rem;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .stat-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .type-chart-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 5px;
+        margin-top: 5px;
+        margin-bottom: 15px;
+    }
+
+    .popup-content {
+        max-height: 80vh;
+        overflow-y: auto;
+        padding: 15px;
+    }
+
+    .type-button {
+        padding: 8px 12px;
+        font-size: 1rem;
+        border: 2px solid black;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .type-button.active {
+        box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.3);
+        border: 3px solid black;
+        transform: scale(1.1);
+    }
+
+    .type-button:hover {
+        background-color: #ddd;
+    }
+
+    /* Overlay */
+    .custom-message-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+        display: none;
+    }
+
+</style>
+
+<h1>Pokemon Card</h1>
+
+<!-- Info Page -->
+<div id="infoPage" class="card-container active-page">
+    <div class="image-container">
+        <img id="pokemonImage" src="" alt="Pokemon Image" onclick="showEvolutionPopup()">
+        <div class="details-container">
+            <div class="stat-item">
+                <div class="stat-label">Name:</div>
+                <div class="stat-value">
+                    <span id="pokemonName"></span>
+                    <span id="pokemonDexEntry" class="dex-entry"></span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Level:</div>
+                <div id="pokemonLevel" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Typing:</div>
+                <div id="pokemonTyping" class="stat-value"></div>
+            </div>
+            <div class="stat-item multi-line">
+                <div class="stat-label">Saving Throw(s):</div>
+                <div id="pokemonSavingThrow" class="stat-value"></div>
+            </div>
+            <div class="stat-item multi-line">
+                <div class="stat-label">Senses:</div>
+                <div id="sensesValue" class="stat-value"></div>
+            </div>
+            <div class="checkbox-container">
+                <label for="inActiveParty">Active Party</label>
+                <input type="checkbox" id="inActiveParty">
+                <label for="inUtilitySlot">Utility Slot</label>
+                <input type="checkbox" id="inUtilitySlot">
+            </div>       
+
+            <div class="feats-comments-buttons-container">
+                <button class="action-button" onclick="showFeatsPopup()">Feats</button>
+                <button class="action-button" onclick="showCommentPopup()">Comments</button>
+            </div>
+
+            <div class="action-buttons-container">
+                <button class="edit-button" onclick="NavigationManager.navigate('edit_pokemon')">Edit Pokémon</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="flavor-text-container">
+        <p id="flavorText" class="flavor-text"></p>
+    </div>
+
+    <div class="skills-container">
+        <h2>Skills</h2>
+        <div id="skills" class="skills-grid"></div>
+    </div>
+
+    <div id="featsPopup" class="popup">
+        <h2>Feats</h2>
+        <div id="featsContainer" class="feats-container">
+            <!-- Each feat should have this structure -->
+            <div class="feats-item-container">
+                <div class="feats-name-header">Feat Name</div>
+                <div class="feats-effect-box">Feat Description</div>
+            </div>
+        </div>
+        <div class="footer">
+            <button class="close-button" onclick="closePopup('featsPopup')">Close</button>
+        </div>
+    </div>
+
+    <div id="commentPopup" class="popup">
+        <h2>Comments</h2>
+        <div id="commentContainer" class="comment-container">
+            <!-- Example of how a comment should be structured -->
+            <div class="comment-item-container">
+                <div class="comment-effect-box">Comment text here</div>
+                <div class="button-container">
+                    <button class="edit-button" onclick="editComment(index)">Edit</button>
+                    <button class="delete-button" onclick="deleteComment(index)">Delete</button>
+                </div>
+            </div>
+        </div>
+        <div class="footer">
+            <button class="action-button add-comment-button" onclick="showAddCommentPopup()">Add Comment</button>
+            <button class="close-button" onclick="closePopup('commentPopup')">Close</button>
+        </div>
+    </div>
+
+    <!-- Add Comment Modal -->
+    <div id="addCommentModal" class="popup-overlay">
+        <div class="popup-box">
+            <h2>Add a Comment</h2>
+            <textarea id="newCommentText" rows="4" cols="50" placeholder="Enter your comment here..."></textarea>
+            <div class="footer">
+                <button class="close-button" onclick="submitNewComment()">Save</button>
+                <button class="close-button" onclick="closeAddCommentModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Battle Page -->
+<div id="battlePage" class="battle-page-container hidden-page">
+    <div class="image-container">
+        <img id="pokemonImageBattle" src="" alt="Pokemon Image">
+    </div>
+
+    <div class="ac-hp-vp-container">
+        <div class="stat-block">
+            <div class="stat-label">AC</div>
+            <div class="stat-value-box" id="acValue"></div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-label">HP</div>
+            <div class="stat-value-box" id="hpValue"></div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-label">VP</div>
+            <div class="stat-value-box" id="vpValue"></div>
+        </div>
+    </div>
+
+    <div class="stats-container">
+        <div class="stat-block">
+            <div class="stat-label">STR</div>
+            <div class="stat-value-box" id="strValue"></div>
+            <div class="stat-modifier-box" id="strModifierValue"></div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-label">DEX</div>
+            <div class="stat-value-box" id="dexValue"></div>
+            <div class="stat-modifier-box" id="dexModifierValue"></div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-label">CON</div>
+            <div class="stat-value-box" id="conValue"></div>
+            <div class="stat-modifier-box" id="conModifierValue"></div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-label">INT</div>
+            <div class="stat-value-box" id="intValue"></div>
+            <div class="stat-modifier-box" id="intModifierValue"></div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-label">WIS</div>
+            <div class="stat-value-box" id="wisValue"></div>
+            <div class="stat-modifier-box" id="wisModifierValue"></div>
+        </div>
+        <div class="stat-block">
+            <div class="stat-label">CHA</div>
+            <div class="stat-value-box" id="chaValue"></div>
+            <div class="stat-modifier-box" id="chaModifierValue"></div>
+        </div>
+    </div>
+
+    <div class="moves-container">
+        <div class="moves-grid" id="movesGrid">
+            <!-- Moves grid will be populated here -->
+        </div>
+    </div>
+
+    <div class="new-details-container">
+        <div class="stat-pair-container">
+            <div class="stat-item">
+                <div class="stat-label">HD:</div>
+                <div id="hdValue" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">VD:</div>
+                <div id="vdValue" class="stat-value"></div>
+            </div>
+        </div>
+        <div class="stat-pair-container">
+            <div class="stat-item">
+                <div class="stat-label">STAB:</div>
+                <div id="stabValue" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Proficiency:</div>
+                <div id="proficiencyValue" class="stat-value"></div>
+            </div>
+        </div>
+        <div class="stat-pair-container">
+            <div class="stat-item">
+                <div class="stat-label">Initiative:</div>
+                <div id="initiativeValue" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Loyalty:</div>
+                <div id="loyaltyValue" class="stat-value"></div>
+            </div>
+        </div>
+        <div class="stat-item multi-line">
+            <span class="stat-label">Ability: <span id="abilityName"></span></span>
+            <div id="abilityEffect" class="stat-value"></div>
+        </div>
+        <div class="stat-item multi-line">
+            <span class="stat-label">Held Item: <span id="heldItemName"></span></span>
+            <div id="heldItemEffect" class="stat-value"></div>
+        </div>
+        <div class="stat-item movement">
+            <div class="stat-label">Movement:</div>
+            <div id="movementValue" class="stat-value"></div>
+        </div>
+        <!-- Add Combat Tracker and Gear buttons -->
+        <div class="combat-gear-buttons-container" style="display: flex; gap: 10px; margin-top: 10px;">
+            <button class="action-button" onclick="showCombatTrackerPopup()">Combat Tracker</button>
+            <button class="action-button" onclick="showGearPopup()">Gear</button>
+        </div>
+
+        <!-- Combat Tracker Popup for Pokémon and Trainer -->
+        <div id="combatTrackerPopup" class="popup" style="background-color: #cfcfcf;">
+            <h2>Combat Tracker</h2>
+            <div class="popup-content" style="display: flex; flex-direction: column; align-items: center; background-color: #cfcfcf;">
+                <!-- Trainer Stats Section -->
+                <div style="width: 100%; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center;">
+                    <h3 style="text-align: center; width: 100%; color: black; font-size: 1.5rem; margin-bottom: 15px;">Trainer Stats</h3>
+                    <div style="display: flex; justify-content: center; width: 100%; max-width: 600px;">
+                        <!-- Trainer HP Section -->
+                        <div style="flex: 1; margin-right: 20px; text-align: center; max-width: 250px;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label for="trainerCurrentHP" style="text-align: center; width: 100%; font-size: 1.2rem;">Current HP</label>
+                                <input type="text" id="trainerCurrentHP" style="width: 80px; padding: 8px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 5px; text-align: center;" readonly>
+                                <label for="trainerHPChangeInput" style="text-align: center; width: 100%; margin-top: 10px; font-size: 1.2rem;">Add / Remove HP</label>
+                                <input type="text" id="trainerHPChangeInput" style="width: 80px; padding: 8px; font-size: 1.3rem; border-radius: 5px; text-align: center;">
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateTrainerStat('HP', 'add')">Add</button>
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateTrainerStat('HP', 'remove')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Trainer VP Section -->
+                        <div style="flex: 1; text-align: center; max-width: 250px;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label for="trainerCurrentVP" style="text-align: center; width: 100%; font-size: 1.2rem;">Current VP</label>
+                                <input type="text" id="trainerCurrentVP" style="width: 80px; padding: 8px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 5px; text-align: center;" readonly>
+                                <label for="trainerVPChangeInput" style="text-align: center; width: 100%; margin-top: 10px; font-size: 1.2rem;">Add / Remove VP</label>
+                                <input type="text" id="trainerVPChangeInput" style="width: 80px; padding: 8px; font-size: 1.3rem; border-radius: 5px; text-align: center;">
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateTrainerStat('VP', 'add')">Add</button>
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateTrainerStat('VP', 'remove')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div style="width: 80%; height: 2px; background-color: #333; margin: 20px 0;"></div>
+
+                <!-- Pokemon Stats Section -->
+                <div style="width: 100%; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center;">
+                    <h3 style="text-align: center; width: 100%; color: black; font-size: 1.5rem; margin-bottom: 15px;">Pokémon Stats</h3>
+                    <div style="display: flex; justify-content: center; width: 100%; max-width: 600px;">
+                        <!-- HP Section -->
+                        <div style="flex: 1; margin-right: 20px; text-align: center; max-width: 250px;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label for="currentHP" style="text-align: center; width: 100%; font-size: 1.2rem;">Current HP</label>
+                                <input type="text" id="currentHP" style="width: 80px; padding: 8px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 5px; text-align: center;" readonly>
+                                <label for="hpChangeInput" style="text-align: center; width: 100%; margin-top: 10px; font-size: 1.2rem;">Add / Remove HP</label>
+                                <input type="text" id="hpChangeInput" style="width: 80px; padding: 8px; font-size: 1.3rem; border-radius: 5px; text-align: center;">
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('HP', 'add')">Add</button>
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('HP', 'remove')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- VP Section -->
+                        <div style="flex: 1; text-align: center; max-width: 250px;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label for="currentVP" style="text-align: center; width: 100%; font-size: 1.2rem;">Current VP</label>
+                                <input type="text" id="currentVP" style="width: 80px; padding: 8px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 5px; text-align: center;" readonly>
+                                <label for="vpChangeInput" style="text-align: center; width: 100%; margin-top: 10px; font-size: 1.2rem;">Add / Remove VP</label>
+                                <input type="text" id="vpChangeInput" style="width: 80px; padding: 8px; font-size: 1.3rem; border-radius: 5px; text-align: center;">
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('VP', 'add')">Add</button>
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('VP', 'remove')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Type Effectiveness Sections -->
+                <div style="text-align: center; margin-top: 20px; width: 100%;">
+                    <h3>Weaknesses</h3>
+                    <div id="weaknessesContainer" class="type-chart-row"></div>
+                </div>
+                <div style="text-align: center; margin-top: 10px; width: 100%;">
+                    <h3>Resistances</h3>
+                    <div id="resistancesContainer" class="type-chart-row"></div>
+                </div>
+                <div style="text-align: center; margin-top: 10px; width: 100%;">
+                    <h3>Immunities</h3>
+                    <div id="immunitiesContainer" class="type-chart-row"></div>
+                </div>
+
+                <!-- Close Button -->
+                <button class="close-button" onclick="closePopup('combatTrackerPopup')" style="margin-top: 20px;">Close</button>
+            </div>
+        </div>
+
+        <div id="gearPopup" class="popup">
+            <h2>Gear</h2>
+            <div id="gearContainer" class="gear-container">
+                <!-- Each gear should have this structure -->
+                <div class="gear-item-container">
+                    <div class="gear-name-header">Gear Name</div>
+                    <div class="gear-effect-box">Gear Description</div>
+                </div>
+            </div>
+            <div class="footer">
+                <button class="close-button" onclick="closePopup('gearPopup')">Close</button>
+            </div>
+        </div>
+
+        <div id="abilityPopup" class="popup">
+            <h2 id="abilityPopupTitle">Ability</h2>
+            <div id="abilityPopupContent" style="padding: 15px; font-size: 1.4rem; line-height: 1.6; color: black; text-align: left;">
+                <!-- Ability description will be inserted here -->
+            </div>
+            <div class="footer">
+                <button class="close-button" onclick="closePopup('abilityPopup')">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Move Details Popup -->
+<div id="moveDetailsPopup" class="move-popup hidden">
+    <div id="movePopupContent" class="move-popup-content">
+        <h2 id="moveNamePopup"></h2>
+        <p><strong>Type:</strong> <span id="moveTypePopup"></span></p>
+        <p><strong>Modifier:</strong> <span id="moveModifierPopup"></span></p>
+        <p><strong>Action Type:</strong> <span id="moveActionTypePopup"></span></p>
+        <p><strong>VP Cost:</strong> <span id="moveVPCostPopup"></span></p>
+        <p><strong>Duration:</strong> <span id="moveDurationPopup"></span></p>
+        <p><strong>Range:</strong> <span id="moveRangePopup"></span></p>
+        <p><strong>Description:</strong> <span id="moveDescriptionPopup"></span></p>
+        <p><strong>Higher Levels:</strong> <span id="moveHigherLevelsPopup"></span></p>
+        <div style="display: flex; justify-content: center; margin-top: 20px; width: 100%;">
+            <button onclick="useMoveConfirmation()" style="margin-right: 30px; width: 120px; border-radius: 8px; padding: 8px 0; background-color: #e0e0e0; border: 1px solid #999; font-size: 16px;">Use Move</button>
+            <button onclick="closeMovePopup()" style="margin-left: 30px; width: 120px; border-radius: 8px; padding: 8px 0; background-color: #e0e0e0; border: 1px solid #999; font-size: 16px;">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="popup-overlay" id="useMoveConfirmationPopup" style="display: none;">
+    <div class="popup-box">
+        <h2>Would you like to use <span id="confirmMoveNamePopup"></span>?</h2>
+        <div style="display: flex; justify-content: center; margin-top: 20px;">
+            <button onclick="executeMove()" style="margin-right: 10px;">Yes</button>
+            <button onclick="cancelUseMove()">No</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add the Move Execution Popup -->
+<div class="popup-overlay" id="moveExecutionPopup" style="display: none;">
+    <div class="popup-box">
+        <h2 id="moveExecutionMessage"></h2>
+    </div>
+</div>
+
+<!-- Navigation Arrows -->
+<button id="nextPage" class="arrow-button" onclick="togglePage()">&#x2192;</button>
+<button id="prevPage" class="arrow-button" onclick="togglePage()">&#x2190;</button>
+<!-- Black Line -->
+<div class="pokeball-center"></div>
+
+<!-- Back Button -->
+<div class="pokeball-button back-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+<div id="customMessageOverlay" class="custom-message-overlay"></div>
+<div id="customMessageBox" class="custom-message-box">
+    <h2>Party Full</h2>
+    <p>Your active party is full. You cannot add more Pokémon.</p>
+    <button onclick="closeCustomMessageBox()">OK</button>
+</div>
+
+<!-- Evolution Confirmation Popup -->
+<div class="popup-overlay" id="evolutionPopup">
+    <div class="popup-box">
+        <h2>Do you want to evolve <span id="evolutionPokemonName"></span>?</h2>
+        <button onclick="confirmEvolution()">Yes</button>
+        <button onclick="closeEvolutionPopup()">No</button>
+    </div>
+</div>
+
+<div class="popup-overlay" id="utilityConfirmationPopup" style="display: none;">
+    <div class="popup-box">
+        <h2>You already have an active utility Pokémon. Would you like to switch utility Pokémon?</h2>
+        <div style="display: flex; justify-content: center; margin-top: 20px;">
+            <button onclick="confirmUtilitySwitch()" style="margin-right: 10px;">Yes</button>
+            <button onclick="cancelUtilitySwitch()">No</button>
+        </div>
+    </div>
+</div>
+
+<!-- Conflict Warning Modal -->
+<div class="popup-overlay" id="conflictWarningPopup" style="display: none;">
+    <div class="popup-box">
+        <h2 id="conflictMessage">A Pokémon cannot be in the active party and the utility slot at the same time</h2>
+        <div style="display: flex; justify-content: center; margin-top: 20px;">
+            <button onclick="closeConflictWarning()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    if (typeof window.currentMoveData === 'undefined') {
+        window.currentMoveData = null;
+    }
+    
+    window.allMoves = window.allMoves || [];
+
+    function loadPokemonDetails() {
+        const selectedPokemonName = sessionStorage.getItem('selectedPokemonName');
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const itemsData = JSON.parse(sessionStorage.getItem('items'));
+
+        if (!trainerData) {
+            console.error('Trainer data not found in session storage.');
+            return;
+        }
+
+        const trainerName = trainerData[1]; // Trainer Name
+        const pokeslots = trainerData[26]; // Pokeslots
+
+        if (selectedPokemonName) {
+            const pokemonDataRaw = sessionStorage.getItem(`pokemon_${selectedPokemonName.toLowerCase()}`);
+            window.selectedPokemon = pokemonDataRaw ? JSON.parse(pokemonDataRaw) : null;
+
+            document.body.style.visibility = 'visible';
+
+            if (window.selectedPokemon) {
+                console.log('STATARRAY ', window.selectedPokemon);
+                const nickname = window.selectedPokemon[36] ? `${window.selectedPokemon[2]} / ${window.selectedPokemon[36]}` : window.selectedPokemon[2];
+                document.getElementById('pokemonName').textContent = nickname;
+                document.getElementById('pokemonDexEntry').textContent = window.selectedPokemon[3] || '';
+                document.getElementById('pokemonLevel').textContent = window.selectedPokemon[4] || '';
+                const typingText = window.selectedPokemon[6] ? `${window.selectedPokemon[5]} / ${window.selectedPokemon[6]}` : `${window.selectedPokemon[5]}`;
+                document.getElementById('pokemonTyping').textContent = typingText.trim();
+                document.getElementById('pokemonImage').src = window.selectedPokemon[1] || 'https://via.placeholder.com/150';
+                document.getElementById('pokemonSavingThrow').textContent = window.selectedPokemon[21] || '';
+                document.getElementById('flavorText').textContent = window.selectedPokemon[52] || '';
+
+                // Display Senses Data
+                const sensesData = window.selectedPokemon[49] || ''; // Senses data string
+                const sensesValues = sensesData.split(',').map(value => value.trim());
+                const sensesTypes = ['Sight', 'Hearing', 'Smell', 'Tremorsense', 'Echolocation', 'Telepathy', 'Blindsight', 'Darkvision', 'Truesight'];
+                const sensesContainer = document.getElementById('sensesValue');
+                sensesContainer.innerHTML = ''; // Clear previous senses display
+
+                sensesValues.forEach((value, index) => {
+                    if (value !== '-') {
+                        const div = document.createElement('div');
+                        div.classList.add('sense-type');
+                        div.textContent = `${sensesTypes[index]}: ${value}`;
+                        sensesContainer.appendChild(div);
+                    }
+                });
+
+                // Display Skills Data
+                const skillsContainer = document.getElementById('skills');
+                const allSkills = [
+                    "Athletics (STR)", "Acrobatics (DEX)", "Sleight of Hand (DEX)", "Stealth (DEX)",
+                    "Arcana (INT)", "History (INT)", "Investigation (INT)", "Nature (INT)", "Religion (INT)",
+                    "Animal Handling (WIS)", "Insight (WIS)", "Medicine (WIS)", "Perception (WIS)",
+                    "Survival (WIS)", "Deception (CHA)", "Intimidation (CHA)", "Performance (CHA)", "Persuasion (CHA)"
+                ];
+
+                const unlockedSkills = window.selectedPokemon[22] ? window.selectedPokemon[22].split(',').map(skill => skill.trim().toLowerCase()) : [];
+
+                // Count occurrences of each skill
+                const skillCounts = unlockedSkills.reduce((countMap, skill) => {
+                    countMap[skill] = (countMap[skill] || 0) + 1;
+                    return countMap;
+                }, {});
+
+                allSkills.forEach(skill => {
+                    const skillElement = document.createElement('div');
+                    skillElement.className = 'skill-item';
+
+                    const skillName = skill.split(' (')[0].toLowerCase().trim(); // Standardize for comparison
+                    const skillModifier = `(${skill.split(' (')[1]}`;
+
+                    const skillNameElement = document.createElement('div');
+                    skillNameElement.textContent = skillName.charAt(0).toUpperCase() + skillName.slice(1); // Capitalize first letter
+
+                    const skillModifierElement = document.createElement('div');
+                    skillModifierElement.className = 'modifier';
+                    skillModifierElement.textContent = skillModifier;
+
+                    skillElement.appendChild(skillNameElement);
+                    skillElement.appendChild(skillModifierElement);
+
+                    // Apply styles based on skill count
+                    if (skillCounts[skillName] > 1) {
+                        skillElement.classList.add('extra-strong'); // For multiple occurrences, apply yellow background
+                    } else if (unlockedSkills.includes(skillName)) {
+                        skillElement.classList.add('highlight'); // For single occurrence, apply white background
+                    }
+
+                    skillsContainer.appendChild(skillElement);
+                });
+
+                // Active Party Checkbox Logic
+                const activePartyCheckbox = document.getElementById('inActiveParty');
+                const isActive = !!window.selectedPokemon[38];
+                activePartyCheckbox.checked = isActive;
+
+                activePartyCheckbox.addEventListener('change', function () {
+                  const action = activePartyCheckbox.checked ? 'add' : 'remove';
+                  
+                  // Check if pokemon is in utility slot
+                  if (action === 'add' && (window.selectedPokemon[56] === 1 || window.selectedPokemon[56] === '1')) {
+                      activePartyCheckbox.checked = false;
+                      showConflictWarning();
+                      return;
+                  }
+                  
+                  NavigationManager.showSpinner();
+                  
+                  google.script.run
+                      .withSuccessHandler(response => {
+                          NavigationManager.hideSpinner();
+                          if (response.status === 'error') {
+                              alert(response.message);
+                              activePartyCheckbox.checked = false;
+                          } else if (response.status === 'success') {
+                              window.selectedPokemon[38] = action === 'add' ? response.slot : '';
+                              sessionStorage.setItem(`pokemon_${selectedPokemonName.toLowerCase()}`, JSON.stringify(window.selectedPokemon));
+                          }
+                      })
+                      .updateActivePartyStatus(trainerName, window.selectedPokemon[2], pokeslots, action);
+              });
+
+                const utilityCheckbox = document.getElementById('inUtilitySlot');
+                const isUtility = window.selectedPokemon[56] === 1;
+                utilityCheckbox.checked = isUtility;
+
+                utilityCheckbox.addEventListener('change', function () {
+                    const action = utilityCheckbox.checked ? 'add' : 'remove';
+                    
+                    // If unchecking, just remove - no confirmation needed
+                    if (action === 'remove') {
+                        updateUtilitySlot('remove');
+                        return;
+                    }
+                    
+                    // Check for active party conflict first
+                    if (window.selectedPokemon[38]) {
+                        utilityCheckbox.checked = false;
+                        showConflictWarning();
+                        return;
+                    }
+                    
+                    // For adding, check if another pokemon is already in utility slot FIRST
+                    NavigationManager.showSpinner();
+                    google.script.run
+                        .withSuccessHandler(response => {
+                            NavigationManager.hideSpinner();
+                            if (response.hasUtilityPokemon && response.utilityPokemonName !== window.selectedPokemon[2]) {
+                                // Show confirmation dialog immediately
+                                showUtilityConfirmation();
+                            } else {
+                                // No conflict, proceed with update
+                                updateUtilitySlot('add');
+                            }
+                        })
+                        .withFailureHandler(error => {
+                            NavigationManager.hideSpinner();
+                            console.error('Error checking utility status:', error);
+                            utilityCheckbox.checked = false;
+                        })
+                        .checkUtilitySlotStatus(trainerName);
+                });
+
+
+
+                populateFeats();
+                populateGear();
+            } else {
+                console.error("SelectedPokemon: " + selectedPokemon);
+                console.error('Selected Pokémon not found.');
+            }
+        } else {
+            console.error('Selected Pokémon name not found in session storage.');
+        }
+    }
+
+    function updateUtilitySlot(action) {
+        // Get the variables from the current context
+        const selectedPokemonName = sessionStorage.getItem('selectedPokemonName');
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const trainerName = trainerData[1];
+        
+        NavigationManager.showSpinner();
+        
+        google.script.run
+            .withSuccessHandler(response => {
+                NavigationManager.hideSpinner();
+                if (response.status === 'success') {
+                    // Update current Pokemon session storage
+                    window.selectedPokemon[56] = action === 'add' ? 1 : '';
+                    sessionStorage.setItem(`pokemon_${selectedPokemonName.toLowerCase()}`, JSON.stringify(window.selectedPokemon));
+                    
+                    // If adding, need to clear utility slot from any other Pokemon in session storage
+                    if (action === 'add') {
+                        for (let i = 0; i < sessionStorage.length; i++) {
+                            const key = sessionStorage.key(i);
+                            if (key.startsWith('pokemon_') && key !== `pokemon_${selectedPokemonName.toLowerCase()}`) {
+                                const otherPokemon = JSON.parse(sessionStorage.getItem(key));
+                                if (otherPokemon[56] === 1 || otherPokemon[56] === '1') {
+                                    otherPokemon[56] = '';
+                                    sessionStorage.setItem(key, JSON.stringify(otherPokemon));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    alert(response.message);
+                    document.getElementById('inUtilitySlot').checked = false;
+                }
+            })
+            .withFailureHandler(error => {
+                NavigationManager.hideSpinner();
+                console.error('Error updating utility status:', error);
+                document.getElementById('inUtilitySlot').checked = !document.getElementById('inUtilitySlot').checked;
+            })
+            .updateUtilitySlotStatus(trainerName, window.selectedPokemon[2], action);
+    }
+
+    function showUtilityConfirmation() {
+        document.getElementById('utilityConfirmationPopup').style.display = 'flex';
+    }
+
+    function confirmUtilitySwitch() {
+        document.getElementById('utilityConfirmationPopup').style.display = 'none';
+        updateUtilitySlot('add');
+    }
+
+    function cancelUtilitySwitch() {
+        document.getElementById('utilityConfirmationPopup').style.display = 'none';
+        document.getElementById('inUtilitySlot').checked = false;
+    }
+
+    function showConflictWarning() {
+        document.getElementById('conflictWarningPopup').style.display = 'flex';
+    }
+
+    function closeConflictWarning() {
+        document.getElementById('conflictWarningPopup').style.display = 'none';
+    }
+
+    // Populate feats from window.selectedPokemon[50]
+    function populateFeats() {
+        const featsContainer = document.getElementById('featsContainer');
+        const featsFromPokemon = window.selectedPokemon[50] || ''; // Assuming feats are stored in index 50
+        featsContainer.innerHTML = '';
+
+        // Retrieve pokemon feats data from sessionStorage
+        const allFeatsData = JSON.parse(sessionStorage.getItem('pokemonFeats')) || []; // Assuming 'pokemonFeats' is the key
+
+        if (featsFromPokemon && featsFromPokemon.length) {
+            const featsArray = featsFromPokemon.split(',').map(f => f.trim());
+
+            featsArray.forEach(featName => {
+                // Search for the feat in the allFeatsData array
+                const matchingFeat = allFeatsData.find(feat => feat.name === featName);
+
+                if (matchingFeat) {
+                    const featEffect = matchingFeat.effect || 'No effect available';
+
+                    // Create the feat container and its children
+                    const featContainer = document.createElement('div');
+                    featContainer.classList.add('feats-item-container'); // Use 'feats-item-container' instead of 'feat-item-container'
+
+                    const featNameElement = document.createElement('div');
+                    featNameElement.classList.add('feats-name-header'); // Use 'feats-name-header' instead of 'feat-name-header'
+                    featNameElement.textContent = matchingFeat.name;
+
+                    const featEffectElement = document.createElement('div');
+                    featEffectElement.classList.add('feats-effect-box'); // Use 'feats-effect-box' instead of 'feat-effect-box'
+                    featEffectElement.textContent = featEffect;
+
+                    featContainer.appendChild(featNameElement);
+                    featContainer.appendChild(featEffectElement);
+
+                    featsContainer.appendChild(featContainer);
+                } else {
+                    // If no matching feat is found in the data, display a placeholder
+                    const featContainer = document.createElement('div');
+                    featContainer.classList.add('feats-item-container'); // Use 'feats-item-container' instead of 'feat-item-container'
+
+                    const featNameElement = document.createElement('div');
+                    featNameElement.classList.add('feats-name-header'); // Use 'feats-name-header' instead of 'feat-name-header'
+                    featNameElement.textContent = featName;
+
+                    const featEffectElement = document.createElement('div');
+                    featEffectElement.classList.add('feats-effect-box'); // Use 'feats-effect-box' instead of 'feat-effect-box'
+                    featEffectElement.textContent = 'Effect not found.';
+
+                    featContainer.appendChild(featNameElement);
+                    featContainer.appendChild(featEffectElement);
+
+                    featsContainer.appendChild(featContainer);
+                }
+            });
+        } else {
+            featsContainer.textContent = 'No feats chosen';
+        }
+    }
+
+    // Show feats popup
+    function showFeatsPopup() {
+        const featsPopup = document.getElementById('featsPopup');
+        featsPopup.classList.add('visible');
+        populateFeats();
+    }
+
+    // Close popup
+    function closePopup(popupId) {
+        const popup = document.getElementById(popupId);
+        popup.classList.remove('visible');
+    }
+
+    function showCommentPopup() {
+        const commentPopup = document.getElementById('commentPopup');
+        commentPopup.classList.add('visible');
+        populateComments();
+    }
+
+    function populateComments() {
+        const commentContainer = document.getElementById('commentContainer');
+        const comments = window.selectedPokemon[48] || ''; // Comments stored in index 48
+        commentContainer.innerHTML = ''; // Clear existing comments
+
+        if (comments && comments.length) {
+            const commentsArray = comments.split(';').map(comment => comment.trim()).filter(comment => comment.length > 0);
+
+            commentsArray.forEach((comment, index) => {
+                // Create a div for the comment item container
+                const commentBox = document.createElement('div');
+                commentBox.classList.add('comment-item-container');
+
+                // Create a div for the comment text
+                const commentText = document.createElement('div');
+                commentText.classList.add('comment-effect-box');
+                commentText.textContent = comment;
+
+                // Create a container for the buttons
+                const buttonContainer = document.createElement('div');
+                buttonContainer.classList.add('button-container');
+
+                // Create the Edit button
+                const editButton = document.createElement('button');
+                editButton.classList.add('edit-button');
+                editButton.textContent = 'Edit';
+                editButton.onclick = function () {
+                    editComment(index);
+                };
+
+                // Create the Delete button
+                const deleteButton = document.createElement('button');
+                deleteButton.classList.add('delete-button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.onclick = function () {
+                    deleteComment(index);
+                };
+
+                // Append buttons to the button container
+                buttonContainer.appendChild(editButton);
+                buttonContainer.appendChild(deleteButton);
+
+                // Append comment text and button container to the comment box
+                commentBox.appendChild(commentText);
+                commentBox.appendChild(buttonContainer);
+
+                // Append the comment box to the container
+                commentContainer.appendChild(commentBox);
+            });
+        }
+    }
+
+
+
+    // Show Add Comment Popup (Using a Prompt for Simplicity)
+    function showAddCommentPopup() {
+        const newComment = prompt("Enter your comment:");
+
+        if (newComment && newComment.trim().length > 0) {
+            saveComment(newComment.trim());
+        } else {
+            alert("Comment cannot be empty.");
+        }
+    }
+
+    // Save Comment to sessionStorage and Google Sheets
+    function saveComment(comment) {
+        console.log("SAVECOMMENT")
+        if (!window.selectedPokemon[48]) {
+            window.selectedPokemon[48] = '';
+        }
+
+        // Append the new comment with a semicolon delimiter
+        const currentComments = window.selectedPokemon[48] ? window.selectedPokemon[48].split(';').map(c => c.trim()) : [];
+        currentComments.push(comment);
+        window.selectedPokemon[48] = currentComments.join('; ');
+
+        closePopup('commentPopup'); 
+        console.log("CLOSE POPUP");
+        NavigationManager.showSpinner();
+
+        // Update sessionStorage
+        sessionStorage.setItem(`pokemon_${window.selectedPokemon[2].toLowerCase()}`, JSON.stringify(window.selectedPokemon));
+
+        // Save to Google Sheets
+        google.script.run
+            .withSuccessHandler(response => {
+                NavigationManager.hideSpinner();
+                if (response.status === 'success') {
+                    populateComments(); // Refresh comments display
+                    showCommentPopup(); 
+                } else {
+                    alert(response.message);
+                }
+            })
+            .writeComment(window.selectedPokemon[0], window.selectedPokemon[2], window.selectedPokemon[48]);
+    }
+
+    function showAddCommentModal() {
+        document.getElementById('addCommentModal').classList.add('visible');
+    }
+
+    // Close Add Comment Modal
+    function closeAddCommentModal() {
+        document.getElementById('addCommentModal').classList.remove('visible');
+        document.getElementById('newCommentText').value = ''; // Clear textarea
+    }
+
+    function editComment(index) {
+        // Store the index in session storage
+        sessionStorage.setItem('currentCommentIndex', index);
+
+        // Get the comments from window.selectedPokemon[48]
+        const commentsArray = window.selectedPokemon[48] ? window.selectedPokemon[48].split(';').map(c => c.trim()) : [];
+
+        // Pre-fill the modal with the selected comment text
+        const commentToEdit = commentsArray[index];
+        document.getElementById('newCommentText').value = commentToEdit !== undefined ? commentToEdit : '';
+
+        // Show the Add Comment modal for editing
+        showAddCommentModal();
+    }
+
+    // Submit New Comment from Modal
+    function submitNewComment() {        
+        const newComment = document.getElementById('newCommentText').value.trim();
+        if (newComment.length === 0) {
+            alert("Comment cannot be empty.");
+            return;
+        }
+
+        // Retrieve the current comment index from session storage
+        const currentCommentIndex = sessionStorage.getItem('currentCommentIndex');
+
+        NavigationManager.showSpinner();
+
+        let commentsArray = window.selectedPokemon[48] ? window.selectedPokemon[48].split(';').map(c => c.trim()) : [];
+
+        if (currentCommentIndex !== null && currentCommentIndex !== undefined) {
+            // Editing existing comment
+            commentsArray[currentCommentIndex] = newComment; // Modify the specific comment in the array
+        } else {
+            // Adding new comment
+            commentsArray.push(newComment);
+        }
+
+        // Join the updated comments array back into a single string and assign it to window.selectedPokemon[48]
+        window.selectedPokemon[48] = commentsArray.join('; ');
+
+        closeAddCommentModal();
+        closePopup('commentPopup');  // Close the main comment popup here
+        // Update sessionStorage
+        sessionStorage.setItem(`pokemon_${window.selectedPokemon[2].toLowerCase()}`, JSON.stringify(window.selectedPokemon));
+
+        // Save to Google Sheets
+        google.script.run
+            .withSuccessHandler(response => {
+                NavigationManager.hideSpinner();
+                if (response.status === 'success') {
+                    populateComments(); // Refresh comments display
+                    showCommentPopup();
+                } else {
+                    alert(response.message);
+                }
+            })
+            .writeComment(window.selectedPokemon[0], window.selectedPokemon[2], window.selectedPokemon[48]);
+
+        closeAddCommentModal();
+        sessionStorage.removeItem('currentCommentIndex'); // Clear the stored comment index after editing
+    }
+
+
+    function deleteComment(index) {
+        const commentsArray = window.selectedPokemon[48].split(';').map(c => c.trim());
+        commentsArray.splice(index, 1); // Remove the comment at the given index
+
+        // Update the comment list
+        window.selectedPokemon[48] = commentsArray.join('; ');
+
+        // Update sessionStorage
+        closePopup('commentPopup');  // Close the main comment popup here
+        NavigationManager.showSpinner();
+        sessionStorage.setItem(`pokemon_${window.selectedPokemon[2].toLowerCase()}`, JSON.stringify(window.selectedPokemon));
+
+        // Save to Google Sheets
+        google.script.run
+            .withSuccessHandler(response => {
+                NavigationManager.hideSpinner();
+                if (response.status === 'success') {
+                    populateComments(); // Refresh comments display
+                    showCommentPopup();
+                } else {
+                    alert(response.message);
+                }
+            })
+            .writeComment(window.selectedPokemon[0], window.selectedPokemon[2], window.selectedPokemon[48]);
+    }
+
+    // Update the showAddCommentPopup to use the modal
+    function showAddCommentPopup() {
+        showAddCommentModal();
+    }
+
+    function fillBattlePageDetails() {
+        if (window.selectedPokemon) {
+            const elements = {
+                pokemonImageBattle: document.getElementById('pokemonImageBattle'),
+                abilityName: document.getElementById('abilityName'),
+                abilityEffect: document.getElementById('abilityEffect'),
+                heldItemName: document.getElementById('heldItemName'),
+                heldItemEffect: document.getElementById('heldItemEffect'),
+                movementValue: document.getElementById('movementValue'),
+                hdValue: document.getElementById('hdValue'),
+                vdValue: document.getElementById('vdValue'),
+                stabValue: document.getElementById('stabValue'),
+                proficiencyValue: document.getElementById('proficiencyValue'),
+                initiativeValue: document.getElementById('initiativeValue'),
+                loyaltyValue: document.getElementById('loyaltyValue'),
+                acValue: document.getElementById('acValue'),
+                hpValue: document.getElementById('hpValue'),
+                vpValue: document.getElementById('vpValue'),
+                strValue: document.getElementById('strValue'),
+                strModifierValue: document.getElementById('strModifierValue'),
+                dexValue: document.getElementById('dexValue'),
+                dexModifierValue: document.getElementById('dexModifierValue'),
+                conValue: document.getElementById('conValue'),
+                conModifierValue: document.getElementById('conModifierValue'),
+                intValue: document.getElementById('intValue'),
+                intModifierValue: document.getElementById('intModifierValue'),
+                wisValue: document.getElementById('wisValue'),
+                wisModifierValue: document.getElementById('wisModifierValue'),
+                chaValue: document.getElementById('chaValue'),
+                chaModifierValue: document.getElementById('chaModifierValue')
+            };
+
+            // Clear any existing boost/nerf classes
+            const statLabelElements = document.querySelectorAll('.stat-label');
+            statLabelElements.forEach(el => el.classList.remove('stat-boosted', 'stat-nerfed'));
+
+            // Nature boost/nerf logic
+            const currentNature = window.selectedPokemon[32]; // Assuming nature is at index 32
+            const natures = JSON.parse(sessionStorage.getItem('natures')) || [];
+            const nature = natures.find(n => n.name === currentNature);
+            console.log("NATURE: ", nature);
+
+            if (nature) {
+                const boostStat = nature.boostStat.toLowerCase();
+                console.log("BOOSTSTAT: ", boostStat);
+                const nerfStat = nature.nerfStat.toLowerCase();
+                console.log("NERFSTAT: ", nerfStat);
+
+                // Mapping from full stat names to the class selector in the stat block
+                const statNameMapping = {
+                    ac: 'ac',
+                    strength: 'STR',
+                    dexterity: 'DEX',
+                    constitution: 'CON',
+                    intelligence: 'INT',
+                    wisdom: 'WIS',
+                    charisma: 'CHA'
+                };
+
+                // Now map to the stat label elements by finding labels that contain specific text
+                const findStatLabelByText = (text) => {
+                    return Array.from(document.querySelectorAll('.stat-label'))
+                        .find(label => label.textContent.trim() === text);
+                };
+
+                const statMapping = {
+                    str: findStatLabelByText('STR'),
+                    dex: findStatLabelByText('DEX'),
+                    con: findStatLabelByText('CON'),
+                    int: findStatLabelByText('INT'),
+                    wis: findStatLabelByText('WIS'),
+                    cha: findStatLabelByText('CHA'),
+                    ac: findStatLabelByText('AC')
+                };
+
+                // Get the corresponding abbreviated stat key from full stat names
+                const boostStatKey = statNameMapping[boostStat];
+                const nerfStatKey = statNameMapping[nerfStat];
+
+                // Apply boosted class to the label
+                if (boostStatKey && boostStatKey.toLowerCase() in statMapping) {
+                    statMapping[boostStatKey.toLowerCase()].classList.add('stat-boosted');
+                }
+
+                // Apply nerfed class to the label
+                if (nerfStatKey && nerfStatKey.toLowerCase() in statMapping) {
+                    statMapping[nerfStatKey.toLowerCase()].classList.add('stat-nerfed');
+                }
+            }
+
+            elements.acValue.textContent = window.selectedPokemon[8] || '0';
+            elements.hpValue.textContent = window.selectedPokemon[10] || '0';
+            elements.vpValue.textContent = window.selectedPokemon[12] || '0';
+            elements.pokemonImageBattle.src = window.selectedPokemon[1] || 'https://via.placeholder.com/150';
+
+            // Modify movement value handling
+            const movementData = window.selectedPokemon[13] || '';
+            const movementValues = movementData.split(',').map(value => value.trim());
+            const movementTypes = ['Walking', 'Climbing', 'Flying', 'Hovering', 'Swimming', 'Burrowing'];
+            elements.movementValue.innerHTML = '';
+            movementValues.forEach((value, index) => {
+                if (value !== '-') {
+                    const div = document.createElement('div');
+                    div.classList.add('movement-type');
+                    div.textContent = `${movementTypes[index]}: ${value}`;
+                    elements.movementValue.appendChild(div);
+                }
+            });
+
+            elements.hdValue.textContent = window.selectedPokemon[9];
+            elements.vdValue.textContent = window.selectedPokemon[11];
+            elements.stabValue.textContent = window.selectedPokemon[34] || '0';
+            elements.proficiencyValue.textContent = window.selectedPokemon[31] || '0';
+            elements.initiativeValue.textContent = window.selectedPokemon[30] || '0';
+            elements.loyaltyValue.textContent = window.selectedPokemon[33] || '0';
+
+            elements.strValue.textContent = window.selectedPokemon[15] || '0';
+            elements.strModifierValue.textContent = window.selectedPokemon[39] || '0';
+            elements.dexValue.textContent = window.selectedPokemon[16] || '0';
+            elements.dexModifierValue.textContent = window.selectedPokemon[40] || '0';
+            elements.conValue.textContent = window.selectedPokemon[17] || '0';
+            elements.conModifierValue.textContent = window.selectedPokemon[41] || '0';
+            elements.intValue.textContent = window.selectedPokemon[18] || '0';
+            elements.intModifierValue.textContent = window.selectedPokemon[42] || '0';
+            elements.wisValue.textContent = window.selectedPokemon[19] || '0';
+            elements.wisModifierValue.textContent = window.selectedPokemon[43] || '0';
+            elements.chaValue.textContent = window.selectedPokemon[20] || '0';
+            elements.chaModifierValue.textContent = window.selectedPokemon[44] || '0';
+
+            // Handle abilities - stored as "slotIndex:name;description|slotIndex:name;description" format
+            const savedAbilitiesRaw = window.selectedPokemon[7] || '';
+            const savedAbilities = savedAbilitiesRaw
+                .split('|')  // Split by pipe to get individual abilities
+                .map(a => a.trim())
+                .filter(a => a);  // Remove empty strings
+
+            console.log('Saved abilities:', savedAbilities);
+
+            elements.abilityName.innerHTML = '';
+
+            // Store abilities globally for popup access
+            window.pokemonAbilities = [];
+
+            if (savedAbilities.length > 0) {
+                let abilitiesHTML = '';
+
+                savedAbilities.forEach((abilityData, index) => {
+                    // Format: "slotIndex:name;description" or legacy "name;description"
+                    let abilityName, abilityDescription;
+
+                    const colonIndex = abilityData.indexOf(':');
+                    if (colonIndex !== -1 && colonIndex < 3) {
+                        // New format with slot index - remove slot prefix
+                        const withoutSlot = abilityData.substring(colonIndex + 1);
+                        const parts = withoutSlot.split(';');
+                        abilityName = parts[0].trim();
+                        abilityDescription = parts.slice(1).join(';').trim() || 'No description available';
+                    } else {
+                        // Legacy format without slot index
+                        const parts = abilityData.split(';');
+                        abilityName = parts[0].trim();
+                        abilityDescription = parts.slice(1).join(';').trim() || 'No description available';
+                    }
+
+                    // Store for popup
+                    window.pokemonAbilities.push({ name: abilityName, description: abilityDescription });
+
+                    // Create clickable button for each ability
+                    if (index > 0) {
+                        abilitiesHTML += ' ';
+                    }
+                    abilitiesHTML += `<button class="ability-button" onclick="showAbilityPopup(${index})" style="background-color: white; color: black; border: 2px solid #333; border-radius: 5px; padding: 6px 12px; font-size: 1.2rem; cursor: pointer; margin: 2px; font-weight: bold;">${abilityName}</button>`;
+                });
+
+                elements.abilityEffect.innerHTML = abilitiesHTML;
+            } else {
+                elements.abilityEffect.innerHTML = 'None';
+            }
+
+            const itemsData = JSON.parse(sessionStorage.getItem('items'));
+            const heldItem = window.selectedPokemon[35];
+
+            if (itemsData && heldItem) {
+                const item = itemsData.find(i => i.name === heldItem);
+                if (item) {
+                    elements.heldItemName.textContent = item.name;
+                    elements.heldItemEffect.textContent = item.effect;
+                } else {
+                    elements.heldItemName.textContent = heldItem;
+                    elements.heldItemEffect.textContent = "Effect not found";
+                }
+            } else {
+                elements.heldItemName.textContent = "No item equipped";
+                elements.heldItemEffect.textContent = "";
+            }
+
+            const movesContainer = document.getElementById('movesGrid');
+            const level = parseInt(window.selectedPokemon[4], 10);
+            const rawMovesData = sessionStorage.getItem('moves');
+
+            try {
+                const cleanMovesData = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
+                window.allMoves = cleanMovesData.map(move => {
+                    return move.map(item => item.trim());
+                });
+
+                const moveIndices = [23, 24, 25, 26, 27, 28, 37];
+                movesContainer.innerHTML = '';
+
+                moveIndices.forEach((index, idx) => {
+                    const requiredLevel = [1, 2, 6, 10, 14, 18, 0];
+                    if (window.selectedPokemon[4] >= requiredLevel[idx] || (index === 37 && window.selectedPokemon[index])) {
+                        const moveNames = window.selectedPokemon[index].split(',');
+                        moveNames.forEach(moveName => {
+                            moveName = moveName.trim();
+                            if (moveName) {
+                                const move = window.allMoves.find(m => m[0] === moveName);
+                                if (move) {
+                                    const moveElement = document.createElement('div');
+                                    moveElement.className = 'move-item';
+                                    moveElement.innerHTML = `<div class="move-name" onclick="showMoveDetails('${move[0]}')">${move[0]}</div>`;
+
+                                    // Get the background color based on the move type
+                                    const bgColor = getMoveTypeColor(move[1]);
+                                    moveElement.style.backgroundColor = bgColor;
+
+                                    // Set text color for contrast
+                                    const textColor = getTextColorForBackground(bgColor);
+                                    moveElement.style.color = textColor;
+
+                                    movesContainer.appendChild(moveElement);
+                                } else {
+                                    console.log('Move not found for:', moveName);
+                                }
+                            }
+                        });
+                    }
+                });
+            } catch (e) {
+                console.error('Failed to parse moves data:', e);
+            }
+        }
+    }
+
+    function showMoveDetails(moveName) {
+        const move = window.allMoves.find(m => m[0] === moveName);
+
+        if (move) {
+            // Store the current move data for later use
+            window.currentMoveData = move;
+            
+            document.getElementById('moveNamePopup').textContent = move[0];
+            document.getElementById('moveTypePopup').textContent = move[1];
+            document.getElementById('moveModifierPopup').textContent = move[2];
+            document.getElementById('moveActionTypePopup').textContent = move[3];
+            document.getElementById('moveVPCostPopup').textContent = move[4];
+            document.getElementById('moveDurationPopup').textContent = move[5];
+            document.getElementById('moveRangePopup').textContent = move[6];
+            document.getElementById('moveDescriptionPopup').textContent = move[7];
+            document.getElementById('moveHigherLevelsPopup').textContent = move[8];
+
+            const popup = document.getElementById('moveDetailsPopup');
+            const bgColor = getMoveTypeColor(move[1]);
+            popup.style.backgroundColor = bgColor;
+
+            const textColor = getTextColorForBackground(bgColor);
+            popup.style.color = textColor;
+
+            popup.classList.remove('hidden');
+            popup.classList.add('visible');
+        }
+    }
+
+    function useMoveConfirmation() {
+        if (!currentMoveData) return;
+        
+        const moveName = window.currentMoveData[0];
+        document.getElementById('confirmMoveNamePopup').textContent = moveName;
+        
+        // Hide the move details popup and show the confirmation popup
+        document.getElementById('moveDetailsPopup').classList.remove('visible');
+        document.getElementById('moveDetailsPopup').classList.add('hidden');
+        document.getElementById('useMoveConfirmationPopup').style.display = 'block';
+    }
+
+    function executeMove() {
+        if (!currentMoveData) return;
+        
+        const moveName = window.currentMoveData[0];
+        const vpCost = parseInt(window.currentMoveData[4], 10) || 0;
+        
+        // Get the Pokemon's current VP
+        const baseVP = parseInt(window.selectedPokemon[12], 10);
+        let currentVP = window.selectedPokemon[46] !== null && 
+                      window.selectedPokemon[46] !== undefined && 
+                      window.selectedPokemon[46] !== ''
+            ? parseInt(window.selectedPokemon[46], 10)
+            : baseVP;
+        
+        // Subtract the VP cost
+        const newVP = Math.max(0, currentVP - vpCost);
+        
+        // Check for VP overflow into HP
+        let vpOverflow = 0;
+        if (newVP < 0) {
+            vpOverflow = Math.abs(newVP);
+            currentVP = 0;
+        } else {
+            currentVP = newVP;
+        }
+        
+        // If there's VP overflow, we'll need to subtract from HP as well
+        let currentHP = window.selectedPokemon[45] !== null && 
+                      window.selectedPokemon[45] !== undefined && 
+                      window.selectedPokemon[45] !== ''
+            ? parseInt(window.selectedPokemon[45], 10)
+            : parseInt(window.selectedPokemon[10], 10);
+        
+        if (vpOverflow > 0) {
+            currentHP = Math.max(0, currentHP - vpOverflow);
+        }
+        
+        // Update the Pokemon's VP (and HP if needed)
+        window.selectedPokemon[46] = currentVP === baseVP ? '' : currentVP;
+        if (vpOverflow > 0) {
+            window.selectedPokemon[45] = currentHP === parseInt(window.selectedPokemon[10], 10) ? '' : currentHP;
+        }
+        
+        // Hide confirmation popup and show execution message
+        document.getElementById('useMoveConfirmationPopup').style.display = 'none';
+        
+        // Display the execution message
+        const pokemonName = window.selectedPokemon[36] ? window.selectedPokemon[36] : window.selectedPokemon[2];
+        document.getElementById('moveExecutionMessage').textContent = `${pokemonName} used ${moveName}!`;
+        document.getElementById('moveExecutionPopup').style.display = 'block';
+        
+        NavigationManager.showSpinner();
+        
+        // Update session storage
+        sessionStorage.setItem(`pokemon_${window.selectedPokemon[2].toLowerCase()}`, JSON.stringify(window.selectedPokemon));
+        
+        // Send updates to Google Sheets - if VP overflow, update both VP and HP
+        if (vpOverflow > 0) {
+            google.script.run.withSuccessHandler(() => {
+                google.script.run.withSuccessHandler(() => {
+                    NavigationManager.hideSpinner();
+                    document.getElementById('moveExecutionPopup').style.display = 'none';
+                    showMoveDetails(moveName); // Go back to the move details popup
+                }).writePokemonLiveStats(window.selectedPokemon[0], window.selectedPokemon[2], 'HP', window.selectedPokemon[45]);
+            }).writePokemonLiveStats(window.selectedPokemon[0], window.selectedPokemon[2], 'VP', window.selectedPokemon[46]);
+        } else {
+            // If no HP impact, just update VP
+            google.script.run.withSuccessHandler(() => {
+                NavigationManager.hideSpinner();
+                document.getElementById('moveExecutionPopup').style.display = 'none';
+                showMoveDetails(moveName); // Go back to the move details popup
+            }).writePokemonLiveStats(window.selectedPokemon[0], window.selectedPokemon[2], 'VP', window.selectedPokemon[46]);
+        }
+    }
+
+    function cancelUseMove() {
+        // Hide the confirmation popup and show the move details popup again
+        document.getElementById('useMoveConfirmationPopup').style.display = 'none';
+        document.getElementById('moveDetailsPopup').classList.remove('hidden');
+        document.getElementById('moveDetailsPopup').classList.add('visible');
+    }
+
+    function closeMovePopup() {
+        const popup = document.getElementById('moveDetailsPopup');
+        popup.classList.remove('visible');
+        popup.classList.add('hidden');
+    }
+
+    function getMoveTypeColor(moveType) {
+        const colors = {
+            "Normal": "#A8A878",
+            "Fighting": "#e68c2e",
+            "Flying": "#A890F0",
+            "Poison": "#A040A0",
+            "Ground": "#DEB887",
+            "Rock": "#a85d16",
+            "Bug": "#A8B820",
+            "Ghost": "#705898",
+            "Steel": "#bdbdbd",
+            "Fire": "#f02e07",
+            "Water": "#1E90FF",
+            "Grass": "#32CD32",
+            "Electric": "#FFD700",
+            "Psychic": "#F85888",
+            "Ice": "#58c8ed",
+            "Dragon": "#280dd4",
+            "Dark": "#282729",
+            "Fairy": "#ed919f",
+            "Cosmic": "#120077"
+        };
+
+        return colors[moveType] || "white";
+    }
+
+    function getTextColorForBackground(bgColor) {
+        const hex = bgColor.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+        return luminance > 128 ? 'black' : 'white';
+    }
+
+    function togglePage() {
+        const infoPage = document.getElementById('infoPage');
+        const battlePage = document.getElementById('battlePage');
+        const nextPageButton = document.getElementById('nextPage');
+        const prevPageButton = document.getElementById('prevPage');
+
+        if (infoPage.classList.contains('hidden-page')) {
+            infoPage.classList.remove('hidden-page');
+            infoPage.classList.add('active-page');
+            battlePage.classList.remove('active-page');
+            battlePage.classList.add('hidden-page');
+            nextPageButton.style.display = 'block';
+            prevPageButton.style.display = 'none';
+        } else {
+            infoPage.classList.remove('active-page');
+            infoPage.classList.add('hidden-page');
+            battlePage.classList.remove('hidden-page');
+            battlePage.classList.add('active-page');
+            nextPageButton.style.display = 'none';
+            prevPageButton.style.display = 'block';
+
+            fillBattlePageDetails();
+        }
+    }
+
+    // First, modify the showCombatTrackerPopup function to include trainer stats
+    function showCombatTrackerPopup() {
+        // POKEMON DATA SECTION 
+        let damageMultiplier = 1;
+          
+        // Get the base HP and VP values (these are always set)
+        const baseHP = parseInt(window.selectedPokemon[10], 10);
+        const baseVP = parseInt(window.selectedPokemon[12], 10);
+
+        // Check if current values exist in session storage (indices 45 and 46)
+        // If they don't exist or are null, use the base values
+        const currentHP = window.selectedPokemon[45] !== null && window.selectedPokemon[45] !== undefined && window.selectedPokemon[45] !== ''    
+            ? parseInt(window.selectedPokemon[45], 10)   
+            : baseHP;
+
+        const currentVP = window.selectedPokemon[46] !== null && window.selectedPokemon[46] !== undefined && window.selectedPokemon[46] !== ''  
+            ? parseInt(window.selectedPokemon[46], 10)  
+            : baseVP;
+
+        // Set the values in the display fields
+        document.getElementById('currentHP').value = currentHP;
+        document.getElementById('currentVP').value = currentVP;
+
+        // Store these values in the session storage if they weren't already set
+        if (window.selectedPokemon[45] === null || window.selectedPokemon[45] === undefined || window.selectedPokemon[45] === '') {
+            window.selectedPokemon[45] = currentHP;
+        }
+        if (window.selectedPokemon[46] === null || window.selectedPokemon[46] === undefined || window.selectedPokemon[46] === '') {
+            window.selectedPokemon[46] = currentVP;
+        }
+
+        // Update session storage with the potentially new values
+        sessionStorage.setItem(`pokemon_${window.selectedPokemon[2].toLowerCase()}`, JSON.stringify(window.selectedPokemon));
+
+        // Clear the input fields for HP and VP changes
+        document.getElementById('hpChangeInput').value = '';
+        document.getElementById('vpChangeInput').value = '';
+
+        // TRAINER DATA SECTION - Updated to ensure correct display
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+          
+        if (trainerData) {
+            // Get trainer base HP and VP values
+            const trainerBaseHP = parseInt(trainerData[11], 10);
+            const trainerBaseVP = parseInt(trainerData[12], 10);
+              
+            // Get current trainer HP and VP values, defaulting to base values if not set
+            const trainerCurrentHP = trainerData[34] !== null && 
+                                  trainerData[34] !== undefined && 
+                                  trainerData[34] !== ''
+                ? parseInt(trainerData[34], 10)
+                : trainerBaseHP;
+                  
+            const trainerCurrentVP = trainerData[35] !== null && 
+                                  trainerData[35] !== undefined && 
+                                  trainerData[35] !== ''
+                ? parseInt(trainerData[35], 10)
+                : trainerBaseVP;
+                  
+            // Set the values in the display fields - ensure numeric display
+            document.getElementById('trainerCurrentHP').value = trainerCurrentHP;
+            document.getElementById('trainerCurrentVP').value = trainerCurrentVP;
+              
+            // Store these values in the session storage if they weren't already set
+            if (trainerData[34] === null || trainerData[34] === undefined || trainerData[34] === '') {
+                trainerData[34] = trainerCurrentHP;
+            }
+            if (trainerData[35] === null || trainerData[35] === undefined || trainerData[35] === '') {
+                trainerData[35] = trainerCurrentVP;
+            }
+              
+            // Update session storage with the potentially new values
+            sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+              
+            // Clear the input fields for trainer HP and VP changes
+            document.getElementById('trainerHPChangeInput').value = '';
+            document.getElementById('trainerVPChangeInput').value = '';
+        }
+
+        // Process type chart values for Weakness, Resistance, Immunity
+        const typeChartValues = window.selectedPokemon[53] ? window.selectedPokemon[53].split(',').map(Number) : [];
+        const typeNames = [
+            "Normal", "Fighting", "Flying", "Poison", "Ground", "Rock", "Bug", "Ghost",
+            "Steel", "Fire", "Water", "Grass", "Electric", "Psychic", "Ice", "Dragon", "Dark", "Fairy"
+        ];
+
+        const weaknesses = [];
+        const resistances = [];
+        const immunities = [];
+
+        typeChartValues.forEach((value, index) => {
+            if (value === 0) {
+                immunities.push(typeNames[index]);
+            } else if (value > 0 && value < 1) {
+                resistances.push(typeNames[index]);
+            } else if (value > 1) {
+                weaknesses.push(typeNames[index]);
+            }
+        });
+
+        toggleTypeChartSection('weaknessesContainer', weaknesses, 'Weaknesses', 2);
+        toggleTypeChartSection('resistancesContainer', resistances, 'Resistances', 0.5);
+        toggleTypeChartSection('immunitiesContainer', immunities, 'Immunities', 0);
+
+        function toggleTypeChartSection(containerId, typesArray, headerText, multiplierValue) {
+            const container = document.getElementById(containerId);
+            const header = container.previousElementSibling;
+
+            if (typesArray.length > 0) {
+                container.innerHTML = '';
+                header.style.display = 'block';
+
+                typesArray.forEach(type => {
+                    const button = document.createElement('button');
+                    button.className = 'type-button';
+                    button.textContent = type;
+
+                    const bgColor = getMoveTypeColor(type);
+                    button.style.backgroundColor = bgColor;
+                    button.style.color = getTextColorForBackground(bgColor);
+                    button.style.border = '1px solid black';
+
+                    button.addEventListener('click', () => {
+                        // Toggle active state
+                        if (button.classList.contains('active')) {
+                            button.classList.remove('active');
+                            damageMultiplier = 1; // Reset multiplier when deselected
+                        } else {
+                            document.querySelectorAll('.type-button').forEach(btn => btn.classList.remove('active'));
+                            button.classList.add('active');
+                            damageMultiplier = multiplierValue; // Set to the selected multiplier value
+                        }
+                    });
+
+                    container.appendChild(button);
+                });
+            } else {
+                header.style.display = 'none';
+                container.innerHTML = '';
+            }
+        }
+
+        // Set the Remove HP button to use the current damageMultiplier when clicked
+        const removeHPButton = document.querySelector('.popup-button[onclick*="updateStat(\'HP\', \'remove\')"]');
+        if (removeHPButton) {
+            removeHPButton.onclick = () => updateStat('HP', 'remove', damageMultiplier);
+        }
+
+        document.getElementById('combatTrackerPopup').classList.add('visible');
+    }
+
+    // Modify the updateStat function to handle Pokemon stats
+    function updateStat(stat, action, multiplier = 1) {
+        // Pokemon stat update logic
+        const statIndex = {
+            'HP': 45,
+            'VP': 46
+        };
+        const baseStatIndex = {
+            'HP': 10,
+            'VP': 12
+        };
+
+        // Get base value
+        const baseStat = parseInt(window.selectedPokemon[baseStatIndex[stat]], 10);
+
+        // Get current value, defaulting to base value if not set
+        let currentStat = window.selectedPokemon[statIndex[stat]] !== null && 
+                        window.selectedPokemon[statIndex[stat]] !== undefined && 
+                        window.selectedPokemon[statIndex[stat]] !== ''
+            ? parseInt(window.selectedPokemon[statIndex[stat]], 10)
+            : baseStat;
+
+        let changeAmount = document.getElementById(stat.toLowerCase() + 'ChangeInput').value;
+        let vpOverflowOccurred = false;
+
+        if (changeAmount === '') {
+            // Reset to base value if input is blank
+            window.selectedPokemon[statIndex[stat]] = baseStat;
+        } else {
+            changeAmount = parseInt(changeAmount, 10) || 0;
+                
+            if (action === 'add') {
+                let newStat = currentStat + changeAmount;
+                if (newStat > baseStat) {
+                    newStat = baseStat;
+                }
+                window.selectedPokemon[statIndex[stat]] = newStat;
+            } else if (action === 'remove') {
+                if (stat === 'HP') {
+                    changeAmount = Math.ceil(changeAmount * multiplier);
+                }
+
+                let newStat = currentStat - changeAmount;
+                    
+                if (stat === 'VP' && newStat < 0) {
+                    const remainingAmount = Math.abs(newStat);
+                    
+                    // Set VP to 0
+                    window.selectedPokemon[statIndex['VP']] = 0;
+
+                    // Get current HP, defaulting to base HP if not set
+                    const currentHP = window.selectedPokemon[statIndex['HP']] !== null && 
+                                    window.selectedPokemon[statIndex['HP']] !== undefined && 
+                                    window.selectedPokemon[statIndex['HP']] !== ''
+                        ? parseInt(window.selectedPokemon[statIndex['HP']], 10)
+                        : parseInt(window.selectedPokemon[baseStatIndex['HP']], 10);
+                            
+                    // Apply overflow damage to HP
+                    window.selectedPokemon[statIndex['HP']] = currentHP - remainingAmount;
+                    vpOverflowOccurred = true;
+                } else {
+                    window.selectedPokemon[statIndex[stat]] = Math.max(0, newStat); // Ensure we don't go below 0
+                }
+            }
+        }
+
+        // Update the display for both stats if VP overflow occurred
+        document.getElementById('current' + stat).value = window.selectedPokemon[statIndex[stat]];
+        if (vpOverflowOccurred) {
+            document.getElementById('currentHP').value = window.selectedPokemon[statIndex['HP']];
+        }
+
+        // Update session storage
+        sessionStorage.setItem(`pokemon_${window.selectedPokemon[2].toLowerCase()}`, JSON.stringify(window.selectedPokemon));
+
+        closePopup('combatTrackerPopup');
+        NavigationManager.showSpinner();
+
+        // Send updates to Google Sheets
+        if (vpOverflowOccurred) {
+            // Need to update both VP and HP
+            google.script.run.withSuccessHandler(() => {
+                // Then update HP
+                google.script.run.withSuccessHandler(() => {
+                    NavigationManager.hideSpinner();
+                    showCombatTrackerPopup();
+                }).writePokemonLiveStats(window.selectedPokemon[0], window.selectedPokemon[2], 'HP', window.selectedPokemon[statIndex['HP']]);
+            }).writePokemonLiveStats(window.selectedPokemon[0], window.selectedPokemon[2], 'VP', window.selectedPokemon[statIndex['VP']]);
+        } else {
+            // Normal case - just update the stat that was changed
+            google.script.run.withSuccessHandler(() => {
+                NavigationManager.hideSpinner();
+                showCombatTrackerPopup();
+            }).writePokemonLiveStats(window.selectedPokemon[0], window.selectedPokemon[2], stat, window.selectedPokemon[statIndex[stat]]);
+        }
+    }
+
+    function updateTrainerStat(stat, action) {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const statIndex = {
+            'HP': 34,   
+            'VP': 35  
+        };
+        const baseStatIndex = {
+            'HP': 11,   
+            'VP': 12  
+        };
+
+        // Get base values
+        const baseHP = parseInt(trainerData[baseStatIndex['HP']], 10);
+        const baseVP = parseInt(trainerData[baseStatIndex['VP']], 10);
+
+        // Get current values, defaulting to base values if not set
+        let currentHP = trainerData[statIndex['HP']] !== null && 
+                      trainerData[statIndex['HP']] !== undefined && 
+                      trainerData[statIndex['HP']] !== ''
+            ? parseInt(trainerData[statIndex['HP']], 10)
+            : baseHP;
+
+        let currentVP = trainerData[statIndex['VP']] !== null && 
+                      trainerData[statIndex['VP']] !== undefined && 
+                      trainerData[statIndex['VP']] !== ''
+            ? parseInt(trainerData[statIndex['VP']], 10)
+            : baseVP;
+
+        // Get the change amount from input field
+        let changeAmount = document.getElementById('trainer' + stat + 'ChangeInput').value;
+        
+        // Track if VP overflow affected HP
+        let vpOverflowOccurred = false;
+
+        // Calculate new values before making any updates
+        if (changeAmount === '') {
+            // If the input is empty, reset to base value
+            if (stat === 'HP') {
+                currentHP = baseHP;
+            } else {
+                currentVP = baseVP;
+            }
+        } else {
+            changeAmount = parseInt(changeAmount, 10) || 0;
+            
+            if (action === 'add') {
+                if (stat === 'HP') {
+                    currentHP = currentHP + changeAmount;
+                    if (currentHP > baseHP) {
+                        currentHP = baseHP;
+                    }
+                } else { // VP
+                    currentVP = currentVP + changeAmount;
+                    if (currentVP > baseVP) {
+                        currentVP = baseVP;
+                    }
+                }
+            } else if (action === 'remove') {
+                if (stat === 'HP') {
+                    currentHP = currentHP - changeAmount;
+                    // No minimum for HP, can go below 0
+                } else { // VP
+                    currentVP = currentVP - changeAmount;
+                    
+                    if (currentVP < 0) {
+                        // When VP goes below 0, the remaining damage transfers to HP
+                        const remainingAmount = Math.abs(currentVP);
+                        currentVP = 0; // Set VP to exactly 0 for display
+                        
+                        // Update HP with the remaining damage
+                        currentHP = currentHP - remainingAmount;
+                        vpOverflowOccurred = true; // Flag that HP was affected by VP overflow
+                    }
+                }
+            }
+        }
+
+        // Update trainerData with new values
+        trainerData[statIndex['HP']] = currentHP === baseHP ? '' : currentHP;
+        trainerData[statIndex['VP']] = currentVP === baseVP ? '' : currentVP;
+
+        // Update session storage with the new values
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        closePopup('combatTrackerPopup');
+        NavigationManager.showSpinner();
+
+        // Directly update display in the UI for immediate feedback
+        document.getElementById('trainerCurrentHP').value = currentHP;
+        document.getElementById('trainerCurrentVP').value = currentVP;
+
+        // Prepare the values to write to Google Sheets
+        let hpValueToWrite = currentHP === baseHP ? '' : currentHP;
+        let vpValueToWrite = currentVP === baseVP ? '' : currentVP;
+
+        // When VP overflow occurs, we need to update both VP and HP in the database
+        if (vpOverflowOccurred) {
+            // First update VP to 0
+            google.script.run.withSuccessHandler(() => {
+                // Then update HP with the new value after VP was processed
+                google.script.run.withSuccessHandler(() => {
+                    NavigationManager.hideSpinner();
+                    showCombatTrackerPopup(); // Reopen the popup once data is done loading
+                }).writeTrainerLiveStats(trainerData[1], 'HP', hpValueToWrite);
+            }).writeTrainerLiveStats(trainerData[1], 'VP', vpValueToWrite);
+        } else {
+            // Normal case - just update the stat that was changed
+            google.script.run.withSuccessHandler(() => {
+                NavigationManager.hideSpinner();
+                showCombatTrackerPopup(); // Reopen the popup once data is done loading
+            }).writeTrainerLiveStats(trainerData[1], stat, stat === 'HP' ? hpValueToWrite : vpValueToWrite);
+        }
+    }
+
+    function populateGear() {
+        const gearContainer = document.getElementById('gearContainer');
+        const gearFromPokemon = window.selectedPokemon[51] || ''; // Assuming gear is stored in index 51 as a string
+        gearContainer.innerHTML = ''; // Clear existing gear data
+
+        // Retrieve items data from sessionStorage
+        const allItemsData = JSON.parse(sessionStorage.getItem('items')) || []; // Assuming 'items' is the key
+
+        // Split the gearFromPokemon string by commas and trim spaces to get individual gear items
+        const gearArray = gearFromPokemon.split(',').map(gear => gear.trim()); // Trim spaces from each item after splitting
+
+        // Loop through gearArray
+        gearArray.forEach(gearName => {
+            // Search for the gear in the allItemsData array (using object properties like name, description, and effect)
+            const matchingItem = allItemsData.find(item => item.name.trim() === gearName); // Trimming both sides for comparison
+
+            if (matchingItem) {
+                const shortDescription = matchingItem.description || ''; // Short description
+                const fullDescription = matchingItem.effect || 'No description available'; // Full description
+
+                // Create the gear container and its children
+                const gearContainerElement = document.createElement('div');
+                gearContainerElement.classList.add('gear-item-container');
+
+                const gearNameElement = document.createElement('div');
+                gearNameElement.classList.add('gear-name-header');
+                gearNameElement.textContent = matchingItem.name; // Gear name
+
+                const gearEffectElement = document.createElement('div');
+                gearEffectElement.classList.add('gear-effect-box');
+                gearEffectElement.innerHTML = `<strong>${shortDescription}</strong><br><br>${fullDescription}`; // Combine short and full description
+
+                gearContainerElement.appendChild(gearNameElement);
+                gearContainerElement.appendChild(gearEffectElement);
+
+                gearContainer.appendChild(gearContainerElement);
+            } else {
+                // If no matching item is found, display a placeholder
+                const gearContainerElement = document.createElement('div');
+                gearContainerElement.classList.add('gear-item-container');
+
+                const gearNameElement = document.createElement('div');
+                gearNameElement.classList.add('gear-name-header');
+                gearNameElement.textContent = gearName;
+
+                const gearEffectElement = document.createElement('div');
+                gearEffectElement.classList.add('gear-effect-box');
+                gearEffectElement.textContent = 'No gear currently equipped';
+
+                gearContainerElement.appendChild(gearNameElement);
+                gearContainerElement.appendChild(gearEffectElement);
+
+                gearContainer.appendChild(gearContainerElement);
+            }
+        });
+    }
+
+    function showGearPopup() {
+        const gearPopup = document.getElementById('gearPopup');
+        gearPopup.classList.add('visible');
+        populateGear();
+    }
+
+    function showAbilityPopup(index) {
+        if (window.pokemonAbilities && window.pokemonAbilities[index]) {
+            const ability = window.pokemonAbilities[index];
+            document.getElementById('abilityPopupTitle').textContent = ability.name;
+            document.getElementById('abilityPopupContent').textContent = ability.description;
+            const abilityPopup = document.getElementById('abilityPopup');
+            abilityPopup.classList.add('visible');
+        }
+    }
+
+    function showCustomMessageBox(message) {
+        const messageBox = document.getElementById('customMessageBox');
+        const messageOverlay = document.getElementById('customMessageOverlay');
+        messageBox.style.display = 'block';
+        messageOverlay.style.display = 'block';
+        if (message) {
+            messageBox.querySelector('p').textContent = message;
+        }
+    }
+
+    function closeCustomMessageBox() {
+        document.getElementById('customMessageBox').style.display = 'none';
+        document.getElementById('customMessageOverlay').style.display = 'none';
+    }
+
+      // Function to show the evolution confirmation popup
+    function showEvolutionPopup() {
+        const pokemonName = window.selectedPokemon[36] ? window.selectedPokemon[36] : window.selectedPokemon[2]; // Get Pokémon's name
+        document.getElementById('evolutionPokemonName').textContent = pokemonName;
+        document.getElementById('evolutionPopup').style.display = 'block'; // Show the popup
+    }
+
+    // Function to close the evolution popup
+    function closeEvolutionPopup() {
+        document.getElementById('evolutionPopup').style.display = 'none'; // Hide the popup
+    }
+
+    // Function to confirm the evolution
+    function confirmEvolution() {
+        closeEvolutionPopup(); // Close the popup
+        NavigationManager.navigate('evolution');
+    }
+</script>

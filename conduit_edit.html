@@ -1,0 +1,681 @@
+<style>
+    .form-container {
+        width: 80%;
+        max-width: 600px;
+        background-color: white;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-height: 70vh;
+        overflow-y: auto;
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+    .form-container label {
+        display: flex;
+        align-items: center;
+        margin-top: 20px;
+        font-weight: bold;
+        text-align: center;
+        font-size: 2rem;
+        cursor: pointer; /* Make label clickable */
+        justify-content: space-between;
+    }
+
+    .form-container input,
+    .form-container select,
+    .form-container textarea {
+        width: calc(100% - 40px);
+        padding: 20px;
+        margin-top: 10px;
+        margin-bottom: 40px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 2rem;
+    }
+
+    .form-container textarea {
+        resize: vertical;
+        height: 200px;
+    }
+
+    .form-container button {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 1.5rem;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        margin-right: 10px;
+    }
+
+    .form-container button:hover {
+        background-color: #d32f2f;
+    }
+
+    /* Hide skills and feats content initially */
+    .skills-section,
+    .feats-section {
+        display: none;
+        flex-direction: column;
+        align-items: flex-start;
+        font-size: 2rem;
+        width: 100%;
+    }
+
+    .skills-section div,
+    .feats-section div {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+        justify-content: flex-start;
+        width: auto;
+        white-space: nowrap;
+    }
+
+    .skills-section div input[type="checkbox"],
+    .feats-section div input[type="checkbox"] {
+        margin-right: 2rem;
+        transform: scale(2);
+        margin-left: 0;
+    }
+
+    .skills-section div label,
+    .feats-section div label {
+        margin-bottom: 0;
+        margin-left: 0.5rem;
+        text-align: left;
+        line-height: 1.5;
+        white-space: nowrap;
+    }
+
+    /* Arrow next to label */
+    .arrow {
+        margin-left: 10px;
+        transition: transform 0.3s ease;
+    }
+
+    .arrow.open {
+        transform: rotate(90deg); /* Rotate when open */
+    }
+
+    .autocomplete-items {
+        position: absolute;
+        border: 1px solid #d4d4d4;
+        border-bottom: none;
+        border-top: none;
+        z-index: 99;
+        background-color: #fff;
+        width: 100%;
+        top: auto;
+        bottom: 100%;
+        left: 0;
+        right: 0;
+        max-height: 150px;
+        overflow-y: auto;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    }
+
+    .autocomplete-items div {
+        padding: 10px;
+        cursor: pointer;
+        background-color: #fff;
+        border-bottom: 1px solid #d4d4d4;
+    }
+
+    .autocomplete-items div:hover {
+        background-color: #e9e9e9;
+    }
+
+    .autocomplete-active {
+        background-color: DodgerBlue !important;
+        color: #ffffff;
+    }
+
+    .custom-move-chip {
+        display: inline-block;
+        padding: 3px 8px;
+        margin: 3px;
+        background-color: #f44336;
+        color: white;
+        border-radius: 15px;
+        font-size: 1rem;
+        cursor: pointer;
+    }
+
+    .custom-move-chip span {
+        margin-left: 10px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    #gearContainer {
+        margin-bottom: 20px; /* Add margin below the gear items */
+        margin-top: 20px;    /* Add margin above the gear items (optional) */
+        display: flex;
+        flex-wrap: wrap;     /* Ensure the gear chips wrap if there are multiple */
+        justify-content: flex-start;
+    }
+</style>
+
+<h1>Edit Trainer</h1>
+<div class="form-container">
+    <form id="editTrainerForm" onsubmit="submitForm(event)">
+        <label for="level">Level</label>
+        <input type="number" id="level" name="level" required />
+
+        <label for="str">STR</label>
+        <input type="number" id="str" name="str" required />
+
+        <label for="dex">DEX</label>
+        <input type="number" id="dex" name="dex" required />
+
+        <label for="con">CON</label>
+        <input type="number" id="con" name="con" required />
+
+        <label for="int">INT</label>
+        <input type="number" id="int" name="int" required />
+
+        <label for="wis">WIS</label>
+        <input type="number" id="wis" name="wis" required />
+
+        <label for="cha">CHA</label>
+        <input type="number" id="cha" name="cha" required />
+
+        <label for="ac">AC</label>
+        <input type="number" id="ac" name="ac" required />
+
+        <label for="leaguePoints">League Points</label>
+        <input type="number" id="leaguePoints" name="leaguePoints" />
+
+        <label for="skills">Skills
+            <span class="arrow" id="skillsArrow">▶</span> <!-- Arrow icon -->
+        </label>
+        <div id="skills" class="skills-section">
+            <!-- Skills checkboxes -->
+            <div>
+                <input type="checkbox" id="athletics" name="skills" value="Athletics" />
+                <label for="athletics">Athletics (STR)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="acrobatics" name="skills" value="Acrobatics" />
+                <label for="acrobatics">Acrobatics (DEX)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="sleightOfHand" name="skills" value="Sleight of Hand" />
+                <label for="sleightOfHand">Sleight of Hand (DEX)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="stealth" name="skills" value="Stealth" />
+                <label for="stealth">Stealth (DEX)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="arcana" name="skills" value="Arcana" />
+                <label for="arcana">Arcana (INT)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="history" name="skills" value="History" />
+                <label for="history">History (INT)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="investigation" name="skills" value="Investigation" />
+                <label for="investigation">Investigation (INT)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="nature" name="skills" value="Nature" />
+                <label for="nature">Nature (INT)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="religion" name="skills" value="Religion" />
+                <label for="religion">Religion (INT)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="animalHandling" name="skills" value="Animal Handling" />
+                <label for="animalHandling">Animal Handling (WIS)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="insight" name="skills" value="Insight" />
+                <label for="insight">Insight (WIS)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="medicine" name="skills" value="Medicine" />
+                <label for="medicine">Medicine (WIS)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="perception" name="skills" value="Perception" />
+                <label for="perception">Perception (WIS)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="survival" name="skills" value="Survival" />
+                <label for="survival">Survival (WIS)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="deception" name="skills" value="Deception" />
+                <label for="deception">Deception (CHA)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="intimidation" name="skills" value="Intimidation" />
+                <label for="intimidation">Intimidation (CHA)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="performance" name="skills" value="Performance" />
+                <label for="performance">Performance (CHA)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="persuasion" name="skills" value="Persuasion" />
+                <label for="persuasion">Persuasion (CHA)</label>
+            </div>
+        </div>
+
+        <label for="feats">Feats
+            <span class="arrow" id="featsArrow">▶</span> <!-- Arrow icon -->
+        </label>
+        <div id="feats" class="feats-section">
+            <div>
+                <input type="checkbox" id="actor" name="feats" value="Actor" />
+                <label for="actor">Actor</label>
+            </div>
+            <div>
+                <input type="checkbox" id="alert" name="feats" value="Alert" />
+                <label for="alert">Alert</label>
+            </div>
+            <div>
+                <input type="checkbox" id="athlete" name="feats" value="Athlete" />
+                <label for="athlete">Athlete</label>
+            </div>
+            <div>
+                <input type="checkbox" id="captureSpecialist" name="feats" value="Capture Specialist" />
+                <label for="captureSpecialist">Capture Specialist</label>
+            </div>
+            <div>
+                <input type="checkbox" id="charger" name="feats" value="Charger" />
+                <label for="charger">Charger</label>
+            </div>
+            <div>
+                <input type="checkbox" id="chef" name="feats" value="Chef" />
+                <label for="chef">Chef</label>
+            </div>
+            <div>
+                <input type="checkbox" id="crusher" name="feats" value="Crusher" />
+                <label for="crusher">Crusher</label>
+            </div>
+            <div>
+                <input type="checkbox" id="defensiveDuelist" name="feats" value="Defensive Duelist" />
+                <label for="defensiveDuelist">Defensive Duelist</label>
+            </div>
+            <div>
+                <input type="checkbox" id="dualWielder" name="feats" value="Dual Wielder" />
+                <label for="dualWielder">Dual Wielder</label>
+            </div>
+            <div>
+                <input type="checkbox" id="dungeonDelver" name="feats" value="Dungeon Delver" />
+                <label for="dungeonDelver">Dungeon Delver</label>
+            </div>
+            <div>
+                <input type="checkbox" id="durable" name="feats" value="Durable" />
+                <label for="durable">Durable</label>
+            </div>
+            <div>
+                <input type="checkbox" id="grappler" name="feats" value="Grappler" />
+                <label for="grappler">Grappler</label>
+            </div>
+            <div>
+                <input type="checkbox" id="greatWeaponMaster" name="feats" value="Great Weapon Master" />
+                <label for="greatWeaponMaster">Great Weapon Master</label>
+            </div>
+            <div>
+                <input type="checkbox" id="gunner" name="feats" value="Gunner" />
+                <label for="gunner">Gunner</label>
+            </div>
+            <div>
+                <input type="checkbox" id="heavilyArmored" name="feats" value="Heavily Armored" />
+                <label for="heavilyArmored">Heavily Armored</label>
+            </div>
+            <div>
+                <input type="checkbox" id="heavyArmorMaster" name="feats" value="Heavy Armor Master" />
+                <label for="heavyArmorMaster">Heavy Armor Master</label>
+            </div>
+            <div>
+                <input type="checkbox" id="inspiringLeader" name="feats" value="Inspiring Leader" />
+                <label for="inspiringLeader">Inspiring Leader</label>
+            </div>
+            <div>
+                <input type="checkbox" id="lightlyArmored" name="feats" value="Lightly Armored" />
+                <label for="lightlyArmored">Lightly Armored</label>
+            </div>
+            <div>
+                <input type="checkbox" id="linguist" name="feats" value="Linguist" />
+                <label for="linguist">Linguist</label>
+            </div>
+            <div>
+                <input type="checkbox" id="lucky" name="feats" value="Lucky" />
+                <label for="lucky">Lucky</label>
+            </div>
+            <div>
+                <input type="checkbox" id="mediumArmorMaster" name="feats" value="Medium Armor Master" />
+                <label for="mediumArmorMaster">Medium Armor Master</label>
+            </div>
+            <div>
+                <input type="checkbox" id="mobile" name="feats" value="Mobile" />
+                <label for="mobile">Mobile</label>
+            </div>
+            <div>
+                <input type="checkbox" id="moderatelyArmored" name="feats" value="Moderately Armored" />
+                <label for="moderatelyArmored">Moderately Armored</label>
+            </div>
+            <div>
+                <input type="checkbox" id="mountedCombatant" name="feats" value="Mounted Combatant" />
+                <label for="mountedCombatant">Mounted Combatant</label>
+            </div>
+            <div>
+                <input type="checkbox" id="observant" name="feats" value="Observant" />
+                <label for="observant">Observant</label>
+            </div>
+            <div>
+                <input type="checkbox" id="resilient" name="feats" value="Resilient" />
+                <label for="resilient">Resilient</label>
+            </div>
+            <div>
+                <input type="checkbox" id="savageAttacker" name="feats" value="Savage Attacker" />
+                <label for="savageAttacker">Savage Attacker</label>
+            </div>
+            <div>
+                <input type="checkbox" id="sentinel" name="feats" value="Sentinel" />
+                <label for="sentinel">Sentinel</label>
+            </div>
+            <div>
+                <input type="checkbox" id="sharpshooter" name="feats" value="Sharpshooter" />
+                <label for="sharpshooter">Sharpshooter</label>
+            </div>
+            <div>
+                <input type="checkbox" id="shieldMaster" name="feats" value="Shield Master" />
+                <label for="shieldMaster">Shield Master</label>
+            </div>
+            <div>
+                <input type="checkbox" id="skillExpert" name="feats" value="Skill Expert" />
+                <label for="skillExpert">Skill Expert</label>
+            </div>
+            <div>
+                <input type="checkbox" id="skilled" name="feats" value="Skilled" />
+                <label for="skilled">Skilled</label>
+            </div>
+            <div>
+                <input type="checkbox" id="skulker" name="feats" value="Skulker" />
+                <label for="skulker">Skulker</label>
+            </div>
+            <div>
+                <input type="checkbox" id="telepathic" name="feats" value="Telepathic" />
+                <label for="telepathic">Telepathic</label>
+            </div>
+            <div>
+                <input type="checkbox" id="tough" name="feats" value="Tough" />
+                <label for="tough">Tough</label>
+            </div>
+        </div>
+
+        <label for="gear">Gear</label>
+        <input type="text" id="gear" name="gear" list="gearList" autocomplete="off">
+        <datalist id="gearList"></datalist>
+        <button type="button" onclick="addGear()">Add Gear</button>
+        <div id="gearContainer"></div>
+
+        <button type="submit">Update Trainer</button>
+    </form>
+</div>
+
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+        const trainerData = trainerDataRaw ? JSON.parse(trainerDataRaw) : null;
+        const items = JSON.parse(sessionStorage.getItem('items')) || [];
+
+        if (trainerData) {
+            document.title = `Edit ${trainerData[1]}`;
+            document.getElementById('level').value = trainerData[2] || '';
+            document.getElementById('str').value = trainerData[5] || '';
+            document.getElementById('dex').value = trainerData[6] || '';
+            document.getElementById('con').value = trainerData[7] || '';
+            document.getElementById('int').value = trainerData[8] || '';
+            document.getElementById('wis').value = trainerData[9] || '';
+            document.getElementById('cha').value = trainerData[10] || '';
+            document.getElementById('ac').value = trainerData[13] || '';
+            document.getElementById('leaguePoints').value = trainerData[21] || '';
+
+            const skills = trainerData[18] ? trainerData[18].split(',').map(skill => skill.trim()) : [];
+            skills.forEach(skill => {
+                const checkbox = document.querySelector(`input[name="skills"][value="${skill}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+
+            const feats = trainerData[33] ? trainerData[33].split(',').map(feat => feat.trim()) : [];
+            feats.forEach(feat => {
+                const checkbox = document.querySelector(`input[name="feats"][value="${feat}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+
+            const existingGear = trainerData[37] ? trainerData[37].split(',').map(gear => gear.trim()) : [];
+            existingGear.forEach(gear => {
+                if (gear) createGearChip(gear);
+            });
+
+            // Populate gear list (from items)
+            const gearList = document.getElementById('gearList');
+            items.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.name;
+                gearList.appendChild(option);
+            });
+        }
+
+        // Toggle Skills section
+        const skillsLabel = document.querySelector('label[for="skills"]');
+        const skillsSection = document.getElementById('skills');
+        const skillsArrow = document.getElementById('skillsArrow');
+
+        skillsLabel.addEventListener('click', () => {
+            skillsSection.style.display = skillsSection.style.display === 'none' ? 'flex' : 'none';
+            skillsArrow.classList.toggle('open'); // Rotate the arrow
+        });
+
+        // Toggle Feats section
+        const featsLabel = document.querySelector('label[for="feats"]');
+        const featsSection = document.getElementById('feats');
+        const featsArrow = document.getElementById('featsArrow');
+
+        featsLabel.addEventListener('click', () => {
+            featsSection.style.display = featsSection.style.display === 'none' ? 'flex' : 'none';
+            featsArrow.classList.toggle('open'); // Rotate the arrow
+        });
+
+        // Initialize sections as hidden
+        skillsSection.style.display = 'none';
+        featsSection.style.display = 'none';
+    });
+
+    function addGear() {
+        const gearInput = document.getElementById('gear');
+        const selectedGear = gearInput.value.trim();
+        if (selectedGear) {
+            createGearChip(selectedGear);
+            gearInput.value = '';
+        }
+    }
+
+    // Function to create a gear chip
+    function createGearChip(gear) {
+        const container = document.getElementById('gearContainer');
+        const chip = document.createElement('div');
+        chip.className = 'custom-move-chip';
+        chip.textContent = gear;
+        
+        const removeBtn = document.createElement('span');
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => container.removeChild(chip);
+        chip.appendChild(removeBtn);
+        
+        container.appendChild(chip);
+    }
+
+    function submitForm(event) {
+        event.preventDefault();
+
+        const form = document.getElementById("editTrainerForm");
+        const formData = new FormData(form);
+
+        NavigationManager.showSpinner();
+
+        const data = {};
+        formData.forEach((value, key) => {
+            if (key === "skills") {
+                if (!data[key]) {
+                    data[key] = [];
+                }
+                data[key].push(value);
+            } else if (key === "feats") {
+                if (!data[key]) {
+                    data[key] = [];
+                }
+                data[key].push(value);
+            } else {
+                data[key] = value;
+            }
+        });
+
+        if (data.skills) {
+            data.skills = data.skills.join(', ');
+        }
+
+        if (data.feats) {
+            data.feats = data.feats.join(', ');
+        }
+
+        const gearContainer = document.getElementById('gearContainer');
+        const gearChips = gearContainer.getElementsByClassName('custom-move-chip');
+        const selectedGear = [];
+
+        for (let chip of gearChips) {
+            selectedGear.push(chip.textContent.replace('×', '').trim()); // Remove the close '×' icon
+        }
+
+        // Add selected gear to the data object
+        data.gear = selectedGear.join(', ');
+
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+        const selectedTrainerData = trainerDataRaw ? JSON.parse(trainerDataRaw) : null;
+
+        if (!selectedTrainerData) {
+            console.error('No trainer data found in session storage.');
+            alert('Could not find the trainer data. Please try again.');
+            NavigationManager.hideSpinner();
+            return;
+        }
+
+        let newTrainerData = updateSessionStorageWithNewTrainer(data, selectedTrainerData);
+
+        // Call calculateTrainerModifiers before updating the session storage and Google Sheets
+        google.script.run.withSuccessHandler((response) => {
+            if (response && response.status === 'success') {
+                newTrainerData = response.newTrainerData; // Update with calculated modifiers
+
+                // Update the session storage
+                sessionStorage.setItem('trainerData', JSON.stringify(newTrainerData));
+
+                // Update the Google Sheets
+                google.script.run.withSuccessHandler((response) => {
+                    if (response.status === 'success') {
+                        displayCustomMessage(`${newTrainerData[1]}'s info is updated!`);
+                        
+                        NavigationManager.hideSpinner();
+
+                        // Redirect to the Trainer card page
+                        google.script.run.withSuccessHandler(function(html) {
+                            document.open();
+                            document.write(html);
+                            document.close();
+                        }).getConduitInfo();
+                    } else {
+                        displayCustomMessage('Failed to update Trainer.');
+                        NavigationManager.hideSpinner();
+                    }
+                }).updateTrainerDataInSheet(newTrainerData);
+            } else {
+                displayCustomMessage('Failed to calculate modifiers.');
+                NavigationManager.hideSpinner();
+            }
+        }).calculateTrainerModifiers(newTrainerData);
+    }
+
+
+    function updateSessionStorageWithNewTrainer(data, selectedTrainerData) {
+        let newTrainerData = [...selectedTrainerData];
+
+        newTrainerData[2] = parseInt(data.level);
+        newTrainerData[5] = parseInt(data.str);
+        newTrainerData[6] = parseInt(data.dex);
+        newTrainerData[7] = parseInt(data.con);
+        newTrainerData[8] = parseInt(data.int);
+        newTrainerData[9] = parseInt(data.wis);
+        newTrainerData[10] = parseInt(data.cha);
+        newTrainerData[13] = parseInt(data.ac);
+        newTrainerData[21] = parseInt(data.leaguePoints); 
+        newTrainerData[18] = data.skills || '';
+        newTrainerData[26] = getAvailablePokeSlots(parseInt(data.level));
+        newTrainerData[33] = data.feats || '';
+        newTrainerData[37] = data.gear || '';
+
+        return newTrainerData;
+    }
+
+    function getAllSkills() {
+        return [
+            "Athletics (STR)", "Acrobatics (DEX)", "Sleight of Hand (DEX)", "Stealth (DEX)",
+            "Arcana (INT)", "History (INT)", "Investigation (INT)", "Nature (INT)", "Religion (INT)",
+            "Animal Handling (WIS)", "Insight (WIS)", "Medicine (WIS)", "Perception (WIS)",
+            "Survival (WIS)", "Deception (CHA)", "Intimidation (CHA)", "Performance (CHA)", "Persuasion (CHA)"
+        ];
+    }
+
+    function getAvailablePokeSlots(trainerLevel) {
+        if (trainerLevel >= 16) {
+            return 6;
+        } else if (trainerLevel >= 10) {
+            return 5;
+        } else if (trainerLevel >= 5) {
+            return 4;
+        } else {
+            return 3;
+        }
+    }
+
+    function displayCustomMessage(message) {
+        const customMessage = document.createElement('div');
+        customMessage.style.position = 'fixed';
+        customMessage.style.top = '20%';
+        customMessage.style.left = '50%';
+        customMessage.style.transform = 'translate(-50%, -50%)';
+        customMessage.style.backgroundColor = '#f44336';
+        customMessage.style.color = 'white';
+        customMessage.style.padding = '20px';
+        customMessage.style.borderRadius = '10px';
+        customMessage.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.1)';
+        customMessage.style.fontSize = '2rem';
+        customMessage.style.zIndex = '1000';
+        customMessage.style.textAlign = 'center';
+        customMessage.textContent = message;
+
+        document.body.appendChild(customMessage);
+
+        setTimeout(() => {
+            document.body.removeChild(customMessage);
+        }, 2000);  // Message disappears after 2 seconds
+    }
+</script>

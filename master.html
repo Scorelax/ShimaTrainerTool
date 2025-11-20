@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Pokemon DnD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?!= include('master_styles'); ?>
+</head>
+<body>
+    <!-- Global spinner -->
+    <div id="spinnerOverlay" class="spinner-overlay">
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- Main content container -->
+    <div id="app-content">
+        <!-- Initial content will be loaded here -->
+    </div>
+    
+    <!-- Global audio elements -->
+    <audio id="global-audio-player"></audio>
+    <audio id="title-screen-audio"></audio>
+    <audio id="startup-audio"></audio>
+    <audio id="intro-audio"></audio>
+    <audio id="welcome-audio"></audio>
+    
+    <?!= include('master_scripts'); ?>
+</body>
+</html>

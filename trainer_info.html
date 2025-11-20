@@ -1,0 +1,3061 @@
+<style>
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .trainer-info-container {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 20px;
+        width: 80%;
+        max-width: 1200px;
+        margin-top: 20px;
+        z-index: 1;
+    }
+
+    .trainer-image-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        width: 350px;
+        border-radius: 10px;
+        overflow: hidden;
+        background-color: transparent;
+    }
+
+    .trainer-image-container img {
+        width: 350px;
+        height: 350px;
+        border-radius: 10px;
+        object-fit: cover;
+    }
+
+    .trainer-details-container {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 10px;
+        width: 100%;
+        padding-left: 0;
+        margin-top: 20px;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 5px;
+        text-align: left;
+        font-size: 1.5rem;
+        width: 100%;
+    }
+
+    .stat-label {
+        font-weight: bold;
+        color: black;
+    }
+
+    .stat-value {
+        color: black;
+        flex-grow: 1;
+        word-wrap: break-word;
+    }
+
+    .button-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 10px;
+        width: 100%;
+    }
+
+    .button {
+      font-size: 1.2rem;
+    }
+
+    /* Special style for the "Edit Trainer" button */
+    #editTrainerButton {
+        background-color: gray;
+        color: white;
+    }
+
+    #editTrainerButton:hover {
+        background-color: darkgray;
+        color: black;
+    }
+
+    /* Container for AC, HP, VP */
+    .stat-main-container {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+        margin-bottom: 20px;
+        gap: 5px;
+    }
+
+    .stat-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 70px;
+        height: 70px;
+        background-color: #f44336;
+        color: black;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        font-size: 1.9rem;
+        font-weight: 650;
+        box-shadow: 3px 3px 0 #000;
+    }
+
+    .stat-label-box {
+        font-weight: bold;
+        color: black;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+
+    /* Container for STR, DEX, etc., and their modifiers */
+    .ability-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .ability-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .ability-box {
+        justify-content: center;
+        align-items: center;
+        width: 60px;
+        height: 60px;
+        background-color: #f44336;
+        color: black;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        vertical-align: middle;
+        font-size: 1.8rem;
+        box-shadow: 3px 3px 0 #000;
+        margin-bottom: 0;
+    }
+
+    .modifier-box {
+        justify-content: center;
+        align-items: center;
+        width: 50px;
+        height: 50px;
+        background-color: #f44336;
+        color: white;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        vertical-align: middle;
+        font-size: 1.6rem;
+        font-weight: 900;
+        box-shadow: 3px 3px 0 #000;
+        margin-top: -10px;
+    }
+
+    /* Skills Section */
+    .skills-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        font-size: 1rem;
+        width: 100%;
+        color: black;
+    }
+
+    .skills-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        border: 2px solid black;
+        padding: 20px;
+        border-radius: 5px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .skill-item {
+        padding: 10px;
+        border: 1px solid #333;
+        border-radius: 5px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 75px;
+        font-size: 1.2rem;
+        background-color: #f44336;
+        color: black;
+    }
+
+    .highlight {
+        background-color: #ffffff;
+        color: black;
+        font-weight: bold;
+    }
+
+    /* Inventory Popup Styles */
+    .inventory-popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 900px;
+        height: 85vh;
+        background-color: #f5f5f5;
+        border: 3px solid #333;
+        border-radius: 15px;
+        z-index: 1000;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+    }
+
+    .inventory-popup-content {
+        display: flex;
+        height: 100%;
+        width: 100%;
+    }
+
+    .inventory-list {
+        font-size: 1.2rem;
+        list-style-type: none;
+        padding: 0;
+    }
+
+    .inventory-list-item {
+        padding: 14px 34px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+        color: #ddd;
+        font-size: 1.1rem;
+    }
+
+    .inventory-list-item:hover {
+        background-color: #3a3a3a;
+        border-left-color: #f44336;
+        color: white;
+    }
+
+    .inventory-list-item.selected {
+        background-color: #f44336;
+        color: white;
+        border-left-color: white;
+    }
+
+    .inventory-list-item span {
+        display: inline;
+        font-size: 1.1rem;
+        margin-left: 10px;
+        opacity: 0.8;
+    }
+
+    .inventory-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 30px;
+        background-color: #fafafa;
+    }
+
+    .item-info-card {
+        flex: 1;
+        background-color: white;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        overflow-y: auto;
+    }
+
+    .item-name {
+        font-size: 2rem;
+        color: #333;
+        margin: 0 0 20px 0;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f44336;
+    }
+
+    .item-details {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .detail-section h4 {
+        color: #f44336;
+        font-size: 1.5rem;
+        margin: 0 0 10px 0;
+        font-weight: bold;
+    }
+
+    .detail-section p {
+        color: #666;
+        font-size: 1.3rem;
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    .detail-divider {
+        height: 1px;
+        background-color: #e0e0e0;
+        margin: 10px 0;
+    }
+
+    .inventory-actions {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 15px;
+        height: auto;
+    }
+
+    #addItemButton { grid-column: 1; grid-row: 1; }
+    #editItemButton { grid-column: 2; grid-row: 1; }
+    #removeItemButton { grid-column: 1; grid-row: 2; }
+    .close-btn { grid-column: 2; grid-row: 2; }
+
+    .action-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 15px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 1rem;
+        font-weight: bold;
+        box-shadow: 0 3px 10px rgba(244, 67, 54, 0.3);
+        position: relative;
+        overflow: hidden;
+        aspect-ratio: 0.7 / 0.7;
+        height: 100%;
+    }
+
+    .action-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+        background-color: #e53935;
+    }
+
+    .action-btn:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 2px 5px rgba(244, 67, 54, 0.3);
+    }
+
+    .action-btn:disabled {
+        background-color: #ccc;
+        color: #888;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    .action-btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        transition: width 0.4s ease, height 0.4s ease;
+    }
+
+    .action-btn:hover:not(:disabled)::before {
+        width: 100px;
+        height: 100px;
+    }
+
+    .btn-icon {
+        font-size: 2rem;
+        margin-bottom: 5px;
+    }
+
+    .btn-text {
+        font-size: 1.5rem;
+    }
+
+    .close-btn {
+        background-color: #666;
+    }
+
+    .close-btn:hover:not(:disabled) {
+        background-color: #555;
+    }
+
+    /* Modern Modal Styles */
+    .inventory-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1100;
+        backdrop-filter: blur(5px);
+        animation: fadeIn 0.2s ease;
+    }
+
+    .inventory-modal-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 700px;  /* Increased from 450px */
+        background-color: #fafafa;
+        border: 3px solid #333;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        overflow: visible !important;
+        animation: slideIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translate(-50%, -60%);
+            opacity: 0;
+        }
+        to {
+            transform: translate(-50%, -50%);
+            opacity: 1;
+        }
+    }
+
+    /* Modal Header */
+    .modal-header {
+        background-color: #f44336;
+        color: white;
+        padding: 30px;  /* Increased from 20px */
+        text-align: center;
+        border-bottom: 3px solid #333;
+    }
+
+    .modal-header h2 {
+        margin: 0;
+        font-size: 2.2rem;  /* Increased from 1.8rem */
+        font-weight: bold;
+    }
+
+    .modal-header.warning {
+        background-color: #ff9800;
+    }
+
+    /* Modal Body */
+    .modal-body {
+        padding: 40px;
+        background-color: white;
+        overflow: visible !important;
+    }
+
+    .form-group {
+        margin-bottom: 35px;
+        position: relative;
+    }
+
+    .form-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 12px;  /* Increased from 8px */
+        font-size: 1.3rem;  /* Increased from 1.1rem */
+        font-weight: bold;
+        color: #333;
+        text-align: center
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="number"] {
+        width: 100%;
+        padding: 16px 20px;  /* Increased from 12px 15px */
+        font-size: 1.3rem;  /* Increased from 1.1rem */
+        border: 2px solid #ddd;
+        border-radius: 10px;  /* Increased from 8px */
+        box-sizing: border-box;
+        transition: all 0.2s ease;
+        background-color: #f9f9f9;
+    }
+
+    .form-group input[type="text"]:focus,
+    .form-group input[type="number"]:focus {
+        outline: none;
+        border-color: #f44336;
+        background-color: white;
+        box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.1);
+    }
+
+    .form-group input:disabled {
+        background-color: #e0e0e0;
+        color: #666;
+        cursor: not-allowed;
+    }
+
+    /* Autocomplete Dropdown */
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background-color: white;
+        border: 2px solid #ddd;
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+        z-index: 9999;  /* Changed from 1200 to 9999 */
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .autocomplete-item {
+        padding: 16px 20px;  /* Increased from 12px 15px */
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 1.2rem;  /* Added font size */
+    }
+
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+
+    .autocomplete-item:hover {
+        background-color: #f44336;
+        color: white;
+    }
+
+    /* Confirmation Styles */
+    .confirmation-text {
+        font-size: 1.4rem;  /* Increased from 1.2rem */
+        color: #666;
+        margin-bottom: 30px;  /* Increased from 20px */
+        text-align: center;
+        line-height: 1.6;
+    }
+
+    .item-preview {
+        background-color: #f5f5f5;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        padding: 25px 40px;  /* More horizontal padding */
+        text-align: center;
+        font-size: 1.6rem;
+        font-weight: bold;
+        color: #333;
+        margin: 0 auto;  /* Center it */
+        max-width: 80%;  /* Don't let it get too wide */
+    }
+
+    /* Modal Actions */
+    .modal-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;  /* Increased from 15px */
+        padding: 30px;  /* Increased from 20px */
+        background-color: #f5f5f5;
+        border-top: 2px solid #e0e0e0;
+    }
+
+    .modal-actions .action-btn {
+        padding: 15px;  
+        min-height: 40px;  
+        font-size: 1.1rem;  /* Added larger font size */
+    }
+
+    .modal-actions .btn-text {
+        font-size: 1.3rem;  /* Larger text */
+    }
+
+    .modal-actions .btn-icon {
+        font-size: 2rem;  /* Larger icons */
+        margin-bottom: 8px;
+    }
+
+    .modal-actions .action-btn.primary {
+        background-color: #4CAF50;
+    }
+
+    .modal-actions .action-btn.primary:hover {
+        background-color: #45a049;
+    }
+
+    .modal-actions .action-btn.secondary {
+        background-color: #666;
+    }
+
+    .modal-actions .action-btn.secondary:hover {
+        background-color: #555;
+    }
+
+    .modal-actions .action-btn.danger {
+        background-color: #f44336;
+    }
+
+    .modal-actions .action-btn.danger:hover {
+        background-color: #da190b;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 480px) {
+        .inventory-modal-content {
+            width: 95%;
+            max-width: none;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-actions {
+            padding: 15px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .inventory-sidebar {
+            width: 250px;
+        }
+        
+        .inventory-actions {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .item-name {
+            font-size: 1.5rem;
+        }
+
+        .inventory-modal-content {
+            width: 95%;
+            max-width: none;
+            min-width: auto;
+        }
+        
+        .modal-body {
+            padding: 30px 20px;
+        }
+        
+        .modal-actions {
+            padding: 20px;
+        }
+    }
+
+    * {
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Quantity control styling */
+    .quantity-control {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 10px;
+    }
+
+    .quantity-btn {
+        width: 60px;
+        height: 60px;
+        border: 2px solid #ddd;
+        background-color: #f44336;
+        color: white;
+        font-size: 24px;
+        font-weight: bold;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+    }
+
+    .quantity-btn:hover {
+        background-color: #d32f2f;
+        transform: scale(1.1);
+    }
+
+    .quantity-btn:active {
+        transform: scale(0.95);
+    }
+
+    .quantity-input {
+        width: 140px !important; 
+        min-width: 140px !important; 
+        max-width: 140px !important;
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        padding: 10px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        /* Remove spinner arrows */
+        -moz-appearance: textfield;
+    }
+
+    /* Remove spinner arrows for Chrome, Safari, Edge */
+    .quantity-input::-webkit-outer-spin-button,
+    .quantity-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+//---------------------------------Gear Popup Start----------------------------------
+    /* Gear Popup Styles */
+
+    #gearPopup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-height: 70vh; /* Limit height to 70% of the viewport */
+        background-color: #cfcfcf;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 1000;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        padding: 0;
+        display: none; /* Default is hidden */
+        flex-direction: column;
+        overflow: hidden; /* Prevent overflowing */
+        font-size: 1.3rem !important;
+    }
+
+    /* Add padding to make sure content is not blocked by the button */
+    #gearContainer {
+        flex: 1; /* Make the content area take up available space */
+        overflow-y: auto; /* Enable scrolling within this area */
+        padding: 20px;
+        box-sizing: border-box; /* Ensure padding is included in the width/height calculation */
+    }
+
+    /* Footer styling for gear */
+    #gearPopup .footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: sticky;
+        bottom: 0;
+        padding: 10px;
+        background-color: #cfcfcf; 
+        border-top: 1px solid #ccc;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Close button styling for gear */
+    #gearPopup .close-button {
+        background-color: #f44336; /* Red color for the button */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        width: 100px;
+    }
+
+    #gearPopup .close-button:hover {
+        background-color: #d32f2f;
+    }
+
+    /* Ensure last gear box is fully visible before cutting */
+    #gearContainer .gear-item-container:last-child {
+        margin-bottom: 40px; /* Add some margin to ensure it's not cut off */
+    }
+
+    /* Gear box (identical to feats) */
+    .gear-item-container {
+        border: 2px solid black;
+        border-radius: 10px;
+        margin: 10px;
+        padding: 10px;
+        width: 95%;
+        box-sizing: border-box; /* Ensures padding doesn’t overflow */
+        background-color: #fff; /* Ensure consistent background */
+    }
+
+    /* Gear name header */
+    .gear-name-header {
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: black; /* Same as Buffs */
+    }
+
+    /* Gear effect box */
+    .gear-effect-box {
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 10px;
+        text-align: left;
+        height: auto;
+        background-color: #f9f9f9; /* Background color */
+        color: black; /* Same color as Buffs */
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Add subtle shadow */
+    }
+//---------------------------------Gear Popup End----------------------------------
+
+    .popup-button {
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        width: 80%;
+        text-align: center;
+    }
+
+    .popup-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 700px;
+        background-color: white;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 1000;
+        padding: 20px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+    }
+
+    .popup h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .popup-content {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-bottom: 20px;
+    }
+
+    .close-button {
+        display: block;
+        margin: 0 auto;
+        padding: 10px 20px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+
+    .close-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .button.disabled {
+        background-color: #ccc;
+        color: #666;
+        cursor: not-allowed;
+    }
+
+    #trainerPathList {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr); /* Two columns */
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .locked-message {
+        text-align: center;
+        font-size: 1.2rem;
+        color: gray;
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+
+    /* Custom Confirmation and Notification Boxes */
+    .custom-message-box {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        border: 2px solid black;
+        border-radius: 10px;
+        padding: 20px;
+        z-index: 1001;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .custom-message-box h3 {
+        margin-top: 0;
+    }
+
+    .custom-message-box .button-container {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .inventory-sidebar {
+        width: 400px;
+        background-color: #2c2c2c;
+        color: white;
+        padding: 0;
+        overflow-y: auto;
+        border-right: 2px solid #333;
+    }
+
+    .inventory-title {
+        padding: 20px;
+        margin: 0;
+        background-color: #f44336;
+        color: white;
+        font-size: 1.8rem;
+        text-align: center;
+        border-bottom: 2px solid #333;
+    }
+
+    .inventory-categories {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .category-header {
+        padding: 18px 24px;
+        background-color: #3a3a3a;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #444;
+        transition: all 0.2s ease;
+        font-size: 1.3rem;
+    }
+
+    .category-header:hover {
+        background-color: #4a4a4a;
+        padding-left: 28px;
+    }
+
+    .category-header.active {
+        background-color: #f44336;
+        color: white;
+    }
+
+    .item-list {
+        background-color: #2c2c2c;
+        padding: 0;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+    }
+
+    .item-list.expanded {
+        max-height: 500px;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .arrow {
+        transition: transform 0.2s ease;
+        font-size: 1rem;
+    }
+
+    .category-header.active .arrow {
+        transform: rotate(90deg);
+    }
+
+    /* Skill container */
+    /* Limit the height of the popup to 70% of the viewport */
+    #trainerSkillsPopup,
+    #affinityPopup,
+    #specializationPopup,
+    #featsPopup,
+    #trainerPathPopup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-height: 70vh; /* Limit height to 70% of the viewport */
+        background-color: #cfcfcf;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 1000;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        padding: 0;
+        display: none; /* Default is hidden */
+        flex-direction: column;
+        overflow: hidden; /* Prevent overflowing */
+        font-size: 1.3rem !important;
+    }
+
+    /* Add padding to make sure content is not blocked by the button */
+    #skillContainer,
+    #affinityContainer,
+    #specializationContainer,
+    #featsContainer,
+    #trainerPathContainer {
+        flex: 1; /* Make the content area take up available space */
+        overflow-y: auto; /* Enable scrolling within this area */
+        padding: 20px;
+        box-sizing: border-box; /* Ensure padding is included in the width/height calculation */
+    }
+
+    #closeButtonContainer {
+        flex-shrink: 0; /* Prevents the footer from shrinking */
+        padding: 10px;
+        background-color: white; /* Matches the rest of the popup */
+        text-align: center;
+        border-top: 1px solid #ccc; /* Separate footer visually */
+    }
+
+    #trainerSkillsPopup .footer,
+    #affinityPopup .footer,
+    #specializationPopup .footer,
+    #featsPopup .footer,
+    #trainerPathPopup .footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: sticky;
+        bottom: 0;
+        padding: 10px;
+        background-color: #cfcfcf; /* Change footer background to white */
+        border-top: 1px solid #ccc;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Close button styling */
+    #trainerSkillsPopup .close-button,
+    #affinityPopup .close-button,
+    #specializationPopup .close-button,
+    #featsPopup .close-button,
+    #trainerPathPopup .close-button {
+        background-color: #f44336; /* Red color for the button */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        width: 100px;
+    }
+
+    #trainerSkillsPopup .close-button:hover,
+    #affinityPopup .close-button:hover,
+    #specializationPopup .close-button:hover,
+    #featsPopup .close-button:hover,
+    #trainerPathPopup .close-button:hover {
+        background-color: #d32f2f;
+    }
+
+    /* Ensure last skill box is fully visible before cutting */
+    #skillContainer .skill-item-container:last-child,
+    #affinityContainer .affinity-item-container:last-child,
+    #specializationContainer .specialization-item-container:last-child,
+    #featsContainer .feats-item-container:last-child,
+    #trainerPathContainer .trainer-path-item-container:last-child {
+        margin-bottom: 40px; /* Add some margin to ensure it's not cut off */
+    }
+
+// -------------- Section for affinity specific styling ------------------------
+    #affinitySelectionPopup {
+        display: none;
+        flex-direction: column;
+        justify-content: space-between;
+        height: auto;
+    }
+
+    .affinity-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); /* 3 columns */
+        grid-template-rows: repeat(6, auto); /* 6 rows */
+        gap: 10px;
+        margin-bottom: 20px; /* Add spacing between grid and effect box */
+    }
+
+    .affinity-item {
+        padding: 10px;
+        border-radius: 5px;
+        text-align: center;
+        background-color: #f44336;
+        color: white;
+        cursor: pointer;
+        border: 1px solid black;
+        transition: background-color 0.3s ease;
+    }
+
+    .affinity-selection-effect-box {
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 10px;
+        text-align: left;
+        height: auto;
+        background-color: #f0f9ff; /* Light blue to differentiate */
+        color: black; /* Text color */
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        margin-top: 15px; /* Add space between grid and effect box */
+        font-size: 1.2rem; /* Adjust font size for better readability */
+        line-height: 1.5; /* Improved text spacing */
+    }
+
+    .affinity-item:hover {
+        background-color: darkred;
+    }
+
+    .footer {
+        display: flex;
+        justify-content: space-between; /* Make sure buttons are side by side */
+    }
+// -------------- Section for affinity specific styling ------------------------
+
+// -------------- Section for specialization specific styling ------------------------
+    #specializationSelectionPopup {
+        display: none;
+        flex-direction: column;
+        justify-content: space-between;
+        height: auto;
+    }
+
+    .specialization-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); /* 3 columns */
+        grid-template-rows: repeat(6, auto); /* 6 rows */
+        gap: 10px;
+        margin-bottom: 20px; /* Add spacing between grid and effect box */
+    }
+
+    .specialization-item {
+        padding: 10px;
+        border-radius: 5px;
+        text-align: center;
+        background-color: #f44336;
+        color: white;
+        cursor: pointer;
+        border: 1px solid black;
+        transition: background-color 0.3s ease;
+    }
+
+    .specialization-selection-effect-box {
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 10px;
+        text-align: left;
+        height: auto;
+        background-color: #f0f9ff; /* Light blue to differentiate */
+        color: black; /* Text color */
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        margin-top: 15px; /* Add space between grid and effect box */
+        font-size: 1.2em; /* Adjust font size for better readability */
+        line-height: 1.5; /* Improved text spacing */
+    }
+
+    .specialization-item:hover {
+        background-color: darkred;
+    }
+// -------------- Section for specialization specific styling ------------------------
+
+    /* Skill box */
+    .skill-item-container,
+    .affinity-item-container,
+    .specialization-item-container,
+    .feats-item-container,
+    .trainer-path-item-container {
+        border: 2px solid black;
+        border-radius: 10px;
+        margin: 10px;
+        padding: 10px;
+        width: 95%;
+        box-sizing: border-box; /* Ensures padding doesn’t overflow */
+        background-color: #fff; /* Ensure consistent background */
+    }
+
+    /* Skill name header */
+    .skill-name-header,
+    .affinity-name-header,
+    .specialization-name-header,
+    .feats-name-header,
+    .trainer-path-name-header {
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: black; /* Same as Buffs */
+    }
+
+    .skill-effect-box,
+    .affinity-effect-box,
+    .specialization-effect-box, 
+    .feats-effect-box,
+    .trainer-path-effect-box {
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 10px;
+        text-align: left;
+        height: auto;
+        background-color: #f9f9f9; /* Background color */
+        color: black; /* Same color as Buffs */
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Add subtle shadow */
+    }
+</style>
+
+<h1>Trainer Info</h1>
+
+<div class="trainer-info-container">
+    <!-- Left Side: Trainer Image and Info -->
+    <div class="trainer-image-container">
+        <img id="trainerImage" src="https://via.placeholder.com/350" alt="Trainer Image">
+        <div class="trainer-details-container">
+            <div class="stat-item">
+                <div class="stat-label">Name:</div>
+                <div id="trainerName" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Level:</div>
+                <div id="trainerLevel" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">League Points:</div>
+                <div id="trainerLeaguePoints" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Saving Throws:</div>
+                <div id="trainerSavingThrows" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Speed:</div>
+                <div id="trainerSpeed" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Initiative:</div>
+                <div id="trainerInitiative" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Proficiency:</div>
+                <div id="trainerProficiency" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">HD:</div>
+                <div id="trainerHD" class="stat-value"></div>
+                <div class="stat-label" style="margin-left: 10px;">VD:</div>
+                <div id="trainerVD" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Money:</div>
+                <button id="trainerMoney" class="button" onclick="showMoneyPopup()"></button>
+            </div>
+            <div class="button-container">
+                <button class="button" onclick="showInventory()">Inventory</button>
+                <button id="affinityButton" class="button" onclick="showAffinityPopup()">Affinity</button>
+                <button id="specializationButton" class="button" onclick="showSpecializationPopup()">Specialization</button>
+                <button id="trainerPathButton" class="button" onclick="showTrainerPathPopup()">Trainer Path</button>
+                <button id="featsButton" class="button" onclick="showFeatsPopup()">Feats</button>
+                <button id="gearButton" class="button" onclick="showGearPopup()">Gear</button>
+                <button id="trainerSkillsButton" class="button" onclick="showTrainerSkillsPopup()">Trainer Buffs</button>
+                <button id="combatTrackerButton" class="button" onclick="showCombatTrackerPopup()">Combat Tracker</button>
+                <button id="editTrainerButton" class="button" style="background-color: gray;" onclick="NavigationManager.navigate('edit_trainer')">Edit Trainer</button>
+            </div>
+            <div id="addItemPopup" class="inventory-modal">
+                <div class="inventory-modal-content">
+                    <div class="modal-header">
+                        <h2>Add Item to Inventory</h2>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="itemSearch">Search for Item</label>
+                            <input type="text" id="itemSearch" placeholder="Start typing to search..." autocomplete="off">
+                            <div id="autocompleteResults" class="autocomplete-dropdown"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="itemQuantity">Quantity</label>
+                            <input type="number" id="itemQuantity" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="action-btn primary" onclick="addItemToInventory()">
+                            <span class="btn-icon">➕</span>
+                            <span class="btn-text">Add</span>
+                        </button>
+                        <button class="action-btn secondary" onclick="backToInventory()">
+                            <span class="btn-icon">↩️</span>
+                            <span class="btn-text">Back</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Item Popup -->
+            <div id="editItemPopup" class="inventory-modal">
+                <div class="inventory-modal-content">
+                    <div class="modal-header">
+                        <h2>Edit Item Quantity</h2>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Item</label>
+                            <div class="item-preview" id="editingItemName">Item Name</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <div class="quantity-control">
+                                <button type="button" class="quantity-btn" onclick="decrementQuantity()">−</button>
+                                <input type="number" id="editItemQuantity" class="quantity-input" value="1" min="0">
+                                <button type="button" class="quantity-btn" onclick="incrementQuantity()">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="action-btn primary" onclick="saveItemEdits()">
+                            <span class="btn-icon">💾</span>
+                            <span class="btn-text">Save</span>
+                        </button>
+                        <button class="action-btn" onclick="closeEditItemPopup()">
+                            <span class="btn-icon">↩️</span>
+                            <span class="btn-text">Back</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="affinityPopup" class="popup">
+                <h2>Affinity</h2>
+                <div id="affinityDetails"></div>
+                <!-- Footer section with Close Button -->
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('affinityPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="affinitySelectionPopup" class="popup">
+                <h2>Select Affinity</h2>
+                <div class="affinity-grid">
+                    <!-- Affinity buttons will be dynamically generated here -->
+                </div>
+                <div class="affinity-selection-effect-box">
+                    <!-- Short effect or improved short effect will be shown here -->
+                    Select an affinity to see its effect.
+                </div>
+                <div class="footer">
+                    <button id="chooseAffinityButton" class="popup-button" disabled>Choose Affinity</button>
+                    <button class="popup-button" onclick="closePopup('affinitySelectionPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="specializationPopup" class="popup">
+                <h2>Specialization</h2>
+                <div id="specializationDetails"></div>
+                <!-- Footer section with Close Button -->
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('specializationPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="specializationSelectionPopup" class="popup">
+                <h2>Select Specialization</h2>
+                <div class="specialization-grid">
+                    <!-- Specialization buttons will be dynamically generated here -->
+                </div>
+                <div class="specialization-selection-effect-box">
+                    <!-- Short effect will be shown here -->
+                    Select a specialization to see its effect.
+                </div>
+                <div class="footer">
+                    <button id="chooseSpecializationButton" class="popup-button" disabled>Choose Specialization</button>
+                    <button class="popup-button" onclick="closePopup('specializationSelectionPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="trainerPathPopup" class="popup">
+                <h2>Trainer Path</h2>
+                <div id="trainerPathContainer"></div>
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('trainerPathPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="featsPopup" class="popup">
+                <h2>Feats</h2>
+                <div id="featsContainer" class="feats-container">
+                    <!-- Feats will be dynamically populated here -->
+                </div>
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('featsPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="gearPopup" class="popup">
+                <h2>Gear</h2>
+                <div id="gearContainer" class="gear-container">
+                    <!-- Gear will be dynamically populated here -->
+                </div>
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('gearPopup')">Close</button>
+                </div>
+            </div>
+
+            <!-- Trainer Buffs Popup -->
+            <div id="trainerSkillsPopup" class="popup">
+                <h2>Trainer Buffs</h2>
+                <div id="skillContainer"></div>
+                <!-- Footer section with Close Button -->
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('trainerSkillsPopup')">Close</button>
+                </div>
+            </div>
+
+            <!-- Combat Tracker Popup -->
+            <div id="combatTrackerPopup" class="popup" style="background-color: #cfcfcf;">
+                <h2>Combat Tracker</h2>
+                <div class="popup-content" style="display: flex; flex-direction: column; align-items: center; background-color: #cfcfcf;">
+                    <div style="display: flex; justify-content: space-around; width: 100%; max-width: 600px;">
+                        <!-- HP Section -->
+                        <div style="flex: 1; margin-right: 20px; text-align: center;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label for="currentHP" style="text-align: center; width: 100%; font-size: 1.2rem;">Current HP</label>
+                                <input type="text" id="currentHP" style="width: 80px; padding: 8px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 5px; text-align: center;" readonly>
+                                <label for="hpChangeInput" style="text-align: center; width: 100%; margin-top: 10px; font-size: 1.2rem;">Add / Remove HP</label>
+                                <input type="text" id="hpChangeInput" style="width: 80px; padding: 8px; font-size: 1.3rem; border-radius: 5px; text-align: center;">
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('HP', 'add')">Add</button>
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('HP', 'remove')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- VP Section -->
+                        <div style="flex: 1; text-align: center;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label for="currentVP" style="text-align: center; width: 100%; font-size: 1.2rem;">Current VP</label>
+                                <input type="text" id="currentVP" style="width: 80px; padding: 8px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 5px; text-align: center;" readonly>
+                                <label for="vpChangeInput" style="text-align: center; width: 100%; margin-top: 10px; font-size: 1.2rem;">Add / Remove VP</label>
+                                <input type="text" id="vpChangeInput" style="width: 80px; padding: 8px; font-size: 1.3rem; border-radius: 5px; text-align: center;">
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('VP', 'add')">Add</button>
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('VP', 'remove')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Close Button -->
+                    <button class="close-button" onclick="closePopup('combatTrackerPopup')" style="margin-top: 20px;">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Side: Main Stats and Ability Scores -->
+    <div class="right-column">
+        <div class="stat-main-container">
+            <div class="stat-box-container">
+                <div class="stat-label-box">AC</div>
+                <div class="stat-box" id="trainerAC">AC</div>
+            </div>
+            <div class="stat-box-container">
+                <div class="stat-label-box">HP</div>
+                <div class="stat-box" id="trainerHP">HP</div>
+            </div>
+            <div class="stat-box-container">
+                <div class="stat-label-box">VP</div>
+                <div class="stat-box" id="trainerVP">VP</div>
+            </div>
+        </div>
+        <div class="ability-container">
+            <div class="ability-group">
+                <div class="stat-label-box">STR</div>
+                <div class="ability-box" id="trainerSTR">STR</div>
+                <div class="modifier-box" id="strmodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">DEX</div>
+                <div class="ability-box" id="trainerDEX">DEX</div>
+                <div class="modifier-box" id="dexmodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">CON</div>
+                <div class="ability-box" id="trainerCON">CON</div>
+                <div class="modifier-box" id="conmodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">INT</div>
+                <div class="ability-box" id="trainerINT">INT</div>
+                <div class="modifier-box" id="intmodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">WIS</div>
+                <div class="ability-box" id="trainerWIS">WIS</div>
+                <div class="modifier-box" id="wismodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">CHA</div>
+                <div class="ability-box" id="trainerCHA">CHA</div>
+                <div class="modifier-box" id="chamodifier">MOD</div>
+            </div>
+        </div>
+        <div class="skills-container">
+            <h2>Skills:</h2>
+            <div id="skillsGrid" class="skills-grid">
+                <!-- Skills will be dynamically generated here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Inventory Popup -->
+<div id="inventoryPopup" class="inventory-popup">
+    <div class="inventory-popup-content">
+        <div class="inventory-sidebar">
+            <h2 class="inventory-title">Inventory</h2>
+            <ul id="inventoryList" class="inventory-categories">
+                <!-- Categories will be dynamically populated -->
+            </ul>
+        </div>
+        <div class="inventory-main">
+            <div class="item-info-card">
+                <h3 class="item-name" id="selectedItemName">Select an item</h3>
+                <div class="item-details">
+                    <div class="detail-section">
+                        <h4>Description</h4>
+                        <p id="descriptionText">Choose an item from your inventory to view its details.</p>
+                    </div>
+                    <div class="detail-divider"></div>
+                    <div class="detail-section">
+                        <h4>Effect</h4>
+                        <p id="effectText">Item effects will appear here.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="inventory-actions">
+                <button class="action-btn" id="addItemButton" onclick="addItem()">
+                    <span class="btn-icon">➕</span>
+                    <span class="btn-text">Add</span>
+                </button>
+                <button class="action-btn" id="editItemButton" onclick="editItem()" disabled>
+                    <span class="btn-icon">✏️</span>
+                    <span class="btn-text">Edit</span>
+                </button>
+                <button class="action-btn" id="removeItemButton" onclick="removeItem()" disabled>
+                    <span class="btn-icon">🗑️</span>
+                    <span class="btn-text">Remove</span>
+                </button>
+                <button class="action-btn close-btn" onclick="closeInventoryPopup()">
+                    <span class="btn-icon">✖️</span>
+                    <span class="btn-text">Close</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Money Popup -->
+<div id="moneyPopup" class="popup" style="background-color: #cfcfcf;">
+    <h2>Edit Money</h2>
+    <div class="popup-content" style="display: flex; flex-direction: column; align-items: center; background-color: #cfcfcf;">
+        <div style="width: 100%; max-width: 400px;">
+            <!-- Balance Row -->
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <label for="currentMoney" style="margin-right: 10px; text-align: right; width: 200px; font-size: 1.3rem;">Balance:</label>
+                <input type="number" id="currentMoney" style="width: 200px; padding: 10px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 10px; border: 1px solid #ccc;" readonly>
+            </div>
+
+            <!-- Add / Remove Money Row -->
+            <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                <label for="moneyChangeInput" style="margin-right: 10px; text-align: right; width: 200px; font-size: 1.3rem;">Add / Remove Money:</label>
+                <input type="number" id="moneyChangeInput" style="width: 200px; padding: 10px; font-size: 1.3rem; border-radius: 10px; border: 1px solid #ccc;">
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+            <button class="popup-button" style="width: 120px; font-size: 1.2rem;" onclick="updateMoney('add')">Add Money</button>
+            <button class="popup-button" style="width: 120px; font-size: 1.2rem;" onclick="updateMoney('remove')">Remove Money</button>
+        </div>
+
+        <!-- Close Button -->
+        <button class="close-button" onclick="closePopup('moneyPopup')" style="margin-top: 20px;">Close</button>
+    </div>
+</div>
+
+<!-- Custom Message Boxes -->
+<div id="confirmDeleteBox" class="inventory-modal">
+    <div class="inventory-modal-content">
+        <div class="modal-header warning">
+            <h2>Confirm Removal</h2>
+        </div>
+        <div class="modal-body">
+            <p class="confirmation-text">Are you sure you want to remove this item from your inventory?</p>
+            <div class="item-preview" id="itemToRemove"></div>
+        </div>
+        <div class="modal-actions">
+            <button class="action-btn danger" onclick="confirmRemoval(true)">
+                <span class="btn-icon">🗑️</span>
+                <span class="btn-text">Remove</span>
+            </button>
+            <button class="action-btn secondary" onclick="confirmRemoval(false)">
+                <span class="btn-icon">✖️</span>
+                <span class="btn-text">Cancel</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="notificationBox" class="custom-message-box">
+    <h3>Notification</h3>
+    <p id="notificationMessage"></p>
+    <div class="button-container">
+        <button class="popup-button" onclick="closeNotification()">OK</button>
+    </div>
+</div>
+
+<!-- Add the Pokeball line and button -->
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+<audio id="new-item-audio">
+  <source src="https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/New%20Item.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+    if (typeof selectedInventoryItem === 'undefined') {
+        var selectedInventoryItem = null;
+    }
+
+    function loadTrainerInfo() {
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+
+        if (!trainerDataRaw || trainerDataRaw === "undefined") {
+            console.error('Trainer data not found or is undefined.');
+            return;
+        }
+
+        try {
+            const trainerData = JSON.parse(trainerDataRaw);
+            if (!trainerData) {
+                console.error('Trainer data could not be parsed.');
+                return;
+            }
+
+            function setTextContentIfExists(elementId, value) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = value || '';
+                }
+            }
+
+            function setTextContentIfExistsStats(elementId, value) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = value || '0';
+                }
+            }
+
+            document.getElementById('trainerImage').src = trainerData[0] || 'https://via.placeholder.com/350';
+            setTextContentIfExists('trainerName', trainerData[1]);
+            setTextContentIfExists('trainerLevel', trainerData[2]);
+            setTextContentIfExists('trainerMoney', trainerData[19]);
+            setTextContentIfExists('trainerLeaguePoints', trainerData[21]);
+            setTextContentIfExists('trainerSavingThrows', trainerData[15]);
+            setTextContentIfExists('trainerSpeed', trainerData[14]);
+            setTextContentIfExists('trainerInitiative', trainerData[16]);
+            setTextContentIfExists('trainerProficiency', trainerData[17]);
+            setTextContentIfExists('trainerHD', trainerData[3]);
+            setTextContentIfExists('trainerVD', trainerData[4]);
+
+            // Update stat boxes
+            setTextContentIfExists('trainerAC', trainerData[13]);
+            setTextContentIfExists('trainerHP', trainerData[11]);
+            setTextContentIfExists('trainerVP', trainerData[12]);
+
+            // Update STR, DEX, CON, INT, WIS, CHA and their modifiers
+            setTextContentIfExistsStats('trainerSTR', trainerData[5]);
+            setTextContentIfExistsStats('strmodifier', trainerData[27]);
+            setTextContentIfExistsStats('trainerDEX', trainerData[6]);
+            setTextContentIfExistsStats('dexmodifier', trainerData[28]);
+            setTextContentIfExistsStats('trainerCON', trainerData[7]);
+            setTextContentIfExistsStats('conmodifier', trainerData[29]);
+            setTextContentIfExistsStats('trainerINT', trainerData[8]);
+            setTextContentIfExistsStats('intmodifier', trainerData[30]);
+            setTextContentIfExistsStats('trainerWIS', trainerData[9]);
+            setTextContentIfExistsStats('wismodifier', trainerData[31]);
+            setTextContentIfExistsStats('trainerCHA', trainerData[10]);
+            setTextContentIfExistsStats('chamodifier', trainerData[32]);
+
+            // New attributes
+            setTextContentIfExists('trainerFeats', trainerData[33]);
+            setTextContentIfExists('currentHP', trainerData[34]);
+            setTextContentIfExists('currentVP', trainerData[35]);
+            setTextContentIfExists('currentAC', trainerData[36]);
+            setTextContentIfExists('gear', trainerData[37]);
+
+            // Skills
+            const skillsGrid = document.getElementById('skillsGrid');
+            skillsGrid.innerHTML = ''; // Clear existing skills
+            const allSkills = [
+                "Athletics (STR)", "Acrobatics (DEX)", "Sleight of Hand (DEX)", "Stealth (DEX)",
+                "Arcana (INT)", "History (INT)", "Investigation (INT)", "Nature (INT)", "Religion (INT)",
+                "Animal Handling (WIS)", "Insight (WIS)", "Medicine (WIS)", "Perception (WIS)",
+                "Survival (WIS)", "Deception (CHA)", "Intimidation (CHA)", "Performance (CHA)", "Persuasion (CHA)"
+            ];
+            const unlockedSkills = trainerData[18] ? trainerData[18].split(',').map(skill => skill.trim()) : [];
+
+            allSkills.forEach(skill => {
+                const skillItem = document.createElement('div');
+                skillItem.className = 'skill-item';
+
+                const skillName = skill.split(' (')[0];
+                const skillModifier = `(${skill.split(' (')[1]}`;
+
+                const skillNameElement = document.createElement('div');
+                skillNameElement.textContent = skillName;
+
+                const skillModifierElement = document.createElement('div');
+                skillModifierElement.className = 'modifier';
+                skillModifierElement.textContent = skillModifier;
+
+                skillItem.appendChild(skillNameElement);
+                skillItem.appendChild(skillModifierElement);
+
+                if (unlockedSkills.includes(skillName)) {
+                    skillItem.classList.add('highlight');
+                }
+
+                skillsGrid.appendChild(skillItem);
+            });
+
+        } catch (error) {
+            console.error('Failed to load trainer info:', error);
+        }
+    }
+
+    // Function to open inventory popup
+    function showInventory() {
+        const inventoryPopup = document.getElementById('inventoryPopup');
+        inventoryPopup.style.display = 'block';
+
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+        if (trainerDataRaw) {
+            const trainerData = JSON.parse(trainerDataRaw);
+            const inventoryListElement = document.getElementById('inventoryList');
+            inventoryListElement.innerHTML = ''; // Clear previous content
+
+            const itemsDataRaw = sessionStorage.getItem('items');
+            if (itemsDataRaw) {
+                const itemsData = JSON.parse(itemsDataRaw);
+
+                // Group the items by type
+                const groupedItems = groupItemsByType(itemsData, trainerData[20]);
+
+                // Render each item type as a collapsible section
+                Object.entries(groupedItems).forEach(([type, items]) => {
+                    if (items.length > 0) {
+                        // Create the category list item
+                        const categoryLi = document.createElement('li');
+
+                        // Create the category header
+                        const header = document.createElement('div');
+                        header.classList.add('category-header');
+                        header.innerHTML = `<span>${type}</span><span class="arrow">▶</span>`;
+                        categoryLi.appendChild(header);
+
+                        // Create the collapsible content for the items
+                        const itemList = document.createElement('div');
+                        itemList.classList.add('item-list');
+
+                        items.forEach(item => {
+                            const itemDiv = document.createElement('div');
+                            itemDiv.classList.add('inventory-list-item');
+                            itemDiv.innerHTML = `${item.name}<span>(x${item.quantity})</span>`;
+                            itemDiv.onclick = () => selectItem(`${item.name} (x${item.quantity})`, itemDiv);
+                            itemList.appendChild(itemDiv);
+                        });
+
+                        categoryLi.appendChild(itemList);
+                        inventoryListElement.appendChild(categoryLi);
+
+                        // Add click event to toggle the category
+                        header.addEventListener('click', () => {
+                            const isExpanded = itemList.classList.contains('expanded');
+                            
+                            // Close all other categories
+                            document.querySelectorAll('.item-list').forEach(list => {
+                                list.classList.remove('expanded');
+                            });
+                            document.querySelectorAll('.category-header').forEach(h => {
+                                h.classList.remove('active');
+                                h.querySelector('.arrow').textContent = '▶';
+                            });
+                            
+                            // Toggle current category
+                            if (!isExpanded) {
+                                itemList.classList.add('expanded');
+                                header.classList.add('active');
+                                header.querySelector('.arrow').textContent = '▼';
+                            }
+                        });
+                    }
+                });
+            }
+        }
+    }
+
+    // Function to group items by type
+    function groupItemsByType(itemsData, inventoryString) {
+        const inventoryItems = inventoryString ? inventoryString.split(',').map(item => item.trim()) : [];
+        const groupedItems = {};
+
+        inventoryItems.forEach(itemStr => {
+            const [name, quantity] = itemStr.split(' (x');
+            const item = itemsData.find(i => i.name === name);
+            if (item) {
+                const type = item.type || "Misc";  // Fallback to "Misc" if no type is defined
+                if (!groupedItems[type]) {
+                    groupedItems[type] = [];
+                }
+                groupedItems[type].push({ ...item, quantity: quantity.replace(')', '') });
+            }
+        });
+
+        return groupedItems;
+    }
+
+    function selectItem(item, listItemElement) {
+      // Remove the highlight from any previously selected item
+      const inventoryItems = document.getElementsByClassName('inventory-list-item');
+      for (let i = 0; i < inventoryItems.length; i++) {
+          inventoryItems[i].classList.remove('selected');
+      }
+
+      // Highlight the selected item
+      listItemElement.classList.add('selected');
+
+      // Enable the Edit and Remove buttons
+      selectedInventoryItem = item;
+      document.getElementById('editItemButton').disabled = false;
+      document.getElementById('removeItemButton').disabled = false;
+
+      // Update the item name header
+      const itemNameElement = document.getElementById('selectedItemName');
+      if (itemNameElement) {
+          itemNameElement.textContent = item.split(' (x')[0];
+      }
+
+      // Display the item description and effect
+      const descriptionBox = document.getElementById('descriptionText');
+      const effectBox = document.getElementById('effectText');
+      const itemsDataRaw = sessionStorage.getItem('items');
+
+      if (itemsDataRaw) {
+          const itemsData = JSON.parse(itemsDataRaw);
+
+          // Extract the item name by removing any quantity in parentheses
+          const selectedItemName = item.split(' (')[0];
+
+          // Find the selected item in the itemsData array
+          const selectedItem = itemsData.find(item => item.name === selectedItemName);
+
+          if (selectedItem) {
+              descriptionBox.textContent = selectedItem.description || "No description available.";
+              effectBox.textContent = selectedItem.effect || "No effect available.";
+          } else {
+              descriptionBox.textContent = "No description available.";
+              effectBox.textContent = "No effect available.";
+          }
+      } else {
+          descriptionBox.textContent = "No description available.";
+          effectBox.textContent = "No effect available.";
+      }
+  }
+
+    function closeInventoryPopup() {
+        const inventoryPopup = document.getElementById('inventoryPopup');
+        inventoryPopup.style.display = 'none';
+    }
+
+    function editItem() {
+        if (!selectedInventoryItem) return;
+
+        // Extract item name and current quantity
+        const [itemName, quantityPart] = selectedInventoryItem.split(' (x');
+        const currentQuantity = parseInt(quantityPart?.replace(')', '') || '1', 10);
+
+        // Set the item name and quantity in the edit popup
+        document.getElementById('editingItemName').textContent = itemName;
+        document.getElementById('editItemQuantity').value = currentQuantity;
+
+        // Show the edit popup
+        closeInventoryPopup();
+        document.getElementById('editItemPopup').style.display = 'block';
+    }
+
+    function incrementQuantity() {
+        const input = document.getElementById('editItemQuantity');
+        const currentValue = parseInt(input.value) || 0;
+        input.value = currentValue + 1;
+    }
+
+    function decrementQuantity() {
+        const input = document.getElementById('editItemQuantity');
+        const currentValue = parseInt(input.value) || 0;
+        if (currentValue > 0) {
+            input.value = currentValue - 1;
+        }
+    }
+
+    function saveItemEdits() {
+        showSpinner();
+
+        const newQuantity = parseInt(document.getElementById('editItemQuantity').value, 10);
+        if (newQuantity < 1) {
+            alert('Quantity must be at least 1.');
+            hideSpinner();
+            return;
+        }
+
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+        if (trainerDataRaw) {
+            const trainerData = JSON.parse(trainerDataRaw);
+            let inventory = trainerData[20] ? trainerData[20].split(',').map(item => item.trim()) : [];
+
+            inventory = inventory.map(item => {
+                const [name, qty] = item.split(' (x');
+                if (name === selectedInventoryItem.split(' (')[0]) {
+                    return `${name} (x${newQuantity})`;
+                }
+                return item;
+            });
+
+            trainerData[20] = inventory.join(', ');
+
+            // Update session storage and write to Google Sheets
+            sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+            google.script.run.withSuccessHandler(() => {
+                console.log('Item quantity updated in Google Sheets.');
+                hideSpinner();
+                closeEditItemPopup();
+                showInventory(); // Refresh the inventory list
+            }).withFailureHandler((error) => {
+                console.error('Failed to update item quantity:', error);
+                alert('Failed to update item quantity. Please try again.');
+                hideSpinner();
+            }).writeItems(trainerData[1], trainerData[20]);
+        }
+    }
+
+    function removeItem() {
+        if (!selectedInventoryItem) return;
+        
+        // Show the item name in the preview
+        const itemPreview = document.getElementById('itemToRemove');
+        if (itemPreview) {
+            itemPreview.textContent = selectedInventoryItem;
+        }
+        
+        // Show the confirmation modal
+        document.getElementById('confirmDeleteBox').style.display = 'block';
+    }
+
+    function confirmRemoval(confirm) {
+        if (confirm) {
+            // Existing removal logic stays the same
+            showSpinner();
+            
+            const trainerDataRaw = sessionStorage.getItem('trainerData');
+            if (trainerDataRaw) {
+                const trainerData = JSON.parse(trainerDataRaw);
+                let inventory = trainerData[20] ? trainerData[20].split(',').map(item => item.trim()) : [];
+                
+                inventory = inventory.filter(item => item.split(' (x')[0] !== selectedInventoryItem.split(' (')[0]);
+                
+                trainerData[20] = inventory.join(', ');
+                
+                // Update session storage and write to Google Sheets
+                sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+                google.script.run.withSuccessHandler(() => {
+                    console.log('Item removed from Google Sheets.');
+                    hideSpinner();
+                    showNotification(`${selectedInventoryItem.split(' (')[0]} has been removed.`);
+                    showInventory(); // Refresh the inventory list
+                }).writeItems(trainerData[1], trainerData[20]);
+            }
+        }
+        
+        // Close the confirmation modal
+        document.getElementById('confirmDeleteBox').style.display = 'none';
+    }
+
+    function showNotification(message) {
+        document.getElementById('notificationMessage').textContent = message;
+        document.getElementById('notificationBox').style.display = 'block';
+    }
+
+    function closeNotification() {
+        document.getElementById('notificationBox').style.display = 'none';
+    }
+
+    function closeEditItemPopup() {
+        document.getElementById('editItemPopup').style.display = 'none';
+        showInventory();
+    }
+
+    function addItem() {
+        console.log("ADDITEMS");
+        console.log(sessionStorage.getItem('items'));
+        closeInventoryPopup();
+        document.getElementById('addItemPopup').style.display = 'block';
+        setupItemAutocomplete();
+    }
+
+    function closeAddItemPopup() {
+        document.getElementById('addItemPopup').style.display = 'none';
+        document.getElementById('itemSearch').value = '';
+        document.getElementById('autocompleteResults').style.display = 'none';
+    }
+
+    function backToInventory() {
+        // Close any open modals
+        document.getElementById('addItemPopup').style.display = 'none';
+        document.getElementById('editItemPopup').style.display = 'none';
+        document.getElementById('confirmDeleteBox').style.display = 'none';
+        
+        // Clear any form inputs
+        document.getElementById('itemSearch').value = '';
+        document.getElementById('itemQuantity').value = '1';
+        document.getElementById('autocompleteResults').style.display = 'none';
+        
+        // Reopen the inventory popup
+        showInventory();
+    }
+
+    // Add the selected item to the inventory
+    function addItemToInventory() {
+        showSpinner();
+
+        const selectedItemName = document.getElementById('itemSearch').value;
+        const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+
+        if (!selectedItemName || quantity < 1 || !trainerDataRaw) {
+            alert('Please select a valid item and quantity.');
+            hideSpinner();
+            return;
+        }
+
+        const trainerData = JSON.parse(trainerDataRaw);
+        let inventory = trainerData[20] ? trainerData[20].split(',').map(item => item.trim()) : [];
+        let found = false;
+
+        inventory = inventory.map(item => {
+            // Extract the item name by removing any quantity in parentheses
+            const [name, qty] = item.split(' (x');
+            if (name === selectedItemName) {
+                found = true;
+                return `${name} (x${parseInt(qty, 10) + quantity})`;
+            }
+            return item;
+        });
+
+        if (!found) {
+            inventory.push(`${selectedItemName} (x${quantity})`);
+        }
+
+        trainerData[20] = inventory.join(', ');
+
+        // Update session storage and write to Google Sheets
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+        google.script.run.withSuccessHandler(() => {
+            var newItemAudio = document.getElementById('new-item-audio');
+            newItemAudio.play();
+            hideSpinner();
+            closeAddItemPopup();
+            showInventory();  // Refresh the inventory list
+        }).writeItems(trainerData[1], trainerData[20]);
+    }
+
+    
+    function setupItemAutocomplete() {       
+        const itemSearch = document.getElementById('itemSearch');
+        const autocompleteResults = document.getElementById('autocompleteResults');
+        
+        // Remove any existing listeners first
+        const newItemSearch = itemSearch.cloneNode(true);
+        itemSearch.parentNode.replaceChild(newItemSearch, itemSearch);
+        
+        // Get reference to the new element
+        const searchInput = document.getElementById('itemSearch');
+        const resultsDiv = document.getElementById('autocompleteResults');
+        
+        // Add input listener
+        searchInput.addEventListener('input', function() {
+            const searchValue = this.value.toLowerCase().trim();
+            
+            if (searchValue.length < 2) {
+                resultsDiv.style.display = 'none';
+                resultsDiv.innerHTML = '';
+                return;
+            }
+            
+            // Get items from session storage
+            const itemsDataRaw = sessionStorage.getItem('items');
+            
+            try {
+                const itemsData = JSON.parse(itemsDataRaw);
+                
+                // Check if itemsData is the actual array or if it's wrapped in an object
+                let itemsArray;
+                if (Array.isArray(itemsData)) {
+                    itemsArray = itemsData;
+                } else if (itemsData && itemsData.items && Array.isArray(itemsData.items)) {
+                    // If it's wrapped in an object with 'items' property
+                    itemsArray = itemsData.items;
+                } else if (itemsData && itemsData.status === 'success' && itemsData.items) {
+                    // If it has the full response structure from loadItemsData()
+                    itemsArray = itemsData.items;
+                } else {
+                    console.error('Items data is not in expected format:', itemsData);
+                    return;
+                }
+                
+                // Filter matches - using normalized search for better matching
+                const matches = itemsArray.filter(item => {
+                    if (item && item.name) {
+                        // Normalize both the search value and item name for better matching
+                        const normalizedItemName = item.name.toLowerCase()
+                            .normalize("NFD")
+                            .replace(/[\u0300-\u036f]/g, "");
+                        const normalizedSearchValue = searchValue
+                            .normalize("NFD")
+                            .replace(/[\u0300-\u036f]/g, "");
+                        
+                        return normalizedItemName.includes(normalizedSearchValue);
+                    }
+                    return false;
+                }).slice(0, 10); // Limit to 10 results
+                
+                // Clear previous results
+                resultsDiv.innerHTML = '';
+                
+                if (matches.length > 0) {
+                    matches.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'autocomplete-item';
+                        div.textContent = item.name;
+                        div.addEventListener('click', function() {
+                            searchInput.value = item.name;
+                            resultsDiv.style.display = 'none';
+                            resultsDiv.innerHTML = '';
+                        });
+                        resultsDiv.appendChild(div);
+                    });
+                    resultsDiv.style.display = 'block';
+                } else {
+                    resultsDiv.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error parsing items data:', error);
+            }
+        });
+        
+        // Hide autocomplete when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+                resultsDiv.style.display = 'none';
+            }
+        });
+    }
+
+
+    function checkButtonAvailability() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const level = trainerData[2];
+
+        if (level < 2) {
+            document.getElementById('affinityButton').classList.add('disabled');
+            document.getElementById('specializationButton').classList.add('disabled');
+        }
+
+        if (level < 3) {
+            document.getElementById('trainerPathButton').classList.add('disabled');
+        }
+    }
+
+    function showAffinityPopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const trainerLevel = trainerData[2]; // Trainer's current level
+        let affinitiesStored = trainerData[23]; // Comma-separated string of affinities
+
+        if (affinitiesStored) {
+            affinitiesStored = affinitiesStored.split(',').map(affinity => affinity.trim());
+        } else {
+            affinitiesStored = [];
+        }
+
+        const affinities = JSON.parse(sessionStorage.getItem('affinities')); // Load all affinities
+
+        const affinityPopup = document.getElementById('affinityPopup');
+        const affinityDetails = document.getElementById('affinityDetails');
+
+        // Clear previous content
+        affinityDetails.innerHTML = '';
+
+        // First Affinity Display
+        const firstAffinityItem = document.createElement('div');
+        firstAffinityItem.classList.add('affinity-item-container');
+
+        const firstAffinityHeader = document.createElement('h3');
+        firstAffinityHeader.classList.add('affinity-name-header');
+
+        if (trainerLevel >= 2 && affinitiesStored.length >= 1) {
+            const firstAffinity = affinitiesStored[0] || "No first affinity found.";
+            firstAffinityHeader.textContent = firstAffinity;
+
+            const firstEffectBox = document.createElement('div');
+            firstEffectBox.classList.add('affinity-effect-box');
+            const firstAffinityData = affinities.find(a => a.name === firstAffinity);
+            firstEffectBox.textContent = firstAffinityData ? firstAffinityData.effect : "No effect found.";
+
+            firstAffinityItem.appendChild(firstAffinityHeader);
+            firstAffinityItem.appendChild(firstEffectBox);
+        } else if (trainerLevel >= 2) {
+            firstAffinityHeader.textContent = "Choose First Affinity";
+
+            const firstEffectBox = document.createElement('div');
+            firstEffectBox.classList.add('affinity-effect-box');
+
+            const chooseAffinityButton = document.createElement('button');
+            chooseAffinityButton.textContent = "Choose Affinity";
+            chooseAffinityButton.classList.add('popup-button');
+            chooseAffinityButton.onclick = () => {
+                closePopup('affinityPopup');
+                showAffinitySelection(affinities, affinitiesStored);
+            };
+            firstEffectBox.appendChild(chooseAffinityButton);
+
+            firstAffinityItem.appendChild(firstAffinityHeader);
+            firstAffinityItem.appendChild(firstEffectBox);
+        }
+
+        affinityDetails.appendChild(firstAffinityItem);
+
+        // Second Affinity Display
+        const secondAffinityItem = document.createElement('div');
+        secondAffinityItem.classList.add('affinity-item-container');
+
+        const secondAffinityHeader = document.createElement('h3');
+        secondAffinityHeader.classList.add('affinity-name-header');
+
+        if (trainerLevel >= 7 && affinitiesStored.length > 1) {
+            const secondAffinity = affinitiesStored[1] || "Improved Affinity";
+            secondAffinityHeader.textContent = secondAffinity;
+
+            const secondEffectBox = document.createElement('div');
+            secondEffectBox.classList.add('affinity-effect-box');
+            const secondAffinityData = affinities.find(a => a.name === secondAffinity);
+
+            // Check if both affinities are the same, and display the improved effect for the second affinity
+            if (secondAffinity === affinitiesStored[0]) {
+                secondEffectBox.textContent = secondAffinityData ? secondAffinityData.improvedEffect : "No improved effect available.";
+            } else {
+                secondEffectBox.textContent = secondAffinityData ? secondAffinityData.effect : "No effect available.";
+            }
+
+            secondAffinityItem.appendChild(secondAffinityHeader);
+            secondAffinityItem.appendChild(secondEffectBox);
+        } else if (trainerLevel >= 7) {
+            secondAffinityHeader.textContent = "Improved Affinity";
+
+            const secondEffectBox = document.createElement('div');
+            secondEffectBox.classList.add('affinity-effect-box');
+
+            const chooseAffinityButton = document.createElement('button');
+            chooseAffinityButton.textContent = "Choose Affinity";
+            chooseAffinityButton.classList.add('popup-button');
+            chooseAffinityButton.onclick = () => {
+                closePopup('affinityPopup');
+                showAffinitySelection(affinities, affinitiesStored);
+            };
+            secondEffectBox.appendChild(chooseAffinityButton);
+
+            secondAffinityItem.appendChild(secondAffinityHeader);
+            secondAffinityItem.appendChild(secondEffectBox);
+        } else {
+            secondAffinityHeader.textContent = "Improved Affinity";
+
+            const secondEffectBox = document.createElement('div');
+            secondEffectBox.classList.add('affinity-effect-box');
+            secondEffectBox.textContent = "Second affinity unlocks at level 7.";
+
+            secondAffinityItem.appendChild(secondAffinityHeader);
+            secondAffinityItem.appendChild(secondEffectBox);
+        }
+
+        affinityDetails.appendChild(secondAffinityItem);
+
+        // Display the popup
+        affinityPopup.style.display = 'flex';
+    }
+
+    function showAffinitySelection(availableAffinities, selectedAffinities) {
+        let affinitySelectionPopup = document.getElementById('affinitySelectionPopup');
+        const affinityList = document.querySelector('.affinity-grid'); // Affinity button grid
+        const affinityEffectBox = document.querySelector('.affinity-selection-effect-box'); // For displaying effect
+        const chooseAffinityButton = document.getElementById('chooseAffinityButton');
+
+        affinityList.innerHTML = ''; // Clear the list
+        affinityEffectBox.innerHTML = 'Select an affinity to see its effect.'; // Reset the effect box
+        chooseAffinityButton.disabled = true; // Disable the button until an affinity is selected
+
+        // Display all affinities without excluding the first selection
+        availableAffinities.forEach(a => {
+            const listItem = document.createElement('div');
+            listItem.textContent = a.name;
+            listItem.className = 'affinity-item'; // Use the consistent class for buttons
+            listItem.onclick = () => selectAffinity(a); // Attach the selection function
+            affinityList.appendChild(listItem);
+        });
+
+        affinitySelectionPopup.style.display = 'flex'; // Show the popup
+    }
+
+    function selectAffinity(affinity) {
+        const affinityEffectBox = document.querySelector('.affinity-selection-effect-box');
+        
+        // Clear the effect box before displaying anything new
+        affinityEffectBox.innerHTML = '';
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const level2Affinity = trainerData[23] ? trainerData[23].split(',')[0] : null; // First chosen affinity
+
+        let effectToShow = affinity.shortEffect;
+
+        // If choosing the second affinity and it's the same as the first, show improved effects
+        if (trainerData[2] >= 7 && affinity.name === level2Affinity) {
+            effectToShow = affinity.improvedShortEffect || affinity.improvedEffect;
+        }
+
+        // Update the effect box with the selected affinity and effect
+        affinityEffectBox.innerHTML = `<strong>${affinity.name}</strong><p>${effectToShow}</p>`;
+
+        // Enable the 'Choose Affinity' button and set its action
+        const chooseAffinityButton = document.getElementById('chooseAffinityButton');
+        chooseAffinityButton.disabled = false; // Enable the button
+        chooseAffinityButton.onclick = function() {
+            saveAffinity(affinity); // Save the selected affinity
+        };
+    }
+
+    function saveAffinity(selectedAffinity) {
+        if (!selectedAffinity) {
+            console.log("No affinity selected.");
+            return;
+        }
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+
+        // If there is already an affinity saved, append the new one, else just save the selected affinity
+        let affinitiesStored = trainerData[23] ? trainerData[23].split(',').map(aff => aff.trim()) : [];
+
+        // Check if we are adding the first or second affinity
+        if (trainerData[2] < 7) {
+            affinitiesStored[0] = selectedAffinity.name; // Set the first affinity if level < 7
+        } else {
+            affinitiesStored[1] = selectedAffinity.name; // Set the second affinity if level >= 7
+        }
+
+        trainerData[23] = affinitiesStored.join(', ');  // Update with the new comma-separated string
+
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        showSpinner(); // Show the spinner while saving
+
+        // Save the affinity to Google Sheets
+        google.script.run.withSuccessHandler(function() {
+            hideSpinner(); // Hide the spinner after saving
+            closePopup('affinitySelectionPopup');
+            showAffinityPopup(); // Refresh the main affinity popup
+        }).writeAffinity(trainerData[1], trainerData[23]); // Assuming writeAffinity is the function to save data
+    }
+
+
+    function showSpecializationPopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const trainerLevel = trainerData[2]; // Trainer's current level
+        let specializationStored = trainerData[24]; // Comma-separated string of specializations
+
+        if (specializationStored) {
+            specializationStored = specializationStored.split(',').map(specialization => specialization.trim());
+        } else {
+            specializationStored = [];
+        }
+
+        const specializations = JSON.parse(sessionStorage.getItem('specializations')); // Load all specializations
+
+        const specializationPopup = document.getElementById('specializationPopup');
+        const specializationDetails = document.getElementById('specializationDetails');
+
+        // Clear previous content
+        specializationDetails.innerHTML = '';
+
+        // Loop through three stages of specialization: level 2, 10, and 17
+        const specializationStages = [
+            { level: 2, index: 0, label: 'First Specialization' },
+            { level: 10, index: 1, label: 'Second Specialization' },
+            { level: 17, index: 2, label: 'Third Specialization' }
+        ];
+
+        specializationStages.forEach(stage => {
+            const specializationItem = document.createElement('div');
+            specializationItem.classList.add('specialization-item-container');
+
+            const specializationHeader = document.createElement('h3');
+            specializationHeader.classList.add('specialization-name-header');
+
+            if (trainerLevel >= stage.level && specializationStored.length > stage.index) {
+                const specialization = specializationStored[stage.index] || `No ${stage.label.toLowerCase()} found.`;
+                specializationHeader.textContent = specialization;
+
+                const effectBox = document.createElement('div');
+                effectBox.classList.add('specialization-effect-box');
+                const specializationData = specializations.find(s => s.name === specialization);
+                effectBox.textContent = specializationData ? specializationData.effect : "No effect found.";
+
+                specializationItem.appendChild(specializationHeader);
+                specializationItem.appendChild(effectBox);
+            } else if (trainerLevel >= stage.level) {
+                specializationHeader.textContent = `Choose ${stage.label}`;
+
+                const effectBox = document.createElement('div');
+                effectBox.classList.add('specialization-effect-box');
+
+                const chooseSpecializationButton = document.createElement('button');
+                chooseSpecializationButton.textContent = "Choose Specialization";
+                chooseSpecializationButton.classList.add('popup-button');
+                chooseSpecializationButton.onclick = () => {
+                    closePopup('specializationPopup');
+                    showSpecializationSelection(specializations, specializationStored);
+                };
+                effectBox.appendChild(chooseSpecializationButton);
+
+                specializationItem.appendChild(specializationHeader);
+                specializationItem.appendChild(effectBox);
+            } else {
+                specializationHeader.textContent = stage.label;
+
+                const effectBox = document.createElement('div');
+                effectBox.classList.add('specialization-effect-box');
+                effectBox.textContent = `${stage.label} unlocks at level ${stage.level}.`;
+
+                specializationItem.appendChild(specializationHeader);
+                specializationItem.appendChild(effectBox);
+            }
+
+            specializationDetails.appendChild(specializationItem);
+        });
+
+        specializationPopup.style.display = 'flex';
+    }
+
+
+    function showSpecializationSelection(availableSpecialization, selectedSpecialization) {
+        let specializationSelectionPopup = document.getElementById('specializationSelectionPopup');
+        const specializationList = document.querySelector('.specialization-grid'); // Specialization button grid
+        const specializationEffectBox = document.querySelector('.specialization-selection-effect-box'); // For displaying effect
+        const chooseSpecializationButton = document.getElementById('chooseSpecializationButton');
+
+        specializationList.innerHTML = ''; // Clear the list
+        specializationEffectBox.innerHTML = 'Select an specialization to see its effect.'; // Reset the effect box
+        chooseSpecializationButton.disabled = true; // Disable the button until an specialization is selected
+
+        // Display all specialization without excluding the first selection
+        availableSpecialization.forEach(s => {
+            const listItem = document.createElement('div');
+            listItem.textContent = s.name;
+            listItem.className = 'specialization-item'; // Use the consistent class for buttons
+            listItem.onclick = () => selectSpecialization(s); // Attach the selection function
+            specializationList.appendChild(listItem);
+        });
+
+        specializationSelectionPopup.style.display = 'flex'; // Show the popup
+    }
+
+    function selectSpecialization(specialization) {
+        const specializationEffectBox = document.querySelector('.specialization-selection-effect-box');
+        
+        // Clear the effect box before displaying anything new
+        specializationEffectBox.innerHTML = '';
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const level2Specialization = trainerData[24] ? trainerData[24].split(',')[0] : null; // First chosen specialization
+
+        let effectToShow = specialization.shortEffect;
+
+        // Update the effect box with the selected affinity and effect
+        specializationEffectBox.innerHTML = `<strong>${specialization.name}</strong><p>${effectToShow}</p>`;
+
+        // Enable the 'Choose Specialization' button and set its action
+        const chooseSpecializationButton = document.getElementById('chooseSpecializationButton');
+        chooseSpecializationButton.disabled = false; // Enable the button
+        chooseSpecializationButton.onclick = function() {
+            saveSpecialization(specialization); // Save the selected specialization
+        };
+    }
+
+    function saveSpecialization(selectedSpecialization) {
+        if (!selectedSpecialization) {
+            console.log("No specialization selected.");
+            return;
+        }
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+
+        // Get the existing specializations and split them into an array, if any.
+        let specializationsStored = trainerData[24] ? trainerData[24].split(',').map(spe => spe.trim()) : [];
+
+        // Add the selected specialization to the array.
+        specializationsStored.push(selectedSpecialization.name);
+
+        // Convert the array back to a comma-separated string.
+        trainerData[24] = specializationsStored.join(', ');
+
+        // Update the session storage with the new specializations.
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        showSpinner(); // Show the spinner while saving
+
+        // Save the specializations to Google Sheets.
+        google.script.run.withSuccessHandler(function() {
+            hideSpinner(); // Hide the spinner after saving
+            closePopup('specializationSelectionPopup');
+            showSpecializationPopup(); // Refresh the main specialization popup
+        }).writeSpecialization(trainerData[1], trainerData[24]); // Assuming `writeSpecialization` is the function to save data.
+    }
+
+    function showTrainerPathPopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const trainerLevel = trainerData[2];  // Trainer's current level
+        let trainerPathName = trainerData[25]; // Get the stored trainer path name
+
+        const trainerPaths = JSON.parse(sessionStorage.getItem('trainerPaths')); // Load all trainer paths
+
+        const trainerPathPopup = document.getElementById('trainerPathPopup');
+        const trainerPathContainer = document.getElementById('trainerPathContainer');
+        const buttonContainer = document.querySelector('#trainerPathPopup .footer');
+
+        // Clear previous content
+        trainerPathContainer.innerHTML = '';
+
+        if (trainerPathName) {
+            const selectedPath = trainerPaths.find(p => p.name === trainerPathName);
+
+            if (selectedPath) {
+                // Define path stages: level3, level5, level9, level15
+                const pathStages = [
+                    { level: 3, data: selectedPath.level3 },
+                    { level: 5, data: selectedPath.level5 },
+                    { level: 9, data: selectedPath.level9 },
+                    { level: 15, data: selectedPath.level15 }
+                ];
+
+                // Loop through stages and render unlocked or locked path data
+                pathStages.forEach(stage => {
+                    if (stage.data) {
+                        const itemContainer = document.createElement('div');
+                        itemContainer.classList.add('skill-item-container');
+
+                        const header = document.createElement('h3');
+                        header.classList.add('skill-name-header');
+                        header.textContent = `${stage.data.name}`;
+                        itemContainer.appendChild(header);
+
+                        const effectBox = document.createElement('div');
+                        effectBox.classList.add('skill-effect-box');
+                        effectBox.textContent = trainerLevel >= stage.level ? stage.data.effect : `Unlocks at level ${stage.level}`;
+                        itemContainer.appendChild(effectBox);
+
+                        trainerPathContainer.appendChild(itemContainer);
+                    }
+                });
+            } else {
+                console.error("Trainer path not found.");
+            }
+        } else {
+            // If no path chosen, show available options
+            trainerPaths.forEach(path => {
+                const pathItem = document.createElement('div');
+                pathItem.className = 'affinity-item'; // Use the same class as affinities
+                pathItem.textContent = path.name;
+                pathItem.onclick = () => selectTrainerPath(path);
+                trainerPathContainer.appendChild(pathItem);
+            });
+        }
+
+        // Display the popup
+        trainerPathPopup.style.display = 'flex';
+    }
+
+    function showTrainerPathDetails(trainerPath) {
+        const trainerPathDetails = document.getElementById('trainerPathDetails');
+        trainerPathDetails.innerHTML = `<strong>${trainerPath.name}</strong><p>${trainerPath.level3.effect}</p>`;
+    }
+
+    function displayTrainerPathDetails(trainerPath, trainerLevel) {
+        const trainerPathDetailsContainer = document.getElementById('trainerPathDetails');
+        
+        const levels = [
+            { level: 3, name: 'level3', effect: trainerPath.level3 },
+            { level: 5, name: 'level5', effect: trainerPath.level5 },
+            { level: 9, name: 'level9', effect: trainerPath.level9 },
+            { level: 15, name: 'level15', effect: trainerPath.level15 }
+        ];
+
+        levels.forEach(stage => {
+            if (stage.effect) {
+                const stageContainer = document.createElement('div');
+                stageContainer.classList.add('trainer-path-item-container'); // Apply same styles as buffs
+
+                // Create the header with stage name
+                const stageHeader = document.createElement('h3');
+                stageHeader.classList.add('skill-name-header');
+                stageHeader.textContent = `Level ${stage.level}: ${stage.effect.name}`;
+                stageContainer.appendChild(stageHeader);
+
+                // Create the effect box
+                const effectBox = document.createElement('div');
+                effectBox.classList.add('skill-effect-box');
+
+                if (trainerLevel >= stage.level) {
+                    // Show full effect if trainer has reached the required level
+                    effectBox.textContent = stage.effect.effect;
+                } else {
+                    // Show locked message if the trainer hasn't unlocked this stage yet
+                    effectBox.textContent = `Unlocks at level ${stage.level}`;
+                }
+                stageContainer.appendChild(effectBox);
+
+                // Append to the details container
+                trainerPathDetailsContainer.appendChild(stageContainer);
+            }
+        });
+    }
+
+    function saveTrainerPath() {
+        // Show the spinner while saving
+        showSpinner(); 
+
+        const selectedTrainerPath = document.querySelector('#trainerPathList .trainer-path-item.selected');
+        if (!selectedTrainerPath) {
+            console.log("No trainer path selected.");
+            hideSpinner(); // Hide the spinner if there's no selection
+            return;
+        }
+
+        // Strip any quotation marks from the trainer path name
+        let trainerPathName = selectedTrainerPath.textContent.trim();
+        trainerPathName = trainerPathName.replace(/^"|"$/g, ''); // Remove any surrounding quotes
+
+        const trainerPaths = JSON.parse(sessionStorage.getItem('trainerPaths'));
+        const selectedPath = trainerPaths.find(p => p.name === trainerPathName);
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        trainerData[25] = trainerPathName; // Store only the cleaned trainer path name in session storage
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        // Write the trainer path name to Google Sheets and close the popup
+        google.script.run.withSuccessHandler(function() {
+            hideSpinner(); // Hide the spinner after saving
+            closePopup('trainerPathPopup');
+        }).writeTrainerPath(trainerData[1], trainerPathName);
+    }
+
+    function showMoneyPopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        document.getElementById('currentMoney').value = trainerData[19] || 0;  // Display current money
+        document.getElementById('moneyChangeInput').value = ''; // Clear the input field
+        document.getElementById('moneyPopup').style.display = 'block';
+    }
+
+    function updateMoney(action) {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const currentMoney = parseInt(trainerData[19], 10) || 0;
+        const changeAmount = parseInt(document.getElementById('moneyChangeInput').value, 10);
+
+        let newMoney;
+        if (action === 'add') {
+            newMoney = currentMoney + changeAmount;
+        } else if (action === 'remove') {
+            newMoney = currentMoney - changeAmount;
+        }
+
+        trainerData[19] = newMoney;
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        showSpinner();
+
+        google.script.run.withSuccessHandler(() => {
+            document.getElementById('trainerMoney').textContent = newMoney;
+            closePopup('moneyPopup');
+            hideSpinner();
+        }).writeMoney(trainerData[1], newMoney);
+    }
+
+    function showTrainerSkillsPopup() {
+        const trainerSkillsPopup = document.getElementById('trainerSkillsPopup');
+        trainerSkillsPopup.style.display = 'flex'; // Show the popup
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const trainerLevel = trainerData[2]; // Trainer level
+        const skillsData = JSON.parse(sessionStorage.getItem('skills')); // Use skills from sessionStorage
+
+        // Fetch nationality data from sessionStorage
+        const nationalitiesData = JSON.parse(sessionStorage.getItem('nationalities'));
+        const nationality = nationalitiesData.find(n => n.nationality === trainerData[38]);
+
+        // Clear previous skill content
+        const skillContainer = document.getElementById('skillContainer');
+        skillContainer.innerHTML = ''; 
+
+        // Check if nationality exists and render it
+        if (nationality) {
+            const nationalityItemContainer = document.createElement('div');
+            nationalityItemContainer.classList.add('skill-item-container');
+
+            // Create the region buff header
+            const nationalityNameHeader = document.createElement('h3');
+            nationalityNameHeader.classList.add('skill-name-header');
+            nationalityNameHeader.textContent = nationality.regionBuff; // Correct property name
+            nationalityItemContainer.appendChild(nationalityNameHeader);
+
+            // Create the effect box
+            const nationalityEffectBox = document.createElement('div');
+            nationalityEffectBox.classList.add('skill-effect-box');
+            nationalityEffectBox.textContent = nationality.effect; // Correct property name
+            nationalityItemContainer.appendChild(nationalityEffectBox);
+
+            // Add the nationality item to the skill container
+            skillContainer.appendChild(nationalityItemContainer);
+        }
+
+        // Loop through each skill and display all of them, regardless of level
+        skillsData.forEach(skill => {
+            const skillLevel = skill.level; // Skill unlock level
+            const skillName = skill.name;   // Skill name
+            let skillEffect;
+
+            // Show the effect if the trainer's level is high enough, otherwise show lock message
+            if (trainerLevel >= skillLevel) {
+                skillEffect = skill.fullEffect; // Use full effect for unlocked skills
+            } else {
+                skillEffect = `Unlocks at level ${skillLevel}`;
+            }
+
+            // Create the skill item container
+            const skillItemContainer = document.createElement('div');
+            skillItemContainer.classList.add('skill-item-container');
+
+            // Create the skill name header
+            const skillNameHeader = document.createElement('h3');
+            skillNameHeader.classList.add('skill-name-header');
+            skillNameHeader.textContent = skillName;
+            skillItemContainer.appendChild(skillNameHeader);
+
+            // Check if there's already a skill with the same name and a lower level unlocked
+            const existingSkill = Array.from(skillContainer.children).find(item => {
+                return item.querySelector('.skill-name-header').textContent === skillName;
+            });
+
+            if (existingSkill) {
+                const existingSkillEffectBox = existingSkill.querySelector('.skill-effect-box');
+                const existingSkillLevel = parseInt(existingSkillEffectBox.getAttribute('data-skill-level'), 10);
+
+                // If the current skill's level is higher, update the existing skill's effect
+                if (trainerLevel >= skillLevel && skillLevel > existingSkillLevel) {
+                    existingSkillEffectBox.textContent = skillEffect;
+                    existingSkillEffectBox.setAttribute('data-skill-level', skillLevel);
+                }
+            } else {
+                // Create the skill effect box and append it for new skills
+                const skillEffectBox = document.createElement('div');
+                skillEffectBox.classList.add('skill-effect-box');
+                skillEffectBox.textContent = skillEffect;
+                skillEffectBox.setAttribute('data-skill-level', skillLevel);
+                skillItemContainer.appendChild(skillEffectBox);
+
+                // Append the new skill to the container
+                skillContainer.appendChild(skillItemContainer);
+            }
+        });
+    }
+
+    function showFeatsPopup() {
+        const featsPopup = document.getElementById('featsPopup');
+        const featsContainer = document.getElementById('featsContainer');
+        featsContainer.innerHTML = ''; // Clear previous feats
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const featsList = trainerData[33] ? trainerData[33].split(',').map(feat => feat.trim()) : [];
+
+        const featsData = JSON.parse(sessionStorage.getItem('trainerFeats')) || [];
+
+        featsList.forEach(featName => {
+            const featData = featsData.find(feat => feat.name === featName);
+
+            if (featData) {
+                // Create feat item container
+                const featItemContainer = document.createElement('div');
+                featItemContainer.className = 'feats-item-container'; // Correct class name
+
+                // Create feat name header
+                const featNameHeader = document.createElement('h3');
+                featNameHeader.className = 'feats-name-header'; // Correct class name
+                featNameHeader.textContent = featName;
+                featItemContainer.appendChild(featNameHeader);
+
+                // Create feat effect box
+                const featEffectBox = document.createElement('div');
+                featEffectBox.className = 'feats-effect-box'; // Correct class name
+                featEffectBox.textContent = featData.effect;
+                featItemContainer.appendChild(featEffectBox);
+
+                // Append the feat item to the feats container
+                featsContainer.appendChild(featItemContainer);
+            }
+        });
+
+        featsPopup.style.display = 'flex'; // Display the popup
+    }
+
+    function showGearPopup() {
+        const gearPopup = document.getElementById('gearPopup');
+        const gearContainer = document.getElementById('gearContainer');
+        gearContainer.innerHTML = ''; // Clear previous gear
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const gearList = trainerData[37] ? trainerData[37].split(',').map(gear => gear.trim()) : [];
+
+        const itemsData = JSON.parse(sessionStorage.getItem('items')) || []; // Assuming items are stored in sessionStorage under 'items'
+
+        gearList.forEach(gearName => {
+            const itemData = itemsData.find(item => item.name === gearName);
+
+            if (itemData) {
+                // Create gear item container
+                const gearItemContainer = document.createElement('div');
+                gearItemContainer.className = 'gear-item-container'; // Correct class name
+
+                // Create gear name header
+                const gearNameHeader = document.createElement('h3');
+                gearNameHeader.className = 'gear-name-header'; // Correct class name
+                gearNameHeader.textContent = gearName;
+                gearItemContainer.appendChild(gearNameHeader);
+
+                // Create gear effect box
+                const gearEffectBox = document.createElement('div');
+                gearEffectBox.className = 'gear-effect-box'; // Correct class name
+                gearEffectBox.textContent = `${itemData.effect || ''}\n\n${itemData.description || 'No description available'}`;
+                gearItemContainer.appendChild(gearEffectBox);
+
+                // Append the gear item to the gear container
+                gearContainer.appendChild(gearItemContainer);
+            }
+        });
+
+        gearPopup.style.display = 'flex'; // Display the popup
+    }
+
+    function showCombatTrackerPopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        // Display current HP, VP  
+        // Force parsing to ensure numeric values display correctly
+        const currentHP = trainerData[34] !== null && 
+                        trainerData[34] !== undefined && 
+                        trainerData[34] !== ''
+            ? parseInt(trainerData[34], 10)
+            : parseInt(trainerData[11], 10); // base HP
+            
+        const currentVP = trainerData[35] !== null && 
+                        trainerData[35] !== undefined && 
+                        trainerData[35] !== ''
+            ? parseInt(trainerData[35], 10)
+            : parseInt(trainerData[12], 10); // base VP
+            
+        document.getElementById('currentHP').value = currentHP;
+        document.getElementById('currentVP').value = currentVP;
+            
+        // Clear the input fields for HP and VP  
+        document.getElementById('hpChangeInput').value = '';  
+        document.getElementById('vpChangeInput').value = '';  
+            
+        document.getElementById('combatTrackerPopup').style.display = 'block';
+    }
+
+    function updateStat(stat, action) {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const statIndex = {
+            'HP': 34,   
+            'VP': 35  
+        };
+        const baseStatIndex = {
+            'HP': 11,   
+            'VP': 12  
+        };
+
+        // Get base values
+        const baseHP = parseInt(trainerData[baseStatIndex['HP']], 10);
+        const baseVP = parseInt(trainerData[baseStatIndex['VP']], 10);
+
+        // Get current values, defaulting to base values if not set
+        let currentHP = trainerData[statIndex['HP']] !== null && 
+                      trainerData[statIndex['HP']] !== undefined && 
+                      trainerData[statIndex['HP']] !== ''
+            ? parseInt(trainerData[statIndex['HP']], 10)
+            : baseHP;
+
+        let currentVP = trainerData[statIndex['VP']] !== null && 
+                      trainerData[statIndex['VP']] !== undefined && 
+                      trainerData[statIndex['VP']] !== ''
+            ? parseInt(trainerData[statIndex['VP']], 10)
+            : baseVP;
+
+        // Get the change amount from input field
+        let changeAmount = document.getElementById(stat.toLowerCase() + 'ChangeInput').value;
+        
+        // Track if VP overflow affected HP
+        let vpOverflowOccurred = false;
+
+        // Calculate new values before making any updates
+        if (changeAmount === '') {
+            // If the input is empty, reset to base value
+            if (stat === 'HP') {
+                currentHP = baseHP;
+            } else {
+                currentVP = baseVP;
+            }
+        } else {
+            changeAmount = parseInt(changeAmount, 10) || 0;
+            
+            if (action === 'add') {
+                if (stat === 'HP') {
+                    currentHP = currentHP + changeAmount;
+                    if (currentHP > baseHP) {
+                        currentHP = baseHP;
+                    }
+                } else { // VP
+                    currentVP = currentVP + changeAmount;
+                    if (currentVP > baseVP) {
+                        currentVP = baseVP;
+                    }
+                }
+            } else if (action === 'remove') {
+                if (stat === 'HP') {
+                    currentHP = currentHP - changeAmount;
+                    // No minimum for HP, can go below 0
+                } else { // VP
+                    currentVP = currentVP - changeAmount;
+                    
+                    if (currentVP < 0) {
+                        // When VP goes below 0, the remaining damage transfers to HP
+                        const remainingAmount = Math.abs(currentVP);
+                        currentVP = 0; // Set VP to exactly 0 for display
+                        
+                        // Update HP with the remaining damage
+                        currentHP = currentHP - remainingAmount;
+                        vpOverflowOccurred = true; // Flag that HP was affected by VP overflow
+                    }
+                }
+            }
+        }
+
+        // Update trainerData with new values
+        trainerData[statIndex['HP']] = currentHP === baseHP ? '' : currentHP;
+        trainerData[statIndex['VP']] = currentVP === baseVP ? '' : currentVP;
+
+        // Update session storage with the new values
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        // Close the popup and show spinner
+        closePopup('combatTrackerPopup');
+        showSpinner();
+
+        // Directly update display in the UI for immediate feedback
+        document.getElementById('currentHP').value = currentHP;
+        document.getElementById('currentVP').value = currentVP;
+
+        // Prepare the values to write to Google Sheets
+        let hpValueToWrite = currentHP === baseHP ? '' : currentHP;
+        let vpValueToWrite = currentVP === baseVP ? '' : currentVP;
+
+        // When VP overflow occurs, we need to update both VP and HP in the database
+        if (vpOverflowOccurred) {
+            // First update VP to 0
+            google.script.run.withSuccessHandler(() => {
+                // Then update HP with the new value after VP was processed
+                google.script.run.withSuccessHandler(() => {
+                    hideSpinner();
+                    showCombatTrackerPopup(); // Reopen the popup once data is done loading
+                }).writeTrainerLiveStats(trainerData[1], 'HP', hpValueToWrite);
+            }).writeTrainerLiveStats(trainerData[1], 'VP', vpValueToWrite);
+        } else {
+            // Normal case - just update the stat that was changed
+            google.script.run.withSuccessHandler(() => {
+                hideSpinner();
+                showCombatTrackerPopup(); // Reopen the popup once data is done loading
+            }).writeTrainerLiveStats(trainerData[1], stat, stat === 'HP' ? hpValueToWrite : vpValueToWrite);
+        }
+    }
+
+    function closePopup(popupId) {
+        document.getElementById(popupId).style.display = 'none';
+    }
+
+    function initializeTrainerInfo() {
+        loadTrainerInfo();
+        checkButtonAvailability();
+    }
+
+</script>

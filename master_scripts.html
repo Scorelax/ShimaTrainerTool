@@ -1,0 +1,1117 @@
+<script>
+    // ===== NAVIGATION MANAGER =====
+    const NavigationManager = {
+        currentPage: null,
+        isNavigating: false,
+        pageHistory: [],
+        navigationStartTime: null,  // Add this property for performance tracking
+     
+        // Navigate to a new page
+        navigate(pageName, options = {}) {
+            if (this.isNavigating) return Promise.resolve();
+            this.isNavigating = true;
+           
+            // Add performance tracking
+            const navStart = performance.now();
+           
+            console.log('Navigating to:', pageName);
+           
+            // Store current page in history
+            if (this.currentPage && !options.isBack) {
+                this.pageHistory.push(this.currentPage);
+                // Limit history to 10 pages
+                if (this.pageHistory.length > 10) {
+                    this.pageHistory.shift();
+                }
+            }
+           
+            // Store navStart in the object so displayContent can access it
+            this.navigationStartTime = navStart;
+           
+            // Check for cached template first
+            const cachedTemplate = PageTemplates.getTemplate(pageName);
+           
+            if (cachedTemplate) {
+                console.log('Using cached template for:', pageName);
+               
+                // Fast navigation with cached template
+                this.showSpinner();
+               
+                // Reduce audio fade time for faster navigation
+                AudioManager.fadeOutAll(200);
+               
+                // Fade out current content
+                const content = document.getElementById('app-content');
+                content.classList.add('fade-out');
+               
+                // Use shorter timeout for cached content
+                setTimeout(() => {
+                    this.displayContent(cachedTemplate, pageName);
+                    this.isNavigating = false;
+                }, 200);
+               
+                return Promise.resolve();
+            } else {
+                console.log('No cached template, fetching from server:', pageName);
+               
+                // Original server fetch logic
+                this.showSpinner();
+               
+                // Start audio fade out
+                const audioFadePromise = AudioManager.fadeOutAll(200); // Reduced from 800ms
+               
+                // Fade out current content
+                const content = document.getElementById('app-content');
+                content.classList.add('fade-out');
+               
+                // Return promise for chaining
+                return new Promise((resolve, reject) => {
+                    audioFadePromise.then(() => {
+                        // Fetch new content
+                        google.script.run
+                            .withSuccessHandler(response => {
+                                if (response.status === 'success') {
+                                    // Cache the template for future use
+                                    if (!PageTemplates.hasTemplate(pageName)) {
+                                        PageTemplates.templates[pageName] = response.html;
+                                        // Update session storage
+                                        try {
+                                            sessionStorage.setItem('pageTemplates',
+                                                JSON.stringify(PageTemplates.templates));
+                                        } catch (e) {
+                                            console.warn('Could not cache template:', e);
+                                        }
+                                    }
+                                   
+                                    // Reduced timeout from 200ms to 100ms
+                                    setTimeout(() => {
+                                        this.displayContent(response.html, pageName);
+                                        this.isNavigating = false;
+                                        resolve();
+                                    }, 100);
+                                } else {
+                                    this.handleError(response);
+                                    this.isNavigating = false;
+                                    reject(response);
+                                }
+                            })
+                            .withFailureHandler(error => {
+                                this.handleError(error);
+                                this.isNavigating = false;
+                                reject(error);
+                            })
+                            .getPageContent(pageName);
+                    });
+                });
+            }
+        },
+     
+        // Navigate back
+        navigateBack() {
+            if (this.pageHistory.length > 0) {
+                const previousPage = this.pageHistory.pop();
+                this.navigate(previousPage, { isBack: true });
+            } else {
+                // Default back behavior
+                this.navigate('index', { isBack: true });
+            }
+        },
+
+
+        // Display the fetched content
+        displayContent(html, pageName) {
+            const content = document.getElementById('app-content');
+         
+            // Clean up previous page
+            this.cleanup();
+         
+            // Remove any custom body classes from previous page
+            document.body.classList.remove('custom-bg');
+
+
+            // Update content
+            console.log('Setting innerHTML for page:', pageName);
+            console.log('HTML content length:', html.length);
+            content.innerHTML = html;
+         
+            // Execute any scripts in the loaded content
+            const scripts = content.getElementsByTagName('script');
+            console.log('Found', scripts.length, 'scripts to execute');
+         
+            for (let i = 0; i < scripts.length; i++) {
+                const script = scripts[i];
+                const newScript = document.createElement('script');
+             
+                // Copy script content
+                if (script.src) {
+                    newScript.src = script.src;
+                } else {
+                    newScript.textContent = script.textContent;
+                }
+             
+                // Copy any attributes
+                for (let j = 0; j < script.attributes.length; j++) {
+                    const attr = script.attributes[j];
+                    if (attr.name !== 'src') {
+                        newScript.setAttribute(attr.name, attr.value);
+                    }
+                }
+             
+                // Replace the old script with the new one (this executes it)
+                script.parentNode.replaceChild(newScript, script);
+            }
+         
+            // Update current page
+            this.currentPage = pageName;
+         
+            // Initialize new page
+            this.initializePage(pageName);
+         
+            // Fade in new content
+            content.classList.remove('fade-out');
+         
+            // Hide spinner
+            if (pageName !== 'evolution') {
+                this.hideSpinner();
+            }
+            this.isNavigating = false;
+           
+            // Performance tracking - add at the very end
+            if (this.navigationStartTime) {
+                const navEnd = performance.now();
+                console.log(`Navigation to ${pageName} took ${(navEnd - this.navigationStartTime).toFixed(2)}ms`);
+                this.navigationStartTime = null;
+            }
+        },
+     
+        // Initialize page-specific functionality
+        initializePage(pageName) {
+            console.log('Initializing page:', pageName);          
+            // Page-specific initialization
+            switch(pageName) {
+                case 'index':
+                    break;
+                 
+                case 'continue_journey':
+                    // Load trainers if the function exists
+                    if (typeof fetchTrainers === 'function') {
+                        fetchTrainers();
+                    }
+                    // Play title screen audio
+                    AudioManager.play('https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Title%20Screen.mp3', {
+                        volume: 0.3,
+                        loop: true,
+                        player: 'title'
+                    });
+                    break;
+                 
+                case 'new_journey':
+                    // Play welcome audio
+                    AudioManager.play('https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Welcome.mp3', {
+                        volume: 0.3,
+                        player: 'welcome'
+                    });
+                    break;
+                 
+                case 'trainer_card':
+                    if (typeof loadTrainerInfo === 'function') {
+                        loadTrainerInfo();
+                    }
+                    break;
+
+
+                case 'trainer_info':
+                    if (typeof initializeTrainerInfo === 'function') {
+                        initializeTrainerInfo();
+                    }
+                    break;
+                 
+                case 'my_pokemon':
+                    if (typeof loadPokemonList === 'function') {
+                        loadPokemonList();
+                    }
+                    break;
+                 
+                case 'new_pokemon':
+                    // Play the find pokemon audio
+                    AudioManager.play('https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Find%20Pokemon.mp3', {
+                        volume: 0.3,
+                        player: 'find-pokemon'
+                    });
+                   
+                    // Load the pokemon data
+                    if (typeof loadEncounteredPokemon === 'function') {
+                        loadEncounteredPokemon();
+                    }
+                    break;
+                 
+                case 'pokemon_form':
+                    if (typeof initializePokemonForm === 'function') {
+                        initializePokemonForm();
+                    }
+                    break;
+                 
+                case 'pokemon_card':
+                    if (typeof loadPokemonDetails === 'function') {
+                        loadPokemonDetails();
+                    }
+                    break;
+                 
+                case 'edit_trainer':
+                    if (typeof initializeEditTrainer === 'function') {
+                        initializeEditTrainer();
+                    }
+                    break;
+                 
+                case 'edit_pokemon':
+                    if (typeof initializeEditPokemon === 'function') {
+                        initializeEditPokemon();
+                    }
+                    break;
+
+
+                case 'evolution':
+                    if (typeof initializeEvolution === 'function') {
+                        initializeEvolution();
+                    }
+                    break;
+                 
+                case 'conduit_card':
+                    if (typeof loadConduitInfo === 'function') {
+                        loadConduitInfo();
+                    }
+                    break;
+                 
+                case 'conduit_info':
+                    if (typeof loadConduitDetails === 'function') {
+                        loadConduitDetails();
+                    }
+                    break;
+                 
+                case 'conduit_edit':
+                    if (typeof loadConduitEditData === 'function') {
+                        loadConduitEditData();
+                    }
+                    break;
+            }
+        },
+     
+        // Clean up before loading new page
+        cleanup() {          
+            // Remove any lingering popups
+            const popups = document.querySelectorAll('.popup-overlay');
+            popups.forEach(popup => {
+                if (popup.parentNode) {
+                    popup.parentNode.removeChild(popup);
+                }
+            });
+           
+            // Clear any custom message boxes BY ID first (more specific)
+            const messageBox = document.getElementById('customMessageBox');
+            const messageOverlay = document.getElementById('customMessageOverlay');
+            if (messageBox) messageBox.remove();
+            if (messageOverlay) messageOverlay.remove();
+           
+            // Then clear by class (fallback)
+            const messageBoxes = document.querySelectorAll('.custom-message-box, .custom-message-overlay');
+            messageBoxes.forEach(box => {
+                if (box.parentNode) {
+                    box.parentNode.removeChild(box);
+                }
+            });
+        },
+     
+        // Error handling
+        handleError(error) {
+            console.error('Navigation error:', error);
+            this.hideSpinner();
+            this.isNavigating = false;
+         
+            // Show user-friendly error message
+            const content = document.getElementById('app-content');
+            content.innerHTML = `
+                <div style="text-align: center; padding: 50px;">
+                    <h2>Oops! Something went wrong</h2>
+                    <p>Failed to load the page. Please try again.</p>
+                    <button onclick="NavigationManager.navigate('index')" class="button">
+                        Go to Home
+                    </button>
+                </div>
+            `;
+            content.classList.remove('fade-out');
+        },
+     
+        showSpinner() {
+            document.getElementById('spinnerOverlay').style.display = 'flex';
+        },
+     
+        hideSpinner() {
+            document.getElementById('spinnerOverlay').style.display = 'none';
+        }
+    };
+   
+    // ===== GLOBAL NAVIGATION FUNCTIONS =====
+    // These replace all the document.write navigation in your pages
+   
+    function navigateTo(pageName) {
+        return NavigationManager.navigate(pageName);
+    }
+
+
+    const parentPageMap = {
+        'my_pokemon': 'trainer_card',
+        'trainer_info': 'trainer_card',
+        'evolution': 'pokemon_card',
+        'new_pokemon': 'my_pokemon',
+        'trainer_card': 'continue_journey',
+        'continue_journey': 'index'
+    };
+   
+    function goBack() {
+        const currentPage = NavigationManager.currentPage;
+        const parentPage = parentPageMap[currentPage];
+       
+        if (currentPage === 'pokemon_card') {
+            // Special handling for pokemon_card
+            const previousPage = sessionStorage.getItem('previousPage');
+            if (previousPage) {
+                sessionStorage.removeItem('previousPage');
+                NavigationManager.navigate(previousPage);
+            } else {
+                NavigationManager.navigate('my_pokemon');
+            }
+        } else if (parentPage) {
+            // Handle pages with fixed parent pages
+            if (currentPage === 'my_pokemon') {
+                // Special case for my_pokemon - check trainer type
+                const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+                if (trainerData && trainerData[39] === "Pokemon Trainer") {
+                    NavigationManager.navigate('trainer_card');
+                } else {
+                    NavigationManager.navigate('conduit_card');
+                }
+            } else {
+                // For other pages in parentPageMap
+                NavigationManager.navigate(parentPage);
+            }
+        } else {
+            // Normal navigation history
+            NavigationManager.navigateBack();
+        }
+    }
+   
+    // Specific navigation functions for easy migration
+    function getContinueJourney() {
+        AudioManager.play('https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Intro.mp3', {
+            volume: 0.3,
+            player: 'intro'
+        });
+        NavigationManager.navigate('continue_journey');
+    }
+   
+    function getnewJourney() {
+        AudioManager.play('https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Intro.mp3', {
+            volume: 0.3,
+            player: 'intro'
+        });
+        NavigationManager.navigate('new_journey');
+    }
+   
+    function getTrainerCard() {
+        NavigationManager.navigate('trainer_card');
+    }
+   
+    function getTrainerInfo() {
+        NavigationManager.navigate('trainer_info');
+    }
+   
+    function getMyPokemon() {
+        NavigationManager.navigate('my_pokemon');
+    }
+   
+    function getNewPokemon() {
+        NavigationManager.navigate('new_pokemon');
+    }
+   
+    function getPokemonForm() {
+        NavigationManager.navigate('pokemon_form');
+    }
+   
+    function getPokemonCard() {
+        NavigationManager.navigate('pokemon_card');
+    }
+   
+    function viewPokemonDetails(pokemonName) {
+        sessionStorage.setItem('previousPage', NavigationManager.currentPage);
+        sessionStorage.setItem('selectedPokemonName', pokemonName);
+        NavigationManager.navigate('pokemon_card');
+    }
+   
+    function getEditTrainer() {
+        NavigationManager.navigate('edit_trainer');
+    }
+   
+    function getEditPokemon() {
+        NavigationManager.navigate('edit_pokemon');
+    }
+   
+    function getEvolution() {
+        NavigationManager.navigate('evolution');
+    }
+   
+    function getConduitCard() {
+        NavigationManager.navigate('conduit_card');
+    }
+   
+    function getConduitInfo() {
+        NavigationManager.navigate('conduit_info');
+    }
+   
+    function getConduitEdit() {
+        NavigationManager.navigate('conduit_edit');
+    }
+   
+    function getContinueJourney() {
+        NavigationManager.navigate('continue_journey');
+    }
+   
+    function getNewJourney() {
+        NavigationManager.navigate('new_journey');
+    }
+   
+    function getTrainerInfo() {
+        NavigationManager.navigate('trainer_info');
+    }
+   
+    function getMyPokemon() {
+        NavigationManager.navigate('my_pokemon');
+    }
+   
+    function getNewPokemon() {
+        NavigationManager.navigate('new_pokemon');
+    }
+   
+    function getPokemonForm() {
+        NavigationManager.navigate('pokemon_form');
+    }
+   
+    function getEditPokemon() {
+        NavigationManager.navigate('edit_pokemon');
+    }
+   
+    function getEditTrainer() {
+        NavigationManager.navigate('edit_trainer');
+    }
+   
+    function getEvolution() {
+        NavigationManager.navigate('evolution');
+    }
+   
+    function getConduitCard() {
+        NavigationManager.navigate('conduit_card');
+    }
+   
+    function getConduitInfo() {
+        NavigationManager.navigate('conduit_info');
+    }
+   
+    function getConduitEdit() {
+        NavigationManager.navigate('conduit_edit');
+    }
+   
+    // ===== AUDIO MANAGER =====
+    const AudioManager = {
+        players: {},
+        fadeDuration: 3000,
+       
+        init() {
+            // Initialize global audio elements from master.html
+            this.players = {
+                'global-audio-player': document.getElementById('global-audio-player'),
+                'title-screen-audio': document.getElementById('title-screen-audio'),
+                'startup-audio': document.getElementById('startup-audio'),
+                'intro-audio': document.getElementById('intro-audio'),
+                'welcome-audio': document.getElementById('welcome-audio')
+            };
+        },
+       
+        play(src, options = {}) {
+            // Map player names to actual audio element IDs
+            const playerMap = {
+                'title': 'title-screen-audio',
+                'startup': 'startup-audio',
+                'intro': 'intro-audio',
+                'welcome': 'welcome-audio',
+                'main': 'global-audio-player',
+                'find-pokemon': 'global-audio-player',
+                'pokeball-sound': 'global-audio-player',
+                'pokemon-caught': 'global-audio-player',
+                'registered-pokemon': 'global-audio-player',
+                'evolution-intro': 'global-audio-player',
+                'evolution-loop': 'global-audio-player',
+                'level-up': 'global-audio-player'
+            };
+           
+            const playerId = playerMap[options.player] || options.player || 'global-audio-player';
+            const audio = this.players[playerId];
+           
+            if (audio) {
+                // Stop any currently playing audio on this player
+                if (!audio.paused) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+               
+                audio.src = src;
+                audio.volume = options.volume || 0.3;
+                audio.loop = options.loop || false;
+                audio.play().catch(e => console.error('Audio play failed:', e));
+            }
+        },
+       
+        stop(player) {
+            const playerMap = {
+                'title': 'title-screen-audio',
+                'startup': 'startup-audio',
+                'intro': 'intro-audio',
+                'welcome': 'welcome-audio',
+                'main': 'global-audio-player'
+            };
+           
+            const playerId = playerMap[player] || player;
+            const audio = this.players[playerId];
+           
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        },
+       
+        fadeOut(playerId, duration = this.fadeDuration) {
+            const audio = this.players[playerId];
+            if (audio && !audio.paused && audio.volume > 0) {
+                const startVolume = audio.volume;
+                const fadeSteps = 20;
+                const fadeInterval = duration / fadeSteps;
+                const volumeStep = startVolume / fadeSteps;
+               
+                return new Promise(resolve => {
+                    const fade = setInterval(() => {
+                        if (audio.volume > volumeStep) {
+                            audio.volume = Math.max(0, audio.volume - volumeStep);
+                        } else {
+                            clearInterval(fade);
+                            audio.volume = 0;
+                            audio.pause();
+                            audio.currentTime = 0;
+                            // Reset volume after a delay
+                            setTimeout(() => {
+                                audio.volume = startVolume;
+                            }, 100);
+                            resolve();
+                        }
+                    }, fadeInterval);
+                });
+            }
+            return Promise.resolve();
+        },
+       
+        fadeOutAll(duration = 200) {
+            const fadePromises = [];
+           
+            // Fade out all tracked players
+            Object.entries(this.players).forEach(([playerId, audio]) => {
+                if (audio && !audio.paused && audio.volume > 0) {
+                    fadePromises.push(this.fadeOut(playerId, duration));
+                }
+            });
+           
+            return Promise.all(fadePromises);
+        },
+       
+        stopAll() {
+            Object.values(this.players).forEach(audio => {
+                if (audio) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            });
+        }
+    };
+   
+    // ===== GLOBAL UTILITY FUNCTIONS =====
+    function showSpinner() {
+        NavigationManager.showSpinner();
+    }
+   
+    function hideSpinner() {
+        NavigationManager.hideSpinner();
+    }
+   
+    // Custom message functions
+    function displayCustomMessage(message) {
+        const existingBox = document.getElementById('customMessageBox');
+        const existingOverlay = document.getElementById('customMessageOverlay');
+       
+        if (existingBox) existingBox.remove();
+        if (existingOverlay) existingOverlay.remove();
+       
+        const overlay = document.createElement('div');
+        overlay.id = 'customMessageOverlay';
+        overlay.className = 'custom-message-overlay';
+        overlay.style.display = 'block';
+       
+        const messageBox = document.createElement('div');
+        messageBox.id = 'customMessageBox';
+        messageBox.className = 'custom-message-box';
+        messageBox.innerHTML = `<p>${message}</p>`;
+        messageBox.style.display = 'block';
+       
+        document.body.appendChild(overlay);
+        document.body.appendChild(messageBox);
+       
+        setTimeout(() => {
+            overlay.remove();
+            messageBox.remove();
+        }, 2000);
+    }
+
+
+
+
+    // ===== DATA PRELOADER =====
+    const DataPreloader = {
+        isLoaded: false,
+        isLoading: false,
+       
+        async preloadGameData() {
+            if (this.isLoaded || this.isLoading) {
+                return;
+            }
+           
+            // Check if already loaded from cache
+            const gameData = await DataCache.get('gameDataLoaded');
+            if (gameData) {
+                this.isLoaded = true;
+                return;
+            }
+           
+            this.isLoading = true;
+            console.log('Preloading game data...');
+           
+            try {
+                const result = await new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        .loadAllGameData();
+                });
+               
+                if (result) {
+                    // Store each data type separately for granular access
+                    Object.keys(result).forEach(key => {
+                        if (result[key]) {
+                            DataCache.set(key, result[key]);
+                        }
+                    });
+                   
+                    DataCache.set('gameDataLoaded', true);
+                    this.isLoaded = true;
+                    console.log('Game data preloaded successfully');
+                }
+            } catch (error) {
+                console.error('Failed to preload game data:', error);
+            } finally {
+                this.isLoading = false;
+            }
+        },
+       
+        async preloadTrainerData(trainerName) {
+            const key = `trainer_${trainerName}`;
+           
+            return await DataCache.get(key, async () => {
+                return new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        .getTrainerData(trainerName);
+                });
+            });
+        },
+       
+        async preloadPokemonData(trainerName) {
+            const key = `pokemonList_${trainerName}`;
+           
+            return await DataCache.get(key, async () => {
+                return new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        .getPokemonForTrainer(trainerName);
+                });
+            });
+        }
+    };
+
+
+    // ===== OPTIMIZED DATA LOADERS =====
+    const OptimizedLoaders = {
+        // Load trainer info page data in one batch
+        async loadTrainerInfoData() {
+            const trainerData = getTrainerData();
+            if (!trainerData) return;
+           
+            const requirements = [
+                {
+                    key: 'specializations',
+                    loader: () => new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler((result) => resolve(result.specializations || []))
+                            .withFailureHandler(reject)
+                            .loadSpecializations();
+                    })
+                },
+                {
+                    key: 'trainerPaths',
+                    loader: () => new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .loadTrainerPaths();
+                    })
+                },
+                {
+                    key: 'affinities',
+                    loader: () => new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .loadAffinities();
+                    })
+                },
+                {
+                    key: 'itemsData',
+                    loader: () => new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler((result) => resolve(result.items || []))
+                            .withFailureHandler(reject)
+                            .loadItemsData();
+                    })
+                }
+            ];
+           
+            return await DataCache.batchGet(requirements);
+        },
+       
+        // Load pokemon list data efficiently
+        async loadPokemonListData(trainerName) {
+            const cacheKey = `pokemonList_${trainerName}`;
+           
+            return await DataCache.get(cacheKey, async () => {
+                return new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        .getPokemonForTrainer(trainerName);
+                });
+            });
+        },
+       
+        // Load pokemon details in batch
+        async loadPokemonDetailsData(pokemonName) {
+            const requirements = [
+                {
+                    key: 'moves',
+                    loader: () => new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .fetchMoveData();
+                    })
+                },
+                {
+                    key: 'abilities',
+                    loader: () => new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .loadAbilitiesData();
+                    })
+                },
+                {
+                    key: 'natures',
+                    loader: () => new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            .getNatureData();
+                    })
+                }
+            ];
+           
+            return await DataCache.batchGet(requirements);
+        }
+    };
+
+
+    // ===== PAGE TEMPLATE MANAGER =====
+    const PageTemplates = {
+        templates: {},
+       
+        async preloadTemplates() {
+            // Skip if already loaded in this session
+            const cached = sessionStorage.getItem('pageTemplates');
+            if (cached) {
+                this.templates = JSON.parse(cached);
+                console.log('Templates loaded from cache');
+                return;
+            }
+           
+            // Show loading indicator
+            const indicator = document.createElement('div');
+            indicator.className = 'template-loading-indicator show';
+            indicator.textContent = 'Optimizing performance...';
+            document.body.appendChild(indicator);
+           
+            const pages = [
+                'index', 'continue_journey', 'new_journey',
+                'trainer_card', 'trainer_info', 'my_pokemon',
+                'new_pokemon', 'pokemon_form', 'pokemon_card',
+                'edit_pokemon', 'edit_trainer', 'evolution',
+                'conduit_card', 'conduit_info', 'conduit_edit'
+            ];
+           
+            console.log('Preloading page templates...');
+           
+            try {
+                const templates = await new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler(reject)
+                        .getAllPageTemplates(pages);
+                });
+               
+                this.templates = templates;
+                sessionStorage.setItem('pageTemplates', JSON.stringify(templates));
+                console.log('Templates preloaded successfully');
+            } catch (error) {
+                console.error('Failed to preload templates:', error);
+            } finally {
+                // Remove indicator whether success or failure
+                if (indicator.parentNode) {
+                    indicator.remove();
+                }
+            }
+        },
+       
+        getTemplate(pageName) {
+            return this.templates[pageName] || null;
+        },
+       
+        hasTemplate(pageName) {
+            return !!this.templates[pageName];
+        }
+    };
+
+
+    // ===== DATA CACHE MANAGER =====
+    const DataCache = {
+        cache: {},
+       
+        async get(key, loader) {
+            // Check memory cache first
+            if (this.cache[key]) {
+                console.log(`DataCache: Retrieved ${key} from memory`);
+                return this.cache[key];
+            }
+           
+            // Check session storage
+            const stored = sessionStorage.getItem(key);
+            if (stored) {
+                try {
+                    this.cache[key] = JSON.parse(stored);
+                    console.log(`DataCache: Retrieved ${key} from session storage`);
+                    return this.cache[key];
+                } catch (e) {
+                    console.warn(`DataCache: Failed to parse ${key} from storage`, e);
+                }
+            }
+           
+            // Load from server if we have a loader function
+            if (loader) {
+                console.log(`DataCache: Loading ${key} from server`);
+                const data = await loader();
+                this.set(key, data);
+                return data;
+            }
+           
+            return null;
+        },
+       
+        set(key, data) {
+            this.cache[key] = data;
+            try {
+                sessionStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                // Handle quota exceeded
+                console.warn('Session storage full, clearing old data');
+                this.clearOldData();
+                // Try one more time
+                try {
+                    sessionStorage.setItem(key, JSON.stringify(data));
+                } catch (e2) {
+                    console.error('Still cannot save to session storage');
+                }
+            }
+        },
+       
+        clearOldData() {
+            // Clear data that's not frequently used
+            const preserveKeys = [
+                'pageTemplates', 'gameDataLoaded', 'trainerData',
+                'completePokemonData', 'specializations', 'trainerPaths',
+                'affinities', 'itemsData', 'abilities', 'moves', 'natures'
+            ];
+           
+            Object.keys(sessionStorage).forEach(key => {
+                if (!preserveKeys.includes(key) && !key.startsWith('pokemon_')) {
+                    sessionStorage.removeItem(key);
+                }
+            });
+        },
+       
+        // Batch load multiple data requirements
+        async batchGet(requirements) {
+            const results = {};
+            const toLoad = [];
+           
+            // Check what we already have
+            for (const req of requirements) {
+                const cached = await this.get(req.key);
+                if (cached) {
+                    results[req.key] = cached;
+                } else {
+                    toLoad.push(req);
+                }
+            }
+           
+            // Load missing data in one batch
+            if (toLoad.length > 0) {
+                console.log(`DataCache: Batch loading ${toLoad.length} items`);
+                const batchResults = await this.batchLoad(toLoad);
+                Object.assign(results, batchResults);
+            }
+           
+            return results;
+        },
+       
+        async batchLoad(requirements) {
+            const loaderMap = {};
+            requirements.forEach(req => {
+                loaderMap[req.key] = req.loader;
+            });
+           
+            try {
+                const results = await Promise.all(
+                    requirements.map(req => req.loader())
+                );
+               
+                const batchResults = {};
+                requirements.forEach((req, index) => {
+                    batchResults[req.key] = results[index];
+                    this.set(req.key, results[index]);
+                });
+               
+                return batchResults;
+            } catch (error) {
+                console.error('Batch load failed:', error);
+                return {};
+            }
+        },
+       
+        // Clear all cached data
+        clearAll() {
+            this.cache = {};
+            const preserveKeys = ['pageTemplates']; // Keep templates
+            Object.keys(sessionStorage).forEach(key => {
+                if (!preserveKeys.includes(key)) {
+                    sessionStorage.removeItem(key);
+                }
+            });
+        }
+    };
+
+
+    // ===== INITIAL LOAD =====
+    document.addEventListener('DOMContentLoaded', async () => {
+        console.log('DOM loaded, initializing app...');
+       
+        // Initialize audio manager
+        AudioManager.init();
+       
+        // Start preloading templates immediately after initial page load
+        // This happens in the background while user sees the index page
+        setTimeout(() => {
+            console.log('Starting background template preload...');
+            PageTemplates.preloadTemplates();
+            // Also preload game data if not already loaded
+            DataPreloader.preloadGameData();
+        }, 100);
+       
+        console.log('Initial app load - navigating to index...');
+        NavigationManager.navigate('index');
+    });
+   
+    // ===== GLOBAL ERROR HANDLER =====
+    window.addEventListener('error', (event) => {
+        console.error('Global error:', event.error);
+        // Don't show error UI for minor issues
+        if (event.error && event.error.toString().includes('NetworkError')) {
+            event.preventDefault();
+        }
+    });
+   
+    // ===== SESSION STORAGE HELPER FUNCTIONS =====
+    function clearAllSessionData() {
+        sessionStorage.clear();
+    }
+   
+    function getTrainerData() {
+        const data = sessionStorage.getItem('trainerData');
+        return data ? JSON.parse(data) : null;
+    }
+   
+    function getPokemonData(pokemonName) {
+        const data = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
+        return data ? JSON.parse(data) : null;
+    }
+   
+    // ===== KEYBOARD SHORTCUTS =====
+    document.addEventListener('keydown', (event) => {
+        // ESC key to close popups
+        if (event.key === 'Escape') {
+            const popups = document.querySelectorAll('.popup-overlay');
+            popups.forEach(popup => {
+                if (popup.style.display !== 'none') {
+                    popup.style.display = 'none';
+                }
+            });
+        }
+    });
+   
+    // ===== DEBUG MODE =====
+    // Enable this for development to see detailed logs
+    window.debugMode = false;
+   
+    if (window.debugMode) {
+        console.log('Debug mode enabled');
+        // Override navigate to add logging
+        const originalNavigate = NavigationManager.navigate.bind(NavigationManager);
+        NavigationManager.navigate = function(pageName, options) {
+            console.log('Debug: Navigating to', pageName, 'with options', options);
+            console.log('Debug: Current page', this.currentPage);
+            console.log('Debug: History', this.pageHistory);
+            return originalNavigate(pageName, options);
+        };
+    }
+</script>

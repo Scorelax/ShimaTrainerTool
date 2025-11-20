@@ -1,0 +1,365 @@
+<style>
+    body, #app-content {
+      background-color: #f44336;
+    }
+
+    body:after {
+      content: '';
+      display: block;
+      width: 100%;
+      height: 50px;
+      position: absolute;
+      bottom: 0;
+      background: linear-gradient(to top, #ffffff 0%, #ffffff 50px, #000000 50px, #f44336 50px);
+      z-index: 0;
+    }
+
+    h1 {
+      margin-top: 2rem;
+    }
+
+    form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 90%;
+        max-width: 600px;
+        padding: 2rem;
+        background-color: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        overflow-y: auto;
+        margin-bottom: 180px;
+        box-sizing: border-box;
+        z-index: 1;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    label {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        font-weight: bold;
+        text-align: center;
+        width: 100%;
+        font-size: 2rem;
+    }
+
+    input[type='text'],
+    input[type='number'],
+    input[type='file'],
+    select,
+    textarea {
+        width: 100%;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+        font-size: 2rem;
+    }
+
+    .button {
+      background-color: #f44336;
+      color: #ffffff;
+      font-size: 2.4rem;
+      padding: 1.6rem 3.2rem;
+    }
+
+    .button:hover {
+      background-color: #d32f2f;
+    }
+
+    .pokeball-center {
+      bottom: 50px;
+    }
+
+    .pokeball-button {
+      width: 25vw;
+      height: 25vw;
+      max-width: 100px;
+      max-height: 100px;
+      bottom: 10px;
+    }
+
+    .pokeball-button:hover {
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .pokeball-button::before {
+        content: '';
+        width: 30px;
+        height: 30px;
+        background-color: #f0f0f0;
+        border-radius: 50%;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .back-button-text {
+        position: relative;
+        z-index: 3;
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #333333;
+        text-shadow: none;
+    }
+</style>
+<!-- Include shared constants -->
+<script>
+    window.IMAGE_BASE_URL = window.IMAGE_BASE_URL || 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/';
+    window.IMAGE_FORMATS = window.IMAGE_FORMATS || ['png', 'jpg', 'jpeg', 'jfif'];
+</script>
+
+<h1>New Journey</h1>
+<form id="newTrainerForm">
+    <label for="name">Name</label>
+    <input type="text" id="name" name="name" required />
+
+    <label for="nationality">Nationality</label>
+    <select id="nationality" name="nationality" required>
+        <option value="Shima">Shima</option>
+        <option value="Kanto">Kanto</option>
+        <option value="Johto">Johto</option>
+        <option value="Hoenn">Hoenn</option>
+        <option value="Orre">Orre</option>
+        <option value="Sinnoh">Sinnoh</option>
+        <option value="Unova">Unova</option>
+        <option value="Kalos">Kalos</option>
+        <option value="Alola">Alola</option>
+        <option value="Galar">Galar</option>
+    </select>
+
+    <label for="level">Level</label>
+    <input type="number" id="level" name="level" required />
+
+    <label for="hitDice">Hit Dice</label>
+    <input type="number" id="hitDice" name="hitDice" required />
+
+    <label for="vitalityDice">Vitality Dice</label>
+    <input type="number" id="vitalityDice" name="vitalityDice" required />
+
+    <label for="strength">Strength (STR)</label>
+    <input type="number" id="strength" name="strength" required />
+
+    <label for="dexterity">Dexterity (DEX)</label>
+    <input type="number" id="dexterity" name="dexterity" required />
+
+    <label for="constitution">Constitution (CON)</label>
+    <input type="number" id="constitution" name="constitution" required />
+
+    <label for="intelligence">Intelligence (INT)</label>
+    <input type="number" id="intelligence" name="intelligence" required />
+
+    <label for="wisdom">Wisdom (WIS)</label>
+    <input type="number" id="wisdom" name="wisdom" required />
+
+    <label for="charisma">Charisma (CHA)</label>
+    <input type="number" id="charisma" name="charisma" required />
+
+    <label for="ac">AC</label>
+    <input type="number" id="ac" name="ac" required />
+
+    <label for="walkingSpeed">Walking Speed</label>
+    <input type="number" id="walkingSpeed" name="walkingSpeed" required />
+
+    <label for="savingThrows">Saving Throws</label>
+    <select id="savingThrows" name="savingThrows" required>
+        <option value="Strength">Strength (STR)</option>
+        <option value="Dexterity">Dexterity (DEX)</option>
+        <option value="Constitution">Constitution (CON)</option>
+        <option value="Intelligence">Intelligence (INT)</option>
+        <option value="Wisdom">Wisdom (WIS)</option>
+        <option value="Charisma">Charisma (CHA)</option>
+    </select>
+
+    <label for="skills">Skills</label>
+    <div id="skills">
+        <input type="checkbox" id="athletics" name="skills" value="Athletics" />
+        <label for="athletics">Athletics (STR)</label><br />
+
+        <input type="checkbox" id="acrobatics" name="skills" value="Acrobatics" />
+        <label for="acrobatics">Acrobatics (DEX)</label><br />
+
+        <input type="checkbox" id="sleightOfHand" name="skills" value="Sleight of Hand" />
+        <label for="sleightOfHand">Sleight of Hand (DEX)</label><br />
+
+        <input type="checkbox" id="stealth" name="skills" value="Stealth" />
+        <label for="stealth">Stealth (DEX)</label><br />
+
+        <input type="checkbox" id="arcana" name="skills" value="Arcana" />
+        <label for="arcana">Arcana (INT)</label><br />
+
+        <input type="checkbox" id="history" name="skills" value="History" />
+        <label for="history">History (INT)</label><br />
+
+        <input type="checkbox" id="investigation" name="skills" value="Investigation" />
+        <label for="investigation">Investigation (INT)</label><br />
+
+        <input type="checkbox" id="nature" name="skills" value="Nature" />
+        <label for="nature">Nature (INT)</label><br />
+
+        <input type="checkbox" id="religion" name="skills" value="Religion" />
+        <label for="religion">Religion (INT)</label><br />
+
+        <input type="checkbox" id="animalHandling" name="skills" value="Animal Handling" />
+        <label for="animalHandling">Animal Handling (WIS)</label><br />
+
+        <input type="checkbox" id="insight" name="skills" value="Insight" />
+        <label for="insight">Insight (WIS)</label><br />
+
+        <input type="checkbox" id="medicine" name="skills" value="Medicine" />
+        <label for="medicine">Medicine (WIS)</label><br />
+
+        <input type="checkbox" id="perception" name="skills" value="Perception" />
+        <label for="perception">Perception (WIS)</label><br />
+
+        <input type="checkbox" id="survival" name="skills" value="Survival" />
+        <label for="survival">Survival (WIS)</label><br />
+
+        <input type="checkbox" id="deception" name="skills" value="Deception" />
+        <label for="deception">Deception (CHA)</label><br />
+
+        <input type="checkbox" id="intimidation" name="skills" value="Intimidation" />
+        <label for="intimidation">Intimidation (CHA)</label><br />
+
+        <input type="checkbox" id="performance" name="skills" value="Performance" />
+        <label for="performance">Performance (CHA)</label><br />
+
+        <input type="checkbox" id="persuasion" name="skills" value="Persuasion" />
+        <label for="persuasion">Persuasion (CHA)</label><br />
+    </div>
+
+    <label for="money">Money</label>
+    <input type="number" id="money" name="money" required />
+
+    <label for="leaguePoints">League Points</label>
+    <input type="number" id="leaguePoints" name="leaguePoints" required />
+
+    <label for="pinCode">PIN Code (4 digits)</label>
+    <input type="text" id="pinCode" name="pinCode" maxlength="4" required />
+
+    <label for="trainerClass">Trainer Class</label>
+    <select id="trainerClass" name="trainerClass" required>
+        <option value="Pokemon Trainer">Pokémon Trainer</option>
+        <option value="Conduit">Conduit</option>
+    </select>
+
+    <button type="button" class="button" onclick="submitForm()">Create Trainer</button>
+</form>
+
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+<script>
+    function validateForm() {
+        const pinCodeInput = document.getElementById("pinCode").value;
+        const pinCodePattern = /^\d{4}$/;
+
+        if (!pinCodePattern.test(pinCodeInput)) {
+            showAlert("PIN Code must be 4 digits.");
+            return false;
+        }
+
+        return true;
+    }
+
+    // ------------------------------------------------- Get Trainer Image URL Start-------------------------------------------------
+    // Function to fetch trainer image using server-side logic
+    async function getTrainerImage(trainerName) {
+        const sanitizedName = sanitizeFileName(trainerName);
+        for (const format of IMAGE_FORMATS) {
+            const url = `${IMAGE_BASE_URL}${sanitizedName}.${format}`;
+            if (await imageExists(url)) {
+                return url;
+            }
+        }
+        return 'https://via.placeholder.com/100'; // Default image if no image found
+    }
+
+    function sanitizeFileName(name) {
+        return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    function imageExists(url) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+            img.src = url;
+        });
+    }
+    // ------------------------------------------------- Get Trainer Image URL End---------------------------------------------------
+
+    async function submitForm() {
+        if (!validateForm()) return;
+
+        const form = document.getElementById("newTrainerForm");
+        const formData = new FormData(form);
+
+        // Convert formData to an object
+        const data = {};
+        formData.forEach((value, key) => {
+            if (key === "skills") {
+                if (!data[key]) {
+                    data[key] = [];
+                }
+                data[key].push(value);
+            } else {
+                data[key] = value;
+            }
+        });
+
+        try {
+            const imageUrl = await getTrainerImage(data.name);
+            data.image = imageUrl;
+
+            // Directly create the trainer using the form data
+            google.script.run
+                .withSuccessHandler((response) => {
+                    if (response.status === "success") {
+                        // Store rowData in session storage
+                        sessionStorage.setItem('trainerData', JSON.stringify(response.rowData));
+                        
+                        showAlert(response.message);
+                        
+                        NavigationManager.navigate('continue_journey');
+                    } else {
+                        showAlert("Failed to create trainer.");
+                    }
+                })
+                .withFailureHandler((error) => {
+                    showAlert("Error creating trainer: " + error.message);
+                })
+                .createTrainer(data);
+        } catch (error) {
+            showAlert("Error submitting form: " + error.message);
+        }
+    }
+
+    function showAlert(message) {
+        const alertBox = document.createElement("div");
+        alertBox.style.position = "fixed";
+        alertBox.style.top = "20px";
+        alertBox.style.left = "50%";
+        alertBox.style.transform = "translateX(-50%)";
+        alertBox.style.padding = "10px 20px";
+        alertBox.style.backgroundColor = "#f44336";
+        alertBox.style.color = "#ffffff";
+        alertBox.style.borderRadius = "5px";
+        alertBox.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.2)";
+        alertBox.style.zIndex = "9999";
+        alertBox.textContent = message;
+
+        document.body.appendChild(alertBox);
+
+        setTimeout(() => {
+            alertBox.remove();
+        }, 3000);
+    }
+</script>

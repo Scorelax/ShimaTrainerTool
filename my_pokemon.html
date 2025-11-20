@@ -1,0 +1,227 @@
+<style>
+    .pokemon-list-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 80%;
+        max-width: 1200px;
+        height: calc(100vh - 200px);
+        position: relative;
+    }
+
+
+    /* Pokémon grid */
+    .pokemon-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 10px 20px;
+        justify-items: center;
+        align-items: center;
+        width: 100%;
+    }
+
+
+    .pokemon-slot {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: transparent;
+        padding: 10px;
+    }
+
+
+    .pokemon-image {
+        width: 200px;
+        height: 200px;
+        border-radius: 10px;
+        object-fit: cover;
+        background-color: #f0f0f0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    }
+
+
+    .pokemon-image:active {
+        transform: scale(0.95);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        opacity: 0.8;
+    }
+
+
+    .pokemon-name,
+    .pokemon-level {
+        font-size: 1.5rem;
+        margin-bottom: 5px;
+        color: white;
+    }
+
+
+    .navigation-buttons,
+    .register-button {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        justify-content: center;
+        width: auto;
+        z-index: 3;
+    }
+
+
+    .navigation-buttons {
+        top: 75%;
+    }
+
+
+    .register-button {
+        top: 80%;
+    }
+
+
+    #pageIndicator {
+        font-size: 1.5rem;
+        font-weight: bold;
+        line-height: 1.5;
+        margin: 0 15px;
+        display: flex;
+        align-items: center;
+    }
+</style>
+
+
+<h1>My Pokémon</h1>
+<div class="pokemon-list-container">
+    <div class="pokemon-grid" id="pokemonGrid">
+        <!-- Pokémon slots will be dynamically generated here -->
+    </div>
+</div>
+
+
+<!-- Controls Container -->
+<div class="controls-container">
+    <div class="navigation-buttons">
+        <button class="button" onclick="prevPage()">&lt; Prev</button>
+        <span id="pageIndicator">1/X</span>
+        <button class="button" onclick="nextPage()">Next &gt;</button>
+    </div>
+    <div class="register-button">
+        <button class="button" onclick="NavigationManager.navigate('new_pokemon')">Register New Pokémon</button>
+    </div>
+</div>
+
+
+<!-- Add the Pokeball line and button -->
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+
+<script>
+    var currentPage = 1;
+    var pokemonsPerPage = 9;
+    var allPokemons = [];
+
+
+    function loadPokemonList() {
+        allPokemons = [];
+
+
+        // Retrieve all Pokémon data from session storage
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key.startsWith('pokemon_')) {
+                const pokemonResult = JSON.parse(sessionStorage.getItem(key));
+                allPokemons.push({
+                    image: pokemonResult[1],       // Image URL
+                    name: pokemonResult[2],        // Name
+                    dexentry: pokemonResult[3],    // Dex Entry
+                    level: pokemonResult[4],       // Level
+                    nickname: pokemonResult[36]    // Nickname
+                });
+            }
+        }
+
+
+        // Sort Pokémon by Dex Entry (or any other criteria you prefer)
+        allPokemons.sort((a, b) => a.dexentry - b.dexentry);
+
+
+        renderPokemonList();
+    }
+
+
+    function renderPokemonList() {
+        const pokemonGrid = document.getElementById('pokemonGrid');
+        pokemonGrid.innerHTML = ''; // Clear existing Pokémon slots
+
+
+        const startIndex = (currentPage - 1) * pokemonsPerPage;
+        const endIndex = startIndex + pokemonsPerPage;
+        const currentPokemons = allPokemons.slice(startIndex, endIndex);
+
+
+        for (const pokemon of currentPokemons) {
+            const slot = document.createElement('div');
+            slot.className = 'pokemon-slot';
+
+
+            const img = document.createElement('img');
+            img.className = 'pokemon-image';
+            img.src = pokemon.image || 'https://via.placeholder.com/150';
+
+
+            // Make the image clickable
+            img.onclick = () => viewPokemonDetails(pokemon.name);
+
+
+            const name = document.createElement('div');
+            name.className = 'pokemon-name';
+            name.textContent = pokemon.nickname || pokemon.name; // Only the name/nickname without a label
+
+
+            const level = document.createElement('div');
+            level.className = 'pokemon-level';
+            level.textContent = `Level: ${pokemon.level || 'N/A'}`;
+
+
+            slot.appendChild(img);
+            slot.appendChild(name);
+            slot.appendChild(level);
+
+
+            pokemonGrid.appendChild(slot);
+        }
+
+
+        // Calculate total pages and ensure it's at least 1
+        const totalPages = Math.max(1, Math.ceil(allPokemons.length / pokemonsPerPage));
+       
+        // Update page indicator
+        document.getElementById('pageIndicator').textContent = `${currentPage}/${totalPages}`;
+    }
+
+
+    function prevPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPokemonList();
+        }
+    }
+
+
+    function nextPage() {
+        if (currentPage < Math.ceil(allPokemons.length / pokemonsPerPage)) {
+            currentPage++;
+            renderPokemonList();
+        }
+    }
+</script>
+
+
+
+
+

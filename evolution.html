@@ -1,0 +1,865 @@
+<style>
+    .evolution-container {
+        display: flex;
+        justify-content: space-around;
+        width: 90%;
+        max-width: 1200px;
+        flex-grow: 1;
+    }
+
+
+    .seen-pokemon-list {
+        width: 45%;
+        max-height: 65vh;
+        overflow-y: auto;
+        border: 2px solid black;
+        border-radius: 10px;
+        padding: 20px;
+        background-color: white;
+    }
+
+
+    .seen-pokemon-list h2 {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 20px;
+        font-size: 2rem;
+    }
+
+
+    .seen-pokemon-list ul {
+        list-style: none;
+        padding: 0;
+    }
+
+
+    .seen-pokemon-list li {
+        font-size: 2rem;
+        margin-bottom: 15px;
+        cursor: pointer;
+    }
+
+
+    .pokemon-details {
+        width: 60%;
+        text-align: center;
+        display: none;
+        color: black;
+        font-size: 2rem;
+    }
+
+
+    .pokemon-details img {
+        width: 300px;
+        height: 300px;
+        background-color: #f0f0f0;
+        border-radius: 10px;
+        object-fit: cover;
+        margin-bottom: 40px;
+    }
+
+
+    .pokemon-details div {
+        margin-bottom: 20px;
+    }
+
+
+    .evolve-button {
+        background-color: white;
+        color: #000000;
+        border: none;
+        border-radius: 5px;
+        padding: 20px 40px;
+        font-size: 2rem;
+        cursor: pointer;
+        transition: background-color 0.3s, color 0.3s;
+        display: none;
+    }
+
+
+    .evolve-button:hover {
+        background-color: #000000;
+        color: white;
+    }
+
+
+    /* Modal styling */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        justify-content: center;
+        align-items: center;
+    }
+
+
+    .modal-content {
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        width: 400px;
+        max-width: 90%;
+    }
+
+
+    .modal-content h2 {
+        margin-bottom: 20px;
+        font-size: 2.5rem;
+    }
+
+
+    .stat-input {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+
+    .stat-input span {
+        font-size: 1.5rem;
+        margin-right: 10px;
+    }
+
+
+    .stat-input input {
+        width: 80px;
+        font-size: 1.5rem;
+        padding: 5px;
+    }
+
+
+    .available-skill-points {
+        font-size: 2rem;
+        margin-bottom: 20px;
+    }
+
+
+    .confirm-button {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 1.5rem;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+
+    .confirm-button:hover {
+        background-color: #d32f2f;
+    }
+
+
+    .new-stat {
+        font-size: 1.5rem;
+        color: green;
+        margin-left: 10px;
+    }
+    .allocated-points-display {
+        font-size: 1.2rem;
+        color: #333;
+        margin-top: 10px;
+    }
+
+
+    /* Custom Message Box */
+    .custom-message-box {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 300px;
+        padding: 20px;
+        background-color: white;
+        border: 2px solid #f44336;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        z-index: 10000;
+        text-align: center;
+        display: none;
+    }
+
+
+    .custom-message-box h2 {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+        color: #f44336;
+    }
+
+
+    .custom-message-box p {
+        font-size: 1rem;
+        margin-bottom: 20px;
+    }
+
+
+    .custom-message-box button {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 1rem;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+
+    .custom-message-box button:hover {
+        background-color: #d32f2f;
+    }
+
+
+    /* Overlay */
+    .custom-message-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+        display: none;
+    }
+
+
+</style>
+
+
+<h1>Evolve Pokémon</h1>
+<div class="evolution-container">
+    <div class="seen-pokemon-list">
+        <h2>Select Evolution</h2>
+        <ul id="pokemonList">
+            <!-- Pokémon entries will be populated here -->
+        </ul>
+    </div>
+    <div class="pokemon-details" id="pokemonDetails">
+        <img src="" alt="Pokémon Image" id="pokemonImage">
+        <div>Name: <span id="pokemonName"></span></div>
+        <div>Dex Entry: <span id="pokemonDexEntry"></span></div>
+        <div>Primary Type: <span id="pokemonPrimaryType"></span></div>
+        <div>Secondary Type: <span id="pokemonSecondaryType"></span></div>
+        <button class="evolve-button" id="evolveButton" onclick="evolvePokemon()">Evolve Pokémon</button>
+    </div>
+</div>
+
+
+<!-- Evolution Skill Points Modal -->
+<div id="evolutionModal" class="modal">
+    <div class="modal-content">
+        <h2>Allocate Skill Points</h2>
+        <div class="available-skill-points">Available Skill Points: <span id="availableSkillPoints"></span></div>
+        <!-- Add remaining points here -->
+        <div class="allocated-points-display">Remaining Points: <span id="remainingPoints">0</span></div>
+       
+        <!-- Your stat-inputs follow as they are -->
+        <div class="stat-input">
+            <span>STR (<span id="currentStr"></span> ➔ <span class="new-stat" id="newStr"></span>):</span>
+            <input type="number" id="strPoints" value="0" min="0" oninput="updateAllocatedPoints()">
+        </div>
+        <div class="stat-input">
+            <span>DEX (<span id="currentDex"></span> ➔ <span class="new-stat" id="newDex"></span>):</span>
+            <input type="number" id="dexPoints" value="0" min="0" oninput="updateAllocatedPoints()">
+        </div>
+        <div class="stat-input">
+            <span>CON (<span id="currentCon"></span> ➔ <span class="new-stat" id="newCon"></span>):</span>
+            <input type="number" id="conPoints" value="0" min="0" oninput="updateAllocatedPoints()">
+        </div>
+        <div class="stat-input">
+            <span>INT (<span id="currentInt"></span> ➔ <span class="new-stat" id="newInt"></span>):</span>
+            <input type="number" id="intPoints" value="0" min="0" oninput="updateAllocatedPoints()">
+        </div>
+        <div class="stat-input">
+            <span>WIS (<span id="currentWis"></span> ➔ <span class="new-stat" id="newWis"></span>):</span>
+            <input type="number" id="wisPoints" value="0" min="0" oninput="updateAllocatedPoints()">
+        </div>
+        <div class="stat-input">
+            <span>CHA (<span id="currentCha"></span> ➔ <span class="new-stat" id="newCha"></span>):</span>
+            <input type="number" id="chaPoints" value="0" min="0" oninput="updateAllocatedPoints()">
+        </div>
+
+
+        <button class="confirm-button" onclick="confirmEvolution()">Confirm Evolution</button>
+        <button class="confirm-button" onclick="cancelEvolution()">Cancel</button>
+    </div>
+</div>
+
+
+<!-- Pokeball button to go back -->
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+
+<!-- Custom Message Box -->
+<div id="customMessageOverlay" class="custom-message-overlay"></div>
+<div id="customMessageBox" class="custom-message-box">
+    <h2>Evolution Successful!</h2>
+    <p>Your Pokémon has evolved into <span id="evolvedPokemonName"></span>!</p>
+    <button onclick="closeCustomMessageBox()">OK</button>
+</div>
+
+
+<audio id="evolution-intro-audio">
+  <source src="https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Evolution%20Start.mp3" type="audio/mpeg">
+</audio>
+
+
+<audio id="evolution-loop-audio" loop>
+  <source src="https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Evolution%20Loop.mp3" type="audio/mpeg">
+</audio>
+
+
+<audio id="registered-pokemon-audio">
+  <source src="https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Registered%20Pokemon.mp3" type="audio/mpeg">
+</audio>
+
+
+<script>
+    // This is the function called by NavigationManager
+    function initializeEvolution() {
+        console.log('Initializing evolution page');
+       
+        // Reset variables
+        window.selectedPokemon = null;
+        window.currentPokemon = null;
+        window.availableSkillPoints = 0;
+        window.allocatedSkillPoints = 0;
+        window.currentPokemonDexEntry = null;
+        window.evolutionOptions = [];
+       
+        // Play evolution audio
+        var evolutionIntroAudio = document.getElementById('evolution-intro-audio');
+        var evolutionLoopAudio = document.getElementById('evolution-loop-audio');
+
+
+        evolutionIntroAudio.volume = 0.3;
+        evolutionIntroAudio.play().catch(error => {
+            console.error('Error playing evolution intro audio:', error);
+        });
+
+
+        evolutionIntroAudio.onended = function () {
+            evolutionLoopAudio.volume = 0.3;
+            evolutionLoopAudio.play().catch(error => {
+                console.error('Error playing evolution loop audio:', error);
+            });
+        };
+       
+        // Load the Pokemon data
+        loadEvolutions();
+    }
+
+
+    function loadEvolutions() {
+        const storedPokemon = sessionStorage.getItem('selectedPokemonName');
+        if (storedPokemon) {
+            const pokemonDataRaw = sessionStorage.getItem(`pokemon_${storedPokemon.toLowerCase()}`);
+            window.currentPokemon = pokemonDataRaw ? JSON.parse(pokemonDataRaw) : null;
+           
+            if (currentPokemon) {
+                const pokemonName = window.currentPokemon[2];
+                document.querySelector('h1').textContent = `Evolve ${pokemonName}`;
+
+
+                // Display current stats
+                document.getElementById('currentStr').textContent = window.currentPokemon[15];
+                document.getElementById('currentDex').textContent = window.currentPokemon[16];
+                document.getElementById('currentCon').textContent = window.currentPokemon[17];
+                document.getElementById('currentInt').textContent = window.currentPokemon[18];
+                document.getElementById('currentWis').textContent = window.currentPokemon[19];
+                document.getElementById('currentCha').textContent = window.currentPokemon[20];
+
+
+                window.currentPokemonDexEntry = window.currentPokemon[3];
+
+
+                // Load only the evolution options we need using the optimized function
+                loadEvolutionOptions();
+            } else {
+                console.error("No Pokémon data found for:", storedPokemon);
+            }
+        } else {
+            console.error("No selected Pokémon name in session storage.");
+        }
+    }
+
+
+    function loadEvolutionOptions() {
+        NavigationManager.showSpinner();
+
+
+        // Get only the next 20 Pokemon after current dex entry
+        google.script.run
+            .withSuccessHandler(function(result) {
+                NavigationManager.hideSpinner();
+               
+                if (result.status === 'success') {
+                    console.log(`Loaded ${result.data.length} evolution options in ${result.executionTime}ms`);
+                    window.evolutionOptions = result.data;
+                    displayEvolutionOptions(window.evolutionOptions);
+                   
+                    // Start resolving images in the background
+                    resolveImagesProgressively(window.evolutionOptions);
+                } else {
+                    console.error('Failed to load evolution options:', result.message);
+                    alert('Failed to load evolution options. Please try again.');
+                }
+            })
+            .withFailureHandler(function(error) {
+                NavigationManager.hideSpinner();
+                console.error('Error fetching evolution options:', error);
+                alert('An error occurred while loading evolution options.');
+            })
+            .getEvolutionOptions(window.currentPokemonDexEntry, 20);
+    }
+
+
+    function displayEvolutionOptions(options) {
+        const pokemonList = document.getElementById('pokemonList');
+        pokemonList.innerHTML = '';
+
+
+        options.forEach(pokemon => {
+            const listItem = document.createElement('li');
+            listItem.textContent = `${pokemon[2]} - ${pokemon[1]}`;
+            listItem.onclick = () => selectEvolution(pokemon);
+            pokemonList.appendChild(listItem);
+        });
+    }
+
+
+    async function resolveImagesProgressively(pokemonList) {
+        // Resolve images one by one to avoid overwhelming the browser
+        for (let i = 0; i < pokemonList.length; i++) {
+            const pokemon = pokemonList[i];
+            if (!pokemon[0]) {
+                const imageUrl = await resolveImageUrl(pokemon[1], pokemon[2]);
+                pokemon[0] = imageUrl;
+               
+                // Update display if this Pokemon is selected
+                if (window.selectedPokemon && window.selectedPokemon[1] === pokemon[1]) {
+                    document.getElementById('pokemonImage').src = imageUrl;
+                }
+            }
+        }
+    }
+
+
+    async function resolveImageUrl(pokemonName, pokemonId) {
+        const paddedId = pokemonId.toString().padStart(3, '0');
+        const sanitizedName = pokemonName.toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        const baseFileName = `${paddedId}-${sanitizedName}`;
+       
+        const formats = ['png', 'jpg', 'jpeg', 'jfif'];
+        const baseUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/';
+       
+        for (const format of formats) {
+            const url = `${baseUrl}${baseFileName}.${format}`;
+            if (await imageExists(url)) {
+                return url;
+            }
+        }
+       
+        return 'https://via.placeholder.com/100';
+    }
+
+
+    function imageExists(url) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+            img.src = url;
+        });
+    }
+
+
+    async function selectEvolution(pokemon) {
+        window.selectedPokemon = pokemon;
+       
+        // Show placeholder immediately
+        const imageUrl = pokemon[0] || 'https://via.placeholder.com/100';
+        document.getElementById('pokemonImage').src = imageUrl;
+       
+        // Resolve image if not already done
+        if (!pokemon[0]) {
+            const resolvedUrl = await resolveImageUrl(pokemon[1], pokemon[2]);
+            pokemon[0] = resolvedUrl;
+            document.getElementById('pokemonImage').src = resolvedUrl;
+        }
+       
+        document.getElementById('pokemonName').textContent = pokemon[1];
+        document.getElementById('pokemonDexEntry').textContent = pokemon[2];
+        document.getElementById('pokemonPrimaryType').textContent = pokemon[4];
+        document.getElementById('pokemonSecondaryType').textContent = pokemon[5] || 'None';
+
+
+        document.getElementById('pokemonDetails').style.display = 'block';
+        document.getElementById('evolveButton').style.display = 'inline-block';
+    }
+
+
+    function evolvePokemon() {
+        if (window.selectedPokemon) {
+            const preEvolvedStats = window.currentPokemon[14];
+            const evolvedStats = window.selectedPokemon[15];
+            window.availableSkillPoints = evolvedStats - preEvolvedStats;
+
+
+            document.getElementById('availableSkillPoints').textContent = window.availableSkillPoints;
+            document.getElementById('remainingPoints').textContent = window.availableSkillPoints;
+           
+            // Update the new stat displays
+            updateNewStats();
+           
+            document.getElementById('evolutionModal').style.display = 'flex';
+        }
+    }
+
+
+    function updateAllocatedPoints() {
+        const str = parseInt(document.getElementById('strPoints').value) || 0;
+        const dex = parseInt(document.getElementById('dexPoints').value) || 0;
+        const con = parseInt(document.getElementById('conPoints').value) || 0;
+        const int = parseInt(document.getElementById('intPoints').value) || 0;
+        const wis = parseInt(document.getElementById('wisPoints').value) || 0;
+        const cha = parseInt(document.getElementById('chaPoints').value) || 0;
+
+
+        window.allocatedSkillPoints = str + dex + con + int + wis + cha;
+
+
+        const remainingPoints = window.availableSkillPoints - window.allocatedSkillPoints;
+        document.getElementById('remainingPoints').textContent = remainingPoints >= 0 ? remainingPoints : 0;
+       
+        // Update the new stat displays
+        updateNewStats();
+    }
+
+
+    function updateNewStats() {
+        const str = parseInt(document.getElementById('strPoints').value) || 0;
+        const dex = parseInt(document.getElementById('dexPoints').value) || 0;
+        const con = parseInt(document.getElementById('conPoints').value) || 0;
+        const int = parseInt(document.getElementById('intPoints').value) || 0;
+        const wis = parseInt(document.getElementById('wisPoints').value) || 0;
+        const cha = parseInt(document.getElementById('chaPoints').value) || 0;
+
+
+        document.getElementById('newStr').textContent = window.currentPokemon[15] + str;
+        document.getElementById('newDex').textContent = window.currentPokemon[16] + dex;
+        document.getElementById('newCon').textContent = window.currentPokemon[17] + con;
+        document.getElementById('newInt').textContent = window.currentPokemon[18] + int;
+        document.getElementById('newWis').textContent = window.currentPokemon[19] + wis;
+        document.getElementById('newCha').textContent = window.currentPokemon[20] + cha;
+    }
+
+
+    function confirmEvolution() {
+        const remainingPoints = window.availableSkillPoints - window.allocatedSkillPoints;
+        if (remainingPoints !== 0) {
+            alert('Please allocate all available skill points.');
+            return;
+        }
+
+        document.getElementById('evolutionModal').style.display = 'none';
+        NavigationManager.showSpinner();
+
+        const str = parseInt(document.getElementById('strPoints').value) || 0;
+        const dex = parseInt(document.getElementById('dexPoints').value) || 0;
+        const con = parseInt(document.getElementById('conPoints').value) || 0;
+        const int = parseInt(document.getElementById('intPoints').value) || 0;
+        const wis = parseInt(document.getElementById('wisPoints').value) || 0;
+        const cha = parseInt(document.getElementById('chaPoints').value) || 0;
+
+        // Calculate new stats (add allocated points to current stats)
+        // window.currentPokemon uses 57-item DATABASE format
+        const newSTR = window.currentPokemon[15] + str;  // Index 15 = STR in database
+        const newDEX = window.currentPokemon[16] + dex;  // Index 16 = DEX in database
+        const newCON = window.currentPokemon[17] + con;  // Index 17 = CON in database
+        const newINT = window.currentPokemon[18] + int;  // Index 18 = INT in database
+        const newWIS = window.currentPokemon[19] + wis;  // Index 19 = WIS in database
+        const newCHA = window.currentPokemon[20] + cha;  // Index 20 = CHA in database
+
+        // Combine skills (from both pre-evolved and evolved)
+        // window.currentPokemon[23] = Skills in database format
+        // window.selectedPokemon[23] = Skills in pokedex format
+        let preEvoSkills = window.currentPokemon[23] ? window.currentPokemon[23].split(',').map(skill => skill.trim()) : [];
+        let evoSkills = window.selectedPokemon[23] ? window.selectedPokemon[23].split(',').map(skill => skill.trim()) : [];
+        let combinedSkills = [...new Set([...preEvoSkills, ...evoSkills])].join(', ');
+
+        // Get Movement and Senses Data from evolved Pokemon (pokedex format)
+        const movementData = window.selectedPokemon[31] || {};  // Index 31 in pokedex format
+        const sensesData = window.selectedPokemon[32] || {};    // Index 32 in pokedex format
+
+        const movementDataString = [
+            movementData.walking || '-',
+            movementData.climbing || '-',
+            movementData.flying || '-',
+            movementData.hovering || '-',
+            movementData.swimming || '-',
+            movementData.burrowing || '-'
+        ].join(', ');
+
+        const sensesDataString = [
+            sensesData.sight || '-',
+            sensesData.hearing || '-',
+            sensesData.smell || '-',
+            sensesData.tremorsense || '-',
+            sensesData.echolocation || '-',
+            sensesData.telepathy || '-',
+            sensesData.blindsight || '-',
+            sensesData.darkvision || '-',
+            sensesData.truesight || '-'
+        ].join(', ');
+
+        // Fetch type matchups first
+        google.script.run
+            .withSuccessHandler(function(typematchups) {
+                const typematchupsString = typematchups.join(', ');
+
+                // Map ability slots from current Pokemon to evolved Pokemon
+                // Current Pokemon abilities format: "slotIndex:name;description|slotIndex:name;description"
+                // Evolved Pokemon abilities format (pokedex): index 6=primary, 7=secondary, 8=hidden
+                const currentAbilitiesRaw = window.currentPokemon[7] || '';
+                const evolvedAbilities = [];
+
+                if (currentAbilitiesRaw) {
+                    const currentAbilities = currentAbilitiesRaw
+                        .split('|')
+                        .map(a => a.trim())
+                        .filter(a => a);
+
+                    // Get evolved Pokemon's abilities (pokedex format: "Name, Description")
+                    const evolvedPokemonAbilities = [
+                        window.selectedPokemon[6],  // Primary ability
+                        window.selectedPokemon[7],  // Secondary ability
+                        window.selectedPokemon[8]   // Hidden ability
+                    ];
+
+                    currentAbilities.forEach(abilityData => {
+                        // Extract slot index from current ability
+                        const colonIndex = abilityData.indexOf(':');
+                        let slotIndex = 0; // Default to primary
+
+                        if (colonIndex !== -1 && colonIndex < 3) {
+                            slotIndex = parseInt(abilityData.substring(0, colonIndex));
+                        }
+
+                        // Get the evolved Pokemon's ability for this slot
+                        const evolvedAbilityData = evolvedPokemonAbilities[slotIndex];
+                        if (evolvedAbilityData) {
+                            // Parse evolved ability (format: "Name, Description")
+                            const parts = evolvedAbilityData.split(',');
+                            const abilityName = parts[0].trim();
+                            const abilityDescription = parts.slice(1).join(',').trim();
+
+                            // Format as "slotIndex:name;description"
+                            evolvedAbilities.push(slotIndex + ':' + abilityName + ';' + abilityDescription);
+                        }
+                    });
+                }
+
+                // If no abilities were mapped, default to primary ability
+                const evolvedAbilitiesString = evolvedAbilities.length > 0
+                    ? evolvedAbilities.join('|')
+                    : (() => {
+                        const primaryAbility = window.selectedPokemon[6];
+                        if (primaryAbility) {
+                            const parts = primaryAbility.split(',');
+                            return '0:' + parts[0].trim() + ';' + parts.slice(1).join(',').trim();
+                        }
+                        return '';
+                    })();
+
+                console.log('Current abilities:', currentAbilitiesRaw);
+                console.log('Evolved abilities:', evolvedAbilitiesString);
+
+                // BUILD THE COMPLETE 57-ITEM DATABASE ARRAY
+                // window.currentPokemon = 57-item DATABASE format
+                // window.selectedPokemon = 34-item POKEDEX format
+                const evolvedPokemonData = [
+                    window.currentPokemon[0],           // 0: Trainer Name (from current - database)
+                    window.selectedPokemon[0],          // 1: Image (from selected - pokedex)
+                    window.selectedPokemon[1],          // 2: Name (from selected - pokedex)
+                    window.selectedPokemon[2],          // 3: Dex Entry (from selected - pokedex)
+                    window.currentPokemon[4],           // 4: Level (from current - database)
+                    window.selectedPokemon[4],          // 5: Primary Type (from selected - pokedex)
+                    window.selectedPokemon[5],          // 6: Secondary Type (from selected - pokedex)
+                    evolvedAbilitiesString,             // 7: Abilities (mapped from current Pokemon's slots)
+                    window.selectedPokemon[9],          // 8: AC (from selected - pokedex, will be recalculated)
+                    window.selectedPokemon[10],         // 9: Hit Dice (from selected - pokedex)
+                    '',                                 // 10: HP (placeholder - calculated by server)
+                    window.selectedPokemon[12],         // 11: Vitality Dice (from selected - pokedex)
+                    '',                                 // 12: VP (placeholder - calculated by server)
+                    movementDataString,                 // 13: Speed (from selected - pokedex, formatted)
+                    window.selectedPokemon[15],         // 14: Total Stats (from selected - pokedex)
+                    newSTR,                             // 15: Strength (current + allocated)
+                    newDEX,                             // 16: Dexterity (current + allocated)
+                    newCON,                             // 17: Constitution (current + allocated)
+                    newINT,                             // 18: Intelligence (current + allocated)
+                    newWIS,                             // 19: Wisdom (current + allocated)
+                    newCHA,                             // 20: Charisma (current + allocated)
+                    window.selectedPokemon[22],         // 21: Saving Throws (from selected - pokedex)
+                    combinedSkills,                     // 22: Skills (combined from both)
+                    window.selectedPokemon[24],         // 23: Starting Moves (from selected - pokedex)
+                    window.selectedPokemon[25],         // 24: Level 2 Moves (from selected - pokedex)
+                    window.selectedPokemon[26],         // 25: Level 6 Moves (from selected - pokedex)
+                    window.selectedPokemon[27],         // 26: Level 10 Moves (from selected - pokedex)
+                    window.selectedPokemon[28],         // 27: Level 14 Moves (from selected - pokedex)
+                    window.selectedPokemon[29],         // 28: Level 18 Moves (from selected - pokedex)
+                    window.selectedPokemon[30],         // 29: Evolution Requirement (from selected - pokedex)
+                    '',                                 // 30: Initiative (placeholder - calculated by server)
+                    '',                                 // 31: Proficiency Bonus (placeholder - calculated by server)
+                    window.currentPokemon[32],          // 32: Nature (from current - database)
+                    window.currentPokemon[33],          // 33: Loyalty (from current - database)
+                    window.currentPokemon[34],          // 34: STAB (from current - database)
+                    window.currentPokemon[35] || '',    // 35: Held Item (from current - database)
+                    window.currentPokemon[36] || '',    // 36: Nickname (from current - database)
+                    window.currentPokemon[37] || '',    // 37: Custom Moves (from current - database)
+                    window.currentPokemon[38] || '',    // 38: In Active Party (from current - database)
+                    '',                                 // 39: strmodifier (placeholder - calculated by server)
+                    '',                                 // 40: dexmodifier (placeholder - calculated by server)
+                    '',                                 // 41: conmodifier (placeholder - calculated by server)
+                    '',                                 // 42: intmodifier (placeholder - calculated by server)
+                    '',                                 // 43: wismodifier (placeholder - calculated by server)
+                    '',                                 // 44: chamodifier (placeholder - calculated by server)
+                    window.currentPokemon[45] || '',    // 45: CurrentHP (from current - database)
+                    window.currentPokemon[46] || '',    // 46: CurrentVP (from current - database)
+                    window.currentPokemon[47] || '',    // 47: CurrentAC (from current - database)
+                    window.currentPokemon[48] || '',    // 48: Comment (from current - database)
+                    sensesDataString,                   // 49: Senses (from selected - pokedex, formatted)
+                    window.currentPokemon[50] || '',    // 50: Feats (from current - database)
+                    window.currentPokemon[51] || '',    // 51: Gear (from current - database)
+                    window.selectedPokemon[33] || '',   // 52: Flavor text (from selected - pokedex)
+                    typematchupsString,                 // 53: Type matchups (calculated)
+                    window.currentPokemon[54] || '',    // 54: Current HD (from current - database)
+                    window.currentPokemon[55] || '',    // 55: Current VD (from current - database)
+                    window.currentPokemon[56] || ''     // 56: Utility Slot (from current - database)
+                ];
+
+                // NOW CALL calculateModifiers - EXACTLY LIKE THE POKEMON FORM DOES
+                google.script.run
+                    .withSuccessHandler(function(response) {
+                        if (response && response.status === 'success') {
+                            const finalEvolvedPokemon = response.newPokemonData;
+
+                            // NOW SAVE TO DATABASE
+                            google.script.run
+                                .withSuccessHandler(function(saveResponse) {
+                                    if (saveResponse.status === 'success') {
+                                        // Play registered Pokemon audio
+                                        const registeredAudio = document.getElementById('registered-pokemon-audio');
+                                        registeredAudio.volume = 0.3;
+                                        registeredAudio.play().catch(error => {
+                                            console.error('Error playing registered Pokemon audio:', error);
+                                        });
+
+                                        // Clean up pre-evolved Pokemon from cache
+                                        const preEvolvedKey = `pokemon_${window.currentPokemon[2].toLowerCase()}`;
+                                        sessionStorage.removeItem(preEvolvedKey);
+                                        
+                                        // Clear pokemon list cache
+                                        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+                                        if (trainerData) {
+                                            sessionStorage.removeItem(`pokemonList_${trainerData[1]}`);
+                                        }
+                                        
+                                        // Update window variables with final evolved Pokemon
+                                        window.selectedPokemon = finalEvolvedPokemon;
+                                        window.currentPokemon = finalEvolvedPokemon;
+                                      
+                                        // Store in session storage
+                                        sessionStorage.setItem('selectedPokemon', JSON.stringify(finalEvolvedPokemon));
+                                        sessionStorage.setItem(`pokemon_${finalEvolvedPokemon[2].toLowerCase()}`, JSON.stringify(finalEvolvedPokemon));
+                                        sessionStorage.setItem('selectedPokemonName', finalEvolvedPokemon[2]);
+                                        
+                                        NavigationManager.hideSpinner();
+                                        showCustomMessageBox(finalEvolvedPokemon[2]);
+                                      
+                                        setTimeout(() => {
+                                            NavigationManager.navigate('pokemon_card');
+                                        }, 2000);
+                                    } else {
+                                        NavigationManager.hideSpinner();
+                                        alert('Evolution failed. Please try again.');
+                                    }
+                                })
+                                .withFailureHandler(function(error) {
+                                    NavigationManager.hideSpinner();
+                                    console.error('Evolution error:', error);
+                                    alert('An error occurred during evolution.');
+                                })
+                                .replacePokemonInSheet(
+                                    window.currentPokemon[2],
+                                    window.currentPokemon[0],
+                                    finalEvolvedPokemon
+                                );
+                        } else {
+                            NavigationManager.hideSpinner();
+                            alert('Failed to calculate modifiers.');
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        NavigationManager.hideSpinner();
+                        console.error('Error calculating modifiers:', error);
+                        alert('Failed to complete evolution. Please try again.');
+                    })
+                    .calculateModifiers(evolvedPokemonData, "None", "None");
+            })
+            .withFailureHandler(function(error) {
+                NavigationManager.hideSpinner();
+                console.error('Error fetching type matchups:', error);
+                alert('Failed to complete evolution. Please try again.');
+            })
+            .calculateTypeEffectiveness(window.selectedPokemon[4], window.selectedPokemon[5]);
+    }
+
+    function calculateAC() {
+        const baseAC = parseInt(window.selectedPokemon[9], 10);
+        const nature = window.currentPokemon[32];
+        return (nature === 'Hardy' || nature === 'Nimble') ? baseAC + 1 : baseAC;
+    }
+
+
+    function cancelEvolution() {
+        document.getElementById('evolutionModal').style.display = 'none';
+        resetAllocationInputs();
+    }
+
+
+    function resetAllocationInputs() {
+        document.getElementById('strPoints').value = 0;
+        document.getElementById('dexPoints').value = 0;
+        document.getElementById('conPoints').value = 0;
+        document.getElementById('intPoints').value = 0;
+        document.getElementById('wisPoints').value = 0;
+        document.getElementById('chaPoints').value = 0;
+        window.allocatedSkillPoints = 0;
+    }
+
+
+    function showCustomMessageBox(evolvedPokemonName) {
+        document.getElementById('evolvedPokemonName').textContent = evolvedPokemonName;
+        document.getElementById('customMessageOverlay').style.display = 'block';
+        document.getElementById('customMessageBox').style.display = 'block';
+    }
+
+
+    function closeCustomMessageBox() {
+        document.getElementById('customMessageOverlay').style.display = 'none';
+        document.getElementById('customMessageBox').style.display = 'none';
+    }
+</script>
+
+
+

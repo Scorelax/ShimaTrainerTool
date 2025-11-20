@@ -1,0 +1,558 @@
+<style>
+    .form-container {
+        width: 80%;
+        max-width: 600px;
+        background-color: white;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-height: 70vh;
+        overflow-y: auto;
+        margin-bottom: 20px;
+    }
+
+
+    .form-container label {
+        display: block;
+        margin-top: 20px;
+        font-weight: bold;
+        text-align: center;
+        font-size: 2rem;
+    }
+
+
+    .form-container input,
+    .form-container select,
+    .form-container textarea {
+        width: calc(100% - 40px);
+        padding: 20px;
+        margin-top: 10px;
+        margin-bottom: 40px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 2rem;
+    }
+
+
+    .form-container textarea {
+        resize: vertical;
+        height: 200px;
+    }
+
+
+    .form-container button {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 20px 40px;
+        font-size: 2rem;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+
+    .form-container button:hover {
+        background-color: #d32f2f;
+    }
+
+    label.collapsible {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+    }
+
+    /* NEW: Arrow for collapsible sections */
+    .arrow {
+        margin-left: auto;
+        font-size: 1.5rem;
+        transition: transform 0.3s;
+    }
+
+    .arrow.open {
+        transform: rotate(90deg);
+    }
+
+    /* NEW: Abilities section container */
+    .abilities-section {
+        display: none;
+        flex-direction: column;
+        align-items: flex-start;
+        font-size: 2rem;
+        width: 100%;
+        margin-bottom: 40px;
+    }
+
+    /* NEW: Individual ability row */
+    .abilities-section div {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    /* NEW: Checkbox styling */
+    .abilities-section div input[type="checkbox"] {
+        margin-right: 2rem;
+        transform: scale(2);
+        margin-left: 0;
+    }
+
+    /* NEW: Ability label styling */
+    .abilities-section div label {
+        margin-bottom: 0;
+        margin-left: 0.5rem;
+        text-align: left;
+        line-height: 1.5;
+        font-size: 1.8rem;
+        display: block;
+    }
+
+    /* NEW: Ability description styling */
+    .ability-description {
+        font-size: 1.4rem;
+        color: #666;
+        font-weight: normal;
+        margin-top: 0.3rem;
+        line-height: 1.3;
+    }
+
+
+    .autocomplete-items {
+        position: absolute;
+        border: 1px solid #d4d4d4;
+        border-bottom: none;
+        border-top: none;
+        z-index: 99;
+        max-height: 150px;
+        overflow-y: auto;
+        background-color: white;
+        width: 100%;
+    }
+
+
+    .autocomplete-items div {
+        padding: 10px;
+        cursor: pointer;
+        background-color: #fff;
+        border-bottom: 1px solid #d4d4d4;
+    }
+
+
+    .autocomplete-items div:hover {
+        background-color: #e9e9e9;
+    }
+
+
+    .autocomplete-active {
+        background-color: DodgerBlue !important;
+        color: #ffffff;
+    }
+</style>
+
+
+<h1>Complete Pokémon Registration</h1>
+<div class="form-container">
+    <form id="pokemonForm" onsubmit="submitForm(event)">
+        <label for="level">Level</label>
+        <input type="number" id="level" name="level" required />
+
+
+        <label for="nature">Nature</label>
+        <select id="nature" name="nature" required></select>
+
+
+        <label for="loyalty">Loyalty</label>
+        <input type="number" id="loyalty" name="loyalty" required />
+
+
+        <label for="abilities" class="collapsible">
+            Abilities
+            <span class="arrow" id="abilitiesArrow">▶</span>
+        </label>
+        <div id="abilities" class="abilities-section">
+            <!-- Abilities will be populated dynamically -->
+        </div>
+
+
+        <label for="heldItem">Held Item</label>
+        <input type="text" id="heldItem" name="heldItem" list="heldItemList" autocomplete="off">
+        <datalist id="heldItemList"></datalist>
+
+
+        <label for="nickname">Nickname</label>
+        <input type="text" id="nickname" name="nickname">
+
+
+        <button type="submit">Register Pokémon</button>
+
+
+    </form>
+</div>
+
+
+<!-- Add the Pokeball line and button -->
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+
+<!-- Custom Message Box -->
+<div id="customMessageBox" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px 60px; background-color: #4CAF50; color: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.2); z-index: 10000; font-size: 3rem; white-space: nowrap;">
+    <span id="customMessageText"></span>
+</div>
+
+
+<audio id="pokemon-caught-audio">
+  <source src="https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokemon%20Caught.mp3" type="audio/mpeg">
+</audio>
+<audio id="registered-pokemon-audio">
+  <source src="https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Registered%20Pokemon.mp3" type="audio/mpeg">
+</audio>
+
+
+<script>
+    function initializePokemonForm() {
+        var pokemonCaughtAudio = document.getElementById('pokemon-caught-audio');
+        pokemonCaughtAudio.volume = 0.3;
+        pokemonCaughtAudio.play().catch(error => {
+            console.error('Error playing title screen audio:', error);
+        });
+       
+        const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
+        loadNatureOptions();
+
+
+        if (selectedPokemonData) {
+            populateAbilityOptions(selectedPokemonData);
+        } else {
+            console.error('No selected Pokémon data found.');
+        }
+
+
+        initializeAutocomplete();
+        setupAbilitiesToggle();
+    }
+
+
+    function populateAbilityOptions(selectedPokemonData) {
+        const abilitiesSection = document.getElementById('abilities');
+        abilitiesSection.innerHTML = ''; // Clear previous options
+
+        // Get all three possible abilities (indices 6, 7, 8)
+        // 0 = primary, 1 = secondary, 2 = hidden
+        const abilities = [
+            selectedPokemonData[6],
+            selectedPokemonData[7],
+            selectedPokemonData[8]
+        ];
+
+        abilities.forEach((abilityData, slotIndex) => {
+            // Skip empty abilities
+            if (!abilityData) return;
+
+            // Parse ability data (format: "AbilityName,Description")
+            const parts = abilityData.split(',');
+            const abilityName = parts[0].trim();
+            const abilityDescription = parts.slice(1).join(',').trim(); // Rejoin in case description has commas
+
+            // Create checkbox container
+            const div = document.createElement('div');
+
+            // Create checkbox
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `ability${slotIndex}`;
+            checkbox.name = 'abilities';
+            // Store slotIndex:name;description format to preserve which slot this ability belongs to
+            checkbox.value = slotIndex + ':' + abilityName + ';' + abilityDescription;
+
+            // Create label with name and description
+            const label = document.createElement('label');
+            label.htmlFor = `ability${slotIndex}`;
+            label.innerHTML = `<strong>${abilityName}</strong><br><span class="ability-description">${abilityDescription}</span>`;
+
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            abilitiesSection.appendChild(div);
+        });
+    }
+
+    function setupAbilitiesToggle() {
+        const abilitiesLabel = document.querySelector('label[for="abilities"]');
+        const abilitiesSection = document.getElementById('abilities');
+        const abilitiesArrow = document.getElementById('abilitiesArrow');
+
+        abilitiesLabel.addEventListener('click', () => {
+            abilitiesSection.style.display = abilitiesSection.style.display === 'none' ? 'flex' : 'none';
+            abilitiesArrow.classList.toggle('open');
+        });
+
+        // Initialize as hidden
+        abilitiesSection.style.display = 'none';
+    }
+
+
+    function submitForm(event) {
+        event.preventDefault();
+
+
+        const form = document.getElementById("pokemonForm");
+        const formData = new FormData(form);
+        showSpinner();
+
+
+        const data = {};
+        formData.forEach((value, key) => {
+            data[key] = value;
+        });
+
+        // Collect selected abilities
+        const selectedAbilities = Array.from(document.querySelectorAll('input[name="abilities"]:checked'))
+            .map(checkbox => checkbox.value)
+            .join('|'); // Use pipe separator
+
+
+        data.abilities = selectedAbilities || '';
+        data.level = parseInt(document.getElementById("level").value, 10);
+
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData')); // Retrieve the trainerData
+        const trainerName = trainerData[1]; // Assuming the name is at index 1
+        const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
+        const pokemonName = selectedPokemonData[1];
+
+
+        // Call updateSessionStorageWithNewPokemon and handle the returned Promise
+        updateSessionStorageWithNewPokemon(data, selectedPokemonData).then(newPokemonData => {
+            // Call calculateModifiers to compute the derived stats
+            google.script.run.withSuccessHandler((response) => {
+                if (response && response.status === 'success') {
+                    // Now that we have the final data, update session storage
+                    sessionStorage.setItem(`pokemon_${selectedPokemonData[1].toLowerCase()}`, JSON.stringify(response.newPokemonData));
+
+
+                    // Also update the general Pokémon data in session storage
+                    const completePokemonData = JSON.parse(sessionStorage.getItem('completePokemonData')) || [];
+                    completePokemonData.push(response.newPokemonData);
+                    sessionStorage.setItem('completePokemonData', JSON.stringify(completePokemonData));
+
+
+                    // Now write the data to Google Sheets
+                    google.script.run.withSuccessHandler((response) => {
+                        var pokemonCaughtAudio = document.getElementById('pokemon-caught-audio');
+                        var registeredPokemonAudio = document.getElementById('registered-pokemon-audio');
+                        var fadeOutInterval = setInterval(function() {
+                            if (pokemonCaughtAudio.volume > 0.05) {
+                                pokemonCaughtAudio.volume -= 0.05;
+                            } else {
+                                clearInterval(fadeOutInterval);
+                                pokemonCaughtAudio.pause();
+                                pokemonCaughtAudio.currentTime = 0;
+                            }
+                        }, 200); // Reduce volume every 200ms for a smooth fade-out
+                        hideSpinner();
+
+
+                        registeredPokemonAudio.play();
+                        showSpinner();
+                        if (response.status === 'success') {
+                            displayCustomMessage(`${trainerName} caught a ${pokemonName}!`);
+                            setTimeout(() => {
+                                NavigationManager.navigate('my_pokemon'); // Redirect after a short delay
+                            }, 3000); // 3-second delay before redirect
+                        } else {
+                            displayCustomMessage('Failed to register Pokémon.');
+                        }
+                    }).registerPokemonForTrainer(trainerName, response.newPokemonData);
+                } else {
+                    displayCustomMessage('Failed to calculate modifiers.');
+                }
+            }).calculateModifiers(newPokemonData, "None", "None");
+        });
+    }
+
+
+    function updateSessionStorageWithNewPokemon(data, selectedPokemonData) {
+        // Load natures from session storage
+        const natures = JSON.parse(sessionStorage.getItem('natures')) || [];
+        const nature = natures.find(n => n.name === data.nature);
+
+
+        if (nature) {
+            const boostStat = nature.boostStat.toLowerCase();
+            const nerfStat = nature.nerfStat.toLowerCase();
+            if (boostStat && selectedPokemonData[15 + getStatIndex(boostStat)] !== undefined) {
+                selectedPokemonData[16 + getStatIndex(boostStat)] += parseInt(nature.boostAmount, 10);
+            }
+            if (nerfStat && selectedPokemonData[15 + getStatIndex(nerfStat)] !== undefined) {
+                selectedPokemonData[16 + getStatIndex(nerfStat)] -= parseInt(nature.nerfAmount, 10);
+            }
+        } else {
+            console.error('Nature not found or undefined:', data.nature);
+        }
+
+
+        const movementData = selectedPokemonData[31] || {};
+        const sensesData = selectedPokemonData[32] || {};
+
+
+        const movementDataString = [
+            movementData.walking || '-',
+            movementData.climbing || '-',
+            movementData.flying || '-',
+            movementData.hovering || '-',
+            movementData.swimming || '-',
+            movementData.burrowing || '-'
+        ].join(', ');
+
+
+        const sensesDataString = [
+            sensesData.sight || '-',
+            sensesData.hearing || '-',
+            sensesData.smell || '-',
+            sensesData.tremorsense || '-',
+            sensesData.echolocation || '-',
+            sensesData.telepathy || '-',
+            sensesData.blindsight || '-',
+            sensesData.darkvision || '-',
+            sensesData.truesight || '-'
+        ].join(', ');
+
+
+        return new Promise((resolve) => {
+            google.script.run
+                .withSuccessHandler((typematchups) => {
+                    const typematchupsString = typematchups.join(', '); // Convert to comma-separated string
+
+
+                    const newPokemonData = [
+                        JSON.parse(sessionStorage.getItem('trainerData'))[1],
+                        selectedPokemonData[0],  // Image
+                        selectedPokemonData[1],  // Name
+                        selectedPokemonData[2],  // Dex Entry
+                        data.level,              // Level
+                        selectedPokemonData[4],  // Primary Type
+                        selectedPokemonData[5],  // Secondary Type
+                        data.abilities,          // Abilities
+                        selectedPokemonData[9],  // AC
+                        selectedPokemonData[10], // Hit Dice
+                        '',                      // Placeholder for HP (to be calculated)
+                        selectedPokemonData[12], // Vitality Dice
+                        '',                      // Placeholder for VP (to be calculated)
+                        movementDataString,      // Speed
+                        selectedPokemonData[15], // Total Stats
+                        selectedPokemonData[16], // Strength
+                        selectedPokemonData[17], // Dexterity
+                        selectedPokemonData[18], // Constitution
+                        selectedPokemonData[19], // Intelligence
+                        selectedPokemonData[20], // Wisdom
+                        selectedPokemonData[21], // Charisma
+                        selectedPokemonData[22], // Saving Throws
+                        selectedPokemonData[23], // Skills
+                        selectedPokemonData[24], // Starting Moves
+                        selectedPokemonData[25], // Level 2 Moves
+                        selectedPokemonData[26], // Level 6 Moves
+                        selectedPokemonData[27], // Level 10 Moves
+                        selectedPokemonData[28], // Level 14 Moves
+                        selectedPokemonData[29], // Level 18 Moves
+                        selectedPokemonData[30], // Evolution Requirement
+                        '',                     // Placeholder for Initiative (to be calculated)
+                        '',                     // Placeholder for Proficiency Bonus (to be calculated)
+                        data.nature,            // Nature
+                        data.loyalty,           // Loyalty
+                        '',                     // Placeholder for STAB (to be calculated)
+                        data.heldItem || '',    // Held Item
+                        data.nickname || '',    // Nickname
+                        data.customMoves || '',       // Custom Moves
+                        data.inActiveParty || '',     // In Active Party
+                        '',                     // Placeholder for STR Modifier (to be calculated)
+                        '',                     // Placeholder for DEX Modifier (to be calculated)
+                        '',                     // Placeholder for CON Modifier (to be calculated)
+                        '',                     // Placeholder for INT Modifier (to be calculated)
+                        '',                     // Placeholder for WIS Modifier (to be calculated)
+                        '',                     // Placeholder for CHA Modifier (to be calculated)
+                        '',                     // Placeholder for currentHP
+                        '',                     // Placeholder for currentVP
+                        '',                     // Placeholder for currentAC
+                        '',                     // Placeholder for comments
+                        sensesDataString || '',
+                        '',                     // Placeholder for feats
+                        '',                     // Placeholder for gear
+                        selectedPokemonData[33],// Flavor text
+                        typematchupsString      // Calculation of type matchups
+                    ];
+
+
+                    resolve(newPokemonData); // Resolve the Promise with the modified newPokemonData
+                })
+                .calculateTypeEffectiveness(selectedPokemonData[4], selectedPokemonData[5]);
+        });
+    }
+
+
+    function getStatIndex(statName) {
+        const statMapping = {
+            'strength': 0,
+            'dexterity': 1,
+            'constitution': 2,
+            'intelligence': 3,
+            'wisdom': 4,
+            'charisma': 5,
+            'ac': -7
+        };
+        return statMapping[statName] || 0;
+    }
+
+
+    function loadNatureOptions() {
+        const natureOptions = JSON.parse(sessionStorage.getItem('natures')) || [];
+        const natureSelect = document.getElementById('nature');
+        natureSelect.innerHTML = ''; // Clear any existing options
+
+
+        natureOptions.forEach(option => {
+            const opt = document.createElement('option');
+            opt.value = option.name;
+            opt.textContent = option.name; // Only display the name
+            natureSelect.appendChild(opt);
+        });
+    }
+
+
+    function displayCustomMessage(message) {
+        const messageBox = document.getElementById('customMessageBox');
+        const messageText = document.getElementById('customMessageText');
+        messageText.textContent = message;
+        messageBox.style.display = 'block';
+        setTimeout(() => {
+            messageBox.style.display = 'none';
+        }, 3000); // Message box will disappear after 3 seconds
+    }
+
+
+    function initializeAutocomplete() {
+        const items = JSON.parse(sessionStorage.getItem('items')) || [];
+        const itemNames = items.map(item => item.name);
+
+
+        const datalist = document.getElementById('heldItemList');
+        datalist.innerHTML = ''; // Clear any existing options
+
+
+        itemNames.forEach(itemName => {
+            const option = document.createElement('option');
+            option.value = itemName;
+            datalist.appendChild(option);
+        });
+    }
+</script>
+
+
+
+
+

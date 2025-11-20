@@ -1,0 +1,241 @@
+<style>
+    .trainer-card-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        width: 90%;
+        max-width: 1200px;
+        padding-bottom: 100px;
+    }
+
+    /* Trainer Section */
+    .trainer-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 40px;
+    }
+
+    .trainer-image {
+        width: 300px;
+        height: 300px;
+        border-radius: 10px;
+        object-fit: cover;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        background-color: #f0f0f0;
+        cursor: pointer;
+    }
+
+    .trainer-info {
+        text-align: center;
+        color: white;
+        margin-top: 10px;
+    }
+
+    .trainer-info div {
+        font-size: 1.5rem;
+    }
+
+    /* Pokémon Section */
+    .pokemon-section {
+        display: flex;
+        justify-content: center; /* Centers the two slots */
+        align-items: center; /* Centers vertically */
+        gap: 40px; /* Space between the two slots */
+        margin-bottom: 10px;
+    }
+
+    .pokemon-slot {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: transparent;
+        padding: 20px; /* Adjust padding as desired */
+    }
+
+    .pokemon-image {
+        width: 200px;
+        height: 200px;
+        border-radius: 10px;
+        object-fit: cover;
+        background-color: #f0f0f0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+        margin-bottom: 10px;
+    }
+
+    .pokemon-slot:hover .pokemon-image {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .pokemon-name,
+    .pokemon-level {
+        font-size: 1.5rem;
+        margin-bottom: 5px;
+        color: white;
+        text-align: center;
+    }
+
+    .pokemon-info-button-container {
+        margin-bottom: 20px;
+    }
+</style>
+
+<h1>Shima Conduit Card</h1>
+
+<div class="trainer-card-container">
+    <div class="trainer-section">
+        <img src="https://via.placeholder.com/200" alt="Trainer Image" id="trainerImage" class="trainer-image" onclick="goToTrainerInfo()">
+        <div class="trainer-info">
+            <div><span id="dynamicTrainerName"></span></div>
+            <div>Level: <span id="dynamicTrainerLevel"></span></div>
+        </div>
+    </div>
+
+    <div class="pokemon-section" id="pokemonSlotsContainer">
+        <!-- Pokémon slots are dynamically generated here -->
+    </div>
+
+    <div class="pokemon-info-button-container">
+        <button class="button pokemon-info-button" onclick="goToMyPokemon()">My Pokémon</button>
+    </div>
+</div>
+
+<!-- Add the Pokeball line and button -->
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+<script>
+    function loadConduitInfo() {
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+
+        if (!trainerDataRaw || trainerDataRaw === "undefined") {
+            console.error('Trainer data not found or is undefined.');
+            return;
+        }
+
+        try {
+            const trainerResult = JSON.parse(trainerDataRaw);
+            if (!trainerResult) {
+                console.error('Trainer data could not be parsed.');
+                return;
+            }
+
+            document.getElementById('trainerImage').src = trainerResult[0] || 'https://via.placeholder.com/200'; // Image
+            document.getElementById('dynamicTrainerName').textContent = trainerResult[1] || 'N/A'; // Name
+            document.getElementById('dynamicTrainerLevel').textContent = trainerResult[2] || 'N/A'; // Level
+
+            // Determine the number of pokeslots based on trainer level
+            const trainerLevel = parseInt(trainerResult[2], 10);
+            let pokeslots = 0; // Default to 3 slots if level is below 5
+
+            if (trainerLevel >= 5 && trainerLevel <= 15) {
+                pokeslots = 1;
+            } else if (trainerLevel >= 16 && trainerLevel <= 20) {
+                pokeslots = 2;
+            } 
+
+            loadPokemonSlots(pokeslots);
+        } catch (error) {
+            console.error('Failed to load trainer info:', error);
+        }
+    }
+
+    function loadPokemonSlots(pokeslots) {
+        try {
+            const pokemonSlotsContainer = document.getElementById('pokemonSlotsContainer');
+            pokemonSlotsContainer.innerHTML = ''; // Clear existing slots
+
+            // Retrieve the images for unlocked and locked slots from session storage
+            const unlockedPokeSlotImage = sessionStorage.getItem('unlockedPokeSlotImage') || 'https://via.placeholder.com/150';
+            const lockedPokeSlotImage = sessionStorage.getItem('lockedPokeSlotImage') || 'https://via.placeholder.com/150';
+
+            const trainerPokemons = Array(2).fill(null); // Initialize an array with 6 null values
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key.startsWith("pokemon_")) {
+                    const pokemonResult = JSON.parse(sessionStorage.getItem(key));
+                    const slotNumber = parseInt(pokemonResult[38], 10); // Get the "inactiveparty" value (index 38)
+                    if (slotNumber && slotNumber >= 1 && slotNumber <= 2) {
+                        trainerPokemons[slotNumber - 1] = pokemonResult; // Place Pokémon in correct slot (1-indexed)
+                    }
+                }
+            }
+
+            for (let i = 0; i < 2; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'pokemon-slot';
+
+                if (trainerPokemons[i]) {
+                    // Slot is filled with a Pokémon
+                    const pokemonResult = trainerPokemons[i];
+
+                    const img = document.createElement('img');
+                    img.className = 'pokemon-image';
+                    img.src = pokemonResult[1] || 'https://via.placeholder.com/150'; // Pokémon Image or placeholder
+                    img.onclick = () => viewPokemonDetails(pokemonResult[2]); // Name
+
+                    const name = document.createElement('div');
+                    name.className = 'pokemon-name';
+                    name.textContent = pokemonResult[36] || pokemonResult[2] || `Pokémon ${i + 1}`; // Nickname or Name
+
+                    const level = document.createElement('div');
+                    level.className = 'pokemon-level';
+                    level.textContent = `Level ${pokemonResult[4] || 'N/A'}`; // Level
+
+                    slot.appendChild(img);
+                    slot.appendChild(name);
+                    slot.appendChild(level);
+                } else if (i < pokeslots) {
+                    // Slot is unlocked but empty
+                    const img = document.createElement('img');
+                    img.className = 'pokemon-image';
+                    img.src = unlockedPokeSlotImage;
+                    slot.appendChild(img);
+                } else {
+                    // Slot is locked
+                    const img = document.createElement('img');
+                    img.className = 'pokemon-image';
+                    img.src = lockedPokeSlotImage;
+                    slot.appendChild(img);
+                }
+
+                pokemonSlotsContainer.appendChild(slot);
+            }
+        } catch (error) {
+            console.error('Failed to load Pokémon slots:', error);
+        }
+    }
+
+    // Function to view Pokémon details
+    function viewPokemonDetails(pokemonName) {
+        sessionStorage.setItem('previousPage', 'trainer_card');
+        sessionStorage.setItem('selectedPokemonName', pokemonName);
+        google.script.run.withSuccessHandler(function(html) {
+            document.open();
+            document.write(html);
+            document.close();
+        }).getConduitPokemonCard();
+    }
+
+    // Page navigation functions
+    function goToTrainerInfo() {
+        google.script.run.withSuccessHandler(function(html) {
+            document.open();
+            document.write(html);
+            document.close();
+        }).getConduitInfo();
+    }
+
+    function goToMyPokemon() {
+        google.script.run.withSuccessHandler(function(html) {
+            document.open();
+            document.write(html);
+            document.close();
+        }).getMyPokemon();
+    }
+</script>

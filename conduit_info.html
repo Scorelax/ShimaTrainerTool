@@ -1,0 +1,2248 @@
+<style>
+    .trainer-info-container {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 20px;
+        width: 80%;
+        max-width: 1200px;
+        margin-top: 20px;
+        z-index: 1;
+    }
+
+    .trainer-image-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        width: 350px;
+        border-radius: 10px;
+        overflow: hidden;
+        background-color: transparent;
+    }
+
+    .trainer-image-container img {
+        width: 350px;
+        height: 350px;
+        border-radius: 10px;
+        object-fit: cover;
+    }
+
+    .trainer-details-container {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 10px;
+        width: 100%;
+        padding-left: 0;
+        margin-top: 20px;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 5px;
+        text-align: left;
+        font-size: 1.5rem;
+        width: 100%;
+    }
+
+    .stat-label {
+        font-weight: bold;
+        color: black;
+    }
+
+    .stat-value {
+        color: black;
+        flex-grow: 1;
+        word-wrap: break-word;
+    }
+
+    .button-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 10px;
+        width: 100%;
+    }
+
+    #editConduitButton {
+        background-color: gray;
+        color: white;
+    }
+
+    #editConduitButton:hover {
+        background-color: darkgray;
+        color: black;
+    }
+
+    /* Container for AC, HP, VP */
+    .stat-main-container {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+        margin-bottom: 20px;
+        gap: 5px;
+    }
+
+    .stat-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 70px;
+        height: 70px;
+        background-color: #f44336;
+        color: black;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        font-size: 1.9rem;
+        font-weight: 650;
+        box-shadow: 3px 3px 0 #000;
+    }
+
+    .stat-label-box {
+        font-weight: bold;
+        color: black;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+
+    .ability-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .ability-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .ability-box {
+        justify-content: center;
+        align-items: center;
+        width: 60px;
+        height: 60px;
+        background-color: #f44336;
+        color: black;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        vertical-align: middle;
+        font-size: 1.8rem;
+        box-shadow: 3px 3px 0 #000;
+        margin-bottom: 0;
+    }
+
+    .modifier-box {
+        justify-content: center;
+        align-items: center;
+        width: 50px;
+        height: 50px;
+        background-color: #f44336;
+        color: white;
+        border-radius: 10px;
+        border: 3px solid black;
+        text-align: center;
+        vertical-align: middle;
+        font-size: 1.6rem;
+        font-weight: 900;
+        box-shadow: 3px 3px 0 #000;
+        margin-top: -10px;
+    }
+
+    .skills-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        font-size: 1rem;
+        width: 100%;
+        color: black;
+    }
+
+    .skills-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        border: 2px solid black;
+        padding: 20px;
+        border-radius: 5px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .skill-item {
+        padding: 10px;
+        border: 1px solid #333;
+        border-radius: 5px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 75px;
+        font-size: 1.2rem;
+        background-color: #f44336;
+        color: black;
+    }
+
+    .highlight {
+        background-color: #ffffff;
+        color: black;
+        font-weight: bold;
+    }
+
+    /* Inventory Popup Styles */
+    .inventory-popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 700px;
+        height: 85%; /* Increase height */
+        background-color: #fff8cc;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 1000;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+    }
+
+    .inventory-popup-content {
+        display: flex;  /* Ensure horizontal layout */
+        justify-content: space-between;  /* Space between the left and right sides */
+        height: 100%;  /* Fill the popup height */
+        width: 100%;  /* Ensure it fills the popup width */
+    }
+
+    .inventory-list-container {
+        width: 40%;  /* Left side occupies 40% of the popup */
+        padding: 10px;
+        border-right: 1px solid black;
+        overflow-y: auto;
+    }
+
+    .inventory-list {
+        font-size: 1.2rem;
+        list-style-type: none;
+        padding: 0;
+    }
+
+    .inventory-list-item {
+        margin: 10px 0;
+        cursor: pointer;
+    }
+
+    .inventory-list-item span {
+        display: block;
+        font-size: 1rem;
+        margin-left: 20px;
+    }
+
+    .inventory-list-item:hover {
+        background-color: #f0f0f0;
+    }
+
+    .inventory-details-container {
+        width: 60%;  /* Right side occupies 60% of the popup */
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: flex-start;
+        height: 90%;  /* Make sure the container takes up the full height */
+        box-sizing: border-box;  /* Ensure padding is included in width/height calculation */
+        overflow: hidden;  /* Prevent overflow issues */
+    }
+
+    .inventory-description, .inventory-effect {
+        font-size: 1.2rem;
+        border: 1px solid black;
+        padding: 10px;
+        width: 100%;
+        border-radius: 5px;
+        overflow-y: auto;
+        flex: 1;  /* Ensure both boxes take equal height */
+        margin-bottom: 10px;  /* Add some space between the boxes */
+        box-sizing: border-box;  /* Ensure padding is included in the width calculation */
+    }
+
+    .inventory-description h3 {
+        margin-top: 0; /* Ensure the heading sits correctly at the top */
+        font-weight: bold;
+        text-align: left;
+    }
+
+    /* New style for the effect box */
+    .inventory-effect {
+        font-size: 1.2rem;
+        border: 1px solid black;
+        padding: 10px;
+        width: 100%;
+        height: 45%; /* Adjust to take the other half of the container */
+        overflow-y: auto;
+        border-radius: 5px;
+    }
+
+    .inventory-effect h3 {
+        margin-top: 0; /* Same styling as for the description */
+        font-weight: bold;
+        text-align: left;
+    }
+
+    #addItemPopup, #editItemPopup, #confirmDeleteBox {
+        width: 50%;  /* Same width as the Money popup */
+        max-width: 300px;  /* Limit maximum width */
+        height: auto;  /* Auto-adjust the height based on content */
+        padding: 20px;
+        box-sizing: border-box;  /* Ensure padding is included in the width calculation */
+        top: 50%;  /* Align vertically */
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.3rem;
+    }
+
+    #addItemPopup .inventory-popup-content, 
+    #editItemPopup .inventory-popup-content, 
+    #confirmDeleteBox .inventory-popup-content {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Adjust the button container to display buttons side by side only for Add, Edit, and Remove popups */
+    #addItemPopup .popup-button-container, 
+    #editItemPopup .popup-button-container, 
+    #confirmDeleteBox .popup-button-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;  /* Ensure full width for the buttons */
+        gap: 20px;  /* Add spacing between buttons */
+        
+    }
+
+    #addItemPopup input[type="text"], 
+    #addItemPopup input[type="number"], 
+    #editItemPopup input[type="text"], 
+    #editItemPopup input[type="number"] {
+        width: 90%; /* Adjust width to prevent overflow */
+        padding: 10px;
+        margin-bottom: 10px;
+        box-sizing: border-box; /* Include padding and border in width calculation */
+    }
+
+    #addItemPopup .popup-button, 
+    #editItemPopup .popup-button, 
+    #confirmDeleteBox .popup-button {
+        width: 48%;  /* Dynamically adjust width of the buttons */
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        text-align: center;
+    }
+
+    .autocomplete-item {
+        padding: 10px;
+        cursor: pointer;
+        border-bottom: 1px solid #ccc;
+    }
+
+    .autocomplete-item:hover {
+        background-color: #f0f0f0;
+    }
+
+//---------------------------------Gear Popup Start----------------------------------
+    /* Gear Popup Styles */
+
+    #gearPopup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-height: 70vh; /* Limit height to 70% of the viewport */
+        background-color: #cfcfcf;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 1000;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        padding: 0;
+        display: none; /* Default is hidden */
+        flex-direction: column;
+        overflow: hidden; /* Prevent overflowing */
+        font-size: 1.3rem !important;
+    }
+
+    /* Add padding to make sure content is not blocked by the button */
+    #gearContainer {
+        flex: 1; /* Make the content area take up available space */
+        overflow-y: auto; /* Enable scrolling within this area */
+        padding: 20px;
+        box-sizing: border-box; /* Ensure padding is included in the width/height calculation */
+    }
+
+    /* Footer styling for gear */
+    #gearPopup .footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: sticky;
+        bottom: 0;
+        padding: 10px;
+        background-color: #cfcfcf; 
+        border-top: 1px solid #ccc;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Close button styling for gear */
+    #gearPopup .close-button {
+        background-color: #f44336; /* Red color for the button */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        width: 100px;
+    }
+
+    #gearPopup .close-button:hover {
+        background-color: #d32f2f;
+    }
+
+    /* Ensure last gear box is fully visible before cutting */
+    #gearContainer .gear-item-container:last-child {
+        margin-bottom: 40px; /* Add some margin to ensure it's not cut off */
+    }
+
+    /* Gear box (identical to feats) */
+    .gear-item-container {
+        border: 2px solid black;
+        border-radius: 10px;
+        margin: 10px;
+        padding: 10px;
+        width: 95%;
+        box-sizing: border-box; /* Ensures padding doesn’t overflow */
+        background-color: #fff; /* Ensure consistent background */
+    }
+
+    /* Gear name header */
+    .gear-name-header {
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: black; 
+    }
+
+    /* Gear effect box */
+    .gear-effect-box {
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 10px;
+        text-align: left;
+        height: auto;
+        background-color: #f9f9f9;
+        color: black; 
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Add subtle shadow */
+    }
+//---------------------------------Gear Popup End----------------------------------
+
+    .popup-button {
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        width: 80%;
+        text-align: center;
+    }
+
+    .popup-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 700px;
+        background-color: white;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 1000;
+        padding: 20px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+    }
+
+    .popup h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .popup-content {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-bottom: 20px;
+    }
+
+    .close-button {
+        display: block;
+        margin: 0 auto;
+        padding: 10px 20px;
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+
+    .close-button:hover {
+        background-color: #d32f2f;
+    }
+
+    .button.disabled {
+        background-color: #ccc;
+        color: #666;
+        cursor: not-allowed;
+    }
+
+    #typeAwakeningList {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr); /* Two columns */
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .locked-message {
+        text-align: center;
+        font-size: 1.2rem;
+        color: gray;
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+
+    .custom-message-box {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        border: 2px solid black;
+        border-radius: 10px;
+        padding: 20px;
+        z-index: 1001;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .custom-message-box h3 {
+        margin-top: 0;
+    }
+
+    .custom-message-box .button-container {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .category-header {
+        padding: 10px;
+        background-color: #f4f4f4;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid black;
+        margin-bottom: 5px;
+    }
+
+    .item-list {
+        padding: 10px;
+        background-color: #fff;
+        border-left: 2px solid black;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .arrow {
+        font-size: 1.2rem;
+    }
+
+    /* Skill container */
+    /* Limit the height of the popup to 70% of the viewport */
+    #conduitFeaturesPopup,
+    #battleStylePopup,
+    #featsPopup,
+    #typeAwakeningPopup {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-height: 70vh; /* Limit height to 70% of the viewport */
+        background-color: #cfcfcf;
+        border: 2px solid black;
+        border-radius: 10px;
+        z-index: 1000;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        padding: 0;
+        display: none; /* Default is hidden */
+        flex-direction: column;
+        overflow: hidden; /* Prevent overflowing */
+        font-size: 1.3rem !important;
+    }
+
+    /* Add padding to make sure content is not blocked by the button */
+    #skillContainer,
+    #battleStyleContainer,
+    #featsContainer,
+    #typeAwakeningContainer {
+        flex: 1; /* Make the content area take up available space */
+        overflow-y: auto; /* Enable scrolling within this area */
+        padding: 20px;
+        box-sizing: border-box; /* Ensure padding is included in the width/height calculation */
+    }
+
+    #closeButtonContainer {
+        flex-shrink: 0; /* Prevents the footer from shrinking */
+        padding: 10px;
+        background-color: white; /* Matches the rest of the popup */
+        text-align: center;
+        border-top: 1px solid #ccc; /* Separate footer visually */
+    }
+
+    #conduitFeaturesPopup .footer,
+    #battleStylePopup .footer,
+    #featsPopup .footer,
+    #typeAwakeningPopup .footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: sticky;
+        bottom: 0;
+        padding: 10px;
+        background-color: #cfcfcf; /* Change footer background to white */
+        border-top: 1px solid #ccc;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Close button styling */
+    #conduitFeaturesPopup .close-button,
+    #battleStylePopup .close-button,
+    #featsPopup .close-button,
+    #typeAwakeningPopup .close-button {
+        background-color: #f44336; /* Red color for the button */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        width: 100px;
+    }
+
+    #conduitFeaturesPopup .close-button:hover,
+    #battleStylePopup .close-button:hover,
+    #featsPopup .close-button:hover,
+    #typeAwakeningPopup .close-button:hover {
+        background-color: #d32f2f;
+    }
+
+    /* Ensure last skill box is fully visible before cutting */
+    #skillContainer .skill-item-container:last-child,
+    #battleStyleContainer .battleStyle-item-container:last-child,
+    #featsContainer .feats-item-container:last-child,
+    #typeAwakeningContainer .trainer-path-item-container:last-child {
+        margin-bottom: 40px; /* Add some margin to ensure it's not cut off */
+    }
+
+// -------------- Section for battleStyle specific styling ------------------------
+    #battleStyleSelectionPopup {
+        display: none;
+        flex-direction: column;
+        justify-content: space-between;
+        height: auto;
+    }
+
+    .battleStyle-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); /* 3 columns */
+        grid-template-rows: repeat(6, auto); /* 6 rows */
+        gap: 10px;
+        margin-bottom: 20px; /* Add spacing between grid and effect box */
+    }
+
+    .battleStyle-item {
+        padding: 10px;
+        border-radius: 5px;
+        text-align: center;
+        background-color: #f44336;
+        color: white;
+        cursor: pointer;
+        border: 1px solid black;
+        transition: background-color 0.3s ease;
+    }
+
+    .battleStyle-selection-effect-box {
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 10px;
+        text-align: left;
+        height: auto;
+        background-color: #f0f9ff; /* Light blue to differentiate */
+        color: black; /* Text color */
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        margin-top: 15px; /* Add space between grid and effect box */
+        font-size: 1.2rem; /* Adjust font size for better readability */
+        line-height: 1.5; /* Improved text spacing */
+    }
+
+    .battleStyle-item:hover {
+        background-color: darkred;
+    }
+
+    .footer {
+        display: flex;
+        justify-content: space-between; /* Make sure buttons are side by side */
+    }
+// -------------- Section for battleStyle specific styling ------------------------
+
+    /* Skill box */
+    .skill-item-container,
+    .battleStyle-item-container,
+    .feats-item-container,
+    .trainer-path-item-container {
+        border: 2px solid black;
+        border-radius: 10px;
+        margin: 10px;
+        padding: 10px;
+        width: 95%;
+        box-sizing: border-box; /* Ensures padding doesn’t overflow */
+        background-color: #fff; /* Ensure consistent background */
+    }
+
+    /* Skill name header */
+    .skill-name-header,
+    .battleStyle-name-header,
+    .feats-name-header,
+    .trainer-path-name-header {
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: black;
+    }
+
+    .skill-effect-box,
+    .battleStyle-effect-box,
+    .feats-effect-box,
+    .trainer-path-effect-box {
+        border: 1px solid black;
+        border-radius: 5px;
+        padding: 10px;
+        text-align: left;
+        height: auto;
+        background-color: #f9f9f9; /* Background color */
+        color: black;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1); /* Add subtle shadow */
+    }
+</style>
+
+<h1>Trainer Info</h1>
+
+<div class="trainer-info-container">
+    <!-- Left Side: Trainer Image and Info -->
+    <div class="trainer-image-container">
+        <img id="trainerImage" src="https://via.placeholder.com/350" alt="Trainer Image">
+        <div class="trainer-details-container">
+            <div class="stat-item">
+                <div class="stat-label">Name:</div>
+                <div id="trainerName" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Level:</div>
+                <div id="trainerLevel" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">League Points:</div>
+                <div id="trainerLeaguePoints" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Saving Throws:</div>
+                <div id="trainerSavingThrows" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Speed:</div>
+                <div id="trainerSpeed" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Initiative:</div>
+                <div id="trainerInitiative" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Proficiency:</div>
+                <div id="trainerProficiency" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">HD:</div>
+                <div id="trainerHD" class="stat-value"></div>
+                <div class="stat-label" style="margin-left: 10px;">VD:</div>
+                <div id="trainerVD" class="stat-value"></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Money:</div>
+                <button id="trainerMoney" class="button" onclick="showMoneyPopup()"></button>
+            </div>
+            <div class="button-container">
+                <button class="button" onclick="showInventory()">Inventory</button>
+                <button id="battleStyleButton" class="button" onclick="showBattleStylePopup()">Battle Style</button>
+                <button id="typeAwakeningButton" class="button" onclick="showTypeAwakeningPopup()">Type Awakening</button>
+                <button id="featsButton" class="button" onclick="showFeatsPopup()">Feats</button>
+                <button id="gearButton" class="button" onclick="showGearPopup()">Gear</button>
+                <button id="conduitFeaturesButton" class="button" onclick="showConduitFeaturesPopup()">Conduit Features</button>
+                <button id="combatTrackerButton" class="button" onclick="showCombatTrackerPopup()">Combat Tracker</button>
+                <button id="editConduitButton" class="button" style="background-color: gray;" onclick="editConduit()">Edit Conduit</button>
+            </div>
+            <div id="addItemPopup" class="inventory-popup">
+                <div class="inventory-popup-content">
+                    <div style="width: 100%; padding: 10px;">
+                        <h2>Add Item to Inventory</h2>
+                        <input type="text" id="itemSearch" placeholder="Search for an item..." style="width: 100%; padding: 10px; margin-bottom: 10px;">
+                        <div id="autocompleteResults" style="background: white; border: 1px solid #ccc; display: none;"></div>
+                        <label for="itemQuantity">Quantity:</label>
+                        <input type="number" id="itemQuantity" value="1" min="1" style="width: 100%; padding: 10px; margin-bottom: 10px;">
+                        <div class="popup-button-container">
+                            <button class="popup-button" onclick="addItemToInventory()">Add Item</button>
+                            <button class="popup-button" onclick="backToInventory()">Back</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="editItemPopup" class="inventory-popup">
+                <div class="inventory-popup-content">
+                    <div style="width: 100%; padding: 10px;">
+                        <h2>Edit Item</h2>
+                        <label for="editItemName">Item:</label>
+                        <input type="text" id="editItemName" style="width: 100%; padding: 10px; margin-bottom: 10px;" disabled>
+                        <label for="editItemQuantity">Quantity:</label>
+                        <input type="number" id="editItemQuantity" min="1" style="width: 100%; padding: 10px; margin-bottom: 10px;">
+                        <div class="popup-button-container">
+                            <button class="popup-button" onclick="saveItemEdits()">Save</button>
+                            <button class="popup-button" onclick="backToInventory()">Back</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="battleStylePopup" class="popup">
+                <h2>BattleStyle</h2>
+                <div id="battleStyleDetails"></div>
+                <!-- Footer section with Close Button -->
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('battleStylePopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="battleStyleSelectionPopup" class="popup">
+                <h2>Select BattleStyle</h2>
+                <div class="battleStyle-grid">
+                    <!-- BattleStyle buttons will be dynamically generated here -->
+                </div>
+                <div class="battleStyle-selection-effect-box">
+                    <!-- Short effect or improved short effect will be shown here -->
+                    Select an battleStyle to see its effect.
+                </div>
+                <div class="footer">
+                    <button id="chooseBattleStyleButton" class="popup-button" disabled>Choose BattleStyle</button>
+                    <button class="popup-button" onclick="closePopup('battleStyleSelectionPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="typeAwakeningPopup" class="popup">
+                <h2>Type Awakening</h2>
+                <div id="typeAwakeningContainer"></div>
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('typeAwakeningPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="featsPopup" class="popup">
+                <h2>Feats</h2>
+                <div id="featsContainer" class="feats-container">
+                    <!-- Feats will be dynamically populated here -->
+                </div>
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('featsPopup')">Close</button>
+                </div>
+            </div>
+
+            <div id="gearPopup" class="popup">
+                <h2>Gear</h2>
+                <div id="gearContainer" class="gear-container">
+                    <!-- Gear will be dynamically populated here -->
+                </div>
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('gearPopup')">Close</button>
+                </div>
+            </div>
+
+            <!-- Conduit Features Popup -->
+            <div id="conduitFeaturesPopup" class="popup">
+                <h2>Conduit Features</h2>
+                <div id="skillContainer"></div>
+                <!-- Footer section with Close Button -->
+                <div class="footer">
+                    <button class="close-button" onclick="closePopup('conduitFeaturesPopup')">Close</button>
+                </div>
+            </div>
+
+            <!-- Combat Tracker Popup -->
+            <div id="combatTrackerPopup" class="popup" style="background-color: #cfcfcf;">
+                <h2>Combat Tracker</h2>
+                <div class="popup-content" style="display: flex; flex-direction: column; align-items: center; background-color: #cfcfcf;">
+                    <div style="display: flex; justify-content: space-around; width: 100%; max-width: 600px;">
+                        <!-- HP Section -->
+                        <div style="flex: 1; margin-right: 20px; text-align: center;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label for="currentHP" style="text-align: center; width: 100%; font-size: 1.2rem;">Current HP</label>
+                                <input type="text" id="currentHP" style="width: 80px; padding: 8px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 5px; text-align: center;" readonly>
+                                <label for="hpChangeInput" style="text-align: center; width: 100%; margin-top: 10px; font-size: 1.2rem;">Add / Remove HP</label>
+                                <input type="text" id="hpChangeInput" style="width: 80px; padding: 8px; font-size: 1.3rem; border-radius: 5px; text-align: center;">
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('HP', 'add')">Add</button>
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('HP', 'remove')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- VP Section -->
+                        <div style="flex: 1; text-align: center;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label for="currentVP" style="text-align: center; width: 100%; font-size: 1.2rem;">Current VP</label>
+                                <input type="text" id="currentVP" style="width: 80px; padding: 8px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 5px; text-align: center;" readonly>
+                                <label for="vpChangeInput" style="text-align: center; width: 100%; margin-top: 10px; font-size: 1.2rem;">Add / Remove VP</label>
+                                <input type="text" id="vpChangeInput" style="width: 80px; padding: 8px; font-size: 1.3rem; border-radius: 5px; text-align: center;">
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('VP', 'add')">Add</button>
+                                    <button class="popup-button" style="width: 80px; padding: 10px; display: flex; justify-content: center; align-items: center; text-align: center; font-size: 1.1rem;" onclick="updateStat('VP', 'remove')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Close Button -->
+                    <button class="close-button" onclick="closePopup('combatTrackerPopup')" style="margin-top: 20px;">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Side: Main Stats and Ability Scores -->
+    <div class="right-column">
+        <div class="stat-main-container">
+            <div class="stat-box-container">
+                <div class="stat-label-box">AC</div>
+                <div class="stat-box" id="trainerAC">AC</div>
+            </div>
+            <div class="stat-box-container">
+                <div class="stat-label-box">HP</div>
+                <div class="stat-box" id="trainerHP">HP</div>
+            </div>
+            <div class="stat-box-container">
+                <div class="stat-label-box">VP</div>
+                <div class="stat-box" id="trainerVP">VP</div>
+            </div>
+        </div>
+        <div class="ability-container">
+            <div class="ability-group">
+                <div class="stat-label-box">STR</div>
+                <div class="ability-box" id="trainerSTR">STR</div>
+                <div class="modifier-box" id="strmodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">DEX</div>
+                <div class="ability-box" id="trainerDEX">DEX</div>
+                <div class="modifier-box" id="dexmodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">CON</div>
+                <div class="ability-box" id="trainerCON">CON</div>
+                <div class="modifier-box" id="conmodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">INT</div>
+                <div class="ability-box" id="trainerINT">INT</div>
+                <div class="modifier-box" id="intmodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">WIS</div>
+                <div class="ability-box" id="trainerWIS">WIS</div>
+                <div class="modifier-box" id="wismodifier">MOD</div>
+            </div>
+            <div class="ability-group">
+                <div class="stat-label-box">CHA</div>
+                <div class="ability-box" id="trainerCHA">CHA</div>
+                <div class="modifier-box" id="chamodifier">MOD</div>
+            </div>
+        </div>
+        <div class="skills-container">
+            <h2>Skills:</h2>
+            <div id="skillsGrid" class="skills-grid">
+                <!-- Skills will be dynamically generated here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Inventory Popup -->
+<div id="inventoryPopup" class="inventory-popup">
+    <div class="inventory-popup-content">
+        <div class="inventory-list-container">
+            <ul id="inventoryList" class="inventory-list"></ul>
+        </div>
+        <div class="inventory-details-container">
+            <div class="inventory-description">
+                <h3>Description</h3>
+                <p id="descriptionText">Description of Item</p>
+            </div>
+            <div class="inventory-effect">
+                <h3>Effect</h3>
+                <p id="effectText">Effect of Item</p>
+            </div>
+            <button class="popup-button" id="editItemButton" onclick="editItem()" disabled>Edit Item</button>
+            <button class="popup-button" id="addItemButton" onclick="addItem()">Add Item</button>
+            <button class="popup-button" id="removeItemButton" onclick="removeItem()" disabled>Remove Item</button>
+            <button class="popup-button" onclick="closeInventoryPopup()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Money Popup -->
+<div id="moneyPopup" class="popup" style="background-color: #cfcfcf;">
+    <h2>Edit Money</h2>
+    <div class="popup-content" style="display: flex; flex-direction: column; align-items: center; background-color: #cfcfcf;">
+        <div style="width: 100%; max-width: 400px;">
+            <!-- Balance Row -->
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <label for="currentMoney" style="margin-right: 10px; text-align: right; width: 200px; font-size: 1.3rem;">Balance:</label>
+                <input type="number" id="currentMoney" style="width: 200px; padding: 10px; background-color: #f0f0f0; font-size: 1.3rem; border-radius: 10px; border: 1px solid #ccc;" readonly>
+            </div>
+
+            <!-- Add / Remove Money Row -->
+            <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                <label for="moneyChangeInput" style="margin-right: 10px; text-align: right; width: 200px; font-size: 1.3rem;">Add / Remove Money:</label>
+                <input type="number" id="moneyChangeInput" style="width: 200px; padding: 10px; font-size: 1.3rem; border-radius: 10px; border: 1px solid #ccc;">
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+            <button class="popup-button" style="width: 120px; font-size: 1.2rem;" onclick="updateMoney('add')">Add Money</button>
+            <button class="popup-button" style="width: 120px; font-size: 1.2rem;" onclick="updateMoney('remove')">Remove Money</button>
+        </div>
+
+        <!-- Close Button -->
+        <button class="close-button" onclick="closePopup('moneyPopup')" style="margin-top: 20px;">Close</button>
+    </div>
+</div>
+
+<!-- Custom Message Boxes -->
+<div id="confirmDeleteBox" class="custom-message-box">
+    <h3>Confirm Removal</h3>
+    <p>Are you sure you want to remove this item?</p>
+    <div class="button-container">
+        <button class="popup-button" onclick="confirmRemoval(true)">Yes</button>
+        <button class="popup-button" onclick="confirmRemoval(false)">No</button>
+    </div>
+</div>
+
+<div id="notificationBox" class="custom-message-box">
+    <h3>Notification</h3>
+    <p id="notificationMessage"></p>
+    <div class="button-container">
+        <button class="popup-button" onclick="closeNotification()">OK</button>
+    </div>
+</div>
+
+<!-- Add the Pokeball line and button -->
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+    <span class="back-button-text">Back</span>
+</div>
+
+<audio id="new-item-audio">
+  <source src="https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/New%20Item.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+    if (typeof selectedInventoryItem === 'undefined') {
+        var selectedInventoryItem = null;
+    }
+
+    function loadConduitDetails() {
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+
+        if (!trainerDataRaw || trainerDataRaw === "undefined") {
+            console.error('Trainer data not found or is undefined.');
+            return;
+        }
+
+        try {
+            const trainerData = JSON.parse(trainerDataRaw);
+            if (!trainerData) {
+                console.error('Trainer data could not be parsed.');
+                return;
+            }
+
+            function setTextContentIfExists(elementId, value) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = value || '';
+                }
+            }
+
+            function setTextContentIfExistsStats(elementId, value) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = value || '0';
+                }
+            }
+
+            document.getElementById('trainerImage').src = trainerData[0] || 'https://via.placeholder.com/350';
+            setTextContentIfExists('trainerName', trainerData[1]);
+            setTextContentIfExists('trainerLevel', trainerData[2]);
+            setTextContentIfExists('trainerMoney', trainerData[19]);
+            setTextContentIfExists('trainerLeaguePoints', trainerData[21]);
+            setTextContentIfExists('trainerSavingThrows', trainerData[15]);
+            setTextContentIfExists('trainerSpeed', trainerData[14]);
+            setTextContentIfExists('trainerInitiative', trainerData[16]);
+            setTextContentIfExists('trainerProficiency', trainerData[17]);
+            setTextContentIfExists('trainerHD', trainerData[3]);
+            setTextContentIfExists('trainerVD', trainerData[4]);
+
+            // Update stat boxes
+            setTextContentIfExists('trainerAC', trainerData[13]);
+            setTextContentIfExists('trainerHP', trainerData[11]);
+            setTextContentIfExists('trainerVP', trainerData[12]);
+
+            // Update STR, DEX, CON, INT, WIS, CHA and their modifiers
+            setTextContentIfExistsStats('trainerSTR', trainerData[5]);
+            setTextContentIfExistsStats('strmodifier', trainerData[27]);
+            setTextContentIfExistsStats('trainerDEX', trainerData[6]);
+            setTextContentIfExistsStats('dexmodifier', trainerData[28]);
+            setTextContentIfExistsStats('trainerCON', trainerData[7]);
+            setTextContentIfExistsStats('conmodifier', trainerData[29]);
+            setTextContentIfExistsStats('trainerINT', trainerData[8]);
+            setTextContentIfExistsStats('intmodifier', trainerData[30]);
+            setTextContentIfExistsStats('trainerWIS', trainerData[9]);
+            setTextContentIfExistsStats('wismodifier', trainerData[31]);
+            setTextContentIfExistsStats('trainerCHA', trainerData[10]);
+            setTextContentIfExistsStats('chamodifier', trainerData[32]);
+
+            // New attributes
+            setTextContentIfExists('trainerFeats', trainerData[33]);
+            setTextContentIfExists('currentHP', trainerData[34]);
+            setTextContentIfExists('currentVP', trainerData[35]);
+            setTextContentIfExists('currentAC', trainerData[36]);
+            setTextContentIfExists('gear', trainerData[37]);
+
+            // Skills
+            const skillsGrid = document.getElementById('skillsGrid');
+            skillsGrid.innerHTML = ''; // Clear existing skills
+            const allSkills = [
+                "Athletics (STR)", "Acrobatics (DEX)", "Sleight of Hand (DEX)", "Stealth (DEX)",
+                "Arcana (INT)", "History (INT)", "Investigation (INT)", "Nature (INT)", "Religion (INT)",
+                "Animal Handling (WIS)", "Insight (WIS)", "Medicine (WIS)", "Perception (WIS)",
+                "Survival (WIS)", "Deception (CHA)", "Intimidation (CHA)", "Performance (CHA)", "Persuasion (CHA)"
+            ];
+            const unlockedSkills = trainerData[18] ? trainerData[18].split(',').map(skill => skill.trim()) : [];
+
+            allSkills.forEach(skill => {
+                const skillItem = document.createElement('div');
+                skillItem.className = 'skill-item';
+
+                const skillName = skill.split(' (')[0];
+                const skillModifier = `(${skill.split(' (')[1]}`;
+
+                const skillNameElement = document.createElement('div');
+                skillNameElement.textContent = skillName;
+
+                const skillModifierElement = document.createElement('div');
+                skillModifierElement.className = 'modifier';
+                skillModifierElement.textContent = skillModifier;
+
+                skillItem.appendChild(skillNameElement);
+                skillItem.appendChild(skillModifierElement);
+
+                if (unlockedSkills.includes(skillName)) {
+                    skillItem.classList.add('highlight');
+                }
+
+                skillsGrid.appendChild(skillItem);
+            });
+
+        } catch (error) {
+            console.error('Failed to load trainer info:', error);
+        }
+    }
+
+    // Function to open inventory popup
+    function showInventory() {
+        const inventoryPopup = document.getElementById('inventoryPopup');
+        inventoryPopup.style.display = 'block';
+
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+        if (trainerDataRaw) {
+            const trainerData = JSON.parse(trainerDataRaw);
+            const inventoryListElement = document.getElementById('inventoryList');
+            inventoryListElement.innerHTML = '';  // Clear previous content
+
+            const itemsDataRaw = sessionStorage.getItem('items');
+            if (itemsDataRaw) {
+                const itemsData = JSON.parse(itemsDataRaw);
+
+                // Group the items by type
+                const groupedItems = groupItemsByType(itemsData, trainerData[20]);
+
+                // Render each item type as a collapsible section
+                Object.entries(groupedItems).forEach(([type, items]) => {
+                    if (items.length > 0) {
+                        // Create the category header (collapsible)
+                        const categoryDiv = document.createElement('div');
+                        categoryDiv.classList.add('category');
+
+                        const header = document.createElement('div');
+                        header.classList.add('category-header');
+                        header.innerHTML = `<span>${type}</span><span class="arrow">►</span>`;
+                        categoryDiv.appendChild(header);
+
+                        // Create the collapsible content for the items
+                        const itemList = document.createElement('div');
+                        itemList.classList.add('item-list', 'hidden');
+
+                        items.forEach(item => {
+                            const itemDiv = document.createElement('div');
+                            itemDiv.classList.add('inventory-list-item');
+                            itemDiv.textContent = `${item.name} (x${item.quantity})`;
+                            itemDiv.onclick = () => selectItem(`${item.name} (x${item.quantity})`, itemDiv);
+                            itemList.appendChild(itemDiv);
+                        });
+
+                        categoryDiv.appendChild(itemList);
+                        inventoryListElement.appendChild(categoryDiv);
+
+                        // Add click event to toggle the category
+                        header.addEventListener('click', () => {
+                            itemList.classList.toggle('hidden');
+                            header.querySelector('.arrow').textContent = itemList.classList.contains('hidden') ? '►' : '▼';
+                        });
+                    }
+                });
+            }
+        }
+    }
+
+    // Function to group items by type
+    function groupItemsByType(itemsData, inventoryString) {
+        const inventoryItems = inventoryString ? inventoryString.split(',').map(item => item.trim()) : [];
+        const groupedItems = {};
+
+        inventoryItems.forEach(itemStr => {
+            const [name, quantity] = itemStr.split(' (x');
+            const item = itemsData.find(i => i.name === name);
+            if (item) {
+                const type = item.type || "Misc";  // Fallback to "Misc" if no type is defined
+                if (!groupedItems[type]) {
+                    groupedItems[type] = [];
+                }
+                groupedItems[type].push({ ...item, quantity: quantity.replace(')', '') });
+            }
+        });
+
+        return groupedItems;
+    }
+
+    function selectItem(item, listItemElement) {
+        // Remove the highlight from any previously selected item
+        const inventoryItems = document.getElementsByClassName('inventory-list-item');
+        for (let i = 0; i < inventoryItems.length; i++) {
+            inventoryItems[i].style.backgroundColor = '';  // Reset background color
+        }
+
+        // Highlight the selected item
+        listItemElement.style.backgroundColor = '#f0f0f0';  // You can change this color as needed
+
+        // Enable the Edit and Remove buttons
+        selectedInventoryItem = item;
+        document.getElementById('editItemButton').disabled = false;
+        document.getElementById('removeItemButton').disabled = false;
+
+        // Display the item description and effect
+        const descriptionBox = document.getElementById('descriptionText');
+        const effectBox = document.getElementById('effectText');
+        const itemsDataRaw = sessionStorage.getItem('items');
+
+        if (itemsDataRaw) {
+            const itemsData = JSON.parse(itemsDataRaw);
+
+            // Extract the item name by removing any quantity in parentheses
+            const selectedItemName = item.split(' (')[0];
+
+            // Find the selected item in the itemsData array
+            const selectedItem = itemsData.find(item => item.name === selectedItemName);
+
+            if (selectedItem) {
+                descriptionBox.textContent = selectedItem.description || "No description available.";
+                effectBox.textContent = selectedItem.effect || "No effect available.";
+            } else {
+                descriptionBox.textContent = "No description available.";
+                effectBox.textContent = "No effect available.";
+            }
+        } else {
+            descriptionBox.textContent = "No description available.";
+            effectBox.textContent = "No effect available.";
+        }
+    }
+
+    function closeInventoryPopup() {
+        const inventoryPopup = document.getElementById('inventoryPopup');
+        inventoryPopup.style.display = 'none';
+    }
+
+    function editItem() {
+        // Ensure an item is selected
+        if (!selectedInventoryItem) return;
+
+        // Close the inventory popup and open the edit popup
+        closeInventoryPopup();
+        const editItemPopup = document.getElementById('editItemPopup');
+        editItemPopup.style.display = 'block';
+
+        // Populate the edit form with the selected item's data
+        const selectedItemName = selectedInventoryItem.split(' (')[0];
+        const currentQuantity = parseInt(selectedInventoryItem.match(/\(x(\d+)\)/)[1], 10);
+        document.getElementById('editItemName').value = selectedItemName;
+        document.getElementById('editItemQuantity').value = currentQuantity;
+    }
+
+    function saveItemEdits() {
+        NavigationManager.showSpinner();
+
+        const newQuantity = parseInt(document.getElementById('editItemQuantity').value, 10);
+        if (newQuantity < 1) {
+            alert('Quantity must be at least 1.');
+            NavigationManager.hideSpinner();
+            return;
+        }
+
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+        if (trainerDataRaw) {
+            const trainerData = JSON.parse(trainerDataRaw);
+            let inventory = trainerData[20] ? trainerData[20].split(',').map(item => item.trim()) : [];
+
+            inventory = inventory.map(item => {
+                const [name, qty] = item.split(' (x');
+                if (name === selectedInventoryItem.split(' (')[0]) {
+                    return `${name} (x${newQuantity})`;
+                }
+                return item;
+            });
+
+            trainerData[20] = inventory.join(', ');
+
+            // Update session storage and write to Google Sheets
+            sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+            google.script.run.withSuccessHandler(() => {
+                console.log('Item quantity updated in Google Sheets.');
+                NavigationManager.hideSpinner();
+                backToInventory();
+            }).writeItems(trainerData[1], trainerData[20]);
+        }
+    }
+
+    function removeItem() {
+        if (!selectedInventoryItem) return;
+
+        // Show custom confirmation box
+        document.getElementById('confirmDeleteBox').style.display = 'block';
+    }
+
+    function confirmRemoval(confirm) {
+        document.getElementById('confirmDeleteBox').style.display = 'none';
+        if (confirm) {
+            NavigationManager.showSpinner();
+
+            const trainerDataRaw = sessionStorage.getItem('trainerData');
+            if (trainerDataRaw) {
+                const trainerData = JSON.parse(trainerDataRaw);
+                let inventory = trainerData[20] ? trainerData[20].split(',').map(item => item.trim()) : [];
+
+                inventory = inventory.filter(item => item.split(' (x')[0] !== selectedInventoryItem.split(' (')[0]);
+
+                trainerData[20] = inventory.join(', ');
+
+                // Update session storage and write to Google Sheets
+                sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+                google.script.run.withSuccessHandler(() => {
+                    console.log('Item removed from Google Sheets.');
+                    NavigationManager.hideSpinner();
+                    showNotification(`${selectedInventoryItem.split(' (')[0]} has been removed.`);
+                    showInventory(); // Refresh the inventory list
+                }).writeItems(trainerData[1], trainerData[20]);
+            }
+        }
+    }
+
+    function showNotification(message) {
+        document.getElementById('notificationMessage').textContent = message;
+        document.getElementById('notificationBox').style.display = 'block';
+    }
+
+    function closeNotification() {
+        document.getElementById('notificationBox').style.display = 'none';
+    }
+
+    function closeEditItemPopup() {
+        const editItemPopup = document.getElementById('editItemPopup');
+        editItemPopup.style.display = 'none';
+    }
+
+    function addItem() {
+        closeInventoryPopup();
+        document.getElementById('addItemPopup').style.display = 'block';
+    }
+
+    function closeAddItemPopup() {
+        document.getElementById('addItemPopup').style.display = 'none';
+        document.getElementById('itemSearch').value = '';
+        document.getElementById('autocompleteResults').style.display = 'none';
+    }
+
+    function backToInventory() {
+        closeAddItemPopup();  // Close the Add Item popup
+        closeEditItemPopup();  // Close the Edit Item popup
+        showInventory();  // Reopen the Inventory popup
+    }
+
+    // Add the selected item to the inventory
+    function addItemToInventory() {
+        NavigationManager.showSpinner();
+
+        const selectedItemName = document.getElementById('itemSearch').value;
+        const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+
+        if (!selectedItemName || quantity < 1 || !trainerDataRaw) {
+            alert('Please select a valid item and quantity.');
+            NavigationManager.hideSpinner();
+            return;
+        }
+
+        const trainerData = JSON.parse(trainerDataRaw);
+        let inventory = trainerData[20] ? trainerData[20].split(',').map(item => item.trim()) : [];
+        let found = false;
+
+        inventory = inventory.map(item => {
+            // Extract the item name by removing any quantity in parentheses
+            const [name, qty] = item.split(' (x');
+            if (name === selectedItemName) {
+                found = true;
+                return `${name} (x${parseInt(qty, 10) + quantity})`;
+            }
+            return item;
+        });
+
+        if (!found) {
+            inventory.push(`${selectedItemName} (x${quantity})`);
+        }
+
+        trainerData[20] = inventory.join(', ');
+
+        // Update session storage and write to Google Sheets
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+        google.script.run.withSuccessHandler(() => {
+            var newItemAudio = document.getElementById('new-item-audio');
+            newItemAudio.play();
+            NavigationManager.hideSpinner();
+            closeAddItemPopup();
+            showInventory();  // Refresh the inventory list
+        }).writeItems(trainerData[1], trainerData[20]);
+    }
+
+    function checkButtonAvailability() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const level = trainerData[2];
+
+        if (level < 3) {
+            document.getElementById('battleStyleButton').classList.add('disabled');
+        }
+
+        if (level < 4) {
+            document.getElementById('typeAwakeningButton').classList.add('disabled');
+        }
+    }
+
+    function showBattleStylePopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const trainerLevel = trainerData[2]; // Trainer's current level
+        let battleStylesStored = trainerData[23]; // Comma-separated string of battleStyles
+
+        if (battleStylesStored) {
+            battleStylesStored = battleStylesStored.split(',').map(battleStyle => battleStyle.trim());
+        } else {
+            battleStylesStored = [];
+        }
+
+        const battleStyles = JSON.parse(sessionStorage.getItem('battleStyles')); // Load all battleStyles
+
+        const battleStylePopup = document.getElementById('battleStylePopup');
+        const battleStyleDetails = document.getElementById('battleStyleDetails');
+
+        // Clear previous content
+        battleStyleDetails.innerHTML = '';
+
+        // First BattleStyle Display
+        const firstBattleStyleItem = document.createElement('div');
+        firstBattleStyleItem.classList.add('battleStyle-item-container');
+
+        const firstBattleStyleHeader = document.createElement('h3');
+        firstBattleStyleHeader.classList.add('battleStyle-name-header');
+
+        if (trainerLevel >= 3 && battleStylesStored.length >= 1) {
+            const firstBattleStyle = battleStylesStored[0] || "No first battleStyle found.";
+            firstBattleStyleHeader.textContent = firstBattleStyle;
+
+            const firstEffectBox = document.createElement('div');
+            firstEffectBox.classList.add('battleStyle-effect-box');
+            const firstBattleStyleData = battleStyles.find(a => a.name === firstBattleStyle);
+            firstEffectBox.textContent = firstBattleStyleData ? firstBattleStyleData.effect : "No effect found.";
+
+            firstBattleStyleItem.appendChild(firstBattleStyleHeader);
+            firstBattleStyleItem.appendChild(firstEffectBox);
+        } else if (trainerLevel >= 3) {
+            firstBattleStyleHeader.textContent = "Choose BattleStyle";
+
+            const firstEffectBox = document.createElement('div');
+            firstEffectBox.classList.add('battleStyle-effect-box');
+
+            const chooseBattleStyleButton = document.createElement('button');
+            chooseBattleStyleButton.textContent = "Choose BattleStyle";
+            chooseBattleStyleButton.classList.add('popup-button');
+            chooseBattleStyleButton.onclick = () => {
+                closePopup('battleStylePopup');
+                showBattleStyleSelection(battleStyles, battleStylesStored);
+            };
+            firstEffectBox.appendChild(chooseBattleStyleButton);
+
+            firstBattleStyleItem.appendChild(firstBattleStyleHeader);
+            firstBattleStyleItem.appendChild(firstEffectBox);
+        }
+
+        battleStyleDetails.appendChild(firstBattleStyleItem);
+
+        // Display the popup
+        battleStylePopup.style.display = 'flex';
+    }
+
+    function showBattleStyleSelection(availableBattleStyles, selectedBattleStyles) {
+        let battleStyleSelectionPopup = document.getElementById('battleStyleSelectionPopup');
+        const battleStyleList = document.querySelector('.battleStyle-grid');
+        const battleStyleEffectBox = document.querySelector('.battleStyle-selection-effect-box'); 
+        const chooseBattleStyleButton = document.getElementById('chooseBattleStyleButton');
+
+        battleStyleList.innerHTML = ''; // Clear the list
+        battleStyleEffectBox.innerHTML = 'Select a Battle style to see its effect.';
+        chooseBattleStyleButton.disabled = true; // Disable the button until an battleStyle is selected
+
+        availableBattleStyles.forEach(a => {
+            const listItem = document.createElement('div');
+            listItem.textContent = a.name;
+            listItem.className = 'battleStyle-item'; 
+            listItem.onclick = () => selectBattleStyle(a);
+            battleStyleList.appendChild(listItem);
+        });
+
+        battleStyleSelectionPopup.style.display = 'flex'; // Show the popup
+    }
+
+    function selectBattleStyle(battleStyle) {
+        const battleStyleEffectBox = document.querySelector('.battleStyle-selection-effect-box');
+        
+        // Clear the effect box before displaying anything new
+        battleStyleEffectBox.innerHTML = '';
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const level2BattleStyle = trainerData[23] ? trainerData[23].split(',')[0] : null; // First chosen battleStyle
+
+        let effectToShow = battleStyle.effect;
+
+        // Update the effect box with the selected battleStyle and effect
+        battleStyleEffectBox.innerHTML = `<strong>${battleStyle.name}</strong><p>${effectToShow}</p>`;
+
+        // Enable the 'Choose BattleStyle' button and set its action
+        const chooseBattleStyleButton = document.getElementById('chooseBattleStyleButton');
+        chooseBattleStyleButton.disabled = false; // Enable the button
+        chooseBattleStyleButton.onclick = function() {
+            console.log("Battle Style: ", battleStyle);
+            saveBattleStyle(battleStyle); // Save the selected battleStyle
+        };
+    }
+
+    function saveBattleStyle(selectedBattleStyle) {
+        if (!selectedBattleStyle) {
+            console.log("No battleStyle selected.");
+            return;
+        }
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        trainerData[23] = selectedBattleStyle.name;  // Update with the new comma-separated string
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+        NavigationManager.showSpinner();
+
+        google.script.run.withSuccessHandler(function() {
+            NavigationManager.hideSpinner();
+            closePopup('battleStyleSelectionPopup');
+            showBattleStylePopup(); // Refresh the main battleStyle popup
+        }).writeAffinity(trainerData[1], trainerData[23]);
+    }
+
+    function showTypeAwakeningPopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData')) || [];
+        const chosenAwakeningData = trainerData[25] || ''; // Get the stored awakening data
+
+        const typeAwakeningPopup = document.getElementById('typeAwakeningPopup');
+        const typeAwakeningContainer = document.getElementById('typeAwakeningContainer');
+        
+        // Clear previous content
+        typeAwakeningContainer.innerHTML = '';
+
+        if (chosenAwakeningData) {
+            // Case 1: Player has already chosen an awakening, display it
+            displayChosenAwakening(chosenAwakeningData);
+        } else {
+            // Case 2: Player has not chosen an awakening, allow selection
+            const typeAwakenings = JSON.parse(sessionStorage.getItem('typeAwakenings')) || {};
+
+            // Create a grid container for the buttons
+            const gridContainer = document.createElement('div');
+            gridContainer.style.display = 'grid';
+            gridContainer.style.gridTemplateColumns = 'repeat(3, 1fr)'; // 3 columns
+            gridContainer.style.gap = '10px'; // Space between buttons
+
+            // Display each type as a selectable option
+            Object.keys(typeAwakenings).forEach(typeName => {
+                const typeButton = document.createElement('button');
+                typeButton.textContent = typeName;
+
+                // Apply type-specific colors
+                const backgroundColor = getMoveTypeColor(typeName);
+                const textColor = getTextColorForBackground(backgroundColor);
+                typeButton.style.backgroundColor = backgroundColor;
+                typeButton.style.color = textColor;
+
+                // Button styling
+                typeButton.style.width = '90%';
+                typeButton.style.height = '60px'; 
+                typeButton.style.padding = '10px';
+                typeButton.style.border = 'none';
+                typeButton.style.borderRadius = '8px';
+                typeButton.style.cursor = 'pointer';
+                typeButton.style.fontSize = '16px';
+                typeButton.style.textAlign = 'center';
+
+                // Add click event to confirm selection
+                typeButton.onclick = () => confirmTypeAwakeningSelection(typeName);
+
+                // Append the button to the grid container
+                gridContainer.appendChild(typeButton);
+            });
+
+            // Append the grid container to the main container
+            typeAwakeningContainer.appendChild(gridContainer);
+        }
+
+        // Display the popup
+        typeAwakeningPopup.style.display = 'flex';
+    }
+
+    // Function to display the chosen awakening details based on stored data
+    function displayChosenAwakening(chosenAwakeningData) {
+        let [typeName, stage1Level, stage2Level, stage3Level, ...points] = chosenAwakeningData.split(', ').map((value, index) => index === 0 ? value : Number(value));
+        
+        const playerLevel = JSON.parse(sessionStorage.getItem('trainerData'))[2];
+        const typeAwakenings = JSON.parse(sessionStorage.getItem('typeAwakenings'));
+        const selectedPath = typeAwakenings[typeName];
+
+        if (selectedPath) {
+            const typeAwakeningContainer = document.getElementById('typeAwakeningContainer');
+            typeAwakeningContainer.innerHTML = ''; // Clear previous content
+
+            // Get the background color and text color based on the chosen type
+            const backgroundColor = getMoveTypeColor(typeName);
+            const textColor = getTextColorForBackground(backgroundColor);
+
+            // Define the level thresholds and their corresponding indexes in the points array
+            const thresholds = [4, 7, 11, 15, 20];
+            let availablePoints = 0;
+
+            // Calculate the total available points based on the trainer's level
+            thresholds.forEach((threshold, index) => {
+                if (playerLevel >= threshold) {
+                    availablePoints += points[index]; // Add only the points available for reached thresholds
+                }
+            });
+
+            console.log("Trainer Level:", playerLevel);
+            console.log("Points by Threshold:", points);
+            console.log("Calculated Available Points:", availablePoints);
+
+            // Display main effect
+            const mainEffectContainer = document.createElement('div');
+            mainEffectContainer.classList.add('skill-item-container');
+            mainEffectContainer.style.backgroundColor = backgroundColor;
+            mainEffectContainer.style.color = textColor;
+
+            const mainEffectHeader = document.createElement('h3');
+            mainEffectHeader.classList.add('skill-name-header');
+            mainEffectHeader.textContent = `${typeName} Awakening`;
+            mainEffectHeader.style.color = textColor;
+            mainEffectContainer.appendChild(mainEffectHeader);
+
+            const mainEffectBox = document.createElement('div');
+            mainEffectBox.classList.add('skill-effect-box');
+            mainEffectBox.textContent = selectedPath.effect;
+            mainEffectBox.style.backgroundColor = backgroundColor;
+            mainEffectBox.style.color = textColor;
+            mainEffectContainer.appendChild(mainEffectBox);
+
+            typeAwakeningContainer.appendChild(mainEffectContainer);
+
+            // Define the levels for each stage dynamically based on the awakening data
+            const stages = [
+                { level: stage1Level, data: selectedPath.awakenings[0] },
+                { level: stage2Level, data: selectedPath.awakenings[1] },
+                { level: stage3Level, data: selectedPath.awakenings[2] }
+            ];
+
+            // Display available points
+            const pointsDisplay = document.createElement('p');
+            pointsDisplay.textContent = `Available Points: ${availablePoints}`;
+            pointsDisplay.style.textAlign = 'center';
+            typeAwakeningContainer.appendChild(pointsDisplay);
+
+            // Display each stage with upgrade logic
+            stages.forEach((stage, index) => {
+                if (stage.data) {
+                    const itemContainer = document.createElement('div');
+                    itemContainer.classList.add('skill-item-container');
+                    itemContainer.style.cursor = availablePoints > 0 ? 'pointer' : 'not-allowed';
+                    itemContainer.style.backgroundColor = backgroundColor;
+                    itemContainer.style.color = textColor;
+
+                    const header = document.createElement('h3');
+                    header.classList.add('skill-name-header');
+                    header.textContent = `${stage.data.name} - Level ${stage.level}`;
+                    header.style.color = textColor; 
+                    itemContainer.appendChild(header);
+
+                    const effectBox = document.createElement('div');
+                    effectBox.classList.add('skill-effect-box');
+                    const effectText = stage.data.levels[stage.level - 1];
+                    effectBox.textContent = effectText || 'Effect not available';
+                    effectBox.style.backgroundColor = backgroundColor;
+                    effectBox.style.color = textColor;
+                    itemContainer.appendChild(effectBox);
+
+                    itemContainer.onclick = () => {
+                        if (availablePoints > 0 && stage.level < stage.data.levels.length) {
+                            upgradeAwakening(index, stage.level + 1, points, playerLevel);
+                        }
+                    };
+
+                    typeAwakeningContainer.appendChild(itemContainer);
+                }
+            });
+        } else {
+            console.error(`Selected path "${typeName}" not found in type awakenings data.`);
+        }
+    }
+
+
+    function upgradeAwakening(stageIndex, newLevel, points, playerLevel) {
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+
+        let [typeName, stage1Level, stage2Level, stage3Level, ...availablePoints] = trainerData[25].split(', ').map((value, index) => index === 0 ? value : Number(value));
+
+        // Determine the next threshold based on the player's level
+        const thresholds = [4, 7, 11, 15, 20];
+        let pointUsed = false;
+
+        for (let i = 0; i < thresholds.length; i++) {
+            const levelThreshold = thresholds[i];
+
+            if (playerLevel >= levelThreshold && availablePoints[i] > 0) {
+                // Deduct a point and mark it as used
+                availablePoints[i] -= 1;
+                pointUsed = true;
+                break;
+            }
+        }
+
+        // If no point was used (no available points or level not reached), do nothing
+        if (!pointUsed) {
+            console.error("No available points to use or level threshold not met.");
+            return;
+        }
+
+        // Update the stage level
+        if (stageIndex === 0) {
+            stage1Level = newLevel;
+        }
+        if (stageIndex === 1) {
+            stage2Level = newLevel;
+        }
+        if (stageIndex === 2) {
+            stage3Level = newLevel;
+        }
+
+        closePopup('typeAwakeningPopup');
+        const updatedAwakeningData = `${typeName}, ${stage1Level}, ${stage2Level}, ${stage3Level}, ${availablePoints.join(', ')}`;
+        saveTypeAwakening(updatedAwakeningData);
+
+        displayChosenAwakening(updatedAwakeningData);
+    }
+
+    function confirmTypeAwakeningSelection(typeName) {
+        // Close the current popup
+        closePopup('typeAwakeningPopup');
+
+        // Create the new popup for confirmation
+        const confirmationPopup = document.createElement('div');
+        confirmationPopup.id = 'confirmationPopup';
+        confirmationPopup.style.display = 'flex';
+        confirmationPopup.style.flexDirection = 'column';
+        confirmationPopup.style.alignItems = 'center';
+        confirmationPopup.style.justifyContent = 'center';
+        confirmationPopup.style.position = 'fixed';
+        confirmationPopup.style.top = '50%';
+        confirmationPopup.style.left = '50%';
+        confirmationPopup.style.transform = 'translate(-50%, -50%)';
+        confirmationPopup.style.backgroundColor = '#f9f9f9';
+        confirmationPopup.style.border = '2px solid black';
+        confirmationPopup.style.padding = '20px';
+        confirmationPopup.style.borderRadius = '12px';
+        confirmationPopup.style.zIndex = '1000';
+
+        // Add the question text
+        const message = document.createElement('p');
+        message.textContent = `Do you want to choose the ${typeName} awakening?`;
+        message.style.marginBottom = '20px';
+        message.style.fontSize = '18px';
+        message.style.fontWeight = 'bold';
+        message.style.textAlign = 'center';
+        confirmationPopup.appendChild(message);
+
+        // Create "Yes" button
+        const yesButton = document.createElement('button');
+        yesButton.textContent = 'Yes';
+        yesButton.style.marginRight = '10px';
+        yesButton.style.padding = '10px 20px';
+        yesButton.style.border = 'none';
+        yesButton.style.borderRadius = '8px';
+        yesButton.style.backgroundColor = '#4CAF50'; // Green
+        yesButton.style.color = 'white';
+        yesButton.style.cursor = 'pointer';
+        yesButton.onclick = () => {
+            const initialLevelString = `${typeName}, 1, 1, 1, 1, 1, 1, 1, 3`;
+            saveTypeAwakening(initialLevelString);
+            document.body.removeChild(confirmationPopup);
+            displayChosenAwakening(initialLevelString);
+        };
+
+        // Create "No" button
+        const noButton = document.createElement('button');
+        noButton.textContent = 'No';
+        noButton.style.marginLeft = '10px';
+        noButton.style.padding = '10px 20px';
+        noButton.style.border = 'none';
+        noButton.style.borderRadius = '8px';
+        noButton.style.backgroundColor = '#f44336'; // Red
+        noButton.style.color = 'white';
+        noButton.style.cursor = 'pointer';
+        noButton.onclick = () => {
+            document.body.removeChild(confirmationPopup);
+            showTypeAwakeningPopup();
+        };
+
+        // Append buttons to the popup
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.justifyContent = 'center';
+        buttonContainer.appendChild(yesButton);
+        buttonContainer.appendChild(noButton);
+
+        confirmationPopup.appendChild(buttonContainer);
+
+        // Append the confirmation popup to the body
+        document.body.appendChild(confirmationPopup);
+    }
+
+    function saveTypeAwakening(typeAwakeningData) {
+        NavigationManager.showSpinner();
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        trainerData[25] = typeAwakeningData; 
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        google.script.run.withSuccessHandler(function() {
+            NavigationManager.hideSpinner();
+            showTypeAwakeningPopup();
+        }).writeTypeAwakening(trainerData[1], typeAwakeningData);
+    }
+
+
+    function getMoveTypeColor(moveType) {
+        const colors = {
+            "Normal": "#A8A878",
+            "Fighting": "#e68c2e",
+            "Flying": "#A890F0",
+            "Poison": "#A040A0",
+            "Ground": "#DEB887",
+            "Rock": "#a85d16",
+            "Bug": "#A8B820",
+            "Ghost": "#705898",
+            "Steel": "#bdbdbd",
+            "Fire": "#f02e07",
+            "Water": "#1E90FF",
+            "Grass": "#32CD32",
+            "Electric": "#FFD700",
+            "Psychic": "#F85888",
+            "Ice": "#58c8ed",
+            "Dragon": "#280dd4",
+            "Dark": "#282729",
+            "Fairy": "#ed919f"
+        };
+
+        return colors[moveType] || "white";
+    }
+
+    function getTextColorForBackground(bgColor) {
+        const hex = bgColor.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+        return luminance > 128 ? 'black' : 'white';
+    }
+
+    function showMoneyPopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        document.getElementById('currentMoney').value = trainerData[19] || 0;  // Display current money
+        document.getElementById('moneyChangeInput').value = ''; // Clear the input field
+        document.getElementById('moneyPopup').style.display = 'block';
+    }
+
+    function updateMoney(action) {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const currentMoney = parseInt(trainerData[19], 10) || 0;
+        const changeAmount = parseInt(document.getElementById('moneyChangeInput').value, 10);
+
+        let newMoney;
+        if (action === 'add') {
+            newMoney = currentMoney + changeAmount;
+        } else if (action === 'remove') {
+            newMoney = currentMoney - changeAmount;
+        }
+
+        trainerData[19] = newMoney;
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        NavigationManager.showSpinner();
+
+        google.script.run.withSuccessHandler(() => {
+            document.getElementById('trainerMoney').textContent = newMoney;
+            closePopup('moneyPopup');
+            NavigationManager.hideSpinner();
+        }).writeMoney(trainerData[1], newMoney);
+    }
+
+    function showConduitFeaturesPopup() {
+        const conduitFeaturesPopup = document.getElementById('conduitFeaturesPopup');
+        conduitFeaturesPopup.style.display = 'flex'; // Show the popup
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const trainerLevel = trainerData[2]; // Trainer level
+        const conduitFeaturesData = JSON.parse(sessionStorage.getItem('conduitFeatures'));
+
+        // Clear previous skill content
+        const skillContainer = document.getElementById('skillContainer');
+        skillContainer.innerHTML = '';
+
+        conduitFeaturesData.forEach(feature => {
+            let highestUnlockedEffect = '';
+            let highestUnlockedStage = 0;
+            let nextUnlockLevel = null; // Track the next unlockable level if none are unlocked
+
+            // Check each stage to find the highest unlocked or next unlock level
+            for (let stage = 1; stage <= 3; stage++) {
+                const stageEffect = feature[`stage${stage}Effect`];
+                if (stageEffect) {
+                    const effectLevelMatch = stageEffect.match(/Level (\d+):\s*(.*)/);
+                    if (effectLevelMatch) {
+                        const effectLevel = parseInt(effectLevelMatch[1], 10);
+                        const effectText = effectLevelMatch[2]; // Remove "Level X:" part
+
+                        if (trainerLevel >= effectLevel && effectLevel > highestUnlockedStage) {
+                            highestUnlockedStage = effectLevel;
+                            highestUnlockedEffect = effectText;
+                        } else if (trainerLevel < effectLevel && (nextUnlockLevel === null || effectLevel < nextUnlockLevel)) {
+                            // Set next unlock level if trainer level is below this effect's level
+                            nextUnlockLevel = effectLevel;
+                        }
+                    }
+                }
+            }
+
+            // Create a container for each feature
+            const featureContainer = document.createElement('div');
+            featureContainer.classList.add('skill-item-container');
+
+            // Create the feature name header
+            const featureNameHeader = document.createElement('h3');
+            featureNameHeader.classList.add('skill-name-header');
+            featureNameHeader.textContent = feature.name;
+            featureContainer.appendChild(featureNameHeader);
+
+            // Create the effect box
+            const effectBox = document.createElement('div');
+            effectBox.classList.add('skill-effect-box');
+
+            // If an effect is unlocked, display it; otherwise, show the unlock level
+            if (highestUnlockedEffect) {
+                effectBox.textContent = highestUnlockedEffect;
+            } else if (nextUnlockLevel !== null) {
+                effectBox.textContent = `Unlocks at level ${nextUnlockLevel}`;
+            } else {
+                effectBox.textContent = 'No effect available';
+            }
+
+            featureContainer.appendChild(effectBox);
+            skillContainer.appendChild(featureContainer);
+        });
+    }
+
+    function showFeatsPopup() {
+        const featsPopup = document.getElementById('featsPopup');
+        const featsContainer = document.getElementById('featsContainer');
+        featsContainer.innerHTML = ''; // Clear previous feats
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const featsList = trainerData[33] ? trainerData[33].split(',').map(feat => feat.trim()) : [];
+
+        const featsData = JSON.parse(sessionStorage.getItem('trainerFeats')) || [];
+
+        featsList.forEach(featName => {
+            const featData = featsData.find(feat => feat.name === featName);
+
+            if (featData) {
+                // Create feat item container
+                const featItemContainer = document.createElement('div');
+                featItemContainer.className = 'feats-item-container'; // Correct class name
+
+                // Create feat name header
+                const featNameHeader = document.createElement('h3');
+                featNameHeader.className = 'feats-name-header'; // Correct class name
+                featNameHeader.textContent = featName;
+                featItemContainer.appendChild(featNameHeader);
+
+                // Create feat effect box
+                const featEffectBox = document.createElement('div');
+                featEffectBox.className = 'feats-effect-box'; // Correct class name
+                featEffectBox.textContent = featData.effect;
+                featItemContainer.appendChild(featEffectBox);
+
+                // Append the feat item to the feats container
+                featsContainer.appendChild(featItemContainer);
+            }
+        });
+
+        featsPopup.style.display = 'flex'; // Display the popup
+    }
+
+    function showGearPopup() {
+        const gearPopup = document.getElementById('gearPopup');
+        const gearContainer = document.getElementById('gearContainer');
+        gearContainer.innerHTML = ''; // Clear previous gear
+
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const gearList = trainerData[37] ? trainerData[37].split(',').map(gear => gear.trim()) : [];
+
+        const itemsData = JSON.parse(sessionStorage.getItem('items')) || []; // Assuming items are stored in sessionStorage under 'items'
+
+        gearList.forEach(gearName => {
+            const itemData = itemsData.find(item => item.name === gearName);
+
+            if (itemData) {
+                // Create gear item container
+                const gearItemContainer = document.createElement('div');
+                gearItemContainer.className = 'gear-item-container'; // Correct class name
+
+                // Create gear name header
+                const gearNameHeader = document.createElement('h3');
+                gearNameHeader.className = 'gear-name-header'; // Correct class name
+                gearNameHeader.textContent = gearName;
+                gearItemContainer.appendChild(gearNameHeader);
+
+                // Create gear effect box
+                const gearEffectBox = document.createElement('div');
+                gearEffectBox.className = 'gear-effect-box'; // Correct class name
+                gearEffectBox.textContent = `${itemData.effect || ''}\n\n${itemData.description || 'No description available'}`;
+                gearItemContainer.appendChild(gearEffectBox);
+
+                // Append the gear item to the gear container
+                gearContainer.appendChild(gearItemContainer);
+            }
+        });
+
+        gearPopup.style.display = 'flex'; // Display the popup
+    }
+
+    function showCombatTrackerPopup() {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        // Display current HP, VP
+        document.getElementById('currentHP').value = trainerData[34] || trainerData[11];
+        document.getElementById('currentVP').value = trainerData[35] || trainerData[12];
+        
+        // Clear the input fields for HP and VP
+        document.getElementById('hpChangeInput').value = '';
+        document.getElementById('vpChangeInput').value = '';
+        
+        document.getElementById('combatTrackerPopup').style.display = 'block';
+    }
+
+    function updateStat(stat, action) {
+        const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+        const statIndex = {
+            'HP': 34, 
+            'VP': 35
+        };
+        const baseStatIndex = {
+            'HP': 11, 
+            'VP': 12
+        };
+
+        const currentStat = parseInt(trainerData[statIndex[stat]], 10) || trainerData[baseStatIndex[stat]];
+        const baseStat = parseInt(trainerData[baseStatIndex[stat]], 10); // Base stat value
+        const changeAmount = parseInt(document.getElementById(stat.toLowerCase() + 'ChangeInput').value, 10);
+
+        let newStat;
+
+        if (action === 'add') {
+            newStat = currentStat + changeAmount;
+            if (newStat > baseStat) {
+                newStat = baseStat; // Ensure HP/VP doesn't exceed base value
+            }
+        } else if (action === 'remove') {
+            newStat = currentStat - changeAmount;
+            if (newStat < 0) {
+                newStat = 0; // Ensure HP/VP doesn't drop below zero
+            }
+        }
+
+        // Update the trainer data with the new stat
+        trainerData[statIndex[stat]] = newStat;
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+        NavigationManager.showSpinner();
+        closePopup('combatTrackerPopup'); // Close the popup while processing
+
+        // Update the display of the current stat on the main page, but leave the base stat unchanged
+        document.getElementById('current' + stat).textContent = newStat; // Update current HP/VP display in the popup or relevant section
+
+        google.script.run.withSuccessHandler(() => {
+            NavigationManager.hideSpinner();
+            showCombatTrackerPopup(); // Reopen the popup once data is done loading
+        }).writeTrainerLiveStats(trainerData[1], stat, newStat);
+    }
+
+    function closePopup(popupId) {
+        document.getElementById(popupId).style.display = 'none';
+    }
+
+    function editConduit() {
+        google.script.run.withSuccessHandler(function(html) {
+            document.open();
+            document.write(html);
+            document.close();
+        }).getConduitEditPage();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadConduitDetails(); // Load the trainer info when the DOM is ready.
+        checkButtonAvailability();
+
+        // Add the input event listener for the search bar after DOM is loaded
+        document.getElementById('itemSearch').addEventListener('input', function () {
+            const searchQuery = this.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Normalize and remove diacritics
+            const itemsDataRaw = sessionStorage.getItem('items');
+            const autocompleteResults = document.getElementById('autocompleteResults');
+
+            if (itemsDataRaw && searchQuery) {
+                const itemsData = JSON.parse(itemsDataRaw);
+                const matchedItems = itemsData.filter(item => 
+                    item.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(searchQuery)
+                );
+
+                autocompleteResults.innerHTML = '';
+                matchedItems.forEach(item => {
+                    const resultItem = document.createElement('div');
+                    resultItem.textContent = item.name;
+                    resultItem.className = 'autocomplete-item';
+                    resultItem.onclick = function () {
+                        document.getElementById('itemSearch').value = item.name;
+                        autocompleteResults.style.display = 'none';
+                    };
+                    autocompleteResults.appendChild(resultItem);
+                });
+
+                autocompleteResults.style.display = matchedItems.length ? 'block' : 'none';
+            } else {
+                autocompleteResults.style.display = 'none';
+            }
+        });
+    });
+
+</script>

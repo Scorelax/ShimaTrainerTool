@@ -1,0 +1,367 @@
+<style>
+  body, #app-content {
+    background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+  }
+
+  h1 {
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .trainer-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem; 
+    width: 100%;
+    padding: 1rem;
+    box-sizing: border-box;
+    justify-items: center; 
+  }
+
+  .trainer-box {
+    flex-basis: calc(45% - 1rem);
+    max-width: 200px;
+    aspect-ratio: 1;
+    height: auto;
+    background-color: #ffffff;
+    border: 2px solid #333333;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+  }
+
+  .trainer-box:hover {
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .trainer-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+  }
+
+  .trainer-name {
+    font-size: 1.2rem;
+    margin-top: 0.5rem;
+    text-align: center;
+    color: #333333;
+    font-weight: bold;
+  }
+
+  .pokeball-center {
+    bottom: 20%;
+  }
+
+  .pokeball-button {
+    bottom: calc(20% - 40px);
+  }
+
+  .pokeball-button:hover {
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+  }
+
+  .pokeball-button::before {
+    content: '';
+    width: 25px;
+    height: 25px;
+    max-width: 100px;
+    max-height: 100px;
+    background-color: #f0f0f0;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+  }
+
+  .back-button-text {
+    position: relative;
+    z-index: 3;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333333;
+    text-shadow: none;
+  }
+
+  /* Small devices (phones) */
+  @media (max-width: 576px) {
+    h1 {
+      font-size: 1.8rem;
+      margin-top: 1rem;
+    }
+
+    .trainer-box {
+      width: 100%;
+      max-width: 150px;
+    }
+
+    .trainer-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .pokeball-button {
+      width: 60px;
+      height: 60px;
+      bottom: calc(20% - 30px);
+    }
+
+    .back-button-text {
+      font-size: 1.2rem;
+    }
+  }
+
+  /* Medium devices (tablets) */
+  @media (min-width: 577px) and (max-width: 768px) {
+    h1 {
+      font-size: 2.2rem;
+      margin-top: 1.5rem;
+    }
+
+    .trainer-box {
+      width: 45%;
+      max-width: 180px;
+    }
+
+    .trainer-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .pokeball-button {
+      width: 70px;
+      height: 70px;
+      bottom: calc(20% - 35px);
+    }
+  }
+
+  /* Large devices (desktops) */
+  @media (min-width: 769px) {
+    .trainer-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+  }
+
+  /* Modal Styles */
+  #pinModal {
+    display: none;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .modal-content {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    width: 90%;
+    max-width: 500px;
+    box-sizing: border-box;
+  }
+
+  .modal-content h2 {
+    font-size: 2rem; /* Increase the font size of the title */
+    margin-bottom: 20px; /* Add more space below the title */
+  }
+
+  #pinError {
+    color: red;
+    margin-top: 10px;
+    height: 20px;
+    /* Reserve space for error message */
+  }
+
+  #pinSubmit {
+    background-color: #4CAF50; /* Make the submit button green */
+    margin-right: 10px; /* Add space between submit and cancel buttons */
+    font-size: 1.2rem;
+    padding: 10px 20px;
+    border-radius: 5px;
+  }
+
+  .close-modal {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 1.2rem;
+    background-color: #f44336;
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  input[type="text"]#pinInput {
+    width: 200px;
+    height: 60px;
+    font-size: 1.8rem;
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px solid #333;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+  }
+
+</style>
+
+<h1>Continue Journey</h1>
+<div class="trainer-container" id="trainerContainer">
+  <!-- Trainer boxes will be dynamically added here -->
+</div>
+
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="goBack()">
+  <span class="back-button-text">Back</span>
+</div>
+
+<!-- Custom PIN Input Modal -->
+<div id="pinModal">
+  <div class="modal-content">
+    <h2>Enter PIN Code</h2>
+    <span id="pinError"></span>
+    <!-- Display error message here -->
+    <input type="text" id="pinInput" maxlength="4" pattern="\d*" placeholder="4-digit PIN" />
+    <button id="pinSubmit">Submit</button>
+    <button class="close-modal" onclick="document.getElementById('pinModal').style.display='none'">Cancel</button>
+  </div>
+</div>
+
+<script>
+  function fetchTrainers() {
+    google.script.run
+      .withSuccessHandler(displayTrainers)
+      .getTrainers();
+  }
+
+  function displayTrainers(trainers) {
+    const container = document.getElementById('trainerContainer');
+    container.innerHTML = '';
+
+    if (trainers.length === 0) {
+      container.innerHTML = '<p>No trainers created yet.</p>';
+      return;
+    }
+
+    trainers.forEach((trainer) => {
+      const box = document.createElement('div');
+      box.className = 'trainer-box';
+      box.onclick = function () {
+        promptPinCode(trainer);
+      };
+
+      const image = document.createElement('img');
+      image.className = 'trainer-image';
+      image.src = trainer.image || 'https://via.placeholder.com/150';
+
+      const name = document.createElement('div');
+      name.className = 'trainer-name';
+      name.textContent = trainer.name || 'Unnamed Trainer';
+
+      box.appendChild(image);
+      box.appendChild(name);
+      container.appendChild(box);
+    });
+  }
+
+  function promptPinCode(trainer) {
+      const modal = document.getElementById('pinModal');
+      const input = document.getElementById('pinInput');
+      const error = document.getElementById('pinError');
+
+      // Define the URLs for the images
+      const unlockedPokeSlotImageUrl = 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokeball.png';
+      const lockedPokeSlotImageUrl = 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Grey%20Pokeball.png';
+
+      // Display the PIN modal
+      modal.style.display = 'flex';
+      input.value = '';
+      error.textContent = '';
+
+      document.getElementById('pinSubmit').onclick = function () {
+          if (input.value === trainer.pinCode.toString()) {
+
+              // Hide the PIN modal and show the loading spinner
+              modal.style.display = 'none';
+              showSpinner();
+
+              // Fetch and store all trainer data and associated Pokémon in session storage via server-side code
+              google.script.run.withSuccessHandler(function (data) {
+                  // Store the retrieved data in session storage
+                  sessionStorage.setItem('trainerData', JSON.stringify(data.trainerData));
+                  data.pokemonData.forEach((pokemon) => {
+                      sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
+                  });
+                  // Store the images in session storage
+                  sessionStorage.setItem('unlockedPokeSlotImage', unlockedPokeSlotImageUrl);
+                  sessionStorage.setItem('lockedPokeSlotImage', lockedPokeSlotImageUrl);
+                  if(data.trainerData[39] === "Pokemon Trainer"){
+                    console.log("Load Pokemon Trainer Page");
+                    // Load additional data into session storage
+                    google.script.run.withSuccessHandler(function (gameData) {
+                        // Store all game data in session storage
+                        sessionStorage.setItem('items', JSON.stringify(gameData.itemsData.items));
+                        sessionStorage.setItem('trainerPaths', JSON.stringify(gameData.trainerPaths));
+                        sessionStorage.setItem('specializations', JSON.stringify(gameData.specializations));
+                        sessionStorage.setItem('affinities', JSON.stringify(gameData.affinities));
+                        sessionStorage.setItem('moves', JSON.stringify(gameData.moves));
+                        sessionStorage.setItem('natures', JSON.stringify(gameData.natures));
+                        sessionStorage.setItem('trainerFeats', JSON.stringify(gameData.trainerFeatsData.trainerFeats));
+                        sessionStorage.setItem('skills', JSON.stringify(gameData.skillsData.skills));
+                        sessionStorage.setItem('pokemonFeats', JSON.stringify(gameData.pokemonFeatsData.pokemonFeats));
+                        sessionStorage.setItem('nationalities', JSON.stringify(gameData.nationalitiesData.nationalities));
+
+                        NavigationManager.navigate('trainer_card');
+
+                    }).loadAllGameData();
+
+                  } else {
+                    console.log("Load Conduit Page");
+                    google.script.run.withSuccessHandler(function (gameData) {
+                        // Store all game data in session storage
+                        sessionStorage.setItem('items', JSON.stringify(gameData.itemsData.items));
+                        sessionStorage.setItem('conduitFeatures', JSON.stringify(gameData.conduitFeatures));
+                        sessionStorage.setItem('battleStyles', JSON.stringify(gameData.battleStyles));
+                        sessionStorage.setItem('typeAwakenings', JSON.stringify(gameData.typeAwakening));
+                        sessionStorage.setItem('moves', JSON.stringify(gameData.moves));
+                        sessionStorage.setItem('natures', JSON.stringify(gameData.natures));
+                        sessionStorage.setItem('pokemonFeats', JSON.stringify(gameData.pokemonFeatsData.pokemonFeats));
+                        sessionStorage.setItem('nationalities', JSON.stringify(gameData.nationalitiesData.nationalities));
+                        console.log("Type Awakenings data:", gameData.typeAwakening);
+
+                        NavigationManager.navigate('conduit_card');
+
+                    }).loadAllConduitGameData();
+
+                  }
+
+              }).storeTrainerAndPokemonData(trainer.name);
+
+          } else {
+              error.textContent = 'Wrong PIN code';
+              setTimeout(() => {
+                  error.textContent = '';
+              }, 3000);
+              input.value = '';
+          }
+      };
+  }
+</script>

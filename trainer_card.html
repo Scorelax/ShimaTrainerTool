@@ -1,0 +1,414 @@
+<style>
+    .trainer-card-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        width: 90%;
+        max-width: 1200px;
+        padding-bottom: 100px;
+    }
+
+    /* Trainer Section */
+    .trainer-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 40px;
+    }
+
+    .trainer-image {
+        width: 300px;
+        height: 300px;
+        border-radius: 10px;
+        object-fit: cover;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        background-color: #f0f0f0;
+        cursor: pointer;
+    }
+
+    .trainer-info {
+        text-align: center;
+        color: white;
+        margin-top: 10px;
+    }
+
+    .trainer-info div {
+        font-size: 1.5rem;
+    }
+
+    /* Pokémon Section */
+    .pokemon-section {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 5px;
+        justify-items: center;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .pokemon-slot {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: transparent;
+        padding: 10px;
+    }
+
+    .pokemon-image {
+        width: 170px;
+        height: 170px;
+        border-radius: 10px;
+        object-fit: cover;
+        background-color: #f0f0f0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+        margin-bottom: 10px;
+    }
+
+    .pokemon-slot:hover .pokemon-image {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .pokemon-name,
+    .pokemon-level {
+        font-size: 1.5rem;
+        margin-bottom: 5px;
+        color: white;
+        text-align: center;
+    }
+
+    .pokemon-info-button-container {
+        margin-bottom: 20px;
+    }
+
+     .utility-section {
+        position: absolute;
+        right: 50px;
+        top: 10%;
+        width: 150px;
+    }
+
+    .utility-slot {
+        width: 200px;
+        height: 200px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: transform 0.2s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        background-color: transparent;
+        padding: 10px;
+        text-align: center;
+    }
+
+    .utility-slot .pokemon-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        transition: transform 0.2s, box-shadow 0.2s;
+        margin-bottom: 10px;
+    }
+
+    .utility-slot:hover .pokemon-image {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .utility-slot .pokemon-name,
+    .utility-slot .pokemon-level {
+        font-size: 1.5rem;
+        margin-bottom: 5px;
+        color: white;
+        text-align: center;
+        position: static; /* Changed from absolute */
+        width: 100%;
+        background-color: transparent; /* Remove the semi-transparent background */
+        padding: 0;
+    }
+
+    /* Adjust trainer card container to make room for utility slot */
+    .trainer-card-container {
+        max-width: 900px;
+        position: relative;
+    }
+
+    /* Modal/Popup styles */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 10;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+        max-width: 400px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-title {
+        font-size: 1.8rem;
+        margin-bottom: 20px;
+        color: #333;
+    }
+
+    .modal-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .modal-button {
+        padding: 10px 20px;
+        font-size: 1.2rem;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .yes-button {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .no-button {
+        background-color: #f44336;
+        color: white;
+    }
+
+    .modal-button:hover {
+        opacity: 0.9;
+    }
+</style>
+
+<h1>Shima Trainer Card</h1>
+
+<div class="trainer-card-container">
+    <div class="trainer-section">
+        <img id="trainerImage" class="trainer-image" src="" alt="Trainer Image" onclick="NavigationManager.navigate('trainer_info')">
+        <div class="trainer-info">
+            <div><span id="dynamicTrainerName"></span></div>
+            <div>Level: <span id="dynamicTrainerLevel"></span></div>
+        </div>
+    </div>
+
+    <div class="pokemon-section" id="pokemonSlotsContainer">
+        <!-- Pokémon slots are dynamically generated here -->
+    </div>
+
+    <div class="utility-section">
+        <div class="utility-slot" id="utilitySlot">
+            <!-- Utility Pokemon will be loaded here -->
+        </div>
+    </div>
+
+    <div class="pokemon-info-button-container">
+        <button class="button pokemon-info-button" onclick="NavigationManager.navigate('my_pokemon')">My Pokémon</button>
+    </div>
+</div>
+
+<!-- Add the Pokeball line and button -->
+<div class="pokeball-center"></div>
+<div class="pokeball-button" onclick="confirmExit()">
+    <span class="back-button-text">Back</span>
+</div>
+
+<!-- Exit Confirmation Modal -->
+<div id="exitModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-title">Do you want to exit?</div>
+        <div class="modal-buttons">
+            <button class="modal-button yes-button" onclick="goBack()">Yes</button>
+            <button class="modal-button no-button" onclick="cancelExit()">No</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function loadTrainerInfo() {
+        const trainerDataRaw = sessionStorage.getItem('trainerData');
+
+        if (!trainerDataRaw || trainerDataRaw === "undefined") {
+            console.error('Trainer data not found or is undefined.');
+            return;
+        }
+
+        try {
+            const trainerResult = JSON.parse(trainerDataRaw);
+            if (!trainerResult) {
+                console.error('Trainer data could not be parsed.');
+                return;
+            }
+
+            document.getElementById('trainerImage').src = trainerResult[0] || 'https://via.placeholder.com/200'; // Image
+            document.getElementById('dynamicTrainerName').textContent = trainerResult[1] || 'N/A'; // Name
+            document.getElementById('dynamicTrainerLevel').textContent = trainerResult[2] || 'N/A'; // Level
+
+            // Determine the number of pokeslots based on trainer level
+            const trainerLevel = parseInt(trainerResult[2], 10);
+            let pokeslots = 3; // Default to 3 slots if level is below 5
+
+            if (trainerLevel >= 5 && trainerLevel <= 9) {
+                pokeslots = 4;
+            } else if (trainerLevel >= 10 && trainerLevel <= 15) {
+                pokeslots = 5;
+            } else if (trainerLevel >= 16) {
+                pokeslots = 6;
+            }
+
+            loadPokemonSlots(pokeslots);
+            loadUtilitySlot();
+        } catch (error) {
+            console.error('Failed to load trainer info:', error);
+        }
+    }
+
+    function loadUtilitySlot() {
+        try {
+            const utilitySlot = document.getElementById('utilitySlot');
+            const unlockedPokeSlotImage = sessionStorage.getItem('unlockedPokeSlotImage') || 'https://via.placeholder.com/150';
+            
+            // Find Pokemon in utility slot
+            let utilityPokemon = null;
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key.startsWith("pokemon_")) {
+                    const pokemonResult = JSON.parse(sessionStorage.getItem(key));
+                    if (pokemonResult[56] === 1) { // Check utility slot index
+                        utilityPokemon = pokemonResult;
+                        break;
+                    }
+                }
+            }
+
+            utilitySlot.innerHTML = ''; // Clear existing content
+
+            if (utilityPokemon) {
+                // Slot is filled with a Pokémon - match the structure of regular pokeslots
+                const img = document.createElement('img');
+                img.className = 'pokemon-image';
+                img.src = utilityPokemon[1] || 'https://via.placeholder.com/150';
+                img.onclick = () => viewPokemonDetails(utilityPokemon[2]);
+
+                const name = document.createElement('div');
+                name.className = 'pokemon-name';
+                name.textContent = utilityPokemon[36] || utilityPokemon[2] || 'Utility Pokémon';
+
+                const level = document.createElement('div');
+                level.className = 'pokemon-level';
+                level.textContent = `Level ${utilityPokemon[4] || 'N/A'}`;
+
+                utilitySlot.appendChild(img);
+                utilitySlot.appendChild(name);
+                utilitySlot.appendChild(level);
+            } else {
+                // Slot is empty
+                const img = document.createElement('img');
+                img.className = 'pokemon-image';
+                img.src = unlockedPokeSlotImage;
+                utilitySlot.appendChild(img);
+            }
+        } catch (error) {
+            console.error('Failed to load utility slot:', error);
+        }
+    }
+
+    function loadPokemonSlots(pokeslots) {
+        try {
+            const pokemonSlotsContainer = document.getElementById('pokemonSlotsContainer');
+            pokemonSlotsContainer.innerHTML = ''; // Clear existing slots
+
+            // Retrieve the images for unlocked and locked slots from session storage
+            const unlockedPokeSlotImage = sessionStorage.getItem('unlockedPokeSlotImage') || 'https://via.placeholder.com/150';
+            const lockedPokeSlotImage = sessionStorage.getItem('lockedPokeSlotImage') || 'https://via.placeholder.com/150';
+
+            const trainerPokemons = Array(6).fill(null); // Initialize an array with 6 null values
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key.startsWith("pokemon_")) {
+                    const pokemonResult = JSON.parse(sessionStorage.getItem(key));
+                    const slotNumber = parseInt(pokemonResult[38], 10); // Get the "inactiveparty" value (index 38)
+                    if (slotNumber && slotNumber >= 1 && slotNumber <= 6) {
+                        trainerPokemons[slotNumber - 1] = pokemonResult; // Place Pokémon in correct slot (1-indexed)
+                    }
+                }
+            }
+
+            for (let i = 0; i < 6; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'pokemon-slot';
+
+                if (trainerPokemons[i]) {
+                    // Slot is filled with a Pokémon
+                    const pokemonResult = trainerPokemons[i];
+
+                    const img = document.createElement('img');
+                    img.className = 'pokemon-image';
+                    img.src = pokemonResult[1] || 'https://via.placeholder.com/150'; // Pokémon Image or placeholder
+                    img.onclick = () => viewPokemonDetails(pokemonResult[2]); // Name
+
+                    const name = document.createElement('div');
+                    name.className = 'pokemon-name';
+                    name.textContent = pokemonResult[36] || pokemonResult[2] || `Pokémon ${i + 1}`; // Nickname or Name
+
+                    const level = document.createElement('div');
+                    level.className = 'pokemon-level';
+                    level.textContent = `Level ${pokemonResult[4] || 'N/A'}`; // Level
+
+                    slot.appendChild(img);
+                    slot.appendChild(name);
+                    slot.appendChild(level);
+                } else if (i < pokeslots) {
+                    // Slot is unlocked but empty
+                    const img = document.createElement('img');
+                    img.className = 'pokemon-image';
+                    img.src = unlockedPokeSlotImage;
+                    slot.appendChild(img);
+                } else {
+                    // Slot is locked
+                    const img = document.createElement('img');
+                    img.className = 'pokemon-image';
+                    img.src = lockedPokeSlotImage;
+                    slot.appendChild(img);
+                }
+
+                pokemonSlotsContainer.appendChild(slot);
+            }
+        } catch (error) {
+            console.error('Failed to load Pokémon slots:', error);
+        }
+    }
+
+    function confirmExit() {
+        document.getElementById('exitModal').style.display = 'flex';
+    }
+
+    function cancelExit() {
+        document.getElementById('exitModal').style.display = 'none';
+    }
+
+    // Close modal if user clicks outside of it
+    window.onclick = function(event) {
+        const modal = document.getElementById('exitModal');
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    } 
+</script>

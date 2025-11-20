@@ -818,6 +818,27 @@ function handlePokemonRoute(action, params) {
         parseInt(params.value)
       );
 
+    case 'abilities':
+      // GET: ?route=pokemon&action=abilities&name=Pikachu
+      if (!params.name) {
+        throw new Error('Missing pokemon name');
+      }
+      return getPokemonAbilities(params.name);
+
+    case 'evolve':
+      // GET: ?route=pokemon&action=evolve&currentName=Pikachu&trainer=Ash&data={...}
+      if (!params.currentName || !params.trainer || !params.data) {
+        throw new Error('Missing evolution parameters');
+      }
+      const evolveData = JSON.parse(params.data);
+      // First calculate modifiers for the evolved Pokemon
+      const calculatedData = calculateModifiers(evolveData, "None", "None");
+      if (calculatedData.status === 'success') {
+        // Then replace in sheet
+        return replacePokemonInSheet(params.currentName, params.trainer, calculatedData.newPokemonData);
+      }
+      return calculatedData;
+
     default:
       throw new Error('Unknown pokemon action: ' + action);
   }
@@ -2253,6 +2274,80 @@ function calculateTypeEffectiveness(type1, type2 = null) {
 }
 
 //---------------------------------Import Data to Session Storage End------------------------------------------
+
+/**
+ * ================================= ABILITIES SECTION =================================
+ */
+
+// Get abilities for a specific Pokemon species with slot indices
+function getPokemonAbilities(pokemonName) {
+  const startTime = Date.now();
+
+  try {
+    // Fetch all Pokemon data
+    const response = UrlFetchApp.fetch(POKEMON_DATA_URL);
+    const allPokemonData = JSON.parse(response.getContentText());
+
+    // Find the specific Pokemon by name (index 2 is the name)
+    const pokemon = allPokemonData.find(row => row[2] === pokemonName);
+
+    if (!pokemon) {
+      Logger.log('Pokemon not found: ' + pokemonName);
+      return {
+        status: 'error',
+        message: 'Pokemon not found: ' + pokemonName,
+        abilities: []
+      };
+    }
+
+    // Extract and format abilities with slot indices
+    // Slot 0 = primary, 1 = secondary, 2 = hidden
+    const abilities = [];
+
+    // Primary ability (index 15 = name, 62 = description) - slot 0
+    if (pokemon[15]) {
+      abilities.push('0:' + formatAbility({
+        name: pokemon[15],
+        description: pokemon[62] || "No description available"
+      }));
+    }
+
+    // Secondary ability (index 16 = name, 63 = description) - slot 1
+    if (pokemon[16]) {
+      abilities.push('1:' + formatAbility({
+        name: pokemon[16],
+        description: pokemon[63] || "No description available"
+      }));
+    }
+
+    // Hidden ability (index 17 = name, 64 = description) - slot 2
+    if (pokemon[17]) {
+      abilities.push('2:' + formatAbility({
+        name: pokemon[17],
+        description: pokemon[64] || "No description available"
+      }));
+    }
+
+    const endTime = Date.now();
+    Logger.log(`getPokemonAbilities for ${pokemonName} completed in ${endTime - startTime}ms`);
+    Logger.log(`Found ${abilities.length} abilities`);
+
+    return {
+      status: 'success',
+      pokemonName: pokemonName,
+      abilities: abilities,
+      executionTime: endTime - startTime
+    };
+
+  } catch (error) {
+    Logger.log('Error in getPokemonAbilities: ' + error.toString());
+    return {
+      status: 'error',
+      message: error.toString(),
+      abilities: []
+    };
+  }
+}
 
 /**
  * ================================= EVOLVE SECTION =================================

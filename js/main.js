@@ -1,6 +1,17 @@
 // Main Application Entry Point
 import { PokemonAPI, TrainerAPI, GameDataAPI, OfflineManager } from './api.js';
-import { TrainerCard } from './components/trainer-card.js';
+import { renderIndex } from './pages/index.js';
+import { renderContinueJourney, attachContinueJourneyListeners } from './pages/continue-journey.js';
+import { renderTrainerCard, attachTrainerCardListeners } from './pages/trainer-card.js';
+import { renderTrainerInfo, attachTrainerInfoListeners } from './pages/trainer-info.js';
+import { renderEditTrainer, attachEditTrainerListeners } from './pages/edit-trainer.js';
+import { renderPokemonCard, attachPokemonCardListeners } from './pages/pokemon-card.js';
+import { renderEditPokemon, attachEditPokemonListeners } from './pages/edit-pokemon.js';
+import { renderMyPokemon, attachMyPokemonListeners } from './pages/my-pokemon.js';
+import { renderNewJourney, attachNewJourneyListeners } from './pages/new-journey.js';
+import { renderNewPokemon, attachNewPokemonListeners } from './pages/new-pokemon.js';
+import { renderPokemonForm, attachPokemonFormListeners } from './pages/pokemon-form.js';
+import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js';
 import { showToast, showError } from './utils/notifications.js';
 
 // ============================================================================
@@ -8,7 +19,7 @@ import { showToast, showError } from './utils/notifications.js';
 // ============================================================================
 
 const AppState = {
-  currentRoute: 'home',
+  currentRoute: 'index',
   currentTrainer: null,
   gameData: null,
   isLoading: false
@@ -21,18 +32,26 @@ const AppState = {
 class Router {
   constructor() {
     this.routes = {
-      home: this.renderHome.bind(this),
-      trainers: this.renderTrainers.bind(this),
+      index: this.renderIndex.bind(this),
+      'continue-journey': this.renderContinueJourney.bind(this),
       'trainer-card': this.renderTrainerCard.bind(this),
-      pokemon: this.renderPokemonList.bind(this),
-      pokedex: this.renderPokedex.bind(this)
+      'conduit-card': this.renderConduitCard.bind(this),
+      'trainer-info': this.renderTrainerInfo.bind(this),
+      'edit-trainer': this.renderEditTrainer.bind(this),
+      'my-pokemon': this.renderMyPokemon.bind(this),
+      'pokemon-card': this.renderPokemonCard.bind(this),
+      'edit-pokemon': this.renderEditPokemon.bind(this),
+      'new-journey': this.renderNewJourney.bind(this),
+      'new-pokemon': this.renderNewPokemon.bind(this),
+      'pokemon-form': this.renderPokemonForm.bind(this),
+      'evolution': this.renderEvolution.bind(this)
     };
 
     this.init();
   }
 
   init() {
-    // Handle navigation clicks
+    // Handle navigation clicks (data-route attributes)
     document.addEventListener('click', (e) => {
       const link = e.target.closest('[data-route]');
       if (link) {
@@ -43,6 +62,12 @@ class Router {
       }
     });
 
+    // Handle custom navigate events (from page components)
+    window.addEventListener('navigate', (e) => {
+      const { route, ...params } = e.detail;
+      this.navigate(route, params);
+    });
+
     // Handle browser back/forward
     window.addEventListener('popstate', (e) => {
       if (e.state && e.state.route) {
@@ -51,7 +76,7 @@ class Router {
     });
 
     // Load initial route
-    const hash = window.location.hash.slice(1) || 'home';
+    const hash = window.location.hash.slice(1) || 'index';
     this.navigate(hash, {}, false);
   }
 
@@ -64,11 +89,6 @@ class Router {
         const url = `#${route}`;
         window.history.pushState({ route, params }, '', url);
       }
-
-      // Update active nav link
-      document.querySelectorAll('.nav-link').forEach(link => {
-        link.classList.toggle('active', link.dataset.route === route);
-      });
 
       // Render the route
       this.render(route, params);
@@ -101,171 +121,100 @@ class Router {
   // ROUTE RENDERERS
   // ============================================================================
 
-  async renderHome() {
+  async renderIndex() {
     const content = document.getElementById('content');
-    content.innerHTML = `
-      <div class="home-page">
-        <header class="hero">
-          <h1>🎮 Pokemon D&D Trainer Tool</h1>
-          <p>Manage your trainers, catch Pokemon, and track your adventure!</p>
-        </header>
-
-        <div class="quick-actions">
-          <div class="action-card" data-route="trainers">
-            <div class="icon">👤</div>
-            <h3>View Trainers</h3>
-            <p>Browse all registered trainers</p>
-          </div>
-
-          <div class="action-card" data-route="pokemon">
-            <div class="icon">🎒</div>
-            <h3>Pokemon List</h3>
-            <p>See all caught Pokemon</p>
-          </div>
-
-          <div class="action-card" data-route="pokedex">
-            <div class="icon">📖</div>
-            <h3>Pokedex</h3>
-            <p>Browse available Pokemon</p>
-          </div>
-        </div>
-      </div>
-    `;
+    content.innerHTML = renderIndex();
   }
 
-  async renderTrainers() {
+  async renderContinueJourney() {
     const content = document.getElementById('content');
-
-    try {
-      // Fetch trainer data
-      const response = await TrainerAPI.getAll();
-      const trainers = response.data;
-
-      if (!trainers || trainers.length === 0) {
-        content.innerHTML = `
-          <div class="empty-state">
-            <h2>No Trainers Found</h2>
-            <p>Start by creating a new trainer!</p>
-            <button class="btn btn-primary">Create Trainer</button>
-          </div>
-        `;
-        return;
-      }
-
-      // Render trainer grid
-      content.innerHTML = `
-        <div class="trainers-page">
-          <header class="page-header">
-            <h1>Trainers</h1>
-            <button class="btn btn-primary">+ New Trainer</button>
-          </header>
-
-          <div class="trainer-grid">
-            ${trainers.map(trainer => `
-              <div class="trainer-card-preview"
-                   data-route="trainer-card"
-                   data-params='{"name": "${trainer.name}"}'>
-                <img src="${trainer.image}" alt="${trainer.name}"
-                     onerror="this.src='assets/default-trainer.png'">
-                <h3>${trainer.name}</h3>
-                <div class="trainer-meta">
-                  <span class="badge">ID: ${trainer.id}</span>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-
-    } catch (error) {
-      showError('Failed to load trainers: ' + error.message);
-    }
+    const html = await renderContinueJourney();
+    content.innerHTML = html;
+    attachContinueJourneyListeners();
   }
 
   async renderTrainerCard(params) {
     const content = document.getElementById('content');
-
-    if (!params.name) {
-      content.innerHTML = '<div class="error">Trainer name required</div>';
-      return;
-    }
-
-    try {
-      // Fetch trainer data with Pokemon
-      const response = await TrainerAPI.get(params.name);
-
-      if (!response.data) {
-        throw new Error('Trainer not found');
-      }
-
-      // Use TrainerCard component
-      const card = new TrainerCard(response.data);
-      content.innerHTML = card.render();
-
-      // Attach event listeners
-      card.attachEventListeners();
-
-    } catch (error) {
-      showError('Failed to load trainer: ' + error.message);
-    }
+    const html = renderTrainerCard();
+    content.innerHTML = html;
+    attachTrainerCardListeners();
   }
 
-  async renderPokemonList() {
+  async renderConduitCard(params) {
     const content = document.getElementById('content');
-
-    try {
-      const response = await PokemonAPI.getRegisteredList();
-      const pokemon = response.data;
-
-      content.innerHTML = `
-        <div class="pokemon-page">
-          <header class="page-header">
-            <h1>Registered Pokemon</h1>
-            <div class="filters">
-              <input type="search" placeholder="Search Pokemon..." class="search-input">
-              <select class="filter-select">
-                <option value="">All Types</option>
-                <option value="fire">Fire</option>
-                <option value="water">Water</option>
-                <option value="grass">Grass</option>
-                <!-- Add more types -->
-              </select>
-            </div>
-          </header>
-
-          <div class="pokemon-grid">
-            ${pokemon.map(p => `
-              <div class="pokemon-card">
-                <img src="${p[0] || 'assets/default-pokemon.png'}"
-                     alt="${p[1]}"
-                     onerror="this.src='assets/default-pokemon.png'">
-                <div class="pokemon-info">
-                  <h3>${p[1]}</h3>
-                  <span class="pokemon-id">#${String(p[2]).padStart(3, '0')}</span>
-                  <div class="pokemon-types">
-                    <span class="type type-${p[4]?.toLowerCase()}">${p[4]}</span>
-                    ${p[5] ? `<span class="type type-${p[5].toLowerCase()}">${p[5]}</span>` : ''}
-                  </div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-
-    } catch (error) {
-      showError('Failed to load Pokemon: ' + error.message);
-    }
-  }
-
-  async renderPokedex() {
-    const content = document.getElementById('content');
+    // TODO: Create conduit-card page
     content.innerHTML = `
-      <div class="pokedex-page">
-        <h1>Pokedex</h1>
+      <div class="error">
+        <h2>Conduit Card</h2>
         <p>Coming soon!</p>
+        <button data-route="index">Back to Home</button>
       </div>
     `;
+  }
+
+  async renderTrainerInfo(params) {
+    const content = document.getElementById('content');
+    const html = renderTrainerInfo();
+    content.innerHTML = html;
+    attachTrainerInfoListeners();
+  }
+
+  async renderEditTrainer(params) {
+    const content = document.getElementById('content');
+    const html = renderEditTrainer();
+    content.innerHTML = html;
+    attachEditTrainerListeners();
+  }
+
+  async renderMyPokemon(params) {
+    const content = document.getElementById('content');
+    const html = renderMyPokemon();
+    content.innerHTML = html;
+    attachMyPokemonListeners();
+  }
+
+  async renderPokemonCard(params) {
+    const content = document.getElementById('content');
+    const pokemonName = params.pokemonName || '';
+    const html = renderPokemonCard(pokemonName);
+    content.innerHTML = html;
+    attachPokemonCardListeners();
+  }
+
+  async renderEditPokemon(params) {
+    const content = document.getElementById('content');
+    const pokemonName = params.pokemonName || '';
+    const html = renderEditPokemon(pokemonName);
+    content.innerHTML = html;
+    attachEditPokemonListeners();
+  }
+
+  async renderNewJourney() {
+    const content = document.getElementById('content');
+    const html = renderNewJourney();
+    content.innerHTML = html;
+    attachNewJourneyListeners();
+  }
+
+  async renderNewPokemon(params) {
+    const content = document.getElementById('content');
+    const html = renderNewPokemon();
+    content.innerHTML = html;
+    attachNewPokemonListeners();
+  }
+
+  async renderPokemonForm(params) {
+    const content = document.getElementById('content');
+    const html = renderPokemonForm();
+    content.innerHTML = html;
+    attachPokemonFormListeners();
+  }
+
+  async renderEvolution(params) {
+    const content = document.getElementById('content');
+    const html = renderEvolution();
+    content.innerHTML = html;
+    attachEvolutionListeners();
   }
 }
 
@@ -280,12 +229,11 @@ async function initApp() {
     // Show loading screen
     document.getElementById('loading-screen').classList.add('active');
 
-    // Load essential game data
-    console.log('📦 Loading game data...');
-    AppState.gameData = await GameDataAPI.getAll();
-    console.log('✅ Game data loaded');
+    // Hide navigation bar (not needed - each page has its own back button)
+    const nav = document.querySelector('.main-nav');
+    if (nav) nav.style.display = 'none';
 
-    // Initialize router
+    // Initialize router (game data will be loaded on-demand by continue-journey page)
     new Router();
 
     // Hide loading screen, show app

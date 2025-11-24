@@ -7,7 +7,7 @@
 
 // Replace with your actual Google Apps Script deployment URL
 const API_CONFIG = {
-  baseUrl: 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec',
+  baseUrl: 'https://script.google.com/macros/s/AKfycbwXsojbcIhuqpYeWFVgsMzf74HvwvV7thts7K6VBV49CWHCNFQ5aKBGeMlWpJaG2YzC/exec',
   timeout: 30000, // 30 seconds
   retries: 2
 };
@@ -264,6 +264,37 @@ export class PokemonAPI {
     }, {
       useCache: false
     });
+  }
+
+  /**
+   * Get abilities for a specific Pokemon species
+   */
+  static async getAbilities(pokemonName) {
+    return API.request('pokemon', 'abilities', {
+      name: pokemonName
+    }, {
+      cacheKey: `pokemon:abilities:${pokemonName}`,
+      useCache: true
+    });
+  }
+
+  /**
+   * Evolve a Pokemon
+   */
+  static async evolve(currentPokemonName, trainerName, evolvedPokemonData) {
+    const result = await API.request('pokemon', 'evolve', {
+      currentName: currentPokemonName,
+      trainer: trainerName,
+      data: JSON.stringify(evolvedPokemonData)
+    }, {
+      useCache: false
+    });
+
+    // Invalidate relevant caches
+    cache.remove(`pokemon:${trainerName}:${currentPokemonName}`);
+    cache.remove(`trainer:${trainerName}`);
+
+    return result;
   }
 }
 

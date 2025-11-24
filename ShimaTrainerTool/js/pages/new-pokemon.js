@@ -15,7 +15,8 @@ export function renderNewPokemon() {
     <div class="new-pokemon-page">
       <style>
         body, .content {
-          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          min-height: 100vh;
         }
 
         .new-pokemon-page {
@@ -23,13 +24,17 @@ export function renderNewPokemon() {
           flex-direction: column;
           align-items: center;
           padding: 2rem 1rem;
-          min-height: 80vh;
+          min-height: 85vh;
         }
 
         .new-pokemon-page h1 {
           color: white;
           margin-bottom: 2rem;
-          font-size: 2.5rem;
+          font-size: 3rem;
+          font-weight: 900;
+          letter-spacing: 1px;
+          text-shadow: 0 4px 10px rgba(0,0,0,0.5),
+                       0 0 20px rgba(255,222,0,0.3);
         }
 
         .register-container {
@@ -44,10 +49,11 @@ export function renderNewPokemon() {
           width: 45%;
           max-height: 65vh;
           overflow-y: auto;
-          border: 2px solid black;
-          border-radius: 10px;
+          border: 4px solid #FFDE00;
+          border-radius: 20px;
           padding: 20px;
-          background-color: white;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
         .pokemon-list h2 {
@@ -108,9 +114,11 @@ export function renderNewPokemon() {
           width: 50%;
           text-align: center;
           display: none;
-          background-color: white;
-          border-radius: 10px;
-          padding: 20px;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          border: 4px solid #FFDE00;
+          border-radius: 20px;
+          padding: 2rem;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
         .pokemon-details.visible {
@@ -133,19 +141,26 @@ export function renderNewPokemon() {
         }
 
         .register-btn {
-          background-color: #4CAF50;
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: none;
-          border-radius: 5px;
-          padding: 15px 30px;
-          font-size: 1.2rem;
+          border: 4px solid #FFDE00;
+          border-radius: 50px;
+          padding: 1rem 2.5rem;
+          font-size: 1.3rem;
+          font-weight: 900;
           cursor: pointer;
-          transition: background-color 0.3s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           margin-top: 20px;
+          box-shadow: 0 8px 20px rgba(76,175,80,0.4);
+          text-transform: uppercase;
+          letter-spacing: 1px;
         }
 
         .register-btn:hover {
-          background-color: #45a049;
+          transform: translateY(-5px) scale(1.02);
+          box-shadow: 0 12px 30px rgba(76,175,80,0.5),
+                      0 0 30px rgba(255,222,0,0.5);
+          border-color: #FFC700;
         }
 
         .no-results {

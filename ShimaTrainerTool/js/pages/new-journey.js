@@ -8,7 +8,8 @@ export function renderNewJourney() {
     <div class="new-journey-page">
       <style>
         body, .content {
-          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          min-height: 100vh;
         }
 
         .new-journey-page {
@@ -16,22 +17,28 @@ export function renderNewJourney() {
           flex-direction: column;
           align-items: center;
           padding: 2rem 1rem;
-          min-height: 80vh;
+          min-height: 85vh;
         }
 
         .new-journey-page h1 {
           color: white;
           margin-bottom: 2rem;
-          font-size: 2.5rem;
+          font-size: 3rem;
+          font-weight: 900;
+          letter-spacing: 1px;
+          text-shadow: 0 4px 10px rgba(0,0,0,0.5),
+                       0 0 20px rgba(255,222,0,0.3);
         }
 
         .form-container {
           width: 90%;
-          max-width: 600px;
-          background-color: white;
-          padding: 2rem;
-          border-radius: 10px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+          max-width: 650px;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          border: 4px solid #FFDE00;
+          padding: 2.5rem;
+          border-radius: 25px;
+          box-shadow: 0 15px 40px rgba(0,0,0,0.4),
+                      inset 0 -4px 0 rgba(0,0,0,0.05);
           max-height: 70vh;
           overflow-y: auto;
         }
@@ -97,30 +104,37 @@ export function renderNewJourney() {
 
         .button {
           padding: 1rem 2rem;
-          border: none;
-          border-radius: 5px;
-          font-size: 1.1rem;
-          font-weight: bold;
+          border: 3px solid #FFDE00;
+          border-radius: 15px;
+          font-size: 1.2rem;
+          font-weight: 900;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
 
         .button-primary {
-          background-color: #4CAF50;
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
         }
 
         .button-primary:hover {
-          background-color: #45a049;
+          transform: translateY(-3px);
+          box-shadow: 0 8px 20px rgba(76,175,80,0.5),
+                      0 0 20px rgba(255,222,0,0.5);
+          border-color: #FFC700;
         }
 
         .button-secondary {
-          background-color: #f44336;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
         }
 
         .button-secondary:hover {
-          background-color: #d32f2f;
+          transform: translateY(-3px);
+          box-shadow: 0 8px 20px rgba(238,21,21,0.5),
+                      0 0 20px rgba(255,222,0,0.5);
+          border-color: #FFC700;
         }
 
         .stats-grid {

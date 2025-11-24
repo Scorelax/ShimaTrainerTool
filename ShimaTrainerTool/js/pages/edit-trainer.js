@@ -180,6 +180,45 @@ export function renderEditTrainer() {
           font-size: 1.2rem;
         }
 
+        .autocomplete-container {
+          position: relative;
+        }
+
+        .autocomplete-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          max-height: 200px;
+          overflow-y: auto;
+          background: white;
+          border: 2px solid #f44336;
+          border-top: none;
+          border-radius: 0 0 5px 5px;
+          z-index: 100;
+          display: none;
+        }
+
+        .autocomplete-dropdown.open {
+          display: block;
+        }
+
+        .autocomplete-item {
+          padding: 0.75rem;
+          cursor: pointer;
+          font-size: 1rem;
+          border-bottom: 1px solid #eee;
+        }
+
+        .autocomplete-item:hover {
+          background-color: #f44336;
+          color: white;
+        }
+
+        .autocomplete-item:last-child {
+          border-bottom: none;
+        }
+
         .button-group {
           display: flex;
           gap: 1rem;
@@ -308,7 +347,10 @@ export function renderEditTrainer() {
                 </div>
               `).join('')}
             </div>
-            <input type="text" id="gearInput" placeholder="Add gear and press Enter" />
+            <div class="autocomplete-container">
+              <input type="text" id="gearInput" placeholder="Type to search items..." autocomplete="off" />
+              <div class="autocomplete-dropdown" id="gearDropdown"></div>
+            </div>
           </div>
 
           <!-- Buttons -->
@@ -337,16 +379,66 @@ export function attachEditTrainerListeners() {
     });
   });
 
-  // Gear input - add gear on Enter
+  // Gear autocomplete
   const gearInput = document.getElementById('gearInput');
+  const gearDropdown = document.getElementById('gearDropdown');
+  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+  const itemNames = items.map(item => item.name || item);
+
+  gearInput?.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+
+    if (query.length === 0) {
+      gearDropdown.classList.remove('open');
+      gearDropdown.innerHTML = '';
+      return;
+    }
+
+    const filtered = itemNames.filter(name =>
+      name.toLowerCase().includes(query)
+    ).slice(0, 10); // Limit to 10 results
+
+    if (filtered.length > 0) {
+      gearDropdown.innerHTML = filtered.map(name =>
+        `<div class="autocomplete-item">${name}</div>`
+      ).join('');
+      gearDropdown.classList.add('open');
+
+      // Add click handlers to dropdown items
+      gearDropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+          addGearChip(item.textContent);
+          gearInput.value = '';
+          gearDropdown.classList.remove('open');
+          gearDropdown.innerHTML = '';
+        });
+      });
+    } else {
+      gearDropdown.classList.remove('open');
+      gearDropdown.innerHTML = '';
+    }
+  });
+
+  // Allow Enter to add custom gear or select first match
   gearInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const gearValue = gearInput.value.trim();
-      if (gearValue) {
-        addGearChip(gearValue);
-        gearInput.value = '';
+      const firstItem = gearDropdown.querySelector('.autocomplete-item');
+      if (firstItem) {
+        addGearChip(firstItem.textContent);
+      } else if (gearInput.value.trim()) {
+        addGearChip(gearInput.value.trim());
       }
+      gearInput.value = '';
+      gearDropdown.classList.remove('open');
+      gearDropdown.innerHTML = '';
+    }
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-container')) {
+      gearDropdown?.classList.remove('open');
     }
   });
 

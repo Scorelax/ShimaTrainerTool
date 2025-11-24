@@ -7,6 +7,11 @@ import { renderTrainerInfo, attachTrainerInfoListeners } from './pages/trainer-i
 import { renderEditTrainer, attachEditTrainerListeners } from './pages/edit-trainer.js';
 import { renderPokemonCard, attachPokemonCardListeners } from './pages/pokemon-card.js';
 import { renderEditPokemon, attachEditPokemonListeners } from './pages/edit-pokemon.js';
+import { renderMyPokemon, attachMyPokemonListeners } from './pages/my-pokemon.js';
+import { renderNewJourney, attachNewJourneyListeners } from './pages/new-journey.js';
+import { renderNewPokemon, attachNewPokemonListeners } from './pages/new-pokemon.js';
+import { renderPokemonForm, attachPokemonFormListeners } from './pages/pokemon-form.js';
+import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js';
 import { showToast, showError } from './utils/notifications.js';
 
 // ============================================================================
@@ -36,7 +41,10 @@ class Router {
       'my-pokemon': this.renderMyPokemon.bind(this),
       'pokemon-card': this.renderPokemonCard.bind(this),
       'edit-pokemon': this.renderEditPokemon.bind(this),
-      'new-journey': this.renderNewJourney.bind(this)
+      'new-journey': this.renderNewJourney.bind(this),
+      'new-pokemon': this.renderNewPokemon.bind(this),
+      'pokemon-form': this.renderPokemonForm.bind(this),
+      'evolution': this.renderEvolution.bind(this)
     };
 
     this.init();
@@ -160,14 +168,9 @@ class Router {
 
   async renderMyPokemon(params) {
     const content = document.getElementById('content');
-    // TODO: Create my-pokemon page
-    content.innerHTML = `
-      <div class="error">
-        <h2>My Pokemon</h2>
-        <p>Coming soon!</p>
-        <button data-route="trainer-card">Back to Trainer Card</button>
-      </div>
-    `;
+    const html = renderMyPokemon();
+    content.innerHTML = html;
+    attachMyPokemonListeners();
   }
 
   async renderPokemonCard(params) {
@@ -188,14 +191,30 @@ class Router {
 
   async renderNewJourney() {
     const content = document.getElementById('content');
-    // TODO: Create new-journey page
-    content.innerHTML = `
-      <div class="error">
-        <h2>Start New Adventure</h2>
-        <p>Coming soon!</p>
-        <button data-route="index">Back to Home</button>
-      </div>
-    `;
+    const html = renderNewJourney();
+    content.innerHTML = html;
+    attachNewJourneyListeners();
+  }
+
+  async renderNewPokemon(params) {
+    const content = document.getElementById('content');
+    const html = renderNewPokemon();
+    content.innerHTML = html;
+    attachNewPokemonListeners();
+  }
+
+  async renderPokemonForm(params) {
+    const content = document.getElementById('content');
+    const html = renderPokemonForm();
+    content.innerHTML = html;
+    attachPokemonFormListeners();
+  }
+
+  async renderEvolution(params) {
+    const content = document.getElementById('content');
+    const html = renderEvolution();
+    content.innerHTML = html;
+    attachEvolutionListeners();
   }
 }
 

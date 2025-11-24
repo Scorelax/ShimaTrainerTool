@@ -213,6 +213,45 @@ export function renderEditPokemon(pokemonName) {
           line-height: 1.3;
           display: block;
         }
+
+        .autocomplete-container {
+          position: relative;
+        }
+
+        .autocomplete-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          max-height: 200px;
+          overflow-y: auto;
+          background: white;
+          border: 2px solid #f44336;
+          border-top: none;
+          border-radius: 0 0 5px 5px;
+          z-index: 100;
+          display: none;
+        }
+
+        .autocomplete-dropdown.open {
+          display: block;
+        }
+
+        .autocomplete-item {
+          padding: 0.75rem;
+          cursor: pointer;
+          font-size: 1rem;
+          border-bottom: 1px solid #eee;
+        }
+
+        .autocomplete-item:hover {
+          background-color: #f44336;
+          color: white;
+        }
+
+        .autocomplete-item:last-child {
+          border-bottom: none;
+        }
       </style>
 
       <h1>Edit ${nickname || name}</h1>
@@ -272,7 +311,10 @@ export function renderEditPokemon(pokemonName) {
 
             <div class="form-group full-width">
               <label for="heldItem">Held Item</label>
-              <input type="text" id="heldItem" name="heldItem" value="${heldItem}" />
+              <div class="autocomplete-container">
+                <input type="text" id="heldItem" name="heldItem" value="${heldItem}" placeholder="Type to search items..." autocomplete="off" />
+                <div class="autocomplete-dropdown" id="heldItemDropdown"></div>
+              </div>
             </div>
 
             <div class="form-group full-width">
@@ -356,6 +398,51 @@ export function attachEditPokemonListeners() {
       content.classList.toggle('open');
       arrow.classList.toggle('open');
     });
+  });
+
+  // Held item autocomplete
+  const heldItemInput = document.getElementById('heldItem');
+  const heldItemDropdown = document.getElementById('heldItemDropdown');
+  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+  const itemNames = items.map(item => item.name || item);
+
+  heldItemInput?.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+
+    if (query.length === 0) {
+      heldItemDropdown.classList.remove('open');
+      heldItemDropdown.innerHTML = '';
+      return;
+    }
+
+    const filtered = itemNames.filter(name =>
+      name.toLowerCase().includes(query)
+    ).slice(0, 10);
+
+    if (filtered.length > 0) {
+      heldItemDropdown.innerHTML = filtered.map(name =>
+        `<div class="autocomplete-item">${name}</div>`
+      ).join('');
+      heldItemDropdown.classList.add('open');
+
+      heldItemDropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+          heldItemInput.value = item.textContent;
+          heldItemDropdown.classList.remove('open');
+          heldItemDropdown.innerHTML = '';
+        });
+      });
+    } else {
+      heldItemDropdown.classList.remove('open');
+      heldItemDropdown.innerHTML = '';
+    }
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-container')) {
+      heldItemDropdown?.classList.remove('open');
+    }
   });
 
   // Load abilities from server

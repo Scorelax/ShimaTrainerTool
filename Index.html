@@ -3,77 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Pokemon D&D Trainer Management Tool">
   <title>Pokemon D&D Trainer Tool</title>
-
-  <!-- PWA Support -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#FF6B6B">
-  <link rel="apple-touch-icon" href="assets/icon-192.png">
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="css/styles.css">
-
-  <!-- Preconnect to API -->
-  <link rel="preconnect" href="https://script.google.com">
+  <meta http-equiv="refresh" content="0; url=ShimaTrainerTool/index.html">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+      color: white;
+    }
+    .redirect-message {
+      text-align: center;
+    }
+    .redirect-message h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .redirect-message p {
+      font-size: 1.2rem;
+    }
+    .redirect-message a {
+      color: #FFDE00;
+      text-decoration: none;
+      font-weight: bold;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    }
+    .redirect-message a:hover {
+      text-decoration: underline;
+    }
+  </style>
 </head>
 <body>
-  <!-- Loading Screen -->
-  <div id="loading-screen" class="loading-screen active">
-    <div class="pokeball-loader"></div>
-    <p>Loading your adventure...</p>
+  <div class="redirect-message">
+    <h1>Pokemon D&D Trainer Tool</h1>
+    <p>Redirecting to application...</p>
+    <p>If you are not redirected automatically, <a href="ShimaTrainerTool/index.html">click here</a>.</p>
   </div>
-
-  <!-- Main App -->
-  <div id="app" class="app hidden">
-    <!-- Navigation -->
-    <nav class="main-nav">
-      <div class="nav-brand">
-        <img src="assets/pokeball.svg" alt="Pokeball" class="nav-logo">
-        <h1>Pokemon D&D</h1>
-      </div>
-
-      <ul class="nav-menu">
-        <li><a href="#home" data-route="home" class="nav-link active">Home</a></li>
-        <li><a href="#trainers" data-route="trainers" class="nav-link">Trainers</a></li>
-        <li><a href="#pokemon" data-route="pokemon" class="nav-link">Pokemon</a></li>
-        <li><a href="#pokedex" data-route="pokedex" class="nav-link">Pokedex</a></li>
-      </ul>
-
-      <!-- Offline Indicator -->
-      <div id="offline-indicator" class="offline-indicator hidden">
-        <span>📡 Offline Mode</span>
-      </div>
-    </nav>
-
-    <!-- Main Content Area -->
-    <main id="content" class="content">
-      <!-- Content will be dynamically loaded here -->
-    </main>
-
-    <!-- Toast Notifications -->
-    <div id="toast-container" class="toast-container"></div>
-  </div>
-
-  <!-- Error Screen -->
-  <div id="error-screen" class="error-screen hidden">
-    <h2>⚠️ Something went wrong</h2>
-    <p id="error-message"></p>
-    <button onclick="location.reload()">Retry</button>
-  </div>
-
-  <!-- Scripts -->
-  <script type="module" src="js/main.js"></script>
-
-  <!-- Service Worker Registration -->
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('SW registered:', reg))
-          .catch(err => console.log('SW registration failed:', err));
-      });
-    }
+    // Immediate JavaScript redirect as backup
+    window.location.href = 'ShimaTrainerTool/index.html';
   </script>
 </body>
 </html>

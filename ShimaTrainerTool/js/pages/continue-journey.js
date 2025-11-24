@@ -10,64 +10,96 @@ export async function renderContinueJourney() {
     <div class="continue-journey-page">
       <style>
         body, .content {
-          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          min-height: 100vh;
         }
 
         .continue-journey-page h1 {
           margin-top: 1.5rem;
-          margin-bottom: 1.5rem;
+          margin-bottom: 2rem;
           color: white;
           text-align: center;
-          font-size: 2.5rem;
+          font-size: 3rem;
+          font-weight: 900;
+          letter-spacing: 1px;
+          text-shadow: 0 4px 10px rgba(0,0,0,0.5),
+                       0 0 20px rgba(255,222,0,0.3);
         }
 
         .trainer-container {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 1rem;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          gap: 2rem;
           width: 100%;
           max-width: 1200px;
           margin: 0 auto;
-          padding: 1rem;
+          padding: 2rem;
           box-sizing: border-box;
           justify-items: center;
         }
 
         .trainer-box {
-          max-width: 200px;
-          aspect-ratio: 1;
-          background-color: #ffffff;
-          border: 2px solid #333333;
-          border-radius: 15px;
+          max-width: 220px;
+          width: 100%;
+          aspect-ratio: 0.85;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          border: 4px solid #FFDE00;
+          border-radius: 20px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: space-around;
-          padding: 0.5rem;
+          justify-content: space-between;
+          padding: 1.5rem 1rem;
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           box-sizing: border-box;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.3),
+                      inset 0 -4px 0 rgba(0,0,0,0.05);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .trainer-box::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(circle, rgba(255,222,0,0.1) 0%, transparent 70%);
+          opacity: 0;
+          transition: opacity 0.3s;
+        }
+
+        .trainer-box:hover::before {
+          opacity: 1;
         }
 
         .trainer-box:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+          transform: translateY(-10px) scale(1.03);
+          box-shadow: 0 15px 40px rgba(0,0,0,0.4),
+                      inset 0 -4px 0 rgba(0,0,0,0.05),
+                      0 0 30px rgba(255,222,0,0.5);
+          border-color: #FFC700;
         }
 
         .trainer-image {
-          width: 100%;
-          height: 100%;
+          width: 90%;
+          height: 70%;
           object-fit: cover;
-          border-radius: 10px;
-          box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+          border-radius: 15px;
+          box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+          border: 3px solid #F0F0F0;
         }
 
         .trainer-name {
-          font-size: 1.2rem;
-          margin-top: 0.5rem;
+          font-size: 1.3rem;
+          margin-top: 0.75rem;
           text-align: center;
           color: #333333;
-          font-weight: bold;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         /* PIN Modal */
@@ -78,10 +110,17 @@ export async function renderContinueJourney() {
           top: 0;
           width: 100%;
           height: 100%;
-          background-color: rgba(0, 0, 0, 0.5);
+          background-color: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(5px);
           z-index: 9999;
           justify-content: center;
           align-items: center;
+          animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
 
         .pin-modal.active {
@@ -89,65 +128,117 @@ export async function renderContinueJourney() {
         }
 
         .pin-modal-content {
-          background-color: #ffffff;
-          border-radius: 10px;
-          padding: 30px;
-          box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          border: 4px solid #FFDE00;
+          border-radius: 25px;
+          padding: 3rem 2rem;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.5),
+                      inset 0 -4px 0 rgba(0,0,0,0.05);
           text-align: center;
           width: 90%;
-          max-width: 500px;
+          max-width: 450px;
           box-sizing: border-box;
+          animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(50px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
         }
 
         .pin-modal-content h2 {
-          font-size: 2rem;
-          margin-bottom: 20px;
+          font-size: 2.2rem;
+          margin-bottom: 1.5rem;
           color: #333;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 1px;
         }
 
         .pin-error {
-          color: red;
-          margin: 10px 0;
-          min-height: 20px;
+          color: #EE1515;
+          margin: 1rem 0;
+          min-height: 24px;
           font-weight: bold;
+          font-size: 1.1rem;
         }
 
         .pin-input {
-          width: 200px;
-          height: 60px;
-          font-size: 1.8rem;
+          width: 220px;
+          height: 70px;
+          font-size: 2rem;
+          font-weight: bold;
           padding: 15px;
-          border-radius: 10px;
-          border: 2px solid #333;
+          border-radius: 15px;
+          border: 3px solid #FFDE00;
           box-sizing: border-box;
-          margin-bottom: 20px;
+          margin-bottom: 2rem;
           text-align: center;
+          box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+          transition: all 0.3s;
+        }
+
+        .pin-input:focus {
+          outline: none;
+          border-color: #FFC700;
+          box-shadow: inset 0 2px 5px rgba(0,0,0,0.1),
+                      0 0 20px rgba(255,222,0,0.4);
         }
 
         .pin-buttons {
           display: flex;
-          gap: 10px;
+          gap: 1rem;
           justify-content: center;
         }
 
         .pin-submit {
-          background-color: #4CAF50;
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          font-size: 1.2rem;
-          padding: 10px 20px;
+          font-size: 1.3rem;
+          font-weight: bold;
+          padding: 1rem 2rem;
           border: none;
-          border-radius: 5px;
+          border-radius: 15px;
           cursor: pointer;
+          box-shadow: 0 5px 15px rgba(76,175,80,0.4);
+          transition: all 0.3s;
+        }
+
+        .pin-submit:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 20px rgba(76,175,80,0.5);
+        }
+
+        .pin-submit:active {
+          transform: translateY(-1px);
         }
 
         .pin-cancel {
-          background-color: #f44336;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          font-size: 1.2rem;
-          padding: 10px 20px;
+          font-size: 1.3rem;
+          font-weight: bold;
+          padding: 1rem 2rem;
           border: none;
-          border-radius: 5px;
+          border-radius: 15px;
           cursor: pointer;
+          box-shadow: 0 5px 15px rgba(238,21,21,0.4);
+          transition: all 0.3s;
+        }
+
+        .pin-cancel:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 20px rgba(238,21,21,0.5);
+        }
+
+        .pin-cancel:active {
+          transform: translateY(-1px);
         }
 
         .back-button {
@@ -155,15 +246,27 @@ export async function renderContinueJourney() {
           bottom: 40px;
           left: 50%;
           transform: translateX(-50%);
-          background: white;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          padding: 15px 30px;
-          border: 2px solid #333;
+          padding: 1rem 2.5rem;
+          border: 3px solid #FFDE00;
           border-radius: 50px;
-          font-size: 1.2rem;
+          font-size: 1.3rem;
           font-weight: bold;
           cursor: pointer;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .back-button:hover {
+          transform: translateX(-50%) translateY(-5px);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 20px rgba(255,222,0,0.5);
+          border-color: #FFC700;
+        }
+
+        .back-button:active {
+          transform: translateX(-50%) translateY(-3px);
         }
 
         @media (max-width: 768px) {

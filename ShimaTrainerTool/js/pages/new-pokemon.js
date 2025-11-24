@@ -1,0 +1,375 @@
+// New Pokemon Page - Register new Pokemon from encountered list
+
+import { PokemonAPI } from '../api.js';
+import { showError } from '../utils/notifications.js';
+
+// Module state
+let selectedPokemon = null;
+let allEncounteredPokemon = [];
+const imageCache = new Map();
+const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/';
+const IMAGE_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
+
+export function renderNewPokemon() {
+  const html = `
+    <div class="new-pokemon-page">
+      <style>
+        body, .content {
+          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+        }
+
+        .new-pokemon-page {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 2rem 1rem;
+          min-height: 80vh;
+        }
+
+        .new-pokemon-page h1 {
+          color: white;
+          margin-bottom: 2rem;
+          font-size: 2.5rem;
+        }
+
+        .register-container {
+          display: flex;
+          justify-content: space-around;
+          width: 90%;
+          max-width: 1200px;
+          gap: 2rem;
+        }
+
+        .pokemon-list {
+          width: 45%;
+          max-height: 65vh;
+          overflow-y: auto;
+          border: 2px solid black;
+          border-radius: 10px;
+          padding: 20px;
+          background-color: white;
+        }
+
+        .pokemon-list h2 {
+          text-align: center;
+          margin-top: 0;
+          margin-bottom: 15px;
+          font-size: 1.5rem;
+        }
+
+        .search-container {
+          position: sticky;
+          top: 0;
+          background-color: white;
+          padding-bottom: 10px;
+          margin-bottom: 10px;
+          border-bottom: 1px solid #e0e0e0;
+        }
+
+        .search-input {
+          width: 100%;
+          padding: 10px;
+          font-size: 1rem;
+          border: 2px solid #ddd;
+          border-radius: 5px;
+          box-sizing: border-box;
+        }
+
+        .search-input:focus {
+          border-color: #f44336;
+          outline: none;
+        }
+
+        .pokemon-list ul {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+
+        .pokemon-list li {
+          font-size: 1.1rem;
+          margin-bottom: 10px;
+          cursor: pointer;
+          padding: 8px;
+          border-radius: 5px;
+          transition: background-color 0.2s;
+        }
+
+        .pokemon-list li:hover {
+          background-color: #f0f0f0;
+        }
+
+        .pokemon-list li.selected {
+          background-color: #f44336;
+          color: white;
+        }
+
+        .pokemon-details {
+          width: 50%;
+          text-align: center;
+          display: none;
+          background-color: white;
+          border-radius: 10px;
+          padding: 20px;
+        }
+
+        .pokemon-details.visible {
+          display: block;
+        }
+
+        .pokemon-details img {
+          width: 250px;
+          height: 250px;
+          background-color: #f0f0f0;
+          border-radius: 10px;
+          object-fit: contain;
+          margin-bottom: 20px;
+        }
+
+        .pokemon-details .detail-item {
+          font-size: 1.2rem;
+          margin-bottom: 10px;
+          color: #333;
+        }
+
+        .register-btn {
+          background-color: #4CAF50;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          padding: 15px 30px;
+          font-size: 1.2rem;
+          cursor: pointer;
+          transition: background-color 0.3s;
+          margin-top: 20px;
+        }
+
+        .register-btn:hover {
+          background-color: #45a049;
+        }
+
+        .no-results {
+          text-align: center;
+          color: #666;
+          font-size: 1.1rem;
+          padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+          .register-container {
+            flex-direction: column;
+          }
+
+          .pokemon-list,
+          .pokemon-details {
+            width: 100%;
+          }
+        }
+      </style>
+
+      <h1>Register New Pokemon</h1>
+
+      <div class="register-container">
+        <div class="pokemon-list">
+          <h2>Encountered Pokemon</h2>
+          <div class="search-container">
+            <input type="text" id="pokemonSearch" class="search-input"
+                   placeholder="Search by name or dex number..." autocomplete="off">
+          </div>
+          <ul id="pokemonList">
+            <li>Loading Pokemon...</li>
+          </ul>
+        </div>
+
+        <div class="pokemon-details" id="pokemonDetails">
+          <img src="" alt="Pokemon" id="pokemonImage" onerror="this.src='assets/Pokeball.png'">
+          <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
+          <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
+          <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
+          <button class="register-btn" id="registerBtn">Register Pokemon</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return html;
+}
+
+export function attachNewPokemonListeners() {
+  // Reset state
+  selectedPokemon = null;
+  allEncounteredPokemon = [];
+
+  // Load encountered Pokemon
+  loadEncounteredPokemon();
+
+  // Search functionality
+  document.getElementById('pokemonSearch')?.addEventListener('input', handleSearch);
+
+  // Register button
+  document.getElementById('registerBtn')?.addEventListener('click', registerPokemon);
+}
+
+async function loadEncounteredPokemon() {
+  // Check for cached data first
+  const cached = sessionStorage.getItem('completePokemonData');
+  if (cached) {
+    try {
+      allEncounteredPokemon = JSON.parse(cached);
+      displayPokemonList(allEncounteredPokemon);
+      return;
+    } catch (e) {
+      console.error('Failed to parse cached data:', e);
+    }
+  }
+
+  // Fetch from API
+  try {
+    const response = await PokemonAPI.getRegisteredList();
+
+    if (response.status === 'success' && response.data) {
+      allEncounteredPokemon = response.data;
+      sessionStorage.setItem('completePokemonData', JSON.stringify(response.data));
+      displayPokemonList(allEncounteredPokemon);
+
+      // Resolve images in background
+      resolveImagesProgressively(allEncounteredPokemon);
+    } else {
+      showError('Failed to load Pokemon list');
+      document.getElementById('pokemonList').innerHTML = '<li>Failed to load Pokemon</li>';
+    }
+  } catch (error) {
+    console.error('Error loading Pokemon:', error);
+    showError('Failed to load Pokemon list');
+    document.getElementById('pokemonList').innerHTML = '<li>Failed to load Pokemon</li>';
+  }
+}
+
+function displayPokemonList(pokemonList) {
+  const listElement = document.getElementById('pokemonList');
+  if (!listElement) return;
+
+  listElement.innerHTML = '';
+
+  if (pokemonList.length === 0) {
+    listElement.innerHTML = '<div class="no-results">No Pokemon found</div>';
+    return;
+  }
+
+  // Sort by dex entry
+  const sortedList = [...pokemonList].sort((a, b) => a[2] - b[2]);
+
+  sortedList.forEach((pokemon) => {
+    const listItem = document.createElement('li');
+    listItem.textContent = `#${pokemon[2]} - ${pokemon[1]}`;
+    listItem.addEventListener('click', () => selectPokemon(pokemon, listItem));
+    listElement.appendChild(listItem);
+  });
+}
+
+function handleSearch(e) {
+  const query = e.target.value.toLowerCase().trim();
+
+  if (query.length === 0) {
+    displayPokemonList(allEncounteredPokemon);
+    return;
+  }
+
+  const filtered = allEncounteredPokemon.filter(pokemon => {
+    const name = pokemon[1].toLowerCase();
+    const dexNum = pokemon[2].toString();
+    return name.includes(query) || dexNum.includes(query);
+  });
+
+  displayPokemonList(filtered);
+}
+
+async function selectPokemon(pokemon, listItem) {
+  selectedPokemon = pokemon;
+
+  // Update selected styling
+  document.querySelectorAll('.pokemon-list li').forEach(li => li.classList.remove('selected'));
+  listItem.classList.add('selected');
+
+  // Show details
+  const imageUrl = pokemon[0] || await resolveImageUrl(pokemon[1], pokemon[2]);
+  document.getElementById('pokemonImage').src = imageUrl;
+  document.getElementById('pokemonName').textContent = pokemon[1];
+  document.getElementById('pokemonDexEntry').textContent = pokemon[2];
+
+  const typeText = pokemon[5] ? `${pokemon[4]} / ${pokemon[5]}` : pokemon[4];
+  document.getElementById('pokemonType').textContent = typeText;
+
+  document.getElementById('pokemonDetails').classList.add('visible');
+}
+
+async function resolveImageUrl(pokemonName, pokemonId) {
+  const cacheKey = `${pokemonId}-${pokemonName}`;
+
+  if (imageCache.has(cacheKey)) {
+    return imageCache.get(cacheKey);
+  }
+
+  const paddedId = pokemonId.toString().padStart(3, '0');
+  const sanitizedName = pokemonName.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const baseFileName = `${paddedId}-${sanitizedName}`;
+
+  for (const format of IMAGE_FORMATS) {
+    const url = `${IMAGE_BASE_URL}${baseFileName}.${format}`;
+    if (await imageExists(url)) {
+      imageCache.set(cacheKey, url);
+      return url;
+    }
+  }
+
+  const placeholder = 'assets/Pokeball.png';
+  imageCache.set(cacheKey, placeholder);
+  return placeholder;
+}
+
+function imageExists(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+}
+
+async function resolveImagesProgressively(pokemonList) {
+  const batchSize = 5;
+
+  for (let i = 0; i < pokemonList.length; i += batchSize) {
+    const batch = pokemonList.slice(i, Math.min(i + batchSize, pokemonList.length));
+
+    await Promise.all(batch.map(async (pokemon) => {
+      if (!pokemon[0]) {
+        const imageUrl = await resolveImageUrl(pokemon[1], pokemon[2]);
+        pokemon[0] = imageUrl;
+      }
+    }));
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  // Update session storage
+  sessionStorage.setItem('completePokemonData', JSON.stringify(pokemonList));
+}
+
+function registerPokemon() {
+  if (!selectedPokemon) {
+    showError('Please select a Pokemon first');
+    return;
+  }
+
+  // Store selected Pokemon data for the registration form
+  sessionStorage.setItem('selectedPokemonData', JSON.stringify(selectedPokemon));
+  sessionStorage.setItem('selectedPokemonName', selectedPokemon[1]);
+
+  // Navigate to Pokemon form
+  window.dispatchEvent(new CustomEvent('navigate', {
+    detail: { route: 'pokemon-form' }
+  }));
+}

@@ -110,26 +110,16 @@ export function renderTrainerCard() {
           position: relative;
         }
 
-        .trainer-and-utility-wrapper {
-          position: relative;
-          width: 100%;
-          max-width: 1200px;
-          display: flex;
-          justify-content: center;
-          margin-bottom: 2rem;
-        }
-
         .trainer-section {
           background: transparent;
           border: none;
           border-radius: 25px;
-          padding: 2.5rem;
+          padding: 2rem;
+          margin-bottom: 2rem;
           box-shadow: none;
           text-align: center;
           width: 100%;
           max-width: 450px;
-          position: relative;
-          overflow: visible;
         }
 
         .trainer-image-container {
@@ -160,10 +150,10 @@ export function renderTrainerCard() {
         }
 
         .trainer-name {
-          font-size: 2.3rem;
+          font-size: 1.8rem;
           font-weight: 900;
           color: white;
-          margin-bottom: 0.75rem;
+          margin-bottom: 0.5rem;
           text-transform: uppercase;
           letter-spacing: 1px;
           position: relative;
@@ -172,9 +162,9 @@ export function renderTrainerCard() {
         }
 
         .trainer-level {
-          font-size: 1.6rem;
+          font-size: 1.3rem;
           color: #FFDE00;
-          margin-bottom: 0.75rem;
+          margin-bottom: 0;
           font-weight: 700;
           position: relative;
           z-index: 1;
@@ -182,14 +172,7 @@ export function renderTrainerCard() {
         }
 
         .trainer-class {
-          font-size: 1.3rem;
-          color: white;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          position: relative;
-          z-index: 1;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          display: none;
         }
 
         .party-section {
@@ -206,8 +189,8 @@ export function renderTrainerCard() {
         .party-section h2 {
           text-align: center;
           color: white;
-          margin-bottom: 2rem;
-          font-size: 2rem;
+          margin-bottom: 1.5rem;
+          font-size: 1.5rem;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 1px;
@@ -293,30 +276,22 @@ export function renderTrainerCard() {
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
         }
 
-        .utility-section {
-          background: transparent;
-          border: none;
-          border-radius: 25px;
-          padding: 1rem 1.5rem;
-          box-shadow: none;
-          width: 200px;
+        .utility-row {
+          grid-column: 1 / -1;
           display: flex;
-          flex-direction: column;
+          justify-content: center;
           align-items: center;
-          position: absolute;
-          right: -50px;
-          top: 120px;
+          gap: 1rem;
+          margin-top: 1rem;
         }
 
-        .utility-section h2 {
-          text-align: center;
+        .utility-label {
           color: white;
-          margin-bottom: 1.5rem;
-          font-size: 1.6rem;
+          font-size: 1.2rem;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 1px;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
         }
 
         .utility-slot {
@@ -377,10 +352,10 @@ export function renderTrainerCard() {
         .my-pokemon-button {
           background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
           color: white;
-          padding: 1.25rem 3rem;
-          border: 4px solid #FFDE00;
+          padding: 1rem 2.4rem;
+          border: 3px solid #FFDE00;
           border-radius: 50px;
-          font-size: 1.6rem;
+          font-size: 1.3rem;
           font-weight: 900;
           cursor: pointer;
           box-shadow: 0 10px 30px rgba(59,76,202,0.4),
@@ -537,14 +512,9 @@ export function renderTrainerCard() {
         }
 
         @media (max-width: 1024px) {
-          .utility-section {
-            position: static;
-            margin: 2rem auto 0;
-          }
-
-          .trainer-and-utility-wrapper {
+          .utility-row {
             flex-direction: column;
-            align-items: center;
+            gap: 0.5rem;
           }
         }
 
@@ -563,33 +533,14 @@ export function renderTrainerCard() {
         }
       </style>
 
-      <!-- Trainer and Utility Wrapper -->
-      <div class="trainer-and-utility-wrapper">
-        <!-- Trainer Section -->
-        <div class="trainer-section">
-          <div class="trainer-image-container" id="trainerImageContainer">
-            <img src="${trainerImage}" alt="${trainerName}" class="trainer-image" onerror="this.src='assets/Pokeball.png'">
-          </div>
-          <div class="trainer-name">${trainerName}</div>
-          <div class="trainer-level">Level ${trainerLevel}</div>
-          <div class="trainer-class">${trainerClass}</div>
+      <!-- Trainer Section -->
+      <div class="trainer-section">
+        <div class="trainer-image-container" id="trainerImageContainer">
+          <img src="${trainerImage}" alt="${trainerName}" class="trainer-image" onerror="this.src='assets/Pokeball.png'">
         </div>
-
-        <!-- Utility Section -->
-        <div class="utility-section">
-          <h2>Utility</h2>
-          ${utilityPokemon ? `
-            <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
-              <img src="${utilityPokemon.image}" alt="${utilityPokemon.name}" onerror="this.src='assets/Pokeball.png'">
-              <div class="pokemon-name">${utilityPokemon.nickname || utilityPokemon.name}</div>
-              <div class="pokemon-level">Level ${utilityPokemon.level}</div>
-            </div>
-          ` : `
-            <div class="utility-slot empty">
-              <img src="${unlockedSlot}" alt="Empty Utility Slot">
-            </div>
-          `}
-        </div>
+        <div class="trainer-name">${trainerName}</div>
+        <div class="trainer-level">Level ${trainerLevel}</div>
+        <div class="trainer-class">${trainerClass}</div>
       </div>
 
       <!-- Party Section -->
@@ -623,6 +574,22 @@ export function renderTrainerCard() {
                 `;
               }
             }).join('')}
+
+            <!-- Utility Row -->
+            <div class="utility-row">
+              <span class="utility-label">Utility:</span>
+              ${utilityPokemon ? `
+                <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
+                  <img src="${utilityPokemon.image}" alt="${utilityPokemon.name}" onerror="this.src='assets/Pokeball.png'">
+                  <div class="pokemon-name">${utilityPokemon.nickname || utilityPokemon.name}</div>
+                  <div class="pokemon-level">Level ${utilityPokemon.level}</div>
+                </div>
+              ` : `
+                <div class="utility-slot empty">
+                  <img src="${unlockedSlot}" alt="Empty Utility Slot">
+                </div>
+              `}
+            </div>
           </div>
         </div>
 

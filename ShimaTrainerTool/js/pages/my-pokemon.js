@@ -60,25 +60,24 @@ export function renderMyPokemon() {
         .pokemon-image {
           width: 150px;
           height: 150px;
-          border-radius: 15px;
+          border-radius: 25px;
           object-fit: contain;
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          border: 3px solid #333;
-          box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+          background: transparent;
+          border: none;
+          box-shadow: 0 8px 25px rgba(0,0,0,0.5);
           margin-bottom: 10px;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .pokemon-image:hover {
-          transform: translateY(-8px) scale(1.05);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.4),
-                      0 0 20px rgba(51,51,51,0.3);
-          border-color: #000;
+          transform: translateY(-10px) scale(1.08);
+          box-shadow: 0 15px 40px rgba(0,0,0,0.6),
+                      0 0 30px rgba(255,222,0,0.4);
         }
 
         .pokemon-image:active {
-          transform: translateY(-4px) scale(1.02);
+          transform: translateY(-5px) scale(1.05);
         }
 
         .pokemon-name {

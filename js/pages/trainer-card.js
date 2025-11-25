@@ -110,16 +110,32 @@ export function renderTrainerCard() {
           position: relative;
         }
 
+        .trainer-utility-container {
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          gap: 2rem;
+          margin-bottom: 2rem;
+          width: 100%;
+          max-width: 900px;
+        }
+
         .trainer-section {
           background: transparent;
           border: none;
           border-radius: 25px;
           padding: 2rem;
-          margin-bottom: 2rem;
           box-shadow: none;
           text-align: center;
-          width: 100%;
-          max-width: 450px;
+          flex-shrink: 0;
+        }
+
+        .utility-side-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding-top: 180px;
+          flex-shrink: 0;
         }
 
         .trainer-image-container {
@@ -276,22 +292,14 @@ export function renderTrainerCard() {
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
         }
 
-        .utility-row {
-          grid-column: 1 / -1;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 1rem;
-          margin-top: 1rem;
-        }
-
-        .utility-label {
+        .utility-side-container h3 {
           color: white;
           font-size: 1.2rem;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 1px;
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          margin-bottom: 1rem;
         }
 
         .utility-slot {
@@ -512,9 +520,14 @@ export function renderTrainerCard() {
         }
 
         @media (max-width: 1024px) {
-          .utility-row {
+          .trainer-utility-container {
             flex-direction: column;
-            gap: 0.5rem;
+            align-items: center;
+          }
+
+          .utility-side-container {
+            padding-top: 0;
+            margin-top: 1rem;
           }
         }
 
@@ -533,14 +546,33 @@ export function renderTrainerCard() {
         }
       </style>
 
-      <!-- Trainer Section -->
-      <div class="trainer-section">
-        <div class="trainer-image-container" id="trainerImageContainer">
-          <img src="${trainerImage}" alt="${trainerName}" class="trainer-image" onerror="this.src='assets/Pokeball.png'">
+      <!-- Trainer and Utility Container -->
+      <div class="trainer-utility-container">
+        <!-- Trainer Section -->
+        <div class="trainer-section">
+          <div class="trainer-image-container" id="trainerImageContainer">
+            <img src="${trainerImage}" alt="${trainerName}" class="trainer-image" onerror="this.src='assets/Pokeball.png'">
+          </div>
+          <div class="trainer-name">${trainerName}</div>
+          <div class="trainer-level">Level ${trainerLevel}</div>
+          <div class="trainer-class">${trainerClass}</div>
         </div>
-        <div class="trainer-name">${trainerName}</div>
-        <div class="trainer-level">Level ${trainerLevel}</div>
-        <div class="trainer-class">${trainerClass}</div>
+
+        <!-- Utility Side Container -->
+        <div class="utility-side-container">
+          <h3>Utility</h3>
+          ${utilityPokemon ? `
+            <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
+              <img src="${utilityPokemon.image}" alt="${utilityPokemon.name}" onerror="this.src='assets/Pokeball.png'">
+              <div class="pokemon-name">${utilityPokemon.nickname || utilityPokemon.name}</div>
+              <div class="pokemon-level">Level ${utilityPokemon.level}</div>
+            </div>
+          ` : `
+            <div class="utility-slot empty">
+              <img src="${unlockedSlot}" alt="Empty Utility Slot">
+            </div>
+          `}
+        </div>
       </div>
 
       <!-- Party Section -->
@@ -574,22 +606,6 @@ export function renderTrainerCard() {
                 `;
               }
             }).join('')}
-
-            <!-- Utility Row -->
-            <div class="utility-row">
-              <span class="utility-label">Utility:</span>
-              ${utilityPokemon ? `
-                <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
-                  <img src="${utilityPokemon.image}" alt="${utilityPokemon.name}" onerror="this.src='assets/Pokeball.png'">
-                  <div class="pokemon-name">${utilityPokemon.nickname || utilityPokemon.name}</div>
-                  <div class="pokemon-level">Level ${utilityPokemon.level}</div>
-                </div>
-              ` : `
-                <div class="utility-slot empty">
-                  <img src="${unlockedSlot}" alt="Empty Utility Slot">
-                </div>
-              `}
-            </div>
           </div>
         </div>
 

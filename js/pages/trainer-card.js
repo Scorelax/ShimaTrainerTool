@@ -111,13 +111,11 @@ export function renderTrainerCard() {
         }
 
         .trainer-utility-container {
+          position: relative;
           display: flex;
-          align-items: flex-start;
           justify-content: center;
-          gap: 20px;
           margin-bottom: 20px;
           width: 100%;
-          max-width: 900px;
         }
 
         .trainer-section {
@@ -126,15 +124,15 @@ export function renderTrainerCard() {
           padding: 20px;
           box-shadow: none;
           text-align: center;
-          flex-shrink: 0;
         }
 
         .utility-side-container {
+          position: absolute;
+          right: 20px;
+          top: 240px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding-top: 240px;
-          flex-shrink: 0;
         }
 
         .trainer-image-container {
@@ -254,14 +252,14 @@ export function renderTrainerCard() {
 
         .utility-side-container h3 {
           color: white;
-          font-size: 1.5rem;
+          font-size: 1.2rem;
           font-weight: 700;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
         }
 
         .utility-slot {
-          width: 200px;
-          height: 200px;
+          width: 130px;
+          height: 130px;
           border-radius: 10px;
           cursor: pointer;
           transition: transform 0.2s;
@@ -270,7 +268,7 @@ export function renderTrainerCard() {
           align-items: center;
           justify-content: center;
           background: transparent;
-          padding: 10px;
+          padding: 8px;
           text-align: center;
         }
 
@@ -293,15 +291,15 @@ export function renderTrainerCard() {
         }
 
         .utility-slot .pokemon-name {
-          font-size: 1.5rem;
-          margin-bottom: 5px;
+          font-size: 1.1rem;
+          margin-bottom: 3px;
           color: white;
           text-align: center;
         }
 
         .utility-slot .pokemon-level {
-          font-size: 1.5rem;
-          margin-bottom: 5px;
+          font-size: 1.1rem;
+          margin-bottom: 3px;
           color: white;
           text-align: center;
         }
@@ -463,13 +461,8 @@ export function renderTrainerCard() {
         }
 
         @media (max-width: 1024px) {
-          .trainer-utility-container {
-            flex-direction: column;
-            align-items: center;
-          }
-
           .utility-side-container {
-            padding-top: 0;
+            position: static;
             margin-top: 20px;
           }
         }

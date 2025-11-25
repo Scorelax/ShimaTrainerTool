@@ -50,7 +50,8 @@ export function renderTrainerInfo() {
     <div class="trainer-info-page">
       <style>
         body, .content {
-          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          min-height: 100vh;
         }
 
         .trainer-info-page {
@@ -65,6 +66,10 @@ export function renderTrainerInfo() {
           color: white;
           margin-bottom: 2rem;
           font-size: 2.5rem;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+          font-weight: 900;
         }
 
         .trainer-info-container {
@@ -86,17 +91,18 @@ export function renderTrainerInfo() {
         .trainer-image-container img {
           width: 350px;
           height: 350px;
-          border-radius: 10px;
+          border-radius: 30px;
           object-fit: cover;
-          border: 4px solid #333;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+          border: none;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5),
+                      0 0 30px rgba(255,222,0,0.3);
         }
 
         .trainer-details-container {
-          background: white;
+          background: transparent;
           border-radius: 15px;
           padding: 2rem;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+          box-shadow: none;
         }
 
         .stat-main-container {
@@ -113,10 +119,13 @@ export function renderTrainerInfo() {
         }
 
         .stat-label-box {
-          font-weight: bold;
-          color: black;
+          font-weight: 900;
+          color: white;
           font-size: 1.2rem;
           margin-bottom: 0.5rem;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          text-transform: uppercase;
+          letter-spacing: 1px;
         }
 
         .stat-box {
@@ -125,13 +134,14 @@ export function renderTrainerInfo() {
           justify-content: center;
           width: 80px;
           height: 80px;
-          background-color: #f44336;
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           color: black;
-          border-radius: 10px;
-          border: 3px solid black;
+          border-radius: 15px;
+          border: 4px solid #333;
           font-size: 2rem;
-          font-weight: 700;
-          box-shadow: 3px 3px 0 #000;
+          font-weight: 900;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.5),
+                      inset 0 -3px 0 rgba(0,0,0,0.2);
         }
 
         .ability-container {
@@ -148,9 +158,12 @@ export function renderTrainerInfo() {
         }
 
         .ability-label {
-          font-weight: bold;
+          font-weight: 900;
           font-size: 1rem;
           margin-bottom: 0.5rem;
+          color: white;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          text-transform: uppercase;
         }
 
         .ability-box {
@@ -159,12 +172,14 @@ export function renderTrainerInfo() {
           justify-content: center;
           width: 60px;
           height: 60px;
-          background-color: #f44336;
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           color: black;
-          border-radius: 10px;
-          border: 3px solid black;
+          border-radius: 15px;
+          border: 4px solid #333;
           font-size: 1.8rem;
-          box-shadow: 3px 3px 0 #000;
+          font-weight: 900;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.5),
+                      inset 0 -3px 0 rgba(0,0,0,0.2);
         }
 
         .modifier-box {
@@ -173,13 +188,14 @@ export function renderTrainerInfo() {
           justify-content: center;
           width: 50px;
           height: 50px;
-          background-color: #f44336;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          border-radius: 10px;
-          border: 3px solid black;
+          border-radius: 12px;
+          border: 3px solid #333;
           font-size: 1.6rem;
           font-weight: 900;
-          box-shadow: 3px 3px 0 #000;
+          box-shadow: 0 6px 15px rgba(0,0,0,0.5),
+                      inset 0 -2px 0 rgba(0,0,0,0.3);
           margin-top: -10px;
         }
 
@@ -187,17 +203,20 @@ export function renderTrainerInfo() {
           display: flex;
           justify-content: space-between;
           padding: 0.5rem 0;
-          border-bottom: 1px solid #ddd;
+          border-bottom: 2px solid rgba(255,222,0,0.3);
           font-size: 1.3rem;
         }
 
         .stat-label {
-          font-weight: bold;
-          color: #333;
+          font-weight: 900;
+          color: white;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
         }
 
         .stat-value {
-          color: #666;
+          color: white;
+          font-weight: 700;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
         }
 
         .skills-container {
@@ -206,25 +225,33 @@ export function renderTrainerInfo() {
 
         .skills-container h3 {
           margin-bottom: 1rem;
-          color: #333;
+          color: white;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
         }
 
         .skills-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 1rem;
-          border: 2px solid #333;
+          border: 3px solid #FFDE00;
           padding: 1rem;
-          border-radius: 5px;
+          border-radius: 15px;
+          background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
         }
 
         .skill-item {
           padding: 0.75rem;
-          border: 1px solid #333;
-          border-radius: 5px;
+          border: 2px solid #333;
+          border-radius: 10px;
           text-align: center;
-          background: #f5f5f5;
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           font-size: 1.1rem;
+          font-weight: 700;
+          color: black;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
         .button-container {
@@ -245,21 +272,39 @@ export function renderTrainerInfo() {
         }
 
         #editTrainerButton {
-          background-color: gray;
+          background: linear-gradient(135deg, #757575 0%, #616161 100%);
           color: white;
+          border: 3px solid #333;
+          border-radius: 15px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         #editTrainerButton:hover {
-          background-color: darkgray;
+          transform: translateY(-2px);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 20px rgba(117,117,117,0.5);
         }
 
         #backButton {
-          background-color: #f44336;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
+          border: 3px solid #FFDE00;
+          border-radius: 15px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         #backButton:hover {
-          background-color: #d32f2f;
+          transform: translateY(-2px);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 20px rgba(255,222,0,0.5);
         }
 
         @media (max-width: 768px) {

@@ -19,7 +19,8 @@ export function renderPokemonForm() {
     <div class="pokemon-form-page">
       <style>
         body, .content {
-          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          min-height: 100vh;
         }
 
         .pokemon-form-page {
@@ -34,15 +35,21 @@ export function renderPokemonForm() {
           color: white;
           margin-bottom: 2rem;
           font-size: 2.5rem;
+          text-transform: uppercase;
+          letter-spacing: 2px;
+          text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+          font-weight: 900;
         }
 
         .form-container {
           width: 100%;
           max-width: 600px;
-          background-color: white;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
           padding: 2.5rem;
-          border-radius: 10px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+          border-radius: 25px;
+          border: 4px solid #FFDE00;
+          box-shadow: 0 15px 40px rgba(0,0,0,0.4),
+                      inset 0 -4px 0 rgba(0,0,0,0.05);
           margin-bottom: 2rem;
           max-height: 70vh;
           overflow-y: auto;
@@ -86,16 +93,23 @@ export function renderPokemonForm() {
           justify-content: space-between;
           align-items: center;
           padding: 1rem;
-          background: #f44336;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          border-radius: 5px;
+          border-radius: 15px;
+          border: 3px solid #FFDE00;
           cursor: pointer;
           font-size: 1.3rem;
-          font-weight: bold;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .collapsible-header:hover {
-          background: #d32f2f;
+          transform: translateY(-2px);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 20px rgba(255,222,0,0.4);
         }
 
         .arrow {
@@ -109,11 +123,12 @@ export function renderPokemonForm() {
         .collapsible-content {
           display: none;
           padding: 1rem;
-          border: 2px solid #f44336;
+          border: 3px solid #FFDE00;
           border-top: none;
-          border-radius: 0 0 5px 5px;
+          border-radius: 0 0 15px 15px;
           max-height: 300px;
           overflow-y: auto;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
         }
 
         .collapsible-content.open {
@@ -166,21 +181,41 @@ export function renderPokemonForm() {
         }
 
         .button-primary {
-          background-color: #4CAF50;
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
+          border: 3px solid #FFDE00;
+          border-radius: 15px;
+          font-size: 1.2rem;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .button-primary:hover {
-          background-color: #45a049;
+          transform: translateY(-2px);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 20px rgba(76,175,80,0.5);
         }
 
         .button-secondary {
-          background-color: #f44336;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
+          border: 3px solid #333;
+          border-radius: 15px;
+          font-size: 1.2rem;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .button-secondary:hover {
-          background-color: #d32f2f;
+          transform: translateY(-2px);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 20px rgba(238,21,21,0.5);
         }
       </style>
 

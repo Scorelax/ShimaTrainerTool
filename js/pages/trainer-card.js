@@ -114,8 +114,8 @@ export function renderTrainerCard() {
           display: flex;
           align-items: flex-start;
           justify-content: center;
-          gap: 2rem;
-          margin-bottom: 2rem;
+          gap: 20px;
+          margin-bottom: 20px;
           width: 100%;
           max-width: 900px;
         }
@@ -123,8 +123,7 @@ export function renderTrainerCard() {
         .trainer-section {
           background: transparent;
           border: none;
-          border-radius: 25px;
-          padding: 2rem;
+          padding: 20px;
           box-shadow: none;
           text-align: center;
           flex-shrink: 0;
@@ -134,29 +133,25 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding-top: 180px;
+          padding-top: 240px;
           flex-shrink: 0;
         }
 
         .trainer-image-container {
-          width: 220px;
-          height: 220px;
-          margin: 0 auto 1.5rem;
+          width: 300px;
+          height: 300px;
+          margin: 0 auto 10px;
           cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          border-radius: 30px;
+          transition: transform 0.2s, box-shadow 0.2s;
+          border-radius: 10px;
           overflow: hidden;
           border: none;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.5),
-                      0 0 30px rgba(255,222,0,0.3);
-          position: relative;
-          z-index: 1;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
         .trainer-image-container:hover {
-          transform: scale(1.08);
-          box-shadow: 0 15px 40px rgba(0,0,0,0.6),
-                      0 0 40px rgba(255,222,0,0.5);
+          transform: translateY(-5px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
 
         .trainer-image {
@@ -166,25 +161,17 @@ export function renderTrainerCard() {
         }
 
         .trainer-name {
-          font-size: 1.8rem;
-          font-weight: 900;
+          font-size: 1.5rem;
+          font-weight: 700;
           color: white;
-          margin-bottom: 0.5rem;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          position: relative;
-          z-index: 1;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+          margin-bottom: 5px;
         }
 
         .trainer-level {
-          font-size: 1.3rem;
-          color: #FFDE00;
-          margin-bottom: 0;
-          font-weight: 700;
-          position: relative;
-          z-index: 1;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          font-size: 1.5rem;
+          color: white;
+          margin-bottom: 5px;
+          font-weight: 400;
         }
 
         .trainer-class {
@@ -194,196 +181,152 @@ export function renderTrainerCard() {
         .party-section {
           background: transparent;
           border: none;
-          border-radius: 25px;
-          padding: 2rem;
+          padding: 20px;
           box-shadow: none;
           width: 100%;
           max-width: 650px;
-          margin: 0 auto 2rem;
+          margin: 0 auto 20px;
         }
 
         .party-section h2 {
           text-align: center;
           color: white;
-          margin-bottom: 1.5rem;
+          margin-bottom: 10px;
           font-size: 1.5rem;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+          font-weight: 700;
         }
 
         .party-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 1.25rem;
-          margin-bottom: 1rem;
+          gap: 5px;
+          margin-bottom: 10px;
         }
 
         .pokemon-slot {
-          aspect-ratio: 1;
-          background: transparent;
-          border: none;
-          border-radius: 18px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
+          background: transparent;
+          padding: 10px;
           cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          padding: 0.75rem;
-          position: relative;
-          box-shadow: none;
-        }
-
-        .pokemon-slot:hover {
-          transform: translateY(-8px) scale(1.05);
         }
 
         .pokemon-slot.empty {
           cursor: default;
           opacity: 0.5;
-          background: transparent;
-        }
-
-        .pokemon-slot.empty:hover {
-          transform: none;
         }
 
         .pokemon-slot.locked {
           cursor: default;
           opacity: 0.3;
-          background: transparent;
-        }
-
-        .pokemon-slot.locked:hover {
-          transform: none;
         }
 
         .pokemon-slot img {
-          width: 80%;
-          height: 80%;
-          object-fit: contain;
-          border-radius: 25px;
-          box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          width: 170px;
+          height: 170px;
+          border-radius: 10px;
+          object-fit: cover;
+          background-color: #f0f0f0;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          transition: transform 0.2s, box-shadow 0.2s;
+          margin-bottom: 10px;
         }
 
         .pokemon-slot:hover img {
-          box-shadow: 0 15px 40px rgba(0,0,0,0.6),
-                      0 0 30px rgba(255,222,0,0.4);
+          transform: translateY(-5px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
 
         .pokemon-slot .pokemon-name {
-          font-size: 0.95rem;
-          font-weight: 800;
-          text-align: center;
-          margin-top: 0.5rem;
+          font-size: 1.5rem;
+          margin-bottom: 5px;
           color: white;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          text-align: center;
         }
 
         .pokemon-slot .pokemon-level {
-          font-size: 0.85rem;
-          color: #FFDE00;
-          font-weight: 700;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          font-size: 1.5rem;
+          margin-bottom: 5px;
+          color: white;
+          text-align: center;
         }
 
         .utility-side-container h3 {
           color: white;
-          font-size: 1.2rem;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
-          margin-bottom: 1rem;
+          font-size: 1.5rem;
+          font-weight: 700;
+          margin-bottom: 10px;
         }
 
         .utility-slot {
-          width: 160px;
-          height: 160px;
-          background: transparent;
-          border: none;
-          border-radius: 18px;
+          width: 200px;
+          height: 200px;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: transform 0.2s;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          padding: 0.75rem;
-          box-shadow: none;
-        }
-
-        .utility-slot:hover {
-          transform: translateY(-10px) scale(1.08);
+          background: transparent;
+          padding: 10px;
+          text-align: center;
         }
 
         .utility-slot.empty {
           cursor: default;
           opacity: 0.5;
-          background: transparent;
-        }
-
-        .utility-slot.empty:hover {
-          transform: none;
         }
 
         .utility-slot img {
-          width: 80%;
-          height: 80%;
+          width: 100%;
+          height: 100%;
           object-fit: contain;
-          border-radius: 25px;
-          box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: transform 0.2s, box-shadow 0.2s;
+          margin-bottom: 10px;
         }
 
         .utility-slot:hover img {
-          box-shadow: 0 15px 40px rgba(0,0,0,0.6),
-                      0 0 30px rgba(59,76,202,0.5);
+          transform: translateY(-5px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
 
         .utility-slot .pokemon-name {
-          font-size: 0.95rem;
-          font-weight: 800;
-          text-align: center;
-          margin-top: 0.5rem;
+          font-size: 1.5rem;
+          margin-bottom: 5px;
           color: white;
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          text-align: center;
+        }
+
+        .utility-slot .pokemon-level {
+          font-size: 1.5rem;
+          margin-bottom: 5px;
+          color: white;
+          text-align: center;
         }
 
         .my-pokemon-button {
           background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
           color: white;
-          padding: 1rem 2.4rem;
-          border: 3px solid #FFDE00;
-          border-radius: 50px;
-          font-size: 1.3rem;
-          font-weight: 900;
+          padding: 10px 20px;
+          border: 2px solid #FFDE00;
+          border-radius: 10px;
+          font-size: 1.5rem;
+          font-weight: 700;
           cursor: pointer;
-          box-shadow: 0 10px 30px rgba(59,76,202,0.4),
-                      inset 0 -3px 0 rgba(0,0,0,0.2);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          margin-bottom: 2rem;
-          text-transform: uppercase;
-          letter-spacing: 1px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          transition: transform 0.2s, box-shadow 0.2s;
+          margin-bottom: 20px;
         }
 
         .my-pokemon-button:hover {
-          transform: translateY(-6px) scale(1.02);
-          box-shadow: 0 15px 40px rgba(59,76,202,0.5),
-                      inset 0 -3px 0 rgba(0,0,0,0.2),
-                      0 0 30px rgba(255,222,0,0.5);
-          border-color: #FFC700;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
 
         .my-pokemon-button:active {
-          transform: translateY(-3px) scale(1.0);
+          transform: translateY(0);
         }
 
         .back-button {
@@ -527,7 +470,7 @@ export function renderTrainerCard() {
 
           .utility-side-container {
             padding-top: 0;
-            margin-top: 1rem;
+            margin-top: 20px;
           }
         }
 

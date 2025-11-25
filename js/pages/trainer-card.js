@@ -75,8 +75,30 @@ export function renderTrainerCard() {
     <div class="trainer-card-page">
       <style>
         body, .content {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          background:
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+            linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
           min-height: 100vh;
+          position: relative;
+          overflow-x: hidden;
+        }
+
+        body::before, .content::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image:
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px, 80px 80px;
+          background-position: 0 0, 40px 40px;
+          pointer-events: none;
+          opacity: 0.5;
         }
 
         .trainer-card-page {
@@ -85,6 +107,7 @@ export function renderTrainerCard() {
           align-items: center;
           padding: 2rem 1rem;
           min-height: 85vh;
+          position: relative;
         }
 
         .trainer-section {
@@ -162,13 +185,13 @@ export function renderTrainerCard() {
         }
 
         .party-and-utility-container {
-          display: flex;
-          gap: 2rem;
+          position: relative;
           width: 100%;
-          max-width: 950px;
+          max-width: 1200px;
           margin-bottom: 2rem;
+          display: flex;
           justify-content: center;
-          flex-wrap: wrap;
+          align-items: flex-start;
         }
 
         .party-section {
@@ -177,8 +200,7 @@ export function renderTrainerCard() {
           border-radius: 25px;
           padding: 2rem;
           box-shadow: none;
-          flex: 1;
-          min-width: 320px;
+          width: 100%;
           max-width: 650px;
         }
 
@@ -282,6 +304,10 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
+          position: absolute;
+          right: 0;
+          top: 50%;
+          transform: translateY(-50%);
         }
 
         .utility-section h2 {
@@ -507,12 +533,20 @@ export function renderTrainerCard() {
           transform: translateY(-1px);
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
+          .utility-section {
+            position: static;
+            transform: none;
+            margin: 2rem auto 0;
+          }
+
           .party-and-utility-container {
             flex-direction: column;
             align-items: center;
           }
+        }
 
+        @media (max-width: 768px) {
           .party-grid {
             grid-template-columns: repeat(2, 1fr);
           }

@@ -182,30 +182,35 @@ export function renderMyPokemon() {
 
         .back-button {
           position: fixed;
-          bottom: 40px;
-          left: 50%;
-          transform: translateX(-50%);
+          top: 20px;
+          left: 20px;
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          padding: 1rem 2.5rem;
+          width: 50px;
+          height: 50px;
           border: 3px solid #FFDE00;
-          border-radius: 50px;
-          font-size: 1.3rem;
+          border-radius: 50%;
+          font-size: 1.8rem;
           font-weight: bold;
           cursor: pointer;
           box-shadow: 0 8px 20px rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
         }
 
         .back-button:hover {
-          transform: translateX(-50%) translateY(-5px);
+          transform: scale(1.1);
           box-shadow: 0 12px 30px rgba(0,0,0,0.4),
                       0 0 20px rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
         .back-button:active {
-          transform: translateX(-50%) translateY(-3px);
+          transform: scale(1.05);
         }
 
         .empty-state {
@@ -249,7 +254,7 @@ export function renderMyPokemon() {
         <button class="register-button" id="registerNewBtn">Register New Pokemon</button>
       </div>
 
-      <button class="back-button" id="backButton">Back to Trainer Card</button>
+      <button class="back-button" id="backButton">←</button>
     </div>
   `;
 

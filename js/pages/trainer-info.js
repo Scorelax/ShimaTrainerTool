@@ -290,21 +290,36 @@ export function renderTrainerInfo() {
         }
 
         #backButton {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
-          color: white;
+          position: fixed;
+          top: 20px;
+          left: 20px;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: 50px;
+          height: 50px;
           border: 3px solid #FFDE00;
-          border-radius: 15px;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 1px;
+          border-radius: 50%;
+          font-size: 1.8rem;
+          font-weight: bold;
+          cursor: pointer;
           box-shadow: 0 8px 20px rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
         }
 
         #backButton:hover {
-          transform: translateY(-2px);
+          transform: scale(1.1);
           box-shadow: 0 12px 30px rgba(0,0,0,0.4),
                       0 0 20px rgba(255,222,0,0.5);
+          border-color: #FFC700;
+        }
+
+        #backButton:active {
+          transform: scale(1.05);
         }
 
         @media (max-width: 768px) {
@@ -466,7 +481,7 @@ export function renderTrainerInfo() {
           <!-- Buttons -->
           <div class="button-container">
             <button class="button" id="editTrainerButton">Edit Trainer</button>
-            <button class="button" id="backButton">Back</button>
+            <button class="button" id="backButton">←</button>
           </div>
         </div>
       </div>

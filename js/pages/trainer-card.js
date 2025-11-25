@@ -297,15 +297,15 @@ export function renderTrainerCard() {
           background: transparent;
           border: none;
           border-radius: 25px;
-          padding: 2rem 1.5rem;
+          padding: 1rem 1.5rem;
           box-shadow: none;
-          width: 220px;
+          width: 200px;
           display: flex;
           flex-direction: column;
           align-items: center;
           position: absolute;
-          right: 0;
-          top: 50px;
+          right: -50px;
+          top: 120px;
         }
 
         .utility-section h2 {
@@ -404,29 +404,36 @@ export function renderTrainerCard() {
         }
 
         .back-button {
+          position: fixed;
+          top: 20px;
+          left: 20px;
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          padding: 1rem 2.5rem;
+          width: 50px;
+          height: 50px;
           border: 3px solid #FFDE00;
-          border-radius: 50px;
-          font-size: 1.3rem;
+          border-radius: 50%;
+          font-size: 1.8rem;
           font-weight: bold;
           cursor: pointer;
           box-shadow: 0 8px 20px rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          margin: 2rem auto;
-          display: block;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
         }
 
         .back-button:hover {
-          transform: translateY(-5px);
+          transform: scale(1.1);
           box-shadow: 0 12px 30px rgba(0,0,0,0.4),
                       0 0 20px rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
         .back-button:active {
-          transform: translateY(-3px);
+          transform: scale(1.05);
         }
 
         /* Exit Confirmation Modal */
@@ -623,7 +630,7 @@ export function renderTrainerCard() {
       <button class="my-pokemon-button" id="myPokemonButton">My Pokemon</button>
 
       <!-- Back Button -->
-      <button class="back-button" id="backButton">Exit</button>
+      <button class="back-button" id="backButton">←</button>
 
       <!-- Exit Confirmation Modal -->
       <div class="exit-modal" id="exitModal">

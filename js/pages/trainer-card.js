@@ -79,7 +79,7 @@ export function renderTrainerCard() {
             radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
           min-height: 100vh;
           position: relative;
           overflow-x: hidden;
@@ -110,12 +110,20 @@ export function renderTrainerCard() {
           position: relative;
         }
 
+        .trainer-and-utility-wrapper {
+          position: relative;
+          width: 100%;
+          max-width: 1200px;
+          display: flex;
+          justify-content: center;
+          margin-bottom: 2rem;
+        }
+
         .trainer-section {
           background: transparent;
           border: none;
           border-radius: 25px;
           padding: 2.5rem;
-          margin-bottom: 2rem;
           box-shadow: none;
           text-align: center;
           width: 100%;
@@ -184,16 +192,6 @@ export function renderTrainerCard() {
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
         }
 
-        .party-and-utility-container {
-          position: relative;
-          width: 100%;
-          max-width: 1200px;
-          margin-bottom: 2rem;
-          display: flex;
-          justify-content: center;
-          align-items: flex-start;
-        }
-
         .party-section {
           background: transparent;
           border: none;
@@ -202,6 +200,7 @@ export function renderTrainerCard() {
           box-shadow: none;
           width: 100%;
           max-width: 650px;
+          margin: 0 auto 2rem;
         }
 
         .party-section h2 {
@@ -306,8 +305,7 @@ export function renderTrainerCard() {
           align-items: center;
           position: absolute;
           right: 0;
-          top: 50%;
-          transform: translateY(-50%);
+          top: 50px;
         }
 
         .utility-section h2 {
@@ -406,10 +404,6 @@ export function renderTrainerCard() {
         }
 
         .back-button {
-          position: fixed;
-          bottom: 40px;
-          left: 50%;
-          transform: translateX(-50%);
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
           padding: 1rem 2.5rem;
@@ -420,17 +414,19 @@ export function renderTrainerCard() {
           cursor: pointer;
           box-shadow: 0 8px 20px rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          margin: 2rem auto;
+          display: block;
         }
 
         .back-button:hover {
-          transform: translateX(-50%) translateY(-5px);
+          transform: translateY(-5px);
           box-shadow: 0 12px 30px rgba(0,0,0,0.4),
                       0 0 20px rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
         .back-button:active {
-          transform: translateX(-50%) translateY(-3px);
+          transform: translateY(-3px);
         }
 
         /* Exit Confirmation Modal */
@@ -536,11 +532,10 @@ export function renderTrainerCard() {
         @media (max-width: 1024px) {
           .utility-section {
             position: static;
-            transform: none;
             margin: 2rem auto 0;
           }
 
-          .party-and-utility-container {
+          .trainer-and-utility-wrapper {
             flex-direction: column;
             align-items: center;
           }
@@ -561,20 +556,37 @@ export function renderTrainerCard() {
         }
       </style>
 
-      <!-- Trainer Section -->
-      <div class="trainer-section">
-        <div class="trainer-image-container" id="trainerImageContainer">
-          <img src="${trainerImage}" alt="${trainerName}" class="trainer-image" onerror="this.src='assets/Pokeball.png'">
+      <!-- Trainer and Utility Wrapper -->
+      <div class="trainer-and-utility-wrapper">
+        <!-- Trainer Section -->
+        <div class="trainer-section">
+          <div class="trainer-image-container" id="trainerImageContainer">
+            <img src="${trainerImage}" alt="${trainerName}" class="trainer-image" onerror="this.src='assets/Pokeball.png'">
+          </div>
+          <div class="trainer-name">${trainerName}</div>
+          <div class="trainer-level">Level ${trainerLevel}</div>
+          <div class="trainer-class">${trainerClass}</div>
         </div>
-        <div class="trainer-name">${trainerName}</div>
-        <div class="trainer-level">Level ${trainerLevel}</div>
-        <div class="trainer-class">${trainerClass}</div>
+
+        <!-- Utility Section -->
+        <div class="utility-section">
+          <h2>Utility</h2>
+          ${utilityPokemon ? `
+            <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
+              <img src="${utilityPokemon.image}" alt="${utilityPokemon.name}" onerror="this.src='assets/Pokeball.png'">
+              <div class="pokemon-name">${utilityPokemon.nickname || utilityPokemon.name}</div>
+              <div class="pokemon-level">Level ${utilityPokemon.level}</div>
+            </div>
+          ` : `
+            <div class="utility-slot empty">
+              <img src="${unlockedSlot}" alt="Empty Utility Slot">
+            </div>
+          `}
+        </div>
       </div>
 
-      <!-- Party and Utility Container -->
-      <div class="party-and-utility-container">
-        <!-- Party Section -->
-        <div class="party-section">
+      <!-- Party Section -->
+      <div class="party-section">
           <h2>Active Party</h2>
           <div class="party-grid">
             ${Array.from({ length: 6 }, (_, i) => {
@@ -606,23 +618,6 @@ export function renderTrainerCard() {
             }).join('')}
           </div>
         </div>
-
-        <!-- Utility Section -->
-        <div class="utility-section">
-          <h2>Utility</h2>
-          ${utilityPokemon ? `
-            <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
-              <img src="${utilityPokemon.image}" alt="${utilityPokemon.name}" onerror="this.src='assets/Pokeball.png'">
-              <div class="pokemon-name">${utilityPokemon.nickname || utilityPokemon.name}</div>
-              <div class="pokemon-level">Level ${utilityPokemon.level}</div>
-            </div>
-          ` : `
-            <div class="utility-slot empty">
-              <img src="${unlockedSlot}" alt="Empty Utility Slot">
-            </div>
-          `}
-        </div>
-      </div>
 
       <!-- My Pokemon Button -->
       <button class="my-pokemon-button" id="myPokemonButton">My Pokemon</button>

@@ -478,16 +478,18 @@ export function renderPokemonCard(pokemonName) {
 
         /* Stats on right side of image */
         .battle-stats-column {
-          flex: 1;
           display: flex;
           flex-direction: column;
           gap: 1vh;
+          max-width: 50%;
+          min-width: 0;
         }
 
         .ac-hp-vp-container {
           display: flex;
-          justify-content: space-between;
-          gap: 0.5vh;
+          flex-direction: row;
+          justify-content: flex-start;
+          gap: 1vh;
           width: 100%;
         }
 
@@ -525,7 +527,7 @@ export function renderPokemonCard(pokemonName) {
         .stats-container {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 0.5vh;
+          gap: 1vh 0.8vh;
           width: 100%;
         }
 
@@ -603,7 +605,7 @@ export function renderPokemonCard(pokemonName) {
         .moves-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 0.6vh;
+          gap: 0.6vh 0.8vh;
           width: 100%;
         }
 

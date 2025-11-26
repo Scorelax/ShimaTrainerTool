@@ -42,6 +42,10 @@ export function renderPokemonCard(pokemonName) {
   const proficiency = pokemonData[23] || 2;
   const speed = pokemonData[24] || 30;
   const initiative = pokemonData[25] || 0;
+  const move1 = pokemonData[26] || '';
+  const move2 = pokemonData[27] || '';
+  const move3 = pokemonData[28] || '';
+  const move4 = pokemonData[29] || '';
   const loyalty = pokemonData[33] || 0;
   const heldItem = pokemonData[35] || 'None';
   const nickname = pokemonData[36] || '';
@@ -50,6 +54,9 @@ export function renderPokemonCard(pokemonName) {
   const feats = pokemonData[50] || '';
   const flavorText = pokemonData[52] || '';
   const inUtilitySlot = pokemonData[56] === 1 || pokemonData[56] === '1';
+
+  // Parse moves into array
+  const moves = [move1, move2, move3, move4].filter(move => move && move.trim() !== '');
 
   // Calculate modifiers
   const strMod = Math.floor((str - 10) / 2);
@@ -428,174 +435,188 @@ export function renderPokemonCard(pokemonName) {
 
         /* Battle Page Styles */
         .battle-page-container {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          grid-template-rows: auto auto 1fr;
+          display: flex;
+          flex-direction: column;
+          width: 95%;
+          max-width: 160vh;
+          margin-top: 0.5vh;
+          position: relative;
+          gap: 1vh;
+        }
+
+        /* Top section on battle page: Image + Stats side by side */
+        .battle-top-section {
+          display: flex;
+          flex-wrap: nowrap;
           gap: 2vh;
-          width: 90%;
-          max-width: 150vh;
-          margin-top: 2vh;
+          align-items: flex-start;
+          width: 100%;
         }
 
         .battle-page-container .image-container {
-          grid-column: 1 / 2;
-          grid-row: 1 / 3;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          width: 45vh;
-          height: 45vh;
-          border-radius: 2vh;
-          overflow: visible;
+          width: min(30vw, 36vh);
+          height: min(30vw, 36vh);
+          border-radius: 0.5vh;
+          overflow: hidden;
           background-color: transparent;
-          z-index: 3;
-          margin-bottom: 1vh;
+          flex-shrink: 0;
+        }
+
+        .battle-page-container .image-container img {
+          width: min(30vw, 36vh);
+          height: min(30vw, 36vh);
+          border-radius: 0.5vh;
+          object-fit: contain;
+        }
+
+        /* Stats on right side of image */
+        .battle-stats-column {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 1vh;
         }
 
         .ac-hp-vp-container {
-          grid-column: 2 / 3;
-          grid-row: 1 / 2;
           display: flex;
           justify-content: space-between;
           gap: 1vh;
           width: 100%;
-          margin-bottom: 0;
         }
 
-        .ac-hp-vp-container .stat-block,
-        .stats-container .stat-block {
+        .ac-hp-vp-container .stat-block {
           display: flex;
           flex-direction: column;
           align-items: center;
           text-align: center;
         }
 
-        .ac-hp-vp-container .stat-label,
-        .stats-container .stat-label {
+        .ac-hp-vp-container .stat-label {
           margin-bottom: 0.5vh;
           text-align: center;
-          font-size: clamp(1rem, 1.7vh, 1.7vh);
+          font-size: clamp(0.8rem, 1.4vh, 1.4vh);
           font-weight: bold;
+          color: black;
         }
 
         .ac-hp-vp-container .stat-value-box {
-          width: 9vh;
-          height: 9vh;
+          width: 7vh;
+          height: 7vh;
           background-color: #f44336;
           color: black;
-          border-radius: 1vh;
-          border: 3px solid black;
+          border-radius: 0.8vh;
+          border: 2px solid black;
           text-align: center;
-          font-size: clamp(1.5rem, 2.5vh, 2.5vh);
+          font-size: clamp(1.2rem, 2vh, 2vh);
           font-weight: 650;
-          box-shadow: 0.3vh 0.3vh 0 #000;
+          box-shadow: 0.2vh 0.2vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
         }
 
         .stats-container {
-          grid-column: 2 / 3;
-          grid-row: 2 / 3;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 1vh;
-          margin-top: 0;
           width: 100%;
-          margin-bottom: 1vh;
         }
 
         .stats-container .stat-block {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 0.5vh;
+          gap: 0.3vh;
+        }
+
+        .stats-container .stat-label {
+          margin-bottom: 0.3vh;
+          text-align: center;
+          font-size: clamp(0.8rem, 1.3vh, 1.3vh);
+          font-weight: bold;
+          color: black;
         }
 
         .stats-container .stat-value-box {
-          width: 7.5vh;
-          height: 7.5vh;
+          width: 5.5vh;
+          height: 5.5vh;
           background-color: #f44336;
           color: black;
-          border-radius: 1vh;
-          border: 3px solid black;
+          border-radius: 0.8vh;
+          border: 2px solid black;
           text-align: center;
-          font-size: clamp(1.5rem, 2.2vh, 2.2vh);
-          box-shadow: 0.3vh 0.3vh 0 #000;
+          font-size: clamp(1.1rem, 1.8vh, 1.8vh);
+          box-shadow: 0.2vh 0.2vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
         }
 
         .stats-container .stat-modifier-box {
-          width: 6.5vh;
-          height: 6.5vh;
+          width: 4.5vh;
+          height: 4.5vh;
           background-color: #f44336;
           color: white;
-          border-radius: 1vh;
-          border: 3px solid black;
+          border-radius: 0.8vh;
+          border: 2px solid black;
           text-align: center;
-          font-size: clamp(1.2rem, 2vh, 2vh);
+          font-size: clamp(0.9rem, 1.5vh, 1.5vh);
           font-weight: 900;
-          box-shadow: 0.3vh 0.3vh 0 #000;
+          box-shadow: 0.2vh 0.2vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
-          margin-top: -1.2vh;
+          margin-top: -0.8vh;
           position: relative;
           z-index: 1;
         }
 
+        /* Details below image on battle page */
+        .battle-details-container {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5vh;
+          width: min(30vw, 36vh);
+        }
+
+        /* Moves below stats on battle page */
         .moves-container {
-          grid-column: 2 / 3;
-          grid-row: 3 / 4;
           display: flex;
           flex-direction: column;
           width: 100%;
-          margin-top: 6.5vh;
-          margin-left: -1vh;
+          gap: 1vh;
+        }
+
+        .moves-container h2 {
+          font-size: clamp(1.2rem, 2vh, 2vh);
+          color: black;
+          margin: 0;
         }
 
         .moves-grid {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5vh;
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 1vh;
           width: 100%;
-          justify-content: flex-start;
         }
 
         .move-item {
-          padding: 1vh;
+          padding: 1vh 1.5vh;
           border: 2px solid black;
           border-radius: 0.5vh;
           background-color: #ffffff;
           color: black;
           text-align: center;
-          font-size: clamp(0.8rem, 1.4vh, 1.4vh);
+          font-size: clamp(0.8rem, 1.3vh, 1.3vh);
+          font-weight: bold;
           display: flex;
-          flex-direction: column;
+          align-items: center;
           justify-content: center;
-          white-space: nowrap;
-          width: auto;
-          flex: 1 1 calc(25% - 1vh);
-          max-width: 100%;
-          box-sizing: border-box;
-          height: 9.5vh;
-        }
-
-        .battle-page-container .new-details-container {
-          grid-column: 1 / 2;
-          grid-row: 3 / 4;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          justify-content: flex-start;
-          gap: 0.5vh;
-          margin-top: -12vh;
-          width: 32vh;
-          padding-left: 0;
-          margin-left: -5vh;
+          min-height: 4vh;
         }
 
         .stat-pair-container {
@@ -782,106 +803,105 @@ export function renderPokemonCard(pokemonName) {
 
       <!-- Battle Page -->
       <div id="battlePage" class="battle-page-container hidden-page">
-        <div class="image-container">
-          <img id="pokemonImageBattle" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+        <!-- Top section: Image + Stats -->
+        <div class="battle-top-section">
+          <div class="image-container">
+            <img id="pokemonImageBattle" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+          </div>
+
+          <!-- Stats column on right -->
+          <div class="battle-stats-column">
+            <div class="ac-hp-vp-container">
+              <div class="stat-block">
+                <div class="stat-label">AC</div>
+                <div class="stat-value-box" id="acValue">${ac}</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">HP</div>
+                <div class="stat-value-box" id="hpValue">${hp}</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">VP</div>
+                <div class="stat-value-box" id="vpValue">${vp}</div>
+              </div>
+            </div>
+
+            <div class="stats-container">
+              <div class="stat-block">
+                <div class="stat-label">STR</div>
+                <div class="stat-value-box" id="strValue">${str}</div>
+                <div class="stat-modifier-box" id="strModifierValue">${strMod >= 0 ? '+' : ''}${strMod}</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">DEX</div>
+                <div class="stat-value-box" id="dexValue">${dex}</div>
+                <div class="stat-modifier-box" id="dexModifierValue">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">CON</div>
+                <div class="stat-value-box" id="conValue">${con}</div>
+                <div class="stat-modifier-box" id="conModifierValue">${conMod >= 0 ? '+' : ''}${conMod}</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">INT</div>
+                <div class="stat-value-box" id="intValue">${int}</div>
+                <div class="stat-modifier-box" id="intModifierValue">${intMod >= 0 ? '+' : ''}${intMod}</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">WIS</div>
+                <div class="stat-value-box" id="wisValue">${wis}</div>
+                <div class="stat-modifier-box" id="wisModifierValue">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">CHA</div>
+                <div class="stat-value-box" id="chaValue">${cha}</div>
+                <div class="stat-modifier-box" id="chaModifierValue">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
+              </div>
+            </div>
+
+            <!-- Moves below stats -->
+            <div class="moves-container">
+              <h2>Moves</h2>
+              <div class="moves-grid" id="movesGrid">
+                ${moves.length > 0 ? moves.map(move => `<div class="move-item">${move}</div>`).join('') : '<div class="move-item">No moves</div>'}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="ac-hp-vp-container">
-          <div class="stat-block">
-            <div class="stat-label">AC</div>
-            <div class="stat-value-box" id="acValue">${ac}</div>
+        <!-- Details below image -->
+        <div class="battle-details-container">
+          <div class="stat-item">
+            <div class="stat-label">HD:</div>
+            <div id="hdValue" class="stat-value">${hd}</div>
           </div>
-          <div class="stat-block">
-            <div class="stat-label">HP</div>
-            <div class="stat-value-box" id="hpValue">${hp}</div>
+          <div class="stat-item">
+            <div class="stat-label">VD:</div>
+            <div id="vdValue" class="stat-value">${vd}</div>
           </div>
-          <div class="stat-block">
-            <div class="stat-label">VP</div>
-            <div class="stat-value-box" id="vpValue">${vp}</div>
+          <div class="stat-item">
+            <div class="stat-label">STAB:</div>
+            <div id="stabValue" class="stat-value">${stab}</div>
           </div>
-        </div>
-
-        <div class="stats-container">
-          <div class="stat-block">
-            <div class="stat-label">STR</div>
-            <div class="stat-value-box" id="strValue">${str}</div>
-            <div class="stat-modifier-box" id="strModifierValue">${strMod >= 0 ? '+' : ''}${strMod}</div>
+          <div class="stat-item">
+            <div class="stat-label">Proficiency:</div>
+            <div id="proficiencyValue" class="stat-value">+${proficiency}</div>
           </div>
-          <div class="stat-block">
-            <div class="stat-label">DEX</div>
-            <div class="stat-value-box" id="dexValue">${dex}</div>
-            <div class="stat-modifier-box" id="dexModifierValue">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
+          <div class="stat-item">
+            <div class="stat-label">Initiative:</div>
+            <div id="initiativeValue" class="stat-value">${initiative >= 0 ? '+' : ''}${initiative}</div>
           </div>
-          <div class="stat-block">
-            <div class="stat-label">CON</div>
-            <div class="stat-value-box" id="conValue">${con}</div>
-            <div class="stat-modifier-box" id="conModifierValue">${conMod >= 0 ? '+' : ''}${conMod}</div>
-          </div>
-          <div class="stat-block">
-            <div class="stat-label">INT</div>
-            <div class="stat-value-box" id="intValue">${int}</div>
-            <div class="stat-modifier-box" id="intModifierValue">${intMod >= 0 ? '+' : ''}${intMod}</div>
-          </div>
-          <div class="stat-block">
-            <div class="stat-label">WIS</div>
-            <div class="stat-value-box" id="wisValue">${wis}</div>
-            <div class="stat-modifier-box" id="wisModifierValue">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
-          </div>
-          <div class="stat-block">
-            <div class="stat-label">CHA</div>
-            <div class="stat-value-box" id="chaValue">${cha}</div>
-            <div class="stat-modifier-box" id="chaModifierValue">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
-          </div>
-        </div>
-
-        <div class="moves-container">
-          <div class="moves-grid" id="movesGrid">
-            <!-- Moves will be populated here - for now showing placeholder -->
-            <div class="move-item">Move 1</div>
-            <div class="move-item">Move 2</div>
-            <div class="move-item">Move 3</div>
-            <div class="move-item">Move 4</div>
-          </div>
-        </div>
-
-        <div class="new-details-container">
-          <div class="stat-pair-container">
-            <div class="stat-item">
-              <div class="stat-label">HD:</div>
-              <div id="hdValue" class="stat-value">${hd}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">VD:</div>
-              <div id="vdValue" class="stat-value">${vd}</div>
-            </div>
-          </div>
-          <div class="stat-pair-container">
-            <div class="stat-item">
-              <div class="stat-label">STAB:</div>
-              <div id="stabValue" class="stat-value">${stab}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">Proficiency:</div>
-              <div id="proficiencyValue" class="stat-value">+${proficiency}</div>
-            </div>
-          </div>
-          <div class="stat-pair-container">
-            <div class="stat-item">
-              <div class="stat-label">Initiative:</div>
-              <div id="initiativeValue" class="stat-value">${initiative >= 0 ? '+' : ''}${initiative}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">Loyalty:</div>
-              <div id="loyaltyValue" class="stat-value">${loyalty}</div>
-            </div>
+          <div class="stat-item">
+            <div class="stat-label">Loyalty:</div>
+            <div id="loyaltyValue" class="stat-value">${loyalty}</div>
           </div>
           <div class="stat-item multi-line">
-            <span class="stat-label">Ability: </span>
+            <div class="stat-label">Ability:</div>
             <div id="abilityEffect" class="stat-value">${abilityButtonsHTML}</div>
           </div>
           <div class="stat-item multi-line">
-            <span class="stat-label">Held Item: <span id="heldItemName">${heldItem}</span></span>
-            <div id="heldItemEffect" class="stat-value">No item effect available</div>
+            <div class="stat-label">Held Item:</div>
+            <div id="heldItemName" class="stat-value">${heldItem}</div>
           </div>
           <div class="stat-item">
             <div class="stat-label">Movement:</div>

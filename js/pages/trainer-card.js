@@ -198,7 +198,7 @@ export function renderTrainerCard() {
         .party-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 1vw;
+          gap: 0.3vw;
           margin-bottom: 1vh;
         }
 
@@ -474,7 +474,8 @@ export function renderTrainerCard() {
 
         @media (max-width: 768px) {
           .party-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5vw;
           }
 
           .trainer-name {

@@ -217,8 +217,8 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          width: min(50vw, 60vh);
-          height: min(50vw, 60vh);
+          width: min(25vw, 30vh);
+          height: min(25vw, 30vh);
           border-radius: 1vh;
           overflow: hidden;
           background-color: transparent;
@@ -226,8 +226,8 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .image-container img {
-          width: min(50vw, 60vh);
-          height: min(50vw, 60vh);
+          width: min(25vw, 30vh);
+          height: min(25vw, 30vh);
           border-radius: 1vh;
           object-fit: contain;
           cursor: pointer;
@@ -303,7 +303,7 @@ export function renderPokemonCard(pokemonName) {
 
         /* Edit button below image */
         .edit-button-container {
-          width: min(50vw, 60vh);
+          width: min(25vw, 30vh);
         }
 
         /* Flavor text below image and edit button */
@@ -383,25 +383,31 @@ export function renderPokemonCard(pokemonName) {
           font-weight: bold;
         }
 
-        /* Back button in top right */
+        /* Back button in top left - round style */
         .back-button {
           position: absolute;
-          top: 1vh;
-          right: 2vh;
+          top: 2vh;
+          left: 2vh;
           background-color: white;
           color: black;
           border: 2px solid black;
-          border-radius: 0.8vh;
-          padding: 1vh 2vh;
-          font-size: clamp(0.9rem, 1.8vh, 1.8vh);
+          border-radius: 50%;
+          width: 6vh;
+          height: 6vh;
+          font-size: clamp(1.2rem, 2.5vh, 2.5vh);
           font-weight: bold;
           cursor: pointer;
-          transition: background-color 0.3s;
+          transition: background-color 0.3s, transform 0.2s;
           z-index: 10;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
         }
 
         .back-button:hover {
           background-color: #f0f0f0;
+          transform: scale(1.05);
         }
 
         /* Battle Page Styles */
@@ -672,13 +678,13 @@ export function renderPokemonCard(pokemonName) {
           .image-container img {
             width: 100%;
             height: auto;
-            max-width: 60vh;
-            max-height: 60vh;
+            max-width: 50vw;
+            max-height: 50vh;
           }
 
           .edit-button-container {
             width: 100%;
-            max-width: 60vh;
+            max-width: 50vw;
           }
 
           .skills-grid {
@@ -701,7 +707,7 @@ export function renderPokemonCard(pokemonName) {
       <h1>Pokemon Card</h1>
 
       <!-- Back Button -->
-      <button class="back-button" id="backToTrainerCard">← Back</button>
+      <button class="back-button" id="backToTrainerCard">←</button>
 
       <!-- Info Page -->
       <div id="infoPage" class="card-container active-page">

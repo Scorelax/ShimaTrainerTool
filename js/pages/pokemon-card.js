@@ -41,12 +41,11 @@ export function renderPokemonCard(pokemonName) {
   const skills = pokemonData[22] || '';
   const proficiency = pokemonData[23] || 2;
   const speed = pokemonData[24] || 30;
-  const initiative = pokemonData[25] || 0;
-  const move1 = pokemonData[26] || '';
-  const move2 = pokemonData[27] || '';
-  const move3 = pokemonData[28] || '';
-  const move4 = pokemonData[29] || '';
+  const initiative = pokemonData[30] || 0;
+  const proficiencyBonus = pokemonData[31] || 2;
+  const nature = pokemonData[32] || '';
   const loyalty = pokemonData[33] || 0;
+  const stabBonus = pokemonData[34] || 2;
   const heldItem = pokemonData[35] || 'None';
   const nickname = pokemonData[36] || '';
   const inActiveParty = !!pokemonData[38];
@@ -55,8 +54,29 @@ export function renderPokemonCard(pokemonName) {
   const flavorText = pokemonData[52] || '';
   const inUtilitySlot = pokemonData[56] === 1 || pokemonData[56] === '1';
 
-  // Parse moves into array
-  const moves = [move1, move2, move3, move4].filter(move => move && move.trim() !== '');
+  // Movement data (index 13 is comma-separated: walking,climbing,flying,hovering,swimming,burrowing)
+  const movementData = pokemonData[13] || '';
+  const movementValues = movementData.split(',').map(v => v.trim());
+  const movementTypes = ['Walking', 'Climbing', 'Flying', 'Hovering', 'Swimming', 'Burrowing'];
+  const movementDisplay = movementValues
+    .map((value, index) => value && value !== '-' && value !== '0' ? `${movementTypes[index]}: ${value} ft` : null)
+    .filter(m => m !== null)
+    .join(', ') || `${speed} ft`;
+
+  // Parse learned moves from indices 23-28, 37 based on level
+  const moveIndices = [23, 24, 25, 26, 27, 28, 37];
+  const requiredLevels = [1, 2, 6, 10, 14, 18, 0]; // 0 means always available
+  const moves = [];
+
+  moveIndices.forEach((index, idx) => {
+    if (level >= requiredLevels[idx] || (index === 37 && pokemonData[index])) {
+      const movesAtIndex = pokemonData[index] || '';
+      if (movesAtIndex) {
+        const moveNames = movesAtIndex.split(',').map(m => m.trim()).filter(m => m);
+        moves.push(...moveNames);
+      }
+    }
+  });
 
   // Calculate modifiers
   const strMod = Math.floor((str - 10) / 2);
@@ -99,8 +119,8 @@ export function renderPokemonCard(pokemonName) {
   const displayName = nickname ? `${name} / ${nickname}` : name;
   const typingText = type2 ? `${type1} / ${type2}` : type1;
 
-  // Calculate STAB (Same Type Attack Bonus) - proficiency bonus
-  const stab = `+${proficiency}`;
+  // STAB display
+  const stab = `+${stabBonus}`;
 
   // Parse senses data (comma-separated string)
   const sensesData = senses || '';
@@ -220,8 +240,9 @@ export function renderPokemonCard(pokemonName) {
           width: 100%;
         }
 
-        /* Image on the left - slightly bigger than trainer image */
-        .image-container {
+        /* Image on both pages - slightly bigger than trainer image */
+        .image-container,
+        .battle-page-container .image-container {
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -234,7 +255,8 @@ export function renderPokemonCard(pokemonName) {
           flex-shrink: 0;
         }
 
-        .image-container img {
+        .image-container img,
+        .battle-page-container .image-container img {
           width: min(30vw, 36vh);
           height: min(30vw, 36vh);
           border-radius: 0.5vh;
@@ -453,25 +475,6 @@ export function renderPokemonCard(pokemonName) {
           width: 100%;
         }
 
-        .battle-page-container .image-container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          width: min(30vw, 36vh);
-          height: min(30vw, 36vh);
-          border-radius: 0.5vh;
-          overflow: hidden;
-          background-color: transparent;
-          flex-shrink: 0;
-        }
-
-        .battle-page-container .image-container img {
-          width: min(30vw, 36vh);
-          height: min(30vw, 36vh);
-          border-radius: 0.5vh;
-          object-fit: contain;
-        }
 
         /* Stats on right side of image */
         .battle-stats-column {
@@ -885,7 +888,7 @@ export function renderPokemonCard(pokemonName) {
           </div>
           <div class="stat-item">
             <div class="stat-label">Proficiency:</div>
-            <div id="proficiencyValue" class="stat-value">+${proficiency}</div>
+            <div id="proficiencyValue" class="stat-value">+${proficiencyBonus}</div>
           </div>
           <div class="stat-item">
             <div class="stat-label">Initiative:</div>
@@ -903,9 +906,9 @@ export function renderPokemonCard(pokemonName) {
             <div class="stat-label">Held Item:</div>
             <div id="heldItemName" class="stat-value">${heldItem}</div>
           </div>
-          <div class="stat-item">
+          <div class="stat-item multi-line">
             <div class="stat-label">Movement:</div>
-            <div id="movementValue" class="stat-value">${speed} ft</div>
+            <div id="movementValue" class="stat-value">${movementDisplay}</div>
           </div>
         </div>
       </div>

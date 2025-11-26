@@ -135,7 +135,7 @@ export function renderPokemonCard(pokemonName) {
   // Generate ability buttons HTML
   const abilityButtonsHTML = parsedAbilities.length > 0
     ? parsedAbilities.map((ability, index) =>
-        `<button class="ability-button" data-ability-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: min(0.5vw, 5px); padding: min(0.6vw, 6px) min(1.2vw, 12px); font-size: clamp(1rem, 1.5vw, 1.2rem); cursor: pointer; margin: min(0.2vw, 2px); font-weight: bold;">${ability.name}</button>`
+        `<button class="ability-button" data-ability-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.8rem, 1.5vh, 1.5vh); cursor: pointer; margin: 0.3vh; font-weight: bold;">${ability.name}</button>`
       ).join(' ')
     : 'None';
 
@@ -163,8 +163,8 @@ export function renderPokemonCard(pokemonName) {
           background-image:
             radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
             radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-          background-size: min(5vw, 5vh) min(5vw, 5vh), min(8vw, 8vh) min(8vw, 8vh);
-          background-position: 0 0, min(4vw, 4vh) min(4vw, 4vh);
+          background-size: 6.5vh 6.5vh, 10.4vh 10.4vh;
+          background-position: 0 0, 5.2vh 5.2vh;
           pointer-events: none;
           opacity: 0.5;
         }
@@ -173,15 +173,15 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 2rem 1rem;
+          padding: 2.5vh 1vh;
           min-height: 80vh;
           position: relative;
         }
 
         .pokemon-card-page h1 {
           color: white;
-          margin-bottom: clamp(1.5rem, 2vw, 2rem);
-          font-size: clamp(2rem, 5vw, 2.5rem);
+          margin-bottom: 2vh;
+          font-size: clamp(1.8rem, 3.2vh, 3.2vh);
         }
 
         /* Page visibility classes */
@@ -193,14 +193,15 @@ export function renderPokemonCard(pokemonName) {
           display: grid !important;
         }
 
-        /* Info Page Styles */
+        /* Info Page Styles - All sized with vh units */
         .card-container {
-          grid-template-columns: min(30vw, 350px) 1fr;
-          grid-template-rows: auto auto;
-          gap: min(2vw, 20px);
-          width: 80%;
-          max-width: 1200px;
-          margin-top: min(2vw, 20px);
+          display: grid;
+          grid-template-columns: 45vh 1fr;
+          grid-template-rows: auto 1fr;
+          gap: 2vh;
+          width: 90%;
+          max-width: 150vh;
+          margin-top: 2vh;
           position: relative;
         }
 
@@ -211,21 +212,26 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: flex-start;
           justify-content: flex-start;
-          width: min(30vw, 350px);
-          height: min(30vw, 350px);
-          border-radius: min(2vw, 20px);
+          width: 45vh;
+          height: 45vh;
+          border-radius: 2vh;
           overflow: visible;
           background-color: transparent;
           z-index: 3;
-          margin-bottom: min(1vw, 10px);
+          margin-bottom: 1vh;
         }
 
         .image-container img {
-          width: min(30vw, 350px);
-          height: min(30vw, 350px);
-          border-radius: min(2vw, 20px);
+          width: 45vh;
+          height: 45vh;
+          border-radius: 2vh;
           object-fit: contain;
           cursor: pointer;
+        }
+
+        .image-container img:hover {
+          opacity: 0.8;
+          transition: opacity 0.3s;
         }
 
         .new-details-container {
@@ -235,9 +241,9 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: flex-start;
           justify-content: flex-start;
-          gap: min(1vw, 10px);
-          margin-top: min(-8vw, -80px);
-          width: min(30vw, 350px);
+          gap: 1vh;
+          margin-top: -10vh;
+          width: 45vh;
           padding-left: 0;
           margin-left: 0;
         }
@@ -246,23 +252,23 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: row;
           align-items: center;
-          gap: min(0.5vw, 5px);
-          margin-bottom: min(1.5vw, 15px);
+          gap: 0.5vh;
+          margin-bottom: 1.5vh;
           text-align: left;
-          font-size: clamp(1.2rem, 2vw, 1.5rem);
+          font-size: clamp(1rem, 2vh, 2vh);
           width: 100%;
-          max-width: min(30vw, 350px);
+          max-width: 45vh;
         }
 
         .stat-label {
           font-weight: bold;
           color: black;
-          min-width: min(8vw, 80px);
+          min-width: 10vh;
         }
 
         .dex-entry::before {
           content: " #";
-          margin-left: min(0.5vw, 5px);
+          margin-left: 0.5vh;
         }
 
         .stat-value {
@@ -283,7 +289,7 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .flavor-text {
-          font-size: clamp(1rem, 1.5vw, 1.2rem);
+          font-size: clamp(0.9rem, 1.5vh, 1.5vh);
           line-height: 1.3;
           color: black;
         }
@@ -294,50 +300,50 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          gap: min(1vw, 10px);
-          margin-top: min(8vw, 80px);
-          font-size: clamp(0.8rem, 1.2vw, 1rem);
+          gap: 1vh;
+          margin-top: 28vh;
+          font-size: clamp(0.8rem, 1.3vh, 1.3vh);
           transform: scale(0.9);
           transform-origin: top left;
-          margin-left: 0px;
+          margin-left: 0;
           z-index: 2;
           color: black;
         }
 
         .skills-container h2 {
-          font-size: clamp(2rem, 4vw, 2.5rem);
-          margin-left: min(20vw, 200px);
-          margin-bottom: clamp(0.4rem, 0.5vw, 0.5rem);
+          font-size: clamp(1.8rem, 3.2vh, 3.2vh);
+          margin-left: 25vh;
+          margin-bottom: 0.5vh;
         }
 
         .skills-grid {
           display: grid;
           grid-template-columns: 1fr 1fr 1fr;
-          gap: min(1vw, 10px);
+          gap: 1vh;
           border: 2px solid black;
-          padding: min(2vw, 20px);
-          border-radius: min(0.5vw, 5px);
+          padding: 2vh;
+          border-radius: 0.5vh;
           width: 100%;
           box-sizing: border-box;
         }
 
         .skill-item {
-          padding: min(1vw, 10px);
+          padding: 1vh;
           border: 1px solid black;
-          border-radius: min(0.5vw, 5px);
-          margin-bottom: min(1vw, 10px);
+          border-radius: 0.5vh;
+          margin-bottom: 1vh;
           text-align: center;
           display: flex;
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          height: min(7.5vw, 75px);
-          font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+          height: 9.5vh;
+          font-size: clamp(1rem, 1.9vh, 1.9vh);
         }
 
         .skill-item .modifier {
-          margin-top: min(0.1vw, 1px);
-          font-size: clamp(1rem, 1.5vw, 1.2rem);
+          margin-top: 0.1vh;
+          font-size: clamp(0.9rem, 1.5vh, 1.5vh);
         }
 
         .skill-item.highlight {
@@ -356,21 +362,21 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: row;
           align-items: center;
-          gap: min(1vw, 10px);
-          margin-top: min(2vw, 20px);
-          margin-left: min(1vw, 10px);
-          font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+          gap: 1vh;
+          margin-top: 2vh;
+          margin-left: 1vh;
+          font-size: clamp(1rem, 1.9vh, 1.9vh);
         }
 
         .checkbox-container label {
           font-weight: bold;
           color: black;
-          margin-bottom: min(0.5vw, 5px);
+          margin-bottom: 0.5vh;
         }
 
         .checkbox-container input[type="checkbox"] {
-          width: min(4vw, 40px);
-          height: min(4vw, 40px);
+          width: 5vh;
+          height: 5vh;
           border: 2px solid black;
           background-color: white;
           color: black;
@@ -379,12 +385,13 @@ export function renderPokemonCard(pokemonName) {
 
         /* Battle Page Styles */
         .battle-page-container {
+          display: grid;
           grid-template-columns: 1fr 1fr;
           grid-template-rows: auto auto 1fr;
-          gap: min(2vw, 20px);
-          width: 80%;
-          max-width: 1200px;
-          margin-top: min(2vw, 20px);
+          gap: 2vh;
+          width: 90%;
+          max-width: 150vh;
+          margin-top: 2vh;
         }
 
         .battle-page-container .image-container {
@@ -394,13 +401,13 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          width: min(30vw, 350px);
-          height: min(30vw, 350px);
-          border-radius: min(2vw, 20px);
+          width: 45vh;
+          height: 45vh;
+          border-radius: 2vh;
           overflow: visible;
           background-color: transparent;
           z-index: 3;
-          margin-bottom: min(1vw, 10px);
+          margin-bottom: 1vh;
         }
 
         .ac-hp-vp-container {
@@ -408,7 +415,7 @@ export function renderPokemonCard(pokemonName) {
           grid-row: 1 / 2;
           display: flex;
           justify-content: space-between;
-          gap: min(1vw, 10px);
+          gap: 1vh;
           width: 100%;
           margin-bottom: 0;
         }
@@ -423,23 +430,23 @@ export function renderPokemonCard(pokemonName) {
 
         .ac-hp-vp-container .stat-label,
         .stats-container .stat-label {
-          margin-bottom: min(0.5vw, 5px);
+          margin-bottom: 0.5vh;
           text-align: center;
-          font-size: clamp(1rem, 1.5vw, 1.3rem);
+          font-size: clamp(1rem, 1.7vh, 1.7vh);
           font-weight: bold;
         }
 
         .ac-hp-vp-container .stat-value-box {
-          width: min(7vw, 70px);
-          height: min(7vw, 70px);
+          width: 9vh;
+          height: 9vh;
           background-color: #f44336;
           color: black;
-          border-radius: min(1vw, 10px);
+          border-radius: 1vh;
           border: 3px solid black;
           text-align: center;
-          font-size: clamp(1.5rem, 2.5vw, 1.9rem);
+          font-size: clamp(1.5rem, 2.5vh, 2.5vh);
           font-weight: 650;
-          box-shadow: min(0.3vw, 3px) min(0.3vw, 3px) 0 #000;
+          box-shadow: 0.3vh 0.3vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -450,49 +457,49 @@ export function renderPokemonCard(pokemonName) {
           grid-row: 2 / 3;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: min(1vw, 10px);
+          gap: 1vh;
           margin-top: 0;
           width: 100%;
-          margin-bottom: min(1vw, 10px);
+          margin-bottom: 1vh;
         }
 
         .stats-container .stat-block {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: min(0.5vw, 5px);
+          gap: 0.5vh;
         }
 
         .stats-container .stat-value-box {
-          width: min(6vw, 60px);
-          height: min(6vw, 60px);
+          width: 7.5vh;
+          height: 7.5vh;
           background-color: #f44336;
           color: black;
-          border-radius: min(1vw, 10px);
+          border-radius: 1vh;
           border: 3px solid black;
           text-align: center;
-          font-size: clamp(1.5rem, 2.2vw, 1.8rem);
-          box-shadow: min(0.3vw, 3px) min(0.3vw, 3px) 0 #000;
+          font-size: clamp(1.5rem, 2.2vh, 2.2vh);
+          box-shadow: 0.3vh 0.3vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
         }
 
         .stats-container .stat-modifier-box {
-          width: min(5vw, 50px);
-          height: min(5vw, 50px);
+          width: 6.5vh;
+          height: 6.5vh;
           background-color: #f44336;
           color: white;
-          border-radius: min(1vw, 10px);
+          border-radius: 1vh;
           border: 3px solid black;
           text-align: center;
-          font-size: clamp(1.4rem, 2vw, 1.6rem);
+          font-size: clamp(1.2rem, 2vh, 2vh);
           font-weight: 900;
-          box-shadow: min(0.3vw, 3px) min(0.3vw, 3px) 0 #000;
+          box-shadow: 0.3vh 0.3vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
-          margin-top: min(-1vw, -10px);
+          margin-top: -1.2vh;
           position: relative;
           z-index: 1;
         }
@@ -503,35 +510,35 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           width: 100%;
-          margin-top: min(5vw, 50px);
-          margin-left: min(-1vw, -10px);
+          margin-top: 6.5vh;
+          margin-left: -1vh;
         }
 
         .moves-grid {
           display: flex;
           flex-wrap: wrap;
-          gap: min(0.5vw, 5px);
+          gap: 0.5vh;
           width: 100%;
           justify-content: flex-start;
         }
 
         .move-item {
-          padding: min(0.8vw, 8px);
+          padding: 1vh;
           border: 2px solid black;
-          border-radius: min(0.5vw, 5px);
+          border-radius: 0.5vh;
           background-color: #ffffff;
           color: black;
           text-align: center;
-          font-size: clamp(0.9rem, 1.3vw, 1.1rem);
+          font-size: clamp(0.8rem, 1.4vh, 1.4vh);
           display: flex;
           flex-direction: column;
           justify-content: center;
           white-space: nowrap;
           width: auto;
-          flex: 1 1 calc(25% - min(0.5vw, 10px));
+          flex: 1 1 calc(25% - 1vh);
           max-width: 100%;
           box-sizing: border-box;
-          height: min(7.5vw, 75px);
+          height: 9.5vh;
         }
 
         .battle-page-container .new-details-container {
@@ -541,18 +548,18 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: flex-start;
           justify-content: flex-start;
-          gap: min(0.5vw, 5px);
-          margin-top: min(-9.5vw, -95px);
-          width: min(25vw, 250px);
+          gap: 0.5vh;
+          margin-top: -12vh;
+          width: 32vh;
           padding-left: 0;
-          margin-left: min(-4vw, -40px);
+          margin-left: -5vh;
         }
 
         .stat-pair-container {
           display: flex;
           justify-content: space-between;
           width: 100%;
-          gap: min(1vw, 10px);
+          gap: 1vh;
         }
 
         .stat-item.multi-line {
@@ -564,7 +571,7 @@ export function renderPokemonCard(pokemonName) {
 
         .stat-item.multi-line .stat-label {
           display: inline;
-          margin-right: min(0.5vw, 5px);
+          margin-right: 0.5vh;
         }
 
         .stat-item.multi-line .stat-value {
@@ -576,12 +583,12 @@ export function renderPokemonCard(pokemonName) {
 
         /* Navigation Arrows */
         .arrow-button {
-          font-size: clamp(2rem, 3vw, 2.5rem);
-          padding: min(0.5vw, 5px) min(1.5vw, 15px);
+          font-size: clamp(1.8rem, 3.2vh, 3.2vh);
+          padding: 0.5vh 1.9vh;
           background-color: white;
           color: black;
           border: 2px solid black;
-          border-radius: min(0.5vw, 5px);
+          border-radius: 0.5vh;
           cursor: pointer;
           transition: background-color 0.3s;
           position: absolute;
@@ -606,17 +613,30 @@ export function renderPokemonCard(pokemonName) {
           background-color: #bfbfbf;
           color: black;
           border: none;
-          border-radius: min(0.5vw, 5px);
-          padding: min(1vw, 10px) min(2vw, 20px);
-          font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+          border-radius: 0.5vh;
+          padding: 1.3vh 2.5vh;
+          font-size: clamp(1rem, 1.9vh, 1.9vh);
           cursor: pointer;
           transition: background-color 0.3s;
-          margin-top: min(1vw, 10px);
+          margin-top: 1vh;
           display: block;
         }
 
         .edit-button:hover {
           background-color: #d32f2f;
+        }
+
+        .stat-boosted {
+          color: #fff200 !important;
+          font-size: 2.2vh !important;
+          font-weight: bold !important;
+          -webkit-text-stroke: 0.5px black !important;
+        }
+
+        .stat-nerfed {
+          color: #0d32d6 !important;
+          font-size: 1.5vh !important;
+          -webkit-text-stroke: 0.5px black !important;
         }
 
         @media (max-width: 1024px) {
@@ -682,7 +702,7 @@ export function renderPokemonCard(pokemonName) {
             <input type="checkbox" id="inUtilitySlot" ${inUtilitySlot ? 'checked' : ''}>
           </div>
 
-          <div style="margin-top: min(1vw, 10px);">
+          <div style="margin-top: 1.3vh;">
             <button class="edit-button" id="editPokemonButton">Edit Pokémon</button>
           </div>
         </div>
@@ -829,10 +849,10 @@ export function renderPokemonCard(pokemonName) {
 
       <!-- Ability Popup -->
       <div id="abilityPopup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-        <div style="background: white; border-radius: min(1vw, 10px); padding: min(2vw, 20px); max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
-          <h2 id="abilityPopupTitle" style="margin-top: 0; color: #333;">Ability</h2>
-          <div id="abilityPopupContent" style="font-size: clamp(1rem, 1.5vw, 1.2rem); line-height: 1.6; color: black;"></div>
-          <button id="closeAbilityPopup" style="margin-top: min(1.5vw, 15px); padding: min(1vw, 10px) min(2vw, 20px); background: #f44336; color: white; border: none; border-radius: min(0.5vw, 5px); cursor: pointer; font-size: clamp(0.9rem, 1.2vw, 1rem);">Close</button>
+        <div style="background: white; border-radius: 1.3vh; padding: 2.6vh; max-width: 65vh; width: 90%; max-height: 80vh; overflow-y: auto;">
+          <h2 id="abilityPopupTitle" style="margin-top: 0; color: #333; font-size: clamp(1.4rem, 2.4vh, 2.4vh);">Ability</h2>
+          <div id="abilityPopupContent" style="font-size: clamp(0.9rem, 1.5vh, 1.5vh); line-height: 1.6; color: black;"></div>
+          <button id="closeAbilityPopup" style="margin-top: 2vh; padding: 1.3vh 2.6vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-size: clamp(0.8rem, 1.3vh, 1.3vh);">Close</button>
         </div>
       </div>
     </div>

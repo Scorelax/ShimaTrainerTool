@@ -217,8 +217,8 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          width: min(20vw, 24vh);
-          height: min(20vw, 24vh);
+          width: min(30vw, 36vh);
+          height: min(30vw, 36vh);
           border-radius: 0.5vh;
           overflow: hidden;
           background-color: transparent;
@@ -226,8 +226,8 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .image-container img {
-          width: min(20vw, 24vh);
-          height: min(20vw, 24vh);
+          width: min(30vw, 36vh);
+          height: min(30vw, 36vh);
           border-radius: 0.5vh;
           object-fit: contain;
           cursor: pointer;

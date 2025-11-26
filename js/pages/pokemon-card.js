@@ -107,7 +107,7 @@ export function renderPokemonCard(pokemonName) {
       return null;
     })
     .filter(s => s !== null);
-  const sensesDisplay = sensesArray.join(', ');
+  const sensesDisplay = sensesArray.join('\n');
 
   // Parse abilities - format: "slotIndex:name;description|slotIndex:name;description"
   const parsedAbilities = [];
@@ -207,8 +207,10 @@ export function renderPokemonCard(pokemonName) {
         /* Top section: Image + Info side by side */
         .top-section {
           display: flex;
-          gap: 1vh;
+          flex-wrap: nowrap;
+          gap: 2vh;
           align-items: flex-start;
+          width: 100%;
         }
 
         /* Image on the left - slightly bigger than trainer image */
@@ -245,7 +247,8 @@ export function renderPokemonCard(pokemonName) {
           align-items: flex-start;
           justify-content: flex-start;
           gap: 0.25vh;
-          flex-grow: 1;
+          flex: 1;
+          min-width: 0;
           padding: 0.5vh;
         }
 
@@ -606,7 +609,12 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           align-items: flex-start;
-          width: 200%;
+          width: 100%;
+        }
+
+        .stat-item.multi-line .stat-value {
+          margin-top: 0.3vh;
+          white-space: pre-line;
         }
 
         .stat-item.multi-line .stat-label {

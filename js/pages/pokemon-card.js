@@ -301,12 +301,14 @@ export function renderPokemonCard(pokemonName) {
           cursor: pointer;
         }
 
-        /* Edit button below image */
-        .edit-button-container {
-          width: min(12.5vw, 15vh);
+        /* Edit and Battle buttons below image */
+        .button-container {
+          display: flex;
+          gap: 1vh;
+          width: 100%;
         }
 
-        /* Flavor text below image and edit button */
+        /* Flavor text below buttons - dynamic height */
         .flavor-text-container {
           display: flex;
           flex-direction: column;
@@ -317,12 +319,14 @@ export function renderPokemonCard(pokemonName) {
           border-radius: 0.5vh;
           border: 2px solid black;
           width: 100%;
+          max-width: 100%;
         }
 
         .flavor-text {
           font-size: clamp(0.6rem, 0.8vh, 0.8vh);
           line-height: 1.4;
           color: black;
+          margin: 0;
         }
 
         /* Skills table below description */
@@ -364,11 +368,13 @@ export function renderPokemonCard(pokemonName) {
           align-items: center;
           height: 4vh;
           font-size: clamp(0.6rem, 0.8vh, 0.8vh);
+          color: black;
         }
 
         .skill-item .modifier {
           margin-top: 0.15vh;
           font-size: clamp(0.55rem, 0.7vh, 0.7vh);
+          color: black;
         }
 
         .skill-item.highlight {
@@ -383,30 +389,37 @@ export function renderPokemonCard(pokemonName) {
           font-weight: bold;
         }
 
-        /* Back button in top left - round style */
+        /* Back button - matches trainer-card style */
         .back-button {
-          position: absolute;
-          top: 2vh;
-          left: 2vh;
-          background-color: white;
-          color: black;
-          border: 2px solid black;
+          position: fixed;
+          top: 20px;
+          left: 20px;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: 50px;
+          height: 50px;
+          border: 3px solid #FFDE00;
           border-radius: 50%;
-          width: 6vh;
-          height: 6vh;
-          font-size: clamp(1.2rem, 2.5vh, 2.5vh);
+          font-size: 1.8rem;
           font-weight: bold;
           cursor: pointer;
-          transition: background-color 0.3s, transform 0.2s;
-          z-index: 10;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
           justify-content: center;
+          z-index: 1000;
           padding: 0;
         }
 
         .back-button:hover {
-          background-color: #f0f0f0;
+          transform: scale(1.1);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 20px rgba(255,222,0,0.5);
+          border-color: #FFC700;
+        }
+
+        .back-button:active {
           transform: scale(1.05);
         }
 
@@ -608,35 +621,13 @@ export function renderPokemonCard(pokemonName) {
           max-width: 100%;
         }
 
-        /* Navigation Arrows */
+        /* Navigation Arrows - Hidden (using Battle Page button instead) */
         .arrow-button {
-          font-size: clamp(1.8rem, 3.2vh, 3.2vh);
-          padding: 0.5vh 1.9vh;
-          background-color: white;
-          color: black;
-          border: 2px solid black;
-          border-radius: 0.5vh;
-          cursor: pointer;
-          transition: background-color 0.3s;
-          position: absolute;
-          bottom: 5%;
-          z-index: 1;
-        }
-
-        .arrow-button:hover {
-          background-color: #f0f0f0;
-        }
-
-        #nextPage {
-          right: calc(20%);
-        }
-
-        #prevPage {
-          left: calc(20%);
           display: none;
         }
 
-        .edit-button {
+        .edit-button,
+        .battle-page-button {
           background-color: #bfbfbf;
           color: black;
           border: 2px solid black;
@@ -646,12 +637,12 @@ export function renderPokemonCard(pokemonName) {
           font-weight: bold;
           cursor: pointer;
           transition: background-color 0.3s;
-          margin-top: 0.5vh;
           display: block;
-          width: 100%;
+          flex: 1;
         }
 
-        .edit-button:hover {
+        .edit-button:hover,
+        .battle-page-button:hover {
           background-color: #d32f2f;
           color: white;
         }
@@ -752,12 +743,13 @@ export function renderPokemonCard(pokemonName) {
           </div>
         </div>
 
-        <!-- Edit button below image -->
-        <div class="edit-button-container">
+        <!-- Edit and Battle buttons below image -->
+        <div class="button-container">
           <button class="edit-button" id="editPokemonButton">Edit Pokémon</button>
+          <button class="battle-page-button" id="battlePageButton">Battle Page</button>
         </div>
 
-        <!-- Description below edit button -->
+        <!-- Description below buttons -->
         ${flavorText ? `
           <div class="flavor-text-container">
             <p id="flavorText" class="flavor-text">${flavorText}</p>
@@ -932,8 +924,7 @@ export function attachPokemonCardListeners() {
   function togglePage() {
     const infoPage = document.getElementById('infoPage');
     const battlePage = document.getElementById('battlePage');
-    const nextButton = document.getElementById('nextPage');
-    const prevButton = document.getElementById('prevPage');
+    const battlePageButton = document.getElementById('battlePageButton');
 
     if (infoPage.classList.contains('active-page')) {
       // Switch to battle page
@@ -941,16 +932,18 @@ export function attachPokemonCardListeners() {
       infoPage.classList.add('hidden-page');
       battlePage.classList.remove('hidden-page');
       battlePage.classList.add('active-page');
-      nextButton.style.display = 'none';
-      prevButton.style.display = 'block';
+      if (battlePageButton) {
+        battlePageButton.textContent = 'Info Page';
+      }
     } else {
       // Switch to info page
       battlePage.classList.remove('active-page');
       battlePage.classList.add('hidden-page');
       infoPage.classList.remove('hidden-page');
       infoPage.classList.add('active-page');
-      nextButton.style.display = 'block';
-      prevButton.style.display = 'none';
+      if (battlePageButton) {
+        battlePageButton.textContent = 'Battle Page';
+      }
     }
   }
 
@@ -964,6 +957,9 @@ export function attachPokemonCardListeners() {
       detail: { route: 'edit-pokemon', pokemonName: pokemonName }
     }));
   });
+
+  // Battle Page button
+  document.getElementById('battlePageButton')?.addEventListener('click', togglePage);
 
   // Active Party checkbox
   document.getElementById('inActiveParty')?.addEventListener('change', async (e) => {

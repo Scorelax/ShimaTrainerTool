@@ -211,14 +211,14 @@ export function renderPokemonCard(pokemonName) {
           align-items: flex-start;
         }
 
-        /* Image on the left */
+        /* Image on the left - slightly bigger than trainer image */
         .image-container {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          width: min(12.5vw, 15vh);
-          height: min(12.5vw, 15vh);
+          width: min(20vw, 24vh);
+          height: min(20vw, 24vh);
           border-radius: 0.5vh;
           overflow: hidden;
           background-color: transparent;
@@ -226,8 +226,8 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .image-container img {
-          width: min(12.5vw, 15vh);
-          height: min(12.5vw, 15vh);
+          width: min(20vw, 24vh);
+          height: min(20vw, 24vh);
           border-radius: 0.5vh;
           object-fit: contain;
           cursor: pointer;
@@ -253,17 +253,17 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: row;
           align-items: center;
-          gap: 0.25vh;
-          margin-bottom: 0.4vh;
+          gap: 0.5vh;
+          margin-bottom: 0.5vh;
           text-align: left;
-          font-size: clamp(0.6rem, 1vh, 1vh);
+          font-size: clamp(0.7rem, 1.4vh, 1.4vh);
           width: 100%;
         }
 
         .stat-label {
           font-weight: bold;
           color: black;
-          min-width: 6vh;
+          min-width: 10vh;
         }
 
         .dex-entry::before {
@@ -281,9 +281,9 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: row;
           align-items: center;
-          gap: 0.4vh;
+          gap: 0.8vh;
           margin-top: 0.5vh;
-          font-size: clamp(0.6rem, 0.9vh, 0.9vh);
+          font-size: clamp(0.7rem, 1.3vh, 1.3vh);
         }
 
         .checkbox-container label {
@@ -293,8 +293,8 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .checkbox-container input[type="checkbox"] {
-          width: 1.5vh;
-          height: 1.5vh;
+          width: 2vh;
+          height: 2vh;
           border: 2px solid black;
           background-color: white;
           color: black;
@@ -323,7 +323,7 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .flavor-text {
-          font-size: clamp(0.6rem, 0.8vh, 0.8vh);
+          font-size: clamp(0.7rem, 1.2vh, 1.2vh);
           line-height: 1.4;
           color: black;
           margin: 0;
@@ -334,12 +334,12 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          gap: 0.5vh;
+          gap: 1vh;
           width: 100%;
         }
 
         .skills-container h2 {
-          font-size: clamp(1rem, 1.5vh, 1.5vh);
+          font-size: clamp(1.2rem, 2vh, 2vh);
           margin-bottom: 0.5vh;
           color: black;
           text-align: center;
@@ -348,9 +348,9 @@ export function renderPokemonCard(pokemonName) {
         .skills-grid {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
-          gap: 0.5vh;
+          gap: 0.8vh;
           border: 2px solid black;
-          padding: 1vh;
+          padding: 1.5vh;
           border-radius: 0.5vh;
           width: 100%;
           box-sizing: border-box;
@@ -358,22 +358,22 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .skill-item {
-          padding: 0.5vh;
+          padding: 0.8vh;
           border: 1px solid black;
-          border-radius: 0.25vh;
+          border-radius: 0.3vh;
           text-align: center;
           display: flex;
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          height: 4vh;
-          font-size: clamp(0.6rem, 0.8vh, 0.8vh);
+          height: 5vh;
+          font-size: clamp(0.7rem, 1.2vh, 1.2vh);
           color: black;
         }
 
         .skill-item .modifier {
-          margin-top: 0.15vh;
-          font-size: clamp(0.55rem, 0.7vh, 0.7vh);
+          margin-top: 0.2vh;
+          font-size: clamp(0.65rem, 1vh, 1vh);
           color: black;
         }
 
@@ -631,9 +631,9 @@ export function renderPokemonCard(pokemonName) {
           background-color: #bfbfbf;
           color: black;
           border: 2px solid black;
-          border-radius: 0.4vh;
-          padding: 0.75vh 1vh;
-          font-size: clamp(0.6rem, 0.9vh, 0.9vh);
+          border-radius: 0.5vh;
+          padding: 1vh 1.5vh;
+          font-size: clamp(0.75rem, 1.3vh, 1.3vh);
           font-weight: bold;
           cursor: pointer;
           transition: background-color 0.3s;
@@ -660,7 +660,7 @@ export function renderPokemonCard(pokemonName) {
           -webkit-text-stroke: 0.5px black !important;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 600px) {
           .top-section {
             flex-direction: column;
           }
@@ -669,13 +669,8 @@ export function renderPokemonCard(pokemonName) {
           .image-container img {
             width: 100%;
             height: auto;
-            max-width: 50vw;
-            max-height: 50vh;
-          }
-
-          .edit-button-container {
-            width: 100%;
-            max-width: 50vw;
+            max-width: 40vw;
+            max-height: 40vh;
           }
 
           .skills-grid {

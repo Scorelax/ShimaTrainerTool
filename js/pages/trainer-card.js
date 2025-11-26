@@ -105,40 +105,41 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 0.5rem 0.5rem;
-          min-height: 85vh;
+          padding: 1vh 2vw;
+          min-height: 100vh;
           position: relative;
+          box-sizing: border-box;
         }
 
         .trainer-utility-container {
           position: relative;
           display: flex;
           justify-content: center;
-          margin-bottom: 8px;
+          margin-bottom: 1vh;
           width: 100%;
         }
 
         .trainer-section {
           background: transparent;
           border: none;
-          padding: 10px;
+          padding: 1vh;
           box-shadow: none;
           text-align: center;
         }
 
         .utility-side-container {
           position: absolute;
-          right: 10px;
-          top: 140px;
+          right: 1vw;
+          top: 18vh;
           display: flex;
           flex-direction: column;
           align-items: center;
         }
 
         .trainer-image-container {
-          width: 180px;
-          height: 180px;
-          margin: 0 auto 8px;
+          width: min(25vw, 30vh);
+          height: min(25vw, 30vh);
+          margin: 0 auto 0.5rem;
           cursor: pointer;
           transition: transform 0.2s, box-shadow 0.2s;
           border-radius: 8px;
@@ -159,16 +160,16 @@ export function renderTrainerCard() {
         }
 
         .trainer-name {
-          font-size: 1.1rem;
+          font-size: clamp(0.9rem, 2vw, 1.2rem);
           font-weight: 700;
           color: white;
-          margin-bottom: 3px;
+          margin-bottom: 0.3rem;
         }
 
         .trainer-level {
-          font-size: 1rem;
+          font-size: clamp(0.85rem, 1.8vw, 1.1rem);
           color: white;
-          margin-bottom: 3px;
+          margin-bottom: 0.3rem;
           font-weight: 400;
         }
 
@@ -179,26 +180,26 @@ export function renderTrainerCard() {
         .party-section {
           background: transparent;
           border: none;
-          padding: 10px;
+          padding: 1vh 2vw;
           box-shadow: none;
-          width: 100%;
-          max-width: 450px;
-          margin: 0 auto 10px;
+          width: 90%;
+          max-width: 60vw;
+          margin: 0 auto 1vh;
         }
 
         .party-section h2 {
           text-align: center;
           color: white;
-          margin-bottom: 8px;
-          font-size: 1.1rem;
+          margin-bottom: 1vh;
+          font-size: clamp(0.9rem, 2vw, 1.2rem);
           font-weight: 700;
         }
 
         .party-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 8px;
-          margin-bottom: 8px;
+          gap: 1vw;
+          margin-bottom: 1vh;
         }
 
         .pokemon-slot {
@@ -206,7 +207,7 @@ export function renderTrainerCard() {
           flex-direction: column;
           align-items: center;
           background: transparent;
-          padding: 5px;
+          padding: 0.5vh 0.5vw;
           cursor: pointer;
         }
 
@@ -221,14 +222,14 @@ export function renderTrainerCard() {
         }
 
         .pokemon-slot img {
-          width: 110px;
-          height: 110px;
+          width: min(15vw, 18vh);
+          height: min(15vw, 18vh);
           border-radius: 8px;
           object-fit: cover;
           background-color: #f0f0f0;
           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
           transition: transform 0.2s, box-shadow 0.2s;
-          margin-bottom: 5px;
+          margin-bottom: 0.3rem;
         }
 
         .pokemon-slot:hover img {
@@ -237,29 +238,29 @@ export function renderTrainerCard() {
         }
 
         .pokemon-slot .pokemon-name {
-          font-size: 0.9rem;
-          margin-bottom: 2px;
+          font-size: clamp(0.7rem, 1.5vw, 0.95rem);
+          margin-bottom: 0.2rem;
           color: white;
           text-align: center;
         }
 
         .pokemon-slot .pokemon-level {
-          font-size: 0.85rem;
-          margin-bottom: 2px;
+          font-size: clamp(0.65rem, 1.4vw, 0.9rem);
+          margin-bottom: 0.2rem;
           color: white;
           text-align: center;
         }
 
         .utility-side-container h3 {
           color: white;
-          font-size: 0.9rem;
+          font-size: clamp(0.75rem, 1.5vw, 1rem);
           font-weight: 700;
-          margin-bottom: 5px;
+          margin-bottom: 0.3rem;
         }
 
         .utility-slot {
-          width: 85px;
-          height: 85px;
+          width: min(12vw, 14vh);
+          height: min(12vw, 14vh);
           border-radius: 8px;
           cursor: pointer;
           transition: transform 0.2s;
@@ -268,7 +269,7 @@ export function renderTrainerCard() {
           align-items: center;
           justify-content: center;
           background: transparent;
-          padding: 5px;
+          padding: 0.3rem;
           text-align: center;
         }
 
@@ -291,15 +292,15 @@ export function renderTrainerCard() {
         }
 
         .utility-slot .pokemon-name {
-          font-size: 0.75rem;
-          margin-bottom: 2px;
+          font-size: clamp(0.6rem, 1.2vw, 0.8rem);
+          margin-bottom: 0.1rem;
           color: white;
           text-align: center;
         }
 
         .utility-slot .pokemon-level {
-          font-size: 0.7rem;
-          margin-bottom: 2px;
+          font-size: clamp(0.55rem, 1.1vw, 0.75rem);
+          margin-bottom: 0.1rem;
           color: white;
           text-align: center;
         }
@@ -307,15 +308,15 @@ export function renderTrainerCard() {
         .my-pokemon-button {
           background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
           color: white;
-          padding: 8px 16px;
+          padding: 1vh 2vw;
           border: 2px solid #FFDE00;
           border-radius: 8px;
-          font-size: 1rem;
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
           font-weight: 700;
           cursor: pointer;
           box-shadow: 0 2px 4px rgba(0,0,0,0.2);
           transition: transform 0.2s, box-shadow 0.2s;
-          margin-bottom: 10px;
+          margin-bottom: 1vh;
         }
 
         .my-pokemon-button:hover {
@@ -463,7 +464,11 @@ export function renderTrainerCard() {
         @media (max-width: 1024px) {
           .utility-side-container {
             position: static;
-            margin-top: 20px;
+            margin-top: 2vh;
+          }
+
+          .party-section {
+            max-width: 80vw;
           }
         }
 

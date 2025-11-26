@@ -193,36 +193,41 @@ export function renderPokemonCard(pokemonName) {
           display: grid !important;
         }
 
-        /* Info Page Styles - Two column layout */
+        /* Info Page Styles - New layout */
         .card-container {
-          display: grid;
-          grid-template-columns: min(25vw, 30vh) 1fr;
-          gap: 2vh;
+          display: flex;
+          flex-direction: column;
           width: 95%;
           max-width: 160vh;
           margin-top: 1vh;
           position: relative;
+          gap: 2vh;
         }
 
-        /* LEFT COLUMN - Image + Details */
+        /* Top section: Image + Info side by side */
+        .top-section {
+          display: flex;
+          gap: 2vh;
+          align-items: flex-start;
+        }
+
+        /* Image on the left */
         .image-container {
-          grid-column: 1 / 2;
-          grid-row: 1 / 2;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          width: min(25vw, 30vh);
-          height: min(25vw, 30vh);
+          width: min(50vw, 60vh);
+          height: min(50vw, 60vh);
           border-radius: 1vh;
           overflow: hidden;
           background-color: transparent;
-          margin-bottom: 1vh;
+          flex-shrink: 0;
         }
 
         .image-container img {
-          width: min(25vw, 30vh);
-          height: min(25vw, 30vh);
+          width: min(50vw, 60vh);
+          height: min(50vw, 60vh);
           border-radius: 1vh;
           object-fit: contain;
           cursor: pointer;
@@ -233,17 +238,15 @@ export function renderPokemonCard(pokemonName) {
           transition: opacity 0.3s;
         }
 
+        /* Info on the right side of image */
         .new-details-container {
-          grid-column: 1 / 2;
-          grid-row: 2 / 3;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
           justify-content: flex-start;
           gap: 0.5vh;
-          width: min(25vw, 30vh);
-          padding-left: 0;
-          margin-left: 0;
+          flex-grow: 1;
+          padding: 1vh;
         }
 
         .stat-item {
@@ -253,15 +256,14 @@ export function renderPokemonCard(pokemonName) {
           gap: 0.5vh;
           margin-bottom: 0.8vh;
           text-align: left;
-          font-size: clamp(0.8rem, 1.6vh, 1.6vh);
+          font-size: clamp(0.8rem, 2vh, 2vh);
           width: 100%;
-          max-width: min(25vw, 30vh);
         }
 
         .stat-label {
           font-weight: bold;
           color: black;
-          min-width: 9vh;
+          min-width: 12vh;
         }
 
         .dex-entry::before {
@@ -281,7 +283,7 @@ export function renderPokemonCard(pokemonName) {
           align-items: center;
           gap: 0.8vh;
           margin-top: 1vh;
-          font-size: clamp(0.8rem, 1.5vh, 1.5vh);
+          font-size: clamp(0.8rem, 1.8vh, 1.8vh);
         }
 
         .checkbox-container label {
@@ -299,56 +301,60 @@ export function renderPokemonCard(pokemonName) {
           cursor: pointer;
         }
 
-        /* RIGHT COLUMN - Flavor Text + Skills */
+        /* Edit button below image */
+        .edit-button-container {
+          width: min(50vw, 60vh);
+        }
+
+        /* Flavor text below image and edit button */
         .flavor-text-container {
-          grid-column: 2 / 3;
-          grid-row: 1 / 2;
           display: flex;
           flex-direction: column;
           text-align: left;
           color: black;
-          padding: 1.5vh;
+          padding: 2vh;
           background-color: rgba(255, 255, 255, 0.9);
           border-radius: 1vh;
           border: 2px solid black;
+          width: 100%;
         }
 
         .flavor-text {
-          font-size: clamp(0.85rem, 1.4vh, 1.4vh);
-          line-height: 1.4;
+          font-size: clamp(0.85rem, 1.6vh, 1.6vh);
+          line-height: 1.5;
           color: black;
         }
 
+        /* Skills table below description */
         .skills-container {
-          grid-column: 2 / 3;
-          grid-row: 2 / 3;
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          gap: 0.5vh;
+          gap: 1vh;
+          width: 100%;
         }
 
         .skills-container h2 {
-          font-size: clamp(1.5rem, 2.5vh, 2.5vh);
-          margin-bottom: 0.8vh;
+          font-size: clamp(1.5rem, 3vh, 3vh);
+          margin-bottom: 1vh;
           color: black;
           text-align: center;
         }
 
         .skills-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 0.8vh;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 1vh;
           border: 2px solid black;
-          padding: 1.5vh;
-          border-radius: 0.5vh;
+          padding: 2vh;
+          border-radius: 1vh;
           width: 100%;
           box-sizing: border-box;
           background-color: rgba(255, 255, 255, 0.1);
         }
 
         .skill-item {
-          padding: 0.8vh;
+          padding: 1vh;
           border: 1px solid black;
           border-radius: 0.5vh;
           text-align: center;
@@ -356,13 +362,13 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          height: 7vh;
-          font-size: clamp(0.85rem, 1.5vh, 1.5vh);
+          height: 8vh;
+          font-size: clamp(0.85rem, 1.6vh, 1.6vh);
         }
 
         .skill-item .modifier {
-          margin-top: 0.1vh;
-          font-size: clamp(0.75rem, 1.3vh, 1.3vh);
+          margin-top: 0.3vh;
+          font-size: clamp(0.75rem, 1.4vh, 1.4vh);
         }
 
         .skill-item.highlight {
@@ -375,6 +381,27 @@ export function renderPokemonCard(pokemonName) {
           background-color: #fff200;
           color: black;
           font-weight: bold;
+        }
+
+        /* Back button in top right */
+        .back-button {
+          position: absolute;
+          top: 1vh;
+          right: 2vh;
+          background-color: white;
+          color: black;
+          border: 2px solid black;
+          border-radius: 0.8vh;
+          padding: 1vh 2vh;
+          font-size: clamp(0.9rem, 1.8vh, 1.8vh);
+          font-weight: bold;
+          cursor: pointer;
+          transition: background-color 0.3s;
+          z-index: 10;
+        }
+
+        .back-button:hover {
+          background-color: #f0f0f0;
         }
 
         /* Battle Page Styles */
@@ -608,8 +635,8 @@ export function renderPokemonCard(pokemonName) {
           color: black;
           border: 2px solid black;
           border-radius: 0.8vh;
-          padding: 1vh 2vh;
-          font-size: clamp(0.85rem, 1.5vh, 1.5vh);
+          padding: 1.5vh 2vh;
+          font-size: clamp(0.9rem, 1.8vh, 1.8vh);
           font-weight: bold;
           cursor: pointer;
           transition: background-color 0.3s;
@@ -636,80 +663,102 @@ export function renderPokemonCard(pokemonName) {
           -webkit-text-stroke: 0.5px black !important;
         }
 
-        @media (max-width: 600px) {
-          .card-container,
+        @media (max-width: 768px) {
+          .top-section {
+            flex-direction: column;
+          }
+
+          .image-container,
+          .image-container img {
+            width: 100%;
+            height: auto;
+            max-width: 60vh;
+            max-height: 60vh;
+          }
+
+          .edit-button-container {
+            width: 100%;
+            max-width: 60vh;
+          }
+
+          .skills-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+
           .battle-page-container {
             grid-template-columns: 1fr;
             grid-template-rows: auto;
           }
 
-          .image-container,
-          .new-details-container,
           .ac-hp-vp-container,
           .stats-container,
-          .skills-container,
           .moves-container {
             grid-column: 1 / 2;
-          }
-
-          .skills-grid {
-            grid-template-columns: repeat(2, 1fr);
           }
         }
       </style>
 
       <h1>Pokemon Card</h1>
 
+      <!-- Back Button -->
+      <button class="back-button" id="backToTrainerCard">← Back</button>
+
       <!-- Info Page -->
       <div id="infoPage" class="card-container active-page">
-        <div class="image-container">
-          <img id="pokemonImage" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
-        </div>
+        <!-- Top section: Image + Info -->
+        <div class="top-section">
+          <div class="image-container">
+            <img id="pokemonImage" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+          </div>
 
-        <div class="new-details-container">
-          <div class="stat-item">
-            <div class="stat-label">Name:</div>
-            <div class="stat-value">
-              <span id="pokemonName">${displayName}</span>
-              <span id="pokemonDexEntry" class="dex-entry">${dexEntry}</span>
+          <div class="new-details-container">
+            <div class="stat-item">
+              <div class="stat-label">Name:</div>
+              <div class="stat-value">
+                <span id="pokemonName">${displayName}</span>
+                <span id="pokemonDexEntry" class="dex-entry">${dexEntry}</span>
+              </div>
             </div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Level:</div>
-            <div id="pokemonLevel" class="stat-value">${level}</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Typing:</div>
-            <div id="pokemonTyping" class="stat-value">${typingText}</div>
-          </div>
-          <div class="stat-item multi-line">
-            <div class="stat-label">Saving Throw(s):</div>
-            <div id="pokemonSavingThrow" class="stat-value">${savingThrow}</div>
-          </div>
-          ${sensesArray.length > 0 ? `
+            <div class="stat-item">
+              <div class="stat-label">Level:</div>
+              <div id="pokemonLevel" class="stat-value">${level}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Typing:</div>
+              <div id="pokemonTyping" class="stat-value">${typingText}</div>
+            </div>
             <div class="stat-item multi-line">
-              <div class="stat-label">Senses:</div>
-              <div id="sensesValue" class="stat-value">${sensesDisplay}</div>
+              <div class="stat-label">Saving Throw(s):</div>
+              <div id="pokemonSavingThrow" class="stat-value">${savingThrow}</div>
             </div>
-          ` : ''}
-          <div class="checkbox-container">
-            <label for="inActiveParty">Active Party</label>
-            <input type="checkbox" id="inActiveParty" ${inActiveParty ? 'checked' : ''}>
-            <label for="inUtilitySlot">Utility Slot</label>
-            <input type="checkbox" id="inUtilitySlot" ${inUtilitySlot ? 'checked' : ''}>
-          </div>
-
-          <div style="margin-top: 1.3vh;">
-            <button class="edit-button" id="editPokemonButton">Edit Pokémon</button>
+            ${sensesArray.length > 0 ? `
+              <div class="stat-item multi-line">
+                <div class="stat-label">Senses:</div>
+                <div id="sensesValue" class="stat-value">${sensesDisplay}</div>
+              </div>
+            ` : ''}
+            <div class="checkbox-container">
+              <label for="inActiveParty">Active Party</label>
+              <input type="checkbox" id="inActiveParty" ${inActiveParty ? 'checked' : ''}>
+              <label for="inUtilitySlot">Utility Slot</label>
+              <input type="checkbox" id="inUtilitySlot" ${inUtilitySlot ? 'checked' : ''}>
+            </div>
           </div>
         </div>
 
+        <!-- Edit button below image -->
+        <div class="edit-button-container">
+          <button class="edit-button" id="editPokemonButton">Edit Pokémon</button>
+        </div>
+
+        <!-- Description below edit button -->
         ${flavorText ? `
           <div class="flavor-text-container">
             <p id="flavorText" class="flavor-text">${flavorText}</p>
           </div>
         ` : ''}
 
+        <!-- Skills table at the bottom -->
         <div class="skills-container">
           <h2>Skills</h2>
           <div id="skills" class="skills-grid">
@@ -865,6 +914,13 @@ export function attachPokemonCardListeners() {
   const pokemonName = sessionStorage.getItem('selectedPokemonName');
   const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+
+  // Back button
+  document.getElementById('backToTrainerCard')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'trainer-card' }
+    }));
+  });
 
   // Page toggle function
   function togglePage() {

@@ -199,15 +199,15 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           width: 95%;
           max-width: 160vh;
-          margin-top: 1vh;
+          margin-top: 0.5vh;
           position: relative;
-          gap: 2vh;
+          gap: 1vh;
         }
 
         /* Top section: Image + Info side by side */
         .top-section {
           display: flex;
-          gap: 2vh;
+          gap: 1vh;
           align-items: flex-start;
         }
 
@@ -217,18 +217,18 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          width: min(25vw, 30vh);
-          height: min(25vw, 30vh);
-          border-radius: 1vh;
+          width: min(12.5vw, 15vh);
+          height: min(12.5vw, 15vh);
+          border-radius: 0.5vh;
           overflow: hidden;
           background-color: transparent;
           flex-shrink: 0;
         }
 
         .image-container img {
-          width: min(25vw, 30vh);
-          height: min(25vw, 30vh);
-          border-radius: 1vh;
+          width: min(12.5vw, 15vh);
+          height: min(12.5vw, 15vh);
+          border-radius: 0.5vh;
           object-fit: contain;
           cursor: pointer;
         }
@@ -244,31 +244,31 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: flex-start;
           justify-content: flex-start;
-          gap: 0.5vh;
+          gap: 0.25vh;
           flex-grow: 1;
-          padding: 1vh;
+          padding: 0.5vh;
         }
 
         .stat-item {
           display: flex;
           flex-direction: row;
           align-items: center;
-          gap: 0.5vh;
-          margin-bottom: 0.8vh;
+          gap: 0.25vh;
+          margin-bottom: 0.4vh;
           text-align: left;
-          font-size: clamp(0.8rem, 2vh, 2vh);
+          font-size: clamp(0.6rem, 1vh, 1vh);
           width: 100%;
         }
 
         .stat-label {
           font-weight: bold;
           color: black;
-          min-width: 12vh;
+          min-width: 6vh;
         }
 
         .dex-entry::before {
           content: " #";
-          margin-left: 0.5vh;
+          margin-left: 0.25vh;
         }
 
         .stat-value {
@@ -281,9 +281,9 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: row;
           align-items: center;
-          gap: 0.8vh;
-          margin-top: 1vh;
-          font-size: clamp(0.8rem, 1.8vh, 1.8vh);
+          gap: 0.4vh;
+          margin-top: 0.5vh;
+          font-size: clamp(0.6rem, 0.9vh, 0.9vh);
         }
 
         .checkbox-container label {
@@ -293,8 +293,8 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .checkbox-container input[type="checkbox"] {
-          width: 3vh;
-          height: 3vh;
+          width: 1.5vh;
+          height: 1.5vh;
           border: 2px solid black;
           background-color: white;
           color: black;
@@ -303,7 +303,7 @@ export function renderPokemonCard(pokemonName) {
 
         /* Edit button below image */
         .edit-button-container {
-          width: min(25vw, 30vh);
+          width: min(12.5vw, 15vh);
         }
 
         /* Flavor text below image and edit button */
@@ -312,16 +312,16 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           text-align: left;
           color: black;
-          padding: 2vh;
+          padding: 1vh;
           background-color: rgba(255, 255, 255, 0.9);
-          border-radius: 1vh;
+          border-radius: 0.5vh;
           border: 2px solid black;
           width: 100%;
         }
 
         .flavor-text {
-          font-size: clamp(0.85rem, 1.6vh, 1.6vh);
-          line-height: 1.5;
+          font-size: clamp(0.6rem, 0.8vh, 0.8vh);
+          line-height: 1.4;
           color: black;
         }
 
@@ -330,13 +330,13 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           justify-content: flex-start;
-          gap: 1vh;
+          gap: 0.5vh;
           width: 100%;
         }
 
         .skills-container h2 {
-          font-size: clamp(1.5rem, 3vh, 3vh);
-          margin-bottom: 1vh;
+          font-size: clamp(1rem, 1.5vh, 1.5vh);
+          margin-bottom: 0.5vh;
           color: black;
           text-align: center;
         }
@@ -344,31 +344,31 @@ export function renderPokemonCard(pokemonName) {
         .skills-grid {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
-          gap: 1vh;
+          gap: 0.5vh;
           border: 2px solid black;
-          padding: 2vh;
-          border-radius: 1vh;
+          padding: 1vh;
+          border-radius: 0.5vh;
           width: 100%;
           box-sizing: border-box;
           background-color: rgba(255, 255, 255, 0.1);
         }
 
         .skill-item {
-          padding: 1vh;
+          padding: 0.5vh;
           border: 1px solid black;
-          border-radius: 0.5vh;
+          border-radius: 0.25vh;
           text-align: center;
           display: flex;
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          height: 8vh;
-          font-size: clamp(0.85rem, 1.6vh, 1.6vh);
+          height: 4vh;
+          font-size: clamp(0.6rem, 0.8vh, 0.8vh);
         }
 
         .skill-item .modifier {
-          margin-top: 0.3vh;
-          font-size: clamp(0.75rem, 1.4vh, 1.4vh);
+          margin-top: 0.15vh;
+          font-size: clamp(0.55rem, 0.7vh, 0.7vh);
         }
 
         .skill-item.highlight {
@@ -640,13 +640,13 @@ export function renderPokemonCard(pokemonName) {
           background-color: #bfbfbf;
           color: black;
           border: 2px solid black;
-          border-radius: 0.8vh;
-          padding: 1.5vh 2vh;
-          font-size: clamp(0.9rem, 1.8vh, 1.8vh);
+          border-radius: 0.4vh;
+          padding: 0.75vh 1vh;
+          font-size: clamp(0.6rem, 0.9vh, 0.9vh);
           font-weight: bold;
           cursor: pointer;
           transition: background-color 0.3s;
-          margin-top: 1vh;
+          margin-top: 0.5vh;
           display: block;
           width: 100%;
         }

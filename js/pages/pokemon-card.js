@@ -487,7 +487,7 @@ export function renderPokemonCard(pokemonName) {
         .ac-hp-vp-container {
           display: flex;
           justify-content: space-between;
-          gap: 1vh;
+          gap: 0.5vh;
           width: 100%;
         }
 
@@ -499,24 +499,24 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .ac-hp-vp-container .stat-label {
-          margin-bottom: 0.5vh;
+          margin-bottom: 0.3vh;
           text-align: center;
-          font-size: clamp(0.8rem, 1.4vh, 1.4vh);
+          font-size: clamp(0.7rem, 1.2vh, 1.2vh);
           font-weight: bold;
           color: black;
         }
 
         .ac-hp-vp-container .stat-value-box {
-          width: 7vh;
-          height: 7vh;
+          width: 5vh;
+          height: 5vh;
           background-color: #f44336;
           color: black;
-          border-radius: 0.8vh;
+          border-radius: 0.6vh;
           border: 2px solid black;
           text-align: center;
-          font-size: clamp(1.2rem, 2vh, 2vh);
+          font-size: clamp(1rem, 1.6vh, 1.6vh);
           font-weight: 650;
-          box-shadow: 0.2vh 0.2vh 0 #000;
+          box-shadow: 0.15vh 0.15vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -525,7 +525,7 @@ export function renderPokemonCard(pokemonName) {
         .stats-container {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 1vh;
+          gap: 0.5vh;
           width: 100%;
         }
 
@@ -533,47 +533,47 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 0.3vh;
+          gap: 0.2vh;
         }
 
         .stats-container .stat-label {
-          margin-bottom: 0.3vh;
+          margin-bottom: 0.2vh;
           text-align: center;
-          font-size: clamp(0.8rem, 1.3vh, 1.3vh);
+          font-size: clamp(0.7rem, 1.1vh, 1.1vh);
           font-weight: bold;
           color: black;
         }
 
         .stats-container .stat-value-box {
-          width: 5.5vh;
-          height: 5.5vh;
+          width: 4vh;
+          height: 4vh;
           background-color: #f44336;
           color: black;
-          border-radius: 0.8vh;
+          border-radius: 0.6vh;
           border: 2px solid black;
           text-align: center;
-          font-size: clamp(1.1rem, 1.8vh, 1.8vh);
-          box-shadow: 0.2vh 0.2vh 0 #000;
+          font-size: clamp(0.9rem, 1.4vh, 1.4vh);
+          box-shadow: 0.15vh 0.15vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
         }
 
         .stats-container .stat-modifier-box {
-          width: 4.5vh;
-          height: 4.5vh;
+          width: 3.2vh;
+          height: 3.2vh;
           background-color: #f44336;
           color: white;
-          border-radius: 0.8vh;
+          border-radius: 0.6vh;
           border: 2px solid black;
           text-align: center;
-          font-size: clamp(0.9rem, 1.5vh, 1.5vh);
+          font-size: clamp(0.75rem, 1.2vh, 1.2vh);
           font-weight: 900;
-          box-shadow: 0.2vh 0.2vh 0 #000;
+          box-shadow: 0.15vh 0.15vh 0 #000;
           display: flex;
           justify-content: center;
           align-items: center;
-          margin-top: -0.8vh;
+          margin-top: -0.6vh;
           position: relative;
           z-index: 1;
         }
@@ -591,11 +591,11 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           width: 100%;
-          gap: 1vh;
+          gap: 0.5vh;
         }
 
         .moves-container h2 {
-          font-size: clamp(1.2rem, 2vh, 2vh);
+          font-size: clamp(1rem, 1.6vh, 1.6vh);
           color: black;
           margin: 0;
         }
@@ -603,23 +603,23 @@ export function renderPokemonCard(pokemonName) {
         .moves-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 1vh;
+          gap: 0.6vh;
           width: 100%;
         }
 
         .move-item {
-          padding: 1vh 1.5vh;
+          padding: 0.6vh 1vh;
           border: 2px solid black;
-          border-radius: 0.5vh;
+          border-radius: 0.4vh;
           background-color: #ffffff;
           color: black;
           text-align: center;
-          font-size: clamp(0.8rem, 1.3vh, 1.3vh);
+          font-size: clamp(0.7rem, 1.1vh, 1.1vh);
           font-weight: bold;
           display: flex;
           align-items: center;
           justify-content: center;
-          min-height: 4vh;
+          min-height: 3vh;
         }
 
         .stat-pair-container {

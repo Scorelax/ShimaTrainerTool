@@ -196,8 +196,8 @@ export function renderPokemonCard(pokemonName) {
         /* Info Page Styles - Two column layout */
         .card-container {
           display: grid;
-          grid-template-columns: 40vh 1fr;
-          gap: 3vh;
+          grid-template-columns: min(25vw, 30vh) 1fr;
+          gap: 2vh;
           width: 95%;
           max-width: 160vh;
           margin-top: 1vh;
@@ -212,18 +212,18 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          width: 40vh;
-          height: 40vh;
-          border-radius: 2vh;
-          overflow: visible;
+          width: min(25vw, 30vh);
+          height: min(25vw, 30vh);
+          border-radius: 1vh;
+          overflow: hidden;
           background-color: transparent;
           margin-bottom: 1vh;
         }
 
         .image-container img {
-          width: 40vh;
-          height: 40vh;
-          border-radius: 2vh;
+          width: min(25vw, 30vh);
+          height: min(25vw, 30vh);
+          border-radius: 1vh;
           object-fit: contain;
           cursor: pointer;
         }
@@ -241,7 +241,7 @@ export function renderPokemonCard(pokemonName) {
           align-items: flex-start;
           justify-content: flex-start;
           gap: 0.5vh;
-          width: 40vh;
+          width: min(25vw, 30vh);
           padding-left: 0;
           margin-left: 0;
         }
@@ -255,7 +255,7 @@ export function renderPokemonCard(pokemonName) {
           text-align: left;
           font-size: clamp(0.8rem, 1.6vh, 1.6vh);
           width: 100%;
-          max-width: 40vh;
+          max-width: min(25vw, 30vh);
         }
 
         .stat-label {
@@ -636,7 +636,7 @@ export function renderPokemonCard(pokemonName) {
           -webkit-text-stroke: 0.5px black !important;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 600px) {
           .card-container,
           .battle-page-container {
             grid-template-columns: 1fr;

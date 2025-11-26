@@ -27,43 +27,43 @@ export function renderPokemonForm() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 2rem 1rem;
+          padding: 2vh 1vw;
           min-height: 80vh;
         }
 
         .pokemon-form-page h1 {
           color: white;
-          margin-bottom: 2rem;
-          font-size: 2.5rem;
+          margin-bottom: 2vh;
+          font-size: clamp(1.5rem, 4vw, 2.5rem);
           text-transform: uppercase;
-          letter-spacing: 2px;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+          letter-spacing: clamp(0.5px, 0.5vw, 2px);
+          text-shadow: 0 clamp(2px, 0.5vh, 4px) clamp(5px, 1.5vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
         }
 
         .form-container {
           width: 100%;
-          max-width: 600px;
+          max-width: clamp(400px, 60vw, 600px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          padding: 2.5rem;
-          border-radius: 25px;
-          border: 4px solid #FFDE00;
-          box-shadow: 0 15px 40px rgba(0,0,0,0.4),
-                      inset 0 -4px 0 rgba(0,0,0,0.05);
-          margin-bottom: 2rem;
+          padding: clamp(1.5rem, 3vw, 2.5rem);
+          border-radius: clamp(15px, 3vw, 25px);
+          border: clamp(2px, 0.5vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.4),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.05);
+          margin-bottom: 2vh;
           max-height: 70vh;
           overflow-y: auto;
         }
 
         .form-group {
-          margin-bottom: 1.5rem;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
         }
 
         .form-group label {
           display: block;
           font-weight: bold;
-          font-size: 1.2rem;
-          margin-bottom: 0.5rem;
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
           color: #333;
         }
 
@@ -71,10 +71,10 @@ export function renderPokemonForm() {
         .form-group input[type="text"],
         .form-group select {
           width: 100%;
-          padding: 0.75rem;
-          font-size: 1.1rem;
-          border: 2px solid #ccc;
-          border-radius: 5px;
+          padding: clamp(0.5rem, 1.5vh, 0.75rem);
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          border: clamp(1px, 0.3vw, 2px) solid #ccc;
+          border-radius: clamp(3px, 0.8vw, 5px);
           box-sizing: border-box;
         }
 
@@ -85,31 +85,31 @@ export function renderPokemonForm() {
         }
 
         .collapsible-section {
-          margin-bottom: 1.5rem;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
         }
 
         .collapsible-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 1rem;
+          padding: clamp(0.75rem, 1.5vh, 1rem);
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          border-radius: 15px;
-          border: 3px solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 15px);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
           cursor: pointer;
-          font-size: 1.3rem;
+          font-size: clamp(1.1rem, 2.2vw, 1.3rem);
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: 1px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 20px) rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .collapsible-header:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      0 0 20px rgba(255,222,0,0.4);
+          transform: translateY(clamp(-1px, -0.3vh, -2px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 2.5vh, 20px) rgba(255,222,0,0.4);
         }
 
         .arrow {
@@ -122,11 +122,11 @@ export function renderPokemonForm() {
 
         .collapsible-content {
           display: none;
-          padding: 1rem;
-          border: 3px solid #FFDE00;
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
           border-top: none;
-          border-radius: 0 0 15px 15px;
-          max-height: 300px;
+          border-radius: 0 0 clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px);
+          max-height: clamp(200px, 35vh, 300px);
           overflow-y: auto;
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
         }
@@ -138,43 +138,43 @@ export function renderPokemonForm() {
         .checkbox-item {
           display: flex;
           align-items: flex-start;
-          margin-bottom: 1rem;
+          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
         }
 
         .checkbox-item input[type="checkbox"] {
-          margin-right: 0.75rem;
-          margin-top: 0.25rem;
-          transform: scale(1.5);
+          margin-right: clamp(0.5rem, 1vw, 0.75rem);
+          margin-top: clamp(0.15rem, 0.4vh, 0.25rem);
+          transform: scale(clamp(1.2, 0.3vw, 1.5));
           cursor: pointer;
         }
 
         .checkbox-item label {
-          font-size: 1.1rem;
+          font-size: clamp(0.95rem, 1.8vw, 1.1rem);
           cursor: pointer;
           margin: 0;
         }
 
         .ability-description {
-          font-size: 0.9rem;
+          font-size: clamp(0.8rem, 1.5vw, 0.9rem);
           color: #666;
           font-weight: normal;
-          margin-top: 0.3rem;
+          margin-top: clamp(0.2rem, 0.5vh, 0.3rem);
           line-height: 1.3;
           display: block;
         }
 
         .button-group {
           display: flex;
-          gap: 1rem;
+          gap: clamp(0.75rem, 2vw, 1rem);
           justify-content: center;
-          margin-top: 2rem;
+          margin-top: clamp(1.5rem, 3vh, 2rem);
         }
 
         .button {
-          padding: 1rem 2rem;
+          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1.5rem, 3vw, 2rem);
           border: none;
-          border-radius: 5px;
-          font-size: 1.2rem;
+          border-radius: clamp(3px, 0.8vw, 5px);
+          font-size: clamp(1rem, 2vw, 1.2rem);
           font-weight: bold;
           cursor: pointer;
           transition: all 0.3s;
@@ -183,39 +183,39 @@ export function renderPokemonForm() {
         .button-primary {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: 3px solid #FFDE00;
-          border-radius: 15px;
-          font-size: 1.2rem;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 15px);
+          font-size: clamp(1rem, 2vw, 1.2rem);
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: 1px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 20px) rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .button-primary:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      0 0 20px rgba(76,175,80,0.5);
+          transform: translateY(clamp(-1px, -0.3vh, -2px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 2.5vh, 20px) rgba(76,175,80,0.5);
         }
 
         .button-secondary {
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          border: 3px solid #333;
-          border-radius: 15px;
-          font-size: 1.2rem;
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(10px, 2vw, 15px);
+          font-size: clamp(1rem, 2vw, 1.2rem);
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: 1px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 20px) rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .button-secondary:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      0 0 20px rgba(238,21,21,0.5);
+          transform: translateY(clamp(-1px, -0.3vh, -2px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 2.5vh, 20px) rgba(238,21,21,0.5);
         }
       </style>
 

@@ -65,33 +65,33 @@ export function renderTrainerInfo() {
         .trainer-info-page h1 {
           color: white;
           margin-bottom: 2rem;
-          font-size: 2.5rem;
+          font-size: clamp(1.5rem, 4vw, 2.5rem);
           text-transform: uppercase;
-          letter-spacing: 2px;
+          letter-spacing: clamp(0.5px, 0.5vw, 2px);
           text-shadow: 0 4px 10px rgba(0,0,0,0.8);
           font-weight: 900;
         }
 
         .trainer-info-container {
           display: grid;
-          grid-template-columns: 350px 1fr;
-          gap: 2rem;
+          grid-template-columns: clamp(280px, 35vw, 400px) 1fr;
+          gap: clamp(1rem, 3vw, 2rem);
           width: 100%;
-          max-width: 1200px;
-          margin-bottom: 2rem;
+          max-width: clamp(800px, 95vw, 1200px);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
         }
 
         .trainer-image-container {
           display: flex;
           flex-direction: column;
           align-items: center;
-          width: 350px;
+          width: clamp(280px, 35vw, 400px);
         }
 
         .trainer-image-container img {
-          width: 350px;
-          height: 350px;
-          border-radius: 30px;
+          width: clamp(280px, 35vw, 400px);
+          height: clamp(280px, 35vw, 400px);
+          border-radius: clamp(20px, 4vw, 30px);
           object-fit: cover;
           border: none;
           box-shadow: 0 10px 30px rgba(0,0,0,0.5),
@@ -100,16 +100,16 @@ export function renderTrainerInfo() {
 
         .trainer-details-container {
           background: transparent;
-          border-radius: 15px;
-          padding: 2rem;
+          border-radius: clamp(10px, 2vw, 15px);
+          padding: clamp(1rem, 3vw, 2rem);
           box-shadow: none;
         }
 
         .stat-main-container {
           display: flex;
           justify-content: space-around;
-          gap: 1rem;
-          margin-bottom: 2rem;
+          gap: clamp(0.5rem, 2vw, 1rem);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
         }
 
         .stat-box-wrapper {
@@ -121,24 +121,24 @@ export function renderTrainerInfo() {
         .stat-label-box {
           font-weight: 900;
           color: white;
-          font-size: 1.2rem;
-          margin-bottom: 0.5rem;
+          font-size: clamp(0.9rem, 2vw, 1.2rem);
+          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
         }
 
         .stat-box {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 80px;
-          height: 80px;
+          width: clamp(60px, 10vw, 80px);
+          height: clamp(60px, 10vw, 80px);
           background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           color: black;
-          border-radius: 15px;
-          border: 4px solid #333;
-          font-size: 2rem;
+          border-radius: clamp(10px, 2vw, 15px);
+          border: clamp(2px, 0.5vw, 4px) solid #333;
+          font-size: clamp(1.5rem, 3vw, 2rem);
           font-weight: 900;
           box-shadow: 0 8px 20px rgba(0,0,0,0.5),
                       inset 0 -3px 0 rgba(0,0,0,0.2);
@@ -147,8 +147,8 @@ export function renderTrainerInfo() {
         .ability-container {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
-          gap: 1rem;
-          margin-bottom: 2rem;
+          gap: clamp(0.5rem, 2vw, 1rem);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
         }
 
         .ability-group {
@@ -159,8 +159,8 @@ export function renderTrainerInfo() {
 
         .ability-label {
           font-weight: 900;
-          font-size: 1rem;
-          margin-bottom: 0.5rem;
+          font-size: clamp(0.8rem, 1.5vw, 1rem);
+          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
           color: white;
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           text-transform: uppercase;
@@ -170,13 +170,13 @@ export function renderTrainerInfo() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 60px;
-          height: 60px;
+          width: clamp(45px, 8vw, 60px);
+          height: clamp(45px, 8vw, 60px);
           background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           color: black;
-          border-radius: 15px;
-          border: 4px solid #333;
-          font-size: 1.8rem;
+          border-radius: clamp(10px, 2vw, 15px);
+          border: clamp(2px, 0.4vw, 4px) solid #333;
+          font-size: clamp(1.3rem, 2.5vw, 1.8rem);
           font-weight: 900;
           box-shadow: 0 8px 20px rgba(0,0,0,0.5),
                       inset 0 -3px 0 rgba(0,0,0,0.2);
@@ -186,25 +186,25 @@ export function renderTrainerInfo() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 50px;
-          height: 50px;
+          width: clamp(38px, 6vw, 50px);
+          height: clamp(38px, 6vw, 50px);
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          border-radius: 12px;
-          border: 3px solid #333;
-          font-size: 1.6rem;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          font-size: clamp(1.2rem, 2vw, 1.6rem);
           font-weight: 900;
           box-shadow: 0 6px 15px rgba(0,0,0,0.5),
                       inset 0 -2px 0 rgba(0,0,0,0.3);
-          margin-top: -10px;
+          margin-top: clamp(-8px, -1vh, -10px);
         }
 
         .stat-item {
           display: flex;
           justify-content: space-between;
-          padding: 0.5rem 0;
-          border-bottom: 2px solid rgba(255,222,0,0.3);
-          font-size: 1.3rem;
+          padding: clamp(0.3rem, 1vh, 0.5rem) 0;
+          border-bottom: clamp(1px, 0.3vw, 2px) solid rgba(255,222,0,0.3);
+          font-size: clamp(1rem, 2vw, 1.3rem);
         }
 
         .stat-label {
@@ -220,35 +220,35 @@ export function renderTrainerInfo() {
         }
 
         .skills-container {
-          margin-top: 2rem;
+          margin-top: clamp(1.5rem, 3vh, 2rem);
         }
 
         .skills-container h3 {
-          margin-bottom: 1rem;
+          margin-bottom: clamp(0.75rem, 2vh, 1rem);
           color: white;
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
         }
 
         .skills-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
-          border: 3px solid #FFDE00;
-          padding: 1rem;
-          border-radius: 15px;
+          gap: clamp(0.75rem, 2vw, 1rem);
+          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
+          padding: clamp(0.75rem, 2vw, 1rem);
+          border-radius: clamp(10px, 2vw, 15px);
           background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
         }
 
         .skill-item {
-          padding: 0.75rem;
-          border: 2px solid #333;
-          border-radius: 10px;
+          padding: clamp(0.5rem, 1.5vw, 0.75rem);
+          border: clamp(1px, 0.3vw, 2px) solid #333;
+          border-radius: clamp(8px, 1.5vw, 10px);
           text-align: center;
           background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
-          font-size: 1.1rem;
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
           font-weight: 700;
           color: black;
           box-shadow: 0 4px 10px rgba(0,0,0,0.3);
@@ -257,15 +257,15 @@ export function renderTrainerInfo() {
         .button-container {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 1rem;
-          margin-top: 2rem;
+          gap: clamp(0.75rem, 2vw, 1rem);
+          margin-top: clamp(1.5rem, 3vh, 2rem);
         }
 
         .button {
-          padding: 1rem 2rem;
+          padding: clamp(0.75rem, 2vh, 1rem) clamp(1.5rem, 3vw, 2rem);
           border: none;
-          border-radius: 5px;
-          font-size: 1.2rem;
+          border-radius: clamp(3px, 0.5vw, 5px);
+          font-size: clamp(0.95rem, 2vw, 1.2rem);
           font-weight: bold;
           cursor: pointer;
           transition: all 0.3s;
@@ -274,11 +274,11 @@ export function renderTrainerInfo() {
         #editTrainerButton {
           background: linear-gradient(135deg, #757575 0%, #616161 100%);
           color: white;
-          border: 3px solid #333;
-          border-radius: 15px;
+          border: clamp(2px, 0.5vw, 3px) solid #333;
+          border-radius: clamp(10px, 2vw, 15px);
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
           box-shadow: 0 8px 20px rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -291,15 +291,15 @@ export function renderTrainerInfo() {
 
         #backButton {
           position: fixed;
-          top: 20px;
-          left: 20px;
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          width: 50px;
-          height: 50px;
-          border: 3px solid #FFDE00;
+          width: clamp(40px, 8vw, 50px);
+          height: clamp(40px, 8vw, 50px);
+          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
           border-radius: 50%;
-          font-size: 1.8rem;
+          font-size: clamp(1.4rem, 3vw, 1.8rem);
           font-weight: bold;
           cursor: pointer;
           box-shadow: 0 8px 20px rgba(0,0,0,0.3);

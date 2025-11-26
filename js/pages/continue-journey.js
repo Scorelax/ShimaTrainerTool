@@ -15,46 +15,46 @@ export async function renderContinueJourney() {
         }
 
         .continue-journey-page h1 {
-          margin-top: 1.5rem;
-          margin-bottom: 2rem;
+          margin-top: 2vh;
+          margin-bottom: 2vh;
           color: white;
           text-align: center;
-          font-size: 3rem;
+          font-size: clamp(1.5rem, 4vw, 2.5rem);
           font-weight: 900;
-          letter-spacing: 1px;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.5),
-                       0 0 20px rgba(255,222,0,0.3);
+          letter-spacing: clamp(0.5px, 0.15vw, 1.5px);
+          text-shadow: 0 clamp(2px, 0.8vh, 5px) clamp(6px, 2vw, 12px) rgba(0,0,0,0.5),
+                       0 0 clamp(10px, 3vw, 25px) rgba(255,222,0,0.3);
         }
 
         .trainer-container {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 2rem;
-          width: 100%;
-          max-width: 1200px;
+          grid-template-columns: repeat(auto-fill, minmax(min(25vw, 30vh), 1fr));
+          gap: 2vw;
+          width: 90%;
+          max-width: 90vw;
           margin: 0 auto;
-          padding: 2rem;
+          padding: 2vh 2vw;
           box-sizing: border-box;
           justify-items: center;
         }
 
         .trainer-box {
-          max-width: 220px;
+          max-width: min(25vw, 30vh);
           width: 100%;
           aspect-ratio: 0.85;
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          border: 4px solid #FFDE00;
-          border-radius: 20px;
+          border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 20px);
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: space-between;
-          padding: 1.5rem 1rem;
+          padding: 1.5vh 1vw;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           box-sizing: border-box;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.3),
-                      inset 0 -4px 0 rgba(0,0,0,0.05);
+          box-shadow: 0 clamp(5px, 1.5vh, 15px) clamp(15px, 4vw, 35px) rgba(0,0,0,0.3),
+                      inset 0 clamp(-3px, -0.6vh, -5px) 0 rgba(0,0,0,0.05);
           position: relative;
           overflow: hidden;
         }
@@ -76,10 +76,10 @@ export async function renderContinueJourney() {
         }
 
         .trainer-box:hover {
-          transform: translateY(-10px) scale(1.03);
-          box-shadow: 0 15px 40px rgba(0,0,0,0.4),
-                      inset 0 -4px 0 rgba(0,0,0,0.05),
-                      0 0 30px rgba(255,222,0,0.5);
+          transform: translateY(clamp(-8px, -1.5vh, -12px)) scale(1.03);
+          box-shadow: 0 clamp(8px, 2vh, 18px) clamp(25px, 5vw, 45px) rgba(0,0,0,0.4),
+                      inset 0 clamp(-3px, -0.6vh, -5px) 0 rgba(0,0,0,0.05),
+                      0 0 clamp(15px, 4vw, 35px) rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
@@ -87,19 +87,19 @@ export async function renderContinueJourney() {
           width: 90%;
           height: 70%;
           object-fit: cover;
-          border-radius: 15px;
-          box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-          border: 3px solid #F0F0F0;
+          border-radius: clamp(10px, 2vw, 20px);
+          box-shadow: 0 clamp(3px, 1vh, 8px) clamp(10px, 2.5vw, 20px) rgba(0,0,0,0.2);
+          border: clamp(2px, 0.3vw, 4px) solid #F0F0F0;
         }
 
         .trainer-name {
-          font-size: 1.3rem;
-          margin-top: 0.75rem;
+          font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+          margin-top: 1vh;
           text-align: center;
           color: #333333;
           font-weight: 800;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: clamp(0.25px, 0.1vw, 0.75px);
         }
 
         /* PIN Modal */
@@ -111,7 +111,7 @@ export async function renderContinueJourney() {
           width: 100%;
           height: 100%;
           background-color: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(5px);
+          backdrop-filter: blur(clamp(3px, 0.8vw, 8px));
           z-index: 9999;
           justify-content: center;
           align-items: center;
@@ -129,21 +129,21 @@ export async function renderContinueJourney() {
 
         .pin-modal-content {
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          border: 4px solid #FFDE00;
-          border-radius: 25px;
-          padding: 3rem 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5),
-                      inset 0 -4px 0 rgba(0,0,0,0.05);
+          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 30px);
+          padding: 3vh 3vw;
+          box-shadow: 0 clamp(10px, 3vh, 25px) clamp(30px, 8vw, 70px) rgba(0,0,0,0.5),
+                      inset 0 clamp(-3px, -0.6vh, -5px) 0 rgba(0,0,0,0.05);
           text-align: center;
           width: 90%;
-          max-width: 450px;
+          max-width: min(50vw, 60vh);
           box-sizing: border-box;
           animation: slideUp 0.3s ease;
         }
 
         @keyframes slideUp {
           from {
-            transform: translateY(50px);
+            transform: translateY(clamp(30px, 8vh, 60px));
             opacity: 0;
           }
           to {
@@ -153,108 +153,108 @@ export async function renderContinueJourney() {
         }
 
         .pin-modal-content h2 {
-          font-size: 2.2rem;
-          margin-bottom: 1.5rem;
+          font-size: clamp(1.5rem, 3vw, 2.5rem);
+          margin-bottom: clamp(1rem, 2.5vh, 2rem);
           color: #333;
           font-weight: 800;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: clamp(0.5px, 0.15vw, 1.5px);
         }
 
         .pin-error {
           color: #EE1515;
-          margin: 1rem 0;
-          min-height: 24px;
+          margin: clamp(0.75rem, 2vh, 1.5rem) 0;
+          min-height: clamp(20px, 3vh, 30px);
           font-weight: bold;
-          font-size: 1.1rem;
+          font-size: clamp(0.9rem, 2vw, 1.3rem);
         }
 
         .pin-input {
-          width: 220px;
-          height: 70px;
-          font-size: 2rem;
+          width: clamp(180px, 30vw, 250px);
+          height: clamp(50px, 10vh, 80px);
+          font-size: clamp(1.5rem, 3vw, 2.5rem);
           font-weight: bold;
-          padding: 15px;
-          border-radius: 15px;
-          border: 3px solid #FFDE00;
+          padding: clamp(10px, 2vh, 20px);
+          border-radius: clamp(10px, 2vw, 20px);
+          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
           box-sizing: border-box;
-          margin-bottom: 2rem;
+          margin-bottom: clamp(1.5rem, 3vh, 2.5rem);
           text-align: center;
-          box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+          box-shadow: inset 0 clamp(1px, 0.3vh, 3px) clamp(3px, 0.8vw, 8px) rgba(0,0,0,0.1);
           transition: all 0.3s;
         }
 
         .pin-input:focus {
           outline: none;
           border-color: #FFC700;
-          box-shadow: inset 0 2px 5px rgba(0,0,0,0.1),
-                      0 0 20px rgba(255,222,0,0.4);
+          box-shadow: inset 0 clamp(1px, 0.3vh, 3px) clamp(3px, 0.8vw, 8px) rgba(0,0,0,0.1),
+                      0 0 clamp(10px, 3vw, 25px) rgba(255,222,0,0.4);
         }
 
         .pin-buttons {
           display: flex;
-          gap: 1rem;
+          gap: clamp(0.75rem, 2vw, 1.5rem);
           justify-content: center;
         }
 
         .pin-submit {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          font-size: 1.3rem;
+          font-size: clamp(1rem, 2.2vw, 1.5rem);
           font-weight: bold;
-          padding: 1rem 2rem;
+          padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 3vw, 2.5rem);
           border: none;
-          border-radius: 15px;
+          border-radius: clamp(10px, 2vw, 20px);
           cursor: pointer;
-          box-shadow: 0 5px 15px rgba(76,175,80,0.4);
+          box-shadow: 0 clamp(3px, 1vh, 8px) clamp(10px, 2.5vw, 20px) rgba(76,175,80,0.4);
           transition: all 0.3s;
         }
 
         .pin-submit:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 20px rgba(76,175,80,0.5);
+          transform: translateY(clamp(-2px, -0.5vh, -4px));
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3vw, 25px) rgba(76,175,80,0.5);
         }
 
         .pin-submit:active {
-          transform: translateY(-1px);
+          transform: translateY(clamp(-1px, -0.3vh, -2px));
         }
 
         .pin-cancel {
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          font-size: 1.3rem;
+          font-size: clamp(1rem, 2.2vw, 1.5rem);
           font-weight: bold;
-          padding: 1rem 2rem;
+          padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 3vw, 2.5rem);
           border: none;
-          border-radius: 15px;
+          border-radius: clamp(10px, 2vw, 20px);
           cursor: pointer;
-          box-shadow: 0 5px 15px rgba(238,21,21,0.4);
+          box-shadow: 0 clamp(3px, 1vh, 8px) clamp(10px, 2.5vw, 20px) rgba(238,21,21,0.4);
           transition: all 0.3s;
         }
 
         .pin-cancel:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 20px rgba(238,21,21,0.5);
+          transform: translateY(clamp(-2px, -0.5vh, -4px));
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3vw, 25px) rgba(238,21,21,0.5);
         }
 
         .pin-cancel:active {
-          transform: translateY(-1px);
+          transform: translateY(clamp(-1px, -0.3vh, -2px));
         }
 
         .back-button {
           position: fixed;
-          top: 20px;
-          left: 20px;
+          top: clamp(10px, 2vh, 30px);
+          left: clamp(10px, 2vw, 30px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          width: 50px;
-          height: 50px;
-          border: 3px solid #FFDE00;
+          width: clamp(40px, 8vw, 70px);
+          height: clamp(40px, 8vw, 70px);
+          border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
           border-radius: 50%;
-          font-size: 1.8rem;
+          font-size: clamp(1.2rem, 3vw, 2.5rem);
           font-weight: bold;
           cursor: pointer;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3vw, 25px) rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
@@ -265,8 +265,8 @@ export async function renderContinueJourney() {
 
         .back-button:hover {
           transform: scale(1.1);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      0 0 20px rgba(255,222,0,0.5);
+          box-shadow: 0 clamp(8px, 2vh, 16px) clamp(20px, 4vw, 35px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
@@ -276,11 +276,11 @@ export async function renderContinueJourney() {
 
         @media (max-width: 768px) {
           .trainer-container {
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(min(40vw, 45vh), 1fr));
           }
 
           .trainer-box {
-            max-width: 150px;
+            max-width: min(40vw, 45vh);
           }
         }
       </style>

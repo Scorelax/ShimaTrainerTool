@@ -43,37 +43,43 @@ export function renderEditTrainer() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 2rem 1rem;
+          padding: clamp(1.5rem, 3vh, 2rem) clamp(0.75rem, 2vw, 1rem);
           min-height: 80vh;
         }
 
         .edit-trainer-page h1 {
           color: white;
-          margin-bottom: 2rem;
-          font-size: 2.5rem;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          font-size: clamp(1.5rem, 4vw, 2.5rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.5vw, 2px);
+          text-shadow: 0 clamp(2px, 0.6vh, 4px) clamp(8px, 1.5vh, 10px) rgba(0,0,0,0.8);
+          font-weight: 900;
         }
 
         .form-container {
           width: 100%;
-          max-width: 600px;
-          background-color: white;
-          padding: 2.5rem;
-          border-radius: 10px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-          margin-bottom: 2rem;
+          max-width: clamp(500px, 80vw, 600px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          padding: clamp(1.5rem, 4vw, 2.5rem);
+          border-radius: clamp(15px, 3vw, 25px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(30px, 5vh, 40px) rgba(0,0,0,0.4),
+                      inset 0 clamp(-3px, -0.5vh, -4px) 0 rgba(0,0,0,0.05);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
           max-height: 70vh;
           overflow-y: auto;
         }
 
         .form-group {
-          margin-bottom: 1.5rem;
+          margin-bottom: clamp(1rem, 2.5vh, 1.5rem);
         }
 
         .form-group label {
           display: block;
           font-weight: bold;
-          font-size: 1.3rem;
-          margin-bottom: 0.5rem;
+          font-size: clamp(1rem, 2vw, 1.3rem);
+          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
           color: #333;
         }
 
@@ -81,10 +87,10 @@ export function renderEditTrainer() {
         .form-group input[type="text"],
         .form-group textarea {
           width: 100%;
-          padding: 0.75rem;
-          font-size: 1.1rem;
-          border: 2px solid #ccc;
-          border-radius: 5px;
+          padding: clamp(0.5rem, 1.5vw, 0.75rem);
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          border: clamp(2px, 0.3vw, 3px) solid #ccc;
+          border-radius: clamp(3px, 0.8vw, 5px);
           box-sizing: border-box;
         }
 
@@ -96,24 +102,31 @@ export function renderEditTrainer() {
         }
 
         .collapsible-section {
-          margin-bottom: 1.5rem;
+          margin-bottom: clamp(1rem, 2.5vh, 1.5rem);
         }
 
         .collapsible-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 1rem;
-          background: #f44336;
+          padding: clamp(0.75rem, 2vw, 1rem);
+          background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
           color: white;
-          border-radius: 5px;
+          border-radius: clamp(8px, 2vw, 15px);
+          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
           cursor: pointer;
-          font-size: 1.3rem;
-          font-weight: bold;
+          font-size: clamp(1rem, 2vw, 1.3rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          box-shadow: 0 clamp(6px, 1.2vh, 8px) clamp(15px, 3vh, 20px) rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .collapsible-header:hover {
-          background: #d32f2f;
+          transform: translateY(clamp(-1px, -0.3vh, -2px));
+          box-shadow: 0 clamp(8px, 1.8vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 3vw, 20px) rgba(255,222,0,0.4);
         }
 
         .arrow {
@@ -126,12 +139,13 @@ export function renderEditTrainer() {
 
         .collapsible-content {
           display: none;
-          padding: 1rem;
-          border: 2px solid #f44336;
+          padding: clamp(0.75rem, 2vw, 1rem);
+          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
           border-top: none;
-          border-radius: 0 0 5px 5px;
-          max-height: 300px;
+          border-radius: 0 0 clamp(8px, 2vw, 15px) clamp(8px, 2vw, 15px);
+          max-height: clamp(250px, 40vh, 300px);
           overflow-y: auto;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
         }
 
         .collapsible-content.open {
@@ -141,17 +155,17 @@ export function renderEditTrainer() {
         .checkbox-item {
           display: flex;
           align-items: center;
-          margin-bottom: 0.75rem;
+          margin-bottom: clamp(0.5rem, 1.5vh, 0.75rem);
         }
 
         .checkbox-item input[type="checkbox"] {
-          margin-right: 0.75rem;
-          transform: scale(1.5);
+          margin-right: clamp(0.5rem, 1.5vw, 0.75rem);
+          transform: scale(clamp(1.2, 0.3vw, 1.5));
           cursor: pointer;
         }
 
         .checkbox-item label {
-          font-size: 1.1rem;
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
           cursor: pointer;
           margin: 0;
         }

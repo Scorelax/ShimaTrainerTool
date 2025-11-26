@@ -16,15 +16,15 @@ export function renderIndex() {
           min-height: 85vh;
           text-align: center;
           position: relative;
-          padding: 2rem;
+          padding: clamp(1rem, 3vh, 3rem);
         }
 
         /* Decorative Pokeball Background */
         .landing-page::before {
           content: '';
           position: absolute;
-          width: 400px;
-          height: 400px;
+          width: min(50vw, 60vh);
+          height: min(50vw, 60vh);
           background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
           border-radius: 50%;
           top: 50%;
@@ -35,13 +35,13 @@ export function renderIndex() {
         }
 
         .landing-title {
-          font-size: 3.5rem;
+          font-size: clamp(2rem, 6vw, 4rem);
           color: white;
-          margin-bottom: 1rem;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.5),
-                       0 0 20px rgba(255,222,0,0.3);
+          margin-bottom: clamp(0.75rem, 2vh, 1.5rem);
+          text-shadow: 0 clamp(2px, 0.8vh, 5px) clamp(6px, 2vw, 12px) rgba(0,0,0,0.5),
+                       0 0 clamp(10px, 3vw, 25px) rgba(255,222,0,0.3);
           font-weight: 900;
-          letter-spacing: 2px;
+          letter-spacing: clamp(1px, 0.3vw, 3px);
           position: relative;
           z-index: 1;
           animation: titleGlow 2s ease-in-out infinite alternate;
@@ -49,20 +49,20 @@ export function renderIndex() {
 
         @keyframes titleGlow {
           from {
-            text-shadow: 0 4px 10px rgba(0,0,0,0.5),
-                         0 0 20px rgba(255,222,0,0.3);
+            text-shadow: 0 clamp(2px, 0.8vh, 5px) clamp(6px, 2vw, 12px) rgba(0,0,0,0.5),
+                         0 0 clamp(10px, 3vw, 25px) rgba(255,222,0,0.3);
           }
           to {
-            text-shadow: 0 4px 15px rgba(0,0,0,0.7),
-                         0 0 30px rgba(255,222,0,0.5);
+            text-shadow: 0 clamp(2px, 0.8vh, 5px) clamp(8px, 2.5vw, 18px) rgba(0,0,0,0.7),
+                         0 0 clamp(15px, 4vw, 35px) rgba(255,222,0,0.5);
           }
         }
 
         .landing-subtitle {
-          font-size: 1.5rem;
+          font-size: clamp(1rem, 3vw, 1.8rem);
           color: #FFDE00;
-          margin-bottom: 3rem;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+          margin-bottom: clamp(2rem, 5vh, 4rem);
+          text-shadow: 0 clamp(1px, 0.3vh, 3px) clamp(3px, 1vw, 7px) rgba(0,0,0,0.5);
           font-weight: 600;
           position: relative;
           z-index: 1;
@@ -71,25 +71,25 @@ export function renderIndex() {
         .landing-buttons {
           display: flex;
           flex-direction: column;
-          gap: 1.5rem;
-          width: 100%;
-          max-width: 450px;
+          gap: clamp(1rem, 2.5vh, 2rem);
+          width: 90%;
+          max-width: min(60vw, 70vh);
           position: relative;
           z-index: 1;
         }
 
         .landing-button {
-          padding: 2rem 3rem;
-          font-size: 1.8rem;
+          padding: clamp(1.5rem, 3vh, 2.5rem) clamp(2rem, 5vw, 4rem);
+          font-size: clamp(1.2rem, 3vw, 2rem);
           font-weight: bold;
           color: #333;
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          border: 4px solid #FFDE00;
-          border-radius: 20px;
+          border: clamp(3px, 0.5vw, 6px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 30px);
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3),
-                      inset 0 -3px 0 rgba(0,0,0,0.1);
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3vw, 25px) rgba(0,0,0,0.3),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.1);
           position: relative;
           overflow: hidden;
         }
@@ -108,42 +108,21 @@ export function renderIndex() {
         }
 
         .landing-button:hover {
-          transform: translateY(-8px) scale(1.02);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      inset 0 -3px 0 rgba(0,0,0,0.1),
-                      0 0 20px rgba(255,222,0,0.6);
+          transform: translateY(clamp(-5px, -1.2vh, -10px)) scale(1.02);
+          box-shadow: 0 clamp(8px, 2vh, 16px) clamp(20px, 4vw, 35px) rgba(0,0,0,0.4),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.1),
+                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.6);
           border-color: #FFC700;
         }
 
         .landing-button:hover::before {
-          width: 300px;
-          height: 300px;
+          width: clamp(200px, 40vw, 350px);
+          height: clamp(200px, 40vw, 350px);
         }
 
         .landing-button:active {
-          transform: translateY(-4px) scale(1.0);
-          box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-        }
-
-        @media (max-width: 768px) {
-          .landing-title {
-            font-size: 2.5rem;
-          }
-
-          .landing-subtitle {
-            font-size: 1.2rem;
-            margin-bottom: 2rem;
-          }
-
-          .landing-button {
-            font-size: 1.5rem;
-            padding: 1.5rem 2rem;
-          }
-
-          .landing-page::before {
-            width: 250px;
-            height: 250px;
-          }
+          transform: translateY(clamp(-3px, -0.8vh, -6px)) scale(1.0);
+          box-shadow: 0 clamp(4px, 1vh, 8px) clamp(10px, 2.5vw, 18px) rgba(0,0,0,0.3);
         }
       </style>
 

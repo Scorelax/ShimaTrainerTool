@@ -23,61 +23,61 @@ export function renderNewPokemon() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 2rem 1rem;
+          padding: clamp(1.5rem, 3vh, 2rem) clamp(0.75rem, 2vw, 1rem);
           min-height: 85vh;
         }
 
         .new-pokemon-page h1 {
           color: white;
-          margin-bottom: 2rem;
-          font-size: 3rem;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          font-size: clamp(2rem, 5vw, 3rem);
           font-weight: 900;
-          letter-spacing: 1px;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.5),
-                       0 0 20px rgba(255,222,0,0.3);
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.5),
+                       0 0 clamp(15px, 4vw, 20px) rgba(255,222,0,0.3);
         }
 
         .register-container {
           display: flex;
           justify-content: space-around;
           width: 90%;
-          max-width: 1200px;
-          gap: 2rem;
+          max-width: clamp(900px, 95vw, 1200px);
+          gap: clamp(1.5rem, 3vw, 2rem);
         }
 
         .pokemon-list {
           width: 45%;
           max-height: 65vh;
           overflow-y: auto;
-          border: 4px solid #FFDE00;
-          border-radius: 20px;
-          padding: 20px;
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 20px);
+          padding: clamp(15px, 3vw, 20px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          box-shadow: 0 clamp(8px, 2vh, 10px) clamp(25px, 5vw, 30px) rgba(0,0,0,0.3);
         }
 
         .pokemon-list h2 {
           text-align: center;
           margin-top: 0;
-          margin-bottom: 15px;
-          font-size: 1.5rem;
+          margin-bottom: clamp(12px, 2vh, 15px);
+          font-size: clamp(1.2rem, 2.5vw, 1.5rem);
         }
 
         .search-container {
           position: sticky;
           top: 0;
           background-color: white;
-          padding-bottom: 10px;
-          margin-bottom: 10px;
-          border-bottom: 1px solid #e0e0e0;
+          padding-bottom: clamp(8px, 1.5vh, 10px);
+          margin-bottom: clamp(8px, 1.5vh, 10px);
+          border-bottom: clamp(1px, 0.2vw, 2px) solid #e0e0e0;
         }
 
         .search-input {
           width: 100%;
-          padding: 10px;
-          font-size: 1rem;
-          border: 2px solid #ddd;
-          border-radius: 5px;
+          padding: clamp(8px, 1.5vh, 10px);
+          font-size: clamp(0.9rem, 1.8vw, 1rem);
+          border: clamp(2px, 0.3vw, 3px) solid #ddd;
+          border-radius: clamp(4px, 1vw, 5px);
           box-sizing: border-box;
         }
 
@@ -93,11 +93,11 @@ export function renderNewPokemon() {
         }
 
         .pokemon-list li {
-          font-size: 1.1rem;
-          margin-bottom: 10px;
+          font-size: clamp(1rem, 2vw, 1.1rem);
+          margin-bottom: clamp(8px, 1.5vh, 10px);
           cursor: pointer;
-          padding: 8px;
-          border-radius: 5px;
+          padding: clamp(6px, 1.5vh, 8px);
+          border-radius: clamp(4px, 1vw, 5px);
           transition: background-color 0.2s;
         }
 
@@ -115,10 +115,10 @@ export function renderNewPokemon() {
           text-align: center;
           display: none;
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          border: 4px solid #FFDE00;
-          border-radius: 20px;
-          padding: 2rem;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 20px);
+          padding: clamp(1.5rem, 3vw, 2rem);
+          box-shadow: 0 clamp(8px, 2vh, 10px) clamp(25px, 5vw, 30px) rgba(0,0,0,0.3);
         }
 
         .pokemon-details.visible {
@@ -126,48 +126,48 @@ export function renderNewPokemon() {
         }
 
         .pokemon-details img {
-          width: 250px;
-          height: 250px;
+          width: min(30vw, 35vh);
+          height: min(30vw, 35vh);
           background-color: #f0f0f0;
-          border-radius: 10px;
+          border-radius: clamp(8px, 1.5vw, 15px);
           object-fit: contain;
-          margin-bottom: 20px;
+          margin-bottom: clamp(1rem, 3vh, 2rem);
         }
 
         .pokemon-details .detail-item {
-          font-size: 1.2rem;
-          margin-bottom: 10px;
+          font-size: clamp(1rem, 2vw, 1.3rem);
+          margin-bottom: clamp(0.5rem, 1.5vh, 1rem);
           color: #333;
         }
 
         .register-btn {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: 4px solid #FFDE00;
-          border-radius: 50px;
-          padding: 1rem 2.5rem;
-          font-size: 1.3rem;
+          border: clamp(2px, 0.5vw, 5px) solid #FFDE00;
+          border-radius: clamp(30px, 8vw, 60px);
+          padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 5vw, 3.5rem);
+          font-size: clamp(1rem, 2.5vw, 1.5rem);
           font-weight: 900;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          margin-top: 20px;
-          box-shadow: 0 8px 20px rgba(76,175,80,0.4);
+          margin-top: clamp(1rem, 3vh, 2rem);
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3.5vw, 25px) rgba(76,175,80,0.4);
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: clamp(0.5px, 0.15vw, 1.5px);
         }
 
         .register-btn:hover {
-          transform: translateY(-5px) scale(1.02);
-          box-shadow: 0 12px 30px rgba(76,175,80,0.5),
-                      0 0 30px rgba(255,222,0,0.5);
+          transform: translateY(clamp(-3px, -1vh, -7px)) scale(1.02);
+          box-shadow: 0 clamp(8px, 2vh, 16px) clamp(22px, 5vw, 40px) rgba(76,175,80,0.5),
+                      0 0 clamp(20px, 4vw, 35px) rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
         .no-results {
           text-align: center;
           color: #666;
-          font-size: 1.1rem;
-          padding: 20px;
+          font-size: clamp(0.9rem, 2vw, 1.2rem);
+          padding: clamp(1rem, 3vh, 2rem);
         }
 
         @media (max-width: 768px) {

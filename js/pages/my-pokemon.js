@@ -20,18 +20,18 @@ export function renderMyPokemon() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 2rem 1rem;
+          padding: clamp(1.5rem, 5vh, 3rem) clamp(0.5rem, 3vw, 2rem);
           min-height: 85vh;
         }
 
         .my-pokemon-page h1 {
           color: white;
-          margin-bottom: 2rem;
-          font-size: 3rem;
+          margin-bottom: clamp(1.5rem, 5vh, 3rem);
+          font-size: clamp(2rem, 6vw, 3.5rem);
           font-weight: 900;
-          letter-spacing: 1px;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.5),
-                       0 0 20px rgba(255,222,0,0.3);
+          letter-spacing: clamp(0.5px, 0.2vw, 1.5px);
+          text-shadow: 0 clamp(2px, 0.5vh, 5px) clamp(6px, 1.5vw, 12px) rgba(0,0,0,0.5),
+                       0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.3);
         }
 
         .pokemon-list-container {
@@ -39,96 +39,96 @@ export function renderMyPokemon() {
           flex-direction: column;
           align-items: center;
           width: 90%;
-          max-width: 1200px;
+          max-width: min(100vw, 1200px);
         }
 
         .pokemon-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 20px;
+          gap: clamp(1rem, 3vw, 2.5rem);
           width: 100%;
-          margin-bottom: 2rem;
+          margin-bottom: clamp(1.5rem, 5vh, 3rem);
         }
 
         .pokemon-slot {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 10px;
+          padding: clamp(0.5rem, 1.5vw, 1.5rem);
         }
 
         .pokemon-image {
-          width: 150px;
-          height: 150px;
-          border-radius: 25px;
+          width: clamp(100px, min(20vw, 25vh), 180px);
+          height: clamp(100px, min(20vw, 25vh), 180px);
+          border-radius: clamp(15px, 3vw, 35px);
           object-fit: contain;
           background: transparent;
           border: none;
-          box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-          margin-bottom: 10px;
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(18px, 4vw, 30px) rgba(0,0,0,0.5);
+          margin-bottom: clamp(0.5rem, 2vh, 1.5rem);
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .pokemon-image:hover {
-          transform: translateY(-10px) scale(1.08);
-          box-shadow: 0 15px 40px rgba(0,0,0,0.6),
-                      0 0 30px rgba(255,222,0,0.4);
+          transform: translateY(clamp(-5px, -1.5vh, -12px)) scale(1.08);
+          box-shadow: 0 clamp(10px, 2.5vh, 18px) clamp(30px, 6vw, 50px) rgba(0,0,0,0.6),
+                      0 0 clamp(20px, 4vw, 35px) rgba(255,222,0,0.4);
         }
 
         .pokemon-image:active {
-          transform: translateY(-5px) scale(1.05);
+          transform: translateY(clamp(-2px, -1vh, -6px)) scale(1.05);
         }
 
         .pokemon-name {
-          font-size: 1.3rem;
-          margin-bottom: 5px;
+          font-size: clamp(1rem, 2.5vw, 1.5rem);
+          margin-bottom: clamp(0.25rem, 1vh, 0.75rem);
           color: white;
           font-weight: 800;
           text-align: center;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+          letter-spacing: clamp(0.25px, 0.15vw, 0.75px);
+          text-shadow: 0 clamp(1px, 0.3vh, 3px) clamp(3px, 1vw, 7px) rgba(0,0,0,0.5);
         }
 
         .pokemon-level {
-          font-size: 1.1rem;
+          font-size: clamp(0.9rem, 2vw, 1.3rem);
           color: #FFDE00;
           font-weight: 700;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+          text-shadow: 0 clamp(1px, 0.3vh, 3px) clamp(3px, 1vw, 7px) rgba(0,0,0,0.5);
         }
 
         .controls-container {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 1rem;
-          margin-top: 1rem;
+          gap: clamp(0.75rem, 2vh, 1.5rem);
+          margin-top: clamp(0.75rem, 2vh, 1.5rem);
         }
 
         .navigation-buttons {
           display: flex;
           align-items: center;
-          gap: 1rem;
+          gap: clamp(0.75rem, 2vw, 1.5rem);
         }
 
         .nav-button {
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          border: 3px solid #FFDE00;
-          border-radius: 15px;
-          padding: 12px 25px;
-          font-size: 1.1rem;
+          border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 20px);
+          padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 4vw, 3rem);
+          font-size: clamp(0.9rem, 2vw, 1.3rem);
           font-weight: bold;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+          box-shadow: 0 clamp(3px, 1vh, 8px) clamp(10px, 2.5vw, 18px) rgba(0,0,0,0.2);
         }
 
         .nav-button:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3),
-                      0 0 20px rgba(255,222,0,0.5);
+          transform: translateY(clamp(-2px, -0.8vh, -5px));
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3vw, 25px) rgba(0,0,0,0.3),
+                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
@@ -139,61 +139,61 @@ export function renderMyPokemon() {
         }
 
         .nav-button:disabled:hover {
-          box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+          box-shadow: 0 clamp(3px, 1vh, 8px) clamp(10px, 2.5vw, 18px) rgba(0,0,0,0.2);
           border-color: #FFDE00;
         }
 
         #pageIndicator {
-          font-size: 1.3rem;
+          font-size: clamp(1rem, 2.5vw, 1.5rem);
           font-weight: 900;
           color: white;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.5);
-          min-width: 80px;
+          text-shadow: 0 clamp(1px, 0.3vh, 3px) clamp(3px, 1vw, 7px) rgba(0,0,0,0.5);
+          min-width: clamp(60px, 12vw, 100px);
           text-align: center;
         }
 
         .register-button {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: 4px solid #FFDE00;
-          border-radius: 50px;
-          padding: 1rem 2.5rem;
-          font-size: 1.3rem;
+          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border-radius: clamp(30px, 8vw, 60px);
+          padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 5vw, 3.5rem);
+          font-size: clamp(1rem, 2.5vw, 1.5rem);
           font-weight: 900;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 8px 20px rgba(76,175,80,0.4),
-                      inset 0 -3px 0 rgba(0,0,0,0.2);
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3.5vw, 25px) rgba(76,175,80,0.4),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.2);
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: clamp(0.5px, 0.15vw, 1.5px);
         }
 
         .register-button:hover {
-          transform: translateY(-5px) scale(1.02);
-          box-shadow: 0 12px 30px rgba(76,175,80,0.5),
-                      inset 0 -3px 0 rgba(0,0,0,0.2),
-                      0 0 30px rgba(255,222,0,0.5);
+          transform: translateY(clamp(-3px, -1vh, -7px)) scale(1.02);
+          box-shadow: 0 clamp(8px, 2vh, 16px) clamp(22px, 5vw, 40px) rgba(76,175,80,0.5),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.2),
+                      0 0 clamp(20px, 4vw, 35px) rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
         .register-button:active {
-          transform: translateY(-3px) scale(1.0);
+          transform: translateY(clamp(-2px, -0.8vh, -5px)) scale(1.0);
         }
 
         .back-button {
           position: fixed;
-          top: 20px;
-          left: 20px;
+          top: clamp(10px, 2vh, 30px);
+          left: clamp(10px, 2vw, 30px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          width: 50px;
-          height: 50px;
-          border: 3px solid #FFDE00;
+          width: clamp(40px, 8vw, 70px);
+          height: clamp(40px, 8vw, 70px);
+          border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
           border-radius: 50%;
-          font-size: 1.8rem;
+          font-size: clamp(1.2rem, 3vw, 2.5rem);
           font-weight: bold;
           cursor: pointer;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3vw, 25px) rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
@@ -204,8 +204,8 @@ export function renderMyPokemon() {
 
         .back-button:hover {
           transform: scale(1.1);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      0 0 20px rgba(255,222,0,0.5);
+          box-shadow: 0 clamp(8px, 2vh, 16px) clamp(20px, 4vw, 35px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
           border-color: #FFC700;
         }
 
@@ -216,8 +216,8 @@ export function renderMyPokemon() {
         .empty-state {
           text-align: center;
           color: white;
-          font-size: 1.3rem;
-          padding: 3rem;
+          font-size: clamp(1rem, 2.5vw, 1.5rem);
+          padding: clamp(1.5rem, 4vh, 4rem);
         }
 
         @media (max-width: 768px) {
@@ -226,8 +226,8 @@ export function renderMyPokemon() {
           }
 
           .pokemon-image {
-            width: 120px;
-            height: 120px;
+            width: clamp(90px, 20vw, 160px);
+            height: clamp(90px, 20vw, 160px);
           }
         }
 

@@ -48,24 +48,24 @@ export function renderEditPokemon(pokemonName) {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 2rem 1rem;
+          padding: clamp(1.5rem, 3vh, 2rem) clamp(0.8rem, 2vw, 1rem);
           min-height: 80vh;
         }
 
         .edit-pokemon-page h1 {
           color: white;
-          margin-bottom: 2rem;
-          font-size: 2.5rem;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          font-size: clamp(1.8rem, 4vw, 2.5rem);
         }
 
         .form-container {
           width: 100%;
-          max-width: 700px;
+          max-width: clamp(600px, 85vw, 700px);
           background-color: white;
-          padding: 2.5rem;
-          border-radius: 10px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-          margin-bottom: 2rem;
+          padding: clamp(2rem, 4vw, 2.5rem);
+          border-radius: clamp(10px, 2vw, 20px);
+          box-shadow: 0 clamp(4px, 0.8vh, 8px) clamp(10px, 2vh, 20px) rgba(0,0,0,0.2);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
           max-height: 70vh;
           overflow-y: auto;
         }
@@ -73,11 +73,11 @@ export function renderEditPokemon(pokemonName) {
         .form-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 1.5rem;
+          gap: clamp(1rem, 2vw, 1.5rem);
         }
 
         .form-group {
-          margin-bottom: 1.5rem;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
         }
 
         .form-group.full-width {
@@ -87,8 +87,8 @@ export function renderEditPokemon(pokemonName) {
         .form-group label {
           display: block;
           font-weight: bold;
-          font-size: 1.2rem;
-          margin-bottom: 0.5rem;
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
           color: #333;
         }
 
@@ -96,10 +96,10 @@ export function renderEditPokemon(pokemonName) {
         .form-group input[type="text"],
         .form-group select {
           width: 100%;
-          padding: 0.75rem;
-          font-size: 1.1rem;
-          border: 2px solid #ccc;
-          border-radius: 5px;
+          padding: clamp(0.5rem, 1.5vw, 0.75rem);
+          font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+          border: clamp(2px, 0.3vw, 3px) solid #ccc;
+          border-radius: clamp(5px, 1vw, 10px);
           box-sizing: border-box;
         }
 
@@ -110,19 +110,19 @@ export function renderEditPokemon(pokemonName) {
         }
 
         .collapsible-section {
-          margin-bottom: 1.5rem;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
         }
 
         .collapsible-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 1rem;
+          padding: clamp(0.8rem, 2vw, 1rem);
           background: #f44336;
           color: white;
-          border-radius: 5px;
+          border-radius: clamp(5px, 1vw, 10px);
           cursor: pointer;
-          font-size: 1.3rem;
+          font-size: clamp(1.1rem, 2.2vw, 1.3rem);
           font-weight: bold;
         }
 
@@ -140,11 +140,11 @@ export function renderEditPokemon(pokemonName) {
 
         .collapsible-content {
           display: none;
-          padding: 1rem;
-          border: 2px solid #f44336;
+          padding: clamp(0.8rem, 2vw, 1rem);
+          border: clamp(2px, 0.3vw, 3px) solid #f44336;
           border-top: none;
-          border-radius: 0 0 5px 5px;
-          max-height: 300px;
+          border-radius: 0 0 clamp(5px, 1vw, 10px) clamp(5px, 1vw, 10px);
+          max-height: clamp(250px, 40vh, 300px);
           overflow-y: auto;
         }
 
@@ -155,33 +155,33 @@ export function renderEditPokemon(pokemonName) {
         .checkbox-item {
           display: flex;
           align-items: center;
-          margin-bottom: 0.75rem;
+          margin-bottom: clamp(0.5rem, 1.5vh, 0.75rem);
         }
 
         .checkbox-item input[type="checkbox"] {
-          margin-right: 0.75rem;
-          transform: scale(1.5);
+          margin-right: clamp(0.5rem, 1.5vw, 0.75rem);
+          transform: scale(clamp(1.2, 0.3vw, 1.5));
           cursor: pointer;
         }
 
         .checkbox-item label {
-          font-size: 1.1rem;
+          font-size: clamp(0.95rem, 1.8vw, 1.1rem);
           cursor: pointer;
           margin: 0;
         }
 
         .button-group {
           display: flex;
-          gap: 1rem;
+          gap: clamp(0.8rem, 2vw, 1rem);
           justify-content: center;
-          margin-top: 2rem;
+          margin-top: clamp(1.5rem, 3vh, 2rem);
         }
 
         .button {
-          padding: 1rem 2rem;
+          padding: clamp(0.8rem, 2vh, 1rem) clamp(1.5rem, 4vw, 2rem);
           border: none;
-          border-radius: 5px;
-          font-size: 1.2rem;
+          border-radius: clamp(5px, 1vw, 10px);
+          font-size: clamp(1rem, 2vw, 1.2rem);
           font-weight: bold;
           cursor: pointer;
           transition: all 0.3s;
@@ -206,10 +206,10 @@ export function renderEditPokemon(pokemonName) {
         }
 
         .ability-description {
-          font-size: 1rem;
+          font-size: clamp(0.9rem, 1.6vw, 1rem);
           color: #666;
           font-weight: normal;
-          margin-top: 0.2rem;
+          margin-top: clamp(0.1rem, 0.3vh, 0.2rem);
           line-height: 1.3;
           display: block;
         }
@@ -223,12 +223,12 @@ export function renderEditPokemon(pokemonName) {
           top: 100%;
           left: 0;
           right: 0;
-          max-height: 200px;
+          max-height: clamp(180px, 30vh, 200px);
           overflow-y: auto;
           background: white;
-          border: 2px solid #f44336;
+          border: clamp(2px, 0.3vw, 3px) solid #f44336;
           border-top: none;
-          border-radius: 0 0 5px 5px;
+          border-radius: 0 0 clamp(5px, 1vw, 10px) clamp(5px, 1vw, 10px);
           z-index: 100;
           display: none;
         }
@@ -238,10 +238,10 @@ export function renderEditPokemon(pokemonName) {
         }
 
         .autocomplete-item {
-          padding: 0.75rem;
+          padding: clamp(0.5rem, 1.5vw, 0.75rem);
           cursor: pointer;
-          font-size: 1rem;
-          border-bottom: 1px solid #eee;
+          font-size: clamp(0.9rem, 1.6vw, 1rem);
+          border-bottom: clamp(1px, 0.15vw, 2px) solid #eee;
         }
 
         .autocomplete-item:hover {
@@ -335,7 +335,7 @@ export function renderEditPokemon(pokemonName) {
               <span class="arrow" id="abilitiesArrow">▶</span>
             </div>
             <div class="collapsible-content" id="abilitiesContent">
-              <div style="padding: 1rem; font-size: 1.1rem; color: #666;">Loading abilities...</div>
+              <div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 1.8vw, 1.1rem); color: #666;">Loading abilities...</div>
             </div>
           </div>
 

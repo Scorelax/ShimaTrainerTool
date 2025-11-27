@@ -28,8 +28,8 @@ export async function renderContinueJourney() {
 
         .trainer-container {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(min(25vw, 30vh), 1fr));
-          gap: 2vw;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 2vh 2vw;
           width: 90%;
           max-width: 90vw;
           margin: 0 auto;
@@ -39,8 +39,8 @@ export async function renderContinueJourney() {
         }
 
         .trainer-box {
-          max-width: min(25vw, 30vh);
           width: 100%;
+          max-width: 22vw;
           aspect-ratio: 0.85;
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
           border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
@@ -274,13 +274,31 @@ export async function renderContinueJourney() {
           transform: scale(1.05);
         }
 
+        /* Responsive layout for smaller screens */
+        @media (max-width: 1200px) {
+          .trainer-container {
+            grid-template-columns: repeat(3, 1fr);
+          }
+          .trainer-box {
+            max-width: 28vw;
+          }
+        }
+
         @media (max-width: 768px) {
           .trainer-container {
-            grid-template-columns: repeat(auto-fill, minmax(min(40vw, 45vh), 1fr));
+            grid-template-columns: repeat(2, 1fr);
           }
-
           .trainer-box {
-            max-width: min(40vw, 45vh);
+            max-width: 42vw;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .trainer-container {
+            grid-template-columns: 1fr;
+          }
+          .trainer-box {
+            max-width: 80vw;
           }
         }
       </style>

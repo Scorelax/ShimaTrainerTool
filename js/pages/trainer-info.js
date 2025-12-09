@@ -122,16 +122,49 @@ export function renderTrainerInfo() {
         .trainer-image-container {
           width: 100%;
           aspect-ratio: 1;
+          cursor: pointer;
+          position: relative;
+          border-radius: clamp(15px, 3vw, 20px);
+          overflow: hidden;
+          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 2vh, 10px) clamp(25px, 5vw, 30px) rgba(0,0,0,0.5),
+                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .trainer-image-container:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 clamp(12px, 3vh, 15px) clamp(30px, 6vw, 35px) rgba(0,0,0,0.6),
+                      0 0 clamp(25px, 5vw, 35px) rgba(255,222,0,0.5);
+          border-color: #FFC700;
+        }
+
+        .trainer-image-container::after {
+          content: 'EDIT TRAINER';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 70%, transparent 100%);
+          color: #FFDE00;
+          font-size: clamp(0.8rem, 1.8vw, 1rem);
+          font-weight: 900;
+          text-align: center;
+          padding: clamp(0.5rem, 1.5vh, 0.8rem);
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        .trainer-image-container:hover::after {
+          opacity: 1;
         }
 
         .trainer-image-container img {
           width: 100%;
           height: 100%;
-          border-radius: clamp(15px, 3vw, 20px);
           object-fit: cover;
-          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
-          box-shadow: 0 clamp(8px, 2vh, 10px) clamp(25px, 5vw, 30px) rgba(0,0,0,0.5),
-                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.3);
+          display: block;
         }
 
         .trainer-info-list {
@@ -143,6 +176,7 @@ export function renderTrainerInfo() {
         .info-item {
           display: flex;
           justify-content: space-between;
+          align-items: center;
           padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
           border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
@@ -157,6 +191,34 @@ export function renderTrainerInfo() {
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+          flex-shrink: 0;
+        }
+
+        .info-item-value {
+          text-align: right;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          max-width: 60%;
+        }
+
+        .info-item-double {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .info-item-half {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-weight: 700;
+          color: white;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         .info-buttons-grid {
@@ -199,7 +261,7 @@ export function renderTrainerInfo() {
           padding-top: clamp(4rem, 8vh, 5rem);
         }
 
-        /* Stats Row 1: AC, HP, VP - Larger boxes */
+        /* Stats Row 1: AC, HP, VP - Medium boxes with HP/VP current values */
         .stat-main-container {
           display: flex;
           justify-content: center;
@@ -216,7 +278,7 @@ export function renderTrainerInfo() {
         .stat-label-box {
           font-weight: 900;
           color: white;
-          font-size: clamp(1rem, 2.2vw, 1.4rem);
+          font-size: clamp(0.95rem, 2vw, 1.2rem);
           margin-bottom: clamp(0.4rem, 1vh, 0.6rem);
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           text-transform: uppercase;
@@ -227,16 +289,45 @@ export function renderTrainerInfo() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: clamp(80px, 12vw, 110px);
-          height: clamp(80px, 12vw, 110px);
+          width: clamp(65px, 10vw, 90px);
+          height: clamp(65px, 10vw, 90px);
           background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           color: black;
           border-radius: clamp(12px, 2.5vw, 18px);
           border: clamp(3px, 0.6vw, 5px) solid #333;
-          font-size: clamp(2rem, 4vw, 2.8rem);
+          font-size: clamp(1.8rem, 3.5vw, 2.4rem);
           font-weight: 900;
           box-shadow: 0 8px 20px rgba(0,0,0,0.5),
                       inset 0 -4px 0 rgba(0,0,0,0.2);
+        }
+
+        .current-stat-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: clamp(55px, 8vw, 75px);
+          height: clamp(55px, 8vw, 75px);
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          color: white;
+          border-radius: clamp(10px, 2vw, 15px);
+          border: clamp(2px, 0.5vw, 4px) solid #333;
+          font-size: clamp(1.5rem, 3vw, 2rem);
+          font-weight: 900;
+          box-shadow: 0 6px 15px rgba(0,0,0,0.5),
+                      inset 0 -2px 0 rgba(0,0,0,0.3);
+          margin-top: clamp(-10px, -1.2vh, -12px);
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .current-stat-box:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.6),
+                      0 0 15px rgba(59,76,202,0.5);
+        }
+
+        .current-stat-box:active {
+          transform: translateY(0);
         }
 
         /* Stats Row 2: STR, DEX, CON, INT, WIS, CHA - Smaller boxes with modifiers */
@@ -358,32 +449,169 @@ export function renderTrainerInfo() {
           margin-top: clamp(2px, 0.5vh, 4px);
         }
 
-        #editTrainerButton {
-          grid-column: 1 / -1;
-          padding: clamp(0.75rem, 2vh, 1rem);
-          background: linear-gradient(135deg, #757575 0%, #616161 100%);
-          color: white;
-          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
-          border-radius: clamp(10px, 2vw, 15px);
-          font-size: clamp(0.95rem, 2vw, 1.2rem);
+        /* Popup Modal Styles */
+        .popup-overlay {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.7);
+          z-index: 2000;
+          justify-content: center;
+          align-items: center;
+          backdrop-filter: blur(3px);
+        }
+
+        .popup-overlay.active {
+          display: flex;
+        }
+
+        .popup-content {
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 20px);
+          padding: clamp(1.5rem, 3vw, 2.5rem);
+          max-width: min(90vw, 600px);
+          max-height: 80vh;
+          overflow-y: auto;
+          position: relative;
+          box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+        }
+
+        .popup-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          padding-bottom: clamp(0.75rem, 1.5vh, 1rem);
+          border-bottom: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+        }
+
+        .popup-title {
+          font-size: clamp(1.3rem, 3vw, 1.8rem);
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          color: #333;
+        }
+
+        .popup-close {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: 50%;
+          width: clamp(35px, 7vw, 45px);
+          height: clamp(35px, 7vw, 45px);
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          font-weight: bold;
           cursor: pointer;
-          box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+          flex-shrink: 0;
         }
 
-        #editTrainerButton:hover {
+        .popup-close:hover {
+          transform: scale(1.1) rotate(90deg);
+          box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+
+        .popup-body {
+          color: #333;
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          line-height: 1.6;
+        }
+
+        .popup-item {
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          padding: clamp(0.75rem, 1.5vw, 1rem);
+          background: linear-gradient(135deg, rgba(255,222,0,0.1) 0%, rgba(255,222,0,0.05) 100%);
+          border: clamp(2px, 0.4vw, 2px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
+        }
+
+        .popup-item-title {
+          font-weight: 900;
+          font-size: clamp(1.05rem, 2.2vw, 1.2rem);
+          margin-bottom: clamp(0.3rem, 0.8vh, 0.5rem);
+          color: #EE1515;
+          text-transform: uppercase;
+        }
+
+        .popup-item-effect {
+          font-size: clamp(0.9rem, 1.9vw, 1rem);
+          color: #555;
+        }
+
+        .combat-tracker-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: clamp(1rem, 2vw, 1.5rem);
+          margin-top: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .combat-stat-group {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .combat-stat-label {
+          font-weight: 900;
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          color: #333;
+          text-transform: uppercase;
+        }
+
+        .combat-stat-value {
+          font-size: clamp(1.8rem, 4vw, 2.4rem);
+          font-weight: 900;
+          color: #FFDE00;
+          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .combat-input-group {
+          display: flex;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+          align-items: center;
+        }
+
+        .combat-input {
+          flex: 1;
+          padding: clamp(0.5rem, 1vh, 0.75rem);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(8px, 1.5vw, 10px);
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          text-align: center;
+        }
+
+        .combat-button {
+          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(8px, 1.5vw, 10px);
+          font-weight: 900;
+          font-size: clamp(0.9rem, 1.9vw, 1rem);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          text-transform: uppercase;
+        }
+
+        .combat-button.add {
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+          color: white;
+        }
+
+        .combat-button.remove {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        .combat-button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.4),
-                      0 0 15px rgba(255,222,0,0.4);
-          border-color: #FFC700;
-        }
-
-        #editTrainerButton:active {
-          transform: translateY(0);
+          box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
         #backButton {
@@ -460,42 +688,44 @@ export function renderTrainerInfo() {
 
       <!-- Left Column: Image, Info List, and Buttons -->
       <div class="left-column">
-        <div class="trainer-image-container">
+        <div class="trainer-image-container" id="trainerImageButton">
           <img id="trainerImage" src="${trainerImage}" alt="${trainerName}" onerror="this.src='assets/Pokeball.png'">
         </div>
 
         <div class="trainer-info-list">
           <div class="info-item">
             <span class="info-item-label">Level:</span>
-            <span>${trainerLevel}</span>
+            <span class="info-item-value">${trainerLevel}</span>
           </div>
-          <div class="info-item">
-            <span class="info-item-label">Hit Dice:</span>
-            <span>${trainerHD}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-item-label">Vitality Dice:</span>
-            <span>${trainerVD}</span>
+          <div class="info-item-double">
+            <div class="info-item-half">
+              <span class="info-item-label">HD:</span>
+              <span>${trainerHD}</span>
+            </div>
+            <div class="info-item-half">
+              <span class="info-item-label">VD:</span>
+              <span>${trainerVD}</span>
+            </div>
           </div>
           <div class="info-item">
             <span class="info-item-label">Speed:</span>
-            <span>${trainerSpeed} ft</span>
+            <span class="info-item-value">${trainerSpeed} ft</span>
           </div>
           <div class="info-item">
             <span class="info-item-label">Initiative:</span>
-            <span>${trainerInitiative >= 0 ? '+' : ''}${trainerInitiative}</span>
+            <span class="info-item-value">${trainerInitiative >= 0 ? '+' : ''}${trainerInitiative}</span>
           </div>
           <div class="info-item">
             <span class="info-item-label">Proficiency:</span>
-            <span>+${trainerProficiency}</span>
+            <span class="info-item-value">+${trainerProficiency}</span>
           </div>
           <div class="info-item">
             <span class="info-item-label">Saving Throws:</span>
-            <span>${trainerSavingThrows}</span>
+            <span class="info-item-value">${trainerSavingThrows}</span>
           </div>
           <div class="info-item">
             <span class="info-item-label">League Points:</span>
-            <span>${trainerLeaguePoints}</span>
+            <span class="info-item-value">${trainerLeaguePoints}</span>
           </div>
         </div>
 
@@ -506,7 +736,6 @@ export function renderTrainerInfo() {
           <button class="info-button" id="affinityButton">Affinity</button>
           <button class="info-button" id="gearButton">Gear</button>
           <button class="info-button" id="featsButton">Feats</button>
-          <button id="editTrainerButton">Edit Trainer</button>
         </div>
       </div>
 
@@ -520,11 +749,13 @@ export function renderTrainerInfo() {
           </div>
           <div class="stat-box-wrapper">
             <div class="stat-label-box">HP</div>
-            <div class="stat-box">${currentHP}</div>
+            <div class="stat-box">${trainerHP}</div>
+            <div class="current-stat-box" id="currentHPButton" title="Click to open Combat Tracker">${currentHP}</div>
           </div>
           <div class="stat-box-wrapper">
             <div class="stat-label-box">VP</div>
-            <div class="stat-box">${currentVP}</div>
+            <div class="stat-box">${trainerVP}</div>
+            <div class="current-stat-box" id="currentVPButton" title="Click to open Combat Tracker">${currentVP}</div>
           </div>
         </div>
 
@@ -581,6 +812,98 @@ export function renderTrainerInfo() {
           </div>
         </div>
       </div>
+
+      <!-- Popup Modals -->
+      <div class="popup-overlay" id="inventoryPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Inventory</div>
+            <button class="popup-close" id="closeInventory">×</button>
+          </div>
+          <div class="popup-body" id="inventoryContent"></div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="specializationPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Specialization</div>
+            <button class="popup-close" id="closeSpecialization">×</button>
+          </div>
+          <div class="popup-body" id="specializationContent"></div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="trainerPathPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Trainer Path</div>
+            <button class="popup-close" id="closeTrainerPath">×</button>
+          </div>
+          <div class="popup-body" id="trainerPathContent"></div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="affinityPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Affinity</div>
+            <button class="popup-close" id="closeAffinity">×</button>
+          </div>
+          <div class="popup-body" id="affinityContent"></div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="gearPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Gear</div>
+            <button class="popup-close" id="closeGear">×</button>
+          </div>
+          <div class="popup-body" id="gearContent"></div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="featsPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Feats</div>
+            <button class="popup-close" id="closeFeats">×</button>
+          </div>
+          <div class="popup-body" id="featsContent"></div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="combatTrackerPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Combat Tracker</div>
+            <button class="popup-close" id="closeCombatTracker">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="combat-tracker-grid">
+              <div class="combat-stat-group">
+                <div class="combat-stat-label">HP</div>
+                <div class="combat-stat-value" id="combatCurrentHP">${currentHP} / ${trainerHP}</div>
+                <div class="combat-input-group">
+                  <input type="number" class="combat-input" id="hpChangeInput" placeholder="Amount">
+                  <button class="combat-button add" id="addHP">+ Add</button>
+                  <button class="combat-button remove" id="removeHP">- Remove</button>
+                </div>
+              </div>
+              <div class="combat-stat-group">
+                <div class="combat-stat-label">VP</div>
+                <div class="combat-stat-value" id="combatCurrentVP">${currentVP} / ${trainerVP}</div>
+                <div class="combat-input-group">
+                  <input type="number" class="combat-input" id="vpChangeInput" placeholder="Amount">
+                  <button class="combat-button add" id="addVP">+ Add</button>
+                  <button class="combat-button remove" id="removeVP">- Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -591,6 +914,25 @@ export function attachTrainerInfoListeners() {
   const trainerDataStr = sessionStorage.getItem('trainerData');
   const trainerData = trainerDataStr ? JSON.parse(trainerDataStr) : null;
 
+  // Helper function to open popup
+  const openPopup = (popupId) => {
+    document.getElementById(popupId)?.classList.add('active');
+  };
+
+  // Helper function to close popup
+  const closePopup = (popupId) => {
+    document.getElementById(popupId)?.classList.remove('active');
+  };
+
+  // Close popups when clicking overlay
+  document.querySelectorAll('.popup-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.classList.remove('active');
+      }
+    });
+  });
+
   // Back button
   document.getElementById('backButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
@@ -598,8 +940,8 @@ export function attachTrainerInfoListeners() {
     }));
   });
 
-  // Edit Trainer button
-  document.getElementById('editTrainerButton')?.addEventListener('click', () => {
+  // Trainer Image button (Edit Trainer)
+  document.getElementById('trainerImageButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'edit-trainer' }
     }));
@@ -611,139 +953,320 @@ export function attachTrainerInfoListeners() {
 
     const inventory = trainerData[20] || 'None';
     const itemsStr = sessionStorage.getItem('items');
+    const content = document.getElementById('inventoryContent');
 
     if (inventory === 'None' || !inventory) {
-      alert('No items in inventory.');
+      content.innerHTML = '<p style="text-align: center; color: #999;">No items in inventory.</p>';
+      openPopup('inventoryPopup');
       return;
     }
 
     const itemsList = inventory.split(',').map(item => item.trim()).filter(item => item);
+    let html = '';
 
     if (itemsStr) {
       const itemsData = JSON.parse(itemsStr);
-      let message = 'Inventory:\n\n';
-
       itemsList.forEach(itemName => {
         const itemData = itemsData.find(i => i.name === itemName);
         if (itemData) {
-          message += `${itemData.name}\n${itemData.effect}\n\n`;
+          html += `
+            <div class="popup-item">
+              <div class="popup-item-title">${itemData.name}</div>
+              <div class="popup-item-effect">${itemData.effect || 'No effect description'}</div>
+            </div>
+          `;
         } else {
-          message += `${itemName}\n\n`;
+          html += `
+            <div class="popup-item">
+              <div class="popup-item-title">${itemName}</div>
+            </div>
+          `;
         }
       });
-
-      alert(message);
     } else {
-      alert('Inventory:\n\n' + itemsList.join('\n'));
+      itemsList.forEach(itemName => {
+        html += `
+          <div class="popup-item">
+            <div class="popup-item-title">${itemName}</div>
+          </div>
+        `;
+      });
     }
+
+    content.innerHTML = html;
+    openPopup('inventoryPopup');
   });
+
+  document.getElementById('closeInventory')?.addEventListener('click', () => closePopup('inventoryPopup'));
 
   // Specialization button
   document.getElementById('specializationButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
     const specialization = trainerData[24] || 'None';
+    const content = document.getElementById('specializationContent');
 
     if (specialization === 'None' || !specialization) {
-      alert('No specialization selected.');
-      return;
+      content.innerHTML = '<p style="text-align: center; color: #999;">No specialization selected.</p>';
+    } else {
+      content.innerHTML = `<div class="popup-item"><div class="popup-item-effect">${specialization}</div></div>`;
     }
 
-    alert(`Specialization:\n\n${specialization}`);
+    openPopup('specializationPopup');
   });
+
+  document.getElementById('closeSpecialization')?.addEventListener('click', () => closePopup('specializationPopup'));
 
   // Trainer Path button
   document.getElementById('trainerPathButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
     const trainerPath = trainerData[25] || 'None';
+    const content = document.getElementById('trainerPathContent');
 
     if (trainerPath === 'None' || !trainerPath) {
-      alert('No trainer path selected.');
-      return;
+      content.innerHTML = '<p style="text-align: center; color: #999;">No trainer path selected.</p>';
+    } else {
+      content.innerHTML = `<div class="popup-item"><div class="popup-item-effect">${trainerPath}</div></div>`;
     }
 
-    alert(`Trainer Path:\n\n${trainerPath}`);
+    openPopup('trainerPathPopup');
   });
+
+  document.getElementById('closeTrainerPath')?.addEventListener('click', () => closePopup('trainerPathPopup'));
 
   // Affinity button
   document.getElementById('affinityButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
     const affinity = trainerData[23] || 'None';
+    const content = document.getElementById('affinityContent');
 
     if (affinity === 'None' || !affinity) {
-      alert('No affinity selected.');
-      return;
+      content.innerHTML = '<p style="text-align: center; color: #999;">No affinity selected.</p>';
+    } else {
+      const affinities = affinity.split(',').map(a => a.trim()).filter(a => a);
+      const html = affinities.map(aff => `
+        <div class="popup-item">
+          <div class="popup-item-title">${aff}</div>
+        </div>
+      `).join('');
+      content.innerHTML = html;
     }
 
-    const affinities = affinity.split(',').map(a => a.trim()).filter(a => a);
-    alert(`Affinity:\n\n${affinities.join('\n')}`);
+    openPopup('affinityPopup');
   });
+
+  document.getElementById('closeAffinity')?.addEventListener('click', () => closePopup('affinityPopup'));
 
   // Gear button
   document.getElementById('gearButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
     const gear = trainerData[37] || 'None';
+    const content = document.getElementById('gearContent');
 
     if (gear === 'None' || !gear) {
-      alert('No gear equipped.');
+      content.innerHTML = '<p style="text-align: center; color: #999;">No gear equipped.</p>';
+      openPopup('gearPopup');
       return;
     }
 
     const gearList = gear.split(',').map(g => g.trim()).filter(g => g);
     const itemsStr = sessionStorage.getItem('items');
+    let html = '';
 
     if (itemsStr) {
       const itemsData = JSON.parse(itemsStr);
-      let message = 'Gear:\n\n';
-
       gearList.forEach(gearName => {
         const itemData = itemsData.find(i => i.name === gearName);
         if (itemData) {
-          message += `${itemData.name}\n${itemData.effect}\n\n`;
+          html += `
+            <div class="popup-item">
+              <div class="popup-item-title">${itemData.name}</div>
+              <div class="popup-item-effect">${itemData.effect || 'No effect description'}</div>
+            </div>
+          `;
         } else {
-          message += `${gearName}\n\n`;
+          html += `
+            <div class="popup-item">
+              <div class="popup-item-title">${gearName}</div>
+            </div>
+          `;
         }
       });
-
-      alert(message);
     } else {
-      alert('Gear:\n\n' + gearList.join('\n'));
+      gearList.forEach(gearName => {
+        html += `
+          <div class="popup-item">
+            <div class="popup-item-title">${gearName}</div>
+          </div>
+        `;
+      });
     }
+
+    content.innerHTML = html;
+    openPopup('gearPopup');
   });
+
+  document.getElementById('closeGear')?.addEventListener('click', () => closePopup('gearPopup'));
 
   // Feats button
   document.getElementById('featsButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
     const feats = trainerData[33] || 'None';
+    const content = document.getElementById('featsContent');
 
     if (feats === 'None' || !feats) {
-      alert('No feats acquired.');
+      content.innerHTML = '<p style="text-align: center; color: #999;">No feats acquired.</p>';
+      openPopup('featsPopup');
       return;
     }
 
     const featsList = feats.split(',').map(f => f.trim()).filter(f => f);
     const featsDataStr = sessionStorage.getItem('trainerFeats');
+    let html = '';
 
     if (featsDataStr) {
       const featsData = JSON.parse(featsDataStr);
-      let message = 'Feats:\n\n';
-
       featsList.forEach(featName => {
         const featData = featsData.find(f => f.name === featName);
         if (featData) {
-          message += `${featData.name}\n${featData.effect}\n\n`;
+          html += `
+            <div class="popup-item">
+              <div class="popup-item-title">${featData.name}</div>
+              <div class="popup-item-effect">${featData.effect || 'No effect description'}</div>
+            </div>
+          `;
         } else {
-          message += `${featName}\n\n`;
+          html += `
+            <div class="popup-item">
+              <div class="popup-item-title">${featName}</div>
+            </div>
+          `;
         }
       });
-
-      alert(message);
     } else {
-      alert('Feats:\n\n' + featsList.join('\n'));
+      featsList.forEach(featName => {
+        html += `
+          <div class="popup-item">
+            <div class="popup-item-title">${featName}</div>
+          </div>
+        `;
+      });
     }
+
+    content.innerHTML = html;
+    openPopup('featsPopup');
+  });
+
+  document.getElementById('closeFeats')?.addEventListener('click', () => closePopup('featsPopup'));
+
+  // HP/VP Combat Tracker buttons
+  const openCombatTracker = () => {
+    if (!trainerData) return;
+
+    const currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
+      ? parseInt(trainerData[34], 10)
+      : parseInt(trainerData[11], 10);
+
+    const currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
+      ? parseInt(trainerData[35], 10)
+      : parseInt(trainerData[12], 10);
+
+    document.getElementById('combatCurrentHP').textContent = `${currentHP} / ${trainerData[11]}`;
+    document.getElementById('combatCurrentVP').textContent = `${currentVP} / ${trainerData[12]}`;
+    document.getElementById('hpChangeInput').value = '';
+    document.getElementById('vpChangeInput').value = '';
+
+    openPopup('combatTrackerPopup');
+  };
+
+  document.getElementById('currentHPButton')?.addEventListener('click', openCombatTracker);
+  document.getElementById('currentVPButton')?.addEventListener('click', openCombatTracker);
+  document.getElementById('closeCombatTracker')?.addEventListener('click', () => closePopup('combatTrackerPopup'));
+
+  // HP Add/Remove buttons
+  document.getElementById('addHP')?.addEventListener('click', () => {
+    const amount = parseInt(document.getElementById('hpChangeInput').value, 10);
+    if (isNaN(amount) || amount <= 0) return;
+
+    let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
+      ? parseInt(trainerData[34], 10)
+      : parseInt(trainerData[11], 10);
+
+    const baseHP = parseInt(trainerData[11], 10);
+    currentHP = Math.min(currentHP + amount, baseHP);
+
+    trainerData[34] = currentHP;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Refresh the page to show updated values
+    window.location.reload();
+  });
+
+  document.getElementById('removeHP')?.addEventListener('click', () => {
+    const amount = parseInt(document.getElementById('hpChangeInput').value, 10);
+    if (isNaN(amount) || amount <= 0) return;
+
+    let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
+      ? parseInt(trainerData[34], 10)
+      : parseInt(trainerData[11], 10);
+
+    currentHP -= amount;
+
+    trainerData[34] = currentHP;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Refresh the page to show updated values
+    window.location.reload();
+  });
+
+  // VP Add/Remove buttons
+  document.getElementById('addVP')?.addEventListener('click', () => {
+    const amount = parseInt(document.getElementById('vpChangeInput').value, 10);
+    if (isNaN(amount) || amount <= 0) return;
+
+    let currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
+      ? parseInt(trainerData[35], 10)
+      : parseInt(trainerData[12], 10);
+
+    const baseVP = parseInt(trainerData[12], 10);
+    currentVP = Math.min(currentVP + amount, baseVP);
+
+    trainerData[35] = currentVP;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Refresh the page to show updated values
+    window.location.reload();
+  });
+
+  document.getElementById('removeVP')?.addEventListener('click', () => {
+    const amount = parseInt(document.getElementById('vpChangeInput').value, 10);
+    if (isNaN(amount) || amount <= 0) return;
+
+    let currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
+      ? parseInt(trainerData[35], 10)
+      : parseInt(trainerData[12], 10);
+
+    let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
+      ? parseInt(trainerData[34], 10)
+      : parseInt(trainerData[11], 10);
+
+    currentVP -= amount;
+
+    // If VP goes negative, transfer to HP
+    if (currentVP < 0) {
+      currentHP += currentVP; // currentVP is negative, so this subtracts from HP
+      currentVP = 0;
+      trainerData[34] = currentHP;
+    }
+
+    trainerData[35] = currentVP;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Refresh the page to show updated values
+    window.location.reload();
   });
 }

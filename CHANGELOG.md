@@ -457,3 +457,232 @@ After these changes, verify:
 ---
 
 **Session completed: 2025-12-09**
+
+---
+
+## Session: 2025-12-09 Part 2 - Trainer Info Page Enhancements
+
+### 1. Info List Improvements
+
+#### HD/VD Layout Changes (lines 171-189, 700-709):
+- Renamed "Hit Dice" to "HD" and "Vitality Dice" to "VD"
+- Placed HD and VD on same row at half width each
+- Added `.info-item-double` grid layout (2 columns)
+- Added `.info-item-half` style for half-width items
+
+#### Multi-Value Support (lines 164-169):
+- Added `.info-item-value` class with text wrapping
+- Allows Speed and Saving Throws to display multiple values
+- Added `max-width: 60%` and `word-wrap: break-word`
+
+---
+
+### 2. Trainer Image as Edit Button (lines 122-168, 691-693)
+
+**Changes**:
+- Converted trainer image container to clickable button
+- Added `cursor: pointer` and hover effects
+- Added overlay text "EDIT TRAINER" that appears on hover
+- Overlay uses gradient fade from bottom: `rgba(0,0,0,0.9)` to transparent
+- Gold text with smooth opacity transition
+- Removed separate "Edit Trainer" button from button grid
+- Click event navigates to edit-trainer page
+
+**Visual Effects**:
+- Lift animation on hover: `translateY(-3px)`
+- Enhanced shadow and gold glow
+- Text opacity: 0 → 1 on hover
+
+---
+
+### 3. Stats Display Updates
+
+#### Reduced Box Sizes (lines 264-331):
+- AC, HP, VP boxes reduced from `clamp(80px, 12vw, 110px)` to `clamp(65px, 10vw, 90px)`
+- Font size reduced from `clamp(2rem, 4vw, 2.8rem)` to `clamp(1.8rem, 3.5vw, 2.4rem)`
+- Label font size adjusted to `clamp(0.95rem, 2vw, 1.2rem)`
+
+#### Current HP/VP Modifier Boxes (lines 304-331, 750-759):
+- Added blue `.current-stat-box` style below HP and VP
+- Size: `clamp(55px, 8vw, 75px)` square
+- Blue gradient: `linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%)`
+- Shows current HP/VP values (overlaps slightly with main box)
+- Clickable buttons that open Combat Tracker popup
+- Hover effects: lift animation and blue glow
+
+---
+
+### 4. Popup Modal System (lines 452-615)
+
+**Base Popup Styles**:
+- `.popup-overlay`: Full-screen dark overlay with blur effect
+- `.popup-content`: White gradient card with gold border
+- Max width: `min(90vw, 600px)`, Max height: `80vh`
+- Scrollable content area
+
+**Popup Header**:
+- Title in uppercase with heavy font weight
+- Red circular close button (×) with rotation animation on hover
+- Gold bottom border separating header from content
+
+**Popup Item Cards**:
+- Gold-tinted gradient background
+- `.popup-item-title`: Red uppercase title
+- `.popup-item-effect`: Gray text for descriptions
+- Rounded corners with gold borders
+
+---
+
+### 5. Combat Tracker Popup (lines 549-615, 877-906)
+
+**Layout**:
+- 2-column grid for HP and VP side-by-side
+- Each column shows:
+  - Label (HP/VP)
+  - Current/Max display (e.g., "25 / 30")
+  - Input field for amount
+  - Add (+) and Remove (-) buttons
+
+**Styling**:
+- Green gradient for Add buttons
+- Red gradient for Remove buttons
+- Gold-bordered input fields
+- Large gold numbers for current values
+
+**Functionality** (lines 1166-1271):
+- Opens when clicking current HP or VP boxes
+- Add buttons: Restore HP/VP (capped at max)
+- Remove buttons: Reduce HP/VP
+- VP overflow: When VP < 0, remaining damage transfers to HP
+- All changes saved to sessionStorage
+- Page refreshes to show updated values
+
+---
+
+### 6. Info Button Popups (lines 816-906, 950-1164)
+
+All info buttons now open custom popup modals instead of browser alerts:
+
+#### Inventory Popup (lines 950-1000):
+- Lists all items from `trainerData[20]`
+- Fetches item details from sessionStorage
+- Displays item name + effect in styled cards
+- Shows empty state if no items
+
+#### Specialization Popup (lines 1002-1018):
+- Displays specialization from `trainerData[24]`
+- Simple text display in popup card
+
+#### Trainer Path Popup (lines 1020-1036):
+- Displays trainer path from `trainerData[25]`
+- Simple text display in popup card
+
+#### Affinity Popup (lines 1038-1060):
+- Splits comma-separated affinities from `trainerData[23]`
+- Each affinity in separate card
+
+#### Gear Popup (lines 1062-1112):
+- Lists equipped gear from `trainerData[37]`
+- Fetches gear details from items database
+- Displays gear name + effect
+- Shows empty state if no gear
+
+#### Feats Popup (lines 1114-1164):
+- Lists feats from `trainerData[33]`
+- Fetches feat details from trainerFeats in sessionStorage
+- Displays feat name + effect
+- Shows empty state if no feats
+
+**Close Mechanisms**:
+- X button in header
+- Clicking outside popup (on overlay)
+- All popups use same styling system
+
+---
+
+### 7. Event Listener Updates
+
+**Removed**:
+- Old `editTrainerButton` listener
+- All `alert()` dialog handlers
+
+**Added**:
+- `trainerImageButton` click handler (edit trainer)
+- `currentHPButton` and `currentVPButton` handlers (combat tracker)
+- 6 info button popup handlers with content population
+- 7 close button handlers (one per popup)
+- Overlay click handlers for all popups
+- Combat tracker HP/VP add/remove button handlers with VP overflow logic
+
+---
+
+## Visual Design Updates
+
+### New Color Usage:
+- **Blue gradient**: `#3B4CCA → #2E3FA0` (current HP/VP boxes, combat buttons)
+- **Green gradient**: `#4CAF50 → #45A049` (add buttons)
+- **Info cards**: Gold-tinted transparent backgrounds
+
+### New Interactive Elements:
+- Trainer image hover overlay
+- Clickable current HP/VP indicators
+- Custom popup modal system
+- Combat tracker with real-time updates
+
+### Improved UX:
+- No more browser alerts
+- Rich content display with item/feat/gear details
+- Visual feedback on all clickable elements
+- Intuitive combat tracking interface
+- HD/VD condensed to single row for cleaner layout
+
+---
+
+## Files Modified This Session
+
+1. `js/pages/trainer-info.js` - Major enhancements (1272 lines total)
+   - Lines 122-189: Trainer image button and info list updates
+   - Lines 264-331: Stat box size adjustments and current HP/VP boxes
+   - Lines 452-615: Popup modal styles and combat tracker styles
+   - Lines 691-709: HTML structure updates for HD/VD and trainer image
+   - Lines 750-759: HTML for current HP/VP buttons
+   - Lines 816-906: Popup modal HTML (7 popups)
+   - Lines 913-1271: Complete event listener rewrite
+
+---
+
+## Testing Checklist
+
+After these changes, verify:
+- [ ] Trainer image shows "EDIT TRAINER" overlay on hover
+- [ ] Clicking trainer image navigates to edit-trainer page
+- [ ] HD and VD appear on same row at half width
+- [ ] Speed and Saving Throws can display long text properly
+- [ ] AC, HP, VP boxes are smaller than before
+- [ ] Current HP/VP boxes appear below HP/VP in blue
+- [ ] Clicking current HP/VP opens Combat Tracker popup
+- [ ] All 6 info buttons open custom popups (not alerts)
+- [ ] All popup close buttons work
+- [ ] Clicking outside popup closes it
+- [ ] Inventory popup shows items with effects
+- [ ] Gear popup shows gear with effects
+- [ ] Feats popup shows feats with effects
+- [ ] Specialization, Path, and Affinity popups display correctly
+- [ ] Combat Tracker allows adding/removing HP/VP
+- [ ] VP overflow transfers to HP correctly
+- [ ] Changes persist after page refresh
+- [ ] All popups are scrollable if content is long
+- [ ] Mobile responsiveness maintained
+
+---
+
+## Known Issues / Future Improvements
+
+- Combat tracker currently refreshes page after each change - could be improved with dynamic updates
+- Could add animation when popups open/close
+- Could add confirmation dialog for large HP/VP changes
+- Consider persisting combat tracker changes to backend/Google Sheets
+
+---
+
+**Session completed: 2025-12-09 Part 2**

@@ -1,5 +1,8 @@
 // Trainer Info Page - Detailed Trainer Information Display
 
+// Module-level variable to track selected inventory item
+let selectedItemData = null;
+
 export function renderTrainerInfo() {
   // Load trainer data from session storage
   const trainerDataStr = sessionStorage.getItem('trainerData');
@@ -1852,7 +1855,6 @@ export function attachTrainerInfoListeners() {
     });
 
     // Add item selection listeners
-    let selectedItemData = null;
     document.querySelectorAll('.inventory-list-item').forEach(itemElement => {
       itemElement.addEventListener('click', function() {
         // Remove previous selection
@@ -1956,10 +1958,18 @@ export function attachTrainerInfoListeners() {
     trainerData[20] = inventoryItems.join(', ');
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-    // Close modal and refresh inventory
-    document.getElementById('addItemModal').style.display = 'none';
-    closePopup('inventoryPopup');
-    setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+    // Update database
+    import('../api.js').then(({ TrainerAPI }) => {
+      TrainerAPI.update(trainerData).then(() => {
+        // Close modal and refresh inventory
+        document.getElementById('addItemModal').style.display = 'none';
+        closePopup('inventoryPopup');
+        setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+      }).catch(error => {
+        console.error('Failed to update inventory in database:', error);
+        alert('Failed to save to database. Please try again.');
+      });
+    });
   });
 
   // Add Item Modal - Cancel button
@@ -2038,10 +2048,18 @@ export function attachTrainerInfoListeners() {
       trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-      // Close modal and refresh inventory
-      document.getElementById('editItemModal').style.display = 'none';
-      closePopup('inventoryPopup');
-      setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+      // Update database
+      import('../api.js').then(({ TrainerAPI }) => {
+        TrainerAPI.update(trainerData).then(() => {
+          // Close modal and refresh inventory
+          document.getElementById('editItemModal').style.display = 'none';
+          closePopup('inventoryPopup');
+          setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+        }).catch(error => {
+          console.error('Failed to update inventory in database:', error);
+          alert('Failed to save to database. Please try again.');
+        });
+      });
     }
   });
 
@@ -2083,10 +2101,18 @@ export function attachTrainerInfoListeners() {
       trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-      // Close modal and refresh inventory
-      document.getElementById('removeItemModal').style.display = 'none';
-      closePopup('inventoryPopup');
-      setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+      // Update database
+      import('../api.js').then(({ TrainerAPI }) => {
+        TrainerAPI.update(trainerData).then(() => {
+          // Close modal and refresh inventory
+          document.getElementById('removeItemModal').style.display = 'none';
+          closePopup('inventoryPopup');
+          setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+        }).catch(error => {
+          console.error('Failed to update inventory in database:', error);
+          alert('Failed to save to database. Please try again.');
+        });
+      });
     }
   });
 

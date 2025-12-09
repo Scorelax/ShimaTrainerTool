@@ -4,6 +4,74 @@ This file tracks all changes made to the project across development sessions.
 
 ---
 
+## Session: 2025-01-27 (Part 2) - Combat Tracker Redesign & Inventory Fix
+
+### Part 12: Combat Tracker Redesign (`js/pages/trainer-info.js`)
+
+**Issue**: Combat tracker required horizontal scrolling on tablets to see VP section. Had separate buttons for HP and VP which was clumsy.
+
+**Changes**:
+
+**HTML Structure** (lines 1658-1687):
+- Changed from vertical grid layout to flexbox container
+- Created side-by-side layout with `display: grid; grid-template-columns: 1fr 1fr`
+- HP and VP now in equal-width columns that fit viewport without scrolling
+- Combined button controls into single row below both stats
+- Added three buttons: Add, Remove, Full Restore (with icons)
+
+**CSS Styling** (lines 1121-1227):
+- `.combat-tracker-container`: Flexbox column layout with responsive gaps
+- `.combat-stats-row`: 2-column grid for side-by-side HP/VP display
+- `.combat-stat-column`: Vertical flex layout for label/value/input
+- `.combat-input`: Dark theme with gold focus borders
+- `.combat-controls`: Flex row for button layout
+- `.combat-button`: Three variants with icon + text format:
+  - `.add`: Green gradient (➕ Add)
+  - `.remove`: Red gradient (➖ Remove)
+  - `.restore`: Blue gradient (✨ Full Restore)
+
+**JavaScript Handlers** (lines 2531-2622):
+- Replaced 4 separate handlers (addHP, removeHP, addVP, removeVP) with 3 combined:
+  - `addStats`: Checks both HP and VP inputs, adds amounts to fields with values, caps at maximum
+  - `removeStats`: Checks both inputs, removes amounts, transfers negative VP to HP damage
+  - `fullRestore`: Shows confirmation dialog, restores both HP and VP to max values
+- Buttons work intelligently: only process fields that have input values
+- Empty fields remain unchanged
+
+**Result**: Combat tracker now fits on tablet screen without scrolling. Single set of intuitive buttons handles both stats. Full Restore provides quick healing between battles.
+
+---
+
+### Part 13: Fix Inventory Modal String Parsing (`js/pages/trainer-info.js`)
+
+**Issue**: Adding/editing/removing inventory items threw error: "Uncaught SyntaxError: Unexpected token 'P', "Poké Ball "... is not valid JSON". Root cause was that inventory data is stored as comma-separated string format (e.g., "Poké Ball (x5), Potion (x3)"), not JSON.
+
+**Changes**:
+
+**Add Item Handler** (lines 1911-1962):
+- Changed from `JSON.parse(inventoryStr)` to `inventoryStr.split(',').map(item => item.trim())`
+- Uses regex pattern `/^(.+?)\s*\(x(\d+)\)$/` to extract item name and quantity
+- Maps through items to find existing items (case-insensitive matching)
+- Updates existing item quantity or adds new item
+- Rebuilds string with `inventoryItems.join(', ')`
+
+**Edit Item Handler** (lines 2003-2045):
+- Replaced JSON.parse with string split/filter/map approach
+- Filters out items with quantity 0 (removes them)
+- Maps to update quantity for matching items
+- Maintains "ItemName (xN)" format when rebuilding string
+- Sets to "None" if inventory becomes empty
+
+**Remove Item Handler** (lines 2063-2090):
+- Replaced JSON.parse with string split/filter approach
+- Filters out the matching item by name (case-insensitive)
+- Joins remaining items back to comma-separated string
+- Sets to "None" if inventory becomes empty
+
+**Result**: All inventory operations (add/edit/remove) now work correctly with the comma-separated string format. No more JSON.parse errors.
+
+---
+
 ## Session: 2025-01-27 - UI Modernization & Evolution Feature
 
 ### 1. Trainer Info Page Layout Fixes (`js/pages/trainer-info.js`)

@@ -760,3 +760,120 @@ After these changes, verify:
 ---
 
 **Session completed: 2025-12-09 Part 3**
+
+---
+
+## Session: 2025-12-09 Part 4 - Trainer Info Responsive Layout Fix
+
+### Issue
+Trainer Info page was switching to single-column layout too early on tablets, causing everything to stack vertically instead of maintaining the intended two-column design.
+
+### Root Cause
+- Media query breakpoint at `max-width: 1024px` was forcing single column
+- Tablets (768px-1024px wide) should maintain two-column layout
+- Only mobile phones (<600px) should use single column
+
+### Solution (lines 650-720 in `js/pages/trainer-info.js`)
+
+Implemented progressive responsive breakpoints:
+
+#### 1. Tablet Landscape (≤1024px):
+- **Maintains 2-column layout**: `grid-template-columns: minmax(30%, 35%) 1fr`
+- Slightly increased left column from 25-30% to 30-35%
+- Reduced gap from `clamp(2rem, 4vw, 4rem)` to `clamp(1.5rem, 3vw, 2.5rem)`
+- Ability scores: 3 columns
+- Skills: Auto-fit with smaller minimum width
+
+#### 2. Tablet Portrait (≤768px):
+- **Still maintains 2-column layout**: `grid-template-columns: minmax(35%, 40%) 1fr`
+- Further increased left column to 35-40% for better balance
+- Tighter gap: `clamp(1rem, 2.5vw, 2rem)`
+- Reduced padding for more content space
+- Ability scores: 3 columns
+- Skills: 2 columns
+
+#### 3. Mobile Phones (≤600px):
+- **Switches to single column**: `grid-template-columns: 1fr`
+- Left column first (image + info)
+- Right column second (stats + skills)
+- Extra top padding on left column to clear title
+- Ability scores: 3 columns
+- Skills: 2 columns
+
+#### 4. Small Mobile (≤480px):
+- Single column (inherited from 600px)
+- Ability scores: 2 columns (for more space)
+- Skills: 1 column (full width for readability)
+- Info buttons: 1 column (stack vertically)
+
+---
+
+## Breakpoint Strategy
+
+| Device | Width | Layout | Left Column | Abilities | Skills |
+|--------|-------|--------|-------------|-----------|--------|
+| Desktop | >1024px | 2-col (25-30%) | 25-30% | 6 cols | auto-fit |
+| Tablet Landscape | ≤1024px | 2-col (30-35%) | 30-35% | 3 cols | auto-fit |
+| Tablet Portrait | ≤768px | 2-col (35-40%) | 35-40% | 3 cols | 2 cols |
+| Mobile | ≤600px | 1-col | 100% | 3 cols | 2 cols |
+| Small Mobile | ≤480px | 1-col | 100% | 2 cols | 1 col |
+
+---
+
+## Why This Works
+
+### Viewport-Based Sizing
+All elements use `clamp()` with viewport units (vw, vh) so they scale proportionally:
+- **clamp(min, preferred, max)** ensures elements never get too small or too large
+- **vw units** scale based on viewport width
+- **vh units** scale based on viewport height
+- **Percentage-based grid columns** adapt to available space
+
+### Progressive Enhancement
+- Larger screens: Maximum detail and spacing
+- Tablets: Balanced layout, slightly more compact
+- Phones: Single column for easy scrolling, optimized for touch
+
+### Maintains Usability
+- Two-column layout on tablets utilizes horizontal space efficiently
+- Single column on phones prevents content from being too cramped
+- All interactive elements remain easily tappable on touch devices
+
+---
+
+## Files Modified This Session
+
+1. `js/pages/trainer-info.js` - Fixed responsive breakpoints (lines 650-720)
+   - Replaced single breakpoint with 4 progressive breakpoints
+   - Maintained 2-column layout on tablets (768px-1024px)
+   - Single column only on mobile phones (<600px)
+   - Added small mobile optimizations (<480px)
+
+---
+
+## Testing Checklist
+
+After these changes, verify on different devices:
+- [ ] Desktop (>1024px): 2 columns, 25-30% left column
+- [ ] Tablet Landscape (768-1024px): 2 columns, 30-35% left column
+- [ ] Tablet Portrait (600-768px): 2 columns, 35-40% left column
+- [ ] Mobile (480-600px): 1 column, stats/skills readable
+- [ ] Small Mobile (<480px): 1 column, 2-col abilities, 1-col skills
+- [ ] All text remains readable at all sizes
+- [ ] Touch targets remain appropriately sized
+- [ ] No horizontal scrolling at any size
+- [ ] Images scale proportionally
+- [ ] Popups work on all devices
+
+---
+
+## Known Improvements
+
+- Layout now scales smoothly across all device sizes
+- Tablets properly utilize available horizontal space
+- Mobile devices get optimized single-column layout
+- All viewport-based sizing ensures consistent appearance regardless of device
+
+---
+
+**Session completed: 2025-12-09 Part 4**

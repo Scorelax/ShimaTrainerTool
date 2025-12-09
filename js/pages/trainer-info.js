@@ -647,17 +647,28 @@ export function renderTrainerInfo() {
           transform: scale(1.08);
         }
 
+        /* Tablet Landscape and below - maintain 2 columns but adjust sizing */
         @media (max-width: 1024px) {
           .trainer-info-page {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(30%, 35%) 1fr;
+            gap: clamp(1.5rem, 3vw, 2.5rem);
           }
 
-          .left-column {
-            padding-top: clamp(5rem, 10vh, 6rem);
+          .ability-container {
+            grid-template-columns: repeat(3, 1fr);
           }
 
-          .right-column {
-            padding-top: clamp(1rem, 2vh, 1.5rem);
+          .skills-grid {
+            grid-template-columns: repeat(auto-fit, minmax(clamp(120px, 18vw, 180px), 1fr));
+          }
+        }
+
+        /* Tablet Portrait - still 2 columns but more compact */
+        @media (max-width: 768px) {
+          .trainer-info-page {
+            grid-template-columns: minmax(35%, 40%) 1fr;
+            gap: clamp(1rem, 2.5vw, 2rem);
+            padding: clamp(1rem, 2vh, 1.5rem) clamp(0.75rem, 1.5vw, 1.5rem);
           }
 
           .ability-container {
@@ -669,12 +680,41 @@ export function renderTrainerInfo() {
           }
         }
 
-        @media (max-width: 640px) {
+        /* Mobile phones - single column layout */
+        @media (max-width: 600px) {
+          .trainer-info-page {
+            grid-template-columns: 1fr;
+            gap: clamp(1rem, 2vh, 1.5rem);
+          }
+
+          .left-column {
+            padding-top: clamp(5rem, 10vh, 6rem);
+          }
+
+          .right-column {
+            padding-top: clamp(0.5rem, 1vh, 1rem);
+          }
+
+          .ability-container {
+            grid-template-columns: repeat(3, 1fr);
+          }
+
+          .skills-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        /* Small mobile phones - more compact */
+        @media (max-width: 480px) {
           .ability-container {
             grid-template-columns: repeat(2, 1fr);
           }
 
           .skills-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .info-buttons-grid {
             grid-template-columns: 1fr;
           }
         }

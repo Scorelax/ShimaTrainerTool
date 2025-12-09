@@ -877,3 +877,148 @@ After these changes, verify on different devices:
 ---
 
 **Session completed: 2025-12-09 Part 4**
+
+---
+
+## Session: 2025-12-09 Part 5 - Mobile Responsive Layout Extension
+
+### Issue
+Following the tablet responsive fix, the two-column layout needed to be extended to work on mobile phones as well, not just tablets.
+
+### Objective
+Maintain the two-column layout design (image/info on left, stats/skills on right) on mobile phones, only falling back to single column on very small screens.
+
+### Solution (lines 650-762 in `js/pages/trainer-info.js`)
+
+Updated responsive breakpoints to maintain 2-column layout on most devices:
+
+#### 1. Mobile Phones (≤600px):
+- **Changed from single column to 2-column layout**
+- Grid: `grid-template-columns: minmax(40%, 45%) 1fr`
+- Left column: 40-45% width (larger proportion for better balance)
+- Reduced gap: `clamp(0.75rem, 2vw, 1.5rem)`
+- Reduced padding: `clamp(1rem, 2vh, 1.5rem) clamp(0.5rem, 1vw, 1rem)`
+- Font sizes scaled down for mobile
+- Ability scores: 3 columns
+- Skills: 2 columns
+
+#### 2. Small Mobile (≤480px):
+- **Still maintains 2-column layout**
+- Grid: `grid-template-columns: minmax(42%, 48%) 1fr`
+- Left column: 42-48% width (slightly larger for very small screens)
+- Further reduced gap: `clamp(0.5rem, 1.5vw, 1rem)`
+- Compact padding throughout
+- Ability scores: 2 columns (more breathing room)
+- Skills: 2 columns
+- Info buttons: 1 column (stack vertically for easier tapping)
+
+#### 3. Very Small Screens (≤360px):
+- **Final fallback to single column**
+- Grid: `grid-template-columns: 1fr`
+- Only activates on very small/old phones (<360px wide)
+- Left column first with extra top padding
+- Right column follows below
+- All elements stack vertically
+
+---
+
+## Updated Breakpoint Strategy
+
+| Device | Width | Layout | Left Column | Abilities | Skills | Buttons |
+|--------|-------|--------|-------------|-----------|--------|---------|
+| Desktop | >1024px | 2-col | 25-30% | 6 cols | auto-fit | 2 cols |
+| Tablet Landscape | ≤1024px | 2-col | 30-35% | 3 cols | auto-fit | 2 cols |
+| Tablet Portrait | ≤768px | 2-col | 35-40% | 3 cols | 2 cols | 2 cols |
+| **Mobile** | **≤600px** | **2-col** | **40-45%** | **3 cols** | **2 cols** | **2 cols** |
+| **Small Mobile** | **≤480px** | **2-col** | **42-48%** | **2 cols** | **2 cols** | **1 col** |
+| Very Small | ≤360px | 1-col | 100% | 2 cols | 1 col | 1 col |
+
+---
+
+## Key Changes from Part 4
+
+### Before (Part 4):
+- Mobile phones (≤600px): Single column
+- Everything stacked vertically on phones
+
+### After (Part 5):
+- Mobile phones (600-480px): 2 columns, 40-45% left
+- Small mobile (480-360px): 2 columns, 42-48% left
+- Very small screens (<360px): Single column fallback
+
+### Progressive Size Reductions:
+- **Gaps**: 2rem → 1.5rem → 1rem → 0.75rem → 0.5rem
+- **Padding**: Progressive reduction at each breakpoint
+- **Font sizes**: Scaled down appropriately for mobile
+- **Touch targets**: Maintained adequate size for tapping
+
+---
+
+## Why This Approach Works
+
+### Viewport-Based Scaling
+All sizing uses `clamp()` with viewport units:
+- Elements scale proportionally across all screen sizes
+- No jarring jumps between breakpoints
+- Consistent visual appearance maintained
+
+### Responsive Grid Percentages
+Using `minmax(40%, 45%)` instead of fixed pixels:
+- Left column adapts to available space
+- Right column always fills remaining space
+- Maintains balance regardless of device
+
+### Progressive Enhancement
+- Desktop → Tablet → Mobile → Small Mobile → Very Small
+- Each breakpoint makes subtle adjustments
+- Layout integrity maintained until absolutely necessary to switch to single column
+- Only the smallest screens (<360px) get single column
+
+---
+
+## Mobile Usability Benefits
+
+1. **Better Space Utilization**: Horizontal space on phones is used efficiently
+2. **Consistent Experience**: Design looks similar across all devices (desktop to mobile)
+3. **Easier Comparison**: Stats and info visible side-by-side on most phones
+4. **Familiar Layout**: Users don't experience drastic layout changes
+5. **Touch-Friendly**: All interactive elements remain easily tappable
+
+---
+
+## Files Modified This Session
+
+1. `js/pages/trainer-info.js` - Extended 2-column layout to mobile (lines 650-762)
+   - Updated 600px breakpoint: Changed from 1-col to 2-col
+   - Updated 480px breakpoint: Maintained 2-col with adjusted proportions
+   - Added 360px breakpoint: Final fallback to single column
+   - Progressive reduction in gaps, padding, and font sizes
+
+---
+
+## Testing Checklist
+
+Test on various devices and screen sizes:
+- [ ] Desktop (>1024px): 2 columns, optimal spacing
+- [ ] Tablet Landscape (768-1024px): 2 columns, balanced layout
+- [ ] Tablet Portrait (600-768px): 2 columns, good proportions
+- [ ] **Modern Phones (480-600px)**: 2 columns, 40-45% left, readable
+- [ ] **Small Phones (360-480px)**: 2 columns, 42-48% left, compact but usable
+- [ ] Very Small Screens (<360px): Single column fallback
+- [ ] All text remains legible at smallest supported sizes
+- [ ] Touch targets are appropriately sized (min 44x44px)
+- [ ] No horizontal scrolling at any breakpoint
+- [ ] Combat tracker popup works on mobile
+- [ ] All info button popups work on mobile
+- [ ] Trainer image "EDIT TRAINER" overlay works on touch devices
+- [ ] Skills table is readable in 2-column format on phones
+
+---
+
+## Result
+
+The trainer info page now maintains its intended two-column design across almost all devices, only switching to single column on very small screens (<360px). This provides a consistent user experience and efficient use of screen space across desktop, tablet, and mobile devices.
+
+---
+
+**Session completed: 2025-12-09 Part 5**

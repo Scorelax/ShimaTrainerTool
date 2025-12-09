@@ -680,11 +680,68 @@ export function renderTrainerInfo() {
           }
         }
 
-        /* Mobile phones - single column layout */
+        /* Mobile phones - still maintain 2 columns with larger left side */
         @media (max-width: 600px) {
           .trainer-info-page {
+            grid-template-columns: minmax(40%, 45%) 1fr;
+            gap: clamp(0.75rem, 2vw, 1.5rem);
+            padding: clamp(1rem, 2vh, 1.5rem) clamp(0.5rem, 1vw, 1rem);
+          }
+
+          .ability-container {
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.4rem, 1.5vw, 0.75rem);
+          }
+
+          .skills-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.4rem, 1.2vw, 0.6rem);
+          }
+
+          .info-item {
+            font-size: clamp(0.8rem, 1.8vw, 1rem);
+            padding: clamp(0.3rem, 0.8vh, 0.5rem) clamp(0.5rem, 1.2vw, 0.8rem);
+          }
+
+          .info-button {
+            font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+            padding: clamp(0.5rem, 1.2vh, 0.7rem);
+          }
+        }
+
+        /* Small mobile phones - even more compact 2 columns */
+        @media (max-width: 480px) {
+          .trainer-info-page {
+            grid-template-columns: minmax(42%, 48%) 1fr;
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+            padding: clamp(0.75rem, 1.5vh, 1.25rem) clamp(0.4rem, 0.8vw, 0.75rem);
+          }
+
+          .ability-container {
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.3rem, 1vw, 0.5rem);
+          }
+
+          .skills-grid {
             grid-template-columns: 1fr;
-            gap: clamp(1rem, 2vh, 1.5rem);
+            gap: clamp(0.3rem, 1vw, 0.5rem);
+          }
+
+          .info-buttons-grid {
+            grid-template-columns: 1fr;
+            gap: clamp(0.4rem, 1vh, 0.6rem);
+          }
+
+          .stat-main-container {
+            gap: clamp(0.5rem, 2vw, 1rem);
+          }
+        }
+
+        /* Very small screens - final fallback single column if needed */
+        @media (max-width: 360px) {
+          .trainer-info-page {
+            grid-template-columns: 1fr;
+            gap: clamp(0.75rem, 2vh, 1rem);
           }
 
           .left-column {
@@ -696,25 +753,10 @@ export function renderTrainerInfo() {
           }
 
           .ability-container {
-            grid-template-columns: repeat(3, 1fr);
-          }
-
-          .skills-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        /* Small mobile phones - more compact */
-        @media (max-width: 480px) {
-          .ability-container {
             grid-template-columns: repeat(2, 1fr);
           }
 
           .skills-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .info-buttons-grid {
             grid-template-columns: 1fr;
           }
         }

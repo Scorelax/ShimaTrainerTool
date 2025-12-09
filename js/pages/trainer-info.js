@@ -473,7 +473,7 @@ export function renderTrainerInfo() {
         }
 
         .popup-content {
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
           border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
           border-radius: clamp(15px, 3vw, 20px);
           padding: clamp(1.5rem, 3vw, 2.5rem);
@@ -481,7 +481,7 @@ export function renderTrainerInfo() {
           max-height: 80vh;
           overflow-y: auto;
           position: relative;
-          box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+          box-shadow: 0 15px 40px rgba(0,0,0,0.8);
         }
 
         .popup-header {
@@ -498,7 +498,8 @@ export function renderTrainerInfo() {
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.3vw, 1px);
-          color: #333;
+          color: #FFDE00;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
 
         .popup-close {
@@ -524,7 +525,7 @@ export function renderTrainerInfo() {
         }
 
         .popup-body {
-          color: #333;
+          color: #e0e0e0;
           font-size: clamp(0.95rem, 2vw, 1.1rem);
           line-height: 1.6;
         }
@@ -532,7 +533,7 @@ export function renderTrainerInfo() {
         .popup-item {
           margin-bottom: clamp(1rem, 2vh, 1.5rem);
           padding: clamp(0.75rem, 1.5vw, 1rem);
-          background: linear-gradient(135deg, rgba(255,222,0,0.1) 0%, rgba(255,222,0,0.05) 100%);
+          background: linear-gradient(135deg, rgba(255,222,0,0.12) 0%, rgba(255,222,0,0.06) 100%);
           border: clamp(2px, 0.4vw, 2px) solid rgba(255,222,0,0.4);
           border-radius: clamp(8px, 1.5vw, 12px);
         }
@@ -541,13 +542,14 @@ export function renderTrainerInfo() {
           font-weight: 900;
           font-size: clamp(1.05rem, 2.2vw, 1.2rem);
           margin-bottom: clamp(0.3rem, 0.8vh, 0.5rem);
-          color: #EE1515;
+          color: #FFDE00;
           text-transform: uppercase;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
         }
 
         .popup-item-effect {
           font-size: clamp(0.9rem, 1.9vw, 1rem);
-          color: #555;
+          color: #c0c0c0;
         }
 
         .popup-item-locked {
@@ -561,7 +563,7 @@ export function renderTrainerInfo() {
         }
 
         .popup-item-locked .popup-item-effect {
-          color: #999;
+          color: #777;
           font-style: italic;
         }
 
@@ -569,15 +571,257 @@ export function renderTrainerInfo() {
           font-size: clamp(1.1rem, 2.3vw, 1.3rem);
           font-weight: 900;
           text-transform: uppercase;
-          color: #EE1515;
+          color: #FFDE00;
           margin: clamp(1rem, 2vh, 1.5rem) 0 clamp(0.5rem, 1vh, 0.75rem) 0;
           padding-bottom: clamp(0.3rem, 0.8vh, 0.5rem);
-          border-bottom: clamp(2px, 0.4vw, 3px) solid rgba(238,21,21,0.3);
+          border-bottom: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
           letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
         }
 
         .popup-category-title:first-child {
           margin-top: 0;
+        }
+
+        /* Special Inventory Popup Styles */
+        #inventoryPopup .popup-content {
+          max-width: min(90vw, 900px);
+          max-height: 85vh;
+          padding: 0;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .inventory-popup-content {
+          display: flex;
+          height: 100%;
+          flex: 1;
+          overflow: hidden;
+        }
+
+        .inventory-sidebar {
+          width: clamp(280px, 35%, 400px);
+          background: linear-gradient(135deg, #2c2c2c 0%, #252525 100%);
+          color: white;
+          display: flex;
+          flex-direction: column;
+          border-right: clamp(2px, 0.4vw, 3px) solid #333;
+          overflow: hidden;
+        }
+
+        .inventory-title {
+          padding: clamp(1rem, 2vh, 1.5rem);
+          margin: 0;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          font-size: clamp(1.4rem, 3vw, 1.8rem);
+          font-weight: 900;
+          text-align: center;
+          border-bottom: clamp(2px, 0.4vw, 3px) solid #333;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .inventory-categories {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          overflow-y: auto;
+          flex: 1;
+        }
+
+        .category-header {
+          padding: clamp(0.9rem, 2vh, 1.2rem) clamp(1.2rem, 2.5vw, 1.6rem);
+          background-color: #3a3a3a;
+          cursor: pointer;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid #444;
+          transition: all 0.2s ease;
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          font-weight: 700;
+        }
+
+        .category-header:hover {
+          background-color: #4a4a4a;
+          padding-left: clamp(1.4rem, 3vw, 1.8rem);
+        }
+
+        .category-header.active {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        .arrow {
+          transition: transform 0.2s ease;
+          font-size: clamp(0.8rem, 1.8vw, 1rem);
+        }
+
+        .category-header.active .arrow {
+          transform: rotate(90deg);
+        }
+
+        .item-list {
+          background-color: #2c2c2c;
+          padding: 0;
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s ease;
+        }
+
+        .item-list.expanded {
+          max-height: 500px;
+          overflow-y: auto;
+        }
+
+        .inventory-list-item {
+          padding: clamp(0.7rem, 1.5vh, 0.9rem) clamp(1.7rem, 3.5vw, 2.2rem);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border-left: clamp(3px, 0.6vw, 4px) solid transparent;
+          color: #ddd;
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+        }
+
+        .inventory-list-item:hover {
+          background-color: #3a3a3a;
+          border-left-color: #EE1515;
+          color: white;
+        }
+
+        .inventory-list-item.selected {
+          background-color: #EE1515;
+          color: white;
+          border-left-color: white;
+          font-weight: 700;
+        }
+
+        .inventory-main {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          padding: clamp(1.5rem, 3vw, 2rem);
+          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+          overflow: hidden;
+        }
+
+        .item-info-card {
+          flex: 1;
+          background: linear-gradient(135deg, #353535 0%, #2d2d2d 100%);
+          border-radius: clamp(10px, 2vw, 15px);
+          padding: clamp(1.2rem, 2.5vw, 2rem);
+          box-shadow: 0 clamp(4px, 1vh, 8px) clamp(15px, 3vw, 25px) rgba(0,0,0,0.5);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          overflow-y: auto;
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+        }
+
+        .item-name {
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          color: #FFDE00;
+          margin: 0 0 clamp(1rem, 2vh, 1.5rem) 0;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .item-details {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .detail-section h4 {
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          color: #FFDE00;
+          margin: 0 0 clamp(0.5rem, 1vh, 0.75rem) 0;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+        }
+
+        .detail-section p {
+          font-size: clamp(0.9rem, 2vw, 1rem);
+          color: #c0c0c0;
+          line-height: 1.6;
+          margin: 0;
+        }
+
+        .detail-divider {
+          height: clamp(2px, 0.4vw, 3px);
+          background: linear-gradient(90deg, transparent 0%, rgba(255,222,0,0.3) 50%, transparent 100%);
+        }
+
+        .inventory-actions {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: clamp(0.75rem, 1.5vw, 1rem);
+        }
+
+        .inventory-actions .action-btn,
+        .inventory-actions .close-btn {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(0.3rem, 0.8vh, 0.5rem);
+          padding: clamp(0.8rem, 1.8vh, 1.2rem);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(10px, 2vw, 15px);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+        }
+
+        .inventory-actions .action-btn {
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          color: white;
+        }
+
+        .inventory-actions .action-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(6px, 1.5vh, 10px) clamp(20px, 4vw, 30px) rgba(0,0,0,0.5),
+                      0 0 clamp(15px, 3vw, 25px) rgba(59,76,202,0.6);
+        }
+
+        .inventory-actions .action-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .inventory-actions .close-btn {
+          background: linear-gradient(135deg, #757575 0%, #616161 100%);
+          color: white;
+        }
+
+        .inventory-actions .close-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(6px, 1.5vh, 10px) clamp(20px, 4vw, 30px) rgba(0,0,0,0.5);
+        }
+
+        .btn-icon {
+          font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+        }
+
+        .btn-text {
+          font-size: clamp(0.85rem, 1.9vw, 1rem);
+        }
+
+        @media (max-width: 768px) {
+          .inventory-sidebar {
+            width: clamp(200px, 40%, 280px);
+          }
+
+          .inventory-actions {
+            grid-template-columns: 1fr;
+          }
         }
 
         .combat-tracker-grid {
@@ -932,11 +1176,48 @@ export function renderTrainerInfo() {
       <!-- Popup Modals -->
       <div class="popup-overlay" id="inventoryPopup">
         <div class="popup-content">
-          <div class="popup-header">
-            <div class="popup-title">Inventory</div>
-            <button class="popup-close" id="closeInventory">×</button>
+          <div class="inventory-popup-content">
+            <div class="inventory-sidebar">
+              <h2 class="inventory-title">Inventory</h2>
+              <ul id="inventoryCategories" class="inventory-categories">
+                <!-- Categories will be dynamically populated -->
+              </ul>
+            </div>
+            <div class="inventory-main">
+              <div class="item-info-card">
+                <h3 class="item-name" id="selectedItemName">Select an item</h3>
+                <div class="item-details">
+                  <div class="detail-section">
+                    <h4>Description</h4>
+                    <p id="descriptionText">Choose an item from your inventory to view its details.</p>
+                  </div>
+                  <div class="detail-divider"></div>
+                  <div class="detail-section">
+                    <h4>Effect</h4>
+                    <p id="effectText">Item effects will appear here.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="inventory-actions">
+                <button class="action-btn" id="addItemButton" disabled>
+                  <span class="btn-icon">➕</span>
+                  <span class="btn-text">Add</span>
+                </button>
+                <button class="action-btn" id="editItemButton" disabled>
+                  <span class="btn-icon">✏️</span>
+                  <span class="btn-text">Edit</span>
+                </button>
+                <button class="action-btn" id="removeItemButton" disabled>
+                  <span class="btn-icon">🗑️</span>
+                  <span class="btn-text">Remove</span>
+                </button>
+                <button class="close-btn" id="closeInventory">
+                  <span class="btn-icon">✖</span>
+                  <span class="btn-text">Close</span>
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="popup-body" id="inventoryContent"></div>
         </div>
       </div>
 
@@ -1063,28 +1344,16 @@ export function attachTrainerInfoListeners() {
     }));
   });
 
-  // Inventory button - fixed to show items grouped by type
+  // Inventory button - redesigned with interactive left/right panes
   document.getElementById('inventoryButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
     const inventory = trainerData[20] || 'None';
     const itemsStr = sessionStorage.getItem('items');
-    const content = document.getElementById('inventoryContent');
+    const categoriesContainer = document.getElementById('inventoryCategories');
 
-    if (inventory === 'None' || !inventory) {
-      content.innerHTML = '<p style="text-align: center; color: #999;">No items in inventory.</p>';
-      openPopup('inventoryPopup');
-      return;
-    }
-
-    if (!itemsStr) {
-      const itemsList = inventory.split(',').map(item => item.trim()).filter(item => item);
-      let html = itemsList.map(itemName => `
-        <div class="popup-item">
-          <div class="popup-item-title">${itemName}</div>
-        </div>
-      `).join('');
-      content.innerHTML = html;
+    if (inventory === 'None' || !inventory || !itemsStr) {
+      categoriesContainer.innerHTML = '<li style="padding: 2rem; text-align: center; color: #999;">No items in inventory</li>';
       openPopup('inventoryPopup');
       return;
     }
@@ -1096,7 +1365,6 @@ export function attachTrainerInfoListeners() {
     // Extract item name and quantity
     const groupedItems = {};
     inventoryItems.forEach(itemStr => {
-      // Parse "ItemName (xQuantity)" format
       const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
       const itemName = match ? match[1].trim() : itemStr;
       const quantity = match ? parseInt(match[2], 10) : 1;
@@ -1109,27 +1377,76 @@ export function attachTrainerInfoListeners() {
         }
         groupedItems[type].push({
           name: itemData.name,
+          description: itemData.description || 'No description available',
           effect: itemData.effect || 'No effect description',
-          quantity: quantity
+          quantity: quantity,
+          fullData: itemData
         });
       }
     });
 
-    // Generate HTML with grouped categories
+    // Generate category list HTML
     let html = '';
     Object.keys(groupedItems).sort().forEach(type => {
-      html += `<div class="popup-category-title">${type}</div>`;
-      groupedItems[type].forEach(item => {
-        html += `
-          <div class="popup-item">
-            <div class="popup-item-title">${item.name} (x${item.quantity})</div>
-            <div class="popup-item-effect">${item.effect}</div>
+      html += `
+        <li>
+          <div class="category-header" data-category="${type}">
+            <span>${type}</span>
+            <span class="arrow">▶</span>
           </div>
-        `;
+          <div class="item-list">
+            ${groupedItems[type].map(item => `
+              <div class="inventory-list-item" data-item='${JSON.stringify(item)}'>
+                ${item.name} (x${item.quantity})
+              </div>
+            `).join('')}
+          </div>
+        </li>
+      `;
+    });
+
+    categoriesContainer.innerHTML = html;
+
+    // Add category toggle listeners
+    document.querySelectorAll('.category-header').forEach(header => {
+      header.addEventListener('click', function() {
+        const itemList = this.nextElementSibling;
+        const isExpanded = itemList.classList.contains('expanded');
+
+        // Close all categories
+        document.querySelectorAll('.item-list').forEach(list => list.classList.remove('expanded'));
+        document.querySelectorAll('.category-header').forEach(h => h.classList.remove('active'));
+
+        // Open clicked category
+        if (!isExpanded) {
+          itemList.classList.add('expanded');
+          this.classList.add('active');
+        }
       });
     });
 
-    content.innerHTML = html || '<p style="text-align: center; color: #999;">No items found.</p>';
+    // Add item selection listeners
+    let selectedItemData = null;
+    document.querySelectorAll('.inventory-list-item').forEach(itemElement => {
+      itemElement.addEventListener('click', function() {
+        // Remove previous selection
+        document.querySelectorAll('.inventory-list-item').forEach(el => el.classList.remove('selected'));
+
+        // Select current item
+        this.classList.add('selected');
+        selectedItemData = JSON.parse(this.dataset.item);
+
+        // Update info panel
+        document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+        document.getElementById('descriptionText').textContent = selectedItemData.description;
+        document.getElementById('effectText').textContent = selectedItemData.effect;
+
+        // Enable edit/remove buttons
+        document.getElementById('editItemButton').disabled = false;
+        document.getElementById('removeItemButton').disabled = false;
+      });
+    });
+
     openPopup('inventoryPopup');
   });
 

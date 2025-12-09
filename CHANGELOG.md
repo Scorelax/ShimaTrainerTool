@@ -1612,3 +1612,303 @@ The page is now more compact on tablets while maintaining excellent readability 
 ---
 
 **Session completed: 2025-12-09 Part 7**
+
+---
+
+## Session: 2025-12-09 Part 8 - Inventory Popup Redesign & Dark Theme
+
+### Changes Made
+
+Complete redesign of the inventory popup to match reference implementation with interactive left/right panes, plus darkened and modernized all other popup themes.
+
+---
+
+### 1. Inventory Popup Complete Redesign (lines 586-825, 1177-1222, 1347-1453)
+
+**Old Design**:
+- Simple popup with flat list of items
+- Categories shown as text headers
+- No interactivity
+- Items displayed with name and effect inline
+
+**New Design - Two-Pane Layout**:
+
+#### Left Pane - Interactive Category List:
+- **Dark sidebar** with gradient background (#2c2c2c → #252525)
+- **Red title bar** with "Inventory" heading
+- **Collapsible categories** with expandable item lists
+- **Category headers**:
+  - Gray background (#3a3a3a)
+  - Hover effect: lighten + indent animation
+  - Active state: Red gradient background
+  - Animated arrow that rotates 90° when expanded
+- **Item list**:
+  - Hidden by default (max-height: 0)
+  - Expands with transition (max-height: 500px)
+  - Individual items clickable
+  - Selected item: Red background with white text
+  - Hover: Dark background with red left border
+
+#### Right Pane - Item Details & Actions:
+- **Item info card**:
+  - Shows selected item name in gold
+  - **Description section** with item description
+  - **Effect section** with item effects
+  - Sections separated by golden gradient divider
+  - Scrollable if content is long
+- **Action buttons grid (2×2)**:
+  - Add Item (disabled by default)
+  - Edit Item (enabled when item selected)
+  - Remove Item (enabled when item selected)
+  - Close button
+  - Icon + text layout
+  - Blue gradient for action buttons
+  - Gray gradient for close button
+
+**Interactive Features**:
+1. Click category → expands to show items
+2. Click item → shows details in right pane
+3. Click different category → collapses previous, opens new
+4. Item selection highlights item and enables edit/remove buttons
+
+---
+
+### 2. Dark Theme for All Popups (lines 475-579)
+
+Changed all non-inventory popups from white to modern dark theme:
+
+#### Background:
+```css
+/* Before */
+background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+
+/* After */
+background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+```
+
+#### Text Colors:
+- **Titles**: Changed from #333 to #FFDE00 (gold) with text-shadow
+- **Body text**: Changed from #333 to #e0e0e0 (light gray)
+- **Item titles**: Changed from #EE1515 (red) to #FFDE00 (gold) with glow
+- **Item effects**: Changed from #555 to #c0c0c0 (medium gray)
+- **Category titles**: Changed from red to gold with text-shadow
+- **Locked items**: Adjusted to #777 for better contrast on dark
+
+#### Visual Enhancements:
+- Enhanced shadows for depth
+- Gold accents throughout
+- Better contrast ratios
+- More premium, modern appearance
+
+---
+
+### 3. Inventory Popup Styling Details
+
+#### Sidebar Dimensions:
+- Width: `clamp(280px, 35%, 400px)`
+- Responsive: Shrinks to 40% on mobile
+
+#### Category Header:
+```css
+padding: clamp(0.9rem, 2vh, 1.2rem) clamp(1.2rem, 2.5vw, 1.6rem);
+background-color: #3a3a3a;
+font-size: clamp(1rem, 2.2vw, 1.3rem);
+```
+
+**Hover Effect**:
+- Background lightens to #4a4a4a
+- Padding-left increases (slide-in effect)
+
+**Active State**:
+- Red gradient background (#EE1515 → #C91010)
+- Arrow rotates 90 degrees
+
+#### Item List:
+```css
+max-height: 0; /* Collapsed */
+transition: max-height 0.3s ease;
+
+.expanded {
+  max-height: 500px; /* Expanded */
+}
+```
+
+#### Item Info Card:
+```css
+background: linear-gradient(135deg, #353535 0%, #2d2d2d 100%);
+border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+padding: clamp(1.2rem, 2.5vw, 2rem);
+```
+
+#### Action Buttons:
+- 2×2 grid layout
+- Blue gradient (#3B4CCA → #2E3FA0)
+- Hover: Lift animation + blue glow
+- Disabled state: 40% opacity
+
+---
+
+### 4. JavaScript Implementation (lines 1347-1453)
+
+**Functionality**:
+
+1. **Parse Inventory**:
+   - Extract item name and quantity from string format
+   - Group items by type (Pokeballs, Potions, etc.)
+   - Fetch full item data from sessionStorage
+
+2. **Generate Category HTML**:
+   - Create collapsible category structure
+   - Embed item data in data attributes
+   - Sort categories alphabetically
+
+3. **Category Toggle**:
+   - Click handler on each category header
+   - Closes all other categories
+   - Expands clicked category
+   - Rotates arrow indicator
+
+4. **Item Selection**:
+   - Click handler on each item
+   - Removes previous selection styling
+   - Highlights selected item
+   - Updates right pane with item details
+   - Enables edit/remove buttons
+
+5. **Details Display**:
+   - Item name with quantity
+   - Description text
+   - Effect text
+   - Sections clearly separated
+
+---
+
+## Visual Comparison
+
+### Inventory Popup:
+
+**Before**:
+```
+┌─────────────────────┐
+│ Inventory       [×] │
+├─────────────────────┤
+│ POKEBALLS           │
+│ Poke Ball (x10)     │
+│ Effect: Standard... │
+│                     │
+│ POTIONS             │
+│ Potion (x5)         │
+│ Effect: Restores... │
+└─────────────────────┘
+```
+
+**After**:
+```
+┌──────────────┬──────────────────┐
+│ INVENTORY    │                  │
+├──────────────┤  Select an item  │
+│ ▼ Pokeballs  │                  │
+│   Poke Ball..│  Description:    │
+│   Great Ball │  Choose an item  │
+│              │                  │
+│ ▶ Potions    │  Effect:         │
+│              │  Item effects... │
+│ ▶ Key Items  │                  │
+│              │  [Add] [Edit]    │
+│              │  [Del] [Close]   │
+└──────────────┴──────────────────┘
+```
+
+### Other Popups:
+
+**Before**: White background, black text
+**After**: Dark gray gradient, gold/white text with shadows
+
+---
+
+## Technical Implementation
+
+### CSS Grid Layout:
+```css
+.inventory-popup-content {
+  display: flex;
+  height: 100%;
+}
+
+.inventory-sidebar {
+  width: clamp(280px, 35%, 400px);
+  /* Left pane */
+}
+
+.inventory-main {
+  flex: 1;
+  /* Right pane */
+}
+```
+
+### Collapsible Animation:
+```css
+.item-list {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.item-list.expanded {
+  max-height: 500px;
+}
+```
+
+### Event Delegation:
+- Categories and items added dynamically
+- Event listeners attached after HTML generation
+- Data stored in data attributes for easy access
+
+---
+
+## Files Modified This Session
+
+1. `js/pages/trainer-info.js` - Complete inventory redesign + dark theme
+   - Lines 475-579: Dark theme for all popups
+   - Lines 586-825: Inventory popup styles (left/right panes)
+   - Lines 1177-1222: Inventory popup HTML structure
+   - Lines 1347-1453: Interactive inventory JavaScript
+
+---
+
+## Testing Checklist
+
+After these changes, verify:
+- [ ] All non-inventory popups have dark backgrounds
+- [ ] Popup text is readable (gold/gray on dark)
+- [ ] Inventory popup has two-pane layout
+- [ ] Left pane shows categories
+- [ ] Clicking category expands/collapses item list
+- [ ] Arrow rotates when category opens
+- [ ] Only one category can be open at a time
+- [ ] Clicking item highlights it in red
+- [ ] Item selection updates right pane with details
+- [ ] Description and effect sections populated correctly
+- [ ] Edit/Remove buttons disabled until item selected
+- [ ] Edit/Remove buttons enable when item clicked
+- [ ] Close button works
+- [ ] Layout responsive on mobile (sidebar shrinks)
+- [ ] All animations smooth (expand/collapse, hover effects)
+- [ ] Scrolling works in item lists and details card
+
+---
+
+## Result
+
+The inventory popup now matches the reference implementation with:
+- **Interactive two-pane design**: Category browsing + item details
+- **Modern dark theme**: Consistent across all popups
+- **Professional appearance**: Gradients, shadows, gold accents
+- **Smooth interactions**: Collapsible categories, item selection
+- **Clear information hierarchy**: Categories → Items → Details
+
+All popups now have a sleek, modern appearance that's easier on the eyes than the previous white backgrounds.
+
+---
+
+**Session completed: 2025-12-09 Part 8**

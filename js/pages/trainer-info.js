@@ -1118,57 +1118,88 @@ export function renderTrainerInfo() {
           }
         }
 
-        .combat-tracker-grid {
+        .combat-tracker-container {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(1.5rem, 3vh, 2rem);
+          padding: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .combat-stats-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: clamp(1rem, 2vw, 1.5rem);
-          margin-top: clamp(1rem, 2vh, 1.5rem);
         }
 
-        .combat-stat-group {
+        .combat-stat-column {
           display: flex;
           flex-direction: column;
           gap: clamp(0.5rem, 1vh, 0.75rem);
+          align-items: center;
         }
 
         .combat-stat-label {
           font-weight: 900;
-          font-size: clamp(1rem, 2.2vw, 1.2rem);
-          color: #333;
+          font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+          color: #FFDE00;
           text-transform: uppercase;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         .combat-stat-value {
-          font-size: clamp(1.8rem, 4vw, 2.4rem);
+          font-size: clamp(1.6rem, 3.5vw, 2.2rem);
           font-weight: 900;
-          color: #FFDE00;
-          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .combat-input-group {
-          display: flex;
-          gap: clamp(0.5rem, 1vw, 0.75rem);
-          align-items: center;
+          color: white;
+          text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
         }
 
         .combat-input {
-          flex: 1;
-          padding: clamp(0.5rem, 1vh, 0.75rem);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
-          border-radius: clamp(8px, 1.5vw, 10px);
-          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          width: 100%;
+          padding: clamp(0.6rem, 1.4vh, 0.9rem);
+          border: clamp(2px, 0.4vw, 3px) solid #555;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          font-weight: 700;
           text-align: center;
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          color: white;
+          box-sizing: border-box;
+        }
+
+        .combat-input:focus {
+          outline: none;
+          border-color: #FFDE00;
+          box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
+        }
+
+        .combat-controls {
+          display: flex;
+          gap: clamp(0.75rem, 1.5vw, 1rem);
+          margin-top: clamp(0.5rem, 1vh, 0.75rem);
         }
 
         .combat-button {
-          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(0.3rem, 0.8vh, 0.5rem);
+          padding: clamp(0.8rem, 1.8vh, 1.2rem);
           border: clamp(2px, 0.4vw, 3px) solid #333;
-          border-radius: clamp(8px, 1.5vw, 10px);
+          border-radius: clamp(10px, 2vw, 15px);
           font-weight: 900;
-          font-size: clamp(0.9rem, 1.9vw, 1rem);
           cursor: pointer;
           transition: all 0.3s ease;
           text-transform: uppercase;
+        }
+
+        .combat-button .btn-icon {
+          font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+        }
+
+        .combat-button .btn-text {
+          font-size: clamp(0.85rem, 1.9vw, 1rem);
         }
 
         .combat-button.add {
@@ -1181,9 +1212,18 @@ export function renderTrainerInfo() {
           color: white;
         }
 
+        .combat-button.restore {
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          color: white;
+        }
+
         .combat-button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+
+        .combat-button:active {
+          transform: translateY(0);
         }
 
         #backButton {
@@ -1656,24 +1696,32 @@ export function renderTrainerInfo() {
             <button class="popup-close" id="closeCombatTracker">×</button>
           </div>
           <div class="popup-body">
-            <div class="combat-tracker-grid">
-              <div class="combat-stat-group">
-                <div class="combat-stat-label">HP</div>
-                <div class="combat-stat-value" id="combatCurrentHP">${currentHP} / ${trainerHP}</div>
-                <div class="combat-input-group">
-                  <input type="number" class="combat-input" id="hpChangeInput" placeholder="Amount">
-                  <button class="combat-button add" id="addHP">+ Add</button>
-                  <button class="combat-button remove" id="removeHP">- Remove</button>
+            <div class="combat-tracker-container">
+              <div class="combat-stats-row">
+                <div class="combat-stat-column">
+                  <div class="combat-stat-label">HP</div>
+                  <div class="combat-stat-value" id="combatCurrentHP">${currentHP} / ${trainerHP}</div>
+                  <input type="number" class="combat-input" id="hpChangeInput" placeholder="HP Amount">
+                </div>
+                <div class="combat-stat-column">
+                  <div class="combat-stat-label">VP</div>
+                  <div class="combat-stat-value" id="combatCurrentVP">${currentVP} / ${trainerVP}</div>
+                  <input type="number" class="combat-input" id="vpChangeInput" placeholder="VP Amount">
                 </div>
               </div>
-              <div class="combat-stat-group">
-                <div class="combat-stat-label">VP</div>
-                <div class="combat-stat-value" id="combatCurrentVP">${currentVP} / ${trainerVP}</div>
-                <div class="combat-input-group">
-                  <input type="number" class="combat-input" id="vpChangeInput" placeholder="Amount">
-                  <button class="combat-button add" id="addVP">+ Add</button>
-                  <button class="combat-button remove" id="removeVP">- Remove</button>
-                </div>
+              <div class="combat-controls">
+                <button class="combat-button add" id="addStats">
+                  <span class="btn-icon">➕</span>
+                  <span class="btn-text">Add</span>
+                </button>
+                <button class="combat-button remove" id="removeStats">
+                  <span class="btn-icon">➖</span>
+                  <span class="btn-text">Remove</span>
+                </button>
+                <button class="combat-button restore" id="fullRestore">
+                  <span class="btn-icon">✨</span>
+                  <span class="btn-text">Full Restore</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1870,7 +1918,7 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const trainerDataRaw = sessionStorage.getItem('currentTrainer');
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       alert('Trainer data not found.');
       return;
@@ -1962,7 +2010,7 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const trainerDataRaw = sessionStorage.getItem('currentTrainer');
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       alert('Trainer data not found.');
       return;
@@ -1988,7 +2036,7 @@ export function attachTrainerInfoListeners() {
 
       // Update sessionStorage
       trainerData[20] = JSON.stringify(inventory);
-      sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
       // Close modal and refresh inventory
       document.getElementById('editItemModal').style.display = 'none';
@@ -2004,7 +2052,7 @@ export function attachTrainerInfoListeners() {
 
   // Remove Item Modal - Confirm button
   document.getElementById('confirmRemoveItem')?.addEventListener('click', function() {
-    const trainerDataRaw = sessionStorage.getItem('currentTrainer');
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       alert('Trainer data not found.');
       return;
@@ -2023,7 +2071,7 @@ export function attachTrainerInfoListeners() {
 
       // Update sessionStorage
       trainerData[20] = JSON.stringify(inventory);
-      sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
       // Close modal and refresh inventory
       document.getElementById('removeItemModal').style.display = 'none';
@@ -2480,86 +2528,96 @@ export function attachTrainerInfoListeners() {
   document.getElementById('currentVPButton')?.addEventListener('click', openCombatTracker);
   document.getElementById('closeCombatTracker')?.addEventListener('click', () => closePopup('combatTrackerPopup'));
 
-  // HP Add/Remove buttons
-  document.getElementById('addHP')?.addEventListener('click', () => {
-    const amount = parseInt(document.getElementById('hpChangeInput').value, 10);
-    if (isNaN(amount) || amount <= 0) return;
+  // Combined Add button - adds HP and/or VP
+  document.getElementById('addStats')?.addEventListener('click', () => {
+    const hpAmount = parseInt(document.getElementById('hpChangeInput').value, 10);
+    const vpAmount = parseInt(document.getElementById('vpChangeInput').value, 10);
 
-    let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
-      ? parseInt(trainerData[34], 10)
-      : parseInt(trainerData[11], 10);
+    let updated = false;
 
-    const baseHP = parseInt(trainerData[11], 10);
-    currentHP = Math.min(currentHP + amount, baseHP);
+    // Add HP if amount provided
+    if (!isNaN(hpAmount) && hpAmount > 0) {
+      let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
+        ? parseInt(trainerData[34], 10)
+        : parseInt(trainerData[11], 10);
 
-    trainerData[34] = currentHP;
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      const baseHP = parseInt(trainerData[11], 10);
+      currentHP = Math.min(currentHP + hpAmount, baseHP);
 
-    // Refresh the page to show updated values
-    window.location.reload();
-  });
-
-  document.getElementById('removeHP')?.addEventListener('click', () => {
-    const amount = parseInt(document.getElementById('hpChangeInput').value, 10);
-    if (isNaN(amount) || amount <= 0) return;
-
-    let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
-      ? parseInt(trainerData[34], 10)
-      : parseInt(trainerData[11], 10);
-
-    currentHP -= amount;
-
-    trainerData[34] = currentHP;
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-
-    // Refresh the page to show updated values
-    window.location.reload();
-  });
-
-  // VP Add/Remove buttons
-  document.getElementById('addVP')?.addEventListener('click', () => {
-    const amount = parseInt(document.getElementById('vpChangeInput').value, 10);
-    if (isNaN(amount) || amount <= 0) return;
-
-    let currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
-      ? parseInt(trainerData[35], 10)
-      : parseInt(trainerData[12], 10);
-
-    const baseVP = parseInt(trainerData[12], 10);
-    currentVP = Math.min(currentVP + amount, baseVP);
-
-    trainerData[35] = currentVP;
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-
-    // Refresh the page to show updated values
-    window.location.reload();
-  });
-
-  document.getElementById('removeVP')?.addEventListener('click', () => {
-    const amount = parseInt(document.getElementById('vpChangeInput').value, 10);
-    if (isNaN(amount) || amount <= 0) return;
-
-    let currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
-      ? parseInt(trainerData[35], 10)
-      : parseInt(trainerData[12], 10);
-
-    let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
-      ? parseInt(trainerData[34], 10)
-      : parseInt(trainerData[11], 10);
-
-    currentVP -= amount;
-
-    // If VP goes negative, transfer to HP
-    if (currentVP < 0) {
-      currentHP += currentVP; // currentVP is negative, so this subtracts from HP
-      currentVP = 0;
       trainerData[34] = currentHP;
+      updated = true;
     }
 
-    trainerData[35] = currentVP;
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    // Add VP if amount provided
+    if (!isNaN(vpAmount) && vpAmount > 0) {
+      let currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
+        ? parseInt(trainerData[35], 10)
+        : parseInt(trainerData[12], 10);
 
-    // Refresh the page to show updated values
-    window.location.reload();
+      const baseVP = parseInt(trainerData[12], 10);
+      currentVP = Math.min(currentVP + vpAmount, baseVP);
+
+      trainerData[35] = currentVP;
+      updated = true;
+    }
+
+    if (updated) {
+      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      window.location.reload();
+    }
+  });
+
+  // Combined Remove button - removes HP and/or VP
+  document.getElementById('removeStats')?.addEventListener('click', () => {
+    const hpAmount = parseInt(document.getElementById('hpChangeInput').value, 10);
+    const vpAmount = parseInt(document.getElementById('vpChangeInput').value, 10);
+
+    let updated = false;
+    let currentHP = trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== ''
+      ? parseInt(trainerData[34], 10)
+      : parseInt(trainerData[11], 10);
+
+    let currentVP = trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== ''
+      ? parseInt(trainerData[35], 10)
+      : parseInt(trainerData[12], 10);
+
+    // Remove HP if amount provided
+    if (!isNaN(hpAmount) && hpAmount > 0) {
+      currentHP -= hpAmount;
+      updated = true;
+    }
+
+    // Remove VP if amount provided
+    if (!isNaN(vpAmount) && vpAmount > 0) {
+      currentVP -= vpAmount;
+
+      // If VP goes negative, transfer to HP
+      if (currentVP < 0) {
+        currentHP += currentVP; // currentVP is negative, so this subtracts from HP
+        currentVP = 0;
+      }
+
+      updated = true;
+    }
+
+    if (updated) {
+      trainerData[34] = currentHP;
+      trainerData[35] = currentVP;
+      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      window.location.reload();
+    }
+  });
+
+  // Full Restore button - fully heals HP and VP
+  document.getElementById('fullRestore')?.addEventListener('click', () => {
+    if (confirm('Are you sure you want to fully restore HP and VP?')) {
+      // Reset current HP to max HP
+      trainerData[34] = trainerData[11];
+      // Reset current VP to max VP
+      trainerData[35] = trainerData[12];
+
+      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      window.location.reload();
+    }
   });
 }

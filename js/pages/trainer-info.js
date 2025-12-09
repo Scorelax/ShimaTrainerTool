@@ -1961,10 +1961,11 @@ export function attachTrainerInfoListeners() {
     // Update database
     import('../api.js').then(({ TrainerAPI }) => {
       TrainerAPI.update(trainerData).then(() => {
-        // Close modal and refresh inventory
+        // Close modal
         document.getElementById('addItemModal').style.display = 'none';
-        closePopup('inventoryPopup');
-        setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+
+        // Reload the page to show updated inventory
+        window.location.reload();
       }).catch(error => {
         console.error('Failed to update inventory in database:', error);
         alert('Failed to save to database. Please try again.');
@@ -2051,10 +2052,11 @@ export function attachTrainerInfoListeners() {
       // Update database
       import('../api.js').then(({ TrainerAPI }) => {
         TrainerAPI.update(trainerData).then(() => {
-          // Close modal and refresh inventory
+          // Close modal
           document.getElementById('editItemModal').style.display = 'none';
-          closePopup('inventoryPopup');
-          setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+
+          // Reload the page to show updated inventory
+          window.location.reload();
         }).catch(error => {
           console.error('Failed to update inventory in database:', error);
           alert('Failed to save to database. Please try again.');
@@ -2104,10 +2106,11 @@ export function attachTrainerInfoListeners() {
       // Update database
       import('../api.js').then(({ TrainerAPI }) => {
         TrainerAPI.update(trainerData).then(() => {
-          // Close modal and refresh inventory
+          // Close modal
           document.getElementById('removeItemModal').style.display = 'none';
-          closePopup('inventoryPopup');
-          setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+
+          // Reload the page to show updated inventory
+          window.location.reload();
         }).catch(error => {
           console.error('Failed to update inventory in database:', error);
           alert('Failed to save to database. Please try again.');

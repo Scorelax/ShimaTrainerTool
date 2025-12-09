@@ -1964,16 +1964,25 @@ export function attachTrainerInfoListeners() {
     trainerData[20] = inventoryItems.join(', ');
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
+    // Show loading overlay
+    const modal = document.getElementById('addItemModal');
+    modal.style.opacity = '0.5';
+    modal.style.pointerEvents = 'none';
+
     // Update database
     import('../api.js').then(({ TrainerAPI }) => {
       TrainerAPI.update(trainerData).then(() => {
         // Close modal
-        document.getElementById('addItemModal').style.display = 'none';
+        modal.style.display = 'none';
+        modal.style.opacity = '1';
+        modal.style.pointerEvents = 'auto';
 
         // Refresh inventory display with updated data
         refreshInventoryDisplay();
       }).catch(error => {
         console.error('Failed to update inventory in database:', error);
+        modal.style.opacity = '1';
+        modal.style.pointerEvents = 'auto';
         alert('Failed to save to database. Please try again.');
       });
     });
@@ -2053,16 +2062,25 @@ export function attachTrainerInfoListeners() {
       trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
+      // Show loading overlay
+      const modal = document.getElementById('editItemModal');
+      modal.style.opacity = '0.5';
+      modal.style.pointerEvents = 'none';
+
       // Update database
       import('../api.js').then(({ TrainerAPI }) => {
         TrainerAPI.update(trainerData).then(() => {
           // Close modal
-          document.getElementById('editItemModal').style.display = 'none';
+          modal.style.display = 'none';
+          modal.style.opacity = '1';
+          modal.style.pointerEvents = 'auto';
 
           // Refresh inventory display with updated data
           refreshInventoryDisplay();
         }).catch(error => {
           console.error('Failed to update inventory in database:', error);
+          modal.style.opacity = '1';
+          modal.style.pointerEvents = 'auto';
           alert('Failed to save to database. Please try again.');
         });
       });
@@ -2106,16 +2124,25 @@ export function attachTrainerInfoListeners() {
       trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
+      // Show loading overlay
+      const modal = document.getElementById('removeItemModal');
+      modal.style.opacity = '0.5';
+      modal.style.pointerEvents = 'none';
+
       // Update database
       import('../api.js').then(({ TrainerAPI }) => {
         TrainerAPI.update(trainerData).then(() => {
           // Close modal
-          document.getElementById('removeItemModal').style.display = 'none';
+          modal.style.display = 'none';
+          modal.style.opacity = '1';
+          modal.style.pointerEvents = 'auto';
 
           // Refresh inventory display with updated data
           refreshInventoryDisplay();
         }).catch(error => {
           console.error('Failed to update inventory in database:', error);
+          modal.style.opacity = '1';
+          modal.style.pointerEvents = 'auto';
           alert('Failed to save to database. Please try again.');
         });
       });

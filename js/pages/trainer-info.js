@@ -1926,53 +1926,35 @@ export function attachTrainerInfoListeners() {
 
     const trainerData = JSON.parse(trainerDataRaw);
     const inventoryStr = trainerData[20] || '';
-    let inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+    let inventoryItems = inventoryStr && inventoryStr !== 'None'
+      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+      : [];
 
     // Check if item already exists
-    const existingIndex = inventory.findIndex(item => item.name.toLowerCase() === selectedItemName.toLowerCase());
+    let found = false;
+    inventoryItems = inventoryItems.map(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
+      const currentQty = match ? parseInt(match[2], 10) : 1;
 
-    if (existingIndex !== -1) {
-      // Update quantity if item exists
-      inventory[existingIndex].quantity += quantity;
-      alert(`Added ${quantity} to existing item. New quantity: ${inventory[existingIndex].quantity}`);
-    } else {
-      // Get item details from sessionStorage
-      const itemsDataRaw = sessionStorage.getItem('items');
-      let description = 'No description provided.';
-      let effect = 'No effect.';
-      let category = 'Items';
-
-      if (itemsDataRaw) {
-        try {
-          const itemsData = JSON.parse(itemsDataRaw);
-          let itemsArray = Array.isArray(itemsData) ? itemsData :
-                          (itemsData.items ? itemsData.items : []);
-
-          const itemData = itemsArray.find(item => item.name === selectedItemName);
-          if (itemData) {
-            description = itemData.description || description;
-            effect = itemData.effect || effect;
-            category = itemData.category || category;
-          }
-        } catch (error) {
-          console.error('Error parsing items data:', error);
-        }
+      if (itemName.toLowerCase() === selectedItemName.toLowerCase()) {
+        found = true;
+        const newQty = currentQty + quantity;
+        alert(`Added ${quantity} to existing item. New quantity: ${newQty}`);
+        return `${itemName} (x${newQty})`;
       }
+      return itemStr;
+    });
 
-      // Add new item
-      inventory.push({
-        name: selectedItemName,
-        quantity: quantity,
-        category: category,
-        description: description,
-        effect: effect
-      });
+    // If not found, add as new item
+    if (!found) {
+      inventoryItems.push(`${selectedItemName} (x${quantity})`);
       alert(`Added ${quantity}x ${selectedItemName} to inventory.`);
     }
 
     // Update sessionStorage
-    trainerData[20] = JSON.stringify(inventory);
-    sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+    trainerData[20] = inventoryItems.join(', ');
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
     // Close modal and refresh inventory
     document.getElementById('addItemModal').style.display = 'none';
@@ -2018,24 +2000,42 @@ export function attachTrainerInfoListeners() {
 
     const trainerData = JSON.parse(trainerDataRaw);
     const inventoryStr = trainerData[20] || '';
-    let inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+    let inventoryItems = inventoryStr && inventoryStr !== 'None'
+      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+      : [];
 
-    // Find the item by name from selectedItemData
-    const itemIndex = inventory.findIndex(item => item.name === selectedItemData.name);
+    // Find the item by parsing each string
+    let found = false;
+    inventoryItems = inventoryItems.filter(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
 
-    if (itemIndex !== -1) {
-      if (newQuantity === 0) {
-        // Remove item if quantity is 0
-        inventory.splice(itemIndex, 1);
-        alert(`${selectedItemData.name} removed from inventory.`);
-      } else {
-        // Update quantity
-        inventory[itemIndex].quantity = newQuantity;
-        alert(`${selectedItemData.name} quantity updated to ${newQuantity}.`);
+      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+        found = true;
+        if (newQuantity === 0) {
+          // Remove item if quantity is 0
+          alert(`${selectedItemData.name} removed from inventory.`);
+          return false; // Filter out this item
+        } else {
+          // Update quantity - will be handled in map below
+          return true;
+        }
       }
+      return true;
+    }).map(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
 
+      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+        alert(`${selectedItemData.name} quantity updated to ${newQuantity}.`);
+        return `${itemName} (x${newQuantity})`;
+      }
+      return itemStr;
+    });
+
+    if (found) {
       // Update sessionStorage
-      trainerData[20] = JSON.stringify(inventory);
+      trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
       // Close modal and refresh inventory
@@ -2060,17 +2060,27 @@ export function attachTrainerInfoListeners() {
 
     const trainerData = JSON.parse(trainerDataRaw);
     const inventoryStr = trainerData[20] || '';
-    let inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+    let inventoryItems = inventoryStr && inventoryStr !== 'None'
+      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+      : [];
 
-    // Find and remove item
-    const itemIndex = inventory.findIndex(item => item.name === selectedItemData.name);
+    // Find and remove item by parsing each string
+    let found = false;
+    inventoryItems = inventoryItems.filter(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
 
-    if (itemIndex !== -1) {
-      inventory.splice(itemIndex, 1);
-      alert(`${selectedItemData.name} removed from inventory.`);
+      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+        found = true;
+        alert(`${selectedItemData.name} removed from inventory.`);
+        return false; // Filter out this item
+      }
+      return true;
+    });
 
+    if (found) {
       // Update sessionStorage
-      trainerData[20] = JSON.stringify(inventory);
+      trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
       // Close modal and refresh inventory

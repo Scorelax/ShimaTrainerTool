@@ -1,6 +1,6 @@
 // Main Application Entry Point
 import { PokemonAPI, TrainerAPI, GameDataAPI, OfflineManager } from './api.js';
-import { renderIndex } from './pages/index.js';
+import { renderIndex, attachIndexListeners } from './pages/index.js';
 import { renderContinueJourney, attachContinueJourneyListeners } from './pages/continue-journey.js';
 import { renderTrainerCard, attachTrainerCardListeners } from './pages/trainer-card.js';
 import { renderTrainerInfo, attachTrainerInfoListeners } from './pages/trainer-info.js';
@@ -124,6 +124,7 @@ class Router {
   async renderIndex() {
     const content = document.getElementById('content');
     content.innerHTML = renderIndex();
+    attachIndexListeners();
   }
 
   async renderContinueJourney() {

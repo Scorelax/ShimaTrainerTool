@@ -686,3 +686,77 @@ After these changes, verify:
 ---
 
 **Session completed: 2025-12-09 Part 2**
+
+---
+
+## Session: 2025-12-09 Part 3 - Cache Reset Feature
+
+### Cache Reset Button on Index Page
+
+**Purpose**: Allow users to clear all cached data without closing browser tabs, useful when multiple tabs are open.
+
+#### UI Implementation (lines 128-165 in `js/pages/index.js`):
+- **Position**: Fixed in top-right corner
+- **Styling**:
+  - Red gradient background: `linear-gradient(135deg, #FF6B6B 0%, #EE5A5A 100%)`
+  - Gold border: `clamp(2px, 0.5vw, 3px) solid #FFDE00`
+  - Rounded corners: `clamp(8px, 2vw, 12px)`
+  - Refresh icon (🔄) + "RESET CACHE" text
+  - Hover effects: lift animation, darker red, gold glow
+
+#### Functionality (lines 189-224 in `js/pages/index.js`):
+1. **Confirmation Dialog**: Asks user to confirm before clearing cache
+2. **Clears Multiple Storage Types**:
+   - `sessionStorage.clear()` - Current session data
+   - `localStorage.clear()` - Persistent local data
+   - `caches.delete()` - Service Worker caches (if present)
+   - `serviceWorker.unregister()` - Unregisters service workers (if present)
+3. **Success Feedback**: Shows alert confirming cache cleared
+4. **Force Reload**: Reloads page from server (bypasses cache)
+
+#### Integration:
+- Added `attachIndexListeners()` function export from `index.js`
+- Updated `main.js` import statement (line 3)
+- Call `attachIndexListeners()` in router's `renderIndex()` (line 127)
+
+---
+
+## Use Cases
+
+- **Multiple Tabs**: Clear cache without closing all tabs
+- **Data Corruption**: Reset if session data becomes corrupted
+- **Testing**: Developers can quickly reset state during testing
+- **Updates**: Users can force-refresh after app updates
+
+---
+
+## Files Modified This Session
+
+1. `js/pages/index.js` - Added cache reset button and functionality
+   - Lines 128-165: Button styling
+   - Lines 168-172: Button HTML
+   - Lines 189-224: Cache clearing logic
+
+2. `js/main.js` - Updated to call index listeners
+   - Line 3: Added `attachIndexListeners` import
+   - Line 127: Call `attachIndexListeners()` after rendering
+
+---
+
+## Testing Checklist
+
+- [ ] Cache reset button visible in top-right on index page
+- [ ] Button shows hover effects (lift, color change, glow)
+- [ ] Clicking button shows confirmation dialog
+- [ ] Confirming clears sessionStorage
+- [ ] Confirming clears localStorage
+- [ ] Confirming clears service worker cache (if present)
+- [ ] Success alert appears
+- [ ] Page reloads after confirmation
+- [ ] Canceling does nothing
+- [ ] Button works on mobile devices
+- [ ] Button doesn't overlap with title on small screens
+
+---
+
+**Session completed: 2025-12-09 Part 3**

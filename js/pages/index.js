@@ -124,7 +124,52 @@ export function renderIndex() {
           transform: translateY(clamp(-3px, -0.8vh, -6px)) scale(1.0);
           box-shadow: 0 clamp(4px, 1vh, 8px) clamp(10px, 2.5vw, 18px) rgba(0,0,0,0.3);
         }
+
+        /* Cache Reset Button */
+        .cache-reset-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          right: clamp(15px, 3vw, 20px);
+          background: linear-gradient(135deg, #FF6B6B 0%, #EE5A5A 100%);
+          color: white;
+          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
+          border-radius: clamp(8px, 2vw, 12px);
+          padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(1rem, 2.5vw, 1.5rem);
+          font-size: clamp(0.85rem, 2vw, 1rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+          cursor: pointer;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          gap: clamp(0.3rem, 0.8vw, 0.5rem);
+        }
+
+        .cache-reset-button:hover {
+          transform: translateY(-2px) scale(1.05);
+          box-shadow: 0 6px 18px rgba(0,0,0,0.4),
+                      0 0 15px rgba(255,222,0,0.5);
+          background: linear-gradient(135deg, #FF5555 0%, #DD4444 100%);
+        }
+
+        .cache-reset-button:active {
+          transform: translateY(0) scale(1.0);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+        }
+
+        .cache-reset-icon {
+          font-size: clamp(1rem, 2.5vw, 1.3rem);
+        }
       </style>
+
+      <!-- Cache Reset Button -->
+      <button class="cache-reset-button" id="cacheResetButton">
+        <span class="cache-reset-icon">🔄</span>
+        <span>Reset Cache</span>
+      </button>
 
       <h1 class="landing-title">Shima Pokemon D&D</h1>
       <div class="landing-subtitle">Your Adventure Awaits</div>
@@ -139,4 +184,41 @@ export function renderIndex() {
       </div>
     </div>
   `;
+}
+
+export function attachIndexListeners() {
+  // Cache Reset Button
+  document.getElementById('cacheResetButton')?.addEventListener('click', () => {
+    if (confirm('Are you sure you want to reset the cache? This will clear all session data and reload the page.')) {
+      // Clear sessionStorage
+      sessionStorage.clear();
+
+      // Clear localStorage (if used)
+      localStorage.clear();
+
+      // Clear any service worker cache if present
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => {
+            caches.delete(name);
+          });
+        });
+      }
+
+      // Unregister service workers if present
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(registration => {
+            registration.unregister();
+          });
+        });
+      }
+
+      // Show confirmation message
+      alert('Cache cleared successfully! The page will now reload.');
+
+      // Force reload from server (bypass cache)
+      window.location.reload(true);
+    }
+  });
 }

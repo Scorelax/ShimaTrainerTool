@@ -847,6 +847,267 @@ export function renderTrainerInfo() {
           font-size: clamp(0.85rem, 1.9vw, 1rem);
         }
 
+        /* Inventory Action Modals */
+        .inventory-modal {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.6);
+          z-index: 2100;
+          backdrop-filter: blur(5px);
+          animation: fadeIn 0.2s ease;
+        }
+
+        .inventory-modal-content {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 90%;
+          max-width: clamp(400px, 80vw, 700px);
+          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 25px);
+          box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+          overflow: hidden;
+          animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -45%);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+          }
+        }
+
+        .modal-header {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          padding: clamp(1rem, 2.5vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+          border-bottom: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+        }
+
+        .modal-header h2 {
+          color: white;
+          margin: 0;
+          font-size: clamp(1.3rem, 2.8vw, 1.8rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          text-align: center;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+        }
+
+        .modal-body {
+          padding: clamp(1.5rem, 3vh, 2.5rem) clamp(1.5rem, 3vw, 2rem);
+          max-height: 60vh;
+          overflow-y: auto;
+        }
+
+        .form-group {
+          margin-bottom: clamp(1.2rem, 2.5vh, 1.8rem);
+          position: relative;
+        }
+
+        .form-group label {
+          display: block;
+          color: #FFDE00;
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          font-weight: 900;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          text-transform: uppercase;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="number"] {
+          width: 100%;
+          padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #555;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          font-weight: 700;
+          box-sizing: border-box;
+          transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+          outline: none;
+          border-color: #FFDE00;
+          box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
+        }
+
+        /* Autocomplete Dropdown */
+        .autocomplete-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #555;
+          border-top: none;
+          border-radius: 0 0 clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px);
+          max-height: clamp(200px, 40vh, 300px);
+          overflow-y: auto;
+          display: none;
+          z-index: 9999;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+        }
+
+        .autocomplete-item {
+          padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border-bottom: 1px solid #444;
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          color: #e0e0e0;
+          font-weight: 700;
+        }
+
+        .autocomplete-item:last-child {
+          border-bottom: none;
+        }
+
+        .autocomplete-item:hover {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        /* Item Preview (for edit/remove modals) */
+        .item-preview {
+          padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: #FFDE00;
+          font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+          font-weight: 900;
+          text-align: center;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        /* Quantity Control */
+        .quantity-control {
+          display: flex;
+          align-items: center;
+          gap: clamp(0.5rem, 1vw, 1rem);
+          justify-content: center;
+        }
+
+        .quantity-btn {
+          width: clamp(40px, 8vw, 55px);
+          height: clamp(40px, 8vw, 55px);
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(1.5rem, 3vw, 2rem);
+          font-weight: 900;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .quantity-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 15px rgba(59,76,202,0.6);
+        }
+
+        .quantity-btn:active {
+          transform: translateY(0);
+        }
+
+        .quantity-input {
+          width: clamp(80px, 15vw, 120px);
+          text-align: center;
+        }
+
+        /* Modal Actions */
+        .modal-actions {
+          display: flex;
+          gap: clamp(0.75rem, 1.5vw, 1rem);
+          padding: clamp(1rem, 2vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+          background: linear-gradient(135deg, #252525 0%, #1a1a1a 100%);
+          border-top: clamp(2px, 0.4vw, 3px) solid #333;
+        }
+
+        .modal-actions .action-btn {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(0.3rem, 0.8vh, 0.5rem);
+          padding: clamp(0.8rem, 1.8vh, 1.2rem);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(10px, 2vw, 15px);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+
+        .modal-actions .action-btn.primary {
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          color: white;
+        }
+
+        .modal-actions .action-btn.primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 15px rgba(59,76,202,0.6);
+        }
+
+        .modal-actions .action-btn.secondary {
+          background: linear-gradient(135deg, #666 0%, #555 100%);
+          color: white;
+        }
+
+        .modal-actions .action-btn.secondary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+
+        .modal-actions .action-btn.danger {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        .modal-actions .action-btn.danger:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 15px rgba(238,21,21,0.6);
+        }
+
+        /* Confirmation Text */
+        .confirmation-text {
+          font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+          color: #e0e0e0;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          text-align: center;
+          line-height: 1.6;
+        }
+
+        .confirmation-text strong {
+          color: #FFDE00;
+          font-weight: 900;
+        }
+
         @media (max-width: 768px) {
           .inventory-sidebar {
             width: clamp(200px, 40%, 280px);
@@ -1251,6 +1512,93 @@ export function renderTrainerInfo() {
         </div>
       </div>
 
+      <!-- Add Item Modal -->
+      <div id="addItemModal" class="inventory-modal">
+        <div class="inventory-modal-content">
+          <div class="modal-header">
+            <h2>Add Item to Inventory</h2>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="itemSearch">Search for Item</label>
+              <input type="text" id="itemSearch" placeholder="Start typing to search..." autocomplete="off">
+              <div id="autocompleteResults" class="autocomplete-dropdown"></div>
+            </div>
+            <div class="form-group">
+              <label for="itemQuantity">Quantity</label>
+              <input type="number" id="itemQuantity" value="1" min="1">
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn primary" id="confirmAddItem">
+              <span class="btn-icon">➕</span>
+              <span class="btn-text">Add</span>
+            </button>
+            <button class="action-btn secondary" id="cancelAddItem">
+              <span class="btn-icon">↩️</span>
+              <span class="btn-text">Back</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Item Modal -->
+      <div id="editItemModal" class="inventory-modal">
+        <div class="inventory-modal-content">
+          <div class="modal-header">
+            <h2>Edit Item Quantity</h2>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Item</label>
+              <div class="item-preview" id="editingItemName">Item Name</div>
+            </div>
+            <div class="form-group">
+              <label>Quantity</label>
+              <div class="quantity-control">
+                <button type="button" class="quantity-btn" id="decrementQty">−</button>
+                <input type="number" id="editItemQuantity" class="quantity-input" value="1" min="0">
+                <button type="button" class="quantity-btn" id="incrementQty">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn primary" id="confirmEditItem">
+              <span class="btn-icon">💾</span>
+              <span class="btn-text">Save</span>
+            </button>
+            <button class="action-btn secondary" id="cancelEditItem">
+              <span class="btn-icon">↩️</span>
+              <span class="btn-text">Back</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Remove Item Modal -->
+      <div id="removeItemModal" class="inventory-modal">
+        <div class="inventory-modal-content">
+          <div class="modal-header">
+            <h2>Remove Item</h2>
+          </div>
+          <div class="modal-body">
+            <div class="confirmation-text">
+              Are you sure you want to remove <strong id="itemToRemove">this item</strong> from your inventory?
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn danger" id="confirmRemoveItem">
+              <span class="btn-icon">✔️</span>
+              <span class="btn-text">Yes</span>
+            </button>
+            <button class="action-btn secondary" id="cancelRemoveItem">
+              <span class="btn-icon">✖️</span>
+              <span class="btn-text">No</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="popup-overlay" id="specializationPopup">
         <div class="popup-content">
           <div class="popup-header">
@@ -1477,119 +1825,308 @@ export function attachTrainerInfoListeners() {
       });
     });
 
-    // Add Item button
+    // Add Item button - Opens add modal
     document.getElementById('addItemButton')?.addEventListener('click', function() {
-      const itemName = prompt('Enter item name:');
-      if (!itemName || !itemName.trim()) return;
-
-      const itemQuantity = prompt('Enter quantity:', '1');
-      const quantity = parseInt(itemQuantity, 10) || 1;
-      if (quantity < 1) return;
-
-      const itemDescription = prompt('Enter item description (optional):', '');
-      const itemEffect = prompt('Enter item effect (optional):', '');
-
-      // Get current inventory
-      const inventoryStr = trainerData[20] || '';
-      const inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
-
-      // Check if item already exists
-      const existingIndex = inventory.findIndex(item => item.name.toLowerCase() === itemName.trim().toLowerCase());
-      if (existingIndex !== -1) {
-        // Update quantity if item exists
-        inventory[existingIndex].quantity += quantity;
-        alert(`Added ${quantity} to existing item. New quantity: ${inventory[existingIndex].quantity}`);
-      } else {
-        // Add new item
-        inventory.push({
-          name: itemName.trim(),
-          quantity: quantity,
-          category: 'Items',
-          description: itemDescription.trim() || 'No description provided.',
-          effect: itemEffect.trim() || 'No effect.'
-        });
-        alert(`Added ${quantity}x ${itemName.trim()} to inventory.`);
-      }
-
-      // Update sessionStorage
-      trainerData[20] = JSON.stringify(inventory);
-      sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
-
-      // Refresh inventory popup
-      closePopup('inventoryPopup');
-      setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+      document.getElementById('addItemModal').style.display = 'block';
+      document.getElementById('itemSearch').value = '';
+      document.getElementById('itemQuantity').value = '1';
+      document.getElementById('autocompleteResults').style.display = 'none';
+      setupItemAutocomplete();
     });
 
-    // Edit Item button
+    // Edit Item button - Opens edit modal
     document.getElementById('editItemButton')?.addEventListener('click', function() {
       if (!selectedItemData) return;
 
-      const newQuantity = prompt(`Edit quantity for ${selectedItemData.name}:`, selectedItemData.quantity.toString());
-      const quantity = parseInt(newQuantity, 10);
-
-      if (isNaN(quantity) || quantity < 0) {
-        alert('Please enter a valid quantity (0 or greater).');
-        return;
-      }
-
-      // Get current inventory
-      const inventoryStr = trainerData[20] || '';
-      const inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
-
-      // Find and update item
-      const itemIndex = inventory.findIndex(item => item.name === selectedItemData.name);
-      if (itemIndex !== -1) {
-        if (quantity === 0) {
-          // Remove item if quantity is 0
-          inventory.splice(itemIndex, 1);
-          alert(`${selectedItemData.name} removed from inventory.`);
-        } else {
-          inventory[itemIndex].quantity = quantity;
-          alert(`${selectedItemData.name} quantity updated to ${quantity}.`);
-        }
-
-        // Update sessionStorage
-        trainerData[20] = JSON.stringify(inventory);
-        sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
-
-        // Refresh inventory popup
-        closePopup('inventoryPopup');
-        setTimeout(() => document.getElementById('inventoryButton').click(), 100);
-      }
+      document.getElementById('editingItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+      document.getElementById('editItemQuantity').value = selectedItemData.quantity;
+      document.getElementById('editItemModal').style.display = 'block';
     });
 
-    // Remove Item button
+    // Remove Item button - Opens remove confirmation modal
     document.getElementById('removeItemButton')?.addEventListener('click', function() {
       if (!selectedItemData) return;
 
-      if (!confirm(`Are you sure you want to remove ${selectedItemData.name} (x${selectedItemData.quantity}) from inventory?`)) {
-        return;
-      }
-
-      // Get current inventory
-      const inventoryStr = trainerData[20] || '';
-      const inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
-
-      // Find and remove item
-      const itemIndex = inventory.findIndex(item => item.name === selectedItemData.name);
-      if (itemIndex !== -1) {
-        inventory.splice(itemIndex, 1);
-        alert(`${selectedItemData.name} removed from inventory.`);
-
-        // Update sessionStorage
-        trainerData[20] = JSON.stringify(inventory);
-        sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
-
-        // Refresh inventory popup
-        closePopup('inventoryPopup');
-        setTimeout(() => document.getElementById('inventoryButton').click(), 100);
-      }
+      document.getElementById('itemToRemove').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+      document.getElementById('removeItemModal').style.display = 'block';
     });
 
     openPopup('inventoryPopup');
   });
 
   document.getElementById('closeInventory')?.addEventListener('click', () => closePopup('inventoryPopup'));
+
+  // ============================================================================
+  // INVENTORY MODAL HANDLERS
+  // ============================================================================
+
+  // Add Item Modal - Confirm button
+  document.getElementById('confirmAddItem')?.addEventListener('click', function() {
+    const selectedItemName = document.getElementById('itemSearch').value.trim();
+    const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
+
+    if (!selectedItemName || quantity < 1) {
+      alert('Please select a valid item and quantity.');
+      return;
+    }
+
+    const trainerDataRaw = sessionStorage.getItem('currentTrainer');
+    if (!trainerDataRaw) {
+      alert('Trainer data not found.');
+      return;
+    }
+
+    const trainerData = JSON.parse(trainerDataRaw);
+    const inventoryStr = trainerData[20] || '';
+    let inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+
+    // Check if item already exists
+    const existingIndex = inventory.findIndex(item => item.name.toLowerCase() === selectedItemName.toLowerCase());
+
+    if (existingIndex !== -1) {
+      // Update quantity if item exists
+      inventory[existingIndex].quantity += quantity;
+      alert(`Added ${quantity} to existing item. New quantity: ${inventory[existingIndex].quantity}`);
+    } else {
+      // Get item details from sessionStorage
+      const itemsDataRaw = sessionStorage.getItem('items');
+      let description = 'No description provided.';
+      let effect = 'No effect.';
+      let category = 'Items';
+
+      if (itemsDataRaw) {
+        try {
+          const itemsData = JSON.parse(itemsDataRaw);
+          let itemsArray = Array.isArray(itemsData) ? itemsData :
+                          (itemsData.items ? itemsData.items : []);
+
+          const itemData = itemsArray.find(item => item.name === selectedItemName);
+          if (itemData) {
+            description = itemData.description || description;
+            effect = itemData.effect || effect;
+            category = itemData.category || category;
+          }
+        } catch (error) {
+          console.error('Error parsing items data:', error);
+        }
+      }
+
+      // Add new item
+      inventory.push({
+        name: selectedItemName,
+        quantity: quantity,
+        category: category,
+        description: description,
+        effect: effect
+      });
+      alert(`Added ${quantity}x ${selectedItemName} to inventory.`);
+    }
+
+    // Update sessionStorage
+    trainerData[20] = JSON.stringify(inventory);
+    sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+
+    // Close modal and refresh inventory
+    document.getElementById('addItemModal').style.display = 'none';
+    closePopup('inventoryPopup');
+    setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+  });
+
+  // Add Item Modal - Cancel button
+  document.getElementById('cancelAddItem')?.addEventListener('click', function() {
+    document.getElementById('addItemModal').style.display = 'none';
+  });
+
+  // Edit Item Modal - Increment button
+  document.getElementById('incrementQty')?.addEventListener('click', function() {
+    const input = document.getElementById('editItemQuantity');
+    const currentValue = parseInt(input.value) || 0;
+    input.value = currentValue + 1;
+  });
+
+  // Edit Item Modal - Decrement button
+  document.getElementById('decrementQty')?.addEventListener('click', function() {
+    const input = document.getElementById('editItemQuantity');
+    const currentValue = parseInt(input.value) || 0;
+    if (currentValue > 0) {
+      input.value = currentValue - 1;
+    }
+  });
+
+  // Edit Item Modal - Confirm button
+  document.getElementById('confirmEditItem')?.addEventListener('click', function() {
+    const newQuantity = parseInt(document.getElementById('editItemQuantity').value, 10);
+
+    if (isNaN(newQuantity) || newQuantity < 0) {
+      alert('Please enter a valid quantity (0 or greater).');
+      return;
+    }
+
+    const trainerDataRaw = sessionStorage.getItem('currentTrainer');
+    if (!trainerDataRaw) {
+      alert('Trainer data not found.');
+      return;
+    }
+
+    const trainerData = JSON.parse(trainerDataRaw);
+    const inventoryStr = trainerData[20] || '';
+    let inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+
+    // Find the item by name from selectedItemData
+    const itemIndex = inventory.findIndex(item => item.name === selectedItemData.name);
+
+    if (itemIndex !== -1) {
+      if (newQuantity === 0) {
+        // Remove item if quantity is 0
+        inventory.splice(itemIndex, 1);
+        alert(`${selectedItemData.name} removed from inventory.`);
+      } else {
+        // Update quantity
+        inventory[itemIndex].quantity = newQuantity;
+        alert(`${selectedItemData.name} quantity updated to ${newQuantity}.`);
+      }
+
+      // Update sessionStorage
+      trainerData[20] = JSON.stringify(inventory);
+      sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+
+      // Close modal and refresh inventory
+      document.getElementById('editItemModal').style.display = 'none';
+      closePopup('inventoryPopup');
+      setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+    }
+  });
+
+  // Edit Item Modal - Cancel button
+  document.getElementById('cancelEditItem')?.addEventListener('click', function() {
+    document.getElementById('editItemModal').style.display = 'none';
+  });
+
+  // Remove Item Modal - Confirm button
+  document.getElementById('confirmRemoveItem')?.addEventListener('click', function() {
+    const trainerDataRaw = sessionStorage.getItem('currentTrainer');
+    if (!trainerDataRaw) {
+      alert('Trainer data not found.');
+      return;
+    }
+
+    const trainerData = JSON.parse(trainerDataRaw);
+    const inventoryStr = trainerData[20] || '';
+    let inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+
+    // Find and remove item
+    const itemIndex = inventory.findIndex(item => item.name === selectedItemData.name);
+
+    if (itemIndex !== -1) {
+      inventory.splice(itemIndex, 1);
+      alert(`${selectedItemData.name} removed from inventory.`);
+
+      // Update sessionStorage
+      trainerData[20] = JSON.stringify(inventory);
+      sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+
+      // Close modal and refresh inventory
+      document.getElementById('removeItemModal').style.display = 'none';
+      closePopup('inventoryPopup');
+      setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+    }
+  });
+
+  // Remove Item Modal - Cancel button
+  document.getElementById('cancelRemoveItem')?.addEventListener('click', function() {
+    document.getElementById('removeItemModal').style.display = 'none';
+  });
+
+  // Autocomplete Setup Function
+  function setupItemAutocomplete() {
+    const searchInput = document.getElementById('itemSearch');
+    const resultsDiv = document.getElementById('autocompleteResults');
+
+    if (!searchInput || !resultsDiv) return;
+
+    // Remove existing listeners by cloning
+    const newSearchInput = searchInput.cloneNode(true);
+    searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+
+    // Get new reference
+    const itemSearch = document.getElementById('itemSearch');
+    const autocompleteResults = document.getElementById('autocompleteResults');
+
+    // Add input listener
+    itemSearch.addEventListener('input', function() {
+      const searchValue = this.value.toLowerCase().trim();
+
+      if (searchValue.length < 2) {
+        autocompleteResults.style.display = 'none';
+        autocompleteResults.innerHTML = '';
+        return;
+      }
+
+      // Get items from sessionStorage
+      const itemsDataRaw = sessionStorage.getItem('items');
+
+      try {
+        const itemsData = JSON.parse(itemsDataRaw);
+
+        // Handle different data structures
+        let itemsArray;
+        if (Array.isArray(itemsData)) {
+          itemsArray = itemsData;
+        } else if (itemsData && itemsData.items && Array.isArray(itemsData.items)) {
+          itemsArray = itemsData.items;
+        } else if (itemsData && itemsData.status === 'success' && itemsData.items) {
+          itemsArray = itemsData.items;
+        } else {
+          console.error('Items data is not in expected format:', itemsData);
+          return;
+        }
+
+        // Filter matches with normalization
+        const matches = itemsArray.filter(item => {
+          if (item && item.name) {
+            const normalizedItemName = item.name.toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+            const normalizedSearchValue = searchValue
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+
+            return normalizedItemName.includes(normalizedSearchValue);
+          }
+          return false;
+        }).slice(0, 10); // Limit to 10 results
+
+        // Clear previous results
+        autocompleteResults.innerHTML = '';
+
+        if (matches.length > 0) {
+          matches.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'autocomplete-item';
+            div.textContent = item.name;
+            div.addEventListener('click', function() {
+              itemSearch.value = item.name;
+              autocompleteResults.style.display = 'none';
+              autocompleteResults.innerHTML = '';
+            });
+            autocompleteResults.appendChild(div);
+          });
+          autocompleteResults.style.display = 'block';
+        } else {
+          autocompleteResults.style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Error parsing items data:', error);
+      }
+    });
+
+    // Hide autocomplete when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!itemSearch.contains(e.target) && !autocompleteResults.contains(e.target)) {
+        autocompleteResults.style.display = 'none';
+      }
+    });
+  }
 
   // Specialization button - fixed to show 3 stages with effects
   document.getElementById('specializationButton')?.addEventListener('click', () => {

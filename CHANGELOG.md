@@ -2311,3 +2311,683 @@ All requested features and layout optimizations are now complete.
 ---
 
 **Session completed: 2025-12-09 Part 9**
+
+---
+
+## Session: 2025-12-09 Part 10 - Additional Layout Refinements
+
+### Changes Made
+
+Further optimized trainer info page layout spacing and fixed button text overflow issues.
+
+---
+
+### Layout Spacing Reductions (lines 259-352)
+
+**Right Column Padding**:
+```css
+padding-top: clamp(3rem, 6vh, 4rem);  /* was 4-5rem */
+```
+
+**Right Column Gap**:
+```css
+gap: clamp(0.75rem, 1.5vh, 1rem);  /* was 1.5-2rem */
+```
+
+**AC/HP/VP to Abilities Gap**:
+```css
+margin-bottom: clamp(0.5rem, 1vh, 0.75rem);  /* was 0.75-1rem */
+```
+
+**Abilities to Skills Gap**:
+```css
+margin-bottom: clamp(0.5rem, 1.2vh, 0.75rem);  /* was 1-1.5rem */
+```
+
+**Result**: Skills table moved significantly higher, better space utilization on tablets.
+
+---
+
+### Button Text Overflow Fix (lines 231-241)
+
+**Font Size Reduction**:
+```css
+font-size: clamp(0.75rem, 1.5vw, 0.9rem);  /* was 0.85-1rem */
+```
+
+**Horizontal Padding Reduction**:
+```css
+padding: ... clamp(0.7rem, 1.5vw, 1rem);  /* was 0.8-1.2rem */
+```
+
+**Letter Spacing Reduction**:
+```css
+letter-spacing: clamp(0.2px, 0.15vw, 0.4px);  /* was 0.3-0.5px */
+```
+
+**Result**: "Affinity", "Specialization", and "Trainer Path" buttons no longer cross into right column.
+
+---
+
+### HD/VD Font Size Fix (lines 225-231)
+
+Added explicit font-size rules to ensure HD/VD values match other info items:
+
+```css
+.info-item-half .info-item-label {
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+}
+
+.info-item-half span:not(.info-item-label) {
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+}
+```
+
+**Result**: HD/VD text now same size as Name, Age, Level, etc.
+
+---
+
+## Files Modified
+
+1. `js/pages/trainer-info.js` - Layout spacing and font adjustments
+   - Lines 259-264: Right column spacing reductions
+   - Lines 231-241: Button font/padding reductions
+   - Lines 225-231: HD/VD font size fixes
+   - Lines 271, 352: Gap reductions between stat sections
+
+---
+
+**Session completed: 2025-12-09 Part 10**
+
+---
+
+## Session: 2025-12-09 Part 11 - Inventory Modal System with Autocomplete
+
+### Changes Made
+
+Completely replaced prompt-based inventory management with professional modal dialogs featuring autocomplete search functionality.
+
+---
+
+### 1. Modal System CSS (lines 850-1109)
+
+#### Base Modal Styles (lines 851-893):
+
+**Modal Overlay**:
+```css
+.inventory-modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 2100;
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.2s ease;
+}
+```
+
+**Modal Content**:
+```css
+.inventory-modal-content {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: clamp(400px, 80vw, 700px);
+  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+  border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+  border-radius: clamp(15px, 3vw, 25px);
+  animation: slideIn 0.3s ease;
+}
+```
+
+**Animations**:
+- `fadeIn`: Smooth overlay appearance
+- `slideIn`: Content slides from slightly above center
+
+---
+
+#### Modal Header (lines 895-909):
+
+```css
+.modal-header {
+  background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+  padding: clamp(1rem, 2.5vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+  border-bottom: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+}
+
+.modal-header h2 {
+  color: white;
+  font-size: clamp(1.3rem, 2.8vw, 1.8rem);
+  text-transform: uppercase;
+  text-align: center;
+}
+```
+
+---
+
+#### Form Elements (lines 911-950):
+
+**Form Group**:
+```css
+.form-group {
+  margin-bottom: clamp(1.2rem, 2.5vh, 1.8rem);
+  position: relative;  /* For autocomplete positioning */
+}
+```
+
+**Form Labels**:
+```css
+.form-group label {
+  color: #FFDE00;
+  font-size: clamp(1rem, 2.2vw, 1.2rem);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+```
+
+**Input Fields**:
+```css
+.form-group input[type="text"],
+.form-group input[type="number"] {
+  width: 100%;
+  padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+  background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+  border: clamp(2px, 0.4vw, 3px) solid #555;
+  color: white;
+  font-size: clamp(1rem, 2.2vw, 1.3rem);
+}
+
+.form-group input:focus {
+  border-color: #FFDE00;
+  box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
+}
+```
+
+---
+
+#### Autocomplete Dropdown (lines 952-986):
+
+```css
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+  border: clamp(2px, 0.4vw, 3px) solid #555;
+  border-top: none;
+  max-height: clamp(200px, 40vh, 300px);
+  overflow-y: auto;
+  z-index: 9999;
+}
+
+.autocomplete-item {
+  padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+  font-size: clamp(1rem, 2.2vw, 1.2rem);
+  color: #e0e0e0;
+  cursor: pointer;
+  border-bottom: 1px solid #444;
+}
+
+.autocomplete-item:hover {
+  background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+  color: white;
+}
+```
+
+---
+
+#### Item Preview & Quantity Controls (lines 988-1038):
+
+**Item Preview Box** (for edit/remove modals):
+```css
+.item-preview {
+  padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+  background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+  border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+  color: #FFDE00;
+  font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+  text-align: center;
+}
+```
+
+**Quantity Control**:
+```css
+.quantity-control {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.5rem, 1vw, 1rem);
+  justify-content: center;
+}
+
+.quantity-btn {
+  width: clamp(40px, 8vw, 55px);
+  height: clamp(40px, 8vw, 55px);
+  background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+  border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+  color: white;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.quantity-input {
+  width: clamp(80px, 15vw, 120px);
+  text-align: center;
+}
+```
+
+---
+
+#### Modal Actions (lines 1040-1095):
+
+```css
+.modal-actions {
+  display: flex;
+  gap: clamp(0.75rem, 1.5vw, 1rem);
+  padding: clamp(1rem, 2vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+  background: linear-gradient(135deg, #252525 0%, #1a1a1a 100%);
+  border-top: clamp(2px, 0.4vw, 3px) solid #333;
+}
+
+.modal-actions .action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.3rem, 0.8vh, 0.5rem);
+  padding: clamp(0.8rem, 1.8vh, 1.2rem);
+}
+
+.modal-actions .action-btn.primary {
+  background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+  color: white;
+}
+
+.modal-actions .action-btn.secondary {
+  background: linear-gradient(135deg, #666 0%, #555 100%);
+  color: white;
+}
+
+.modal-actions .action-btn.danger {
+  background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+  color: white;
+}
+```
+
+---
+
+### 2. Modal HTML Structure (lines 1515-1600)
+
+#### Add Item Modal (lines 1515-1543):
+
+```html
+<div id="addItemModal" class="inventory-modal">
+  <div class="inventory-modal-content">
+    <div class="modal-header">
+      <h2>Add Item to Inventory</h2>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="itemSearch">Search for Item</label>
+        <input type="text" id="itemSearch" placeholder="Start typing to search..." autocomplete="off">
+        <div id="autocompleteResults" class="autocomplete-dropdown"></div>
+      </div>
+      <div class="form-group">
+        <label for="itemQuantity">Quantity</label>
+        <input type="number" id="itemQuantity" value="1" min="1">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="action-btn primary" id="confirmAddItem">
+        <span class="btn-icon">➕</span>
+        <span class="btn-text">Add</span>
+      </button>
+      <button class="action-btn secondary" id="cancelAddItem">
+        <span class="btn-icon">↩️</span>
+        <span class="btn-text">Back</span>
+      </button>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+#### Edit Item Modal (lines 1545-1576):
+
+```html
+<div id="editItemModal" class="inventory-modal">
+  <div class="inventory-modal-content">
+    <div class="modal-header">
+      <h2>Edit Item Quantity</h2>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Item</label>
+        <div class="item-preview" id="editingItemName">Item Name</div>
+      </div>
+      <div class="form-group">
+        <label>Quantity</label>
+        <div class="quantity-control">
+          <button type="button" class="quantity-btn" id="decrementQty">−</button>
+          <input type="number" id="editItemQuantity" class="quantity-input" value="1" min="0">
+          <button type="button" class="quantity-btn" id="incrementQty">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="action-btn primary" id="confirmEditItem">
+        <span class="btn-icon">💾</span>
+        <span class="btn-text">Save</span>
+      </button>
+      <button class="action-btn secondary" id="cancelEditItem">
+        <span class="btn-icon">↩️</span>
+        <span class="btn-text">Back</span>
+      </button>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+#### Remove Item Modal (lines 1578-1600):
+
+```html
+<div id="removeItemModal" class="inventory-modal">
+  <div class="inventory-modal-content">
+    <div class="modal-header">
+      <h2>Remove Item</h2>
+    </div>
+    <div class="modal-body">
+      <div class="confirmation-text">
+        Are you sure you want to remove <strong id="itemToRemove">this item</strong> from your inventory?
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="action-btn danger" id="confirmRemoveItem">
+        <span class="btn-icon">✔️</span>
+        <span class="btn-text">Yes</span>
+      </button>
+      <button class="action-btn secondary" id="cancelRemoveItem">
+        <span class="btn-icon">✖️</span>
+        <span class="btn-text">No</span>
+      </button>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+### 3. Modal Interaction JavaScript (lines 1828-2129)
+
+#### Button Click Handlers (lines 1828-1852):
+
+**Add Button** - Opens modal and sets up autocomplete:
+```javascript
+document.getElementById('addItemButton')?.addEventListener('click', function() {
+  document.getElementById('addItemModal').style.display = 'block';
+  document.getElementById('itemSearch').value = '';
+  document.getElementById('itemQuantity').value = '1';
+  document.getElementById('autocompleteResults').style.display = 'none';
+  setupItemAutocomplete();
+});
+```
+
+**Edit Button** - Opens modal with current item data:
+```javascript
+document.getElementById('editItemButton')?.addEventListener('click', function() {
+  if (!selectedItemData) return;
+
+  document.getElementById('editingItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+  document.getElementById('editItemQuantity').value = selectedItemData.quantity;
+  document.getElementById('editItemModal').style.display = 'block';
+});
+```
+
+**Remove Button** - Opens confirmation:
+```javascript
+document.getElementById('removeItemButton')?.addEventListener('click', function() {
+  if (!selectedItemData) return;
+
+  document.getElementById('itemToRemove').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+  document.getElementById('removeItemModal').style.display = 'block';
+});
+```
+
+---
+
+#### Add Item Confirmation (lines 1863-1933):
+
+**Functionality**:
+1. Validates item name and quantity
+2. Gets items data from sessionStorage
+3. Checks if item already exists
+4. If exists: Adds to quantity
+5. If new: Gets description/effect/category from items database
+6. Updates trainerData[20] JSON
+7. Saves to sessionStorage
+8. Closes modal and refreshes inventory
+
+**Key Code**:
+```javascript
+// Check if item exists
+const existingIndex = inventory.findIndex(item =>
+  item.name.toLowerCase() === selectedItemName.toLowerCase()
+);
+
+if (existingIndex !== -1) {
+  inventory[existingIndex].quantity += quantity;
+} else {
+  // Get item details from database
+  const itemData = itemsArray.find(item => item.name === selectedItemName);
+  inventory.push({
+    name: selectedItemName,
+    quantity: quantity,
+    category: itemData?.category || 'Items',
+    description: itemData?.description || 'No description provided.',
+    effect: itemData?.effect || 'No effect.'
+  });
+}
+```
+
+---
+
+#### Edit Item Confirmation (lines 1956-1998):
+
+**Functionality**:
+1. Gets new quantity from input
+2. Validates quantity (0 or greater)
+3. If 0: Removes item from inventory
+4. Otherwise: Updates quantity
+5. Saves to sessionStorage
+6. Closes modal and refreshes inventory
+
+**Quantity Controls**:
+```javascript
+// Increment button
+document.getElementById('incrementQty')?.addEventListener('click', function() {
+  const input = document.getElementById('editItemQuantity');
+  input.value = parseInt(input.value || 0) + 1;
+});
+
+// Decrement button
+document.getElementById('decrementQty')?.addEventListener('click', function() {
+  const input = document.getElementById('editItemQuantity');
+  const currentValue = parseInt(input.value || 0);
+  if (currentValue > 0) input.value = currentValue - 1;
+});
+```
+
+---
+
+#### Remove Item Confirmation (lines 2005-2033):
+
+**Functionality**:
+1. Finds item in inventory by name
+2. Removes item from array
+3. Updates sessionStorage
+4. Closes modal and refreshes inventory
+
+---
+
+#### Autocomplete System (lines 2040-2129):
+
+**Setup Function**:
+```javascript
+function setupItemAutocomplete() {
+  const searchInput = document.getElementById('itemSearch');
+  const resultsDiv = document.getElementById('autocompleteResults');
+
+  // Clone to remove old listeners
+  const newSearchInput = searchInput.cloneNode(true);
+  searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+
+  // Get fresh references
+  const itemSearch = document.getElementById('itemSearch');
+  const autocompleteResults = document.getElementById('autocompleteResults');
+
+  // Add input listener
+  itemSearch.addEventListener('input', function() {
+    const searchValue = this.value.toLowerCase().trim();
+
+    if (searchValue.length < 2) {
+      autocompleteResults.style.display = 'none';
+      return;
+    }
+
+    // Get items from sessionStorage
+    const itemsData = JSON.parse(sessionStorage.getItem('items'));
+
+    // Handle different data structures
+    let itemsArray = Array.isArray(itemsData) ? itemsData :
+                    (itemsData.items ? itemsData.items : []);
+
+    // Filter with unicode normalization
+    const matches = itemsArray.filter(item => {
+      const normalized = item.name.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      return normalized.includes(searchValue
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+      );
+    }).slice(0, 10);
+
+    // Display results
+    if (matches.length > 0) {
+      autocompleteResults.innerHTML = '';
+      matches.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'autocomplete-item';
+        div.textContent = item.name;
+        div.addEventListener('click', function() {
+          itemSearch.value = item.name;
+          autocompleteResults.style.display = 'none';
+        });
+        autocompleteResults.appendChild(div);
+      });
+      autocompleteResults.style.display = 'block';
+    }
+  });
+
+  // Hide on outside click
+  document.addEventListener('click', function(e) {
+    if (!itemSearch.contains(e.target) && !autocompleteResults.contains(e.target)) {
+      autocompleteResults.style.display = 'none';
+    }
+  });
+}
+```
+
+**Features**:
+- Minimum 2 characters to search
+- Unicode normalization for better matching (handles accents)
+- Limit to 10 results
+- Click to select
+- Auto-hide on outside click
+- Gets item details from sessionStorage
+
+---
+
+## Visual Comparison
+
+### Old vs New:
+
+**Before** (Prompts):
+```
+[Add clicked] → prompt("Enter item name:")
+            → prompt("Enter quantity:")
+            → prompt("Enter description:")
+            → prompt("Enter effect:")
+            → alert("Added!")
+```
+
+**After** (Modals):
+```
+[Add clicked] → Beautiful modal appears
+            → Autocomplete dropdown
+            → Type to search items
+            → Select from list
+            → Adjust quantity
+            → Click Add button
+            → Modal animates out
+            → Inventory refreshes
+```
+
+---
+
+## Files Modified This Session
+
+1. `js/pages/trainer-info.js` - Complete modal system implementation
+   - Lines 850-1109: Modal CSS styles (261 lines)
+   - Lines 1515-1600: Modal HTML (86 lines)
+   - Lines 1828-1852: Modal open handlers (25 lines)
+   - Lines 1859-2129: Modal interaction logic (271 lines)
+   - **Total added: 643 lines**
+
+---
+
+## Testing Checklist
+
+After these changes, verify:
+- [ ] Add button opens modal with search field
+- [ ] Typing 2+ characters shows autocomplete dropdown
+- [ ] Autocomplete filters items correctly
+- [ ] Clicking autocomplete item fills search field
+- [ ] Add button adds new items to inventory
+- [ ] Add button increases quantity for existing items
+- [ ] Edit button opens modal with current quantity
+- [ ] +/- buttons adjust quantity correctly
+- [ ] Edit saves new quantity
+- [ ] Edit with quantity 0 removes item
+- [ ] Remove button opens confirmation dialog
+- [ ] Remove Yes deletes item from inventory
+- [ ] All cancel/back buttons close modals
+- [ ] Modals have smooth animations
+- [ ] Modals match app dark theme
+- [ ] All changes persist in sessionStorage
+- [ ] Inventory refreshes after each action
+- [ ] Unicode characters work in search
+- [ ] Clicking outside autocomplete closes it
+- [ ] ESC key behavior (future enhancement)
+
+---
+
+## Result
+
+The inventory system now features:
+- **Professional modal dialogs** replacing browser prompts
+- **Intelligent autocomplete** with unicode support
+- **Smooth animations** (fade in overlay, slide in content)
+- **Consistent dark theme** matching rest of app
+- **Better UX**: Visual feedback, hover states, proper validation
+- **Quantity controls**: +/- buttons for easy adjustment
+- **Confirmation dialogs**: Prevent accidental deletions
+- **Item database integration**: Auto-fills description/effect from sessionStorage
+
+The modal system adds ~640 lines but provides a significantly better user experience compared to browser prompts.
+
+---
+
+**Session completed: 2025-12-09 Part 11**

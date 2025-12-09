@@ -11,7 +11,6 @@ export function renderEditTrainer() {
   }
 
   const trainerData = JSON.parse(trainerDataStr);
-  const skillsData = JSON.parse(sessionStorage.getItem('skills') || '{"skills": []}');
   const trainerFeatsData = JSON.parse(sessionStorage.getItem('trainerFeats') || '{"trainerFeats": []}');
 
   // Extract trainer info
@@ -28,6 +27,14 @@ export function renderEditTrainer() {
   const trainerSkills = trainerData[18] || '';
   const trainerFeats = trainerData[33] || '';
   const gear = trainerData[37] || '';
+
+  // Hardcoded D&D skills list (matching reference file)
+  const allSkills = [
+    "Athletics (STR)", "Acrobatics (DEX)", "Sleight of Hand (DEX)", "Stealth (DEX)",
+    "Arcana (INT)", "History (INT)", "Investigation (INT)", "Nature (INT)", "Religion (INT)",
+    "Animal Handling (WIS)", "Insight (WIS)", "Medicine (WIS)", "Perception (WIS)",
+    "Survival (WIS)", "Deception (CHA)", "Intimidation (CHA)", "Performance (CHA)", "Persuasion (CHA)"
+  ];
 
   const selectedSkills = trainerSkills ? trainerSkills.split(',').map(s => s.trim()) : [];
   const selectedFeats = trainerFeats ? trainerFeats.split(',').map(s => s.trim()) : [];
@@ -73,18 +80,18 @@ export function renderEditTrainer() {
           box-sizing: border-box;
         }
 
-        .page-title {
+        .edit-trainer-page h1 {
           color: white;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
           font-size: clamp(2rem, 5vw, 3rem);
           text-transform: uppercase;
           letter-spacing: clamp(1px, 0.5vw, 3px);
           text-shadow: 0 clamp(3px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.8);
           font-weight: 900;
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
           text-align: center;
         }
 
-        .trainer-name-subtitle {
+        .trainer-name {
           color: #FFDE00;
           font-size: clamp(1.2rem, 3vw, 1.8rem);
           font-weight: 600;
@@ -93,123 +100,55 @@ export function renderEditTrainer() {
           text-align: center;
         }
 
-        .edit-container {
+        .form-container {
           width: 90%;
-          max-width: clamp(600px, 70vw, 900px);
+          max-width: clamp(500px, 70vw, 700px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
           padding: clamp(2rem, 4vw, 3rem);
           border-radius: clamp(20px, 3vw, 30px);
           border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
           box-shadow: 0 clamp(15px, 3vh, 25px) clamp(40px, 6vh, 60px) rgba(0,0,0,0.5),
                       inset 0 clamp(-4px, -0.8vh, -6px) 0 rgba(0,0,0,0.1);
+          max-height: 70vh;
+          overflow-y: auto;
         }
 
-        /* Stats Grid Sections */
-        .stats-section {
-          margin-bottom: clamp(2rem, 4vh, 3rem);
+        .form-group {
+          margin-bottom: clamp(1.2rem, 2.5vh, 1.8rem);
         }
 
-        .section-title {
-          font-size: clamp(1.3rem, 2.8vw, 1.8rem);
-          font-weight: 900;
-          color: #EE1515;
-          text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.3vw, 1px);
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
-          padding-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          border-bottom: clamp(3px, 0.5vw, 4px) solid #FFDE00;
-        }
-
-        /* Main Stats Grid (AC, Level, League Points) */
-        .main-stats-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: clamp(1rem, 2vw, 1.5rem);
-          margin-bottom: clamp(2rem, 4vh, 3rem);
-        }
-
-        .stat-input-box {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: clamp(0.5rem, 1vh, 0.75rem);
-        }
-
-        .stat-input-label {
-          font-size: clamp(1rem, 2vw, 1.3rem);
-          font-weight: 900;
+        .form-group label {
+          display: block;
+          font-weight: 700;
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          margin-bottom: clamp(0.4rem, 1vh, 0.6rem);
           color: #333;
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
 
-        .stat-input-field {
+        .form-group input[type="number"],
+        .form-group input[type="text"] {
           width: 100%;
-          max-width: clamp(80px, 15vw, 100px);
-          height: clamp(60px, 12vh, 80px);
-          font-size: clamp(1.5rem, 3vw, 2rem);
-          font-weight: 700;
-          text-align: center;
-          background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
-          color: black;
-          border: clamp(3px, 0.5vw, 4px) solid #000;
-          border-radius: clamp(8px, 2vw, 12px);
-          box-shadow: 3px 3px 0 #000;
-          transition: all 0.3s ease;
-        }
-
-        .stat-input-field:focus {
-          outline: none;
-          border-color: #FFDE00;
-          box-shadow: 3px 3px 0 #000, 0 0 15px rgba(255, 222, 0, 0.5);
-          transform: translateY(-2px);
-        }
-
-        /* Ability Scores Grid (STR, DEX, CON, INT, WIS, CHA) */
-        .ability-scores-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: clamp(1.5rem, 3vw, 2rem);
-        }
-
-        .ability-input-group {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: clamp(0.3rem, 0.8vh, 0.5rem);
-        }
-
-        .ability-input-label {
+          padding: clamp(0.6rem, 1.5vh, 0.9rem);
           font-size: clamp(1rem, 2vw, 1.2rem);
-          font-weight: 900;
-          color: #333;
-          text-transform: uppercase;
-        }
-
-        .ability-input-field {
-          width: clamp(60px, 12vw, 80px);
-          height: clamp(60px, 12vw, 80px);
-          font-size: clamp(1.5rem, 3vw, 2rem);
-          font-weight: 700;
-          text-align: center;
-          background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
-          color: black;
-          border: clamp(3px, 0.5vw, 4px) solid #000;
+          border: clamp(3px, 0.5vw, 4px) solid #DDD;
           border-radius: clamp(8px, 2vw, 12px);
-          box-shadow: 3px 3px 0 #000;
+          box-sizing: border-box;
           transition: all 0.3s ease;
+          background: white;
         }
 
-        .ability-input-field:focus {
-          outline: none;
+        .form-group input[type="number"]:focus,
+        .form-group input[type="text"]:focus {
           border-color: #FFDE00;
-          box-shadow: 3px 3px 0 #000, 0 0 15px rgba(255, 222, 0, 0.5);
-          transform: translateY(-2px);
+          outline: none;
+          box-shadow: 0 0 12px rgba(255, 222, 0, 0.4);
         }
 
-        /* Skills & Feats Collapsible Sections */
+        /* Collapsible Sections */
         .collapsible-section {
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          margin-bottom: clamp(1.2rem, 2.5vh, 1.8rem);
         }
 
         .collapsible-header {
@@ -260,21 +199,15 @@ export function renderEditTrainer() {
           display: block;
         }
 
-        .checkbox-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 25vw, 200px), 1fr));
-          gap: clamp(0.8rem, 1.5vh, 1.2rem);
-        }
-
         .checkbox-item {
           display: flex;
           align-items: center;
+          margin-bottom: clamp(0.6rem, 1.5vh, 0.9rem);
           padding: clamp(0.5rem, 1vh, 0.75rem);
           background: white;
           border: 2px solid #DDD;
           border-radius: clamp(6px, 1.5vw, 10px);
           transition: all 0.2s ease;
-          cursor: pointer;
         }
 
         .checkbox-item:hover {
@@ -283,47 +216,42 @@ export function renderEditTrainer() {
         }
 
         .checkbox-item input[type="checkbox"] {
-          margin-right: clamp(0.5rem, 1vw, 0.75rem);
-          transform: scale(clamp(1.2, 0.25vw, 1.5));
+          margin-right: clamp(0.6rem, 1.5vw, 0.9rem);
+          transform: scale(clamp(1.3, 0.3vw, 1.6));
           cursor: pointer;
           accent-color: #F44336;
         }
 
         .checkbox-item label {
-          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          font-size: clamp(0.95rem, 2vw, 1.15rem);
           cursor: pointer;
           margin: 0;
-          color: #333;
           font-weight: 500;
+          color: #333;
         }
 
         /* Gear Section */
-        .gear-section {
-          margin-bottom: clamp(2rem, 4vh, 3rem);
-        }
-
-        .gear-chips-container {
+        .gear-container {
           display: flex;
           flex-wrap: wrap;
           gap: clamp(0.5rem, 1vw, 0.75rem);
           margin-bottom: clamp(1rem, 2vh, 1.5rem);
-          min-height: clamp(40px, 8vh, 60px);
           padding: clamp(0.75rem, 1.5vh, 1rem);
           background: linear-gradient(135deg, #FAFAFA 0%, #F0F0F0 100%);
           border: 2px solid #DDD;
           border-radius: clamp(8px, 2vw, 12px);
+          min-height: clamp(50px, 10vh, 70px);
         }
 
         .gear-chip {
           display: inline-flex;
           align-items: center;
-          gap: clamp(0.5rem, 1vw, 0.75rem);
           padding: clamp(0.5rem, 1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
           color: white;
           border: 2px solid #000;
           border-radius: clamp(15px, 3vw, 20px);
-          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          font-size: clamp(0.95rem, 2vw, 1.15rem);
           font-weight: 600;
           box-shadow: 2px 2px 0 #000;
           transition: all 0.2s ease;
@@ -334,36 +262,20 @@ export function renderEditTrainer() {
           box-shadow: 3px 3px 0 #000;
         }
 
-        .remove-gear {
-          cursor: pointer;
+        .gear-chip span {
+          margin-left: clamp(0.5rem, 1vw, 0.75rem);
           font-weight: 900;
-          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-          line-height: 1;
+          cursor: pointer;
+          font-size: clamp(1.2rem, 2.5vw, 1.5rem);
           transition: transform 0.2s ease;
         }
 
-        .remove-gear:hover {
+        .gear-chip span:hover {
           transform: scale(1.3);
         }
 
         .autocomplete-container {
           position: relative;
-        }
-
-        .gear-input-field {
-          width: 100%;
-          padding: clamp(0.75rem, 1.5vh, 1rem);
-          font-size: clamp(1rem, 2vw, 1.2rem);
-          background: white;
-          border: clamp(3px, 0.5vw, 4px) solid #DDD;
-          border-radius: clamp(8px, 2vw, 12px);
-          transition: all 0.3s ease;
-        }
-
-        .gear-input-field:focus {
-          outline: none;
-          border-color: #F44336;
-          box-shadow: 0 0 15px rgba(244, 67, 54, 0.3);
         }
 
         .autocomplete-dropdown {
@@ -403,50 +315,51 @@ export function renderEditTrainer() {
           border-bottom: none;
         }
 
-        /* Action Buttons */
-        .button-container {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
+        /* Button Group */
+        .button-group {
+          display: flex;
           gap: clamp(1rem, 2vw, 1.5rem);
+          justify-content: center;
           margin-top: clamp(2rem, 4vh, 3rem);
         }
 
-        .action-button {
-          padding: clamp(1rem, 2vh, 1.5rem);
-          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
+        .button {
+          flex: 1;
+          padding: clamp(1rem, 2vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+          border: clamp(3px, 0.5vw, 4px) solid #000;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          font-size: clamp(1.1rem, 2.3vw, 1.4rem);
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.3vw, 1px);
-          border: clamp(3px, 0.5vw, 4px) solid #000;
-          border-radius: clamp(12px, 2.5vw, 18px);
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           box-shadow: 0 clamp(6px, 1.5vh, 10px) clamp(15px, 3vh, 20px) rgba(0,0,0,0.3);
         }
 
-        .save-button {
+        .button-primary {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
         }
 
-        .save-button:hover {
+        .button-primary:hover {
           transform: translateY(clamp(-3px, -0.8vh, -5px));
           box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 35px) rgba(0,0,0,0.4),
                       0 0 clamp(15px, 3vw, 25px) rgba(76, 175, 80, 0.5);
         }
 
-        .cancel-button {
+        .button-secondary {
           background: linear-gradient(135deg, #9E9E9E 0%, #757575 100%);
           color: white;
         }
 
-        .cancel-button:hover {
+        .button-secondary:hover {
           transform: translateY(clamp(-3px, -0.8vh, -5px));
           box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 35px) rgba(0,0,0,0.4),
                       0 0 clamp(15px, 3vw, 25px) rgba(158, 158, 158, 0.5);
         }
 
-        .action-button:active {
+        .button:active {
           transform: translateY(0);
           box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
         }
@@ -489,59 +402,54 @@ export function renderEditTrainer() {
       <!-- Back Button -->
       <button class="back-button" id="backButton">←</button>
 
-      <h1 class="page-title">Edit Trainer</h1>
-      <div class="trainer-name-subtitle">${trainerName}</div>
+      <h1>Edit Trainer</h1>
+      <div class="trainer-name">${trainerName}</div>
 
-      <div class="edit-container">
+      <div class="form-container">
         <form id="editTrainerForm">
-          <!-- Main Stats Section -->
-          <div class="stats-section">
-            <div class="section-title">Main Stats</div>
-            <div class="main-stats-grid">
-              <div class="stat-input-box">
-                <label class="stat-input-label" for="ac">AC</label>
-                <input type="number" id="ac" name="ac" class="stat-input-field" value="${trainerAC}" min="1" max="30" required />
-              </div>
-              <div class="stat-input-box">
-                <label class="stat-input-label" for="level">Level</label>
-                <input type="number" id="level" name="level" class="stat-input-field" value="${trainerLevel}" min="1" max="20" required />
-              </div>
-              <div class="stat-input-box">
-                <label class="stat-input-label" for="leaguePoints">LP</label>
-                <input type="number" id="leaguePoints" name="leaguePoints" class="stat-input-field" value="${trainerLeaguePoints}" min="0" required />
-              </div>
-            </div>
+          <div class="form-group">
+            <label for="level">Level</label>
+            <input type="number" id="level" name="level" value="${trainerLevel}" min="1" max="20" required />
           </div>
 
-          <!-- Ability Scores Section -->
-          <div class="stats-section">
-            <div class="section-title">Ability Scores</div>
-            <div class="ability-scores-grid">
-              <div class="ability-input-group">
-                <label class="ability-input-label" for="str">STR</label>
-                <input type="number" id="str" name="str" class="ability-input-field" value="${trainerSTR}" min="1" max="30" required />
-              </div>
-              <div class="ability-input-group">
-                <label class="ability-input-label" for="dex">DEX</label>
-                <input type="number" id="dex" name="dex" class="ability-input-field" value="${trainerDEX}" min="1" max="30" required />
-              </div>
-              <div class="ability-input-group">
-                <label class="ability-input-label" for="con">CON</label>
-                <input type="number" id="con" name="con" class="ability-input-field" value="${trainerCON}" min="1" max="30" required />
-              </div>
-              <div class="ability-input-group">
-                <label class="ability-input-label" for="int">INT</label>
-                <input type="number" id="int" name="int" class="ability-input-field" value="${trainerINT}" min="1" max="30" required />
-              </div>
-              <div class="ability-input-group">
-                <label class="ability-input-label" for="wis">WIS</label>
-                <input type="number" id="wis" name="wis" class="ability-input-field" value="${trainerWIS}" min="1" max="30" required />
-              </div>
-              <div class="ability-input-group">
-                <label class="ability-input-label" for="cha">CHA</label>
-                <input type="number" id="cha" name="cha" class="ability-input-field" value="${trainerCHA}" min="1" max="30" required />
-              </div>
-            </div>
+          <div class="form-group">
+            <label for="str">STR</label>
+            <input type="number" id="str" name="str" value="${trainerSTR}" min="1" max="30" required />
+          </div>
+
+          <div class="form-group">
+            <label for="dex">DEX</label>
+            <input type="number" id="dex" name="dex" value="${trainerDEX}" min="1" max="30" required />
+          </div>
+
+          <div class="form-group">
+            <label for="con">CON</label>
+            <input type="number" id="con" name="con" value="${trainerCON}" min="1" max="30" required />
+          </div>
+
+          <div class="form-group">
+            <label for="int">INT</label>
+            <input type="number" id="int" name="int" value="${trainerINT}" min="1" max="30" required />
+          </div>
+
+          <div class="form-group">
+            <label for="wis">WIS</label>
+            <input type="number" id="wis" name="wis" value="${trainerWIS}" min="1" max="30" required />
+          </div>
+
+          <div class="form-group">
+            <label for="cha">CHA</label>
+            <input type="number" id="cha" name="cha" value="${trainerCHA}" min="1" max="30" required />
+          </div>
+
+          <div class="form-group">
+            <label for="ac">AC</label>
+            <input type="number" id="ac" name="ac" value="${trainerAC}" min="1" max="30" required />
+          </div>
+
+          <div class="form-group">
+            <label for="leaguePoints">League Points</label>
+            <input type="number" id="leaguePoints" name="leaguePoints" value="${trainerLeaguePoints}" min="0" required />
           </div>
 
           <!-- Skills Section -->
@@ -551,14 +459,12 @@ export function renderEditTrainer() {
               <span class="arrow" id="skillsArrow">▶</span>
             </div>
             <div class="collapsible-content" id="skillsContent">
-              <div class="checkbox-grid">
-                ${(skillsData.skills || []).map(skill => `
-                  <div class="checkbox-item">
-                    <input type="checkbox" id="skill_${skill.name.replace(/\s+/g, '_')}" name="skills" value="${skill.name}" ${selectedSkills.includes(skill.name) ? 'checked' : ''} />
-                    <label for="skill_${skill.name.replace(/\s+/g, '_')}">${skill.name}</label>
-                  </div>
-                `).join('')}
-              </div>
+              ${allSkills.map(skill => `
+                <div class="checkbox-item">
+                  <input type="checkbox" id="skill_${skill.replace(/\s+/g, '_').replace(/\(|\)/g, '')}" name="skills" value="${skill}" ${selectedSkills.includes(skill) ? 'checked' : ''} />
+                  <label for="skill_${skill.replace(/\s+/g, '_').replace(/\(|\)/g, '')}">${skill}</label>
+                </div>
+              `).join('')}
             </div>
           </div>
 
@@ -569,38 +475,36 @@ export function renderEditTrainer() {
               <span class="arrow" id="featsArrow">▶</span>
             </div>
             <div class="collapsible-content" id="featsContent">
-              <div class="checkbox-grid">
-                ${(trainerFeatsData.trainerFeats || []).map(feat => `
-                  <div class="checkbox-item">
-                    <input type="checkbox" id="feat_${feat.name.replace(/\s+/g, '_')}" name="feats" value="${feat.name}" ${selectedFeats.includes(feat.name) ? 'checked' : ''} />
-                    <label for="feat_${feat.name.replace(/\s+/g, '_')}">${feat.name}</label>
-                  </div>
-                `).join('')}
-              </div>
+              ${(trainerFeatsData.trainerFeats || []).map(feat => `
+                <div class="checkbox-item">
+                  <input type="checkbox" id="feat_${feat.name.replace(/\s+/g, '_')}" name="feats" value="${feat.name}" ${selectedFeats.includes(feat.name) ? 'checked' : ''} />
+                  <label for="feat_${feat.name.replace(/\s+/g, '_')}">${feat.name}</label>
+                </div>
+              `).join('')}
             </div>
           </div>
 
           <!-- Gear Section -->
-          <div class="gear-section">
-            <div class="section-title">Gear</div>
-            <div class="gear-chips-container" id="gearContainer">
+          <div class="form-group">
+            <label for="gearInput">Gear</label>
+            <div class="gear-container" id="gearContainer">
               ${gearArray.length > 0 ? gearArray.map(g => `
                 <div class="gear-chip">
                   ${g}
                   <span class="remove-gear" data-gear="${g}">×</span>
                 </div>
-              `).join('') : '<span style="color: #999; font-style: italic;">No gear items added</span>'}
+              `).join('') : '<span style="color: #999; font-style: italic;">No gear items</span>'}
             </div>
             <div class="autocomplete-container">
-              <input type="text" id="gearInput" class="gear-input-field" placeholder="Type to search and add gear items..." autocomplete="off" />
+              <input type="text" id="gearInput" placeholder="Type to search items..." autocomplete="off" />
               <div class="autocomplete-dropdown" id="gearDropdown"></div>
             </div>
           </div>
 
-          <!-- Action Buttons -->
-          <div class="button-container">
-            <button type="submit" class="action-button save-button">💾 Save Changes</button>
-            <button type="button" class="action-button cancel-button" id="cancelButton">✖ Cancel</button>
+          <!-- Buttons -->
+          <div class="button-group">
+            <button type="submit" class="button button-primary">Save Changes</button>
+            <button type="button" class="button button-secondary" id="cancelButton">Cancel</button>
           </div>
         </form>
       </div>
@@ -691,10 +595,10 @@ export function attachEditTrainerListeners() {
     btn.addEventListener('click', (e) => {
       e.target.closest('.gear-chip').remove();
 
-      // Update placeholder if no gear left
+      // Add placeholder if no gear left
       const container = document.getElementById('gearContainer');
       if (container.querySelectorAll('.gear-chip').length === 0) {
-        container.innerHTML = '<span style="color: #999; font-style: italic;">No gear items added</span>';
+        container.innerHTML = '<span style="color: #999; font-style: italic;">No gear items</span>';
       }
     });
   });
@@ -750,7 +654,7 @@ function addGearChip(gearName) {
 
     // Add placeholder back if no gear left
     if (container.querySelectorAll('.gear-chip').length === 0) {
-      container.innerHTML = '<span style="color: #999; font-style: italic;">No gear items added</span>';
+      container.innerHTML = '<span style="color: #999; font-style: italic;">No gear items</span>';
     }
   });
 

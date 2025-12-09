@@ -222,6 +222,14 @@ export function renderTrainerInfo() {
           text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
+        .info-item-half .info-item-label {
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+        }
+
+        .info-item-half span:not(.info-item-label) {
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+        }
+
         .info-buttons-grid {
           display: grid;
           grid-template-columns: auto auto;
@@ -229,16 +237,16 @@ export function renderTrainerInfo() {
         }
 
         .info-button {
-          padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(0.8rem, 2vw, 1.2rem);
+          padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(0.7rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
           border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
           border-radius: clamp(8px, 1.5vw, 12px);
           color: white;
-          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-size: clamp(0.75rem, 1.5vw, 0.9rem);
           white-space: nowrap;
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+          letter-spacing: clamp(0.2px, 0.15vw, 0.4px);
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           box-shadow: 0 4px 10px rgba(0,0,0,0.3);
@@ -259,8 +267,8 @@ export function renderTrainerInfo() {
         .right-column {
           display: flex;
           flex-direction: column;
-          gap: clamp(1.5rem, 3vh, 2rem);
-          padding-top: clamp(4rem, 8vh, 5rem);
+          gap: clamp(0.75rem, 1.5vh, 1rem);
+          padding-top: clamp(3rem, 6vh, 4rem);
         }
 
         /* Stats Row 1: AC, HP, VP - Medium boxes with HP/VP current values */
@@ -268,7 +276,7 @@ export function renderTrainerInfo() {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
           gap: clamp(0.6rem, 2vw, 1rem);
-          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
         }
 
         .stat-box-wrapper {
@@ -349,7 +357,7 @@ export function renderTrainerInfo() {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
           gap: clamp(0.6rem, 2vw, 1rem);
-          margin-bottom: clamp(1rem, 2.5vh, 1.5rem);
+          margin-bottom: clamp(0.5rem, 1.2vh, 0.75rem);
         }
 
         .ability-group {

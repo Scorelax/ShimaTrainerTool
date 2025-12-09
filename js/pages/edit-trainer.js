@@ -15,6 +15,7 @@ export function renderEditTrainer() {
   const trainerFeatsData = JSON.parse(sessionStorage.getItem('trainerFeats') || '{"trainerFeats": []}');
 
   // Extract trainer info
+  const trainerName = trainerData[1] || 'Trainer';
   const trainerLevel = trainerData[2] || 1;
   const trainerSTR = trainerData[5] || 10;
   const trainerDEX = trainerData[6] || 10;
@@ -36,101 +37,208 @@ export function renderEditTrainer() {
     <div class="edit-trainer-page">
       <style>
         body, .content {
-          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+          background:
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
+          min-height: 100vh;
+          position: relative;
+          overflow-x: hidden;
+        }
+
+        body::before, .content::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image:
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px, 80px 80px;
+          background-position: 0 0, 40px 40px;
+          pointer-events: none;
+          opacity: 0.5;
         }
 
         .edit-trainer-page {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(1.5rem, 3vh, 2rem) clamp(0.75rem, 2vw, 1rem);
-          min-height: 80vh;
-        }
-
-        .edit-trainer-page h1 {
-          color: white;
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
-          font-size: clamp(1.5rem, 4vw, 2.5rem);
-          text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.5vw, 2px);
-          text-shadow: 0 clamp(2px, 0.6vh, 4px) clamp(8px, 1.5vh, 10px) rgba(0,0,0,0.8);
-          font-weight: 900;
-        }
-
-        .form-container {
-          width: 100%;
-          max-width: clamp(500px, 80vw, 600px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          padding: clamp(1.5rem, 4vw, 2.5rem);
-          border-radius: clamp(15px, 3vw, 25px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(30px, 5vh, 40px) rgba(0,0,0,0.4),
-                      inset 0 clamp(-3px, -0.5vh, -4px) 0 rgba(0,0,0,0.05);
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
-          max-height: 70vh;
-          overflow-y: auto;
-        }
-
-        .form-group {
-          margin-bottom: clamp(1rem, 2.5vh, 1.5rem);
-        }
-
-        .form-group label {
-          display: block;
-          font-weight: bold;
-          font-size: clamp(1rem, 2vw, 1.3rem);
-          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
-          color: #333;
-        }
-
-        .form-group input[type="number"],
-        .form-group input[type="text"],
-        .form-group textarea {
-          width: 100%;
-          padding: clamp(0.5rem, 1.5vw, 0.75rem);
-          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
-          border: clamp(2px, 0.3vw, 3px) solid #ccc;
-          border-radius: clamp(3px, 0.8vw, 5px);
+          padding: clamp(5rem, 10vh, 8rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
+          min-height: 100vh;
+          position: relative;
           box-sizing: border-box;
         }
 
-        .form-group input[type="number"]:focus,
-        .form-group input[type="text"]:focus,
-        .form-group textarea:focus {
-          border-color: #f44336;
-          outline: none;
+        .page-title {
+          color: white;
+          font-size: clamp(2rem, 5vw, 3rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(1px, 0.5vw, 3px);
+          text-shadow: 0 clamp(3px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.8);
+          font-weight: 900;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          text-align: center;
         }
 
+        .trainer-name-subtitle {
+          color: #FFDE00;
+          font-size: clamp(1.2rem, 3vw, 1.8rem);
+          font-weight: 600;
+          margin-bottom: clamp(2rem, 4vh, 3rem);
+          text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+          text-align: center;
+        }
+
+        .edit-container {
+          width: 90%;
+          max-width: clamp(600px, 70vw, 900px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          padding: clamp(2rem, 4vw, 3rem);
+          border-radius: clamp(20px, 3vw, 30px);
+          border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
+          box-shadow: 0 clamp(15px, 3vh, 25px) clamp(40px, 6vh, 60px) rgba(0,0,0,0.5),
+                      inset 0 clamp(-4px, -0.8vh, -6px) 0 rgba(0,0,0,0.1);
+        }
+
+        /* Stats Grid Sections */
+        .stats-section {
+          margin-bottom: clamp(2rem, 4vh, 3rem);
+        }
+
+        .section-title {
+          font-size: clamp(1.3rem, 2.8vw, 1.8rem);
+          font-weight: 900;
+          color: #EE1515;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          padding-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          border-bottom: clamp(3px, 0.5vw, 4px) solid #FFDE00;
+        }
+
+        /* Main Stats Grid (AC, Level, League Points) */
+        .main-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: clamp(1rem, 2vw, 1.5rem);
+          margin-bottom: clamp(2rem, 4vh, 3rem);
+        }
+
+        .stat-input-box {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .stat-input-label {
+          font-size: clamp(1rem, 2vw, 1.3rem);
+          font-weight: 900;
+          color: #333;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .stat-input-field {
+          width: 100%;
+          max-width: clamp(80px, 15vw, 100px);
+          height: clamp(60px, 12vh, 80px);
+          font-size: clamp(1.5rem, 3vw, 2rem);
+          font-weight: 700;
+          text-align: center;
+          background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
+          color: black;
+          border: clamp(3px, 0.5vw, 4px) solid #000;
+          border-radius: clamp(8px, 2vw, 12px);
+          box-shadow: 3px 3px 0 #000;
+          transition: all 0.3s ease;
+        }
+
+        .stat-input-field:focus {
+          outline: none;
+          border-color: #FFDE00;
+          box-shadow: 3px 3px 0 #000, 0 0 15px rgba(255, 222, 0, 0.5);
+          transform: translateY(-2px);
+        }
+
+        /* Ability Scores Grid (STR, DEX, CON, INT, WIS, CHA) */
+        .ability-scores-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: clamp(1.5rem, 3vw, 2rem);
+        }
+
+        .ability-input-group {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: clamp(0.3rem, 0.8vh, 0.5rem);
+        }
+
+        .ability-input-label {
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          font-weight: 900;
+          color: #333;
+          text-transform: uppercase;
+        }
+
+        .ability-input-field {
+          width: clamp(60px, 12vw, 80px);
+          height: clamp(60px, 12vw, 80px);
+          font-size: clamp(1.5rem, 3vw, 2rem);
+          font-weight: 700;
+          text-align: center;
+          background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
+          color: black;
+          border: clamp(3px, 0.5vw, 4px) solid #000;
+          border-radius: clamp(8px, 2vw, 12px);
+          box-shadow: 3px 3px 0 #000;
+          transition: all 0.3s ease;
+        }
+
+        .ability-input-field:focus {
+          outline: none;
+          border-color: #FFDE00;
+          box-shadow: 3px 3px 0 #000, 0 0 15px rgba(255, 222, 0, 0.5);
+          transform: translateY(-2px);
+        }
+
+        /* Skills & Feats Collapsible Sections */
         .collapsible-section {
-          margin-bottom: clamp(1rem, 2.5vh, 1.5rem);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
         }
 
         .collapsible-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: clamp(0.75rem, 2vw, 1rem);
-          background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+          padding: clamp(1rem, 2vh, 1.5rem);
+          background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
           color: white;
-          border-radius: clamp(8px, 2vw, 15px);
-          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           cursor: pointer;
-          font-size: clamp(1rem, 2vw, 1.3rem);
+          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.3vw, 1px);
-          box-shadow: 0 clamp(6px, 1.2vh, 8px) clamp(15px, 3vh, 20px) rgba(0,0,0,0.3);
+          box-shadow: 0 clamp(6px, 1.5vh, 10px) clamp(15px, 3vh, 25px) rgba(0,0,0,0.4);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .collapsible-header:hover {
-          transform: translateY(clamp(-1px, -0.3vh, -2px));
-          box-shadow: 0 clamp(8px, 1.8vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4),
-                      0 0 clamp(15px, 3vw, 20px) rgba(255,222,0,0.4);
+          transform: translateY(clamp(-2px, -0.5vh, -3px));
+          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 35px) rgba(0,0,0,0.5),
+                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
         }
 
         .arrow {
-          transition: transform 0.3s;
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          transition: transform 0.3s ease;
         }
 
         .arrow.open {
@@ -139,63 +247,123 @@ export function renderEditTrainer() {
 
         .collapsible-content {
           display: none;
-          padding: clamp(0.75rem, 2vw, 1rem);
-          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
+          padding: clamp(1rem, 2vh, 1.5rem);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           border-top: none;
-          border-radius: 0 0 clamp(8px, 2vw, 15px) clamp(8px, 2vw, 15px);
-          max-height: clamp(250px, 40vh, 300px);
+          border-radius: 0 0 clamp(12px, 2.5vw, 18px) clamp(12px, 2.5vw, 18px);
+          max-height: clamp(200px, 35vh, 300px);
           overflow-y: auto;
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          background: linear-gradient(135deg, #FAFAFA 0%, #F0F0F0 100%);
         }
 
         .collapsible-content.open {
           display: block;
         }
 
+        .checkbox-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(clamp(120px, 25vw, 200px), 1fr));
+          gap: clamp(0.8rem, 1.5vh, 1.2rem);
+        }
+
         .checkbox-item {
           display: flex;
           align-items: center;
-          margin-bottom: clamp(0.5rem, 1.5vh, 0.75rem);
+          padding: clamp(0.5rem, 1vh, 0.75rem);
+          background: white;
+          border: 2px solid #DDD;
+          border-radius: clamp(6px, 1.5vw, 10px);
+          transition: all 0.2s ease;
+          cursor: pointer;
+        }
+
+        .checkbox-item:hover {
+          border-color: #F44336;
+          background: #FFF8F8;
         }
 
         .checkbox-item input[type="checkbox"] {
-          margin-right: clamp(0.5rem, 1.5vw, 0.75rem);
-          transform: scale(clamp(1.2, 0.3vw, 1.5));
+          margin-right: clamp(0.5rem, 1vw, 0.75rem);
+          transform: scale(clamp(1.2, 0.25vw, 1.5));
           cursor: pointer;
+          accent-color: #F44336;
         }
 
         .checkbox-item label {
           font-size: clamp(0.9rem, 1.8vw, 1.1rem);
           cursor: pointer;
           margin: 0;
+          color: #333;
+          font-weight: 500;
         }
 
-        .gear-container {
+        /* Gear Section */
+        .gear-section {
+          margin-bottom: clamp(2rem, 4vh, 3rem);
+        }
+
+        .gear-chips-container {
           display: flex;
           flex-wrap: wrap;
-          gap: 0.5rem;
-          margin-bottom: 1rem;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          min-height: clamp(40px, 8vh, 60px);
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          background: linear-gradient(135deg, #FAFAFA 0%, #F0F0F0 100%);
+          border: 2px solid #DDD;
+          border-radius: clamp(8px, 2vw, 12px);
         }
 
         .gear-chip {
           display: inline-flex;
           align-items: center;
-          padding: 0.5rem 1rem;
-          background-color: #f44336;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
+          background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
           color: white;
-          border-radius: 15px;
-          font-size: 1rem;
+          border: 2px solid #000;
+          border-radius: clamp(15px, 3vw, 20px);
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          font-weight: 600;
+          box-shadow: 2px 2px 0 #000;
+          transition: all 0.2s ease;
         }
 
-        .gear-chip span {
-          margin-left: 0.75rem;
-          font-weight: bold;
+        .gear-chip:hover {
+          transform: translateY(-2px);
+          box-shadow: 3px 3px 0 #000;
+        }
+
+        .remove-gear {
           cursor: pointer;
-          font-size: 1.2rem;
+          font-weight: 900;
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          line-height: 1;
+          transition: transform 0.2s ease;
+        }
+
+        .remove-gear:hover {
+          transform: scale(1.3);
         }
 
         .autocomplete-container {
           position: relative;
+        }
+
+        .gear-input-field {
+          width: 100%;
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          background: white;
+          border: clamp(3px, 0.5vw, 4px) solid #DDD;
+          border-radius: clamp(8px, 2vw, 12px);
+          transition: all 0.3s ease;
+        }
+
+        .gear-input-field:focus {
+          outline: none;
+          border-color: #F44336;
+          box-shadow: 0 0 15px rgba(244, 67, 54, 0.3);
         }
 
         .autocomplete-dropdown {
@@ -203,14 +371,15 @@ export function renderEditTrainer() {
           top: 100%;
           left: 0;
           right: 0;
-          max-height: 200px;
+          max-height: clamp(150px, 30vh, 250px);
           overflow-y: auto;
           background: white;
-          border: 2px solid #f44336;
+          border: clamp(3px, 0.5vw, 4px) solid #F44336;
           border-top: none;
-          border-radius: 0 0 5px 5px;
+          border-radius: 0 0 clamp(8px, 2vw, 12px) clamp(8px, 2vw, 12px);
           z-index: 100;
           display: none;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.2);
         }
 
         .autocomplete-dropdown.open {
@@ -218,14 +387,15 @@ export function renderEditTrainer() {
         }
 
         .autocomplete-item {
-          padding: 0.75rem;
+          padding: clamp(0.75rem, 1.5vh, 1rem);
           cursor: pointer;
-          font-size: 1rem;
-          border-bottom: 1px solid #eee;
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          border-bottom: 1px solid #EEE;
+          transition: all 0.2s ease;
         }
 
         .autocomplete-item:hover {
-          background-color: #f44336;
+          background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
           color: white;
         }
 
@@ -233,89 +403,145 @@ export function renderEditTrainer() {
           border-bottom: none;
         }
 
-        .button-group {
-          display: flex;
-          gap: 1rem;
-          justify-content: center;
-          margin-top: 2rem;
+        /* Action Buttons */
+        .button-container {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: clamp(1rem, 2vw, 1.5rem);
+          margin-top: clamp(2rem, 4vh, 3rem);
         }
 
-        .button {
-          padding: 1rem 2rem;
-          border: none;
-          border-radius: 5px;
-          font-size: 1.2rem;
-          font-weight: bold;
+        .action-button {
+          padding: clamp(1rem, 2vh, 1.5rem);
+          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          border: clamp(3px, 0.5vw, 4px) solid #000;
+          border-radius: clamp(12px, 2.5vw, 18px);
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 clamp(6px, 1.5vh, 10px) clamp(15px, 3vh, 20px) rgba(0,0,0,0.3);
         }
 
-        .button-primary {
-          background-color: #4CAF50;
+        .save-button {
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
         }
 
-        .button-primary:hover {
-          background-color: #45a049;
+        .save-button:hover {
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 35px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 3vw, 25px) rgba(76, 175, 80, 0.5);
         }
 
-        .button-secondary {
-          background-color: #f44336;
+        .cancel-button {
+          background: linear-gradient(135deg, #9E9E9E 0%, #757575 100%);
           color: white;
         }
 
-        .button-secondary:hover {
-          background-color: #d32f2f;
+        .cancel-button:hover {
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 35px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 3vw, 25px) rgba(158, 158, 158, 0.5);
+        }
+
+        .action-button:active {
+          transform: translateY(0);
+          box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
+        }
+
+        /* Back Button */
+        .back-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 25px);
+          left: clamp(15px, 3vw, 25px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: clamp(45px, 9vw, 60px);
+          height: clamp(45px, 9vw, 60px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+          font-weight: 900;
+          cursor: pointer;
+          box-shadow: 0 clamp(8px, 2vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+        }
+
+        .back-button:hover {
+          transform: scale(1.15);
+          box-shadow: 0 clamp(12px, 3vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
+                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        .back-button:active {
+          transform: scale(1.05);
         }
       </style>
 
-      <h1>Edit Trainer</h1>
+      <!-- Back Button -->
+      <button class="back-button" id="backButton">←</button>
 
-      <div class="form-container">
+      <h1 class="page-title">Edit Trainer</h1>
+      <div class="trainer-name-subtitle">${trainerName}</div>
+
+      <div class="edit-container">
         <form id="editTrainerForm">
-          <div class="form-group">
-            <label for="level">Level</label>
-            <input type="number" id="level" name="level" value="${trainerLevel}" min="1" max="20" required />
+          <!-- Main Stats Section -->
+          <div class="stats-section">
+            <div class="section-title">Main Stats</div>
+            <div class="main-stats-grid">
+              <div class="stat-input-box">
+                <label class="stat-input-label" for="ac">AC</label>
+                <input type="number" id="ac" name="ac" class="stat-input-field" value="${trainerAC}" min="1" max="30" required />
+              </div>
+              <div class="stat-input-box">
+                <label class="stat-input-label" for="level">Level</label>
+                <input type="number" id="level" name="level" class="stat-input-field" value="${trainerLevel}" min="1" max="20" required />
+              </div>
+              <div class="stat-input-box">
+                <label class="stat-input-label" for="leaguePoints">LP</label>
+                <input type="number" id="leaguePoints" name="leaguePoints" class="stat-input-field" value="${trainerLeaguePoints}" min="0" required />
+              </div>
+            </div>
           </div>
 
-          <div class="form-group">
-            <label for="str">STR</label>
-            <input type="number" id="str" name="str" value="${trainerSTR}" min="1" max="30" required />
-          </div>
-
-          <div class="form-group">
-            <label for="dex">DEX</label>
-            <input type="number" id="dex" name="dex" value="${trainerDEX}" min="1" max="30" required />
-          </div>
-
-          <div class="form-group">
-            <label for="con">CON</label>
-            <input type="number" id="con" name="con" value="${trainerCON}" min="1" max="30" required />
-          </div>
-
-          <div class="form-group">
-            <label for="int">INT</label>
-            <input type="number" id="int" name="int" value="${trainerINT}" min="1" max="30" required />
-          </div>
-
-          <div class="form-group">
-            <label for="wis">WIS</label>
-            <input type="number" id="wis" name="wis" value="${trainerWIS}" min="1" max="30" required />
-          </div>
-
-          <div class="form-group">
-            <label for="cha">CHA</label>
-            <input type="number" id="cha" name="cha" value="${trainerCHA}" min="1" max="30" required />
-          </div>
-
-          <div class="form-group">
-            <label for="ac">AC</label>
-            <input type="number" id="ac" name="ac" value="${trainerAC}" min="1" max="30" required />
-          </div>
-
-          <div class="form-group">
-            <label for="leaguePoints">League Points</label>
-            <input type="number" id="leaguePoints" name="leaguePoints" value="${trainerLeaguePoints}" min="0" required />
+          <!-- Ability Scores Section -->
+          <div class="stats-section">
+            <div class="section-title">Ability Scores</div>
+            <div class="ability-scores-grid">
+              <div class="ability-input-group">
+                <label class="ability-input-label" for="str">STR</label>
+                <input type="number" id="str" name="str" class="ability-input-field" value="${trainerSTR}" min="1" max="30" required />
+              </div>
+              <div class="ability-input-group">
+                <label class="ability-input-label" for="dex">DEX</label>
+                <input type="number" id="dex" name="dex" class="ability-input-field" value="${trainerDEX}" min="1" max="30" required />
+              </div>
+              <div class="ability-input-group">
+                <label class="ability-input-label" for="con">CON</label>
+                <input type="number" id="con" name="con" class="ability-input-field" value="${trainerCON}" min="1" max="30" required />
+              </div>
+              <div class="ability-input-group">
+                <label class="ability-input-label" for="int">INT</label>
+                <input type="number" id="int" name="int" class="ability-input-field" value="${trainerINT}" min="1" max="30" required />
+              </div>
+              <div class="ability-input-group">
+                <label class="ability-input-label" for="wis">WIS</label>
+                <input type="number" id="wis" name="wis" class="ability-input-field" value="${trainerWIS}" min="1" max="30" required />
+              </div>
+              <div class="ability-input-group">
+                <label class="ability-input-label" for="cha">CHA</label>
+                <input type="number" id="cha" name="cha" class="ability-input-field" value="${trainerCHA}" min="1" max="30" required />
+              </div>
+            </div>
           </div>
 
           <!-- Skills Section -->
@@ -325,12 +551,14 @@ export function renderEditTrainer() {
               <span class="arrow" id="skillsArrow">▶</span>
             </div>
             <div class="collapsible-content" id="skillsContent">
-              ${(skillsData.skills || []).map(skill => `
-                <div class="checkbox-item">
-                  <input type="checkbox" id="skill_${skill.name.replace(/\s+/g, '_')}" name="skills" value="${skill.name}" ${selectedSkills.includes(skill.name) ? 'checked' : ''} />
-                  <label for="skill_${skill.name.replace(/\s+/g, '_')}">${skill.name}</label>
-                </div>
-              `).join('')}
+              <div class="checkbox-grid">
+                ${(skillsData.skills || []).map(skill => `
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="skill_${skill.name.replace(/\s+/g, '_')}" name="skills" value="${skill.name}" ${selectedSkills.includes(skill.name) ? 'checked' : ''} />
+                    <label for="skill_${skill.name.replace(/\s+/g, '_')}">${skill.name}</label>
+                  </div>
+                `).join('')}
+              </div>
             </div>
           </div>
 
@@ -341,36 +569,38 @@ export function renderEditTrainer() {
               <span class="arrow" id="featsArrow">▶</span>
             </div>
             <div class="collapsible-content" id="featsContent">
-              ${(trainerFeatsData.trainerFeats || []).map(feat => `
-                <div class="checkbox-item">
-                  <input type="checkbox" id="feat_${feat.name.replace(/\s+/g, '_')}" name="feats" value="${feat.name}" ${selectedFeats.includes(feat.name) ? 'checked' : ''} />
-                  <label for="feat_${feat.name.replace(/\s+/g, '_')}">${feat.name}</label>
-                </div>
-              `).join('')}
+              <div class="checkbox-grid">
+                ${(trainerFeatsData.trainerFeats || []).map(feat => `
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="feat_${feat.name.replace(/\s+/g, '_')}" name="feats" value="${feat.name}" ${selectedFeats.includes(feat.name) ? 'checked' : ''} />
+                    <label for="feat_${feat.name.replace(/\s+/g, '_')}">${feat.name}</label>
+                  </div>
+                `).join('')}
+              </div>
             </div>
           </div>
 
           <!-- Gear Section -->
-          <div class="form-group">
-            <label for="gearInput">Gear</label>
-            <div class="gear-container" id="gearContainer">
-              ${gearArray.map(g => `
+          <div class="gear-section">
+            <div class="section-title">Gear</div>
+            <div class="gear-chips-container" id="gearContainer">
+              ${gearArray.length > 0 ? gearArray.map(g => `
                 <div class="gear-chip">
                   ${g}
                   <span class="remove-gear" data-gear="${g}">×</span>
                 </div>
-              `).join('')}
+              `).join('') : '<span style="color: #999; font-style: italic;">No gear items added</span>'}
             </div>
             <div class="autocomplete-container">
-              <input type="text" id="gearInput" placeholder="Type to search items..." autocomplete="off" />
+              <input type="text" id="gearInput" class="gear-input-field" placeholder="Type to search and add gear items..." autocomplete="off" />
               <div class="autocomplete-dropdown" id="gearDropdown"></div>
             </div>
           </div>
 
-          <!-- Buttons -->
-          <div class="button-group">
-            <button type="submit" class="button button-primary">Save Changes</button>
-            <button type="button" class="button button-secondary" id="cancelButton">Cancel</button>
+          <!-- Action Buttons -->
+          <div class="button-container">
+            <button type="submit" class="action-button save-button">💾 Save Changes</button>
+            <button type="button" class="action-button cancel-button" id="cancelButton">✖ Cancel</button>
           </div>
         </form>
       </div>
@@ -460,11 +690,24 @@ export function attachEditTrainerListeners() {
   document.querySelectorAll('.remove-gear').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.target.closest('.gear-chip').remove();
+
+      // Update placeholder if no gear left
+      const container = document.getElementById('gearContainer');
+      if (container.querySelectorAll('.gear-chip').length === 0) {
+        container.innerHTML = '<span style="color: #999; font-style: italic;">No gear items added</span>';
+      }
     });
   });
 
   // Cancel button
   document.getElementById('cancelButton')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'trainer-info' }
+    }));
+  });
+
+  // Back button
+  document.getElementById('backButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'trainer-info' }
     }));
@@ -479,6 +722,22 @@ export function attachEditTrainerListeners() {
 
 function addGearChip(gearName) {
   const container = document.getElementById('gearContainer');
+
+  // Remove placeholder if present
+  const placeholder = container.querySelector('span[style]');
+  if (placeholder) {
+    placeholder.remove();
+  }
+
+  // Check if gear already exists
+  const existingGear = Array.from(container.querySelectorAll('.gear-chip'))
+    .find(chip => chip.textContent.replace('×', '').trim() === gearName);
+
+  if (existingGear) {
+    alert('This item is already in your gear list.');
+    return;
+  }
+
   const chip = document.createElement('div');
   chip.className = 'gear-chip';
   chip.innerHTML = `
@@ -488,6 +747,11 @@ function addGearChip(gearName) {
 
   chip.querySelector('.remove-gear').addEventListener('click', () => {
     chip.remove();
+
+    // Add placeholder back if no gear left
+    if (container.querySelectorAll('.gear-chip').length === 0) {
+      container.innerHTML = '<span style="color: #999; font-style: italic;">No gear items added</span>';
+    }
   });
 
   container.appendChild(chip);
@@ -535,11 +799,11 @@ async function handleFormSubmit() {
     trainerData[10] = cha;
     trainerData[13] = ac;
     trainerData[21] = leaguePoints;
-    trainerData[18] = selectedSkills.join(', ');
-    trainerData[33] = selectedFeats.join(', ');
+    trainerData[18] = selectedSkills.length > 0 ? selectedSkills.join(', ') : '';
+    trainerData[33] = selectedFeats.length > 0 ? selectedFeats.join(', ') : '';
     trainerData[37] = gearItems.length > 0 ? gearItems.join(', ') : 'None';
 
-    // Calculate modifiers (simple calculation based on D&D rules)
+    // Calculate modifiers (D&D 5e rules)
     trainerData[27] = Math.floor((str - 10) / 2);  // STR modifier
     trainerData[28] = Math.floor((dex - 10) / 2);  // DEX modifier
     trainerData[29] = Math.floor((con - 10) / 2);  // CON modifier

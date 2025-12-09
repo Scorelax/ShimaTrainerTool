@@ -1334,3 +1334,281 @@ All popups now display complete, accurate information matching the reference imp
 ---
 
 **Session completed: 2025-12-09 Part 6**
+
+---
+
+## Session: 2025-12-09 Part 7 - Layout Improvements & Optimization
+
+### Changes Made
+
+Improved the trainer info page layout for better space utilization and visual organization.
+
+---
+
+### 1. HD/VD Single Line Display (line 210-223)
+
+**Issue**: HD and VD values were displayed on separate lines, taking unnecessary space.
+
+**Solution**: Changed `.info-item-half` flex direction from column to row.
+
+**Changes**:
+```css
+/* Before */
+flex-direction: column;
+align-items: center;
+
+/* After */
+justify-content: center;
+align-items: center;
+gap: clamp(0.3rem, 0.8vw, 0.5rem);
+```
+
+**Result**:
+- HD and VD now display as "HD: 8" and "VD: 8" on single lines
+- Reduced vertical space usage in info list
+- More compact and readable layout
+
+---
+
+### 2. Flexible Button Width (lines 225-238)
+
+**Issue**: All buttons had equal width (2-column grid with `1fr 1fr`), wasting space for short labels like "Gear" and "Affinity" while cramping longer labels like "Trainer Path" and "Specialization".
+
+**Solution**: Changed grid from fixed `1fr` columns to flexible `auto` columns.
+
+**Changes**:
+```css
+/* Before */
+grid-template-columns: repeat(2, 1fr);
+
+/* After */
+grid-template-columns: auto auto;
+white-space: nowrap;
+padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(0.8rem, 2vw, 1.2rem);
+```
+
+**Result**:
+- Buttons now size based on text content
+- "Trainer Path" and "Specialization" get more space
+- "Gear" and "Affinity" take less space
+- Total width remains the same
+- Better visual balance
+
+---
+
+### 3. Button Reordering (lines 846-853)
+
+**Issue**: Button arrangement didn't match logical grouping.
+
+**Old Order**:
+| Column 1 | Column 2 |
+|----------|----------|
+| Inventory | Specialization |
+| Trainer Path | Affinity |
+| Gear | Feats |
+
+**New Order**:
+| Column 1 | Column 2 |
+|----------|----------|
+| Inventory | Affinity |
+| Gear | Specialization |
+| Feats | Trainer Path |
+
+**Reasoning**:
+- Left column: Item-related (Inventory, Gear, Feats)
+- Right column: Character progression (Affinity, Specialization, Trainer Path)
+- Better semantic grouping
+
+---
+
+### 4. Centered Skills Title (line 397-406)
+
+**Issue**: "Skills" title was left-aligned above the skills table.
+
+**Solution**: Added `text-align: center` to `.skills-container h3`.
+
+**Result**:
+- Title now centered above skills table
+- Better visual hierarchy
+- Matches centered layout of skills grid
+
+---
+
+### 5. Skills Table 3-Column Layout (lines 408-454)
+
+**Issue**: Skills displayed in 2×9 layout on tablets, making table too tall and text too large.
+
+**Changes**:
+
+#### Grid Layout:
+```css
+/* Before */
+grid-template-columns: repeat(auto-fit, minmax(clamp(140px, 20vw, 200px), 1fr));
+
+/* After */
+grid-template-columns: repeat(3, 1fr);
+```
+
+#### Font Size Reduction:
+```css
+/* Skill Item */
+font-size: clamp(0.7rem, 1.5vw, 0.85rem);    /* was 0.85rem-1rem */
+padding: clamp(0.4rem, 1vh, 0.6rem);          /* was 0.6rem-0.9rem */
+
+/* Skill Name */
+font-size: clamp(0.7rem, 1.5vw, 0.85rem);    /* added explicit size */
+letter-spacing: clamp(0.2px, 0.15vw, 0.4px);  /* reduced from 0.3px-0.5px */
+
+/* Skill Modifier */
+font-size: clamp(0.65rem, 1.3vw, 0.75rem);   /* was 0.75rem-0.9rem */
+margin-top: clamp(2px, 0.3vh, 3px);           /* reduced from 2px-4px */
+```
+
+**Result**:
+- Skills now display in **3 columns × 6 rows** (18 skills total)
+- More compact skill boxes with reduced padding
+- Smaller font sizes for better fit
+- Skills table is now shorter and wider
+- Better space utilization on tablets
+
+---
+
+### 6. Responsive Breakpoint Updates (lines 712-761)
+
+Updated responsive breakpoints to maintain 3-column skills layout across devices:
+
+#### Tablet Portrait (≤768px):
+```css
+.skills-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+```
+
+#### Mobile Phones (≤600px):
+```css
+.skills-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+```
+
+#### Small Mobile (≤480px):
+```css
+.skills-grid {
+  grid-template-columns: repeat(2, 1fr);  /* 2 columns on very small screens */
+}
+```
+
+**Strategy**:
+- Desktop & Tablets: **3 columns** (optimal space usage)
+- Mobile Phones: **3 columns** (maintains layout consistency)
+- Small Phones: **2 columns** (prevents cramping)
+- Very Small Screens (<360px): **2 columns** (fallback)
+
+---
+
+## Visual Comparison
+
+### Before:
+```
+Info List:
+  HD:
+  8
+  VD:
+  8
+
+Buttons (equal width):
+  [     Inventory     ] [  Specialization  ]
+  [   Trainer Path    ] [     Affinity     ]
+  [       Gear        ] [      Feats       ]
+
+Skills: SKILLS
+  [Acrobatics] [Animal Handling]
+  [Arcana] [Athletics]
+  ... (2 columns × 9 rows)
+```
+
+### After:
+```
+Info List:
+  HD: 8     VD: 8
+
+Buttons (flexible width):
+  [  Inventory  ] [      Affinity       ]
+  [    Gear     ] [  Specialization   ]
+  [   Feats     ] [   Trainer Path    ]
+
+Skills:
+                SKILLS
+  [Acrobatics] [Animal Hand.] [Arcana]
+  [Athletics]  [Deception]    [History]
+  ... (3 columns × 6 rows)
+```
+
+---
+
+## Technical Details
+
+### Flexbox Auto-Sizing:
+- `grid-template-columns: auto auto` allows columns to size based on content
+- `white-space: nowrap` prevents button text from wrapping
+- Horizontal padding increased to give buttons more breathing room
+
+### Font Size Reduction:
+- Base skill font: **15-17% smaller**
+- Skill modifier font: **13-16% smaller**
+- Padding reduced by **25-33%**
+- Result: Skills are more compact but still readable
+
+### Grid Responsiveness:
+- 3 columns maintained down to 480px width
+- Progressive degradation: 3 cols → 2 cols on smallest screens
+- Skills remain organized and readable at all sizes
+
+---
+
+## Files Modified This Session
+
+1. `js/pages/trainer-info.js` - Layout and styling updates
+   - Line 210-223: HD/VD single line layout
+   - Lines 225-238: Flexible button width
+   - Lines 397-406: Centered skills title
+   - Lines 408-454: 3-column skills grid with smaller fonts
+   - Lines 712-761: Responsive breakpoint updates
+   - Lines 846-853: Button reordering (HTML)
+
+---
+
+## Testing Checklist
+
+After these changes, verify:
+- [ ] HD and VD display on single lines (e.g., "HD: 8", "VD: 8")
+- [ ] Buttons have flexible widths based on text length
+- [ ] "Trainer Path" and "Specialization" buttons have more space
+- [ ] "Gear" and "Affinity" buttons are more compact
+- [ ] Buttons arranged as: Col1(Inventory,Gear,Feats) Col2(Affinity,Spec,Path)
+- [ ] "Skills" title is centered above skills table
+- [ ] Skills display in 3 columns on desktop and tablets
+- [ ] Skills display in 3 columns on most mobile phones
+- [ ] Skills display in 2 columns on small phones (<480px)
+- [ ] Skill text is smaller but still readable
+- [ ] Skills table is shorter (6 rows instead of 9)
+- [ ] Skills table is wider (3 columns instead of 2)
+- [ ] All layouts are responsive and don't overflow
+- [ ] Page looks good on tablets (768-1024px)
+
+---
+
+## Result
+
+The trainer info page now has:
+- **More efficient space usage**: HD/VD on single lines, compact skills
+- **Better visual organization**: Buttons grouped logically, centered titles
+- **Improved readability**: 3×6 skills grid instead of 2×9
+- **Flexible layouts**: Buttons auto-size based on content
+- **Maintained responsiveness**: All layouts work across all devices
+
+The page is now more compact on tablets while maintaining excellent readability and usability.
+
+---
+
+**Session completed: 2025-12-09 Part 7**

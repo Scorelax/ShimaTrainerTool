@@ -209,8 +209,9 @@ export function renderTrainerInfo() {
 
         .info-item-half {
           display: flex;
-          flex-direction: column;
+          justify-content: center;
           align-items: center;
+          gap: clamp(0.3rem, 0.8vw, 0.5rem);
           padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
           border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
@@ -223,17 +224,18 @@ export function renderTrainerInfo() {
 
         .info-buttons-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: auto auto;
           gap: clamp(0.5rem, 1vh, 0.75rem);
         }
 
         .info-button {
-          padding: clamp(0.6rem, 1.5vh, 0.9rem);
+          padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(0.8rem, 2vw, 1.2rem);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
           border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
           border-radius: clamp(8px, 1.5vw, 12px);
           color: white;
           font-size: clamp(0.85rem, 1.8vw, 1rem);
+          white-space: nowrap;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
@@ -400,11 +402,12 @@ export function renderTrainerInfo() {
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.4vw, 1px);
           font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          text-align: center;
         }
 
         .skills-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(clamp(140px, 20vw, 200px), 1fr));
+          grid-template-columns: repeat(3, 1fr);
           gap: clamp(0.5rem, 1.5vw, 0.8rem);
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           padding: clamp(0.75rem, 2vw, 1.2rem);
@@ -417,12 +420,12 @@ export function renderTrainerInfo() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: clamp(0.6rem, 1.5vw, 0.9rem);
+          padding: clamp(0.4rem, 1vh, 0.6rem);
           border: clamp(2px, 0.4vw, 3px) solid #333;
           border-radius: clamp(8px, 1.5vw, 12px);
           text-align: center;
           background: linear-gradient(135deg, rgba(100,100,100,0.4) 0%, rgba(80,80,80,0.4) 100%);
-          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
           font-weight: 700;
           color: rgba(255,255,255,0.5);
           box-shadow: 0 4px 10px rgba(0,0,0,0.3);
@@ -440,13 +443,14 @@ export function renderTrainerInfo() {
         .skill-name {
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+          letter-spacing: clamp(0.2px, 0.15vw, 0.4px);
+          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
         }
 
         .skill-modifier {
-          font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+          font-size: clamp(0.65rem, 1.3vw, 0.75rem);
           opacity: 0.8;
-          margin-top: clamp(2px, 0.5vh, 4px);
+          margin-top: clamp(2px, 0.3vh, 3px);
         }
 
         /* Popup Modal Styles */
@@ -706,7 +710,7 @@ export function renderTrainerInfo() {
           }
 
           .skills-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
           }
         }
 
@@ -724,7 +728,7 @@ export function renderTrainerInfo() {
           }
 
           .skills-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: clamp(0.4rem, 1.2vw, 0.6rem);
           }
 
@@ -735,7 +739,7 @@ export function renderTrainerInfo() {
 
           .info-button {
             font-size: clamp(0.75rem, 1.6vw, 0.9rem);
-            padding: clamp(0.5rem, 1.2vh, 0.7rem);
+            padding: clamp(0.5rem, 1.2vh, 0.7rem) clamp(0.6rem, 1.5vw, 0.9rem);
           }
         }
 
@@ -753,7 +757,7 @@ export function renderTrainerInfo() {
           }
 
           .skills-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: clamp(0.3rem, 1vw, 0.5rem);
           }
 
@@ -843,11 +847,11 @@ export function renderTrainerInfo() {
 
         <div class="info-buttons-grid">
           <button class="info-button" id="inventoryButton">Inventory</button>
-          <button class="info-button" id="specializationButton">Specialization</button>
-          <button class="info-button" id="trainerPathButton">Trainer Path</button>
           <button class="info-button" id="affinityButton">Affinity</button>
           <button class="info-button" id="gearButton">Gear</button>
+          <button class="info-button" id="specializationButton">Specialization</button>
           <button class="info-button" id="featsButton">Feats</button>
+          <button class="info-button" id="trainerPathButton">Trainer Path</button>
         </div>
       </div>
 

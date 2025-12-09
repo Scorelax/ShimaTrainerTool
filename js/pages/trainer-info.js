@@ -265,10 +265,10 @@ export function renderTrainerInfo() {
 
         /* Stats Row 1: AC, HP, VP - Medium boxes with HP/VP current values */
         .stat-main-container {
-          display: flex;
-          justify-content: center;
-          gap: clamp(1rem, 3vw, 2rem);
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: clamp(0.6rem, 2vw, 1rem);
+          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
         }
 
         .stat-box-wrapper {
@@ -277,47 +277,59 @@ export function renderTrainerInfo() {
           align-items: center;
         }
 
+        .stat-box-wrapper:nth-child(1) {
+          grid-column: 1 / 3;
+        }
+
+        .stat-box-wrapper:nth-child(2) {
+          grid-column: 3 / 5;
+        }
+
+        .stat-box-wrapper:nth-child(3) {
+          grid-column: 5 / 7;
+        }
+
         .stat-label-box {
           font-weight: 900;
           color: white;
-          font-size: clamp(0.95rem, 2vw, 1.2rem);
-          margin-bottom: clamp(0.4rem, 1vh, 0.6rem);
+          font-size: clamp(0.8rem, 1.8vw, 1rem);
+          margin-bottom: clamp(0.3rem, 0.8vh, 0.4rem);
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.4vw, 1.5px);
+          letter-spacing: clamp(0.3px, 0.3vw, 1px);
         }
 
         .stat-box {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: clamp(65px, 10vw, 90px);
-          height: clamp(65px, 10vw, 90px);
+          width: clamp(50px, 9vw, 70px);
+          height: clamp(50px, 9vw, 70px);
           background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           color: black;
-          border-radius: clamp(12px, 2.5vw, 18px);
-          border: clamp(3px, 0.6vw, 5px) solid #333;
-          font-size: clamp(1.8rem, 3.5vw, 2.4rem);
+          border-radius: clamp(10px, 2vw, 15px);
+          border: clamp(2px, 0.5vw, 4px) solid #333;
+          font-size: clamp(1.4rem, 2.8vw, 2rem);
           font-weight: 900;
           box-shadow: 0 8px 20px rgba(0,0,0,0.5),
-                      inset 0 -4px 0 rgba(0,0,0,0.2);
+                      inset 0 -3px 0 rgba(0,0,0,0.2);
         }
 
         .current-stat-box {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: clamp(55px, 8vw, 75px);
-          height: clamp(55px, 8vw, 75px);
+          width: clamp(45px, 7vw, 60px);
+          height: clamp(45px, 7vw, 60px);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
           color: white;
-          border-radius: clamp(10px, 2vw, 15px);
-          border: clamp(2px, 0.5vw, 4px) solid #333;
-          font-size: clamp(1.5rem, 3vw, 2rem);
+          border-radius: clamp(8px, 1.8vw, 12px);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
           font-weight: 900;
           box-shadow: 0 6px 15px rgba(0,0,0,0.5),
                       inset 0 -2px 0 rgba(0,0,0,0.3);
-          margin-top: clamp(-10px, -1.2vh, -12px);
+          margin-top: clamp(-8px, -1vh, -10px);
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -337,7 +349,7 @@ export function renderTrainerInfo() {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
           gap: clamp(0.6rem, 2vw, 1rem);
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          margin-bottom: clamp(1rem, 2.5vh, 1.5rem);
         }
 
         .ability-group {
@@ -348,25 +360,25 @@ export function renderTrainerInfo() {
 
         .ability-label {
           font-weight: 900;
-          font-size: clamp(0.85rem, 1.8vw, 1.1rem);
-          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.95rem);
+          margin-bottom: clamp(0.25rem, 0.8vh, 0.4rem);
           color: white;
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           text-transform: uppercase;
-          letter-spacing: clamp(0.3px, 0.3vw, 0.8px);
+          letter-spacing: clamp(0.2px, 0.25vw, 0.6px);
         }
 
         .ability-box {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: clamp(50px, 9vw, 70px);
-          height: clamp(50px, 9vw, 70px);
+          width: clamp(45px, 8vw, 60px);
+          height: clamp(45px, 8vw, 60px);
           background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           color: black;
-          border-radius: clamp(10px, 2vw, 15px);
-          border: clamp(2px, 0.5vw, 4px) solid #333;
-          font-size: clamp(1.4rem, 2.8vw, 2rem);
+          border-radius: clamp(8px, 1.8vw, 12px);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          font-size: clamp(1.2rem, 2.5vw, 1.7rem);
           font-weight: 900;
           box-shadow: 0 8px 20px rgba(0,0,0,0.5),
                       inset 0 -3px 0 rgba(0,0,0,0.2);
@@ -376,17 +388,17 @@ export function renderTrainerInfo() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: clamp(42px, 7vw, 58px);
-          height: clamp(42px, 7vw, 58px);
+          width: clamp(38px, 6.5vw, 50px);
+          height: clamp(38px, 6.5vw, 50px);
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          border-radius: clamp(8px, 1.5vw, 12px);
+          border-radius: clamp(7px, 1.4vw, 10px);
           border: clamp(2px, 0.4vw, 3px) solid #333;
-          font-size: clamp(1.2rem, 2.2vw, 1.7rem);
+          font-size: clamp(1rem, 2vw, 1.4rem);
           font-weight: 900;
           box-shadow: 0 6px 15px rgba(0,0,0,0.5),
                       inset 0 -2px 0 rgba(0,0,0,0.3);
-          margin-top: clamp(-10px, -1.2vh, -12px);
+          margin-top: clamp(-8px, -1vh, -10px);
         }
 
         /* Skills Table */
@@ -408,11 +420,10 @@ export function renderTrainerInfo() {
         .skills-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: clamp(0.5rem, 1.5vw, 0.8rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          padding: clamp(0.75rem, 2vw, 1.2rem);
-          border-radius: clamp(12px, 2.5vw, 18px);
-          background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+          gap: clamp(0.4rem, 1.2vw, 0.6rem);
+          padding: clamp(0.5rem, 1.5vw, 0.8rem);
+          border-radius: clamp(10px, 2vw, 15px);
+          background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
         }
 
         .skill-item {
@@ -420,15 +431,15 @@ export function renderTrainerInfo() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: clamp(0.4rem, 1vh, 0.6rem);
-          border: clamp(2px, 0.4vw, 3px) solid #333;
-          border-radius: clamp(8px, 1.5vw, 12px);
+          padding: clamp(0.35rem, 0.8vh, 0.5rem);
+          border: clamp(2px, 0.3vw, 2.5px) solid #333;
+          border-radius: clamp(7px, 1.3vw, 10px);
           text-align: center;
           background: linear-gradient(135deg, rgba(100,100,100,0.4) 0%, rgba(80,80,80,0.4) 100%);
-          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
+          font-size: clamp(0.65rem, 1.3vw, 0.75rem);
           font-weight: 700;
           color: rgba(255,255,255,0.5);
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.3);
           transition: all 0.3s ease;
         }
 
@@ -443,14 +454,14 @@ export function renderTrainerInfo() {
         .skill-name {
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: clamp(0.2px, 0.15vw, 0.4px);
-          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
+          letter-spacing: clamp(0.15px, 0.12vw, 0.3px);
+          font-size: clamp(0.65rem, 1.3vw, 0.75rem);
         }
 
         .skill-modifier {
-          font-size: clamp(0.65rem, 1.3vw, 0.75rem);
+          font-size: clamp(0.6rem, 1.2vw, 0.7rem);
           opacity: 0.8;
-          margin-top: clamp(2px, 0.3vh, 3px);
+          margin-top: clamp(1.5px, 0.25vh, 2.5px);
         }
 
         /* Popup Modal Styles */
@@ -641,7 +652,7 @@ export function renderTrainerInfo() {
           align-items: center;
           border-bottom: 1px solid #444;
           transition: all 0.2s ease;
-          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          font-size: clamp(0.85rem, 1.9vw, 1.1rem);
           font-weight: 700;
         }
 
@@ -683,7 +694,7 @@ export function renderTrainerInfo() {
           transition: all 0.2s ease;
           border-left: clamp(3px, 0.6vw, 4px) solid transparent;
           color: #ddd;
-          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-size: clamp(0.8rem, 1.8vw, 0.95rem);
         }
 
         .inventory-list-item:hover {
@@ -745,7 +756,7 @@ export function renderTrainerInfo() {
         }
 
         .detail-section p {
-          font-size: clamp(0.9rem, 2vw, 1rem);
+          font-size: clamp(0.95rem, 2.1vw, 1.1rem);
           color: #c0c0c0;
           line-height: 1.6;
           margin: 0;
@@ -756,14 +767,38 @@ export function renderTrainerInfo() {
           background: linear-gradient(90deg, transparent 0%, rgba(255,222,0,0.3) 50%, transparent 100%);
         }
 
+        .inventory-close {
+          position: absolute;
+          top: clamp(15px, 3vh, 20px);
+          right: clamp(15px, 3vw, 20px);
+          width: clamp(35px, 7vw, 45px);
+          height: clamp(35px, 7vw, 45px);
+          background: linear-gradient(135deg, #757575 0%, #616161 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s ease;
+          z-index: 10;
+        }
+
+        .inventory-close:hover {
+          transform: scale(1.1) rotate(90deg);
+          background: linear-gradient(135deg, #616161 0%, #505050 100%);
+          box-shadow: 0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.6);
+        }
+
         .inventory-actions {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(3, 1fr);
           gap: clamp(0.75rem, 1.5vw, 1rem);
         }
 
-        .inventory-actions .action-btn,
-        .inventory-actions .close-btn {
+        .inventory-actions .action-btn {
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -794,16 +829,6 @@ export function renderTrainerInfo() {
         .inventory-actions .action-btn:disabled {
           opacity: 0.4;
           cursor: not-allowed;
-        }
-
-        .inventory-actions .close-btn {
-          background: linear-gradient(135deg, #757575 0%, #616161 100%);
-          color: white;
-        }
-
-        .inventory-actions .close-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 clamp(6px, 1.5vh, 10px) clamp(20px, 4vw, 30px) rgba(0,0,0,0.5);
         }
 
         .btn-icon {
@@ -1176,6 +1201,7 @@ export function renderTrainerInfo() {
       <!-- Popup Modals -->
       <div class="popup-overlay" id="inventoryPopup">
         <div class="popup-content">
+          <button class="popup-close inventory-close" id="closeInventory">×</button>
           <div class="inventory-popup-content">
             <div class="inventory-sidebar">
               <h2 class="inventory-title">Inventory</h2>
@@ -1199,7 +1225,7 @@ export function renderTrainerInfo() {
                 </div>
               </div>
               <div class="inventory-actions">
-                <button class="action-btn" id="addItemButton" disabled>
+                <button class="action-btn" id="addItemButton">
                   <span class="btn-icon">➕</span>
                   <span class="btn-text">Add</span>
                 </button>
@@ -1210,10 +1236,6 @@ export function renderTrainerInfo() {
                 <button class="action-btn" id="removeItemButton" disabled>
                   <span class="btn-icon">🗑️</span>
                   <span class="btn-text">Remove</span>
-                </button>
-                <button class="close-btn" id="closeInventory">
-                  <span class="btn-icon">✖</span>
-                  <span class="btn-text">Close</span>
                 </button>
               </div>
             </div>
@@ -1445,6 +1467,115 @@ export function attachTrainerInfoListeners() {
         document.getElementById('editItemButton').disabled = false;
         document.getElementById('removeItemButton').disabled = false;
       });
+    });
+
+    // Add Item button
+    document.getElementById('addItemButton')?.addEventListener('click', function() {
+      const itemName = prompt('Enter item name:');
+      if (!itemName || !itemName.trim()) return;
+
+      const itemQuantity = prompt('Enter quantity:', '1');
+      const quantity = parseInt(itemQuantity, 10) || 1;
+      if (quantity < 1) return;
+
+      const itemDescription = prompt('Enter item description (optional):', '');
+      const itemEffect = prompt('Enter item effect (optional):', '');
+
+      // Get current inventory
+      const inventoryStr = trainerData[20] || '';
+      const inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+
+      // Check if item already exists
+      const existingIndex = inventory.findIndex(item => item.name.toLowerCase() === itemName.trim().toLowerCase());
+      if (existingIndex !== -1) {
+        // Update quantity if item exists
+        inventory[existingIndex].quantity += quantity;
+        alert(`Added ${quantity} to existing item. New quantity: ${inventory[existingIndex].quantity}`);
+      } else {
+        // Add new item
+        inventory.push({
+          name: itemName.trim(),
+          quantity: quantity,
+          category: 'Items',
+          description: itemDescription.trim() || 'No description provided.',
+          effect: itemEffect.trim() || 'No effect.'
+        });
+        alert(`Added ${quantity}x ${itemName.trim()} to inventory.`);
+      }
+
+      // Update sessionStorage
+      trainerData[20] = JSON.stringify(inventory);
+      sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+
+      // Refresh inventory popup
+      closePopup('inventoryPopup');
+      setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+    });
+
+    // Edit Item button
+    document.getElementById('editItemButton')?.addEventListener('click', function() {
+      if (!selectedItemData) return;
+
+      const newQuantity = prompt(`Edit quantity for ${selectedItemData.name}:`, selectedItemData.quantity.toString());
+      const quantity = parseInt(newQuantity, 10);
+
+      if (isNaN(quantity) || quantity < 0) {
+        alert('Please enter a valid quantity (0 or greater).');
+        return;
+      }
+
+      // Get current inventory
+      const inventoryStr = trainerData[20] || '';
+      const inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+
+      // Find and update item
+      const itemIndex = inventory.findIndex(item => item.name === selectedItemData.name);
+      if (itemIndex !== -1) {
+        if (quantity === 0) {
+          // Remove item if quantity is 0
+          inventory.splice(itemIndex, 1);
+          alert(`${selectedItemData.name} removed from inventory.`);
+        } else {
+          inventory[itemIndex].quantity = quantity;
+          alert(`${selectedItemData.name} quantity updated to ${quantity}.`);
+        }
+
+        // Update sessionStorage
+        trainerData[20] = JSON.stringify(inventory);
+        sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+
+        // Refresh inventory popup
+        closePopup('inventoryPopup');
+        setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+      }
+    });
+
+    // Remove Item button
+    document.getElementById('removeItemButton')?.addEventListener('click', function() {
+      if (!selectedItemData) return;
+
+      if (!confirm(`Are you sure you want to remove ${selectedItemData.name} (x${selectedItemData.quantity}) from inventory?`)) {
+        return;
+      }
+
+      // Get current inventory
+      const inventoryStr = trainerData[20] || '';
+      const inventory = inventoryStr ? JSON.parse(inventoryStr) : [];
+
+      // Find and remove item
+      const itemIndex = inventory.findIndex(item => item.name === selectedItemData.name);
+      if (itemIndex !== -1) {
+        inventory.splice(itemIndex, 1);
+        alert(`${selectedItemData.name} removed from inventory.`);
+
+        // Update sessionStorage
+        trainerData[20] = JSON.stringify(inventory);
+        sessionStorage.setItem('currentTrainer', JSON.stringify(trainerData));
+
+        // Refresh inventory popup
+        closePopup('inventoryPopup');
+        setTimeout(() => document.getElementById('inventoryButton').click(), 100);
+      }
     });
 
     openPopup('inventoryPopup');

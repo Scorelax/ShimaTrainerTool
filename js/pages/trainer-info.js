@@ -546,6 +546,36 @@ export function renderTrainerInfo() {
           color: #555;
         }
 
+        .popup-item-locked {
+          opacity: 0.6;
+          background: linear-gradient(135deg, rgba(150,150,150,0.15) 0%, rgba(150,150,150,0.08) 100%);
+          border-color: rgba(150,150,150,0.3);
+        }
+
+        .popup-item-locked .popup-item-title {
+          color: #888;
+        }
+
+        .popup-item-locked .popup-item-effect {
+          color: #999;
+          font-style: italic;
+        }
+
+        .popup-category-title {
+          font-size: clamp(1.1rem, 2.3vw, 1.3rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          color: #EE1515;
+          margin: clamp(1rem, 2vh, 1.5rem) 0 clamp(0.5rem, 1vh, 0.75rem) 0;
+          padding-bottom: clamp(0.3rem, 0.8vh, 0.5rem);
+          border-bottom: clamp(2px, 0.4vw, 3px) solid rgba(238,21,21,0.3);
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+        }
+
+        .popup-category-title:first-child {
+          margin-top: 0;
+        }
+
         .combat-tracker-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -1029,7 +1059,7 @@ export function attachTrainerInfoListeners() {
     }));
   });
 
-  // Inventory button
+  // Inventory button - fixed to show items grouped by type
   document.getElementById('inventoryButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
@@ -1043,99 +1073,283 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const itemsList = inventory.split(',').map(item => item.trim()).filter(item => item);
-    let html = '';
+    if (!itemsStr) {
+      const itemsList = inventory.split(',').map(item => item.trim()).filter(item => item);
+      let html = itemsList.map(itemName => `
+        <div class="popup-item">
+          <div class="popup-item-title">${itemName}</div>
+        </div>
+      `).join('');
+      content.innerHTML = html;
+      openPopup('inventoryPopup');
+      return;
+    }
 
-    if (itemsStr) {
-      const itemsData = JSON.parse(itemsStr);
-      itemsList.forEach(itemName => {
-        const itemData = itemsData.find(i => i.name === itemName);
-        if (itemData) {
-          html += `
-            <div class="popup-item">
-              <div class="popup-item-title">${itemData.name}</div>
-              <div class="popup-item-effect">${itemData.effect || 'No effect description'}</div>
-            </div>
-          `;
-        } else {
-          html += `
-            <div class="popup-item">
-              <div class="popup-item-title">${itemName}</div>
-            </div>
-          `;
+    // Parse items data and group by type
+    const itemsData = JSON.parse(itemsStr);
+    const inventoryItems = inventory.split(',').map(item => item.trim()).filter(item => item);
+
+    // Extract item name and quantity
+    const groupedItems = {};
+    inventoryItems.forEach(itemStr => {
+      // Parse "ItemName (xQuantity)" format
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
+      const quantity = match ? parseInt(match[2], 10) : 1;
+
+      const itemData = itemsData.find(i => i.name === itemName);
+      if (itemData) {
+        const type = itemData.type || 'Misc';
+        if (!groupedItems[type]) {
+          groupedItems[type] = [];
         }
-      });
-    } else {
-      itemsList.forEach(itemName => {
+        groupedItems[type].push({
+          name: itemData.name,
+          effect: itemData.effect || 'No effect description',
+          quantity: quantity
+        });
+      }
+    });
+
+    // Generate HTML with grouped categories
+    let html = '';
+    Object.keys(groupedItems).sort().forEach(type => {
+      html += `<div class="popup-category-title">${type}</div>`;
+      groupedItems[type].forEach(item => {
         html += `
           <div class="popup-item">
-            <div class="popup-item-title">${itemName}</div>
+            <div class="popup-item-title">${item.name} (x${item.quantity})</div>
+            <div class="popup-item-effect">${item.effect}</div>
           </div>
         `;
       });
-    }
+    });
 
-    content.innerHTML = html;
+    content.innerHTML = html || '<p style="text-align: center; color: #999;">No items found.</p>';
     openPopup('inventoryPopup');
   });
 
   document.getElementById('closeInventory')?.addEventListener('click', () => closePopup('inventoryPopup'));
 
-  // Specialization button
+  // Specialization button - fixed to show 3 stages with effects
   document.getElementById('specializationButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
-    const specialization = trainerData[24] || 'None';
+    const trainerLevel = parseInt(trainerData[2], 10) || 1;
+    const specializationsStr = trainerData[24] || '';
+    const specializationsStored = specializationsStr ? specializationsStr.split(',').map(s => s.trim()) : [];
+    const specializationsDataStr = sessionStorage.getItem('specializations');
     const content = document.getElementById('specializationContent');
 
-    if (specialization === 'None' || !specialization) {
-      content.innerHTML = '<p style="text-align: center; color: #999;">No specialization selected.</p>';
-    } else {
-      content.innerHTML = `<div class="popup-item"><div class="popup-item-effect">${specialization}</div></div>`;
-    }
+    const specializationStages = [
+      { level: 2, index: 0, label: 'First Specialization' },
+      { level: 10, index: 1, label: 'Second Specialization' },
+      { level: 17, index: 2, label: 'Third Specialization' }
+    ];
 
+    let html = '';
+
+    specializationStages.forEach(stage => {
+      if (trainerLevel >= stage.level && specializationsStored.length > stage.index) {
+        // Specialization is unlocked and chosen
+        const specName = specializationsStored[stage.index];
+        let effect = 'No effect found.';
+
+        if (specializationsDataStr) {
+          const specializationsData = JSON.parse(specializationsDataStr);
+          const specData = specializationsData.find(s => s.name === specName);
+          if (specData) {
+            effect = specData.effect || 'No effect found.';
+          }
+        }
+
+        html += `
+          <div class="popup-item">
+            <div class="popup-item-title">${specName}</div>
+            <div class="popup-item-effect">${effect}</div>
+          </div>
+        `;
+      } else if (trainerLevel >= stage.level) {
+        // Unlocked but not chosen
+        html += `
+          <div class="popup-item popup-item-locked">
+            <div class="popup-item-title">${stage.label}</div>
+            <div class="popup-item-effect">Not selected yet</div>
+          </div>
+        `;
+      } else {
+        // Locked
+        html += `
+          <div class="popup-item popup-item-locked">
+            <div class="popup-item-title">${stage.label}</div>
+            <div class="popup-item-effect">Unlocks at level ${stage.level}</div>
+          </div>
+        `;
+      }
+    });
+
+    content.innerHTML = html || '<p style="text-align: center; color: #999;">No specializations available.</p>';
     openPopup('specializationPopup');
   });
 
   document.getElementById('closeSpecialization')?.addEventListener('click', () => closePopup('specializationPopup'));
 
-  // Trainer Path button
+  // Trainer Path button - fixed to show 4 stages with effects
   document.getElementById('trainerPathButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
-    const trainerPath = trainerData[25] || 'None';
+    const trainerLevel = parseInt(trainerData[2], 10) || 1;
+    const trainerPathName = trainerData[25] || '';
+    const trainerPathsDataStr = sessionStorage.getItem('trainerPaths');
     const content = document.getElementById('trainerPathContent');
 
-    if (trainerPath === 'None' || !trainerPath) {
+    if (!trainerPathName || trainerPathName === 'None') {
       content.innerHTML = '<p style="text-align: center; color: #999;">No trainer path selected.</p>';
-    } else {
-      content.innerHTML = `<div class="popup-item"><div class="popup-item-effect">${trainerPath}</div></div>`;
+      openPopup('trainerPathPopup');
+      return;
     }
 
+    let html = '';
+
+    if (trainerPathsDataStr) {
+      const trainerPathsData = JSON.parse(trainerPathsDataStr);
+      const selectedPath = trainerPathsData.find(p => p.name === trainerPathName);
+
+      if (selectedPath) {
+        const pathStages = [
+          { level: 3, data: selectedPath.level3 },
+          { level: 5, data: selectedPath.level5 },
+          { level: 9, data: selectedPath.level9 },
+          { level: 15, data: selectedPath.level15 }
+        ];
+
+        pathStages.forEach(stage => {
+          if (stage.data) {
+            if (trainerLevel >= stage.level) {
+              // Unlocked
+              html += `
+                <div class="popup-item">
+                  <div class="popup-item-title">${stage.data.name}</div>
+                  <div class="popup-item-effect">${stage.data.effect || 'No effect found.'}</div>
+                </div>
+              `;
+            } else {
+              // Locked
+              html += `
+                <div class="popup-item popup-item-locked">
+                  <div class="popup-item-title">${stage.data.name}</div>
+                  <div class="popup-item-effect">Unlocks at level ${stage.level}</div>
+                </div>
+              `;
+            }
+          }
+        });
+      } else {
+        html = `<p style="text-align: center; color: #999;">Trainer path "${trainerPathName}" not found.</p>`;
+      }
+    } else {
+      html = `
+        <div class="popup-item">
+          <div class="popup-item-title">${trainerPathName}</div>
+          <div class="popup-item-effect">Path details not available</div>
+        </div>
+      `;
+    }
+
+    content.innerHTML = html || '<p style="text-align: center; color: #999;">No path stages available.</p>';
     openPopup('trainerPathPopup');
   });
 
   document.getElementById('closeTrainerPath')?.addEventListener('click', () => closePopup('trainerPathPopup'));
 
-  // Affinity button
+  // Affinity button - fixed to show 2 stages with effects and improved effects
   document.getElementById('affinityButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
-    const affinity = trainerData[23] || 'None';
+    const trainerLevel = parseInt(trainerData[2], 10) || 1;
+    const affinitiesStr = trainerData[23] || '';
+    const affinitiesStored = affinitiesStr ? affinitiesStr.split(',').map(a => a.trim()) : [];
+    const affinitiesDataStr = sessionStorage.getItem('affinities');
     const content = document.getElementById('affinityContent');
 
-    if (affinity === 'None' || !affinity) {
-      content.innerHTML = '<p style="text-align: center; color: #999;">No affinity selected.</p>';
-    } else {
-      const affinities = affinity.split(',').map(a => a.trim()).filter(a => a);
-      const html = affinities.map(aff => `
+    let html = '';
+
+    // First Affinity (Level 2)
+    if (trainerLevel >= 2 && affinitiesStored.length >= 1) {
+      const affName = affinitiesStored[0];
+      let effect = 'No effect found.';
+
+      if (affinitiesDataStr) {
+        const affinitiesData = JSON.parse(affinitiesDataStr);
+        const affData = affinitiesData.find(a => a.name === affName);
+        if (affData) {
+          effect = affData.effect || 'No effect found.';
+        }
+      }
+
+      html += `
         <div class="popup-item">
-          <div class="popup-item-title">${aff}</div>
+          <div class="popup-item-title">${affName}</div>
+          <div class="popup-item-effect">${effect}</div>
         </div>
-      `).join('');
-      content.innerHTML = html;
+      `;
+    } else if (trainerLevel >= 2) {
+      html += `
+        <div class="popup-item popup-item-locked">
+          <div class="popup-item-title">First Affinity</div>
+          <div class="popup-item-effect">Not selected yet</div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="popup-item popup-item-locked">
+          <div class="popup-item-title">First Affinity</div>
+          <div class="popup-item-effect">Unlocks at level 2</div>
+        </div>
+      `;
     }
 
+    // Second Affinity / Improved Affinity (Level 7)
+    if (trainerLevel >= 7 && affinitiesStored.length >= 2) {
+      const affName = affinitiesStored[1];
+      let effect = 'No effect found.';
+
+      if (affinitiesDataStr) {
+        const affinitiesData = JSON.parse(affinitiesDataStr);
+        const affData = affinitiesData.find(a => a.name === affName);
+        if (affData) {
+          // Check if it's the same affinity (improved) or different
+          if (affName === affinitiesStored[0]) {
+            effect = affData.improvedEffect || affData.effect || 'No improved effect found.';
+          } else {
+            effect = affData.effect || 'No effect found.';
+          }
+        }
+      }
+
+      html += `
+        <div class="popup-item">
+          <div class="popup-item-title">${affName}${affName === affinitiesStored[0] ? ' (Improved)' : ''}</div>
+          <div class="popup-item-effect">${effect}</div>
+        </div>
+      `;
+    } else if (trainerLevel >= 7) {
+      html += `
+        <div class="popup-item popup-item-locked">
+          <div class="popup-item-title">Improved Affinity</div>
+          <div class="popup-item-effect">Not selected yet</div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="popup-item popup-item-locked">
+          <div class="popup-item-title">Improved Affinity</div>
+          <div class="popup-item-effect">Unlocks at level 7</div>
+        </div>
+      `;
+    }
+
+    content.innerHTML = html || '<p style="text-align: center; color: #999;">No affinities available.</p>';
     openPopup('affinityPopup');
   });
 

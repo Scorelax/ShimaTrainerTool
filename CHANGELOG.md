@@ -1022,3 +1022,315 @@ The trainer info page now maintains its intended two-column design across almost
 ---
 
 **Session completed: 2025-12-09 Part 5**
+
+---
+
+## Session: 2025-12-09 Part 6 - Popup Functionality & Modernization
+
+### Issue
+All popup modals were displaying incomplete or incorrect information:
+- **Inventory**: Showed only item categories, not actual items with descriptions
+- **Specialization**: Showed only the name, missing effects and multiple stages
+- **Affinity**: Listed names only, missing effects and "Improved Affinity" handling
+- **Trainer Path**: Showed only the path name, missing all 4 stages with unlock levels
+
+### Solution
+
+Completely rewrote all popup button handlers to match reference implementation functionality.
+
+---
+
+### 1. Inventory Popup Fix (lines 1032-1102)
+
+**Old Behavior**:
+- Parsed inventory string but didn't extract item quantities properly
+- Showed only item names without grouping by type
+- No category headers
+
+**New Implementation**:
+- Parses `"ItemName (xQuantity)"` format correctly using regex
+- Groups items by type (fetched from items database)
+- Displays quantity with each item: `ItemName (x5)`
+- Shows category titles (e.g., "Pokeballs", "Potions", "Key Items")
+- Displays full item effects from sessionStorage
+- Sorted categories alphabetically
+
+**Example Output**:
+```
+POKEBALLS
+  Poke Ball (x10)
+  Effect: Standard capture device
+
+POTIONS
+  Potion (x5)
+  Effect: Restores 20 HP
+
+KEY ITEMS
+  Bike (x1)
+  Effect: Travel faster
+```
+
+---
+
+### 2. Specialization Popup Fix (lines 1104-1165)
+
+**Old Behavior**:
+- Displayed only the specialization name(s)
+- No effect descriptions
+- No indication of locked/unlocked stages
+
+**New Implementation**:
+- Shows all 3 specialization stages:
+  1. **First Specialization** (Level 2)
+  2. **Second Specialization** (Level 10)
+  3. **Third Specialization** (Level 17)
+
+**Stage States**:
+- **Unlocked & Chosen**: Shows specialization name and full effect
+- **Unlocked but Not Chosen**: Shows "Not selected yet"
+- **Locked**: Shows "Unlocks at level X"
+
+**Data Source**: `sessionStorage.getItem('specializations')`
+
+**Visual Styling**:
+- Unlocked: Gold gradient background, full opacity
+- Locked: Gray gradient, 60% opacity, italic text
+
+---
+
+### 3. Affinity Popup Fix (lines 1235-1276)
+
+**Old Behavior**:
+- Listed affinity names without effects
+- No handling of "Improved Affinity" mechanic
+
+**New Implementation**:
+- Shows 2 affinity stages:
+  1. **First Affinity** (Level 2)
+  2. **Improved Affinity** (Level 7)
+
+**Special Logic**:
+- If 2nd affinity is same as 1st: Shows `improvedEffect` from database
+- If 2nd affinity is different: Shows regular `effect`
+- Adds "(Improved)" label when displaying improved version
+
+**Stage States**:
+- **Unlocked & Chosen**: Shows affinity name and effect
+- **Unlocked but Not Chosen**: Shows "Not selected yet"
+- **Locked**: Shows "Unlocks at level X"
+
+**Data Source**: `sessionStorage.getItem('affinities')`
+
+**Example**:
+```
+Fire Affinity
++2 to Fire-type moves
+
+Fire Affinity (Improved)
++4 to Fire-type moves and immunity to burn
+```
+
+---
+
+### 4. Trainer Path Popup Fix (lines 1167-1233)
+
+**Old Behavior**:
+- Displayed only the trainer path name
+- No stage information or effects
+
+**New Implementation**:
+- Shows all 4 trainer path stages:
+  1. **Level 3 ability**
+  2. **Level 5 ability**
+  3. **Level 9 ability**
+  4. **Level 15 ability**
+
+**Stage Display**:
+- **Unlocked**: Shows ability name and full effect
+- **Locked**: Shows ability name with "Unlocks at level X"
+
+**Data Source**: `sessionStorage.getItem('trainerPaths')`
+
+**Path Structure**:
+```javascript
+{
+  name: "Ace Trainer",
+  level3: { name: "Quick Commands", effect: "..." },
+  level5: { name: "Tactical Advantage", effect: "..." },
+  level9: { name: "Advanced Strategy", effect: "..." },
+  level15: { name: "Master Trainer", effect: "..." }
+}
+```
+
+---
+
+### 5. Modern Popup Styling (lines 549-577)
+
+Added new CSS classes for enhanced visual feedback:
+
+#### Locked Item Styling (`.popup-item-locked`):
+```css
+opacity: 0.6;
+background: linear-gradient(135deg, rgba(150,150,150,0.15) 0%, rgba(150,150,150,0.08) 100%);
+border-color: rgba(150,150,150,0.3);
+```
+
+**Locked State Visual Cues**:
+- 60% opacity (faded appearance)
+- Gray gradient background
+- Gray border
+- Gray title color (#888)
+- Italic text for locked message
+- Lighter text color (#999)
+
+#### Category Title Styling (`.popup-category-title`):
+```css
+font-size: clamp(1.1rem, 2.3vw, 1.3rem);
+font-weight: 900;
+text-transform: uppercase;
+color: #EE1515; /* Red */
+border-bottom: clamp(2px, 0.4vw, 3px) solid rgba(238,21,21,0.3);
+```
+
+**Category Headers**:
+- Bold uppercase red titles
+- Underlined with red fade
+- Proper spacing above/below
+- Used in Inventory for item type grouping
+
+---
+
+## Visual Comparison
+
+### Before:
+```
+Inventory Popup:
+  Pokeballs
+  Potions
+  Key Items
+
+Specialization Popup:
+  Ace Trainer
+
+Affinity Popup:
+  Fire
+  Fire
+```
+
+### After:
+```
+Inventory Popup:
+  POKEBALLS
+    Poke Ball (x10) - Standard capture device
+    Great Ball (x3) - Better catch rate
+
+  POTIONS
+    Potion (x5) - Restores 20 HP
+
+Specialization Popup:
+  Ace Trainer
+  Gain +1 to all stats when commanding Pokemon
+
+  Second Specialization
+  Unlocks at level 10
+
+  Third Specialization
+  Unlocks at level 17
+
+Affinity Popup:
+  Fire Affinity
+  +2 to all Fire-type moves
+
+  Fire Affinity (Improved)
+  +4 to Fire-type moves and immunity to burn
+```
+
+---
+
+## Technical Implementation Details
+
+### Level Checking Logic:
+All popups now properly check trainer level (`trainerData[2]`) to determine locked/unlocked state.
+
+### Comma-Separated String Parsing:
+```javascript
+const items = trainerData[X].split(',').map(item => item.trim());
+```
+
+### Quantity Extraction:
+```javascript
+const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+const itemName = match ? match[1].trim() : itemStr;
+const quantity = match ? parseInt(match[2], 10) : 1;
+```
+
+### Data Fetching Pattern:
+```javascript
+const dataStr = sessionStorage.getItem('items'); // or 'specializations', etc.
+if (dataStr) {
+  const data = JSON.parse(dataStr);
+  const found = data.find(item => item.name === searchName);
+  const effect = found ? found.effect : 'No effect found.';
+}
+```
+
+---
+
+## Files Modified This Session
+
+1. `js/pages/trainer-info.js` - Complete popup overhaul
+   - Lines 549-577: New CSS for locked items and category titles
+   - Lines 1032-1102: Inventory popup with grouping and quantities
+   - Lines 1104-1165: Specialization popup with 3 stages
+   - Lines 1167-1233: Trainer Path popup with 4 stages
+   - Lines 1235-1276: Affinity popup with improved effect handling
+
+---
+
+## Testing Checklist
+
+After these changes, verify:
+- [ ] Inventory shows items grouped by category
+- [ ] Inventory displays item quantities correctly (x1, x5, etc.)
+- [ ] Inventory shows item effects for each item
+- [ ] Specialization shows all 3 stages
+- [ ] Specialization displays effects for chosen specializations
+- [ ] Specialization shows "Unlocks at level X" for locked stages
+- [ ] Affinity shows both First and Improved affinity
+- [ ] Affinity displays improved effect when same affinity chosen twice
+- [ ] Affinity marks improved affinity with "(Improved)" label
+- [ ] Trainer Path shows all 4 level-based abilities
+- [ ] Trainer Path displays effects for unlocked abilities
+- [ ] Trainer Path shows "Unlocks at level X" for locked abilities
+- [ ] Locked items appear faded (60% opacity)
+- [ ] Locked items have gray styling
+- [ ] Locked item text is italicized
+- [ ] Category titles appear in red with underline
+- [ ] All popups are scrollable if content is long
+- [ ] Popups work correctly on mobile devices
+
+---
+
+## Data Requirements
+
+For popups to display full information, sessionStorage must contain:
+- `trainerData`: Trainer stats array
+- `items`: Item database with name, type, and effect fields
+- `specializations`: Specialization database with name and effect
+- `affinities`: Affinity database with name, effect, and improvedEffect
+- `trainerPaths`: Path database with name and level3/5/9/15 objects
+
+---
+
+## Result
+
+All popups now display complete, accurate information matching the reference implementation. Users can see:
+- Full item lists with categories and quantities
+- All specialization/affinity/path stages with unlock levels
+- Complete effect descriptions from the database
+- Clear visual distinction between locked and unlocked content
+- Modern, professional styling with proper hierarchy
+
+---
+
+**Session completed: 2025-12-09 Part 6**

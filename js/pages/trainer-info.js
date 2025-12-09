@@ -1773,11 +1773,14 @@ export function attachTrainerInfoListeners() {
     }));
   });
 
-  // Inventory button - redesigned with interactive left/right panes
-  document.getElementById('inventoryButton')?.addEventListener('click', () => {
-    if (!trainerData) return;
+  // Helper function to refresh inventory display
+  function refreshInventoryDisplay() {
+    // Reload fresh trainer data from sessionStorage
+    const freshTrainerDataStr = sessionStorage.getItem('trainerData');
+    if (!freshTrainerDataStr) return;
 
-    const inventory = trainerData[20] || 'None';
+    const freshTrainerData = JSON.parse(freshTrainerDataStr);
+    const inventory = freshTrainerData[20] || 'None';
     const itemsStr = sessionStorage.getItem('items');
     const categoriesContainer = document.getElementById('inventoryCategories');
 
@@ -1902,6 +1905,11 @@ export function attachTrainerInfoListeners() {
     });
 
     openPopup('inventoryPopup');
+  }
+
+  // Inventory button - calls the refresh function
+  document.getElementById('inventoryButton')?.addEventListener('click', () => {
+    refreshInventoryDisplay();
   });
 
   document.getElementById('closeInventory')?.addEventListener('click', () => closePopup('inventoryPopup'));
@@ -1942,7 +1950,6 @@ export function attachTrainerInfoListeners() {
       if (itemName.toLowerCase() === selectedItemName.toLowerCase()) {
         found = true;
         const newQty = currentQty + quantity;
-        alert(`Added ${quantity} to existing item. New quantity: ${newQty}`);
         return `${itemName} (x${newQty})`;
       }
       return itemStr;
@@ -1951,7 +1958,6 @@ export function attachTrainerInfoListeners() {
     // If not found, add as new item
     if (!found) {
       inventoryItems.push(`${selectedItemName} (x${quantity})`);
-      alert(`Added ${quantity}x ${selectedItemName} to inventory.`);
     }
 
     // Update sessionStorage
@@ -1964,8 +1970,8 @@ export function attachTrainerInfoListeners() {
         // Close modal
         document.getElementById('addItemModal').style.display = 'none';
 
-        // Reload the page to show updated inventory
-        window.location.reload();
+        // Refresh inventory display with updated data
+        refreshInventoryDisplay();
       }).catch(error => {
         console.error('Failed to update inventory in database:', error);
         alert('Failed to save to database. Please try again.');
@@ -2025,7 +2031,6 @@ export function attachTrainerInfoListeners() {
         found = true;
         if (newQuantity === 0) {
           // Remove item if quantity is 0
-          alert(`${selectedItemData.name} removed from inventory.`);
           return false; // Filter out this item
         } else {
           // Update quantity - will be handled in map below
@@ -2038,7 +2043,6 @@ export function attachTrainerInfoListeners() {
       const itemName = match ? match[1].trim() : itemStr;
 
       if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-        alert(`${selectedItemData.name} quantity updated to ${newQuantity}.`);
         return `${itemName} (x${newQuantity})`;
       }
       return itemStr;
@@ -2055,8 +2059,8 @@ export function attachTrainerInfoListeners() {
           // Close modal
           document.getElementById('editItemModal').style.display = 'none';
 
-          // Reload the page to show updated inventory
-          window.location.reload();
+          // Refresh inventory display with updated data
+          refreshInventoryDisplay();
         }).catch(error => {
           console.error('Failed to update inventory in database:', error);
           alert('Failed to save to database. Please try again.');
@@ -2092,7 +2096,6 @@ export function attachTrainerInfoListeners() {
 
       if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
         found = true;
-        alert(`${selectedItemData.name} removed from inventory.`);
         return false; // Filter out this item
       }
       return true;
@@ -2109,8 +2112,8 @@ export function attachTrainerInfoListeners() {
           // Close modal
           document.getElementById('removeItemModal').style.display = 'none';
 
-          // Reload the page to show updated inventory
-          window.location.reload();
+          // Refresh inventory display with updated data
+          refreshInventoryDisplay();
         }).catch(error => {
           console.error('Failed to update inventory in database:', error);
           alert('Failed to save to database. Please try again.');

@@ -246,17 +246,6 @@ export function renderMyPokemon() {
           padding: clamp(1.5rem, 4vh, 4rem);
         }
 
-        @media (max-width: 768px) {
-          .pokemon-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .pokemon-image {
-            width: clamp(90px, 20vw, 160px);
-            height: clamp(90px, 20vw, 160px);
-          }
-        }
-
         @media (max-width: 480px) {
           .pokemon-grid {
             grid-template-columns: 1fr;

@@ -114,7 +114,7 @@ export function renderTrainerCard() {
         /* Trainer and Utility Container */
         .trainer-utility-wrapper {
           position: relative;
-          margin-bottom: clamp(2rem, 4vh, 3rem);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
           width: 100%;
           min-height: clamp(300px, 35vw, 400px);
           display: flex;
@@ -176,7 +176,7 @@ export function renderTrainerCard() {
         .utility-container {
           position: absolute;
           left: calc(50% + clamp(130px, 18vw, 180px));
-          bottom: 0;
+          bottom: clamp(2.5rem, 5vh, 3.5rem);
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -248,18 +248,11 @@ export function renderTrainerCard() {
         .party-section {
           width: 100%;
           max-width: 900px;
-          margin-bottom: clamp(2rem, 4vh, 3rem);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
         }
 
         .party-section h2 {
-          text-align: center;
-          color: white;
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
-          font-size: clamp(1.5rem, 3.5vw, 2.5rem);
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.3vw, 1px);
-          text-shadow: 0 clamp(2px, 0.8vh, 4px) clamp(6px, 1.5vh, 10px) rgba(0,0,0,0.8);
+          display: none;
         }
 
         .party-grid {

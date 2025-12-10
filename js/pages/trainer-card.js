@@ -114,13 +114,12 @@ export function renderTrainerCard() {
         /* Trainer and Utility Container */
         .trainer-utility-wrapper {
           position: relative;
-          display: flex;
-          justify-content: center;
-          align-items: flex-end;
           margin-bottom: clamp(2rem, 4vh, 3rem);
           width: 100%;
-          max-width: 900px;
-          min-height: clamp(250px, 30vw, 350px);
+          min-height: clamp(300px, 35vw, 400px);
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
         }
 
         /* Trainer Section */
@@ -128,7 +127,7 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          z-index: 1;
+          z-index: 2;
         }
 
         .trainer-image-container {
@@ -176,11 +175,12 @@ export function renderTrainerCard() {
         /* Utility Slot - Positioned to the right */
         .utility-container {
           position: absolute;
-          right: clamp(10px, 5vw, 50px);
+          left: calc(50% + clamp(130px, 18vw, 180px));
           bottom: 0;
           display: flex;
           flex-direction: column;
           align-items: center;
+          z-index: 1;
         }
 
         .utility-label {
@@ -474,7 +474,7 @@ export function renderTrainerCard() {
         }
 
         /* Responsive adjustments */
-        @media (max-width: 600px) {
+        @media (max-width: 480px) {
           .utility-container {
             position: static;
             margin-top: clamp(1rem, 2vh, 1.5rem);

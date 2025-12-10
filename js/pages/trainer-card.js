@@ -105,7 +105,7 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(6rem, 12vh, 8rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
+          padding: clamp(2rem, 4vh, 3rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
           min-height: 100vh;
           position: relative;
           box-sizing: border-box;
@@ -119,7 +119,7 @@ export function renderTrainerCard() {
           letter-spacing: clamp(1px, 0.5vw, 3px);
           text-shadow: 0 clamp(3px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.8);
           font-weight: 900;
-          margin-bottom: clamp(2rem, 4vh, 3rem);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
           text-align: center;
         }
 
@@ -129,7 +129,7 @@ export function renderTrainerCard() {
           display: flex;
           justify-content: center;
           align-items: flex-end;
-          margin-bottom: clamp(3rem, 6vh, 5rem);
+          margin-bottom: clamp(2rem, 4vh, 3rem);
           width: 100%;
           max-width: 900px;
         }
@@ -143,8 +143,8 @@ export function renderTrainerCard() {
         }
 
         .trainer-image-container {
-          width: clamp(250px, 35vw, 400px);
-          height: clamp(250px, 35vw, 400px);
+          width: clamp(200px, 25vw, 280px);
+          height: clamp(200px, 25vw, 280px);
           margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
           cursor: pointer;
           transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
@@ -206,38 +206,37 @@ export function renderTrainerCard() {
 
         .utility-slot {
           width: clamp(120px, 20vw, 180px);
-          height: clamp(120px, 20vw, 180px);
-          border-radius: clamp(12px, 2.5vw, 18px);
-          cursor: pointer;
-          transition: transform 0.3s, box-shadow 0.3s;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
-          padding: clamp(0.5rem, 1vh, 0.75rem);
-          overflow: hidden;
+          background: transparent;
+          padding: 0;
+          border-radius: 0;
+          border: none;
+          cursor: pointer;
+          transition: transform 0.3s, filter 0.3s;
         }
 
         .utility-slot.empty {
           opacity: 0.6;
           cursor: default;
-          background: linear-gradient(135deg, #E0E0E0 0%, #CCCCCC 100%);
         }
 
         .utility-slot:not(.empty):hover {
-          transform: translateY(clamp(-5px, -1.2vh, -8px)) scale(1.05);
-          box-shadow: 0 clamp(12px, 2.5vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
-                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
 
         .utility-slot img {
-          width: 85%;
-          height: 85%;
-          object-fit: contain;
-          margin-bottom: clamp(0.3rem, 0.8vh, 0.5rem);
+          width: 100%;
+          height: auto;
+          aspect-ratio: 1;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          object-fit: cover;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          background-color: #fff;
         }
 
         .utility-slot .pokemon-name {
@@ -282,41 +281,39 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          padding: clamp(0.75rem, 1.5vh, 1rem);
-          border-radius: clamp(12px, 2.5vw, 18px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          background: transparent;
+          padding: 0;
+          border-radius: 0;
+          border: none;
           cursor: pointer;
-          transition: transform 0.3s, box-shadow 0.3s;
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
+          transition: transform 0.3s, filter 0.3s;
         }
 
         .pokemon-slot.empty {
           cursor: default;
           opacity: 0.6;
-          background: linear-gradient(135deg, #E0E0E0 0%, #CCCCCC 100%);
         }
 
         .pokemon-slot.locked {
           cursor: default;
           opacity: 0.3;
-          background: linear-gradient(135deg, #B0B0B0 0%, #909090 100%);
-          border-color: #999;
         }
 
         .pokemon-slot:not(.empty):not(.locked):hover {
           transform: translateY(clamp(-5px, -1.2vh, -8px)) scale(1.05);
-          box-shadow: 0 clamp(12px, 2.5vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
-                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
+          filter: brightness(1.1) drop-shadow(0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.6));
         }
 
         .pokemon-slot img {
-          width: clamp(100px, 18vw, 150px);
-          height: clamp(100px, 18vw, 150px);
-          border-radius: clamp(8px, 1.5vw, 12px);
+          width: 100%;
+          height: auto;
+          aspect-ratio: 1;
+          border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
           margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          background-color: #f0f0f0;
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          background-color: #fff;
         }
 
         .pokemon-slot .pokemon-name {

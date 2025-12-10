@@ -74,8 +74,8 @@ export function renderEditTrainer() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(6rem, 12vh, 8rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
-          min-height: 100vh;
+          padding: clamp(6rem, 12vh, 8rem) clamp(1rem, 3vw, 2rem) clamp(1rem, 2vh, 1.5rem);
+          min-height: auto;
           position: relative;
           box-sizing: border-box;
         }

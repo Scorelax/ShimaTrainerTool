@@ -105,22 +105,10 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(2rem, 4vh, 3rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
+          padding: clamp(5rem, 10vh, 7rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
           min-height: 100vh;
           position: relative;
           box-sizing: border-box;
-        }
-
-        /* Title */
-        .page-title {
-          color: white;
-          font-size: clamp(2.5rem, 6vw, 4rem);
-          text-transform: uppercase;
-          letter-spacing: clamp(1px, 0.5vw, 3px);
-          text-shadow: 0 clamp(3px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.8);
-          font-weight: 900;
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
-          text-align: center;
         }
 
         /* Trainer and Utility Container */
@@ -131,7 +119,8 @@ export function renderTrainerCard() {
           align-items: flex-end;
           margin-bottom: clamp(2rem, 4vh, 3rem);
           width: 100%;
-          max-width: 900px;
+          max-width: 650px;
+          min-height: clamp(250px, 30vw, 350px);
         }
 
         /* Trainer Section */
@@ -187,12 +176,11 @@ export function renderTrainerCard() {
         /* Utility Slot - Positioned to the right */
         .utility-container {
           position: absolute;
-          right: 0;
+          right: clamp(-20px, -3vw, -10px);
           bottom: 0;
           display: flex;
           flex-direction: column;
           align-items: center;
-          margin-left: clamp(1rem, 2vw, 1.5rem);
         }
 
         .utility-label {
@@ -228,7 +216,7 @@ export function renderTrainerCard() {
         }
 
         .utility-slot img {
-          width: 100%;
+          width: 85%;
           height: auto;
           aspect-ratio: 1;
           border-radius: clamp(12px, 2.5vw, 18px);
@@ -240,17 +228,20 @@ export function renderTrainerCard() {
         }
 
         .utility-slot .pokemon-name {
-          font-size: clamp(0.85rem, 1.8vw, 1.1rem);
-          font-weight: 700;
-          color: #333;
+          font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+          font-weight: 900;
+          color: #FFDE00;
           text-align: center;
-          margin-bottom: clamp(0.1rem, 0.3vh, 0.2rem);
+          margin-bottom: clamp(0.2rem, 0.5vh, 0.3rem);
+          text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
 
         .utility-slot .pokemon-level {
-          font-size: clamp(0.75rem, 1.5vw, 0.95rem);
-          color: #666;
+          font-size: clamp(0.95rem, 2vw, 1.3rem);
+          color: white;
           text-align: center;
+          font-weight: 600;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         /* Party Section */
@@ -305,7 +296,7 @@ export function renderTrainerCard() {
         }
 
         .pokemon-slot img {
-          width: 100%;
+          width: 85%;
           height: auto;
           aspect-ratio: 1;
           border-radius: clamp(12px, 2.5vw, 18px);
@@ -317,17 +308,20 @@ export function renderTrainerCard() {
         }
 
         .pokemon-slot .pokemon-name {
-          font-size: clamp(0.95rem, 2vw, 1.3rem);
+          font-size: clamp(1.1rem, 2.4vw, 1.5rem);
           margin-bottom: clamp(0.2rem, 0.5vh, 0.3rem);
-          color: #333;
+          color: #FFDE00;
           text-align: center;
-          font-weight: 700;
+          font-weight: 900;
+          text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
 
         .pokemon-slot .pokemon-level {
-          font-size: clamp(0.85rem, 1.8vw, 1.1rem);
-          color: #666;
+          font-size: clamp(0.95rem, 2vw, 1.3rem);
+          color: white;
           text-align: center;
+          font-weight: 600;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         /* My Pokemon Button */
@@ -502,9 +496,6 @@ export function renderTrainerCard() {
 
       <!-- Back Button -->
       <button class="back-button" id="backButton">←</button>
-
-      <!-- Title -->
-      <h1 class="page-title">${trainerName}</h1>
 
       <!-- Trainer and Utility Container -->
       <div class="trainer-utility-wrapper">

@@ -95,15 +95,6 @@ export function renderEditTrainer() {
           z-index: 1000;
         }
 
-        .trainer-name {
-          color: #FFDE00;
-          font-size: clamp(1.2rem, 3vw, 1.8rem);
-          font-weight: 600;
-          margin-bottom: clamp(2rem, 4vh, 3rem);
-          text-shadow: 0 2px 8px rgba(0,0,0,0.6);
-          text-align: center;
-        }
-
         .form-container {
           width: 90%;
           max-width: clamp(500px, 70vw, 700px);
@@ -407,7 +398,6 @@ export function renderEditTrainer() {
       <button class="back-button" id="backButton">←</button>
 
       <h1>Edit Trainer</h1>
-      <div class="trainer-name">${trainerName}</div>
 
       <div class="form-container">
         <form id="editTrainerForm">

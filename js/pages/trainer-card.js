@@ -105,7 +105,7 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(5rem, 10vh, 7rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
+          padding: clamp(1rem, 2vh, 1.5rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
           min-height: 100vh;
           position: relative;
           box-sizing: border-box;
@@ -119,7 +119,7 @@ export function renderTrainerCard() {
           align-items: flex-end;
           margin-bottom: clamp(2rem, 4vh, 3rem);
           width: 100%;
-          max-width: 650px;
+          max-width: 900px;
           min-height: clamp(250px, 30vw, 350px);
         }
 
@@ -176,7 +176,7 @@ export function renderTrainerCard() {
         /* Utility Slot - Positioned to the right */
         .utility-container {
           position: absolute;
-          right: clamp(-20px, -3vw, -10px);
+          right: clamp(10px, 5vw, 50px);
           bottom: 0;
           display: flex;
           flex-direction: column;
@@ -474,7 +474,7 @@ export function renderTrainerCard() {
         }
 
         /* Responsive adjustments */
-        @media (max-width: 1024px) {
+        @media (max-width: 600px) {
           .utility-container {
             position: static;
             margin-top: clamp(1rem, 2vh, 1.5rem);
@@ -485,9 +485,7 @@ export function renderTrainerCard() {
             flex-direction: column;
             align-items: center;
           }
-        }
 
-        @media (max-width: 768px) {
           .party-grid {
             gap: clamp(0.75rem, 1.5vw, 1rem);
           }

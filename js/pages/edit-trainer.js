@@ -74,21 +74,25 @@ export function renderEditTrainer() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(5rem, 10vh, 8rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
+          padding: clamp(6rem, 12vh, 8rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
           min-height: 100vh;
           position: relative;
           box-sizing: border-box;
         }
 
         .edit-trainer-page h1 {
+          position: absolute;
+          top: clamp(15px, 3vh, 20px);
+          left: 50%;
+          transform: translateX(-50%);
           color: white;
-          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          margin: 0;
           font-size: clamp(2rem, 5vw, 3rem);
           text-transform: uppercase;
           letter-spacing: clamp(1px, 0.5vw, 3px);
-          text-shadow: 0 clamp(3px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.8);
+          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
-          text-align: center;
+          z-index: 1000;
         }
 
         .trainer-name {
@@ -367,18 +371,18 @@ export function renderEditTrainer() {
         /* Back Button */
         .back-button {
           position: fixed;
-          top: clamp(15px, 3vh, 25px);
-          left: clamp(15px, 3vw, 25px);
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          width: clamp(45px, 9vw, 60px);
-          height: clamp(45px, 9vw, 60px);
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           border-radius: 50%;
-          font-size: clamp(1.6rem, 3.5vw, 2.2rem);
-          font-weight: 900;
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          font-weight: bold;
           cursor: pointer;
-          box-shadow: 0 clamp(8px, 2vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
@@ -389,13 +393,13 @@ export function renderEditTrainer() {
 
         .back-button:hover {
           transform: scale(1.15);
-          box-shadow: 0 clamp(12px, 3vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
-                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.6);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
           border-color: #FFC700;
         }
 
         .back-button:active {
-          transform: scale(1.05);
+          transform: scale(1.08);
         }
       </style>
 
@@ -459,12 +463,16 @@ export function renderEditTrainer() {
               <span class="arrow" id="skillsArrow">▶</span>
             </div>
             <div class="collapsible-content" id="skillsContent">
-              ${allSkills.map(skill => `
-                <div class="checkbox-item">
-                  <input type="checkbox" id="skill_${skill.replace(/\s+/g, '_').replace(/\(|\)/g, '')}" name="skills" value="${skill}" ${selectedSkills.includes(skill) ? 'checked' : ''} />
-                  <label for="skill_${skill.replace(/\s+/g, '_').replace(/\(|\)/g, '')}">${skill}</label>
-                </div>
-              `).join('')}
+              ${allSkills.map(skill => {
+                const skillName = skill.split(' (')[0].trim();
+                const isChecked = selectedSkills.includes(skillName);
+                return `
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="skill_${skill.replace(/\s+/g, '_').replace(/\(|\)/g, '')}" name="skills" value="${skillName}" ${isChecked ? 'checked' : ''} />
+                    <label for="skill_${skill.replace(/\s+/g, '_').replace(/\(|\)/g, '')}">${skill}</label>
+                  </div>
+                `;
+              }).join('')}
             </div>
           </div>
 

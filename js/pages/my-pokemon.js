@@ -12,26 +12,54 @@ export function renderMyPokemon() {
     <div class="my-pokemon-page">
       <style>
         body, .content {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          background:
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
           min-height: 100vh;
+          position: relative;
+        }
+
+        body::before, .content::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image:
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px, 80px 80px;
+          background-position: 0 0, 40px 40px;
+          pointer-events: none;
+          opacity: 0.5;
         }
 
         .my-pokemon-page {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(1.5rem, 5vh, 3rem) clamp(0.5rem, 3vw, 2rem);
-          min-height: 85vh;
+          padding: clamp(5rem, 10vh, 7rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
+          min-height: 100vh;
+          position: relative;
+          box-sizing: border-box;
         }
 
         .my-pokemon-page h1 {
+          position: absolute;
+          top: clamp(15px, 3vh, 20px);
+          left: 50%;
+          transform: translateX(-50%);
           color: white;
-          margin-bottom: clamp(1.5rem, 5vh, 3rem);
-          font-size: clamp(2rem, 6vw, 3.5rem);
+          margin: 0;
+          font-size: clamp(2rem, 5vw, 3rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(1px, 0.5vw, 3px);
+          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
-          letter-spacing: clamp(0.5px, 0.2vw, 1.5px);
-          text-shadow: 0 clamp(2px, 0.5vh, 5px) clamp(6px, 1.5vw, 12px) rgba(0,0,0,0.5),
-                       0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.3);
+          z-index: 1000;
         }
 
         .pokemon-list-container {
@@ -54,48 +82,46 @@ export function renderMyPokemon() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(0.5rem, 1.5vw, 1.5rem);
+          background: transparent;
+          padding: 0;
+          cursor: pointer;
+          transition: transform 0.3s, filter 0.3s;
+        }
+
+        .pokemon-slot:hover {
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
 
         .pokemon-image {
-          width: clamp(100px, min(20vw, 25vh), 180px);
-          height: clamp(100px, min(20vw, 25vh), 180px);
-          border-radius: clamp(15px, 3vw, 35px);
-          object-fit: contain;
-          background: transparent;
-          border: none;
-          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(18px, 4vw, 30px) rgba(0,0,0,0.5);
-          margin-bottom: clamp(0.5rem, 2vh, 1.5rem);
+          width: 85%;
+          height: auto;
+          aspect-ratio: 1;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          object-fit: cover;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          background-color: #fff;
           cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .pokemon-image:hover {
-          transform: translateY(clamp(-5px, -1.5vh, -12px)) scale(1.08);
-          box-shadow: 0 clamp(10px, 2.5vh, 18px) clamp(30px, 6vw, 50px) rgba(0,0,0,0.6),
-                      0 0 clamp(20px, 4vw, 35px) rgba(255,222,0,0.4);
-        }
-
-        .pokemon-image:active {
-          transform: translateY(clamp(-2px, -1vh, -6px)) scale(1.05);
+          transition: transform 0.3s;
         }
 
         .pokemon-name {
-          font-size: clamp(1rem, 2.5vw, 1.5rem);
-          margin-bottom: clamp(0.25rem, 1vh, 0.75rem);
-          color: white;
-          font-weight: 800;
+          font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+          margin-bottom: clamp(0.2rem, 0.5vh, 0.3rem);
+          color: #FFDE00;
           text-align: center;
-          text-transform: uppercase;
-          letter-spacing: clamp(0.25px, 0.15vw, 0.75px);
-          text-shadow: 0 clamp(1px, 0.3vh, 3px) clamp(3px, 1vw, 7px) rgba(0,0,0,0.5);
+          font-weight: 900;
+          text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
 
         .pokemon-level {
-          font-size: clamp(0.9rem, 2vw, 1.3rem);
-          color: #FFDE00;
-          font-weight: 700;
-          text-shadow: 0 clamp(1px, 0.3vh, 3px) clamp(3px, 1vw, 7px) rgba(0,0,0,0.5);
+          font-size: clamp(0.95rem, 2vw, 1.3rem);
+          color: white;
+          text-align: center;
+          font-weight: 600;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         .controls-container {
@@ -182,18 +208,18 @@ export function renderMyPokemon() {
 
         .back-button {
           position: fixed;
-          top: clamp(10px, 2vh, 30px);
-          left: clamp(10px, 2vw, 30px);
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          width: clamp(40px, 8vw, 70px);
-          height: clamp(40px, 8vw, 70px);
-          border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           border-radius: 50%;
-          font-size: clamp(1.2rem, 3vw, 2.5rem);
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
           font-weight: bold;
           cursor: pointer;
-          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3vw, 25px) rgba(0,0,0,0.3);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
@@ -203,14 +229,14 @@ export function renderMyPokemon() {
         }
 
         .back-button:hover {
-          transform: scale(1.1);
-          box-shadow: 0 clamp(8px, 2vh, 16px) clamp(20px, 4vw, 35px) rgba(0,0,0,0.4),
-                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
+          transform: scale(1.15);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
           border-color: #FFC700;
         }
 
         .back-button:active {
-          transform: scale(1.05);
+          transform: scale(1.08);
         }
 
         .empty-state {

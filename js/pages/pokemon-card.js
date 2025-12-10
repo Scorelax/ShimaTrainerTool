@@ -197,18 +197,28 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .pokemon-card-page {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 2.5vh 1vh;
-          min-height: 80vh;
+          display: grid;
+          grid-template-columns: minmax(25%, 30%) 1fr;
+          gap: clamp(2rem, 4vw, 4rem);
+          padding: clamp(1rem, 2vh, 2rem) clamp(1rem, 2vw, 3rem) clamp(1rem, 2vh, 1.5rem);
+          min-height: auto;
           position: relative;
+          z-index: 1;
         }
 
         .pokemon-card-page h1 {
+          position: absolute;
+          top: clamp(15px, 3vh, 20px);
+          left: 50%;
+          transform: translateX(-50%);
           color: white;
-          margin-bottom: 2vh;
-          font-size: clamp(1.8rem, 3.2vh, 3.2vh);
+          margin: 0;
+          font-size: clamp(2rem, 5vw, 3rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(1px, 0.5vw, 3px);
+          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
+          font-weight: 900;
+          z-index: 1000;
         }
 
         /* Page visibility classes */
@@ -218,6 +228,202 @@ export function renderPokemonCard(pokemonName) {
 
         .active-page {
           display: grid !important;
+        }
+
+        /* Info Page Grid Layout - matches trainer-info */
+        .info-page-grid {
+          display: grid;
+          grid-template-columns: minmax(25%, 30%) 1fr;
+          gap: clamp(2rem, 4vw, 4rem);
+          grid-column: 1 / -1;
+        }
+
+        .left-column {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          padding-top: clamp(4rem, 8vh, 6rem);
+        }
+
+        .pokemon-image-container {
+          width: 100%;
+          aspect-ratio: 1;
+          border-radius: clamp(15px, 3vw, 25px);
+          overflow: hidden;
+          border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
+          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.5);
+          background: white;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+        }
+
+        .pokemon-image-container img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .pokemon-info-list {
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border-radius: clamp(15px, 3vw, 25px);
+          padding: clamp(1rem, 2vh, 1.5rem);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+        }
+
+        .info-item {
+          display: flex;
+          justify-content: space-between;
+          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+        }
+
+        .info-item:last-child {
+          border-bottom: none;
+        }
+
+        .info-item-label {
+          color: #FFDE00;
+          font-weight: 700;
+        }
+
+        .info-item-value {
+          color: white;
+          font-weight: 600;
+          text-align: right;
+          max-width: 60%;
+          word-wrap: break-word;
+        }
+
+        .checkbox-container {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+          border-radius: clamp(10px, 2vw, 15px);
+        }
+
+        .checkbox-container label {
+          display: flex;
+          align-items: center;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+          color: white;
+          font-weight: 600;
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          cursor: pointer;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+          width: clamp(18px, 3.5vw, 22px);
+          height: clamp(18px, 3.5vw, 22px);
+          cursor: pointer;
+        }
+
+        .info-buttons-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: clamp(0.75rem, 1.5vh, 1rem);
+        }
+
+        .info-button {
+          background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
+          color: white;
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 15px);
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s;
+          text-transform: uppercase;
+        }
+
+        .info-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(15px, 3vw, 20px) rgba(59, 76, 202, 0.4);
+        }
+
+        .right-column {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(1.5rem, 3vh, 2rem);
+          padding-top: clamp(4rem, 8vh, 6rem);
+        }
+
+        .description-container {
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border-radius: clamp(15px, 3vw, 25px);
+          padding: clamp(1rem, 2vh, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+        }
+
+        .description-container h3 {
+          color: #FFDE00;
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          margin: 0 0 clamp(0.75rem, 1.5vh, 1rem) 0;
+          font-weight: 900;
+        }
+
+        .description-text {
+          color: white;
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          line-height: 1.6;
+          margin: 0;
+        }
+
+        .skills-container {
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border-radius: clamp(15px, 3vw, 25px);
+          padding: clamp(1rem, 2vh, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+        }
+
+        .skills-container h3 {
+          color: #FFDE00;
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          margin: 0 0 clamp(0.75rem, 1.5vh, 1rem) 0;
+          font-weight: 900;
+          text-align: center;
+        }
+
+        .skills-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: clamp(0.4rem, 1.2vw, 0.6rem);
+        }
+
+        .skill-item {
+          background: rgba(255,255,255,0.08);
+          padding: clamp(0.4rem, 0.8vh, 0.6rem);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .skill-item.highlight {
+          background: rgba(255,222,0,0.2);
+          border-color: rgba(255,222,0,0.5);
+        }
+
+        .skill-item.extra-strong {
+          background: rgba(255,222,0,0.35);
+          border-color: rgba(255,222,0,0.8);
+        }
+
+        .skill-name {
+          color: white;
+          font-size: clamp(0.75rem, 1.5vw, 0.95rem);
+          font-weight: 600;
+        }
+
+        .skill-modifier {
+          color: #FFDE00;
+          font-size: clamp(0.75rem, 1.5vw, 0.95rem);
+          font-weight: 700;
         }
 
         /* Info Page Styles - New layout */
@@ -724,84 +930,83 @@ export function renderPokemonCard(pokemonName) {
         }
       </style>
 
-      <h1>Pokemon Card</h1>
+      <h1>${displayName} #${dexEntry}</h1>
 
       <!-- Back Button -->
       <button class="back-button" id="backToTrainerCard">←</button>
 
       <!-- Info Page -->
-      <div id="infoPage" class="card-container active-page">
-        <!-- Top section: Image + Info -->
-        <div class="top-section">
-          <div class="image-container">
+      <div id="infoPage" class="info-page-grid active-page">
+        <!-- Left Column: Image + Info List + Buttons -->
+        <div class="left-column">
+          <div class="pokemon-image-container">
             <img id="pokemonImage" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
           </div>
 
-          <div class="new-details-container">
-            <div class="stat-item">
-              <div class="stat-label">Name:</div>
-              <div class="stat-value">
-                <span id="pokemonName">${displayName}</span>
-                <span id="pokemonDexEntry" class="dex-entry">${dexEntry}</span>
-              </div>
+          <div class="pokemon-info-list">
+            <div class="info-item">
+              <span class="info-item-label">Level:</span>
+              <span class="info-item-value" id="pokemonLevel">${level}</span>
             </div>
-            <div class="stat-item">
-              <div class="stat-label">Level:</div>
-              <div id="pokemonLevel" class="stat-value">${level}</div>
+            <div class="info-item">
+              <span class="info-item-label">Typing:</span>
+              <span class="info-item-value" id="pokemonTyping">${typingText}</span>
             </div>
-            <div class="stat-item">
-              <div class="stat-label">Typing:</div>
-              <div id="pokemonTyping" class="stat-value">${typingText}</div>
-            </div>
-            <div class="stat-item multi-line">
-              <div class="stat-label">Saving Throw(s):</div>
-              <div id="pokemonSavingThrow" class="stat-value">${savingThrow}</div>
+            <div class="info-item">
+              <span class="info-item-label">Saving Throw(s):</span>
+              <span class="info-item-value" id="pokemonSavingThrow">${savingThrow}</span>
             </div>
             ${sensesArray.length > 0 ? `
-              <div class="stat-item multi-line">
-                <div class="stat-label">Senses:</div>
-                <div id="sensesValue" class="stat-value">${sensesDisplay}</div>
+              <div class="info-item">
+                <span class="info-item-label">Senses:</span>
+                <span class="info-item-value" id="sensesValue">${sensesDisplay}</span>
               </div>
             ` : ''}
-            <div class="checkbox-container">
-              <label for="inActiveParty">Active Party</label>
+          </div>
+
+          <div class="checkbox-container">
+            <label for="inActiveParty">
               <input type="checkbox" id="inActiveParty" ${inActiveParty ? 'checked' : ''}>
-              <label for="inUtilitySlot">Utility Slot</label>
+              Active Party
+            </label>
+            <label for="inUtilitySlot">
               <input type="checkbox" id="inUtilitySlot" ${inUtilitySlot ? 'checked' : ''}>
+              Utility Slot
+            </label>
+          </div>
+
+          <div class="info-buttons-grid">
+            <button class="info-button" id="editPokemonButton">Edit Pokémon</button>
+            <button class="info-button" id="battlePageButton">Battle Page</button>
+          </div>
+        </div>
+
+        <!-- Right Column: Description + Skills -->
+        <div class="right-column">
+          ${flavorText ? `
+            <div class="description-container">
+              <h3>Description</h3>
+              <p id="flavorText" class="description-text">${flavorText}</p>
             </div>
-          </div>
-        </div>
+          ` : ''}
 
-        <!-- Edit and Battle buttons below image -->
-        <div class="button-container">
-          <button class="edit-button" id="editPokemonButton">Edit Pokémon</button>
-          <button class="battle-page-button" id="battlePageButton">Battle Page</button>
-        </div>
+          <div class="skills-container">
+            <h3>Skills</h3>
+            <div id="skills" class="skills-grid">
+              ${allSkills.map(skill => {
+                const skillKey = skill.name.toLowerCase();
+                const proficiencyLevel = skillCounts[skillKey] || 0;
+                const skillClass = proficiencyLevel >= 2 ? 'extra-strong' : (proficiencyLevel === 1 ? 'highlight' : '');
+                const modifier = skill.mod + (proficiencyLevel * 2);
 
-        <!-- Description below buttons -->
-        ${flavorText ? `
-          <div class="flavor-text-container">
-            <p id="flavorText" class="flavor-text">${flavorText}</p>
-          </div>
-        ` : ''}
-
-        <!-- Skills table at the bottom -->
-        <div class="skills-container">
-          <h2>Skills</h2>
-          <div id="skills" class="skills-grid">
-            ${allSkills.map(skill => {
-              const skillKey = skill.name.toLowerCase();
-              const proficiencyLevel = skillCounts[skillKey] || 0;
-              const skillClass = proficiencyLevel >= 2 ? 'extra-strong' : (proficiencyLevel === 1 ? 'highlight' : '');
-              const modifier = skill.mod + (proficiencyLevel * 2);
-
-              return `
-                <div class="skill-item ${skillClass}">
-                  <div>${skill.name}</div>
-                  <div class="modifier">${modifier >= 0 ? '+' : ''}${modifier}</div>
-                </div>
-              `;
-            }).join('')}
+                return `
+                  <div class="skill-item ${skillClass}">
+                    <div class="skill-name">${skill.name}</div>
+                    <div class="skill-modifier">${modifier >= 0 ? '+' : ''}${modifier}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
           </div>
         </div>
       </div>
@@ -984,6 +1189,16 @@ export function attachPokemonCardListeners() {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'edit-pokemon', pokemonName: pokemonName }
     }));
+  });
+
+  // Pokemon image click - prompt for evolution
+  document.getElementById('pokemonImage')?.addEventListener('click', () => {
+    const confirmEvolution = confirm(`Would you like to evolve ${pokemonName}?`);
+    if (confirmEvolution) {
+      window.dispatchEvent(new CustomEvent('navigate', {
+        detail: { route: 'evolution' }
+      }));
+    }
   });
 
   // Battle Page button

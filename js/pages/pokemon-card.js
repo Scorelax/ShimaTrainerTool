@@ -426,6 +426,119 @@ export function renderPokemonCard(pokemonName) {
           font-weight: 700;
         }
 
+        /* Battle Page Grid Layout - matches trainer-info */
+        .battle-page-grid {
+          display: grid;
+          grid-template-columns: minmax(25%, 30%) 1fr;
+          gap: clamp(2rem, 4vw, 4rem);
+          grid-column: 1 / -1;
+        }
+
+        .battle-stats-container {
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border-radius: clamp(15px, 3vw, 25px);
+          padding: clamp(1rem, 2vh, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+        }
+
+        .battle-stats-container h3 {
+          color: #FFDE00;
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          margin: 0 0 clamp(0.75rem, 1.5vh, 1rem) 0;
+          font-weight: 900;
+          text-align: center;
+        }
+
+        .stat-main-container {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(0.75rem, 1.5vh, 1rem);
+        }
+
+        .ability-container {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+        }
+
+        .ability-box {
+          background: rgba(255,255,255,0.08);
+          border-radius: clamp(10px, 2vw, 15px);
+          padding: clamp(0.5rem, 1vh, 0.75rem);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: clamp(0.25rem, 0.5vh, 0.4rem);
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .ability-label {
+          color: #FFDE00;
+          font-size: clamp(0.75rem, 1.5vw, 0.95rem);
+          font-weight: 700;
+          text-transform: uppercase;
+        }
+
+        .ability-value {
+          color: white;
+          font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+          font-weight: 900;
+        }
+
+        .ability-modifier {
+          color: #FFDE00;
+          font-size: clamp(0.85rem, 1.7vw, 1.1rem);
+          font-weight: 700;
+        }
+
+        .moves-list-container {
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border-radius: clamp(15px, 3vw, 25px);
+          padding: clamp(1rem, 2vh, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+        }
+
+        .moves-list-container h3 {
+          color: #FFDE00;
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          margin: 0 0 clamp(0.75rem, 1.5vh, 1rem) 0;
+          font-weight: 900;
+          text-align: center;
+        }
+
+        .moves-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(clamp(100px, 15vw, 140px), 1fr));
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+        }
+
+        .move-item {
+          background: rgba(255,255,255,0.9);
+          color: #333;
+          padding: clamp(0.5rem, 1vh, 0.75rem);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          text-align: center;
+          font-weight: 700;
+          font-size: clamp(0.8rem, 1.6vw, 1rem);
+          cursor: pointer;
+          transition: all 0.3s;
+          border: 2px solid rgba(0,0,0,0.2);
+        }
+
+        .move-item:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .no-moves {
+          grid-column: 1 / -1;
+          text-align: center;
+          color: rgba(255,255,255,0.6);
+          font-style: italic;
+          padding: clamp(1rem, 2vh, 1.5rem);
+        }
+
         /* Info Page Styles - New layout */
         .card-container {
           display: flex;
@@ -1012,110 +1125,120 @@ export function renderPokemonCard(pokemonName) {
       </div>
 
       <!-- Battle Page -->
-      <div id="battlePage" class="battle-page-container hidden-page">
-        <!-- Top section: Image + Stats -->
-        <div class="battle-top-section">
-          <div class="image-container">
+      <div id="battlePage" class="battle-page-grid hidden-page">
+        <!-- Left Column: Image + Battle Info -->
+        <div class="left-column">
+          <div class="pokemon-image-container">
             <img id="pokemonImageBattle" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
           </div>
 
-          <!-- Stats column on right -->
-          <div class="battle-stats-column">
-            <div class="ac-hp-vp-container">
-              <div class="stat-block">
-                <div class="stat-label">AC</div>
-                <div class="stat-value-box" id="acValue">${ac}</div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-label">HP</div>
-                <div class="stat-value-box" id="hpValue">${hp}</div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-label">VP</div>
-                <div class="stat-value-box" id="vpValue">${vp}</div>
-              </div>
+          <div class="pokemon-info-list">
+            <div class="info-item">
+              <span class="info-item-label">HD:</span>
+              <span class="info-item-value" id="hdValue">${hd}</span>
             </div>
+            <div class="info-item">
+              <span class="info-item-label">VD:</span>
+              <span class="info-item-value" id="vdValue">${vd}</span>
+            </div>
+          </div>
 
-            <div class="stats-container">
-              <div class="stat-block">
-                <div class="stat-label">STR</div>
-                <div class="stat-value-box" id="strValue">${str}</div>
-                <div class="stat-modifier-box" id="strModifierValue">${strMod >= 0 ? '+' : ''}${strMod}</div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-label">DEX</div>
-                <div class="stat-value-box" id="dexValue">${dex}</div>
-                <div class="stat-modifier-box" id="dexModifierValue">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-label">CON</div>
-                <div class="stat-value-box" id="conValue">${con}</div>
-                <div class="stat-modifier-box" id="conModifierValue">${conMod >= 0 ? '+' : ''}${conMod}</div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-label">INT</div>
-                <div class="stat-value-box" id="intValue">${int}</div>
-                <div class="stat-modifier-box" id="intModifierValue">${intMod >= 0 ? '+' : ''}${intMod}</div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-label">WIS</div>
-                <div class="stat-value-box" id="wisValue">${wis}</div>
-                <div class="stat-modifier-box" id="wisModifierValue">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
-              </div>
-              <div class="stat-block">
-                <div class="stat-label">CHA</div>
-                <div class="stat-value-box" id="chaValue">${cha}</div>
-                <div class="stat-modifier-box" id="chaModifierValue">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
-              </div>
+          <div class="pokemon-info-list">
+            <div class="info-item">
+              <span class="info-item-label">STAB:</span>
+              <span class="info-item-value" id="stabValue">${stab}</span>
             </div>
+            <div class="info-item">
+              <span class="info-item-label">Proficiency:</span>
+              <span class="info-item-value" id="proficiencyValue">+${proficiencyBonus}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item-label">Initiative:</span>
+              <span class="info-item-value" id="initiativeValue">${initiative >= 0 ? '+' : ''}${initiative}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item-label">Loyalty:</span>
+              <span class="info-item-value" id="loyaltyValue">${loyalty}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item-label">Ability:</span>
+              <span class="info-item-value" id="abilityEffect">${abilityButtonsHTML}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item-label">Held Item:</span>
+              <span class="info-item-value" id="heldItemName">${heldItem}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item-label">Movement:</span>
+              <span class="info-item-value" id="movementValue">${movementDisplay}</span>
+            </div>
+          </div>
 
-            <!-- Moves below stats -->
-            <div class="moves-container">
-              <h2>Moves</h2>
-              <div class="moves-grid" id="movesGrid">
-                ${moves.length > 0 ? moves.map(move => `<div class="move-item">${move}</div>`).join('') : '<div class="move-item">No moves</div>'}
-              </div>
-            </div>
+          <div class="info-buttons-grid">
+            <button class="info-button" id="infoPageButton">Info Page</button>
           </div>
         </div>
 
-        <!-- Details below image -->
-        <div class="battle-details-container">
-          <div class="stat-item">
-            <div class="stat-label">HD:</div>
-            <div id="hdValue" class="stat-value">${hd}</div>
+        <!-- Right Column: Stats + Moves -->
+        <div class="right-column">
+          <div class="battle-stats-container">
+            <h3>Stats</h3>
+            <div class="stat-main-container">
+              <div class="ability-container">
+                <div class="ability-box">
+                  <div class="ability-label">AC</div>
+                  <div class="ability-value" id="acValue">${ac}</div>
+                </div>
+                <div class="ability-box">
+                  <div class="ability-label">HP</div>
+                  <div class="ability-value" id="hpValue">${hp}</div>
+                </div>
+                <div class="ability-box">
+                  <div class="ability-label">VP</div>
+                  <div class="ability-value" id="vpValue">${vp}</div>
+                </div>
+              </div>
+
+              <div class="ability-container">
+                <div class="ability-box">
+                  <div class="ability-label">STR</div>
+                  <div class="ability-value" id="strValue">${str}</div>
+                  <div class="ability-modifier" id="strModifierValue">${strMod >= 0 ? '+' : ''}${strMod}</div>
+                </div>
+                <div class="ability-box">
+                  <div class="ability-label">DEX</div>
+                  <div class="ability-value" id="dexValue">${dex}</div>
+                  <div class="ability-modifier" id="dexModifierValue">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
+                </div>
+                <div class="ability-box">
+                  <div class="ability-label">CON</div>
+                  <div class="ability-value" id="conValue">${con}</div>
+                  <div class="ability-modifier" id="conModifierValue">${conMod >= 0 ? '+' : ''}${conMod}</div>
+                </div>
+                <div class="ability-box">
+                  <div class="ability-label">INT</div>
+                  <div class="ability-value" id="intValue">${int}</div>
+                  <div class="ability-modifier" id="intModifierValue">${intMod >= 0 ? '+' : ''}${intMod}</div>
+                </div>
+                <div class="ability-box">
+                  <div class="ability-label">WIS</div>
+                  <div class="ability-value" id="wisValue">${wis}</div>
+                  <div class="ability-modifier" id="wisModifierValue">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
+                </div>
+                <div class="ability-box">
+                  <div class="ability-label">CHA</div>
+                  <div class="ability-value" id="chaValue">${cha}</div>
+                  <div class="ability-modifier" id="chaModifierValue">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="stat-item">
-            <div class="stat-label">VD:</div>
-            <div id="vdValue" class="stat-value">${vd}</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">STAB:</div>
-            <div id="stabValue" class="stat-value">${stab}</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Proficiency:</div>
-            <div id="proficiencyValue" class="stat-value">+${proficiencyBonus}</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Initiative:</div>
-            <div id="initiativeValue" class="stat-value">${initiative >= 0 ? '+' : ''}${initiative}</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Loyalty:</div>
-            <div id="loyaltyValue" class="stat-value">${loyalty}</div>
-          </div>
-          <div class="stat-item multi-line">
-            <div class="stat-label">Ability:</div>
-            <div id="abilityEffect" class="stat-value">${abilityButtonsHTML}</div>
-          </div>
-          <div class="stat-item multi-line">
-            <div class="stat-label">Held Item:</div>
-            <div id="heldItemName" class="stat-value">${heldItem}</div>
-          </div>
-          <div class="stat-item multi-line">
-            <div class="stat-label">Movement:</div>
-            <div id="movementValue" class="stat-value">${movementDisplay}</div>
+
+          <div class="moves-list-container">
+            <h3>Moves</h3>
+            <div class="moves-grid" id="movesGrid">
+              ${moves.length > 0 ? moves.map(move => `<div class="move-item" data-move="${move}">${move}</div>`).join('') : '<div class="no-moves">No moves learned</div>'}
+            </div>
           </div>
         </div>
       </div>
@@ -1315,4 +1438,148 @@ export function attachPokemonCardListeners() {
       document.getElementById('abilityPopup').style.display = 'none';
     }
   });
+
+  // Load move colors and click listeners
+  loadMoveColorsAndListeners();
+}
+
+// Helper function to get Pokemon type color
+function getMoveTypeColor(moveType) {
+  const colors = {
+    "Normal": "#A8A878",
+    "Fighting": "#e68c2e",
+    "Flying": "#A890F0",
+    "Poison": "#A040A0",
+    "Ground": "#DEB887",
+    "Rock": "#a85d16",
+    "Bug": "#A8B820",
+    "Ghost": "#705898",
+    "Steel": "#bdbdbd",
+    "Fire": "#f02e07",
+    "Water": "#1E90FF",
+    "Grass": "#32CD32",
+    "Electric": "#FFD700",
+    "Psychic": "#F85888",
+    "Ice": "#58c8ed",
+    "Dragon": "#280dd4",
+    "Dark": "#282729",
+    "Fairy": "#ed919f",
+    "Cosmic": "#120077"
+  };
+
+  return colors[moveType] || "#ffffff";
+}
+
+// Helper function to determine text color based on background
+function getTextColorForBackground(bgColor) {
+  // Convert hex to RGB
+  const hex = bgColor.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Return black for light backgrounds, white for dark
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+// Load moves data and apply colors and click listeners
+function loadMoveColorsAndListeners() {
+  const rawMovesData = sessionStorage.getItem('moves');
+  if (!rawMovesData) return;
+
+  try {
+    const cleanMovesData = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
+    window.allMoves = cleanMovesData.map(move => {
+      return move.map(item => item.trim());
+    });
+
+    // Apply colors to move items
+    const moveItems = document.querySelectorAll('.move-item');
+    moveItems.forEach(moveItem => {
+      const moveName = moveItem.dataset.move;
+      const move = window.allMoves.find(m => m[0] === moveName);
+
+      if (move) {
+        const bgColor = getMoveTypeColor(move[1]);
+        const textColor = getTextColorForBackground(bgColor);
+        moveItem.style.backgroundColor = bgColor;
+        moveItem.style.color = textColor;
+
+        // Add click listener
+        moveItem.addEventListener('click', () => showMoveDetails(moveName));
+      }
+    });
+  } catch (e) {
+    console.error('Failed to parse moves data:', e);
+  }
+}
+
+// Show move details popup
+function showMoveDetails(moveName) {
+  const move = window.allMoves.find(m => m[0] === moveName);
+
+  if (move) {
+    // Create popup if it doesn't exist
+    let popup = document.getElementById('moveDetailsPopup');
+    if (!popup) {
+      popup = document.createElement('div');
+      popup.id = 'moveDetailsPopup';
+      popup.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;';
+
+      const popupContent = document.createElement('div');
+      popupContent.style.cssText = 'background: white; border-radius: 1.3vh; padding: 2.6vh; max-width: 65vh; width: 90%; max-height: 80vh; overflow-y: auto;';
+
+      popupContent.innerHTML = `
+        <h2 id="moveNamePopup" style="margin-top: 0; color: #333; font-size: clamp(1.4rem, 2.4vh, 2.4vh);"></h2>
+        <div style="font-size: clamp(0.9rem, 1.5vh, 1.5vh); line-height: 1.6; color: black;">
+          <p><strong>Type:</strong> <span id="moveTypePopup"></span></p>
+          <p><strong>Modifier:</strong> <span id="moveModifierPopup"></span></p>
+          <p><strong>Action Type:</strong> <span id="moveActionTypePopup"></span></p>
+          <p><strong>VP Cost:</strong> <span id="moveVPCostPopup"></span></p>
+          <p><strong>Duration:</strong> <span id="moveDurationPopup"></span></p>
+          <p><strong>Range:</strong> <span id="moveRangePopup"></span></p>
+          <p><strong>Description:</strong> <span id="moveDescriptionPopup"></span></p>
+          <p><strong>Higher Levels:</strong> <span id="moveHigherLevelsPopup"></span></p>
+        </div>
+        <button id="closeMovePopup" style="margin-top: 2vh; padding: 1.3vh 2.6vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-size: clamp(0.8rem, 1.3vh, 1.3vh);">Close</button>
+      `;
+
+      popup.appendChild(popupContent);
+      document.body.appendChild(popup);
+
+      // Close button listener
+      document.getElementById('closeMovePopup').addEventListener('click', () => {
+        popup.style.display = 'none';
+      });
+
+      // Close when clicking outside
+      popup.addEventListener('click', (e) => {
+        if (e.target.id === 'moveDetailsPopup') {
+          popup.style.display = 'none';
+        }
+      });
+    }
+
+    // Populate move details
+    document.getElementById('moveNamePopup').textContent = move[0];
+    document.getElementById('moveTypePopup').textContent = move[1];
+    document.getElementById('moveModifierPopup').textContent = move[2];
+    document.getElementById('moveActionTypePopup').textContent = move[3];
+    document.getElementById('moveVPCostPopup').textContent = move[4];
+    document.getElementById('moveDurationPopup').textContent = move[5];
+    document.getElementById('moveRangePopup').textContent = move[6];
+    document.getElementById('moveDescriptionPopup').textContent = move[7];
+    document.getElementById('moveHigherLevelsPopup').textContent = move[8];
+
+    // Apply type color to popup
+    const bgColor = getMoveTypeColor(move[1]);
+    const textColor = getTextColorForBackground(bgColor);
+    popup.querySelector('div').style.backgroundColor = bgColor;
+    popup.querySelector('div').style.color = textColor;
+
+    popup.style.display = 'flex';
+  }
 }

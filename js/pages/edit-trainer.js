@@ -11,7 +11,7 @@ export function renderEditTrainer() {
   }
 
   const trainerData = JSON.parse(trainerDataStr);
-  const trainerFeatsData = JSON.parse(sessionStorage.getItem('trainerFeats') || '{"trainerFeats": []}');
+  const trainerFeatsData = JSON.parse(sessionStorage.getItem('trainerFeats') || '[]');
 
   // Extract trainer info
   const trainerName = trainerData[1] || 'Trainer';
@@ -475,7 +475,7 @@ export function renderEditTrainer() {
               <span class="arrow" id="featsArrow">▶</span>
             </div>
             <div class="collapsible-content" id="featsContent">
-              ${(trainerFeatsData.trainerFeats || []).map(feat => `
+              ${(trainerFeatsData || []).map(feat => `
                 <div class="checkbox-item">
                   <input type="checkbox" id="feat_${feat.name.replace(/\s+/g, '_')}" name="feats" value="${feat.name}" ${selectedFeats.includes(feat.name) ? 'checked' : ''} />
                   <label for="feat_${feat.name.replace(/\s+/g, '_')}">${feat.name}</label>

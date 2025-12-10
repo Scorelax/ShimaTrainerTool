@@ -230,8 +230,16 @@ export function renderPokemonCard(pokemonName) {
           display: grid !important;
         }
 
-        /* Info Page Grid Layout - matches trainer-info */
+        /* Info Page Grid Layout - matches trainer-info EXACTLY */
         .info-page-grid {
+          display: grid;
+          grid-template-columns: minmax(25%, 30%) 1fr;
+          gap: clamp(2rem, 4vw, 4rem);
+          grid-column: 1 / -1;
+        }
+
+        /* Battle Page Grid Layout - matches trainer-info EXACTLY */
+        .battle-page-grid {
           display: grid;
           grid-template-columns: minmax(25%, 30%) 1fr;
           gap: clamp(2rem, 4vw, 4rem);
@@ -241,150 +249,179 @@ export function renderPokemonCard(pokemonName) {
         .left-column {
           display: flex;
           flex-direction: column;
-          align-items: stretch;
-          padding-top: clamp(4rem, 8vh, 6rem);
+          gap: clamp(1rem, 2vh, 1.5rem);
+          padding-top: clamp(4rem, 8vh, 5rem);
         }
 
         .pokemon-image-container {
           width: 100%;
           aspect-ratio: 1;
-          border-radius: clamp(15px, 3vw, 25px);
+          cursor: pointer;
+          position: relative;
+          border-radius: clamp(15px, 3vw, 20px);
           overflow: hidden;
-          border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
-          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.5);
-          background: white;
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 2vh, 10px) clamp(25px, 5vw, 30px) rgba(0,0,0,0.5),
+                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .pokemon-image-container:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 clamp(12px, 3vh, 15px) clamp(30px, 6vw, 35px) rgba(0,0,0,0.6),
+                      0 0 clamp(25px, 5vw, 35px) rgba(255,222,0,0.5);
+          border-color: #FFC700;
         }
 
         .pokemon-image-container img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          display: block;
         }
 
         .pokemon-info-list {
-          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border-radius: clamp(15px, 3vw, 25px);
-          padding: clamp(1rem, 2vh, 1.5rem);
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+          display: flex;
+          flex-direction: column;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
         }
 
         .info-item {
           display: flex;
           justify-content: space-between;
-          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
-          border-bottom: 1px solid rgba(255,255,255,0.1);
-          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
-        }
-
-        .info-item:last-child {
-          border-bottom: none;
+          align-items: center;
+          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-weight: 700;
+          color: white;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         .info-item-label {
-          color: #FFDE00;
-          font-weight: 700;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+          flex-shrink: 0;
         }
 
         .info-item-value {
-          color: white;
-          font-weight: 600;
           text-align: right;
-          max-width: 60%;
           word-wrap: break-word;
+          overflow-wrap: break-word;
+          max-width: 60%;
+          white-space: pre-line;
         }
 
         .checkbox-container {
           display: flex;
           flex-direction: column;
-          gap: clamp(0.5rem, 1vh, 0.75rem);
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
-          padding: clamp(0.75rem, 1.5vh, 1rem);
-          background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-          border-radius: clamp(10px, 2vw, 15px);
+          gap: clamp(0.3rem, 0.7vh, 0.5rem);
+          padding: clamp(0.6rem, 1.2vh, 0.8rem);
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
         }
 
         .checkbox-container label {
           display: flex;
           align-items: center;
-          gap: clamp(0.5rem, 1vw, 0.75rem);
+          gap: clamp(0.4rem, 0.8vw, 0.6rem);
           color: white;
-          font-weight: 600;
-          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          font-weight: 700;
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
           cursor: pointer;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         .checkbox-container input[type="checkbox"] {
-          width: clamp(18px, 3.5vw, 22px);
-          height: clamp(18px, 3.5vw, 22px);
+          width: clamp(16px, 3vw, 20px);
+          height: clamp(16px, 3vw, 20px);
           cursor: pointer;
         }
 
         .info-buttons-grid {
           display: grid;
-          grid-template-columns: 1fr;
-          gap: clamp(0.75rem, 1.5vh, 1rem);
+          grid-template-columns: auto auto;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
         }
 
         .info-button {
-          background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
-          color: white;
-          padding: clamp(0.75rem, 1.5vh, 1rem);
+          padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(0.7rem, 1.5vw, 1rem);
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
           border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
-          border-radius: clamp(10px, 2vw, 15px);
-          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.3s;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+          white-space: nowrap;
+          font-weight: 900;
           text-transform: uppercase;
+          letter-spacing: clamp(0.2px, 0.15vw, 0.4px);
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+          text-shadow: 0 2px 4px rgba(0,0,0,0.4);
         }
 
         .info-button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(15px, 3vw, 20px) rgba(59, 76, 202, 0.4);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 15px rgba(255,222,0,0.4);
+          border-color: #FFC700;
+        }
+
+        .info-button:active {
+          transform: translateY(0);
         }
 
         .right-column {
           display: flex;
           flex-direction: column;
-          gap: clamp(1.5rem, 3vh, 2rem);
-          padding-top: clamp(4rem, 8vh, 6rem);
+          gap: clamp(0.75rem, 1.5vh, 1rem);
+          padding-top: clamp(3rem, 6vh, 4rem);
         }
 
         .description-container {
-          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border-radius: clamp(15px, 3vw, 25px);
-          padding: clamp(1rem, 2vh, 1.5rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+          width: 100%;
         }
 
         .description-container h3 {
-          color: #FFDE00;
-          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-          margin: 0 0 clamp(0.75rem, 1.5vh, 1rem) 0;
+          margin-bottom: clamp(0.75rem, 2vh, 1rem);
+          color: white;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.4vw, 1px);
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          text-align: center;
         }
 
         .description-text {
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
           color: white;
-          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
-          line-height: 1.6;
-          margin: 0;
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          line-height: 1.5;
+          font-weight: 600;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
         }
 
         .skills-container {
-          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border-radius: clamp(15px, 3vw, 25px);
-          padding: clamp(1rem, 2vh, 1.5rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+          width: 100%;
         }
 
         .skills-container h3 {
-          color: #FFDE00;
-          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-          margin: 0 0 clamp(0.75rem, 1.5vh, 1rem) 0;
+          margin-bottom: clamp(0.75rem, 2vh, 1rem);
+          color: white;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.4vw, 1px);
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
           text-align: center;
         }
 
@@ -392,125 +429,187 @@ export function renderPokemonCard(pokemonName) {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: clamp(0.4rem, 1.2vw, 0.6rem);
+          padding: clamp(0.5rem, 1.5vw, 0.8rem);
+          border-radius: clamp(10px, 2vw, 15px);
+          background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
         }
 
         .skill-item {
-          background: rgba(255,255,255,0.08);
-          padding: clamp(0.4rem, 0.8vh, 0.6rem);
-          border-radius: clamp(8px, 1.5vw, 12px);
           display: flex;
-          justify-content: space-between;
+          flex-direction: column;
           align-items: center;
-          border: 1px solid rgba(255,255,255,0.1);
+          justify-content: center;
+          padding: clamp(0.35rem, 0.8vh, 0.5rem);
+          border: clamp(2px, 0.3vw, 2.5px) solid #333;
+          border-radius: clamp(7px, 1.3vw, 10px);
+          text-align: center;
+          background: linear-gradient(135deg, rgba(100,100,100,0.4) 0%, rgba(80,80,80,0.4) 100%);
+          font-size: clamp(0.65rem, 1.3vw, 0.75rem);
+          font-weight: 700;
+          color: rgba(255,255,255,0.5);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+          transition: all 0.3s ease;
         }
 
-        .skill-item.highlight {
-          background: rgba(255,222,0,0.2);
-          border-color: rgba(255,222,0,0.5);
-        }
-
-        .skill-item.extra-strong {
-          background: rgba(255,222,0,0.35);
-          border-color: rgba(255,222,0,0.8);
+        .skill-item.unlocked {
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
+          color: black;
+          border-color: #333;
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 10px rgba(255,222,0,0.5);
         }
 
         .skill-name {
-          color: white;
-          font-size: clamp(0.75rem, 1.5vw, 0.95rem);
-          font-weight: 600;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.15px, 0.12vw, 0.3px);
+          font-size: clamp(0.65rem, 1.3vw, 0.75rem);
         }
 
         .skill-modifier {
-          color: #FFDE00;
-          font-size: clamp(0.75rem, 1.5vw, 0.95rem);
-          font-weight: 700;
+          font-size: clamp(0.6rem, 1.2vw, 0.7rem);
+          opacity: 0.8;
+          margin-top: clamp(1.5px, 0.25vh, 2.5px);
         }
 
-        /* Battle Page Grid Layout - matches trainer-info */
-        .battle-page-grid {
-          display: grid;
-          grid-template-columns: minmax(25%, 30%) 1fr;
-          gap: clamp(2rem, 4vw, 4rem);
-          grid-column: 1 / -1;
-        }
-
-        .battle-stats-container {
-          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border-radius: clamp(15px, 3vw, 25px);
-          padding: clamp(1rem, 2vh, 1.5rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
-        }
-
-        .battle-stats-container h3 {
-          color: #FFDE00;
-          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-          margin: 0 0 clamp(0.75rem, 1.5vh, 1rem) 0;
-          font-weight: 900;
-          text-align: center;
-        }
-
+        /* Stats Row 1: AC, HP, VP - Medium boxes */
         .stat-main-container {
-          display: flex;
-          flex-direction: column;
-          gap: clamp(0.75rem, 1.5vh, 1rem);
-        }
-
-        .ability-container {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: clamp(0.5rem, 1vw, 0.75rem);
+          grid-template-columns: repeat(6, 1fr);
+          gap: clamp(0.6rem, 2vw, 1rem);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
         }
 
-        .ability-box {
-          background: rgba(255,255,255,0.08);
-          border-radius: clamp(10px, 2vw, 15px);
-          padding: clamp(0.5rem, 1vh, 0.75rem);
+        .stat-box-wrapper {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: clamp(0.25rem, 0.5vh, 0.4rem);
-          border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stat-box-wrapper:nth-child(1) {
+          grid-column: 1 / 3;
+        }
+
+        .stat-box-wrapper:nth-child(2) {
+          grid-column: 3 / 5;
+        }
+
+        .stat-box-wrapper:nth-child(3) {
+          grid-column: 5 / 7;
+        }
+
+        .stat-label-box {
+          font-weight: 900;
+          color: white;
+          font-size: clamp(0.8rem, 1.8vw, 1rem);
+          margin-bottom: clamp(0.3rem, 0.8vh, 0.4rem);
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.3vw, 1px);
+        }
+
+        .stat-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: clamp(50px, 9vw, 70px);
+          height: clamp(50px, 9vw, 70px);
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
+          color: black;
+          border-radius: clamp(10px, 2vw, 15px);
+          border: clamp(2px, 0.5vw, 4px) solid #333;
+          font-size: clamp(1.4rem, 2.8vw, 2rem);
+          font-weight: 900;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.5),
+                      inset 0 -3px 0 rgba(0,0,0,0.2);
+        }
+
+        /* Stats Row 2: STR, DEX, CON, INT, WIS, CHA */
+        .ability-container {
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: clamp(0.6rem, 2vw, 1rem);
+          margin-bottom: clamp(0.5rem, 1.2vh, 0.75rem);
+        }
+
+        .ability-group {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
 
         .ability-label {
-          color: #FFDE00;
-          font-size: clamp(0.75rem, 1.5vw, 0.95rem);
-          font-weight: 700;
-          text-transform: uppercase;
-        }
-
-        .ability-value {
-          color: white;
-          font-size: clamp(1.1rem, 2.2vw, 1.4rem);
           font-weight: 900;
+          font-size: clamp(0.75rem, 1.6vw, 0.95rem);
+          margin-bottom: clamp(0.25rem, 0.8vh, 0.4rem);
+          color: white;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.2px, 0.25vw, 0.6px);
         }
 
-        .ability-modifier {
-          color: #FFDE00;
-          font-size: clamp(0.85rem, 1.7vw, 1.1rem);
-          font-weight: 700;
+        .ability-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: clamp(45px, 8vw, 60px);
+          height: clamp(45px, 8vw, 60px);
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
+          color: black;
+          border-radius: clamp(8px, 1.8vw, 12px);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+          font-weight: 900;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.5),
+                      inset 0 -3px 0 rgba(0,0,0,0.2);
         }
 
-        .moves-list-container {
-          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border-radius: clamp(15px, 3vw, 25px);
-          padding: clamp(1rem, 2vh, 1.5rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+        .modifier-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: clamp(38px, 6.5vw, 50px);
+          height: clamp(38px, 6.5vw, 50px);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          border-radius: clamp(7px, 1.4vw, 10px);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          font-size: clamp(1rem, 2vw, 1.4rem);
+          font-weight: 900;
+          box-shadow: 0 6px 15px rgba(0,0,0,0.5),
+                      inset 0 -2px 0 rgba(0,0,0,0.3);
+          margin-top: clamp(-8px, -1vh, -10px);
+        }
+
+        .battle-stats-container h3 {
+          margin-bottom: clamp(0.75rem, 2vh, 1rem);
+          color: white;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.4vw, 1px);
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          text-align: center;
         }
 
         .moves-list-container h3 {
-          color: #FFDE00;
-          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-          margin: 0 0 clamp(0.75rem, 1.5vh, 1rem) 0;
+          margin-bottom: clamp(0.75rem, 2vh, 1rem);
+          color: white;
+          text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.4vw, 1px);
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
           text-align: center;
         }
 
         .moves-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(clamp(100px, 15vw, 140px), 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(clamp(90px, 14vw, 120px), 1fr));
           gap: clamp(0.5rem, 1vw, 0.75rem);
+          padding: clamp(0.5rem, 1.5vw, 0.8rem);
+          border-radius: clamp(10px, 2vw, 15px);
+          background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
         }
 
         .move-item {
@@ -520,15 +619,16 @@ export function renderPokemonCard(pokemonName) {
           border-radius: clamp(8px, 1.5vw, 12px);
           text-align: center;
           font-weight: 700;
-          font-size: clamp(0.8rem, 1.6vw, 1rem);
+          font-size: clamp(0.75rem, 1.5vw, 0.9rem);
           cursor: pointer;
           transition: all 0.3s;
           border: 2px solid rgba(0,0,0,0.2);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.3);
         }
 
         .move-item:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+          box-shadow: 0 5px 12px rgba(0,0,0,0.4);
         }
 
         .no-moves {
@@ -539,219 +639,18 @@ export function renderPokemonCard(pokemonName) {
           padding: clamp(1rem, 2vh, 1.5rem);
         }
 
-        /* Info Page Styles - New layout */
-        .card-container {
-          display: flex;
-          flex-direction: column;
-          width: 95%;
-          max-width: 160vh;
-          margin-top: 0.5vh;
-          position: relative;
-          gap: 1vh;
-        }
-
-        /* Top section: Image + Info side by side */
-        .top-section {
-          display: flex;
-          flex-wrap: nowrap;
-          gap: 2vh;
-          align-items: flex-start;
-          width: 100%;
-        }
-
-        /* Image on both pages - slightly bigger than trainer image */
-        .image-container,
-        .battle-page-container .image-container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          width: min(30vw, 36vh);
-          height: min(30vw, 36vh);
-          border-radius: 0.5vh;
-          overflow: hidden;
-          background-color: transparent;
-          flex-shrink: 0;
-        }
-
-        .image-container img,
-        .battle-page-container .image-container img {
-          width: min(30vw, 36vh);
-          height: min(30vw, 36vh);
-          border-radius: 0.5vh;
-          object-fit: contain;
-          cursor: pointer;
-        }
-
-        .image-container img:hover {
-          opacity: 0.8;
-          transition: opacity 0.3s;
-        }
-
-        /* Info on the right side of image */
-        .new-details-container {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          justify-content: flex-start;
-          gap: 0.25vh;
-          flex: 1;
-          min-width: 0;
-          padding: 0.5vh;
-        }
-
-        .stat-item {
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          gap: 0.5vh;
-          margin-bottom: 0.5vh;
-          text-align: left;
-          font-size: clamp(0.7rem, 1.4vh, 1.4vh);
-          width: 100%;
-        }
-
-        .stat-label {
-          font-weight: bold;
-          color: black;
-          min-width: 10vh;
-        }
-
-        .dex-entry::before {
-          content: " #";
-          margin-left: 0.25vh;
-        }
-
-        .stat-value {
-          color: black;
-          word-wrap: break-word;
-          flex-grow: 1;
-        }
-
-        .checkbox-container {
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          gap: 0.8vh;
-          margin-top: 0.5vh;
-          font-size: clamp(0.7rem, 1.3vh, 1.3vh);
-        }
-
-        .checkbox-container label {
-          font-weight: bold;
-          color: black;
-          margin-bottom: 0;
-        }
-
-        .checkbox-container input[type="checkbox"] {
-          width: 2vh;
-          height: 2vh;
-          border: 2px solid black;
-          background-color: white;
-          color: black;
-          cursor: pointer;
-        }
-
-        /* Edit and Battle buttons below image */
-        .button-container {
-          display: flex;
-          gap: 1vh;
-          width: 100%;
-        }
-
-        /* Flavor text below buttons - dynamic height */
-        .flavor-text-container {
-          display: flex;
-          flex-direction: column;
-          text-align: left;
-          color: black;
-          padding: 1vh;
-          background-color: rgba(255, 255, 255, 0.9);
-          border-radius: 0.5vh;
-          border: 2px solid black;
-          width: 100%;
-          max-width: 100%;
-        }
-
-        .flavor-text {
-          font-size: clamp(0.7rem, 1.2vh, 1.2vh);
-          line-height: 1.4;
-          color: black;
-          margin: 0;
-        }
-
-        /* Skills table below description */
-        .skills-container {
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-start;
-          gap: 1vh;
-          width: 100%;
-        }
-
-        .skills-container h2 {
-          font-size: clamp(1.2rem, 2vh, 2vh);
-          margin-bottom: 0.5vh;
-          color: black;
-          text-align: center;
-        }
-
-        .skills-grid {
-          display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          gap: 0.8vh;
-          border: 2px solid black;
-          padding: 1.5vh;
-          border-radius: 0.5vh;
-          width: 100%;
-          box-sizing: border-box;
-          background-color: rgba(255, 255, 255, 0.1);
-        }
-
-        .skill-item {
-          padding: 0.8vh;
-          border: 1px solid black;
-          border-radius: 0.3vh;
-          text-align: center;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          height: 5vh;
-          font-size: clamp(0.7rem, 1.2vh, 1.2vh);
-          color: black;
-        }
-
-        .skill-item .modifier {
-          margin-top: 0.2vh;
-          font-size: clamp(0.65rem, 1vh, 1vh);
-          color: black;
-        }
-
-        .skill-item.highlight {
-          background-color: white;
-          color: black;
-          font-weight: bold;
-        }
-
-        .skill-item.extra-strong {
-          background-color: #fff200;
-          color: black;
-          font-weight: bold;
-        }
-
         /* Back button - matches trainer-card style */
         .back-button {
           position: fixed;
-          top: 20px;
-          left: 20px;
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          width: 50px;
-          height: 50px;
-          border: 3px solid #FFDE00;
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           border-radius: 50%;
-          font-size: 1.8rem;
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
           font-weight: bold;
           cursor: pointer;
           box-shadow: 0 8px 20px rgba(0,0,0,0.3);
@@ -764,281 +663,34 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .back-button:hover {
-          transform: scale(1.1);
+          transform: scale(1.15);
           box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      0 0 20px rgba(255,222,0,0.5);
+                      0 0 25px rgba(255,222,0,0.6);
           border-color: #FFC700;
         }
 
         .back-button:active {
-          transform: scale(1.05);
+          transform: scale(1.08);
         }
 
-        /* Battle Page Styles */
-        .battle-page-container {
-          display: flex;
-          flex-direction: column;
-          width: 95%;
-          max-width: 160vh;
-          margin-top: 0.5vh;
-          position: relative;
-          gap: 1vh;
-        }
-
-        /* Top section on battle page: Image + Stats side by side */
-        .battle-top-section {
-          display: flex;
-          flex-wrap: nowrap;
-          gap: 2vh;
-          align-items: flex-start;
-          width: 100%;
-        }
-
-
-        /* Stats on right side of image */
-        .battle-stats-column {
-          display: flex;
-          flex-direction: column;
-          gap: 1vh;
-          max-width: 50%;
-          min-width: 0;
-        }
-
-        .ac-hp-vp-container {
-          display: flex;
-          flex-direction: row;
-          justify-content: flex-start;
-          gap: 1vh;
-          width: 100%;
-        }
-
-        .ac-hp-vp-container .stat-block {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-
-        .ac-hp-vp-container .stat-label {
-          margin-bottom: 0.3vh;
-          text-align: center;
-          font-size: clamp(0.7rem, 1.2vh, 1.2vh);
-          font-weight: bold;
-          color: black;
-        }
-
-        .ac-hp-vp-container .stat-value-box {
-          width: 5vh;
-          height: 5vh;
-          background-color: #f44336;
-          color: black;
-          border-radius: 0.6vh;
-          border: 2px solid black;
-          text-align: center;
-          font-size: clamp(1rem, 1.6vh, 1.6vh);
-          font-weight: 650;
-          box-shadow: 0.15vh 0.15vh 0 #000;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-
-        .stats-container {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1vh 0.8vh;
-          width: 100%;
-        }
-
-        .stats-container .stat-block {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.2vh;
-        }
-
-        .stats-container .stat-label {
-          margin-bottom: 0.2vh;
-          text-align: center;
-          font-size: clamp(0.7rem, 1.1vh, 1.1vh);
-          font-weight: bold;
-          color: black;
-        }
-
-        .stats-container .stat-value-box {
-          width: 4vh;
-          height: 4vh;
-          background-color: #f44336;
-          color: black;
-          border-radius: 0.6vh;
-          border: 2px solid black;
-          text-align: center;
-          font-size: clamp(0.9rem, 1.4vh, 1.4vh);
-          box-shadow: 0.15vh 0.15vh 0 #000;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-
-        .stats-container .stat-modifier-box {
-          width: 3.2vh;
-          height: 3.2vh;
-          background-color: #f44336;
-          color: white;
-          border-radius: 0.6vh;
-          border: 2px solid black;
-          text-align: center;
-          font-size: clamp(0.75rem, 1.2vh, 1.2vh);
-          font-weight: 900;
-          box-shadow: 0.15vh 0.15vh 0 #000;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          margin-top: -0.6vh;
-          position: relative;
-          z-index: 1;
-        }
-
-        /* Details below image on battle page */
-        .battle-details-container {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5vh;
-          width: min(30vw, 36vh);
-        }
-
-        /* Moves below stats on battle page */
-        .moves-container {
-          display: flex;
-          flex-direction: column;
-          width: 100%;
-          gap: 0.5vh;
-        }
-
-        .moves-container h2 {
-          font-size: clamp(1rem, 1.6vh, 1.6vh);
-          color: black;
-          margin: 0;
-        }
-
-        .moves-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 0.6vh 0.8vh;
-          width: 100%;
-        }
-
-        .move-item {
-          padding: 0.6vh 1vh;
-          border: 2px solid black;
-          border-radius: 0.4vh;
-          background-color: #ffffff;
-          color: black;
-          text-align: center;
-          font-size: clamp(0.7rem, 1.1vh, 1.1vh);
-          font-weight: bold;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 3vh;
-        }
-
-        .stat-pair-container {
-          display: flex;
-          justify-content: space-between;
-          width: 100%;
-          gap: 1vh;
-        }
-
-        .stat-item.multi-line {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          width: 100%;
-        }
-
-        .stat-item.multi-line .stat-value {
-          margin-top: 0.3vh;
-          white-space: pre-line;
-        }
-
-        .stat-item.multi-line .stat-label {
-          display: inline;
-          margin-right: 0.5vh;
-        }
-
-        .stat-item.multi-line .stat-value {
-          display: inline;
-          margin-top: 0;
-          word-wrap: break-word;
-          max-width: 100%;
-        }
-
-        /* Navigation Arrows - Hidden (using Battle Page button instead) */
+        /* Navigation Arrows - Hidden */
         .arrow-button {
           display: none;
         }
 
-        .edit-button,
-        .battle-page-button {
-          background-color: #bfbfbf;
-          color: black;
-          border: 2px solid black;
-          border-radius: 0.5vh;
-          padding: 1vh 1.5vh;
-          font-size: clamp(0.75rem, 1.3vh, 1.3vh);
-          font-weight: bold;
-          cursor: pointer;
-          transition: background-color 0.3s;
-          display: block;
-          flex: 1;
-        }
-
-        .edit-button:hover,
-        .battle-page-button:hover {
-          background-color: #d32f2f;
-          color: white;
-        }
-
-        .stat-boosted {
-          color: #fff200 !important;
-          font-size: 2.2vh !important;
-          font-weight: bold !important;
-          -webkit-text-stroke: 0.5px black !important;
-        }
-
-        .stat-nerfed {
-          color: #0d32d6 !important;
-          font-size: 1.5vh !important;
-          -webkit-text-stroke: 0.5px black !important;
-        }
-
-        @media (max-width: 600px) {
-          .top-section {
-            flex-direction: column;
-          }
-
-          .image-container,
-          .image-container img {
-            width: 100%;
-            height: auto;
-            max-width: 40vw;
-            max-height: 40vh;
+        /* Mobile Responsive */
+        @media (max-width: 480px) {
+          .info-page-grid,
+          .battle-page-grid {
+            grid-template-columns: 1fr;
           }
 
           .skills-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+          .ability-container {
             grid-template-columns: repeat(3, 1fr);
-          }
-
-          .battle-page-container {
-            grid-template-columns: 1fr;
-            grid-template-rows: auto;
-          }
-
-          .ac-hp-vp-container,
-          .stats-container,
-          .moves-container {
-            grid-column: 1 / 2;
           }
         }
       </style>
@@ -1109,7 +761,7 @@ export function renderPokemonCard(pokemonName) {
               ${allSkills.map(skill => {
                 const skillKey = skill.name.toLowerCase();
                 const proficiencyLevel = skillCounts[skillKey] || 0;
-                const skillClass = proficiencyLevel >= 2 ? 'extra-strong' : (proficiencyLevel === 1 ? 'highlight' : '');
+                const skillClass = proficiencyLevel >= 1 ? 'unlocked' : '';
                 const modifier = skill.mod + (proficiencyLevel * 2);
 
                 return `
@@ -1181,64 +833,61 @@ export function renderPokemonCard(pokemonName) {
 
         <!-- Right Column: Stats + Moves -->
         <div class="right-column">
-          <div class="battle-stats-container">
-            <h3>Stats</h3>
-            <div class="stat-main-container">
-              <div class="ability-container">
-                <div class="ability-box">
-                  <div class="ability-label">AC</div>
-                  <div class="ability-value" id="acValue">${ac}</div>
-                </div>
-                <div class="ability-box">
-                  <div class="ability-label">HP</div>
-                  <div class="ability-value" id="hpValue">${hp}</div>
-                </div>
-                <div class="ability-box">
-                  <div class="ability-label">VP</div>
-                  <div class="ability-value" id="vpValue">${vp}</div>
-                </div>
-              </div>
+          <h3 class="battle-stats-container">Stats</h3>
 
-              <div class="ability-container">
-                <div class="ability-box">
-                  <div class="ability-label">STR</div>
-                  <div class="ability-value" id="strValue">${str}</div>
-                  <div class="ability-modifier" id="strModifierValue">${strMod >= 0 ? '+' : ''}${strMod}</div>
-                </div>
-                <div class="ability-box">
-                  <div class="ability-label">DEX</div>
-                  <div class="ability-value" id="dexValue">${dex}</div>
-                  <div class="ability-modifier" id="dexModifierValue">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
-                </div>
-                <div class="ability-box">
-                  <div class="ability-label">CON</div>
-                  <div class="ability-value" id="conValue">${con}</div>
-                  <div class="ability-modifier" id="conModifierValue">${conMod >= 0 ? '+' : ''}${conMod}</div>
-                </div>
-                <div class="ability-box">
-                  <div class="ability-label">INT</div>
-                  <div class="ability-value" id="intValue">${int}</div>
-                  <div class="ability-modifier" id="intModifierValue">${intMod >= 0 ? '+' : ''}${intMod}</div>
-                </div>
-                <div class="ability-box">
-                  <div class="ability-label">WIS</div>
-                  <div class="ability-value" id="wisValue">${wis}</div>
-                  <div class="ability-modifier" id="wisModifierValue">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
-                </div>
-                <div class="ability-box">
-                  <div class="ability-label">CHA</div>
-                  <div class="ability-value" id="chaValue">${cha}</div>
-                  <div class="ability-modifier" id="chaModifierValue">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
-                </div>
-              </div>
+          <!-- Row 1: AC, HP, VP -->
+          <div class="stat-main-container">
+            <div class="stat-box-wrapper">
+              <div class="stat-label-box">AC</div>
+              <div class="stat-box" id="acValue">${ac}</div>
+            </div>
+            <div class="stat-box-wrapper">
+              <div class="stat-label-box">HP</div>
+              <div class="stat-box" id="hpValue">${hp}</div>
+            </div>
+            <div class="stat-box-wrapper">
+              <div class="stat-label-box">VP</div>
+              <div class="stat-box" id="vpValue">${vp}</div>
             </div>
           </div>
 
-          <div class="moves-list-container">
-            <h3>Moves</h3>
-            <div class="moves-grid" id="movesGrid">
-              ${moves.length > 0 ? moves.map(move => `<div class="move-item" data-move="${move}">${move}</div>`).join('') : '<div class="no-moves">No moves learned</div>'}
+          <!-- Row 2: STR, DEX, CON, INT, WIS, CHA with modifiers -->
+          <div class="ability-container">
+            <div class="ability-group">
+              <div class="ability-label">STR</div>
+              <div class="ability-box" id="strValue">${str}</div>
+              <div class="modifier-box" id="strModifierValue">${strMod >= 0 ? '+' : ''}${strMod}</div>
             </div>
+            <div class="ability-group">
+              <div class="ability-label">DEX</div>
+              <div class="ability-box" id="dexValue">${dex}</div>
+              <div class="modifier-box" id="dexModifierValue">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
+            </div>
+            <div class="ability-group">
+              <div class="ability-label">CON</div>
+              <div class="ability-box" id="conValue">${con}</div>
+              <div class="modifier-box" id="conModifierValue">${conMod >= 0 ? '+' : ''}${conMod}</div>
+            </div>
+            <div class="ability-group">
+              <div class="ability-label">INT</div>
+              <div class="ability-box" id="intValue">${int}</div>
+              <div class="modifier-box" id="intModifierValue">${intMod >= 0 ? '+' : ''}${intMod}</div>
+            </div>
+            <div class="ability-group">
+              <div class="ability-label">WIS</div>
+              <div class="ability-box" id="wisValue">${wis}</div>
+              <div class="modifier-box" id="wisModifierValue">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
+            </div>
+            <div class="ability-group">
+              <div class="ability-label">CHA</div>
+              <div class="ability-box" id="chaValue">${cha}</div>
+              <div class="modifier-box" id="chaModifierValue">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
+            </div>
+          </div>
+
+          <h3 class="moves-list-container">Moves</h3>
+          <div class="moves-grid" id="movesGrid">
+            ${moves.length > 0 ? moves.map(move => `<div class="move-item" data-move="${move}">${move}</div>`).join('') : '<div class="no-moves">No moves learned</div>'}
           </div>
         </div>
       </div>

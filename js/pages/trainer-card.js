@@ -105,52 +105,60 @@ export function renderTrainerCard() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 1vh 2vw;
+          padding: clamp(6rem, 12vh, 8rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
           min-height: 100vh;
           position: relative;
           box-sizing: border-box;
         }
 
-        .trainer-utility-container {
-          position: relative;
-          display: flex;
-          justify-content: center;
-          margin-bottom: 1vh;
-          width: 100%;
-        }
-
-        .trainer-section {
-          background: transparent;
-          border: none;
-          padding: 1vh;
-          box-shadow: none;
+        /* Title */
+        .page-title {
+          color: white;
+          font-size: clamp(2.5rem, 6vw, 4rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(1px, 0.5vw, 3px);
+          text-shadow: 0 clamp(3px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.8);
+          font-weight: 900;
+          margin-bottom: clamp(2rem, 4vh, 3rem);
           text-align: center;
         }
 
-        .utility-side-container {
-          position: absolute;
-          right: 1vw;
-          top: 18vh;
+        /* Trainer and Utility Container */
+        .trainer-utility-wrapper {
+          position: relative;
+          display: flex;
+          justify-content: center;
+          align-items: flex-end;
+          margin-bottom: clamp(3rem, 6vh, 5rem);
+          width: 100%;
+          max-width: 900px;
+        }
+
+        /* Trainer Section */
+        .trainer-section {
           display: flex;
           flex-direction: column;
           align-items: center;
+          z-index: 1;
         }
 
         .trainer-image-container {
-          width: min(25vw, 30vh);
-          height: min(25vw, 30vh);
-          margin: 0 auto 0.5rem;
+          width: clamp(250px, 35vw, 400px);
+          height: clamp(250px, 35vw, 400px);
+          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
           cursor: pointer;
-          transition: transform 0.2s, box-shadow 0.2s;
-          border-radius: 8px;
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
+          border-radius: clamp(15px, 3vw, 25px);
           overflow: hidden;
-          border: none;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
+          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.5);
+          background: white;
         }
 
         .trainer-image-container:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+          transform: translateY(clamp(-5px, -1.2vh, -8px)) scale(1.02);
+          box-shadow: 0 clamp(15px, 3vh, 25px) clamp(40px, 8vh, 60px) rgba(0,0,0,0.6),
+                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.6);
         }
 
         .trainer-image {
@@ -160,188 +168,213 @@ export function renderTrainerCard() {
         }
 
         .trainer-name {
-          font-size: clamp(0.9rem, 2vw, 1.2rem);
-          font-weight: 700;
-          color: white;
-          margin-bottom: 0.3rem;
+          font-size: clamp(1.3rem, 3vw, 2rem);
+          font-weight: 900;
+          color: #FFDE00;
+          margin-bottom: clamp(0.3rem, 0.8vh, 0.5rem);
+          text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+          text-align: center;
         }
 
         .trainer-level {
-          font-size: clamp(0.85rem, 1.8vw, 1.1rem);
+          font-size: clamp(1rem, 2.2vw, 1.5rem);
           color: white;
-          margin-bottom: 0.3rem;
-          font-weight: 400;
+          font-weight: 600;
+          text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+          text-align: center;
         }
 
-        .trainer-class {
-          display: none;
+        /* Utility Slot - Positioned to the right */
+        .utility-container {
+          position: absolute;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-left: clamp(1rem, 2vw, 1.5rem);
         }
 
+        .utility-label {
+          color: white;
+          font-size: clamp(1rem, 2vw, 1.4rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+
+        .utility-slot {
+          width: clamp(120px, 20vw, 180px);
+          height: clamp(120px, 20vw, 180px);
+          border-radius: clamp(12px, 2.5vw, 18px);
+          cursor: pointer;
+          transition: transform 0.3s, box-shadow 0.3s;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
+          padding: clamp(0.5rem, 1vh, 0.75rem);
+          overflow: hidden;
+        }
+
+        .utility-slot.empty {
+          opacity: 0.6;
+          cursor: default;
+          background: linear-gradient(135deg, #E0E0E0 0%, #CCCCCC 100%);
+        }
+
+        .utility-slot:not(.empty):hover {
+          transform: translateY(clamp(-5px, -1.2vh, -8px)) scale(1.05);
+          box-shadow: 0 clamp(12px, 2.5vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
+                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
+        }
+
+        .utility-slot img {
+          width: 85%;
+          height: 85%;
+          object-fit: contain;
+          margin-bottom: clamp(0.3rem, 0.8vh, 0.5rem);
+        }
+
+        .utility-slot .pokemon-name {
+          font-size: clamp(0.85rem, 1.8vw, 1.1rem);
+          font-weight: 700;
+          color: #333;
+          text-align: center;
+          margin-bottom: clamp(0.1rem, 0.3vh, 0.2rem);
+        }
+
+        .utility-slot .pokemon-level {
+          font-size: clamp(0.75rem, 1.5vw, 0.95rem);
+          color: #666;
+          text-align: center;
+        }
+
+        /* Party Section */
         .party-section {
-          background: transparent;
-          border: none;
-          padding: 1vh 2vw;
-          box-shadow: none;
-          width: 90%;
-          max-width: 60vw;
-          margin: 0 auto 1vh;
+          width: 100%;
+          max-width: 900px;
+          margin-bottom: clamp(2rem, 4vh, 3rem);
         }
 
         .party-section h2 {
           text-align: center;
           color: white;
-          margin-bottom: 1vh;
-          font-size: clamp(0.9rem, 2vw, 1.2rem);
-          font-weight: 700;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          text-shadow: 0 clamp(2px, 0.8vh, 4px) clamp(6px, 1.5vh, 10px) rgba(0,0,0,0.8);
         }
 
         .party-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 0.3vw;
-          margin-bottom: 1vh;
+          gap: clamp(1rem, 2vw, 1.5rem);
         }
 
         .pokemon-slot {
           display: flex;
           flex-direction: column;
           align-items: center;
-          background: transparent;
-          padding: 0.5vh 0.5vw;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          border-radius: clamp(12px, 2.5vw, 18px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           cursor: pointer;
+          transition: transform 0.3s, box-shadow 0.3s;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
         }
 
         .pokemon-slot.empty {
           cursor: default;
-          opacity: 0.5;
+          opacity: 0.6;
+          background: linear-gradient(135deg, #E0E0E0 0%, #CCCCCC 100%);
         }
 
         .pokemon-slot.locked {
           cursor: default;
           opacity: 0.3;
+          background: linear-gradient(135deg, #B0B0B0 0%, #909090 100%);
+          border-color: #999;
+        }
+
+        .pokemon-slot:not(.empty):not(.locked):hover {
+          transform: translateY(clamp(-5px, -1.2vh, -8px)) scale(1.05);
+          box-shadow: 0 clamp(12px, 2.5vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
+                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
         }
 
         .pokemon-slot img {
-          width: min(15vw, 18vh);
-          height: min(15vw, 18vh);
-          border-radius: 8px;
+          width: clamp(100px, 18vw, 150px);
+          height: clamp(100px, 18vw, 150px);
+          border-radius: clamp(8px, 1.5vw, 12px);
           object-fit: cover;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
           background-color: #f0f0f0;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          transition: transform 0.2s, box-shadow 0.2s;
-          margin-bottom: 0.3rem;
-        }
-
-        .pokemon-slot:hover img {
-          transform: translateY(-5px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
 
         .pokemon-slot .pokemon-name {
-          font-size: clamp(0.7rem, 1.5vw, 0.95rem);
-          margin-bottom: 0.2rem;
-          color: white;
+          font-size: clamp(0.95rem, 2vw, 1.3rem);
+          margin-bottom: clamp(0.2rem, 0.5vh, 0.3rem);
+          color: #333;
           text-align: center;
+          font-weight: 700;
         }
 
         .pokemon-slot .pokemon-level {
-          font-size: clamp(0.65rem, 1.4vw, 0.9rem);
-          margin-bottom: 0.2rem;
-          color: white;
+          font-size: clamp(0.85rem, 1.8vw, 1.1rem);
+          color: #666;
           text-align: center;
         }
 
-        .utility-side-container h3 {
-          color: white;
-          font-size: clamp(0.75rem, 1.5vw, 1rem);
-          font-weight: 700;
-          margin-bottom: 0.3rem;
-        }
-
-        .utility-slot {
-          width: min(12vw, 14vh);
-          height: min(12vw, 14vh);
-          border-radius: 8px;
-          cursor: pointer;
-          transition: transform 0.2s;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          background: transparent;
-          padding: 0.3rem;
-          text-align: center;
-        }
-
-        .utility-slot.empty {
-          cursor: default;
-          opacity: 0.5;
-        }
-
-        .utility-slot img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          transition: transform 0.2s, box-shadow 0.2s;
-          margin-bottom: 10px;
-        }
-
-        .utility-slot:hover img {
-          transform: translateY(-5px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-
-        .utility-slot .pokemon-name {
-          font-size: clamp(0.6rem, 1.2vw, 0.8rem);
-          margin-bottom: 0.1rem;
-          color: white;
-          text-align: center;
-        }
-
-        .utility-slot .pokemon-level {
-          font-size: clamp(0.55rem, 1.1vw, 0.75rem);
-          margin-bottom: 0.1rem;
-          color: white;
-          text-align: center;
-        }
-
+        /* My Pokemon Button */
         .my-pokemon-button {
           background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
           color: white;
-          padding: 1vh 2vw;
-          border: 2px solid #FFDE00;
-          border-radius: 8px;
-          font-size: clamp(0.9rem, 2vw, 1.1rem);
-          font-weight: 700;
+          padding: clamp(1rem, 2vh, 1.5rem) clamp(2rem, 4vw, 3rem);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 25px);
+          font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
           cursor: pointer;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-          transition: transform 0.2s, box-shadow 0.2s;
-          margin-bottom: 1vh;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .my-pokemon-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          box-shadow: 0 clamp(12px, 2.5vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
+                      0 0 clamp(20px, 4vw, 30px) rgba(59, 76, 202, 0.5);
         }
 
         .my-pokemon-button:active {
           transform: translateY(0);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2vh, 18px) rgba(0,0,0,0.4);
         }
 
+        /* Back Button */
         .back-button {
           position: fixed;
-          top: 20px;
-          left: 20px;
+          top: clamp(15px, 3vh, 25px);
+          left: clamp(15px, 3vw, 25px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          width: 50px;
-          height: 50px;
-          border: 3px solid #FFDE00;
+          width: clamp(45px, 9vw, 60px);
+          height: clamp(45px, 9vw, 60px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           border-radius: 50%;
-          font-size: 1.8rem;
-          font-weight: bold;
+          font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+          font-weight: 900;
           cursor: pointer;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          box-shadow: 0 clamp(8px, 2vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
@@ -351,9 +384,9 @@ export function renderTrainerCard() {
         }
 
         .back-button:hover {
-          transform: scale(1.1);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      0 0 20px rgba(255,222,0,0.5);
+          transform: scale(1.15);
+          box-shadow: 0 clamp(12px, 3vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
+                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.6);
           border-color: #FFC700;
         }
 
@@ -374,7 +407,6 @@ export function renderTrainerCard() {
           z-index: 9999;
           justify-content: center;
           align-items: center;
-          animation: fadeIn 0.3s ease;
         }
 
         .exit-modal.active {
@@ -382,114 +414,103 @@ export function renderTrainerCard() {
         }
 
         .exit-modal-content {
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          border: 4px solid #FFDE00;
-          border-radius: 25px;
-          padding: 3rem 2rem;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5),
-                      inset 0 -4px 0 rgba(0,0,0,0.05);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
+          border-radius: clamp(20px, 4vw, 30px);
+          padding: clamp(2rem, 4vh, 3rem);
+          box-shadow: 0 clamp(15px, 3vh, 25px) clamp(40px, 8vh, 60px) rgba(0,0,0,0.6),
+                      inset 0 clamp(-4px, -0.8vh, -6px) 0 rgba(0,0,0,0.05);
           text-align: center;
           width: 90%;
           max-width: 500px;
-          box-sizing: border-box;
-          animation: slideUp 0.3s ease;
         }
 
         .exit-modal-content h2 {
-          font-size: 2.2rem;
-          margin-bottom: 1rem;
+          font-size: clamp(1.8rem, 4vw, 2.5rem);
+          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
           color: #333;
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
         }
 
         .exit-modal-content p {
-          font-size: 1.2rem;
+          font-size: clamp(1rem, 2.2vw, 1.4rem);
           color: #666;
-          margin-bottom: 2rem;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
         }
 
         .exit-buttons {
           display: flex;
-          gap: 1rem;
+          gap: clamp(0.75rem, 1.5vw, 1rem);
           justify-content: center;
-          margin-top: 2rem;
         }
 
         .exit-confirm {
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
-          font-size: 1.3rem;
-          font-weight: bold;
-          padding: 1rem 2rem;
+          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
+          font-weight: 900;
+          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1.5rem, 3vw, 2rem);
           border: none;
-          border-radius: 15px;
+          border-radius: clamp(12px, 2.5vw, 18px);
           cursor: pointer;
-          box-shadow: 0 5px 15px rgba(238,21,21,0.4);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 18px) rgba(238,21,21,0.4);
           transition: all 0.3s;
         }
 
         .exit-confirm:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 20px rgba(238,21,21,0.5);
-        }
-
-        .exit-confirm:active {
-          transform: translateY(-1px);
+          transform: translateY(clamp(-2px, -0.5vh, -3px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(238,21,21,0.5);
         }
 
         .exit-cancel {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          font-size: 1.3rem;
-          font-weight: bold;
-          padding: 1rem 2rem;
+          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
+          font-weight: 900;
+          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1.5rem, 3vw, 2rem);
           border: none;
-          border-radius: 15px;
+          border-radius: clamp(12px, 2.5vw, 18px);
           cursor: pointer;
-          box-shadow: 0 5px 15px rgba(76,175,80,0.4);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 18px) rgba(76,175,80,0.4);
           transition: all 0.3s;
         }
 
         .exit-cancel:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 20px rgba(76,175,80,0.5);
+          transform: translateY(clamp(-2px, -0.5vh, -3px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(76,175,80,0.5);
         }
 
-        .exit-cancel:active {
-          transform: translateY(-1px);
-        }
-
+        /* Responsive adjustments */
         @media (max-width: 1024px) {
-          .utility-side-container {
+          .utility-container {
             position: static;
-            margin-top: 2vh;
+            margin-top: clamp(1rem, 2vh, 1.5rem);
+            margin-left: 0;
           }
 
-          .party-section {
-            max-width: 80vw;
+          .trainer-utility-wrapper {
+            flex-direction: column;
+            align-items: center;
           }
         }
 
         @media (max-width: 768px) {
           .party-grid {
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.5vw;
-          }
-
-          .trainer-name {
-            font-size: 1.5rem;
-          }
-
-          .trainer-level {
-            font-size: 1.2rem;
+            gap: clamp(0.75rem, 1.5vw, 1rem);
           }
         }
       </style>
 
+      <!-- Back Button -->
+      <button class="back-button" id="backButton">←</button>
+
+      <!-- Title -->
+      <h1 class="page-title">${trainerName}</h1>
+
       <!-- Trainer and Utility Container -->
-      <div class="trainer-utility-container">
+      <div class="trainer-utility-wrapper">
         <!-- Trainer Section -->
         <div class="trainer-section">
           <div class="trainer-image-container" id="trainerImageContainer">
@@ -497,12 +518,11 @@ export function renderTrainerCard() {
           </div>
           <div class="trainer-name">${trainerName}</div>
           <div class="trainer-level">Level ${trainerLevel}</div>
-          <div class="trainer-class">${trainerClass}</div>
         </div>
 
-        <!-- Utility Side Container -->
-        <div class="utility-side-container">
-          <h3>Utility</h3>
+        <!-- Utility Container -->
+        <div class="utility-container">
+          <div class="utility-label">Utility</div>
           ${utilityPokemon ? `
             <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
               <img src="${utilityPokemon.image}" alt="${utilityPokemon.name}" onerror="this.src='assets/Pokeball.png'">
@@ -519,43 +539,40 @@ export function renderTrainerCard() {
 
       <!-- Party Section -->
       <div class="party-section">
-          <h2>Active Party</h2>
-          <div class="party-grid">
-            ${Array.from({ length: 6 }, (_, i) => {
-              const pokemon = partyPokemon[i];
-              if (pokemon) {
-                const displayName = pokemon.nickname || pokemon.name;
-                return `
-                  <div class="pokemon-slot" data-pokemon-name="${pokemon.name.toLowerCase()}">
-                    <img src="${pokemon.image}" alt="${pokemon.name}" onerror="this.src='assets/Pokeball.png'">
-                    <div class="pokemon-name">${displayName}</div>
-                    <div class="pokemon-level">Level ${pokemon.level}</div>
-                  </div>
-                `;
-              } else if (i < numPokeSlots) {
-                // Empty unlocked slot
-                return `
-                  <div class="pokemon-slot empty">
-                    <img src="${unlockedSlot}" alt="Empty Slot">
-                  </div>
-                `;
-              } else {
-                // Locked slot
-                return `
-                  <div class="pokemon-slot locked">
-                    <img src="${lockedSlot}" alt="Locked Slot">
-                  </div>
-                `;
-              }
-            }).join('')}
-          </div>
+        <h2>Active Party</h2>
+        <div class="party-grid">
+          ${Array.from({ length: 6 }, (_, i) => {
+            const pokemon = partyPokemon[i];
+            if (pokemon) {
+              const displayName = pokemon.nickname || pokemon.name;
+              return `
+                <div class="pokemon-slot" data-pokemon-name="${pokemon.name.toLowerCase()}">
+                  <img src="${pokemon.image}" alt="${pokemon.name}" onerror="this.src='assets/Pokeball.png'">
+                  <div class="pokemon-name">${displayName}</div>
+                  <div class="pokemon-level">Level ${pokemon.level}</div>
+                </div>
+              `;
+            } else if (i < numPokeSlots) {
+              // Empty unlocked slot
+              return `
+                <div class="pokemon-slot empty">
+                  <img src="${unlockedSlot}" alt="Empty Slot">
+                </div>
+              `;
+            } else {
+              // Locked slot
+              return `
+                <div class="pokemon-slot locked">
+                  <img src="${lockedSlot}" alt="Locked Slot">
+                </div>
+              `;
+            }
+          }).join('')}
         </div>
+      </div>
 
       <!-- My Pokemon Button -->
       <button class="my-pokemon-button" id="myPokemonButton">My Pokemon</button>
-
-      <!-- Back Button -->
-      <button class="back-button" id="backButton">←</button>
 
       <!-- Exit Confirmation Modal -->
       <div class="exit-modal" id="exitModal">

@@ -280,7 +280,8 @@ export function renderPokemonCard(pokemonName) {
           display: block;
         }
 
-        .pokemon-info-list {
+        .pokemon-info-list,
+        .trainer-info-list {
           display: flex;
           flex-direction: column;
           gap: clamp(0.5rem, 1vh, 0.75rem);
@@ -313,6 +314,35 @@ export function renderPokemonCard(pokemonName) {
           overflow-wrap: break-word;
           max-width: 60%;
           white-space: pre-line;
+        }
+
+        .info-item-double {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .info-item-half {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: clamp(0.3rem, 0.8vw, 0.5rem);
+          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-weight: 700;
+          color: white;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .info-item-half .info-item-label {
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+        }
+
+        .info-item-half span:not(.info-item-label) {
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
         }
 
         .checkbox-container {
@@ -708,7 +738,7 @@ export function renderPokemonCard(pokemonName) {
             <img id="pokemonImage" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
           </div>
 
-          <div class="pokemon-info-list">
+          <div class="trainer-info-list">
             <div class="info-item">
               <span class="info-item-label">Level:</span>
               <span class="info-item-value" id="pokemonLevel">${level}</span>
@@ -784,18 +814,17 @@ export function renderPokemonCard(pokemonName) {
             <img id="pokemonImageBattle" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
           </div>
 
-          <div class="pokemon-info-list">
-            <div class="info-item">
-              <span class="info-item-label">HD:</span>
-              <span class="info-item-value" id="hdValue">${hd}</span>
+          <div class="trainer-info-list">
+            <div class="info-item-double">
+              <div class="info-item-half">
+                <span class="info-item-label">HD:</span>
+                <span id="hdValue">${hd}</span>
+              </div>
+              <div class="info-item-half">
+                <span class="info-item-label">VD:</span>
+                <span id="vdValue">${vd}</span>
+              </div>
             </div>
-            <div class="info-item">
-              <span class="info-item-label">VD:</span>
-              <span class="info-item-value" id="vdValue">${vd}</span>
-            </div>
-          </div>
-
-          <div class="pokemon-info-list">
             <div class="info-item">
               <span class="info-item-label">STAB:</span>
               <span class="info-item-value" id="stabValue">${stab}</span>

@@ -1,6 +1,6 @@
 // Pokemon Card Page - Detailed Pokemon Information Display with Info/Battle Pages
 
-import { PokemonAPI } from '../api.js';
+import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 
 export function renderPokemonCard(pokemonName) {
@@ -1803,7 +1803,7 @@ export function attachPokemonCardListeners() {
   }
 
   // Pokemon Combat tracker buttons
-  document.getElementById('addStats')?.addEventListener('click', () => {
+  document.getElementById('addStats')?.addEventListener('click', async () => {
     const hpChange = parseInt(document.getElementById('hpChangeInput').value) || 0;
     const vpChange = parseInt(document.getElementById('vpChangeInput').value) || 0;
 
@@ -1826,11 +1826,24 @@ export function attachPokemonCardListeners() {
     pokemonData[46] = newVp;
     sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
 
+    // Persist to database
+    try {
+      if (hpChange !== 0) {
+        await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp);
+      }
+      if (vpChange !== 0) {
+        await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
+      }
+    } catch (error) {
+      console.error('Error updating Pokemon live stats:', error);
+      showError('Failed to save HP/VP changes to database');
+    }
+
     document.getElementById('hpChangeInput').value = '';
     document.getElementById('vpChangeInput').value = '';
   });
 
-  document.getElementById('removeStats')?.addEventListener('click', () => {
+  document.getElementById('removeStats')?.addEventListener('click', async () => {
     let hpChange = parseInt(document.getElementById('hpChangeInput').value) || 0;
     const vpChange = parseInt(document.getElementById('vpChangeInput').value) || 0;
 
@@ -1844,12 +1857,14 @@ export function attachPokemonCardListeners() {
 
     let newHp = currentHp;
     let newVp = currentVp - vpChange;
+    let vpOverflow = false;
 
     // Handle VP overflow to HP
     if (newVp < 0) {
       const remainingDamage = Math.abs(newVp);
       newVp = 0;
       newHp = currentHp - remainingDamage;
+      vpOverflow = true;
     }
 
     newHp = Math.max(newHp - (hpChange > 0 && vpChange === 0 ? hpChange : 0), 0);
@@ -1865,6 +1880,26 @@ export function attachPokemonCardListeners() {
     pokemonData[46] = newVp;
     sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
 
+    // Persist to database
+    try {
+      if (vpOverflow) {
+        // VP overflow occurred, update both VP and HP
+        await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
+        await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp);
+      } else {
+        // Normal case - update only what changed
+        if (hpChange > 0) {
+          await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp);
+        }
+        if (vpChange > 0) {
+          await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating Pokemon live stats:', error);
+      showError('Failed to save HP/VP changes to database');
+    }
+
     document.getElementById('hpChangeInput').value = '';
     document.getElementById('vpChangeInput').value = '';
 
@@ -1873,7 +1908,7 @@ export function attachPokemonCardListeners() {
     document.querySelectorAll('.type-button').forEach(btn => btn.classList.remove('active'));
   });
 
-  document.getElementById('fullRestore')?.addEventListener('click', () => {
+  document.getElementById('fullRestore')?.addEventListener('click', async () => {
     const currentHpText = document.getElementById('combatCurrentHP').textContent;
     const currentVpText = document.getElementById('combatCurrentVP').textContent;
     const [, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
@@ -1890,12 +1925,21 @@ export function attachPokemonCardListeners() {
     pokemonData[46] = maxVp;
     sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
 
+    // Persist to database
+    try {
+      await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', maxHp);
+      await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', maxVp);
+    } catch (error) {
+      console.error('Error updating Pokemon live stats:', error);
+      showError('Failed to save HP/VP restore to database');
+    }
+
     document.getElementById('hpChangeInput').value = '';
     document.getElementById('vpChangeInput').value = '';
   });
 
   // Trainer Combat tracker buttons
-  document.getElementById('addTrainerStats')?.addEventListener('click', () => {
+  document.getElementById('addTrainerStats')?.addEventListener('click', async () => {
     const hpChange = parseInt(document.getElementById('trainerHpChangeInput').value) || 0;
     const vpChange = parseInt(document.getElementById('trainerVpChangeInput').value) || 0;
 
@@ -1916,11 +1960,24 @@ export function attachPokemonCardListeners() {
     trainerData[35] = newVp;
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
+    // Persist to database
+    try {
+      if (hpChange !== 0) {
+        await TrainerAPI.updateLiveStats(trainerData[1], 'HP', newHp);
+      }
+      if (vpChange !== 0) {
+        await TrainerAPI.updateLiveStats(trainerData[1], 'VP', newVp);
+      }
+    } catch (error) {
+      console.error('Error updating Trainer live stats:', error);
+      showError('Failed to save Trainer HP/VP changes to database');
+    }
+
     document.getElementById('trainerHpChangeInput').value = '';
     document.getElementById('trainerVpChangeInput').value = '';
   });
 
-  document.getElementById('removeTrainerStats')?.addEventListener('click', () => {
+  document.getElementById('removeTrainerStats')?.addEventListener('click', async () => {
     const hpChange = parseInt(document.getElementById('trainerHpChangeInput').value) || 0;
     const vpChange = parseInt(document.getElementById('trainerVpChangeInput').value) || 0;
 
@@ -1931,12 +1988,14 @@ export function attachPokemonCardListeners() {
 
     let newHp = currentHp;
     let newVp = currentVp - vpChange;
+    let vpOverflow = false;
 
     // Handle VP overflow to HP
     if (newVp < 0) {
       const remainingDamage = Math.abs(newVp);
       newVp = 0;
       newHp = currentHp - remainingDamage;
+      vpOverflow = true;
     }
 
     newHp = Math.max(newHp - (hpChange > 0 && vpChange === 0 ? hpChange : 0), 0);
@@ -1950,11 +2009,31 @@ export function attachPokemonCardListeners() {
     trainerData[35] = newVp;
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
+    // Persist to database
+    try {
+      if (vpOverflow) {
+        // VP overflow occurred, update both VP and HP
+        await TrainerAPI.updateLiveStats(trainerData[1], 'VP', newVp);
+        await TrainerAPI.updateLiveStats(trainerData[1], 'HP', newHp);
+      } else {
+        // Normal case - update only what changed
+        if (hpChange > 0) {
+          await TrainerAPI.updateLiveStats(trainerData[1], 'HP', newHp);
+        }
+        if (vpChange > 0) {
+          await TrainerAPI.updateLiveStats(trainerData[1], 'VP', newVp);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating Trainer live stats:', error);
+      showError('Failed to save Trainer HP/VP changes to database');
+    }
+
     document.getElementById('trainerHpChangeInput').value = '';
     document.getElementById('trainerVpChangeInput').value = '';
   });
 
-  document.getElementById('fullRestoreTrainer')?.addEventListener('click', () => {
+  document.getElementById('fullRestoreTrainer')?.addEventListener('click', async () => {
     const currentHpText = document.getElementById('trainerCombatCurrentHP').textContent;
     const currentVpText = document.getElementById('trainerCombatCurrentVP').textContent;
     const [, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
@@ -1968,6 +2047,15 @@ export function attachPokemonCardListeners() {
     trainerData[34] = maxHp;
     trainerData[35] = maxVp;
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Persist to database
+    try {
+      await TrainerAPI.updateLiveStats(trainerData[1], 'HP', maxHp);
+      await TrainerAPI.updateLiveStats(trainerData[1], 'VP', maxVp);
+    } catch (error) {
+      console.error('Error updating Trainer live stats:', error);
+      showError('Failed to save Trainer HP/VP restore to database');
+    }
 
     document.getElementById('trainerHpChangeInput').value = '';
     document.getElementById('trainerVpChangeInput').value = '';

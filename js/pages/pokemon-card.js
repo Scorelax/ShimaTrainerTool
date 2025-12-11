@@ -370,10 +370,11 @@ export function renderPokemonCard(pokemonName) {
         .info-item-column .info-item-value {
           text-align: left;
           font-size: clamp(0.75rem, 1.6vw, 0.9rem);
-          white-space: pre-line;
+          white-space: normal;
           word-wrap: break-word;
-          overflow-wrap: anywhere;
+          overflow-wrap: break-word;
           line-height: 1.6;
+          width: 100%;
         }
 
         .checkbox-container {
@@ -441,7 +442,7 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           gap: clamp(0.75rem, 1.5vh, 1rem);
-          padding-top: clamp(3rem, 6vh, 4rem);
+          padding-top: clamp(4rem, 8vh, 5rem);
         }
 
         .description-container {
@@ -477,6 +478,7 @@ export function renderPokemonCard(pokemonName) {
 
         .skills-container h3 {
           margin-bottom: clamp(0.75rem, 2vh, 1rem);
+          margin-top: 0;
           color: white;
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           font-weight: 900;

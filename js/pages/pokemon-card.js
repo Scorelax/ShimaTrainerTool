@@ -30,7 +30,7 @@ export function renderPokemonCard(pokemonName) {
   const ac = pokemonData[10] || 10;
   const vd = pokemonData[11] || 0;
   const hp = pokemonData[12] || 0;
-  const vp = pokemonData[13] || 0;
+  const vp = pokemonData[14] || 0;
   const str = pokemonData[15] || 10;
   const dex = pokemonData[16] || 10;
   const con = pokemonData[17] || 10;
@@ -336,18 +336,18 @@ export function renderPokemonCard(pokemonName) {
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
           border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
           border-radius: clamp(8px, 1.5vw, 12px);
-          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
           font-weight: 700;
           color: white;
           text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         .info-item-half .info-item-label {
-          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
         }
 
         .info-item-half span:not(.info-item-label) {
-          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
         }
 
         .info-item-column {

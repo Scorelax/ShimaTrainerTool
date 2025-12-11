@@ -254,7 +254,7 @@ export function renderPokemonCard(pokemonName) {
         /* Info Page Grid Layout - matches trainer-info EXACTLY */
         .info-page-grid {
           display: grid;
-          grid-template-columns: minmax(25%, 30%) 1fr;
+          grid-template-columns: 27% 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           grid-column: 1 / -1;
         }
@@ -262,7 +262,7 @@ export function renderPokemonCard(pokemonName) {
         /* Battle Page Grid Layout - matches trainer-info EXACTLY */
         .battle-page-grid {
           display: grid;
-          grid-template-columns: minmax(25%, 30%) 1fr;
+          grid-template-columns: 27% 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           grid-column: 1 / -1;
         }
@@ -402,10 +402,6 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: row;
           gap: clamp(1rem, 2vw, 1.5rem);
-          padding: clamp(0.6rem, 1.2vh, 0.8rem);
-          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
-          border-radius: clamp(8px, 1.5vw, 12px);
         }
 
         .checkbox-container label {
@@ -420,14 +416,14 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .checkbox-container input[type="checkbox"] {
-          width: clamp(16px, 3vw, 20px);
-          height: clamp(16px, 3vw, 20px);
+          width: clamp(32px, 6vw, 40px);
+          height: clamp(32px, 6vw, 40px);
           cursor: pointer;
         }
 
         .info-buttons-grid {
           display: grid;
-          grid-template-columns: auto auto;
+          grid-template-columns: 1fr;
           gap: clamp(0.5rem, 1vh, 0.75rem);
         }
 
@@ -607,6 +603,35 @@ export function renderPokemonCard(pokemonName) {
           font-weight: 900;
           box-shadow: 0 8px 20px rgba(0,0,0,0.5),
                       inset 0 -3px 0 rgba(0,0,0,0.2);
+        }
+
+        .current-stat-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: clamp(45px, 7vw, 60px);
+          height: clamp(45px, 7vw, 60px);
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          color: white;
+          border-radius: clamp(8px, 1.8vw, 12px);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          font-weight: 900;
+          box-shadow: 0 6px 15px rgba(0,0,0,0.5),
+                      inset 0 -2px 0 rgba(0,0,0,0.3);
+          margin-top: clamp(-8px, -1vh, -10px);
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .current-stat-box:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.6),
+                      0 0 15px rgba(59,76,202,0.5);
+        }
+
+        .current-stat-box:active {
+          transform: translateY(0);
         }
 
         /* Stats Row 2: STR, DEX, CON, INT, WIS, CHA */
@@ -1004,7 +1029,7 @@ export function renderPokemonCard(pokemonName) {
             <div class="info-item">
               <span class="info-item-label">Held Item:</span>
               <span class="info-item-value">
-                ${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0; font-weight: bold;">${heldItem}</button>` : 'None'}
+                ${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.4vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0; font-weight: bold; vertical-align: baseline;">${heldItem}</button>` : 'None'}
               </span>
             </div>
             <div class="info-item-column">

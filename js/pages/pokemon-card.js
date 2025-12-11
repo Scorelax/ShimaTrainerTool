@@ -370,9 +370,9 @@ export function renderPokemonCard(pokemonName) {
         .info-item-column .info-item-value {
           text-align: left;
           font-size: clamp(0.75rem, 1.6vw, 0.9rem);
-          white-space: normal;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
+          white-space: pre-line;
+          word-break: keep-all;
+          overflow-wrap: normal;
           line-height: 1.6;
           width: 100%;
         }
@@ -474,10 +474,11 @@ export function renderPokemonCard(pokemonName) {
 
         .skills-container {
           width: 100%;
+          margin-top: clamp(-0.25rem, -0.5vh, -0.5rem);
         }
 
         .skills-container h3 {
-          margin-bottom: clamp(0.75rem, 2vh, 1rem);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
           margin-top: 0;
           color: white;
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);

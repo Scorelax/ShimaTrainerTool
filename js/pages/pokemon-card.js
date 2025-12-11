@@ -26,11 +26,11 @@ export function renderPokemonCard(pokemonName) {
   const type1 = pokemonData[5] || '';
   const type2 = pokemonData[6] || '';
   const abilitiesRaw = pokemonData[7] || '';
+  const ac = pokemonData[8] || 10;
   const hd = pokemonData[9] || 0;
-  const ac = pokemonData[10] || 10;
+  const hp = pokemonData[10] || 0;
   const vd = pokemonData[11] || 0;
-  const hp = pokemonData[12] || 0;
-  const vp = pokemonData[14] || 0;
+  const vp = pokemonData[12] || 0;
   const str = pokemonData[15] || 10;
   const dex = pokemonData[16] || 10;
   const con = pokemonData[17] || 10;
@@ -61,7 +61,7 @@ export function renderPokemonCard(pokemonName) {
   const movementDisplay = movementValues
     .map((value, index) => value && value !== '-' && value !== '0' ? `${movementTypes[index]}: ${value} ft` : null)
     .filter(m => m !== null)
-    .join(', ') || `${speed} ft`;
+    .join('\n') || `Walking: ${speed} ft`;
 
   // Parse learned moves from indices 23-28, 37 based on level
   const moveIndices = [23, 24, 25, 26, 27, 28, 37];
@@ -382,8 +382,8 @@ export function renderPokemonCard(pokemonName) {
 
         .checkbox-container {
           display: flex;
-          flex-direction: column;
-          gap: clamp(0.3rem, 0.7vh, 0.5rem);
+          flex-direction: row;
+          gap: clamp(1rem, 2vw, 1.5rem);
           padding: clamp(0.6rem, 1.2vh, 0.8rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
           border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
@@ -897,6 +897,18 @@ export function renderPokemonCard(pokemonName) {
             ` : ''}
           </div>
 
+          <div class="info-buttons-grid">
+            <button class="info-button" id="editPokemonButton">Edit Pokémon</button>
+            <button class="info-button" id="battlePageButton">Battle Page</button>
+          </div>
+        </div>
+
+        <!-- Right Column: Description + Checkboxes + Skills -->
+        <div class="right-column">
+          ${flavorText ? `
+            <p id="flavorText" class="description-text">${flavorText}</p>
+          ` : ''}
+
           <div class="checkbox-container">
             <label for="inActiveParty">
               <input type="checkbox" id="inActiveParty" ${inActiveParty ? 'checked' : ''}>
@@ -906,18 +918,6 @@ export function renderPokemonCard(pokemonName) {
               <input type="checkbox" id="inUtilitySlot" ${inUtilitySlot ? 'checked' : ''}>
               Utility Slot
             </label>
-          </div>
-        </div>
-
-        <!-- Right Column: Description + Buttons + Skills -->
-        <div class="right-column">
-          ${flavorText ? `
-            <p id="flavorText" class="description-text">${flavorText}</p>
-          ` : ''}
-
-          <div class="info-buttons-grid">
-            <button class="info-button" id="editPokemonButton">Edit Pokémon</button>
-            <button class="info-button" id="battlePageButton">Battle Page</button>
           </div>
 
           <div class="skills-container">
@@ -962,17 +962,17 @@ export function renderPokemonCard(pokemonName) {
             <div class="info-item-double">
               <div class="info-item-half">
                 <span class="info-item-label">STAB:</span>
-                <span id="stabValue">${stab}</span>
+                <span id="stabValue">${stabBonus}</span>
               </div>
               <div class="info-item-half">
                 <span class="info-item-label">Proficiency:</span>
-                <span id="proficiencyValue">+${proficiencyBonus}</span>
+                <span id="proficiencyValue">${proficiencyBonus}</span>
               </div>
             </div>
             <div class="info-item-double">
               <div class="info-item-half">
                 <span class="info-item-label">Initiative:</span>
-                <span id="initiativeValue">${initiative >= 0 ? '+' : ''}${initiative}</span>
+                <span id="initiativeValue">${initiative}</span>
               </div>
               <div class="info-item-half">
                 <span class="info-item-label">Loyalty:</span>
@@ -987,7 +987,7 @@ export function renderPokemonCard(pokemonName) {
               <span class="info-item-label">Held Item:</span>
               <span class="info-item-value" id="heldItemName">${heldItem}</span>
             </div>
-            <div class="info-item">
+            <div class="info-item-column">
               <span class="info-item-label">Movement:</span>
               <span class="info-item-value" id="movementValue">${movementDisplay}</span>
             </div>

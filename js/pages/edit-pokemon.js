@@ -346,6 +346,46 @@ export function renderEditPokemon(pokemonName) {
           box-shadow: 0 0 clamp(8px, 1.5vw, 12px) rgba(255,222,0,0.4);
         }
 
+        .styled-dropdown-header {
+          padding: clamp(0.8rem, 2vh, 1rem) clamp(1rem, 2.5vw, 1.5rem);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          border-radius: clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px) 0 0;
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-bottom: none;
+          box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
+        }
+
+        .styled-dropdown-header label {
+          margin: 0;
+          color: white;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+
+        .styled-select {
+          width: 100%;
+          padding: clamp(0.8rem, 2vw, 1rem);
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-top: none;
+          border-radius: 0 0 clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px);
+          background: rgba(255,255,255,0.95);
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+          box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
+        }
+
+        .styled-select:focus {
+          outline: none;
+          background: white;
+          box-shadow: 0 clamp(4px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.4);
+        }
+
         .button-group {
           display: flex;
           gap: clamp(1rem, 2.5vw, 1.5rem);
@@ -522,21 +562,16 @@ export function renderEditPokemon(pokemonName) {
           </div>
 
           <!-- Nature Section -->
-          <div class="collapsible-section">
-            <div class="collapsible-header" id="natureHeader">
-              <span>Nature</span>
-              <span class="arrow" id="natureArrow">▶</span>
+          <div class="form-group full-width" style="margin-bottom: clamp(1rem, 2vh, 1.5rem);">
+            <div class="styled-dropdown-header">
+              <label for="nature">Nature</label>
             </div>
-            <div class="collapsible-content" id="natureContent">
-              <div class="dropdown-wrapper">
-                <select id="nature" name="nature">
-                  <option value="">Select a nature...</option>
-                  ${natures.map(n => `
-                    <option value="${n.name}" ${n.name === currentNature ? 'selected' : ''}>${n.name}</option>
-                  `).join('')}
-                </select>
-              </div>
-            </div>
+            <select id="nature" name="nature" class="styled-select">
+              <option value="">Select a nature...</option>
+              ${natures.map(n => `
+                <option value="${n.name}" ${n.name === currentNature ? 'selected' : ''}>${n.name}</option>
+              `).join('')}
+            </select>
           </div>
 
           <!-- Abilities Section -->
@@ -605,7 +640,7 @@ export function attachEditPokemonListeners() {
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
   // Collapsible sections
-  ['skills', 'feats', 'abilities', 'nature'].forEach(section => {
+  ['skills', 'feats', 'abilities'].forEach(section => {
     const header = document.getElementById(`${section}Header`);
     const content = document.getElementById(`${section}Content`);
     const arrow = document.getElementById(`${section}Arrow`);

@@ -441,7 +441,7 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           gap: clamp(0.75rem, 1.5vh, 1rem);
-          padding-top: clamp(4rem, 8vh, 5rem);
+          padding-top: clamp(3rem, 6vh, 4rem);
         }
 
         .description-container {

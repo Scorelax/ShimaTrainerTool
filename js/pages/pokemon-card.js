@@ -117,7 +117,7 @@ export function renderPokemonCard(pokemonName) {
   });
 
   const displayName = name; // Just use the Pokemon name, not nickname
-  const typingText = type2 ? `${type1}\n${type2}` : type1;
+  const typingText = type2 ? `${type1} - ${type2}` : type1;
 
   // STAB display
   const stab = `+${stabBonus}`;
@@ -198,7 +198,7 @@ export function renderPokemonCard(pokemonName) {
 
         .pokemon-card-page {
           display: grid;
-          grid-template-columns: minmax(25%, 30%) 1fr;
+          grid-template-columns: minmax(28%, 33%) 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           padding: clamp(1rem, 2vh, 2rem) clamp(1rem, 2vw, 3rem) clamp(1rem, 2vh, 1.5rem);
           min-height: auto;
@@ -233,7 +233,7 @@ export function renderPokemonCard(pokemonName) {
         /* Info Page Grid Layout - matches trainer-info EXACTLY */
         .info-page-grid {
           display: grid;
-          grid-template-columns: minmax(25%, 30%) 1fr;
+          grid-template-columns: minmax(28%, 33%) 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           grid-column: 1 / -1;
         }
@@ -241,7 +241,7 @@ export function renderPokemonCard(pokemonName) {
         /* Battle Page Grid Layout - matches trainer-info EXACTLY */
         .battle-page-grid {
           display: grid;
-          grid-template-columns: minmax(25%, 30%) 1fr;
+          grid-template-columns: minmax(28%, 33%) 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           grid-column: 1 / -1;
         }
@@ -295,7 +295,7 @@ export function renderPokemonCard(pokemonName) {
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
           border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
           border-radius: clamp(8px, 1.5vw, 12px);
-          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
           font-weight: 700;
           color: white;
           text-shadow: 0 2px 4px rgba(0,0,0,0.6);
@@ -306,6 +306,7 @@ export function renderPokemonCard(pokemonName) {
           text-transform: uppercase;
           letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
           flex-shrink: 0;
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
         }
 
         .info-item-value {
@@ -314,6 +315,7 @@ export function renderPokemonCard(pokemonName) {
           overflow-wrap: break-word;
           max-width: 60%;
           white-space: pre-line;
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
         }
 
         .info-item-double {
@@ -362,12 +364,12 @@ export function renderPokemonCard(pokemonName) {
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
-          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
         }
 
         .info-item-column .info-item-value {
           text-align: left;
-          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
           white-space: pre-line;
           word-wrap: break-word;
         }
@@ -806,10 +808,7 @@ export function renderPokemonCard(pokemonName) {
         <!-- Right Column: Description + Skills -->
         <div class="right-column">
           ${flavorText ? `
-            <div class="description-container">
-              <h3>Description</h3>
-              <p id="flavorText" class="description-text">${flavorText}</p>
-            </div>
+            <p id="flavorText" class="description-text">${flavorText}</p>
           ` : ''}
 
           <div class="skills-container">

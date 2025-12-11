@@ -1239,7 +1239,7 @@ export function renderPokemonCard(pokemonName) {
           <div class="stat-main-container">
             <div class="stat-box-wrapper">
               <div class="stat-label-box">AC</div>
-              <div class="stat-box" id="acValue">${ac}</div>
+              <div class="stat-box" id="acValue" style="color: ${getStatColor('ac')}">${ac}</div>
             </div>
             <div class="stat-box-wrapper">
               <div class="stat-label-box">HP</div>
@@ -1547,16 +1547,16 @@ export function attachPokemonCardListeners() {
     if (heldItem !== 'None') {
       // Look up item details from sessionStorage
       const itemsData = JSON.parse(sessionStorage.getItem('items')) || [];
-      const item = itemsData.find(i => i[0] === heldItem);
+      const item = itemsData.find(i => i.name === heldItem);
 
       if (item) {
         heldItemContent.innerHTML = `
           <div style="margin-bottom: 1rem;">
             <div style="font-weight: 900; font-size: clamp(1.05rem, 2.2vw, 1.2rem); margin-bottom: 0.5rem; color: #FFDE00; text-transform: uppercase;">
-              ${item[0]}
+              ${item.name}
             </div>
             <div style="color: #c0c0c0; font-size: clamp(0.9rem, 1.9vw, 1rem);">
-              ${item[1] || 'No description available'}
+              ${item.effect || item.description || 'No description available'}
             </div>
           </div>
         `;

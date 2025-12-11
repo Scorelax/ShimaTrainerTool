@@ -158,6 +158,7 @@ export function renderEditPokemon(pokemonName) {
           flex-wrap: wrap;
           gap: clamp(0.4rem, 1vw, 0.6rem);
           margin-top: clamp(0.5rem, 1vh, 0.75rem);
+          padding-bottom: clamp(1rem, 2vh, 1.5rem);
           min-height: clamp(2rem, 4vh, 2.5rem);
         }
 
@@ -323,6 +324,28 @@ export function renderEditPokemon(pokemonName) {
           line-height: 1.4;
         }
 
+        .dropdown-wrapper {
+          padding: clamp(0.8rem, 2vw, 1rem);
+        }
+
+        .dropdown-wrapper select {
+          width: 100%;
+          padding: clamp(0.6rem, 1.5vw, 0.8rem);
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.5);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          background: white;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .dropdown-wrapper select:focus {
+          border-color: #FFDE00;
+          outline: none;
+          box-shadow: 0 0 clamp(8px, 1.5vw, 12px) rgba(255,222,0,0.4);
+        }
+
         .button-group {
           display: flex;
           gap: clamp(1rem, 2.5vw, 1.5rem);
@@ -456,23 +479,25 @@ export function renderEditPokemon(pokemonName) {
               <label for="cha">CHA</label>
               <input type="number" id="cha" name="cha" value="${cha}" min="1" max="30" required />
             </div>
+          </div>
 
-            <div class="form-group full-width">
-              <label for="nature">Nature</label>
-              <select id="nature" name="nature">
-                <option value="">Select a nature...</option>
-                ${natures.map(n => `
-                  <option value="${n.name}" ${n.name === currentNature ? 'selected' : ''}>${n.name}</option>
-                `).join('')}
-              </select>
-            </div>
-
-            <div class="form-group full-width">
-              <label for="heldItem">Held Item</label>
-              <div class="autocomplete-container">
-                <input type="text" id="heldItem" name="heldItem" value="${heldItem}" placeholder="Type to search items..." autocomplete="off" />
+          <!-- Held Items Section -->
+          <div class="form-group full-width">
+            <label for="heldItems">Held Items</label>
+            <div style="display: flex; gap: clamp(0.5rem, 1.2vw, 0.75rem); margin-bottom: clamp(0.5rem, 1vh, 0.75rem);">
+              <div class="autocomplete-container" style="flex: 1;">
+                <input type="text" id="heldItemInput" placeholder="Type to search items..." autocomplete="off" />
                 <div class="autocomplete-dropdown" id="heldItemDropdown"></div>
               </div>
+              <button type="button" class="add-button" id="addItemButton">Add</button>
+            </div>
+            <div class="chip-container" id="heldItemsContainer">
+              ${heldItem ? heldItem.split(',').map(item => item.trim()).filter(i => i).map(item => `
+                <div class="chip">
+                  ${item}
+                  <span class="chip-remove" data-item="${item}">×</span>
+                </div>
+              `).join('') : ''}
             </div>
           </div>
 
@@ -493,6 +518,24 @@ export function renderEditPokemon(pokemonName) {
                   <span class="chip-remove" data-move="${move}">×</span>
                 </div>
               `).join('')}
+            </div>
+          </div>
+
+          <!-- Nature Section -->
+          <div class="collapsible-section">
+            <div class="collapsible-header" id="natureHeader">
+              <span>Nature</span>
+              <span class="arrow" id="natureArrow">▶</span>
+            </div>
+            <div class="collapsible-content" id="natureContent">
+              <div class="dropdown-wrapper">
+                <select id="nature" name="nature">
+                  <option value="">Select a nature...</option>
+                  ${natures.map(n => `
+                    <option value="${n.name}" ${n.name === currentNature ? 'selected' : ''}>${n.name}</option>
+                  `).join('')}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -562,7 +605,7 @@ export function attachEditPokemonListeners() {
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
   // Collapsible sections
-  ['skills', 'feats', 'abilities'].forEach(section => {
+  ['skills', 'feats', 'abilities', 'nature'].forEach(section => {
     const header = document.getElementById(`${section}Header`);
     const content = document.getElementById(`${section}Content`);
     const arrow = document.getElementById(`${section}Arrow`);
@@ -573,12 +616,37 @@ export function attachEditPokemonListeners() {
     });
   });
 
-  // Held item autocomplete
+  // Held items autocomplete and chip management
+  const heldItemInput = document.getElementById('heldItemInput');
+  const heldItemsContainer = document.getElementById('heldItemsContainer');
+
   setupAutocomplete(
-    'heldItem',
+    'heldItemInput',
     'heldItemDropdown',
     items.map(item => item.name)
   );
+
+  // Add item button
+  document.getElementById('addItemButton')?.addEventListener('click', () => {
+    const itemName = heldItemInput.value.trim();
+    if (itemName) {
+      // Check if already added
+      const existing = Array.from(heldItemsContainer.querySelectorAll('.chip'))
+        .some(chip => chip.textContent.trim().replace('×', '').trim() === itemName);
+
+      if (!existing) {
+        addItemChip(itemName);
+        heldItemInput.value = '';
+      }
+    }
+  });
+
+  // Remove existing item chips
+  heldItemsContainer.querySelectorAll('.chip-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.target.closest('.chip').remove();
+    });
+  });
 
   // Custom moves autocomplete and chip management
   const customMovesInput = document.getElementById('customMovesInput');
@@ -691,6 +759,23 @@ function setupAutocomplete(inputId, dropdownId, dataSource) {
   });
 }
 
+function addItemChip(itemName) {
+  const container = document.getElementById('heldItemsContainer');
+  const chip = document.createElement('div');
+  chip.className = 'chip';
+  chip.innerHTML = `
+    ${itemName}
+    <span class="chip-remove" data-item="${itemName}">×</span>
+  `;
+
+  const removeBtn = chip.querySelector('.chip-remove');
+  removeBtn.addEventListener('click', () => {
+    chip.remove();
+  });
+
+  container.appendChild(chip);
+}
+
 function addMoveChip(moveName) {
   const container = document.getElementById('customMovesContainer');
   const chip = document.createElement('div');
@@ -784,7 +869,6 @@ async function handleFormSubmit(pokemonName, originalNature) {
     const int = parseInt(form.int.value);
     const wis = parseInt(form.wis.value);
     const cha = parseInt(form.cha.value);
-    const heldItem = form.heldItem.value.trim();
     const nature = form.nature.value;
 
     // Get selected skills
@@ -799,6 +883,13 @@ async function handleFormSubmit(pokemonName, originalNature) {
     const selectedAbilities = Array.from(document.querySelectorAll('input[name="abilities"]:checked'))
       .map(cb => cb.value);
     const abilitiesString = selectedAbilities.join('|');
+
+    // Get held items from chips
+    const heldItemChips = Array.from(document.querySelectorAll('#heldItemsContainer .chip'));
+    const heldItems = heldItemChips.map(chip =>
+      chip.textContent.trim().replace('×', '').trim()
+    );
+    const heldItemsString = heldItems.join(', ');
 
     // Get custom moves from chips
     const customMoveChips = Array.from(document.querySelectorAll('#customMovesContainer .chip'));
@@ -818,7 +909,7 @@ async function handleFormSubmit(pokemonName, originalNature) {
     pokemonData[22] = selectedSkills.join(', ');
     pokemonData[32] = nature;
     pokemonData[33] = loyalty;
-    pokemonData[35] = heldItem;
+    pokemonData[35] = heldItemsString;
     pokemonData[37] = customMoves.join(', ');
     pokemonData[50] = selectedFeats.join(', ');
 

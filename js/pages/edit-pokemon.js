@@ -1,4 +1,4 @@
-// Edit Pokemon Page - Form for editing Pokemon stats
+// Edit Pokemon Page - Modern form for editing Pokemon stats with pre-filled data
 
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
@@ -13,13 +13,13 @@ export function renderEditPokemon(pokemonName) {
   const pokemonData = JSON.parse(pokemonDataStr);
   const natures = JSON.parse(sessionStorage.getItem('natures') || '[]');
   const pokemonFeatsData = JSON.parse(sessionStorage.getItem('pokemonFeats') || '{"pokemonFeats": []}');
+  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+  const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
   // Extract Pokemon info
   const name = pokemonData[2] || '';
   const nickname = pokemonData[36] || '';
   const level = pokemonData[4] || 1;
-  const hd = pokemonData[9] || 0;
-  const vd = pokemonData[11] || 0;
   const str = pokemonData[15] || 10;
   const dex = pokemonData[16] || 10;
   const con = pokemonData[17] || 10;
@@ -28,56 +28,91 @@ export function renderEditPokemon(pokemonName) {
   const cha = pokemonData[20] || 10;
   const loyalty = pokemonData[33] || 0;
   const heldItem = pokemonData[35] || '';
-  const nature = pokemonData[34] || '';
+  const currentNature = pokemonData[32] || '';
   const skills = pokemonData[22] || '';
   const feats = pokemonData[50] || '';
-
-  const abilities = pokemonData[7] || '';
+  const customMoves = pokemonData[37] || '';
 
   const selectedSkills = skills ? skills.split(',').map(s => s.trim()) : [];
   const selectedFeats = feats ? feats.split(',').map(s => s.trim()) : [];
+  const existingCustomMoves = customMoves ? customMoves.split(',').map(m => m.trim()).filter(m => m) : [];
 
   const html = `
     <div class="edit-pokemon-page">
       <style>
         body, .content {
-          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+          background:
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+            linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          min-height: 100vh;
+          position: relative;
+        }
+
+        body::before, .content::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image:
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px, 80px 80px;
+          background-position: 0 0, 40px 40px;
+          pointer-events: none;
+          opacity: 0.5;
         }
 
         .edit-pokemon-page {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: clamp(1.5rem, 3vh, 2rem) clamp(0.8rem, 2vw, 1rem);
-          min-height: 80vh;
+          padding: clamp(5rem, 10vh, 7rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vh, 3rem);
+          min-height: 100vh;
+          position: relative;
+          box-sizing: border-box;
         }
 
         .edit-pokemon-page h1 {
+          position: absolute;
+          top: clamp(15px, 3vh, 20px);
+          left: 50%;
+          transform: translateX(-50%);
           color: white;
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
-          font-size: clamp(1.8rem, 4vw, 2.5rem);
+          margin: 0;
+          font-size: clamp(2rem, 5vw, 3rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(1px, 0.5vw, 3px);
+          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
+          font-weight: 900;
+          z-index: 1000;
         }
 
         .form-container {
           width: 100%;
-          max-width: clamp(600px, 85vw, 700px);
-          background-color: white;
-          padding: clamp(2rem, 4vw, 2.5rem);
-          border-radius: clamp(10px, 2vw, 20px);
-          box-shadow: 0 clamp(4px, 0.8vh, 8px) clamp(10px, 2vh, 20px) rgba(0,0,0,0.2);
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
-          max-height: 70vh;
+          max-width: clamp(600px, 90vw, 800px);
+          background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(245,245,245,0.98) 100%);
+          padding: clamp(2rem, 4vw, 3rem);
+          border-radius: clamp(15px, 3vw, 20px);
+          box-shadow: 0 clamp(8px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.5);
+          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          max-height: 75vh;
           overflow-y: auto;
         }
 
         .form-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: clamp(1rem, 2vw, 1.5rem);
+          gap: clamp(1rem, 2.5vw, 1.5rem);
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
         }
 
         .form-group {
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          display: flex;
+          flex-direction: column;
         }
 
         .form-group.full-width {
@@ -85,133 +120,89 @@ export function renderEditPokemon(pokemonName) {
         }
 
         .form-group label {
-          display: block;
-          font-weight: bold;
-          font-size: clamp(1rem, 2vw, 1.2rem);
-          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
+          font-weight: 900;
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          margin-bottom: clamp(0.3rem, 0.8vh, 0.5rem);
           color: #333;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
         }
 
         .form-group input[type="number"],
         .form-group input[type="text"],
         .form-group select {
           width: 100%;
-          padding: clamp(0.5rem, 1.5vw, 0.75rem);
-          font-size: clamp(0.95rem, 1.8vw, 1.1rem);
-          border: clamp(2px, 0.3vw, 3px) solid #ccc;
-          border-radius: clamp(5px, 1vw, 10px);
+          padding: clamp(0.6rem, 1.5vw, 0.8rem);
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.5);
+          border-radius: clamp(8px, 1.5vw, 12px);
           box-sizing: border-box;
+          background: white;
+          font-weight: 600;
+          transition: all 0.3s;
         }
 
         .form-group input:focus,
         .form-group select:focus {
-          border-color: #f44336;
+          border-color: #FFDE00;
           outline: none;
+          box-shadow: 0 0 clamp(8px, 1.5vw, 12px) rgba(255,222,0,0.4);
         }
 
-        .collapsible-section {
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+        .form-group select {
+          cursor: pointer;
         }
 
-        .collapsible-header {
+        .chip-container {
           display: flex;
-          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: clamp(0.4rem, 1vw, 0.6rem);
+          margin-top: clamp(0.5rem, 1vh, 0.75rem);
+          min-height: clamp(2rem, 4vh, 2.5rem);
+        }
+
+        .chip {
+          display: inline-flex;
           align-items: center;
-          padding: clamp(0.8rem, 2vw, 1rem);
-          background: #f44336;
+          gap: clamp(0.3rem, 0.8vw, 0.5rem);
+          padding: clamp(0.3rem, 0.8vh, 0.5rem) clamp(0.6rem, 1.5vw, 0.8rem);
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
           color: white;
-          border-radius: clamp(5px, 1vw, 10px);
+          border-radius: clamp(15px, 3vw, 20px);
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-weight: 700;
+          border: clamp(2px, 0.3vw, 3px) solid #FFDE00;
+        }
+
+        .chip-remove {
           cursor: pointer;
-          font-size: clamp(1.1rem, 2.2vw, 1.3rem);
           font-weight: bold;
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          line-height: 1;
+          transition: transform 0.2s;
         }
 
-        .collapsible-header:hover {
-          background: #d32f2f;
+        .chip-remove:hover {
+          transform: scale(1.3);
+          color: #EE1515;
         }
 
-        .arrow {
-          transition: transform 0.3s;
-        }
-
-        .arrow.open {
-          transform: rotate(90deg);
-        }
-
-        .collapsible-content {
-          display: none;
-          padding: clamp(0.8rem, 2vw, 1rem);
-          border: clamp(2px, 0.3vw, 3px) solid #f44336;
-          border-top: none;
-          border-radius: 0 0 clamp(5px, 1vw, 10px) clamp(5px, 1vw, 10px);
-          max-height: clamp(250px, 40vh, 300px);
-          overflow-y: auto;
-        }
-
-        .collapsible-content.open {
-          display: block;
-        }
-
-        .checkbox-item {
-          display: flex;
-          align-items: center;
-          margin-bottom: clamp(0.5rem, 1.5vh, 0.75rem);
-        }
-
-        .checkbox-item input[type="checkbox"] {
-          margin-right: clamp(0.5rem, 1.5vw, 0.75rem);
-          transform: scale(clamp(1.2, 0.3vw, 1.5));
-          cursor: pointer;
-        }
-
-        .checkbox-item label {
-          font-size: clamp(0.95rem, 1.8vw, 1.1rem);
-          cursor: pointer;
-          margin: 0;
-        }
-
-        .button-group {
-          display: flex;
-          gap: clamp(0.8rem, 2vw, 1rem);
-          justify-content: center;
-          margin-top: clamp(1.5rem, 3vh, 2rem);
-        }
-
-        .button {
-          padding: clamp(0.8rem, 2vh, 1rem) clamp(1.5rem, 4vw, 2rem);
-          border: none;
-          border-radius: clamp(5px, 1vw, 10px);
-          font-size: clamp(1rem, 2vw, 1.2rem);
-          font-weight: bold;
+        .add-button {
+          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.8rem, 2vw, 1.2rem);
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(8px, 1.5vw, 10px);
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-weight: 900;
           cursor: pointer;
           transition: all 0.3s;
+          text-transform: uppercase;
         }
 
-        .button-primary {
-          background-color: #4CAF50;
-          color: white;
-        }
-
-        .button-primary:hover {
-          background-color: #45a049;
-        }
-
-        .button-secondary {
-          background-color: #f44336;
-          color: white;
-        }
-
-        .button-secondary:hover {
-          background-color: #d32f2f;
-        }
-
-        .ability-description {
-          font-size: clamp(0.9rem, 1.6vw, 1rem);
-          color: #666;
-          font-weight: normal;
-          margin-top: clamp(0.1rem, 0.3vh, 0.2rem);
-          line-height: 1.3;
-          display: block;
+        .add-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(4px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(76,175,80,0.5);
         }
 
         .autocomplete-container {
@@ -223,14 +214,15 @@ export function renderEditPokemon(pokemonName) {
           top: 100%;
           left: 0;
           right: 0;
-          max-height: clamp(180px, 30vh, 200px);
+          max-height: clamp(150px, 25vh, 200px);
           overflow-y: auto;
           background: white;
-          border: clamp(2px, 0.3vw, 3px) solid #f44336;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
           border-top: none;
-          border-radius: 0 0 clamp(5px, 1vw, 10px) clamp(5px, 1vw, 10px);
+          border-radius: 0 0 clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px);
           z-index: 100;
           display: none;
+          box-shadow: 0 clamp(4px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.3);
         }
 
         .autocomplete-dropdown.open {
@@ -238,19 +230,185 @@ export function renderEditPokemon(pokemonName) {
         }
 
         .autocomplete-item {
-          padding: clamp(0.5rem, 1.5vw, 0.75rem);
+          padding: clamp(0.5rem, 1.2vh, 0.75rem) clamp(0.6rem, 1.5vw, 0.8rem);
           cursor: pointer;
-          font-size: clamp(0.9rem, 1.6vw, 1rem);
-          border-bottom: clamp(1px, 0.15vw, 2px) solid #eee;
+          font-size: clamp(0.9rem, 1.8vw, 1rem);
+          border-bottom: clamp(1px, 0.2vw, 2px) solid #f0f0f0;
+          transition: background 0.2s;
+          font-weight: 600;
         }
 
         .autocomplete-item:hover {
-          background-color: #f44336;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
         }
 
         .autocomplete-item:last-child {
           border-bottom: none;
+        }
+
+        .collapsible-section {
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .collapsible-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: clamp(0.8rem, 2vh, 1rem) clamp(1rem, 2.5vw, 1.5rem);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          border-radius: clamp(10px, 2vw, 15px);
+          cursor: pointer;
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          transition: all 0.3s;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
+        }
+
+        .collapsible-header:hover {
+          background: linear-gradient(135deg, #C91010 0%, #A00808 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(5px, 1.2vh, 8px) clamp(12px, 2vh, 18px) rgba(0,0,0,0.4);
+        }
+
+        .arrow {
+          transition: transform 0.3s;
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+        }
+
+        .arrow.open {
+          transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+          display: none;
+          padding: clamp(1rem, 2.5vh, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.5);
+          border-top: none;
+          border-radius: 0 0 clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px);
+          max-height: clamp(200px, 35vh, 300px);
+          overflow-y: auto;
+          background: rgba(255,255,255,0.5);
+        }
+
+        .collapsible-content.open {
+          display: block;
+        }
+
+        .checkbox-item {
+          display: flex;
+          align-items: flex-start;
+          margin-bottom: clamp(0.6rem, 1.5vh, 0.8rem);
+          gap: clamp(0.5rem, 1.2vw, 0.75rem);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+          margin-top: clamp(0.1rem, 0.3vh, 0.2rem);
+          width: clamp(18px, 4vw, 22px);
+          height: clamp(18px, 4vw, 22px);
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+
+        .checkbox-item label {
+          font-size: clamp(0.9rem, 1.9vw, 1.05rem);
+          cursor: pointer;
+          margin: 0;
+          font-weight: 600;
+          color: #333;
+          line-height: 1.4;
+        }
+
+        .button-group {
+          display: flex;
+          gap: clamp(1rem, 2.5vw, 1.5rem);
+          justify-content: center;
+          margin-top: clamp(2rem, 4vh, 3rem);
+          flex-wrap: wrap;
+        }
+
+        .button {
+          padding: clamp(0.8rem, 2vh, 1.2rem) clamp(2rem, 5vw, 3rem);
+          border: clamp(3px, 0.6vw, 4px) solid #333;
+          border-radius: clamp(10px, 2vw, 15px);
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          font-weight: 900;
+          cursor: pointer;
+          transition: all 0.3s;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          box-shadow: 0 clamp(4px, 1vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.3);
+        }
+
+        .button-primary {
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+          color: white;
+          border-color: #FFDE00;
+        }
+
+        .button-primary:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 clamp(6px, 1.5vh, 10px) clamp(15px, 3vh, 25px) rgba(76,175,80,0.5),
+                      0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.5);
+        }
+
+        .button-secondary {
+          background: linear-gradient(135deg, #666 0%, #555 100%);
+          color: white;
+          border-color: #999;
+        }
+
+        .button-secondary:hover {
+          background: linear-gradient(135deg, #555 0%, #444 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(5px, 1.2vh, 8px) clamp(12px, 2.5vh, 20px) rgba(0,0,0,0.4);
+        }
+
+        .back-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          font-weight: bold;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+        }
+
+        .back-button:hover {
+          transform: scale(1.15);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        .back-button:active {
+          transform: scale(1.08);
+        }
+
+        @media (max-width: 600px) {
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .form-group.full-width {
+            grid-column: 1;
+          }
         }
       </style>
 
@@ -267,16 +425,6 @@ export function renderEditPokemon(pokemonName) {
             <div class="form-group">
               <label for="loyalty">Loyalty</label>
               <input type="number" id="loyalty" name="loyalty" value="${loyalty}" min="-10" max="10" required />
-            </div>
-
-            <div class="form-group">
-              <label for="hd">Hit Dice (HD)</label>
-              <input type="number" id="hd" name="hd" value="${hd}" min="0" required />
-            </div>
-
-            <div class="form-group">
-              <label for="vd">Vitality Dice (VD)</label>
-              <input type="number" id="vd" name="vd" value="${vd}" min="0" required />
             </div>
 
             <div class="form-group">
@@ -310,21 +458,41 @@ export function renderEditPokemon(pokemonName) {
             </div>
 
             <div class="form-group full-width">
+              <label for="nature">Nature</label>
+              <select id="nature" name="nature">
+                <option value="">Select a nature...</option>
+                ${natures.map(n => `
+                  <option value="${n.name}" ${n.name === currentNature ? 'selected' : ''}>${n.name}</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div class="form-group full-width">
               <label for="heldItem">Held Item</label>
               <div class="autocomplete-container">
                 <input type="text" id="heldItem" name="heldItem" value="${heldItem}" placeholder="Type to search items..." autocomplete="off" />
                 <div class="autocomplete-dropdown" id="heldItemDropdown"></div>
               </div>
             </div>
+          </div>
 
-            <div class="form-group full-width">
-              <label for="nature">Nature</label>
-              <select id="nature" name="nature">
-                <option value="">Select a nature...</option>
-                ${natures.map(n => `
-                  <option value="${n.name}" ${n.name === nature ? 'selected' : ''}>${n.name}</option>
-                `).join('')}
-              </select>
+          <!-- Custom Moves Section -->
+          <div class="form-group full-width">
+            <label for="customMoves">Custom Moves</label>
+            <div style="display: flex; gap: clamp(0.5rem, 1.2vw, 0.75rem); margin-bottom: clamp(0.5rem, 1vh, 0.75rem);">
+              <div class="autocomplete-container" style="flex: 1;">
+                <input type="text" id="customMovesInput" placeholder="Type to search moves..." autocomplete="off" />
+                <div class="autocomplete-dropdown" id="customMovesDropdown"></div>
+              </div>
+              <button type="button" class="add-button" id="addMoveButton">Add</button>
+            </div>
+            <div class="chip-container" id="customMovesContainer">
+              ${existingCustomMoves.map(move => `
+                <div class="chip">
+                  ${move}
+                  <span class="chip-remove" data-move="${move}">×</span>
+                </div>
+              `).join('')}
             </div>
           </div>
 
@@ -335,7 +503,7 @@ export function renderEditPokemon(pokemonName) {
               <span class="arrow" id="abilitiesArrow">▶</span>
             </div>
             <div class="collapsible-content" id="abilitiesContent">
-              <div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 1.8vw, 1.1rem); color: #666;">Loading abilities...</div>
+              <div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #666;">Loading abilities...</div>
             </div>
           </div>
 
@@ -378,6 +546,9 @@ export function renderEditPokemon(pokemonName) {
           </div>
         </form>
       </div>
+
+      <!-- Back Button -->
+      <button class="back-button" id="backButton">←</button>
     </div>
   `;
 
@@ -387,6 +558,8 @@ export function renderEditPokemon(pokemonName) {
 export function attachEditPokemonListeners() {
   const pokemonName = sessionStorage.getItem('selectedPokemonName');
   const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
+  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+  const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
   // Collapsible sections
   ['skills', 'feats', 'abilities'].forEach(section => {
@@ -401,48 +574,43 @@ export function attachEditPokemonListeners() {
   });
 
   // Held item autocomplete
-  const heldItemInput = document.getElementById('heldItem');
-  const heldItemDropdown = document.getElementById('heldItemDropdown');
-  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
-  const itemNames = items.map(item => item.name || item);
+  setupAutocomplete(
+    'heldItem',
+    'heldItemDropdown',
+    items.map(item => item.name)
+  );
 
-  heldItemInput?.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase().trim();
+  // Custom moves autocomplete and chip management
+  const customMovesInput = document.getElementById('customMovesInput');
+  const customMovesDropdown = document.getElementById('customMovesDropdown');
+  const customMovesContainer = document.getElementById('customMovesContainer');
 
-    if (query.length === 0) {
-      heldItemDropdown.classList.remove('open');
-      heldItemDropdown.innerHTML = '';
-      return;
-    }
+  setupAutocomplete(
+    'customMovesInput',
+    'customMovesDropdown',
+    moves.map(move => move[0])
+  );
 
-    const filtered = itemNames.filter(name =>
-      name.toLowerCase().includes(query)
-    ).slice(0, 10);
+  // Add move button
+  document.getElementById('addMoveButton')?.addEventListener('click', () => {
+    const moveName = customMovesInput.value.trim();
+    if (moveName) {
+      // Check if already added
+      const existing = Array.from(customMovesContainer.querySelectorAll('.chip'))
+        .some(chip => chip.textContent.trim().replace('×', '').trim() === moveName);
 
-    if (filtered.length > 0) {
-      heldItemDropdown.innerHTML = filtered.map(name =>
-        `<div class="autocomplete-item">${name}</div>`
-      ).join('');
-      heldItemDropdown.classList.add('open');
-
-      heldItemDropdown.querySelectorAll('.autocomplete-item').forEach(item => {
-        item.addEventListener('click', () => {
-          heldItemInput.value = item.textContent;
-          heldItemDropdown.classList.remove('open');
-          heldItemDropdown.innerHTML = '';
-        });
-      });
-    } else {
-      heldItemDropdown.classList.remove('open');
-      heldItemDropdown.innerHTML = '';
+      if (!existing) {
+        addMoveChip(moveName);
+        customMovesInput.value = '';
+      }
     }
   });
 
-  // Close dropdown when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.autocomplete-container')) {
-      heldItemDropdown?.classList.remove('open');
-    }
+  // Remove existing move chips
+  customMovesContainer.querySelectorAll('.chip-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.target.closest('.chip').remove();
+    });
   });
 
   // Load abilities from server
@@ -455,34 +623,168 @@ export function attachEditPokemonListeners() {
     }));
   });
 
+  // Back button
+  document.getElementById('backButton')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'pokemon-card', pokemonName: pokemonName }
+    }));
+  });
+
+  // Nature change listener for stat recalculation
+  const natureSelect = document.getElementById('nature');
+  const originalNature = pokemonData[32] || '';
+
+  natureSelect?.addEventListener('change', (e) => {
+    recalculateStatsForNatureChange(originalNature, e.target.value, pokemonData);
+  });
+
   // Form submission
   document.getElementById('editPokemonForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    await handleFormSubmit(pokemonName);
+    await handleFormSubmit(pokemonName, originalNature);
   });
 }
 
-async function handleFormSubmit(pokemonName) {
+function setupAutocomplete(inputId, dropdownId, dataSource) {
+  const input = document.getElementById(inputId);
+  const dropdown = document.getElementById(dropdownId);
+
+  if (!input || !dropdown) return;
+
+  input.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+
+    if (query.length === 0) {
+      dropdown.classList.remove('open');
+      dropdown.innerHTML = '';
+      return;
+    }
+
+    const filtered = dataSource
+      .filter(item => item && item.toLowerCase().includes(query))
+      .slice(0, 10);
+
+    if (filtered.length > 0) {
+      dropdown.innerHTML = filtered.map(item =>
+        `<div class="autocomplete-item">${item}</div>`
+      ).join('');
+      dropdown.classList.add('open');
+
+      dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+          input.value = item.textContent;
+          dropdown.classList.remove('open');
+          dropdown.innerHTML = '';
+        });
+      });
+    } else {
+      dropdown.classList.remove('open');
+      dropdown.innerHTML = '';
+    }
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${dropdownId}`)) {
+      dropdown.classList.remove('open');
+    }
+  });
+}
+
+function addMoveChip(moveName) {
+  const container = document.getElementById('customMovesContainer');
+  const chip = document.createElement('div');
+  chip.className = 'chip';
+  chip.innerHTML = `
+    ${moveName}
+    <span class="chip-remove" data-move="${moveName}">×</span>
+  `;
+
+  const removeBtn = chip.querySelector('.chip-remove');
+  removeBtn.addEventListener('click', () => {
+    chip.remove();
+  });
+
+  container.appendChild(chip);
+}
+
+function recalculateStatsForNatureChange(oldNatureName, newNatureName, pokemonData) {
+  if (oldNatureName === newNatureName) return;
+
+  const natures = JSON.parse(sessionStorage.getItem('natures')) || [];
+  const statMapping = {
+    'strength': 'str',
+    'dexterity': 'dex',
+    'constitution': 'con',
+    'intelligence': 'int',
+    'wisdom': 'wis',
+    'charisma': 'cha',
+    'ac': 'ac'
+  };
+
+  // Reverse old nature
+  if (oldNatureName) {
+    const oldNature = natures.find(n => n.name === oldNatureName);
+    if (oldNature) {
+      const oldBoostStat = statMapping[oldNature.boostStat.toLowerCase()];
+      const oldNerfStat = statMapping[oldNature.nerfStat.toLowerCase()];
+
+      if (oldBoostStat && oldBoostStat !== 'ac') {
+        const input = document.getElementById(oldBoostStat);
+        if (input) {
+          input.value = parseInt(input.value) - parseInt(oldNature.boostAmount);
+        }
+      }
+
+      if (oldNerfStat && oldNerfStat !== 'ac') {
+        const input = document.getElementById(oldNerfStat);
+        if (input) {
+          input.value = parseInt(input.value) + parseInt(oldNature.nerfAmount);
+        }
+      }
+    }
+  }
+
+  // Apply new nature
+  if (newNatureName) {
+    const newNature = natures.find(n => n.name === newNatureName);
+    if (newNature) {
+      const newBoostStat = statMapping[newNature.boostStat.toLowerCase()];
+      const newNerfStat = statMapping[newNature.nerfStat.toLowerCase()];
+
+      if (newBoostStat && newBoostStat !== 'ac') {
+        const input = document.getElementById(newBoostStat);
+        if (input) {
+          input.value = parseInt(input.value) + parseInt(newNature.boostAmount);
+        }
+      }
+
+      if (newNerfStat && newNerfStat !== 'ac') {
+        const input = document.getElementById(newNerfStat);
+        if (input) {
+          input.value = parseInt(input.value) - parseInt(newNature.nerfAmount);
+        }
+      }
+    }
+  }
+}
+
+async function handleFormSubmit(pokemonName, originalNature) {
   const form = document.getElementById('editPokemonForm');
   const pokemonDataStr = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
   const pokemonData = JSON.parse(pokemonDataStr);
-
-  // Show loading
-  document.getElementById('content').innerHTML = '<div class="loading">Saving changes...</div>';
 
   try {
     // Gather form data
     const level = parseInt(form.level.value);
     const loyalty = parseInt(form.loyalty.value);
-    const hd = parseInt(form.hd.value);
-    const vd = parseInt(form.vd.value);
     const str = parseInt(form.str.value);
     const dex = parseInt(form.dex.value);
     const con = parseInt(form.con.value);
     const int = parseInt(form.int.value);
     const wis = parseInt(form.wis.value);
     const cha = parseInt(form.cha.value);
-    const heldItem = form.heldItem.value;
+    const heldItem = form.heldItem.value.trim();
     const nature = form.nature.value;
 
     // Get selected skills
@@ -493,17 +795,20 @@ async function handleFormSubmit(pokemonName) {
     const selectedFeats = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
       .map(cb => cb.value);
 
-    // Get selected abilities (format: slotIndex:name;description)
+    // Get selected abilities
     const selectedAbilities = Array.from(document.querySelectorAll('input[name="abilities"]:checked'))
       .map(cb => cb.value);
-    // Join with pipe separator since descriptions may contain commas
     const abilitiesString = selectedAbilities.join('|');
+
+    // Get custom moves from chips
+    const customMoveChips = Array.from(document.querySelectorAll('#customMovesContainer .chip'));
+    const customMoves = customMoveChips.map(chip =>
+      chip.textContent.trim().replace('×', '').trim()
+    );
 
     // Update Pokemon data array
     pokemonData[4] = level;
     pokemonData[7] = abilitiesString;
-    pokemonData[9] = hd;
-    pokemonData[11] = vd;
     pokemonData[15] = str;
     pokemonData[16] = dex;
     pokemonData[17] = con;
@@ -511,9 +816,10 @@ async function handleFormSubmit(pokemonName) {
     pokemonData[19] = wis;
     pokemonData[20] = cha;
     pokemonData[22] = selectedSkills.join(', ');
+    pokemonData[32] = nature;
     pokemonData[33] = loyalty;
-    pokemonData[34] = nature;
     pokemonData[35] = heldItem;
+    pokemonData[37] = customMoves.join(', ');
     pokemonData[50] = selectedFeats.join(', ');
 
     // Update session storage
@@ -547,44 +853,39 @@ async function handleFormSubmit(pokemonName) {
 
 async function loadAbilities(pokemonData) {
   const currentPokemonName = pokemonData[2];
-  console.log('Loading abilities for:', currentPokemonName);
-
   const abilitiesContent = document.getElementById('abilitiesContent');
+
   if (abilitiesContent) {
-    abilitiesContent.innerHTML = '<div style="padding: 1rem; font-size: 1.1rem; color: #666;">Loading abilities...</div>';
+    abilitiesContent.innerHTML = '<div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #666;">Loading abilities...</div>';
   }
 
   try {
     const response = await PokemonAPI.getAbilities(currentPokemonName);
     if (response.status === 'success') {
-      console.log('Fetched abilities:', response.abilities);
       populateAbilities(response.abilities, pokemonData);
     } else {
       console.error('Error fetching Pokemon abilities:', response.message);
       if (abilitiesContent) {
-        abilitiesContent.innerHTML = '<div style="padding: 1rem; font-size: 1.1rem; color: #f44336;">Failed to load abilities</div>';
+        abilitiesContent.innerHTML = '<div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #f44336;">Failed to load abilities</div>';
       }
-      showError('Failed to load Pokemon abilities. Please try again.');
+      showError('Failed to load Pokemon abilities');
     }
   } catch (error) {
     console.error('Error calling getPokemonAbilities:', error);
     if (abilitiesContent) {
-      abilitiesContent.innerHTML = '<div style="padding: 1rem; font-size: 1.1rem; color: #f44336;">Failed to load abilities</div>';
+      abilitiesContent.innerHTML = '<div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #f44336;">Failed to load abilities</div>';
     }
-    showError('Failed to load Pokemon abilities. Please try again.');
+    showError('Failed to load Pokemon abilities');
   }
 }
 
 function populateAbilities(abilities, pokemonData) {
-  console.log('Populating', abilities.length, 'abilities');
-
   const abilitiesContent = document.getElementById('abilitiesContent');
   if (!abilitiesContent) return;
 
   abilitiesContent.innerHTML = '';
 
   abilities.forEach((abilityData, index) => {
-    // Format from server: "slotIndex:Name, Description"
     const colonIndex = abilityData.indexOf(':');
     let slotIndex = index;
     let abilityString = abilityData;
@@ -605,12 +906,11 @@ function populateAbilities(abilities, pokemonData) {
     checkbox.type = 'checkbox';
     checkbox.id = `ability${slotIndex}`;
     checkbox.name = 'abilities';
-    // Store slotIndex:name;description format
     checkbox.value = slotIndex + ':' + abilityName + ';' + abilityDescription;
 
     const label = document.createElement('label');
     label.htmlFor = `ability${slotIndex}`;
-    label.innerHTML = `<strong>${abilityName}</strong>`;
+    label.textContent = abilityName;
 
     div.appendChild(checkbox);
     div.appendChild(label);
@@ -618,28 +918,20 @@ function populateAbilities(abilities, pokemonData) {
   });
 
   // Check currently selected abilities
-  // Format: "slotIndex:name;description|slotIndex:name;description"
   const currentAbilitiesRaw = pokemonData[7] || '';
   const currentAbilities = currentAbilitiesRaw
     .split('|')
     .map(ability => ability.trim())
     .filter(ability => ability);
 
-  console.log('Current abilities from database:', currentAbilities);
-
   currentAbilities.forEach(abilityData => {
     const colonIndex = abilityData.indexOf(':');
 
     if (colonIndex !== -1 && colonIndex < 3) {
-      // New format with slot index
       const slotIndex = abilityData.substring(0, colonIndex);
-      const abilityName = abilityData.substring(colonIndex + 1).split(';')[0].trim();
       const checkbox = document.getElementById(`ability${slotIndex}`);
       if (checkbox) {
         checkbox.checked = true;
-        console.log('Checked ability (by slot):', abilityName, 'slot:', slotIndex);
-      } else {
-        console.warn('Checkbox not found for slot:', slotIndex, 'ability:', abilityName);
       }
     } else {
       // Legacy format - match by name
@@ -658,7 +950,6 @@ function populateAbilities(abilities, pokemonData) {
 
         if (checkboxAbilityName.toLowerCase() === abilityName.toLowerCase()) {
           checkbox.checked = true;
-          console.log('Checked ability (by name):', abilityName);
         }
       });
     }

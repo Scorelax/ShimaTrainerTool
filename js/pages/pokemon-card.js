@@ -351,7 +351,7 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           gap: clamp(0.25rem, 0.5vh, 0.4rem);
-          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
+          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.4rem, 1vw, 0.6rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
           border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
           border-radius: clamp(8px, 1.5vw, 12px);
@@ -371,8 +371,8 @@ export function renderPokemonCard(pokemonName) {
           text-align: left;
           font-size: clamp(0.75rem, 1.6vw, 0.9rem);
           white-space: pre-line;
-          word-break: keep-all;
-          overflow-wrap: normal;
+          word-break: normal;
+          overflow-wrap: break-word;
           line-height: 1.6;
           width: 100%;
         }
@@ -474,19 +474,22 @@ export function renderPokemonCard(pokemonName) {
 
         .skills-container {
           width: 100%;
-          margin-top: clamp(-0.25rem, -0.5vh, -0.5rem);
         }
 
         .skills-container h3 {
-          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          margin-bottom: clamp(0.75rem, 2vh, 1rem);
           margin-top: 0;
           color: white;
           text-shadow: 0 2px 5px rgba(0,0,0,0.8);
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.4vw, 1px);
-          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-          text-align: center;
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+          text-align: left;
+          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.4rem, 1vw, 0.6rem);
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
         }
 
         .skills-grid {

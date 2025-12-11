@@ -46,29 +46,30 @@ export function renderPokemonCard(pokemonName) {
   const nature = pokemonData[32] || '';
   const loyalty = pokemonData[33] || 0;
 
-  // Parse nature to identify boosted/nerfed stats
+  // Parse nature to identify boosted/nerfed stats using natures from sessionStorage
   let boostedStat = '';
   let nerfedStat = '';
   if (nature) {
-    // Extract stat names from nature string - multiple formats:
-    // "Adamant (+ATK, -SPATK)" or "Adamant (Atk+, SpA-)" or "(+ATK, -SPATK)"
-    const boostMatch = nature.match(/\+\s*(\w+)|(\w+)\s*\+/i);
-    const nerfMatch = nature.match(/-\s*(\w+)|(\w+)\s*-/i);
+    const natures = JSON.parse(sessionStorage.getItem('natures')) || [];
+    const natureData = natures.find(n => n.name === nature);
 
-    if (boostMatch) {
-      let stat = (boostMatch[1] || boostMatch[2] || '').toLowerCase();
-      // Map stat abbreviations to D&D stats
-      stat = stat.replace(/^atk$/i, 'str').replace(/^spa$/i, 'int').replace(/^spd$/i, 'wis')
-                 .replace(/^spatk$/i, 'int').replace(/^spdef$/i, 'wis').replace(/^def$/i, 'con');
-      boostedStat = stat;
-    }
+    if (natureData) {
+      // Map from full stat names to abbreviated D&D stats
+      const statNameMapping = {
+        'strength': 'str',
+        'dexterity': 'dex',
+        'constitution': 'con',
+        'intelligence': 'int',
+        'wisdom': 'wis',
+        'charisma': 'cha',
+        'ac': 'ac'
+      };
 
-    if (nerfMatch) {
-      let stat = (nerfMatch[1] || nerfMatch[2] || '').toLowerCase();
-      // Map stat abbreviations to D&D stats
-      stat = stat.replace(/^atk$/i, 'str').replace(/^spa$/i, 'int').replace(/^spd$/i, 'wis')
-                 .replace(/^spatk$/i, 'int').replace(/^spdef$/i, 'wis').replace(/^def$/i, 'con');
-      nerfedStat = stat;
+      const boostStatFull = natureData.boostStat ? natureData.boostStat.toLowerCase() : '';
+      const nerfStatFull = natureData.nerfStat ? natureData.nerfStat.toLowerCase() : '';
+
+      boostedStat = statNameMapping[boostStatFull] || '';
+      nerfedStat = statNameMapping[nerfStatFull] || '';
     }
   }
   const stabBonus = pokemonData[34] || 2;
@@ -773,6 +774,181 @@ export function renderPokemonCard(pokemonName) {
           padding: clamp(1rem, 2vh, 1.5rem);
         }
 
+        /* Popup Modal Styles */
+        .popup-overlay {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0,0,0,0.7);
+          z-index: 2000;
+          justify-content: center;
+          align-items: center;
+          backdrop-filter: blur(3px);
+        }
+
+        .popup-overlay.active {
+          display: flex;
+        }
+
+        .popup-content {
+          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 20px);
+          padding: clamp(1.5rem, 3vw, 2.5rem);
+          max-width: min(90vw, 600px);
+          max-height: 85vh;
+          overflow-y: auto;
+          position: relative;
+          box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+        }
+
+        .popup-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          padding-bottom: clamp(0.75rem, 1.5vh, 1rem);
+          border-bottom: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+        }
+
+        .popup-title {
+          font-size: clamp(1.3rem, 3vw, 1.8rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          color: #FFDE00;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .popup-close {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: 50%;
+          width: clamp(35px, 7vw, 45px);
+          height: clamp(35px, 7vw, 45px);
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          font-weight: bold;
+          cursor: pointer;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          flex-shrink: 0;
+        }
+
+        .popup-close:hover {
+          transform: scale(1.1) rotate(90deg);
+          box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+
+        .popup-body {
+          color: #e0e0e0;
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          line-height: 1.6;
+        }
+
+        /* Combat Tracker Specific Styles */
+        .combat-tracker-container {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .combat-stats-row {
+          display: flex;
+          gap: clamp(1rem, 2vw, 2rem);
+        }
+
+        .combat-stat-column {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .combat-stat-label {
+          font-weight: 900;
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          color: #FFDE00;
+          text-transform: uppercase;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+        }
+
+        .combat-stat-value {
+          font-size: clamp(1.2rem, 2.8vw, 1.6rem);
+          font-weight: 900;
+          color: white;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .combat-input {
+          width: 100%;
+          padding: clamp(0.5rem, 1vh, 0.75rem);
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+          border-radius: clamp(8px, 1.5vw, 10px);
+          color: white;
+          font-size: clamp(0.9rem, 2vw, 1rem);
+          font-weight: 700;
+        }
+
+        .combat-input:focus {
+          outline: none;
+          border-color: #FFDE00;
+        }
+
+        .combat-buttons {
+          display: flex;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+        }
+
+        .combat-btn {
+          flex: 1;
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(8px, 1.5vw, 10px);
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-weight: 900;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          text-transform: uppercase;
+        }
+
+        .combat-btn-add {
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+          color: white;
+        }
+
+        .combat-btn-add:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(76,175,80,0.5);
+        }
+
+        .combat-btn-remove {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        .combat-btn-remove:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(238,21,21,0.5);
+        }
+
+        .combat-btn-restore {
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          color: white;
+        }
+
+        .combat-btn-restore:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(59,76,202,0.5);
+        }
+
         /* Back button - matches trainer-card style */
         .back-button {
           position: fixed;
@@ -1122,46 +1298,54 @@ export function renderPokemonCard(pokemonName) {
       <button id="prevPage" class="arrow-button">&#x2190;</button>
 
       <!-- Ability Popup -->
-      <div id="abilityPopup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-        <div style="background: white; border-radius: 1.3vh; padding: 2.6vh; max-width: 65vh; width: 90%; max-height: 80vh; overflow-y: auto;">
-          <h2 id="abilityPopupTitle" style="margin-top: 0; color: #333; font-size: clamp(1.4rem, 2.4vh, 2.4vh);">Ability</h2>
-          <div id="abilityPopupContent" style="font-size: clamp(0.9rem, 1.5vh, 1.5vh); line-height: 1.6; color: black;"></div>
-          <button id="closeAbilityPopup" style="margin-top: 2vh; padding: 1.3vh 2.6vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-size: clamp(0.8rem, 1.3vh, 1.3vh);">Close</button>
+      <div id="abilityPopup" class="popup-overlay">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title" id="abilityPopupTitle">Ability</div>
+            <button class="popup-close" id="closeAbilityPopup">×</button>
+          </div>
+          <div class="popup-body" id="abilityPopupContent"></div>
         </div>
       </div>
 
       <!-- Held Item Popup -->
-      <div id="heldItemPopup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-        <div style="background: white; border-radius: 1.3vh; padding: 2.6vh; max-width: 65vh; width: 90%; max-height: 80vh; overflow-y: auto;">
-          <h2 style="margin-top: 0; color: #333; font-size: clamp(1.4rem, 2.4vh, 2.4vh);">Held Item</h2>
-          <div style="font-size: clamp(0.9rem, 1.5vh, 1.5vh); line-height: 1.6; color: black;">${heldItem}</div>
-          <button id="closeHeldItemPopup" style="margin-top: 2vh; padding: 1.3vh 2.6vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-size: clamp(0.8rem, 1.3vh, 1.3vh);">Close</button>
+      <div id="heldItemPopup" class="popup-overlay">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Held Item</div>
+            <button class="popup-close" id="closeHeldItemPopup">×</button>
+          </div>
+          <div class="popup-body" id="heldItemContent"></div>
         </div>
       </div>
 
       <!-- Combat Tracker Popup -->
-      <div id="combatTrackerPopup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-        <div style="background: white; border-radius: 1.3vh; padding: 2.6vh; max-width: 65vh; width: 90%;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2vh;">
-            <h2 style="margin: 0; color: #333; font-size: clamp(1.4rem, 2.4vh, 2.4vh);">Combat Tracker</h2>
-            <button id="closeCombatTracker" style="background: none; border: none; font-size: 2rem; cursor: pointer; color: #333;">×</button>
+      <div id="combatTrackerPopup" class="popup-overlay">
+        <div class="popup-content" style="max-width: min(90vw, 500px);">
+          <div class="popup-header">
+            <div class="popup-title">Combat Tracker</div>
+            <button class="popup-close" id="closeCombatTracker">×</button>
           </div>
-          <div style="display: flex; gap: 2vh; margin-bottom: 2vh;">
-            <div style="flex: 1;">
-              <div style="font-weight: bold; margin-bottom: 1vh; color: #333;">HP</div>
-              <div id="combatCurrentHP" style="font-size: 1.5rem; margin-bottom: 1vh; color: #333;">${hp} / ${hp}</div>
-              <input type="number" id="hpChangeInput" placeholder="HP Amount" style="width: 100%; padding: 1vh; border: 2px solid #ddd; border-radius: 0.5vh;">
+          <div class="popup-body">
+            <div class="combat-tracker-container">
+              <div class="combat-stats-row">
+                <div class="combat-stat-column">
+                  <div class="combat-stat-label">HP</div>
+                  <div class="combat-stat-value" id="combatCurrentHP">${hp} / ${hp}</div>
+                  <input type="number" id="hpChangeInput" class="combat-input" placeholder="HP Amount">
+                </div>
+                <div class="combat-stat-column">
+                  <div class="combat-stat-label">VP</div>
+                  <div class="combat-stat-value" id="combatCurrentVP">${vp} / ${vp}</div>
+                  <input type="number" id="vpChangeInput" class="combat-input" placeholder="VP Amount">
+                </div>
+              </div>
+              <div class="combat-buttons">
+                <button id="addStats" class="combat-btn combat-btn-add">➕ Add</button>
+                <button id="removeStats" class="combat-btn combat-btn-remove">➖ Remove</button>
+                <button id="fullRestore" class="combat-btn combat-btn-restore">✨ Restore</button>
+              </div>
             </div>
-            <div style="flex: 1;">
-              <div style="font-weight: bold; margin-bottom: 1vh; color: #333;">VP</div>
-              <div id="combatCurrentVP" style="font-size: 1.5rem; margin-bottom: 1vh; color: #333;">${vp} / ${vp}</div>
-              <input type="number" id="vpChangeInput" placeholder="VP Amount" style="width: 100%; padding: 1vh; border: 2px solid #ddd; border-radius: 0.5vh;">
-            </div>
-          </div>
-          <div style="display: flex; gap: 1vh;">
-            <button id="addStats" style="flex: 1; padding: 1.5vh; background: #4CAF50; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-weight: bold;">➕ Add</button>
-            <button id="removeStats" style="flex: 1; padding: 1.5vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-weight: bold;">➖ Remove</button>
-            <button id="fullRestore" style="flex: 1; padding: 1.5vh; background: #2196F3; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-weight: bold;">✨ Restore</button>
           </div>
         </div>
       </div>
@@ -1335,57 +1519,91 @@ export function attachPokemonCardListeners() {
         document.getElementById('abilityPopupTitle').textContent = ability.name;
         document.getElementById('abilityPopupContent').textContent = ability.description;
         const abilityPopup = document.getElementById('abilityPopup');
-        abilityPopup.style.display = 'flex';
+        abilityPopup.classList.add('active');
       }
     });
   });
 
   // Close ability popup button
   document.getElementById('closeAbilityPopup')?.addEventListener('click', () => {
-    document.getElementById('abilityPopup').style.display = 'none';
+    document.getElementById('abilityPopup').classList.remove('active');
   });
 
   // Close ability popup when clicking outside
   document.getElementById('abilityPopup')?.addEventListener('click', (e) => {
     if (e.target.id === 'abilityPopup') {
-      document.getElementById('abilityPopup').style.display = 'none';
+      document.getElementById('abilityPopup').classList.remove('active');
     }
   });
 
   // Held item button click listener
   document.querySelector('.held-item-button')?.addEventListener('click', () => {
     const heldItemPopup = document.getElementById('heldItemPopup');
-    heldItemPopup.style.display = 'flex';
+    const heldItemContent = document.getElementById('heldItemContent');
+
+    // Get held item from pokemon data
+    const heldItem = pokemonData[35] || 'None';
+
+    if (heldItem !== 'None') {
+      // Look up item details from sessionStorage
+      const itemsData = JSON.parse(sessionStorage.getItem('items')) || [];
+      const item = itemsData.find(i => i[0] === heldItem);
+
+      if (item) {
+        heldItemContent.innerHTML = `
+          <div style="margin-bottom: 1rem;">
+            <div style="font-weight: 900; font-size: clamp(1.05rem, 2.2vw, 1.2rem); margin-bottom: 0.5rem; color: #FFDE00; text-transform: uppercase;">
+              ${item[0]}
+            </div>
+            <div style="color: #c0c0c0; font-size: clamp(0.9rem, 1.9vw, 1rem);">
+              ${item[1] || 'No description available'}
+            </div>
+          </div>
+        `;
+      } else {
+        heldItemContent.innerHTML = `
+          <div style="color: #c0c0c0;">
+            ${heldItem}
+            <br><br>
+            <em>Item description not found in database.</em>
+          </div>
+        `;
+      }
+    } else {
+      heldItemContent.innerHTML = '<div style="color: #c0c0c0;">No held item</div>';
+    }
+
+    heldItemPopup.classList.add('active');
   });
 
   // Close held item popup
   document.getElementById('closeHeldItemPopup')?.addEventListener('click', () => {
-    document.getElementById('heldItemPopup').style.display = 'none';
+    document.getElementById('heldItemPopup').classList.remove('active');
   });
 
   document.getElementById('heldItemPopup')?.addEventListener('click', (e) => {
     if (e.target.id === 'heldItemPopup') {
-      document.getElementById('heldItemPopup').style.display = 'none';
+      document.getElementById('heldItemPopup').classList.remove('active');
     }
   });
 
   // Current HP/VP boxes click listeners - open combat tracker
   document.getElementById('currentHpValue')?.addEventListener('click', () => {
-    document.getElementById('combatTrackerPopup').style.display = 'flex';
+    document.getElementById('combatTrackerPopup').classList.add('active');
   });
 
   document.getElementById('currentVpValue')?.addEventListener('click', () => {
-    document.getElementById('combatTrackerPopup').style.display = 'flex';
+    document.getElementById('combatTrackerPopup').classList.add('active');
   });
 
   // Close combat tracker
   document.getElementById('closeCombatTracker')?.addEventListener('click', () => {
-    document.getElementById('combatTrackerPopup').style.display = 'none';
+    document.getElementById('combatTrackerPopup').classList.remove('active');
   });
 
   document.getElementById('combatTrackerPopup')?.addEventListener('click', (e) => {
     if (e.target.id === 'combatTrackerPopup') {
-      document.getElementById('combatTrackerPopup').style.display = 'none';
+      document.getElementById('combatTrackerPopup').classList.remove('active');
     }
   });
 

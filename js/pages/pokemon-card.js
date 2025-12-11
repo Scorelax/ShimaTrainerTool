@@ -671,21 +671,21 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .moves-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(clamp(90px, 14vw, 120px), 1fr));
-          gap: clamp(0.5rem, 1vw, 0.75rem);
-          padding: clamp(0.5rem, 1.5vw, 0.8rem);
-          border-radius: clamp(10px, 2vw, 15px);
-          background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+          display: flex;
+          flex-wrap: wrap;
+          gap: clamp(0.4rem, 1vw, 0.6rem);
+          margin-top: clamp(1rem, 2vh, 1.5rem);
         }
 
         .move-item {
           background: rgba(255,255,255,0.9);
           color: #333;
-          padding: clamp(0.5rem, 1vh, 0.75rem);
+          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
           border-radius: clamp(8px, 1.5vw, 12px);
           text-align: center;
           font-weight: 700;
+          white-space: nowrap;
+          width: auto;
           font-size: clamp(0.75rem, 1.5vw, 0.9rem);
           cursor: pointer;
           transition: all 0.3s;
@@ -959,21 +959,25 @@ export function renderPokemonCard(pokemonName) {
                 <span id="vdValue">${vd}</span>
               </div>
             </div>
-            <div class="info-item">
-              <span class="info-item-label">STAB:</span>
-              <span class="info-item-value" id="stabValue">${stab}</span>
+            <div class="info-item-double">
+              <div class="info-item-half">
+                <span class="info-item-label">STAB:</span>
+                <span id="stabValue">${stab}</span>
+              </div>
+              <div class="info-item-half">
+                <span class="info-item-label">Proficiency:</span>
+                <span id="proficiencyValue">+${proficiencyBonus}</span>
+              </div>
             </div>
-            <div class="info-item">
-              <span class="info-item-label">Proficiency:</span>
-              <span class="info-item-value" id="proficiencyValue">+${proficiencyBonus}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-item-label">Initiative:</span>
-              <span class="info-item-value" id="initiativeValue">${initiative >= 0 ? '+' : ''}${initiative}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-item-label">Loyalty:</span>
-              <span class="info-item-value" id="loyaltyValue">${loyalty}</span>
+            <div class="info-item-double">
+              <div class="info-item-half">
+                <span class="info-item-label">Initiative:</span>
+                <span id="initiativeValue">${initiative >= 0 ? '+' : ''}${initiative}</span>
+              </div>
+              <div class="info-item-half">
+                <span class="info-item-label">Loyalty:</span>
+                <span id="loyaltyValue">${loyalty}</span>
+              </div>
             </div>
             <div class="info-item">
               <span class="info-item-label">Ability:</span>
@@ -996,8 +1000,6 @@ export function renderPokemonCard(pokemonName) {
 
         <!-- Right Column: Stats + Moves -->
         <div class="right-column">
-          <h3 class="battle-stats-container">Stats</h3>
-
           <!-- Row 1: AC, HP, VP -->
           <div class="stat-main-container">
             <div class="stat-box-wrapper">
@@ -1007,10 +1009,12 @@ export function renderPokemonCard(pokemonName) {
             <div class="stat-box-wrapper">
               <div class="stat-label-box">HP</div>
               <div class="stat-box" id="hpValue">${hp}</div>
+              <div class="current-stat-box" id="currentHpValue">${hp}</div>
             </div>
             <div class="stat-box-wrapper">
               <div class="stat-label-box">VP</div>
               <div class="stat-box" id="vpValue">${vp}</div>
+              <div class="current-stat-box" id="currentVpValue">${vp}</div>
             </div>
           </div>
 
@@ -1048,7 +1052,6 @@ export function renderPokemonCard(pokemonName) {
             </div>
           </div>
 
-          <h3 class="moves-list-container">Moves</h3>
           <div class="moves-grid" id="movesGrid">
             ${moves.length > 0 ? moves.map(move => `<div class="move-item" data-move="${move}">${move}</div>`).join('') : '<div class="no-moves">No moves learned</div>'}
           </div>
@@ -1138,6 +1141,9 @@ export function attachPokemonCardListeners() {
 
   // Battle Page button
   document.getElementById('battlePageButton')?.addEventListener('click', togglePage);
+
+  // Info Page button
+  document.getElementById('infoPageButton')?.addEventListener('click', togglePage);
 
   // Active Party checkbox
   document.getElementById('inActiveParty')?.addEventListener('change', async (e) => {

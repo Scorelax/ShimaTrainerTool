@@ -198,7 +198,7 @@ export function renderPokemonCard(pokemonName) {
 
         .pokemon-card-page {
           display: grid;
-          grid-template-columns: minmax(28%, 33%) 1fr;
+          grid-template-columns: minmax(25%, 30%) 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           padding: clamp(1rem, 2vh, 2rem) clamp(1rem, 2vw, 3rem) clamp(1rem, 2vh, 1.5rem);
           min-height: auto;
@@ -233,7 +233,7 @@ export function renderPokemonCard(pokemonName) {
         /* Info Page Grid Layout - matches trainer-info EXACTLY */
         .info-page-grid {
           display: grid;
-          grid-template-columns: minmax(28%, 33%) 1fr;
+          grid-template-columns: minmax(25%, 30%) 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           grid-column: 1 / -1;
         }
@@ -241,7 +241,7 @@ export function renderPokemonCard(pokemonName) {
         /* Battle Page Grid Layout - matches trainer-info EXACTLY */
         .battle-page-grid {
           display: grid;
-          grid-template-columns: minmax(28%, 33%) 1fr;
+          grid-template-columns: minmax(25%, 30%) 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           grid-column: 1 / -1;
         }

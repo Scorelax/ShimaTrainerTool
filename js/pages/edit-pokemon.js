@@ -307,7 +307,8 @@ export function renderEditPokemon(pokemonName) {
           gap: clamp(0.5rem, 1.2vw, 0.75rem);
         }
 
-        .checkbox-item input[type="checkbox"] {
+        .checkbox-item input[type="checkbox"],
+        .checkbox-item input[type="radio"] {
           margin-top: clamp(0.1rem, 0.3vh, 0.2rem);
           width: clamp(18px, 4vw, 22px);
           height: clamp(18px, 4vw, 22px);
@@ -562,16 +563,19 @@ export function renderEditPokemon(pokemonName) {
           </div>
 
           <!-- Nature Section -->
-          <div class="form-group full-width" style="margin-bottom: clamp(1rem, 2vh, 1.5rem);">
-            <div class="styled-dropdown-header">
-              <label for="nature">Nature</label>
+          <div class="collapsible-section">
+            <div class="collapsible-header" id="natureHeader">
+              <span>Nature</span>
+              <span class="arrow" id="natureArrow">▶</span>
             </div>
-            <select id="nature" name="nature" class="styled-select">
-              <option value="">Select a nature...</option>
+            <div class="collapsible-content" id="natureContent">
               ${natures.map(n => `
-                <option value="${n.name}" ${n.name === currentNature ? 'selected' : ''}>${n.name}</option>
+                <div class="checkbox-item">
+                  <input type="radio" id="nature_${n.name.replace(/\s+/g, '_')}" name="nature" value="${n.name}" ${n.name === currentNature ? 'checked' : ''} />
+                  <label for="nature_${n.name.replace(/\s+/g, '_')}">${n.name}</label>
+                </div>
               `).join('')}
-            </select>
+            </div>
           </div>
 
           <!-- Abilities Section -->
@@ -640,7 +644,7 @@ export function attachEditPokemonListeners() {
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
   // Collapsible sections
-  ['skills', 'feats', 'abilities'].forEach(section => {
+  ['skills', 'feats', 'abilities', 'nature'].forEach(section => {
     const header = document.getElementById(`${section}Header`);
     const content = document.getElementById(`${section}Content`);
     const arrow = document.getElementById(`${section}Arrow`);
@@ -734,11 +738,15 @@ export function attachEditPokemonListeners() {
   });
 
   // Nature change listener for stat recalculation
-  const natureSelect = document.getElementById('nature');
+  const natureRadios = document.querySelectorAll('input[name="nature"]');
   const originalNature = pokemonData[32] || '';
 
-  natureSelect?.addEventListener('change', (e) => {
-    recalculateStatsForNatureChange(originalNature, e.target.value, pokemonData);
+  natureRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        recalculateStatsForNatureChange(originalNature, e.target.value, pokemonData);
+      }
+    });
   });
 
   // Form submission

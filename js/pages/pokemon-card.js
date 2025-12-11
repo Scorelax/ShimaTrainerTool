@@ -50,19 +50,35 @@ export function renderPokemonCard(pokemonName) {
   let boostedStat = '';
   let nerfedStat = '';
   if (nature) {
-    // Extract stat names from nature string like "Adamant (+ATK, -SPATK)" or "Adamant (Atk+, SpA-)"
-    const boostMatch = nature.match(/\+\s*(\w+)|\(\s*(\w+)\s*\+/i);
-    const nerfMatch = nature.match(/-\s*(\w+)|\(\s*(\w+)\s*-/i);
-    if (boostMatch) boostedStat = (boostMatch[1] || boostMatch[2] || '').toLowerCase().replace('atk', 'str').replace('spa', 'int').replace('spd', 'wis');
-    if (nerfMatch) nerfedStat = (nerfMatch[1] || nerfMatch[2] || '').toLowerCase().replace('atk', 'str').replace('spa', 'int').replace('spd', 'wis');
+    // Extract stat names from nature string - multiple formats:
+    // "Adamant (+ATK, -SPATK)" or "Adamant (Atk+, SpA-)" or "(+ATK, -SPATK)"
+    const boostMatch = nature.match(/\+\s*(\w+)|(\w+)\s*\+/i);
+    const nerfMatch = nature.match(/-\s*(\w+)|(\w+)\s*-/i);
+
+    if (boostMatch) {
+      let stat = (boostMatch[1] || boostMatch[2] || '').toLowerCase();
+      // Map stat abbreviations to D&D stats
+      stat = stat.replace(/^atk$/i, 'str').replace(/^spa$/i, 'int').replace(/^spd$/i, 'wis')
+                 .replace(/^spatk$/i, 'int').replace(/^spdef$/i, 'wis').replace(/^def$/i, 'con');
+      boostedStat = stat;
+    }
+
+    if (nerfMatch) {
+      let stat = (nerfMatch[1] || nerfMatch[2] || '').toLowerCase();
+      // Map stat abbreviations to D&D stats
+      stat = stat.replace(/^atk$/i, 'str').replace(/^spa$/i, 'int').replace(/^spd$/i, 'wis')
+                 .replace(/^spatk$/i, 'int').replace(/^spdef$/i, 'wis').replace(/^def$/i, 'con');
+      nerfedStat = stat;
+    }
   }
   const stabBonus = pokemonData[34] || 2;
   const heldItem = pokemonData[35] || 'None';
 
   // Helper function to get stat color based on nature
   const getStatColor = (statName) => {
-    if (boostedStat && statName.toLowerCase().includes(boostedStat)) return '#EE1515'; // Red for boosted
-    if (nerfedStat && statName.toLowerCase().includes(nerfedStat)) return '#3B4CCA'; // Blue for nerfed
+    const normalizedStatName = statName.toLowerCase();
+    if (boostedStat && normalizedStatName === boostedStat) return '#EE1515'; // Red for boosted
+    if (nerfedStat && normalizedStatName === nerfedStat) return '#3B4CCA'; // Blue for nerfed
     return 'black'; // Default color
   };
   const nickname = pokemonData[36] || '';
@@ -136,6 +152,14 @@ export function renderPokemonCard(pokemonName) {
 
   const displayName = name; // Just use the Pokemon name, not nickname
   const typingText = type2 ? `${type1} - ${type2}` : type1;
+
+  // Create typing buttons with colors
+  const createTypeButton = (typeValue) => {
+    const bgColor = getMoveTypeColor(typeValue);
+    const textColor = getTextColorForBackground(bgColor);
+    return `<span style="display: inline-block; background-color: ${bgColor}; color: ${textColor}; padding: 0.3vh 1vh; border-radius: 0.5vh; font-size: clamp(0.7rem, 1.5vw, 0.85rem); font-weight: bold; margin: 0 0.2rem;">${typeValue}</span>`;
+  };
+  const typingButtons = type2 ? `${createTypeButton(type1)}${createTypeButton(type2)}` : createTypeButton(type1);
 
   // Format saving throws - replace newlines with commas
   const savingThrowFormatted = savingThrow.replace(/\n/g, ', ');
@@ -926,7 +950,7 @@ export function renderPokemonCard(pokemonName) {
             </div>
             <div class="info-item">
               <span class="info-item-label">Typing:</span>
-              <span class="info-item-value" id="pokemonTyping">${typingText}</span>
+              <span class="info-item-value" id="pokemonTyping">${typingButtons}</span>
             </div>
             <div class="info-item">
               <span class="info-item-label">Saving Throw(s):</span>
@@ -1029,7 +1053,7 @@ export function renderPokemonCard(pokemonName) {
             <div class="info-item">
               <span class="info-item-label">Held Item:</span>
               <span class="info-item-value">
-                ${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.4vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0; font-weight: bold; vertical-align: baseline;">${heldItem}</button>` : 'None'}
+                ${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0.3vh; font-weight: bold;">${heldItem}</button>` : 'None'}
               </span>
             </div>
             <div class="info-item-column">

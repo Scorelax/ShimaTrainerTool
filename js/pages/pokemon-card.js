@@ -815,10 +815,9 @@ export function renderPokemonCard(pokemonName) {
         /* Mobile Responsive */
         /* Large tablet - wider left column */
         @media (max-width: 1024px) {
-          .pokemon-card-page,
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: minmax(30%, 35%) 1fr;
+            grid-template-columns: 32% 1fr;
             gap: clamp(1.5rem, 3vw, 2.5rem);
           }
 
@@ -833,12 +832,10 @@ export function renderPokemonCard(pokemonName) {
 
         /* Tablet Portrait - even wider left column */
         @media (max-width: 768px) {
-          .pokemon-card-page,
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: minmax(35%, 40%) 1fr;
+            grid-template-columns: 37% 1fr;
             gap: clamp(1rem, 2.5vw, 2rem);
-            padding: clamp(1rem, 2vh, 1.5rem) clamp(0.75rem, 1.5vw, 1.5rem);
           }
 
           .ability-container {
@@ -852,12 +849,10 @@ export function renderPokemonCard(pokemonName) {
 
         /* Mobile phones - maintain 2 columns with larger left side */
         @media (max-width: 600px) {
-          .pokemon-card-page,
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: minmax(40%, 45%) 1fr;
+            grid-template-columns: 42% 1fr;
             gap: clamp(0.75rem, 2vw, 1.5rem);
-            padding: clamp(1rem, 2vh, 1.5rem) clamp(0.5rem, 1vw, 1rem);
           }
 
           .ability-container {
@@ -883,12 +878,10 @@ export function renderPokemonCard(pokemonName) {
 
         /* Small mobile phones - compact 2 columns */
         @media (max-width: 480px) {
-          .pokemon-card-page,
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: minmax(42%, 48%) 1fr;
+            grid-template-columns: 45% 1fr;
             gap: clamp(0.5rem, 1.5vw, 1rem);
-            padding: clamp(0.75rem, 1.5vh, 1.25rem) clamp(0.4rem, 0.8vw, 0.75rem);
           }
 
           .ability-container {
@@ -913,7 +906,6 @@ export function renderPokemonCard(pokemonName) {
 
         /* Very small screens - single column fallback */
         @media (max-width: 360px) {
-          .pokemon-card-page,
           .info-page-grid,
           .battle-page-grid {
             grid-template-columns: 1fr;
@@ -1052,9 +1044,7 @@ export function renderPokemonCard(pokemonName) {
             </div>
             <div class="info-item">
               <span class="info-item-label">Held Item:</span>
-              <span class="info-item-value">
-                ${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0 0.3vh; font-weight: bold; vertical-align: middle;">${heldItem}</button>` : 'None'}
-              </span>
+              <span class="info-item-value">${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0 0.3vh; font-weight: bold; vertical-align: middle;">${heldItem}</button>` : 'None'}</span>
             </div>
             <div class="info-item-column">
               <span class="info-item-label">Movement:</span>

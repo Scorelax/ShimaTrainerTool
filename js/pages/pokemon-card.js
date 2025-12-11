@@ -45,8 +45,26 @@ export function renderPokemonCard(pokemonName) {
   const proficiencyBonus = pokemonData[31] || 2;
   const nature = pokemonData[32] || '';
   const loyalty = pokemonData[33] || 0;
+
+  // Parse nature to identify boosted/nerfed stats
+  let boostedStat = '';
+  let nerfedStat = '';
+  if (nature) {
+    // Extract stat names from nature string like "Adamant (+ATK, -SPATK)" or "Adamant (Atk+, SpA-)"
+    const boostMatch = nature.match(/\+\s*(\w+)|\(\s*(\w+)\s*\+/i);
+    const nerfMatch = nature.match(/-\s*(\w+)|\(\s*(\w+)\s*-/i);
+    if (boostMatch) boostedStat = (boostMatch[1] || boostMatch[2] || '').toLowerCase().replace('atk', 'str').replace('spa', 'int').replace('spd', 'wis');
+    if (nerfMatch) nerfedStat = (nerfMatch[1] || nerfMatch[2] || '').toLowerCase().replace('atk', 'str').replace('spa', 'int').replace('spd', 'wis');
+  }
   const stabBonus = pokemonData[34] || 2;
   const heldItem = pokemonData[35] || 'None';
+
+  // Helper function to get stat color based on nature
+  const getStatColor = (statName) => {
+    if (boostedStat && statName.toLowerCase().includes(boostedStat)) return '#EE1515'; // Red for boosted
+    if (nerfedStat && statName.toLowerCase().includes(nerfedStat)) return '#3B4CCA'; // Blue for nerfed
+    return 'black'; // Default color
+  };
   const nickname = pokemonData[36] || '';
   const inActiveParty = !!pokemonData[38];
   const senses = pokemonData[49] || '';
@@ -165,7 +183,7 @@ export function renderPokemonCard(pokemonName) {
   // Generate ability buttons HTML
   const abilityButtonsHTML = parsedAbilities.length > 0
     ? parsedAbilities.map((ability, index) =>
-        `<button class="ability-button" data-ability-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.8rem, 1.5vh, 1.5vh); cursor: pointer; margin: 0.3vh; font-weight: bold;">${ability.name}</button>`
+        `<button class="ability-button" data-ability-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0.3vh; font-weight: bold;">${ability.name}</button>`
       ).join(' ')
     : 'None';
 
@@ -985,7 +1003,9 @@ export function renderPokemonCard(pokemonName) {
             </div>
             <div class="info-item">
               <span class="info-item-label">Held Item:</span>
-              <span class="info-item-value" id="heldItemName">${heldItem}</span>
+              <span class="info-item-value">
+                ${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0; font-weight: bold;">${heldItem}</button>` : 'None'}
+              </span>
             </div>
             <div class="info-item-column">
               <span class="info-item-label">Movement:</span>
@@ -1022,32 +1042,32 @@ export function renderPokemonCard(pokemonName) {
           <div class="ability-container">
             <div class="ability-group">
               <div class="ability-label">STR</div>
-              <div class="ability-box" id="strValue">${str}</div>
+              <div class="ability-box" id="strValue" style="color: ${getStatColor('str')}">${str}</div>
               <div class="modifier-box" id="strModifierValue">${strMod >= 0 ? '+' : ''}${strMod}</div>
             </div>
             <div class="ability-group">
               <div class="ability-label">DEX</div>
-              <div class="ability-box" id="dexValue">${dex}</div>
+              <div class="ability-box" id="dexValue" style="color: ${getStatColor('dex')}">${dex}</div>
               <div class="modifier-box" id="dexModifierValue">${dexMod >= 0 ? '+' : ''}${dexMod}</div>
             </div>
             <div class="ability-group">
               <div class="ability-label">CON</div>
-              <div class="ability-box" id="conValue">${con}</div>
+              <div class="ability-box" id="conValue" style="color: ${getStatColor('con')}">${con}</div>
               <div class="modifier-box" id="conModifierValue">${conMod >= 0 ? '+' : ''}${conMod}</div>
             </div>
             <div class="ability-group">
               <div class="ability-label">INT</div>
-              <div class="ability-box" id="intValue">${int}</div>
+              <div class="ability-box" id="intValue" style="color: ${getStatColor('int')}">${int}</div>
               <div class="modifier-box" id="intModifierValue">${intMod >= 0 ? '+' : ''}${intMod}</div>
             </div>
             <div class="ability-group">
               <div class="ability-label">WIS</div>
-              <div class="ability-box" id="wisValue">${wis}</div>
+              <div class="ability-box" id="wisValue" style="color: ${getStatColor('wis')}">${wis}</div>
               <div class="modifier-box" id="wisModifierValue">${wisMod >= 0 ? '+' : ''}${wisMod}</div>
             </div>
             <div class="ability-group">
               <div class="ability-label">CHA</div>
-              <div class="ability-box" id="chaValue">${cha}</div>
+              <div class="ability-box" id="chaValue" style="color: ${getStatColor('cha')}">${cha}</div>
               <div class="modifier-box" id="chaModifierValue">${chaMod >= 0 ? '+' : ''}${chaMod}</div>
             </div>
           </div>

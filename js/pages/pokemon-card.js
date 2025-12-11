@@ -740,18 +740,119 @@ export function renderPokemonCard(pokemonName) {
         }
 
         /* Mobile Responsive */
-        @media (max-width: 480px) {
+        /* Large tablet - wider left column */
+        @media (max-width: 1024px) {
+          .pokemon-card-page,
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .skills-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: minmax(30%, 35%) 1fr;
+            gap: clamp(1.5rem, 3vw, 2.5rem);
           }
 
           .ability-container {
             grid-template-columns: repeat(3, 1fr);
+          }
+
+          .skills-grid {
+            grid-template-columns: repeat(auto-fit, minmax(clamp(120px, 18vw, 180px), 1fr));
+          }
+        }
+
+        /* Tablet Portrait - even wider left column */
+        @media (max-width: 768px) {
+          .pokemon-card-page,
+          .info-page-grid,
+          .battle-page-grid {
+            grid-template-columns: minmax(35%, 40%) 1fr;
+            gap: clamp(1rem, 2.5vw, 2rem);
+            padding: clamp(1rem, 2vh, 1.5rem) clamp(0.75rem, 1.5vw, 1.5rem);
+          }
+
+          .ability-container {
+            grid-template-columns: repeat(3, 1fr);
+          }
+
+          .skills-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+
+        /* Mobile phones - maintain 2 columns with larger left side */
+        @media (max-width: 600px) {
+          .pokemon-card-page,
+          .info-page-grid,
+          .battle-page-grid {
+            grid-template-columns: minmax(40%, 45%) 1fr;
+            gap: clamp(0.75rem, 2vw, 1.5rem);
+            padding: clamp(1rem, 2vh, 1.5rem) clamp(0.5rem, 1vw, 1rem);
+          }
+
+          .ability-container {
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.4rem, 1.5vw, 0.75rem);
+          }
+
+          .skills-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.4rem, 1.2vw, 0.6rem);
+          }
+
+          .info-item {
+            font-size: clamp(0.8rem, 1.8vw, 1rem);
+            padding: clamp(0.3rem, 0.8vh, 0.5rem) clamp(0.5rem, 1.2vw, 0.8rem);
+          }
+
+          .info-button {
+            font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+            padding: clamp(0.5rem, 1.2vh, 0.7rem) clamp(0.6rem, 1.5vw, 0.9rem);
+          }
+        }
+
+        /* Small mobile phones - compact 2 columns */
+        @media (max-width: 480px) {
+          .pokemon-card-page,
+          .info-page-grid,
+          .battle-page-grid {
+            grid-template-columns: minmax(42%, 48%) 1fr;
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+            padding: clamp(0.75rem, 1.5vh, 1.25rem) clamp(0.4rem, 0.8vw, 0.75rem);
+          }
+
+          .ability-container {
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.3rem, 1vw, 0.5rem);
+          }
+
+          .skills-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.3rem, 1vw, 0.5rem);
+          }
+
+          .info-buttons-grid {
+            grid-template-columns: 1fr;
+            gap: clamp(0.4rem, 1vh, 0.6rem);
+          }
+
+          .stat-main-container {
+            gap: clamp(0.5rem, 2vw, 1rem);
+          }
+        }
+
+        /* Very small screens - single column fallback */
+        @media (max-width: 360px) {
+          .pokemon-card-page,
+          .info-page-grid,
+          .battle-page-grid {
+            grid-template-columns: 1fr;
+            gap: clamp(0.75rem, 2vh, 1rem);
+          }
+
+          .left-column {
+            padding-top: clamp(5rem, 10vh, 6rem);
+          }
+
+          .right-column {
+            padding-top: 0;
           }
         }
       </style>

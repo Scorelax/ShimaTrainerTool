@@ -372,6 +372,8 @@ export function renderPokemonCard(pokemonName) {
           font-size: clamp(0.75rem, 1.6vw, 0.9rem);
           white-space: pre-line;
           word-wrap: break-word;
+          overflow-wrap: anywhere;
+          line-height: 1.6;
         }
 
         .checkbox-container {
@@ -439,7 +441,7 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           gap: clamp(0.75rem, 1.5vh, 1rem);
-          padding-top: clamp(3rem, 6vh, 4rem);
+          padding-top: clamp(4rem, 8vh, 5rem);
         }
 
         .description-container {
@@ -798,18 +800,18 @@ export function renderPokemonCard(pokemonName) {
               Utility Slot
             </label>
           </div>
+        </div>
+
+        <!-- Right Column: Description + Buttons + Skills -->
+        <div class="right-column">
+          ${flavorText ? `
+            <p id="flavorText" class="description-text">${flavorText}</p>
+          ` : ''}
 
           <div class="info-buttons-grid">
             <button class="info-button" id="editPokemonButton">Edit Pokémon</button>
             <button class="info-button" id="battlePageButton">Battle Page</button>
           </div>
-        </div>
-
-        <!-- Right Column: Description + Skills -->
-        <div class="right-column">
-          ${flavorText ? `
-            <p id="flavorText" class="description-text">${flavorText}</p>
-          ` : ''}
 
           <div class="skills-container">
             <h3>Skills</h3>
@@ -818,12 +820,11 @@ export function renderPokemonCard(pokemonName) {
                 const skillKey = skill.name.toLowerCase();
                 const proficiencyLevel = skillCounts[skillKey] || 0;
                 const skillClass = proficiencyLevel >= 1 ? 'unlocked' : '';
-                const modifier = skill.mod + (proficiencyLevel * 2);
 
                 return `
                   <div class="skill-item ${skillClass}">
                     <div class="skill-name">${skill.name}</div>
-                    <div class="skill-modifier">${modifier >= 0 ? '+' : ''}${modifier}</div>
+                    <div class="skill-modifier">(${skill.stat})</div>
                   </div>
                 `;
               }).join('')}

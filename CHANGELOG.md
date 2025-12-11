@@ -4,6 +4,125 @@ This file tracks all changes made to the project across development sessions.
 
 ---
 
+## Session: 2025-01-27 (Part 3) - Combat Tracker Enhancements
+
+### Part 14: Pokemon Combat Tracker - Type Effectiveness, HP/VP Persistence, and Trainer Integration (`js/pages/pokemon-card.js`)
+
+**Features Added**:
+
+1. **Type Effectiveness Buttons (Pokemon Section Only)**
+   - Added weakness/resistance/immunity type buttons to Pokemon combat tracker
+   - Data sourced from pokemonData index 53 (comma-separated type chart multipliers)
+   - Type effectiveness categories:
+     - **Weaknesses (2× Damage)**: Values > 1 in type chart
+     - **Resistances (0.5× Damage)**: Values between 0-1 in type chart
+     - **Immunities (0× Damage)**: Values = 0 in type chart
+   - Buttons use Pokemon type colors (matching move buttons)
+   - Click to activate/deactivate type effectiveness multiplier
+   - Only one type can be active at a time
+   - Active button highlighted with gold border and glow effect
+
+2. **Type Effectiveness Damage Calculation**
+   - Damage multiplier applied to HP damage when removing stats
+   - Formula: `hpChange = Math.ceil(hpChange * damageMultiplier)`
+   - Example: 10 damage with weakness (2×) = 20 damage
+   - Example: 10 damage with resistance (0.5×) = 5 damage
+   - Example: Any damage with immunity (0×) = 0 damage
+   - Multiplier automatically resets to 1 after damage applied
+   - Type buttons automatically deactivate after damage applied
+
+3. **HP/VP Data Persistence**
+   - Current HP stored at pokemonData index 45
+   - Current VP stored at pokemonData index 46
+   - Values persist to sessionStorage on every HP/VP change
+   - Current values default to base values (indices 10 and 12) if not set
+   - Storage key format: `pokemon_{pokemonNameInLowercase}`
+   - Current HP/VP displayed in blue boxes below base stat boxes
+   - Values maintained across page navigation and app reload
+
+4. **VP Overflow Mechanics**
+   - When VP damage exceeds current VP, overflow transfers to HP
+   - Example: Pokemon has 5 VP, takes 8 VP damage → VP becomes 0, HP reduced by 3
+   - Implemented for both Pokemon and Trainer combat trackers
+   - Mirrors D&D vitality point system mechanics
+
+5. **Trainer Combat Tracker Integration**
+   - Added Trainer section above Pokemon section in combat tracker popup
+   - Trainer section includes:
+     - HP/VP display with current/max values
+     - Input fields for HP and VP changes
+     - Add/Remove/Restore buttons for trainer stats
+   - Trainer HP stored at trainerData index 34
+   - Trainer VP stored at trainerData index 35
+   - Base trainer HP at index 11, base VP at index 12
+   - Visual separator (gold gradient line) between Trainer and Pokemon sections
+   - Type effectiveness buttons only appear in Pokemon section (not trainer)
+
+6. **Combat Tracker UI Improvements**
+   - Expanded popup width to accommodate new features
+   - Added section headers: "Trainer" and "Pokemon" in gold uppercase text
+   - Type effectiveness sections with clear headers showing multiplier values
+   - Responsive button layout with type-colored backgrounds
+   - Consistent styling matching app's Pokemon red/gold theme
+
+**Code Changes**:
+
+**Lines 75-105**: Parse type chart data and categorize into weaknesses/resistances/immunities
+```javascript
+const typeChartValues = pokemonData[53] ? pokemonData[53].split(',').map(Number) : [];
+const weaknesses = [];
+const resistances = [];
+const immunities = [];
+
+typeChartValues.forEach((value, index) => {
+  if (value === 0) immunities.push(typeNames[index]);
+  else if (value > 0 && value < 1) resistances.push(typeNames[index]);
+  else if (value > 1) weaknesses.push(typeNames[index]);
+});
+```
+
+**Lines 99-105**: Load current HP/VP from sessionStorage or default to base values
+```javascript
+const currentHp = pokemonData[45] !== null && pokemonData[45] !== undefined && pokemonData[45] !== ''
+  ? parseInt(pokemonData[45])
+  : hp;
+const currentVp = pokemonData[46] !== null && pokemonData[46] !== undefined && pokemonData[46] !== ''
+  ? parseInt(pokemonData[46])
+  : vp;
+```
+
+**Lines 981-1027**: Added CSS for type effectiveness buttons and section separator
+
+**Lines 1324-1329**: Updated current HP/VP box displays to show persisted values
+
+**Lines 1400-1477**: Complete combat tracker popup redesign with Trainer and Pokemon sections
+
+**Lines 1482-1483**: Store type effectiveness data globally for event listeners
+
+**Lines 1494**: Added `damageMultiplier` variable to track active type effectiveness
+
+**Lines 1740-1803**: Initialize type effectiveness buttons and create click handlers
+
+**Lines 1805-1895**: Updated Pokemon combat tracker buttons with persistence and type multiplier
+
+**Lines 1897-1974**: Added Trainer combat tracker button handlers with VP overflow
+
+**Technical Details**:
+- Type buttons created dynamically using `createTypeButton(type, multiplier)` helper
+- Type colors from `getMoveTypeColor()` with contrast-aware text colors
+- Data persisted to sessionStorage immediately on stat changes
+- Combat tracker popup max-width expanded from 500px to 550px
+- Section separator uses gradient: `linear-gradient(90deg, transparent 0%, #FFDE00 50%, transparent 100%)`
+
+**Result**:
+- Complete combat tracking solution for both trainers and Pokemon
+- Type effectiveness system provides realistic damage calculations
+- HP/VP persistence ensures continuity across sessions
+- Unified combat interface reduces need to navigate between pages
+- All damage calculations mirror reference file implementation
+
+---
+
 ## Session: 2025-01-27 (Part 2) - Combat Tracker Redesign & Inventory Fix
 
 ### Part 12: Combat Tracker Redesign (`js/pages/trainer-info.js`)

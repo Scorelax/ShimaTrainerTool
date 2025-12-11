@@ -75,6 +75,35 @@ export function renderPokemonCard(pokemonName) {
   const stabBonus = pokemonData[34] || 2;
   const heldItem = pokemonData[35] || 'None';
 
+  // Type chart data for weaknesses, resistances, immunities (index 53)
+  const typeChartValues = pokemonData[53] ? pokemonData[53].split(',').map(Number) : [];
+  const typeNames = [
+    "Normal", "Fighting", "Flying", "Poison", "Ground", "Rock", "Bug", "Ghost",
+    "Steel", "Fire", "Water", "Grass", "Electric", "Psychic", "Ice", "Dragon", "Dark", "Fairy"
+  ];
+
+  const weaknesses = [];
+  const resistances = [];
+  const immunities = [];
+
+  typeChartValues.forEach((value, index) => {
+    if (value === 0) {
+      immunities.push(typeNames[index]);
+    } else if (value > 0 && value < 1) {
+      resistances.push(typeNames[index]);
+    } else if (value > 1) {
+      weaknesses.push(typeNames[index]);
+    }
+  });
+
+  // Current HP/VP values (indices 45 and 46)
+  const currentHp = pokemonData[45] !== null && pokemonData[45] !== undefined && pokemonData[45] !== ''
+    ? parseInt(pokemonData[45])
+    : hp;
+  const currentVp = pokemonData[46] !== null && pokemonData[46] !== undefined && pokemonData[46] !== ''
+    ? parseInt(pokemonData[46])
+    : vp;
+
   // Helper function to get stat color based on nature
   const getStatColor = (statName) => {
     const normalizedStatName = statName.toLowerCase();
@@ -949,6 +978,54 @@ export function renderPokemonCard(pokemonName) {
           box-shadow: 0 5px 15px rgba(59,76,202,0.5);
         }
 
+        .type-effectiveness-section {
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .type-effectiveness-header {
+          font-weight: 900;
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          color: #FFDE00;
+          text-transform: uppercase;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .type-buttons-container {
+          display: flex;
+          flex-wrap: wrap;
+          gap: clamp(0.4rem, 1vw, 0.6rem);
+        }
+
+        .type-button {
+          padding: clamp(0.4rem, 0.8vh, 0.6rem) clamp(0.6rem, 1.2vw, 0.8rem);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(6px, 1.2vw, 8px);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          text-transform: capitalize;
+        }
+
+        .type-button.active {
+          border-color: #FFDE00;
+          border-width: clamp(3px, 0.6vw, 4px);
+          box-shadow: 0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6);
+          transform: scale(1.05);
+        }
+
+        .type-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+        }
+
+        .combat-section-separator {
+          height: clamp(2px, 0.4vw, 3px);
+          background: linear-gradient(90deg, transparent 0%, #FFDE00 50%, transparent 100%);
+          margin: clamp(1.5rem, 3vh, 2rem) 0;
+        }
+
         /* Back button - matches trainer-card style */
         .back-button {
           position: fixed;
@@ -1244,12 +1321,12 @@ export function renderPokemonCard(pokemonName) {
             <div class="stat-box-wrapper">
               <div class="stat-label-box">HP</div>
               <div class="stat-box" id="hpValue">${hp}</div>
-              <div class="current-stat-box" id="currentHpValue">${hp}</div>
+              <div class="current-stat-box" id="currentHpValue">${currentHp}</div>
             </div>
             <div class="stat-box-wrapper">
               <div class="stat-label-box">VP</div>
               <div class="stat-box" id="vpValue">${vp}</div>
-              <div class="current-stat-box" id="currentVpValue">${vp}</div>
+              <div class="current-stat-box" id="currentVpValue">${currentVp}</div>
             </div>
           </div>
 
@@ -1321,29 +1398,78 @@ export function renderPokemonCard(pokemonName) {
 
       <!-- Combat Tracker Popup -->
       <div id="combatTrackerPopup" class="popup-overlay">
-        <div class="popup-content" style="max-width: min(90vw, 500px);">
+        <div class="popup-content" style="max-width: min(90vw, 550px);">
           <div class="popup-header">
             <div class="popup-title">Combat Tracker</div>
             <button class="popup-close" id="closeCombatTracker">×</button>
           </div>
           <div class="popup-body">
             <div class="combat-tracker-container">
-              <div class="combat-stats-row">
-                <div class="combat-stat-column">
-                  <div class="combat-stat-label">HP</div>
-                  <div class="combat-stat-value" id="combatCurrentHP">${hp} / ${hp}</div>
-                  <input type="number" id="hpChangeInput" class="combat-input" placeholder="HP Amount">
+              <!-- Trainer Section -->
+              <div style="margin-bottom: clamp(1rem, 2vh, 1.5rem);">
+                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.75rem, 1.5vh, 1rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">Trainer</div>
+                <div class="combat-stats-row">
+                  <div class="combat-stat-column">
+                    <div class="combat-stat-label">HP</div>
+                    <div class="combat-stat-value" id="trainerCombatCurrentHP">${trainerData[34] || trainerData[11]} / ${trainerData[11]}</div>
+                    <input type="number" id="trainerHpChangeInput" class="combat-input" placeholder="HP Amount">
+                  </div>
+                  <div class="combat-stat-column">
+                    <div class="combat-stat-label">VP</div>
+                    <div class="combat-stat-value" id="trainerCombatCurrentVP">${trainerData[35] || trainerData[12]} / ${trainerData[12]}</div>
+                    <input type="number" id="trainerVpChangeInput" class="combat-input" placeholder="VP Amount">
+                  </div>
                 </div>
-                <div class="combat-stat-column">
-                  <div class="combat-stat-label">VP</div>
-                  <div class="combat-stat-value" id="combatCurrentVP">${vp} / ${vp}</div>
-                  <input type="number" id="vpChangeInput" class="combat-input" placeholder="VP Amount">
+                <div class="combat-buttons">
+                  <button id="addTrainerStats" class="combat-btn combat-btn-add">➕ Add</button>
+                  <button id="removeTrainerStats" class="combat-btn combat-btn-remove">➖ Remove</button>
+                  <button id="fullRestoreTrainer" class="combat-btn combat-btn-restore">✨ Restore</button>
                 </div>
               </div>
-              <div class="combat-buttons">
-                <button id="addStats" class="combat-btn combat-btn-add">➕ Add</button>
-                <button id="removeStats" class="combat-btn combat-btn-remove">➖ Remove</button>
-                <button id="fullRestore" class="combat-btn combat-btn-restore">✨ Restore</button>
+
+              <div class="combat-section-separator"></div>
+
+              <!-- Pokemon Section -->
+              <div>
+                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.75rem, 1.5vh, 1rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">Pokemon</div>
+
+                <!-- Type Effectiveness Buttons -->
+                ${weaknesses.length > 0 ? `
+                  <div class="type-effectiveness-section">
+                    <div class="type-effectiveness-header">Weaknesses (2× Damage)</div>
+                    <div class="type-buttons-container" id="weaknessesContainer"></div>
+                  </div>
+                ` : ''}
+                ${resistances.length > 0 ? `
+                  <div class="type-effectiveness-section">
+                    <div class="type-effectiveness-header">Resistances (0.5× Damage)</div>
+                    <div class="type-buttons-container" id="resistancesContainer"></div>
+                  </div>
+                ` : ''}
+                ${immunities.length > 0 ? `
+                  <div class="type-effectiveness-section">
+                    <div class="type-effectiveness-header">Immunities (0× Damage)</div>
+                    <div class="type-buttons-container" id="immunitiesContainer"></div>
+                  </div>
+                ` : ''}
+
+                <div class="combat-stats-row">
+                  <div class="combat-stat-column">
+                    <div class="combat-stat-label">HP</div>
+                    <div class="combat-stat-value" id="combatCurrentHP">${currentHp} / ${hp}</div>
+                    <input type="number" id="hpChangeInput" class="combat-input" placeholder="HP Amount">
+                  </div>
+                  <div class="combat-stat-column">
+                    <div class="combat-stat-label">VP</div>
+                    <div class="combat-stat-value" id="combatCurrentVP">${currentVp} / ${vp}</div>
+                    <input type="number" id="vpChangeInput" class="combat-input" placeholder="VP Amount">
+                  </div>
+                </div>
+                <div class="combat-buttons">
+                  <button id="addStats" class="combat-btn combat-btn-add">➕ Add</button>
+                  <button id="removeStats" class="combat-btn combat-btn-remove">➖ Remove</button>
+                  <button id="fullRestore" class="combat-btn combat-btn-restore">✨ Restore</button>
+                </div>
               </div>
             </div>
           </div>
@@ -1352,8 +1478,9 @@ export function renderPokemonCard(pokemonName) {
     </div>
   `;
 
-  // Store parsed abilities for event listener use
+  // Store parsed abilities and type effectiveness data for event listener use
   window.pokemonAbilities = parsedAbilities;
+  window.typeEffectiveness = { weaknesses, resistances, immunities };
 
   return html;
 }
@@ -1362,6 +1489,9 @@ export function attachPokemonCardListeners() {
   const pokemonName = sessionStorage.getItem('selectedPokemonName');
   const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+
+  // Global damage multiplier for type effectiveness
+  let damageMultiplier = 1;
 
   // Back button
   document.getElementById('backToTrainerCard')?.addEventListener('click', () => {
@@ -1607,7 +1737,72 @@ export function attachPokemonCardListeners() {
     }
   });
 
-  // Combat tracker buttons
+  // Initialize type effectiveness buttons
+  if (window.typeEffectiveness) {
+    const { weaknesses, resistances, immunities } = window.typeEffectiveness;
+
+    // Create weakness buttons
+    if (weaknesses.length > 0) {
+      const weaknessContainer = document.getElementById('weaknessesContainer');
+      if (weaknessContainer) {
+        weaknesses.forEach(type => {
+          const button = createTypeButton(type, 2);
+          weaknessContainer.appendChild(button);
+        });
+      }
+    }
+
+    // Create resistance buttons
+    if (resistances.length > 0) {
+      const resistanceContainer = document.getElementById('resistancesContainer');
+      if (resistanceContainer) {
+        resistances.forEach(type => {
+          const button = createTypeButton(type, 0.5);
+          resistanceContainer.appendChild(button);
+        });
+      }
+    }
+
+    // Create immunity buttons
+    if (immunities.length > 0) {
+      const immunityContainer = document.getElementById('immunitiesContainer');
+      if (immunityContainer) {
+        immunities.forEach(type => {
+          const button = createTypeButton(type, 0);
+          immunityContainer.appendChild(button);
+        });
+      }
+    }
+  }
+
+  // Helper function to create type buttons
+  function createTypeButton(type, multiplier) {
+    const button = document.createElement('button');
+    button.className = 'type-button';
+    button.textContent = type;
+
+    const bgColor = getMoveTypeColor(type);
+    const textColor = getTextColorForBackground(bgColor);
+    button.style.backgroundColor = bgColor;
+    button.style.color = textColor;
+
+    button.addEventListener('click', () => {
+      // Toggle active state
+      if (button.classList.contains('active')) {
+        button.classList.remove('active');
+        damageMultiplier = 1; // Reset multiplier
+      } else {
+        // Deactivate all other type buttons
+        document.querySelectorAll('.type-button').forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        damageMultiplier = multiplier;
+      }
+    });
+
+    return button;
+  }
+
+  // Pokemon Combat tracker buttons
   document.getElementById('addStats')?.addEventListener('click', () => {
     const hpChange = parseInt(document.getElementById('hpChangeInput').value) || 0;
     const vpChange = parseInt(document.getElementById('vpChangeInput').value) || 0;
@@ -1620,34 +1815,62 @@ export function attachPokemonCardListeners() {
     const newHp = Math.min(currentHp + hpChange, maxHp);
     const newVp = Math.min(currentVp + vpChange, maxVp);
 
+    // Update UI
     document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
     document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
     document.getElementById('currentHpValue').textContent = newHp;
     document.getElementById('currentVpValue').textContent = newVp;
+
+    // Save to sessionStorage
+    pokemonData[45] = newHp;
+    pokemonData[46] = newVp;
+    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
 
     document.getElementById('hpChangeInput').value = '';
     document.getElementById('vpChangeInput').value = '';
   });
 
   document.getElementById('removeStats')?.addEventListener('click', () => {
-    const hpChange = parseInt(document.getElementById('hpChangeInput').value) || 0;
+    let hpChange = parseInt(document.getElementById('hpChangeInput').value) || 0;
     const vpChange = parseInt(document.getElementById('vpChangeInput').value) || 0;
+
+    // Apply damage multiplier to HP damage
+    hpChange = Math.ceil(hpChange * damageMultiplier);
 
     const currentHpText = document.getElementById('combatCurrentHP').textContent;
     const currentVpText = document.getElementById('combatCurrentVP').textContent;
     const [currentHp, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
     const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
 
-    const newHp = Math.max(currentHp - hpChange, 0);
-    const newVp = Math.max(currentVp - vpChange, 0);
+    let newHp = currentHp;
+    let newVp = currentVp - vpChange;
 
+    // Handle VP overflow to HP
+    if (newVp < 0) {
+      const remainingDamage = Math.abs(newVp);
+      newVp = 0;
+      newHp = currentHp - remainingDamage;
+    }
+
+    newHp = Math.max(newHp - (hpChange > 0 && vpChange === 0 ? hpChange : 0), 0);
+
+    // Update UI
     document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
     document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
     document.getElementById('currentHpValue').textContent = newHp;
     document.getElementById('currentVpValue').textContent = newVp;
 
+    // Save to sessionStorage
+    pokemonData[45] = newHp;
+    pokemonData[46] = newVp;
+    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
     document.getElementById('hpChangeInput').value = '';
     document.getElementById('vpChangeInput').value = '';
+
+    // Reset damage multiplier and deactivate type buttons
+    damageMultiplier = 1;
+    document.querySelectorAll('.type-button').forEach(btn => btn.classList.remove('active'));
   });
 
   document.getElementById('fullRestore')?.addEventListener('click', () => {
@@ -1656,13 +1879,98 @@ export function attachPokemonCardListeners() {
     const [, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
     const [, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
 
+    // Update UI
     document.getElementById('combatCurrentHP').textContent = `${maxHp} / ${maxHp}`;
     document.getElementById('combatCurrentVP').textContent = `${maxVp} / ${maxVp}`;
     document.getElementById('currentHpValue').textContent = maxHp;
     document.getElementById('currentVpValue').textContent = maxVp;
 
+    // Save to sessionStorage
+    pokemonData[45] = maxHp;
+    pokemonData[46] = maxVp;
+    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
     document.getElementById('hpChangeInput').value = '';
     document.getElementById('vpChangeInput').value = '';
+  });
+
+  // Trainer Combat tracker buttons
+  document.getElementById('addTrainerStats')?.addEventListener('click', () => {
+    const hpChange = parseInt(document.getElementById('trainerHpChangeInput').value) || 0;
+    const vpChange = parseInt(document.getElementById('trainerVpChangeInput').value) || 0;
+
+    const currentHpText = document.getElementById('trainerCombatCurrentHP').textContent;
+    const currentVpText = document.getElementById('trainerCombatCurrentVP').textContent;
+    const [currentHp, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
+    const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+
+    const newHp = Math.min(currentHp + hpChange, maxHp);
+    const newVp = Math.min(currentVp + vpChange, maxVp);
+
+    // Update UI
+    document.getElementById('trainerCombatCurrentHP').textContent = `${newHp} / ${maxHp}`;
+    document.getElementById('trainerCombatCurrentVP').textContent = `${newVp} / ${maxVp}`;
+
+    // Save to sessionStorage
+    trainerData[34] = newHp;
+    trainerData[35] = newVp;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    document.getElementById('trainerHpChangeInput').value = '';
+    document.getElementById('trainerVpChangeInput').value = '';
+  });
+
+  document.getElementById('removeTrainerStats')?.addEventListener('click', () => {
+    const hpChange = parseInt(document.getElementById('trainerHpChangeInput').value) || 0;
+    const vpChange = parseInt(document.getElementById('trainerVpChangeInput').value) || 0;
+
+    const currentHpText = document.getElementById('trainerCombatCurrentHP').textContent;
+    const currentVpText = document.getElementById('trainerCombatCurrentVP').textContent;
+    const [currentHp, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
+    const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+
+    let newHp = currentHp;
+    let newVp = currentVp - vpChange;
+
+    // Handle VP overflow to HP
+    if (newVp < 0) {
+      const remainingDamage = Math.abs(newVp);
+      newVp = 0;
+      newHp = currentHp - remainingDamage;
+    }
+
+    newHp = Math.max(newHp - (hpChange > 0 && vpChange === 0 ? hpChange : 0), 0);
+
+    // Update UI
+    document.getElementById('trainerCombatCurrentHP').textContent = `${newHp} / ${maxHp}`;
+    document.getElementById('trainerCombatCurrentVP').textContent = `${newVp} / ${maxVp}`;
+
+    // Save to sessionStorage
+    trainerData[34] = newHp;
+    trainerData[35] = newVp;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    document.getElementById('trainerHpChangeInput').value = '';
+    document.getElementById('trainerVpChangeInput').value = '';
+  });
+
+  document.getElementById('fullRestoreTrainer')?.addEventListener('click', () => {
+    const currentHpText = document.getElementById('trainerCombatCurrentHP').textContent;
+    const currentVpText = document.getElementById('trainerCombatCurrentVP').textContent;
+    const [, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
+    const [, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+
+    // Update UI
+    document.getElementById('trainerCombatCurrentHP').textContent = `${maxHp} / ${maxHp}`;
+    document.getElementById('trainerCombatCurrentVP').textContent = `${maxVp} / ${maxVp}`;
+
+    // Save to sessionStorage
+    trainerData[34] = maxHp;
+    trainerData[35] = maxVp;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    document.getElementById('trainerHpChangeInput').value = '';
+    document.getElementById('trainerVpChangeInput').value = '';
   });
 
   // Load move colors and click listeners

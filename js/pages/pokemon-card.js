@@ -116,8 +116,8 @@ export function renderPokemonCard(pokemonName) {
     skillCounts[skillName] = (skillCounts[skillName] || 0) + 1;
   });
 
-  const displayName = nickname ? `${name} / ${nickname}` : name;
-  const typingText = type2 ? `${type1} / ${type2}` : type1;
+  const displayName = name; // Just use the Pokemon name, not nickname
+  const typingText = type2 ? `${type1}\n${type2}` : type1;
 
   // STAB display
   const stab = `+${stabBonus}`;
@@ -343,6 +343,33 @@ export function renderPokemonCard(pokemonName) {
 
         .info-item-half span:not(.info-item-label) {
           font-size: clamp(0.9rem, 2vw, 1.1rem);
+        }
+
+        .info-item-column {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(0.25rem, 0.5vh, 0.4rem);
+          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
+          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          font-weight: 700;
+          color: white;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .info-item-column .info-item-label {
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
+        }
+
+        .info-item-column .info-item-value {
+          text-align: left;
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          white-space: pre-line;
+          word-wrap: break-word;
         }
 
         .checkbox-container {
@@ -743,16 +770,16 @@ export function renderPokemonCard(pokemonName) {
               <span class="info-item-label">Level:</span>
               <span class="info-item-value" id="pokemonLevel">${level}</span>
             </div>
-            <div class="info-item">
+            <div class="info-item-column">
               <span class="info-item-label">Typing:</span>
               <span class="info-item-value" id="pokemonTyping">${typingText}</span>
             </div>
-            <div class="info-item">
+            <div class="info-item-column">
               <span class="info-item-label">Saving Throw(s):</span>
               <span class="info-item-value" id="pokemonSavingThrow">${savingThrow}</span>
             </div>
             ${sensesArray.length > 0 ? `
-              <div class="info-item">
+              <div class="info-item-column">
                 <span class="info-item-label">Senses:</span>
                 <span class="info-item-value" id="sensesValue">${sensesDisplay}</span>
               </div>

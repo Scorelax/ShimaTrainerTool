@@ -1090,6 +1090,42 @@ export function renderPokemonCard(pokemonName) {
           <button id="closeAbilityPopup" style="margin-top: 2vh; padding: 1.3vh 2.6vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-size: clamp(0.8rem, 1.3vh, 1.3vh);">Close</button>
         </div>
       </div>
+
+      <!-- Held Item Popup -->
+      <div id="heldItemPopup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 1.3vh; padding: 2.6vh; max-width: 65vh; width: 90%; max-height: 80vh; overflow-y: auto;">
+          <h2 style="margin-top: 0; color: #333; font-size: clamp(1.4rem, 2.4vh, 2.4vh);">Held Item</h2>
+          <div style="font-size: clamp(0.9rem, 1.5vh, 1.5vh); line-height: 1.6; color: black;">${heldItem}</div>
+          <button id="closeHeldItemPopup" style="margin-top: 2vh; padding: 1.3vh 2.6vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-size: clamp(0.8rem, 1.3vh, 1.3vh);">Close</button>
+        </div>
+      </div>
+
+      <!-- Combat Tracker Popup -->
+      <div id="combatTrackerPopup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 1.3vh; padding: 2.6vh; max-width: 65vh; width: 90%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2vh;">
+            <h2 style="margin: 0; color: #333; font-size: clamp(1.4rem, 2.4vh, 2.4vh);">Combat Tracker</h2>
+            <button id="closeCombatTracker" style="background: none; border: none; font-size: 2rem; cursor: pointer; color: #333;">×</button>
+          </div>
+          <div style="display: flex; gap: 2vh; margin-bottom: 2vh;">
+            <div style="flex: 1;">
+              <div style="font-weight: bold; margin-bottom: 1vh; color: #333;">HP</div>
+              <div id="combatCurrentHP" style="font-size: 1.5rem; margin-bottom: 1vh; color: #333;">${hp} / ${hp}</div>
+              <input type="number" id="hpChangeInput" placeholder="HP Amount" style="width: 100%; padding: 1vh; border: 2px solid #ddd; border-radius: 0.5vh;">
+            </div>
+            <div style="flex: 1;">
+              <div style="font-weight: bold; margin-bottom: 1vh; color: #333;">VP</div>
+              <div id="combatCurrentVP" style="font-size: 1.5rem; margin-bottom: 1vh; color: #333;">${vp} / ${vp}</div>
+              <input type="number" id="vpChangeInput" placeholder="VP Amount" style="width: 100%; padding: 1vh; border: 2px solid #ddd; border-radius: 0.5vh;">
+            </div>
+          </div>
+          <div style="display: flex; gap: 1vh;">
+            <button id="addStats" style="flex: 1; padding: 1.5vh; background: #4CAF50; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-weight: bold;">➕ Add</button>
+            <button id="removeStats" style="flex: 1; padding: 1.5vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-weight: bold;">➖ Remove</button>
+            <button id="fullRestore" style="flex: 1; padding: 1.5vh; background: #2196F3; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-weight: bold;">✨ Restore</button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -1275,6 +1311,101 @@ export function attachPokemonCardListeners() {
     if (e.target.id === 'abilityPopup') {
       document.getElementById('abilityPopup').style.display = 'none';
     }
+  });
+
+  // Held item button click listener
+  document.querySelector('.held-item-button')?.addEventListener('click', () => {
+    const heldItemPopup = document.getElementById('heldItemPopup');
+    heldItemPopup.style.display = 'flex';
+  });
+
+  // Close held item popup
+  document.getElementById('closeHeldItemPopup')?.addEventListener('click', () => {
+    document.getElementById('heldItemPopup').style.display = 'none';
+  });
+
+  document.getElementById('heldItemPopup')?.addEventListener('click', (e) => {
+    if (e.target.id === 'heldItemPopup') {
+      document.getElementById('heldItemPopup').style.display = 'none';
+    }
+  });
+
+  // Current HP/VP boxes click listeners - open combat tracker
+  document.getElementById('currentHpValue')?.addEventListener('click', () => {
+    document.getElementById('combatTrackerPopup').style.display = 'flex';
+  });
+
+  document.getElementById('currentVpValue')?.addEventListener('click', () => {
+    document.getElementById('combatTrackerPopup').style.display = 'flex';
+  });
+
+  // Close combat tracker
+  document.getElementById('closeCombatTracker')?.addEventListener('click', () => {
+    document.getElementById('combatTrackerPopup').style.display = 'none';
+  });
+
+  document.getElementById('combatTrackerPopup')?.addEventListener('click', (e) => {
+    if (e.target.id === 'combatTrackerPopup') {
+      document.getElementById('combatTrackerPopup').style.display = 'none';
+    }
+  });
+
+  // Combat tracker buttons
+  document.getElementById('addStats')?.addEventListener('click', () => {
+    const hpChange = parseInt(document.getElementById('hpChangeInput').value) || 0;
+    const vpChange = parseInt(document.getElementById('vpChangeInput').value) || 0;
+
+    const currentHpText = document.getElementById('combatCurrentHP').textContent;
+    const currentVpText = document.getElementById('combatCurrentVP').textContent;
+    const [currentHp, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
+    const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+
+    const newHp = Math.min(currentHp + hpChange, maxHp);
+    const newVp = Math.min(currentVp + vpChange, maxVp);
+
+    document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
+    document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
+    document.getElementById('currentHpValue').textContent = newHp;
+    document.getElementById('currentVpValue').textContent = newVp;
+
+    document.getElementById('hpChangeInput').value = '';
+    document.getElementById('vpChangeInput').value = '';
+  });
+
+  document.getElementById('removeStats')?.addEventListener('click', () => {
+    const hpChange = parseInt(document.getElementById('hpChangeInput').value) || 0;
+    const vpChange = parseInt(document.getElementById('vpChangeInput').value) || 0;
+
+    const currentHpText = document.getElementById('combatCurrentHP').textContent;
+    const currentVpText = document.getElementById('combatCurrentVP').textContent;
+    const [currentHp, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
+    const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+
+    const newHp = Math.max(currentHp - hpChange, 0);
+    const newVp = Math.max(currentVp - vpChange, 0);
+
+    document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
+    document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
+    document.getElementById('currentHpValue').textContent = newHp;
+    document.getElementById('currentVpValue').textContent = newVp;
+
+    document.getElementById('hpChangeInput').value = '';
+    document.getElementById('vpChangeInput').value = '';
+  });
+
+  document.getElementById('fullRestore')?.addEventListener('click', () => {
+    const currentHpText = document.getElementById('combatCurrentHP').textContent;
+    const currentVpText = document.getElementById('combatCurrentVP').textContent;
+    const [, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
+    const [, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+
+    document.getElementById('combatCurrentHP').textContent = `${maxHp} / ${maxHp}`;
+    document.getElementById('combatCurrentVP').textContent = `${maxVp} / ${maxVp}`;
+    document.getElementById('currentHpValue').textContent = maxHp;
+    document.getElementById('currentVpValue').textContent = maxVp;
+
+    document.getElementById('hpChangeInput').value = '';
+    document.getElementById('vpChangeInput').value = '';
   });
 
   // Load move colors and click listeners

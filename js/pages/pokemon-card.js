@@ -119,6 +119,9 @@ export function renderPokemonCard(pokemonName) {
   const displayName = name; // Just use the Pokemon name, not nickname
   const typingText = type2 ? `${type1} - ${type2}` : type1;
 
+  // Format saving throws - replace newlines with commas
+  const savingThrowFormatted = savingThrow.replace(/\n/g, ', ');
+
   // STAB display
   const stab = `+${stabBonus}`;
 
@@ -484,12 +487,8 @@ export function renderPokemonCard(pokemonName) {
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.4vw, 1px);
-          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
-          text-align: left;
-          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.4rem, 1vw, 0.6rem);
-          background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
-          border-radius: clamp(8px, 1.5vw, 12px);
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          text-align: center;
         }
 
         .skills-grid {
@@ -881,13 +880,13 @@ export function renderPokemonCard(pokemonName) {
               <span class="info-item-label">Level:</span>
               <span class="info-item-value" id="pokemonLevel">${level}</span>
             </div>
-            <div class="info-item-column">
+            <div class="info-item">
               <span class="info-item-label">Typing:</span>
               <span class="info-item-value" id="pokemonTyping">${typingText}</span>
             </div>
-            <div class="info-item-column">
+            <div class="info-item">
               <span class="info-item-label">Saving Throw(s):</span>
-              <span class="info-item-value" id="pokemonSavingThrow">${savingThrow}</span>
+              <span class="info-item-value" id="pokemonSavingThrow">${savingThrowFormatted}</span>
             </div>
             ${sensesArray.length > 0 ? `
               <div class="info-item-column">

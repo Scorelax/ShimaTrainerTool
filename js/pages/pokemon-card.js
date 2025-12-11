@@ -243,7 +243,7 @@ export function renderPokemonCard(pokemonName) {
 
         .pokemon-card-page {
           display: grid;
-          grid-template-columns: minmax(25%, 30%) 1fr;
+          grid-template-columns: 1fr;
           gap: clamp(2rem, 4vw, 4rem);
           padding: clamp(1rem, 2vh, 2rem) clamp(1rem, 2vw, 3rem) clamp(1rem, 2vh, 1.5rem);
           min-height: auto;

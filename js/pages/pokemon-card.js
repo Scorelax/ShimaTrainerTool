@@ -292,8 +292,9 @@ export function renderPokemonCard(pokemonName) {
 
         .info-item {
           display: flex;
-          justify-content: space-between;
+          justify-content: flex-start;
           align-items: center;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
           padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
           border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
@@ -313,10 +314,9 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .info-item-value {
-          text-align: right;
+          text-align: left;
           word-wrap: break-word;
           overflow-wrap: break-word;
-          max-width: 60%;
           white-space: pre-line;
           font-size: clamp(0.75rem, 1.6vw, 0.9rem);
         }
@@ -477,6 +477,7 @@ export function renderPokemonCard(pokemonName) {
 
         .skills-container {
           width: 100%;
+          margin-top: clamp(1rem, 2vh, 1.5rem);
         }
 
         .skills-container h3 {

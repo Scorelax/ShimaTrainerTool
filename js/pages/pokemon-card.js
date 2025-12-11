@@ -207,7 +207,7 @@ export function renderPokemonCard(pokemonName) {
   // Generate ability buttons HTML
   const abilityButtonsHTML = parsedAbilities.length > 0
     ? parsedAbilities.map((ability, index) =>
-        `<button class="ability-button" data-ability-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0.3vh; font-weight: bold;">${ability.name}</button>`
+        `<button class="ability-button" data-ability-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0 0.3vh; font-weight: bold; vertical-align: middle;">${ability.name}</button>`
       ).join(' ')
     : 'None';
 
@@ -1053,7 +1053,7 @@ export function renderPokemonCard(pokemonName) {
             <div class="info-item">
               <span class="info-item-label">Held Item:</span>
               <span class="info-item-value">
-                ${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0.3vh; font-weight: bold;">${heldItem}</button>` : 'None'}
+                ${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0 0.3vh; font-weight: bold; vertical-align: middle;">${heldItem}</button>` : 'None'}
               </span>
             </div>
             <div class="info-item-column">

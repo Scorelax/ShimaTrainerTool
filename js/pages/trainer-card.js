@@ -582,6 +582,7 @@ export function attachTrainerCardListeners() {
   document.querySelectorAll('.pokemon-slot[data-pokemon-name]').forEach(slot => {
     slot.addEventListener('click', () => {
       const pokemonName = slot.dataset.pokemonName;
+      sessionStorage.setItem('previousRoute', 'trainer-card');
       window.dispatchEvent(new CustomEvent('navigate', {
         detail: {
           route: 'pokemon-card',
@@ -594,6 +595,7 @@ export function attachTrainerCardListeners() {
   // Utility slot click
   document.querySelector('.utility-slot[data-pokemon-name]')?.addEventListener('click', () => {
     const pokemonName = document.querySelector('.utility-slot[data-pokemon-name]').dataset.pokemonName;
+    sessionStorage.setItem('previousRoute', 'trainer-card');
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: {
         route: 'pokemon-card',

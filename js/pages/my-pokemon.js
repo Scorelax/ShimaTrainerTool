@@ -364,6 +364,7 @@ function renderPokemonList() {
     // Make image clickable to view details
     img.addEventListener('click', () => {
       sessionStorage.setItem('selectedPokemonName', pokemon.name);
+      sessionStorage.setItem('previousRoute', 'my-pokemon');
       window.dispatchEvent(new CustomEvent('navigate', {
         detail: { route: 'pokemon-card', pokemonName: pokemon.name }
       }));

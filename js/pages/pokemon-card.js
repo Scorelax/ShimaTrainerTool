@@ -123,7 +123,7 @@ export function renderPokemonCard(pokemonName) {
   const movementValues = movementData.split(',').map(v => v.trim());
   const movementTypes = ['Walking', 'Climbing', 'Flying', 'Hovering', 'Swimming', 'Burrowing'];
   const movementDisplay = movementValues
-    .map((value, index) => value && value !== '-' && value !== '0' ? `${movementTypes[index]}: ${value} ft` : null)
+    .map((value, index) => value && value !== '-' && value !== '0' ? `${movementTypes[index]}: ${value}` : null)
     .filter(m => m !== null)
     .join('\n') || `Walking: ${speed} ft`;
 
@@ -514,6 +514,8 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           gap: clamp(0.75rem, 1.5vh, 1rem);
           padding-top: clamp(4rem, 8vh, 5rem);
+          max-width: 100%;
+          overflow: hidden;
         }
 
         .description-container {
@@ -541,6 +543,9 @@ export function renderPokemonCard(pokemonName) {
           line-height: 1.5;
           font-weight: 600;
           text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          max-width: 100%;
         }
 
         .skills-container {
@@ -1493,10 +1498,11 @@ export function attachPokemonCardListeners() {
   // Global damage multiplier for type effectiveness
   let damageMultiplier = 1;
 
-  // Back button
+  // Back button - navigate to previous page (my-pokemon or trainer-card)
   document.getElementById('backToTrainerCard')?.addEventListener('click', () => {
+    const previousRoute = sessionStorage.getItem('previousRoute') || 'trainer-card';
     window.dispatchEvent(new CustomEvent('navigate', {
-      detail: { route: 'trainer-card' }
+      detail: { route: previousRoute }
     }));
   });
 
@@ -1568,7 +1574,7 @@ export function attachPokemonCardListeners() {
 
     try {
       const action = isChecked ? 'add' : 'remove';
-      const response = await PokemonAPI.updateActiveParty(
+      const response = await PokemonAPI.updatePartyStatus(
         trainerData[1],
         pokemonData[2],
         trainerData[26],

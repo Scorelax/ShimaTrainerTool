@@ -643,17 +643,19 @@ async function confirmEvolution() {
     return;
   }
 
+  // Read input values BEFORE clearing the DOM
+  const str = parseInt(document.getElementById('strPoints').value) || 0;
+  const dex = parseInt(document.getElementById('dexPoints').value) || 0;
+  const con = parseInt(document.getElementById('conPoints').value) || 0;
+  const int = parseInt(document.getElementById('intPoints').value) || 0;
+  const wis = parseInt(document.getElementById('wisPoints').value) || 0;
+  const cha = parseInt(document.getElementById('chaPoints').value) || 0;
+
   // Hide modal and show loading
   document.getElementById('evolutionModal').classList.remove('visible');
   document.getElementById('content').innerHTML = '<div class="loading">Evolving Pokemon...</div>';
 
   try {
-    const str = parseInt(document.getElementById('strPoints').value) || 0;
-    const dex = parseInt(document.getElementById('dexPoints').value) || 0;
-    const con = parseInt(document.getElementById('conPoints').value) || 0;
-    const int = parseInt(document.getElementById('intPoints').value) || 0;
-    const wis = parseInt(document.getElementById('wisPoints').value) || 0;
-    const cha = parseInt(document.getElementById('chaPoints').value) || 0;
 
     // Calculate new stats
     const newSTR = currentPokemon[15] + str;

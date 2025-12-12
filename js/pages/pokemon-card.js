@@ -2408,6 +2408,36 @@ function showMoveDetails(moveName) {
       popup.appendChild(popupContent);
       document.body.appendChild(popup);
 
+      // Create confirmation popup if it doesn't exist
+      let confirmPopup = document.getElementById('useMoveConfirmPopup');
+      if (!confirmPopup) {
+        confirmPopup = document.createElement('div');
+        confirmPopup.id = 'useMoveConfirmPopup';
+        confirmPopup.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(3px);';
+
+        const confirmContent = document.createElement('div');
+        confirmContent.style.cssText = 'background: white; border-radius: 15px; padding: 2rem; max-width: 400px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center;';
+
+        confirmContent.innerHTML = `
+          <h2 style="margin: 0 0 1rem 0; font-size: 1.5rem; color: #333;">Use Move?</h2>
+          <p id="confirmMoveText" style="margin: 0 0 1.5rem 0; font-size: 1.1rem; color: #666;"></p>
+          <div style="display: flex; gap: 1rem; justify-content: center;">
+            <button id="confirmUseMoveYes" style="flex: 1; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: all 0.3s;">Yes</button>
+            <button id="confirmUseMoveNo" style="flex: 1; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #EE1515 0%, #C91010 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: all 0.3s;">No</button>
+          </div>
+        `;
+
+        confirmPopup.appendChild(confirmContent);
+        document.body.appendChild(confirmPopup);
+
+        // Close when clicking outside
+        confirmPopup.addEventListener('click', (e) => {
+          if (e.target.id === 'useMoveConfirmPopup') {
+            confirmPopup.style.display = 'none';
+          }
+        });
+      }
+
       // Close X button listener
       document.getElementById('closeMovePopupX').addEventListener('click', () => {
         popup.style.display = 'none';
@@ -2420,8 +2450,20 @@ function showMoveDetails(moveName) {
         }
       });
 
-      // Use Move button listener
-      document.getElementById('useMoveButton').addEventListener('click', async () => {
+      // Use Move button listener - show confirmation
+      document.getElementById('useMoveButton').addEventListener('click', () => {
+        const vpCost = parseInt(move[4]) || 0;
+        const moveName = move[0];
+
+        // Update confirmation text
+        document.getElementById('confirmMoveText').textContent = `Use ${moveName} (${vpCost} VP)?`;
+
+        // Show confirmation popup
+        document.getElementById('useMoveConfirmPopup').style.display = 'flex';
+      });
+
+      // Confirmation Yes button
+      document.getElementById('confirmUseMoveYes').addEventListener('click', async () => {
         const vpCost = parseInt(move[4]) || 0;
         const currentVpText = document.getElementById('combatCurrentVP')?.textContent || '0 / 0';
         const currentHpText = document.getElementById('combatCurrentHP')?.textContent || '0 / 0';
@@ -2461,8 +2503,14 @@ function showMoveDetails(moveName) {
           console.error('Error updating stats:', error);
         }
 
-        // Close popup
+        // Close both popups
+        document.getElementById('useMoveConfirmPopup').style.display = 'none';
         popup.style.display = 'none';
+      });
+
+      // Confirmation No button
+      document.getElementById('confirmUseMoveNo').addEventListener('click', () => {
+        document.getElementById('useMoveConfirmPopup').style.display = 'none';
       });
 
       // Hover effect for X button

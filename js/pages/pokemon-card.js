@@ -550,7 +550,9 @@ export function renderPokemonCard(pokemonName) {
 
         .skills-container {
           width: 100%;
+          max-width: 100%;
           margin-top: clamp(1rem, 2vh, 1.5rem);
+          overflow: hidden;
         }
 
         .skills-container h3 {
@@ -572,6 +574,8 @@ export function renderPokemonCard(pokemonName) {
           padding: clamp(0.5rem, 1.5vw, 0.8rem);
           border-radius: clamp(10px, 2vw, 15px);
           background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .skill-item {
@@ -589,6 +593,9 @@ export function renderPokemonCard(pokemonName) {
           color: rgba(255,255,255,0.5);
           box-shadow: 0 3px 8px rgba(0,0,0,0.3);
           transition: all 0.3s ease;
+          min-width: 0;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
         }
 
         .skill-item.unlocked {
@@ -1572,6 +1579,38 @@ export function attachPokemonCardListeners() {
       return;
     }
 
+    // Store original state for rollback
+    const originalPokemonSlot = pokemonData[38];
+    const originalTrainerSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+
+    // Optimistic update - update sessionStorage immediately
+    if (isChecked) {
+      // Find first empty slot for optimistic update
+      let slotIndex = -1;
+      for (let i = 26; i <= 31; i++) {
+        if (!trainerData[i] || trainerData[i] === '') {
+          slotIndex = i;
+          trainerData[i] = pokemonData[2];
+          pokemonData[38] = (i - 25).toString();
+          break;
+        }
+      }
+    } else {
+      // Remove from party slot
+      pokemonData[38] = '';
+      for (let i = 26; i <= 31; i++) {
+        if (trainerData[i] === pokemonData[2]) {
+          trainerData[i] = '';
+          break;
+        }
+      }
+    }
+
+    // Update sessionStorage immediately for instant UI feedback
+    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+    sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+
+    // Now make the API call
     try {
       const action = isChecked ? 'add' : 'remove';
       const response = await PokemonAPI.updatePartyStatus(
@@ -1582,32 +1621,42 @@ export function attachPokemonCardListeners() {
       );
 
       if (response.status === 'success') {
-        pokemonData[38] = isChecked ? response.slot : '';
-        sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
-
-        // Update trainer data in sessionStorage
+        // Update with actual slot from server if adding
         if (isChecked && response.slot) {
-          // Add to party slot (indices 26-31 are party slots)
           const slotIndex = 26 + parseInt(response.slot) - 1;
-          trainerData[slotIndex] = pokemonData[2];
-        } else if (!isChecked) {
-          // Remove from party slot
+          // Clear any incorrect optimistic placement
           for (let i = 26; i <= 31; i++) {
             if (trainerData[i] === pokemonData[2]) {
               trainerData[i] = '';
-              break;
             }
           }
+          // Set correct slot
+          trainerData[slotIndex] = pokemonData[2];
+          pokemonData[38] = response.slot;
+          sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+          sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
         }
-        sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-
         showSuccess(isChecked ? 'Added to active party!' : 'Removed from active party!');
       } else {
+        // Rollback on failure
+        pokemonData[38] = originalPokemonSlot;
+        for (let i = 0; i < 6; i++) {
+          trainerData[26 + i] = originalTrainerSlots[i];
+        }
+        sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+        sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
         e.target.checked = !isChecked;
         showError(response.message || 'Failed to update active party status');
       }
     } catch (error) {
       console.error('Error updating active party:', error);
+      // Rollback on error
+      pokemonData[38] = originalPokemonSlot;
+      for (let i = 0; i < 6; i++) {
+        trainerData[26 + i] = originalTrainerSlots[i];
+      }
+      sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+      sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
       e.target.checked = !isChecked;
       showError('Failed to update active party status');
     }
@@ -1625,6 +1674,33 @@ export function attachPokemonCardListeners() {
       return;
     }
 
+    // Store original state for rollback
+    const originalUtilityStatus = pokemonData[56];
+    const clearedPokemon = [];
+
+    // Optimistic update - update sessionStorage immediately
+    pokemonData[56] = isChecked ? 1 : '';
+    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
+    // Clear utility slot from other Pokemon if adding
+    if (isChecked) {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key.startsWith('pokemon_') && key !== `pokemon_${pokemonName.toLowerCase()}`) {
+          const otherPokemon = JSON.parse(sessionStorage.getItem(key));
+          if (otherPokemon[56] === 1 || otherPokemon[56] === '1') {
+            clearedPokemon.push({ key, originalValue: otherPokemon[56] });
+            otherPokemon[56] = '';
+            sessionStorage.setItem(key, JSON.stringify(otherPokemon));
+          }
+        }
+      }
+    }
+
+    // Update trainer data timestamp to trigger refresh
+    sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+
+    // Now make the API call
     try {
       const action = isChecked ? 'add' : 'remove';
       const response = await PokemonAPI.updateUtilitySlot(
@@ -1634,33 +1710,37 @@ export function attachPokemonCardListeners() {
       );
 
       if (response.status === 'success') {
-        pokemonData[56] = isChecked ? 1 : '';
-        sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
-
-        // Clear utility slot from other Pokemon if adding
-        if (isChecked) {
-          for (let i = 0; i < sessionStorage.length; i++) {
-            const key = sessionStorage.key(i);
-            if (key.startsWith('pokemon_') && key !== `pokemon_${pokemonName.toLowerCase()}`) {
-              const otherPokemon = JSON.parse(sessionStorage.getItem(key));
-              if (otherPokemon[56] === 1 || otherPokemon[56] === '1') {
-                otherPokemon[56] = '';
-                sessionStorage.setItem(key, JSON.stringify(otherPokemon));
-              }
-            }
-          }
-        }
-
-        // Update trainer data timestamp to trigger refresh
-        sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-
         showSuccess(isChecked ? 'Added to utility slot!' : 'Removed from utility slot!');
       } else {
+        // Rollback on failure
+        pokemonData[56] = originalUtilityStatus;
+        sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
+        // Restore cleared Pokemon
+        clearedPokemon.forEach(({ key, originalValue }) => {
+          const otherPokemon = JSON.parse(sessionStorage.getItem(key));
+          otherPokemon[56] = originalValue;
+          sessionStorage.setItem(key, JSON.stringify(otherPokemon));
+        });
+
+        sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
         e.target.checked = !isChecked;
         showError(response.message || 'Failed to update utility slot status');
       }
     } catch (error) {
       console.error('Error updating utility slot:', error);
+      // Rollback on error
+      pokemonData[56] = originalUtilityStatus;
+      sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
+      // Restore cleared Pokemon
+      clearedPokemon.forEach(({ key, originalValue }) => {
+        const otherPokemon = JSON.parse(sessionStorage.getItem(key));
+        otherPokemon[56] = originalValue;
+        sessionStorage.setItem(key, JSON.stringify(otherPokemon));
+      });
+
+      sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
       e.target.checked = !isChecked;
       showError('Failed to update utility slot status');
     }

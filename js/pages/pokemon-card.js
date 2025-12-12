@@ -2311,6 +2311,9 @@ function showMoveDetails(moveName) {
       .filter(val => val !== undefined);
     const highestMod = allowedModifiers.length > 0 ? Math.max(...allowedModifiers) : 0;
 
+    // Find which stat is being used (for display purposes)
+    const usedStat = moveModifiers.find(mod => modifierValues[mod] === highestMod) || '';
+
     // Calculate Attack Roll bonus
     const proficiencyBonus = hasSTAB ? proficiency : 0;
     const attackRollBonus = proficiencyBonus + highestMod;
@@ -2318,6 +2321,25 @@ function showMoveDetails(moveName) {
     // Calculate Damage Roll bonus
     const stabBonus = hasSTAB ? stabBonusValue : 0;
     const damageRollBonus = stabBonus + highestMod;
+
+    // Create breakdown text
+    const attackBreakdownParts = [];
+    if (proficiencyBonus > 0) {
+      attackBreakdownParts.push(`Proficiency +${proficiencyBonus}`);
+    }
+    if (highestMod !== 0) {
+      attackBreakdownParts.push(`${usedStat} ${highestMod >= 0 ? '+' : ''}${highestMod}`);
+    }
+    const attackBreakdown = attackBreakdownParts.length > 0 ? `(${attackBreakdownParts.join(', ')})` : '';
+
+    const damageBreakdownParts = [];
+    if (stabBonus > 0) {
+      damageBreakdownParts.push(`STAB +${stabBonus}`);
+    }
+    if (highestMod !== 0) {
+      damageBreakdownParts.push(`${usedStat} ${highestMod >= 0 ? '+' : ''}${highestMod}`);
+    }
+    const damageBreakdown = damageBreakdownParts.length > 0 ? `(${damageBreakdownParts.join(', ')})` : '';
 
     // Get held items info
     const heldItemsInfo = heldItems.length > 0
@@ -2361,8 +2383,14 @@ function showMoveDetails(moveName) {
               <strong>Higher Levels:</strong> <span id="moveHigherLevelsPopup"></span>
             </div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: #e8f5e9; border-radius: 8px;">
-              <div><strong>Attack Roll:</strong> <span id="attackRollBonus" style="font-size: 1.2em; color: #2e7d32;">+</span></div>
-              <div><strong>Damage Roll:</strong> <span id="damageRollBonus" style="font-size: 1.2em; color: #c62828;">+</span></div>
+              <div>
+                <strong>Attack Roll:</strong> <span id="attackRollBonus" style="font-size: 1.2em; color: #2e7d32;">+</span>
+                <div id="attackRollBreakdown" style="font-size: 0.75em; color: #555; margin-top: 0.3rem;"></div>
+              </div>
+              <div>
+                <strong>Damage Roll:</strong> <span id="damageRollBonus" style="font-size: 1.2em; color: #c62828;">+</span>
+                <div id="damageRollBreakdown" style="font-size: 0.75em; color: #555; margin-top: 0.3rem;"></div>
+              </div>
             </div>
             <div style="margin-bottom: 1.5rem; padding: 1rem; background: #fff3e0; border-radius: 8px; border-left: 4px solid #ff9800;">
               <strong style="display: block; margin-bottom: 0.5rem;">Held Items:</strong>
@@ -2468,6 +2496,8 @@ function showMoveDetails(moveName) {
     document.getElementById('moveHigherLevelsPopup').textContent = move[8];
     document.getElementById('attackRollBonus').textContent = `+${attackRollBonus}`;
     document.getElementById('damageRollBonus').textContent = `+${damageRollBonus}`;
+    document.getElementById('attackRollBreakdown').textContent = attackBreakdown;
+    document.getElementById('damageRollBreakdown').textContent = damageBreakdown;
     document.getElementById('heldItemsInfo').innerHTML = heldItemsInfo;
 
     // Apply type color to popup header

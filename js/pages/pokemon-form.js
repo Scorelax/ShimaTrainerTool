@@ -19,8 +19,31 @@ export function renderPokemonForm() {
     <div class="pokemon-form-page">
       <style>
         body, .content {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          background:
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
           min-height: 100vh;
+          position: relative;
+          overflow-x: hidden;
+        }
+
+        .pokemon-form-page::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image:
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px, 80px 80px;
+          background-position: 0 0, 40px 40px;
+          pointer-events: none;
+          opacity: 0.5;
+          z-index: 0;
         }
 
         .pokemon-form-page {
@@ -29,6 +52,12 @@ export function renderPokemonForm() {
           align-items: center;
           padding: 2vh 1vw;
           min-height: 80vh;
+          position: relative;
+        }
+
+        .pokemon-form-page > * {
+          position: relative;
+          z-index: 1;
         }
 
         .pokemon-form-page h1 {

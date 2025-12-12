@@ -29,21 +29,56 @@ export function renderEvolution() {
     <div class="evolution-page">
       <style>
         body, .content {
-          background: linear-gradient(to bottom, #f44336 80%, #ffffff 20%);
+          background:
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
+          min-height: 100vh;
+          position: relative;
+          overflow-x: hidden;
+        }
+
+        .evolution-page::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image:
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px, 80px 80px;
+          background-position: 0 0, 40px 40px;
+          pointer-events: none;
+          opacity: 0.5;
+          z-index: 0;
         }
 
         .evolution-page {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 2rem 1rem;
-          min-height: 80vh;
+          padding: clamp(1.5rem, 3vh, 2rem) clamp(0.75rem, 2vw, 1rem);
+          min-height: 100vh;
+          position: relative;
+          box-sizing: border-box;
+        }
+
+        .evolution-page > * {
+          position: relative;
+          z-index: 1;
         }
 
         .evolution-page h1 {
           color: white;
-          margin-bottom: 2rem;
-          font-size: 2.5rem;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          font-size: clamp(1.8rem, 4.5vw, 2.5rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.5vw, 2px);
+          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
+          font-weight: 900;
         }
 
         .evolution-container {
@@ -59,17 +94,22 @@ export function renderEvolution() {
           width: 45%;
           max-height: 65vh;
           overflow-y: auto;
-          border: 2px solid black;
-          border-radius: 10px;
-          padding: 20px;
-          background-color: white;
+          border: clamp(3px, 0.5vw, 4px) solid #FFDE00;
+          border-radius: clamp(15px, 2.5vw, 20px);
+          padding: clamp(1.25rem, 2.5vw, 1.5rem);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4);
         }
 
         .evolution-list h2 {
           text-align: center;
           margin-top: 0;
-          margin-bottom: 20px;
-          font-size: 1.5rem;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          font-size: clamp(1.3rem, 2.8vw, 1.5rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          color: #333;
         }
 
         .evolution-list ul {
@@ -79,21 +119,27 @@ export function renderEvolution() {
         }
 
         .evolution-list li {
-          font-size: 1.2rem;
-          margin-bottom: 15px;
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          margin-bottom: clamp(0.8rem, 1.8vh, 1rem);
           cursor: pointer;
-          padding: 10px;
-          border-radius: 5px;
-          transition: background-color 0.2s;
+          padding: clamp(0.65rem, 1.5vw, 0.85rem);
+          border-radius: clamp(8px, 1.5vw, 10px);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          background: transparent;
+          border: clamp(2px, 0.3vw, 2px) solid transparent;
         }
 
         .evolution-list li:hover {
-          background-color: #f0f0f0;
+          background: rgba(255, 222, 0, 0.1);
+          border-color: #FFDE00;
+          transform: translateX(clamp(3px, 0.8vw, 5px));
         }
 
         .evolution-list li.selected {
-          background-color: #f44336;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
+          border-color: #FFDE00;
+          box-shadow: 0 clamp(4px, 0.8vh, 6px) clamp(12px, 2.5vh, 15px) rgba(238,21,21,0.4);
         }
 
         .pokemon-details {
@@ -101,9 +147,11 @@ export function renderEvolution() {
           text-align: center;
           display: none;
           color: black;
-          background-color: white;
-          border-radius: 10px;
-          padding: 20px;
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+          border: clamp(3px, 0.5vw, 4px) solid #FFDE00;
+          border-radius: clamp(15px, 2.5vw, 20px);
+          padding: clamp(1.25rem, 2.5vw, 1.5rem);
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4);
         }
 
         .pokemon-details.visible {
@@ -125,19 +173,25 @@ export function renderEvolution() {
         }
 
         .evolve-button {
-          background-color: #4CAF50;
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: none;
-          border-radius: 5px;
-          padding: 15px 30px;
-          font-size: 1.3rem;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 15px);
+          padding: clamp(1rem, 2vh, 1.2rem) clamp(2rem, 4vw, 2.5rem);
+          font-size: clamp(1.1rem, 2.4vw, 1.3rem);
+          font-weight: 900;
           cursor: pointer;
-          transition: background-color 0.3s;
-          margin-top: 20px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          margin-top: clamp(1.25rem, 2.5vh, 1.5rem);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(15px, 3vh, 20px) rgba(0,0,0,0.3);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
         }
 
         .evolve-button:hover {
-          background-color: #45a049;
+          transform: translateY(clamp(-2px, -0.5vh, -3px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(76,175,80,0.5),
+                      0 0 clamp(15px, 3vw, 20px) rgba(255,222,0,0.5);
         }
 
         /* Modal styles */
@@ -279,6 +333,39 @@ export function renderEvolution() {
           margin-top: 0;
         }
 
+        .back-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: clamp(40px, 8vw, 50px);
+          height: clamp(40px, 8vw, 50px);
+          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.4rem, 3vw, 1.8rem);
+          font-weight: bold;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+        }
+
+        .back-button:hover {
+          transform: scale(1.1);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 20px rgba(255,222,0,0.5);
+          border-color: #FFC700;
+        }
+
+        .back-button:active {
+          transform: scale(1.05);
+        }
+
         @media (max-width: 768px) {
           .evolution-container {
             flex-direction: column;
@@ -355,6 +442,9 @@ export function renderEvolution() {
         <h2>Evolution Successful!</h2>
         <p>Your Pokemon has evolved into <strong id="evolvedPokemonName"></strong>!</p>
       </div>
+
+      <!-- Back Button -->
+      <button class="back-button" id="backButton">←</button>
     </div>
   `;
 
@@ -393,6 +483,14 @@ export function attachEvolutionListeners() {
   // Stat point inputs
   ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(stat => {
     document.getElementById(`${stat}Points`)?.addEventListener('input', updateAllocatedPoints);
+  });
+
+  // Back button
+  document.getElementById('backButton')?.addEventListener('click', () => {
+    const pokemonName = sessionStorage.getItem('selectedPokemonName');
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'pokemon-card', pokemonName: pokemonName }
+    }));
   });
 }
 

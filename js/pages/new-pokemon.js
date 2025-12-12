@@ -15,8 +15,31 @@ export function renderNewPokemon() {
     <div class="new-pokemon-page">
       <style>
         body, .content {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          background:
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
           min-height: 100vh;
+          position: relative;
+          overflow-x: hidden;
+        }
+
+        .new-pokemon-page::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image:
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px, 80px 80px;
+          background-position: 0 0, 40px 40px;
+          pointer-events: none;
+          opacity: 0.5;
+          z-index: 0;
         }
 
         .new-pokemon-page {
@@ -25,6 +48,12 @@ export function renderNewPokemon() {
           align-items: center;
           padding: clamp(1.5rem, 3vh, 2rem) clamp(0.75rem, 2vw, 1rem);
           min-height: 85vh;
+          position: relative;
+        }
+
+        .new-pokemon-page > * {
+          position: relative;
+          z-index: 1;
         }
 
         .new-pokemon-page h1 {

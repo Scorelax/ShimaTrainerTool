@@ -920,6 +920,8 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           gap: clamp(0.5rem, 1vh, 0.75rem);
+          align-items: center;
+          text-align: center;
         }
 
         .combat-stat-label {
@@ -1002,11 +1004,12 @@ export function renderPokemonCard(pokemonName) {
 
         .type-effectiveness-section {
           margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          text-align: center;
         }
 
         .type-effectiveness-header {
           font-weight: 900;
-          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
           color: #FFDE00;
           text-transform: uppercase;
           text-shadow: 0 1px 3px rgba(0,0,0,0.6);
@@ -1017,6 +1020,7 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-wrap: wrap;
           gap: clamp(0.4rem, 1vw, 0.6rem);
+          justify-content: center;
         }
 
         .type-button {
@@ -1420,8 +1424,8 @@ export function renderPokemonCard(pokemonName) {
 
       <!-- Combat Tracker Popup -->
       <div id="combatTrackerPopup" class="popup-overlay">
-        <div class="popup-content" style="max-width: min(90vw, 550px);">
-          <div class="popup-header" style="position: sticky; top: 0; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); z-index: 10; padding-top: clamp(1rem, 2vh, 1.5rem);">
+        <div class="popup-content" style="max-width: min(90vw, 550px); padding-top: clamp(0.5rem, 1vh, 0.75rem);">
+          <div class="popup-header">
             <div class="popup-title">Combat Tracker</div>
             <button class="popup-close" id="closeCombatTracker">×</button>
           </div>

@@ -2277,7 +2277,7 @@ function showMoveDetails(moveName) {
     const wis = pokemonData[11] || 10;
     const cha = pokemonData[12] || 10;
     const proficiency = pokemonData[33] || 2;
-    const stabBonus = pokemonData[34] || 2;
+    const stabBonusValue = pokemonData[34] || 2;
     const heldItemsStr = pokemonData[35] || '';
     const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
@@ -2318,7 +2318,7 @@ function showMoveDetails(moveName) {
     const attackRollBonus = proficiencyBonus + highestMod;
 
     // Calculate Damage Roll bonus
-    const stabBonus = hasSTAB ? parseInt(stabBonus) : 0;
+    const stabBonus = hasSTAB ? stabBonusValue : 0;
     const damageRollBonus = stabBonus + highestMod;
 
     // Get held items info
@@ -2394,31 +2394,45 @@ function showMoveDetails(moveName) {
       document.getElementById('useMoveButton').addEventListener('click', async () => {
         const vpCost = parseInt(move[4]) || 0;
         const currentVpText = document.getElementById('combatCurrentVP')?.textContent || '0 / 0';
+        const currentHpText = document.getElementById('combatCurrentHP')?.textContent || '0 / 0';
         const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+        const [currentHp, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
 
-        if (currentVp >= vpCost) {
-          const newVp = currentVp - vpCost;
+        let newVp = currentVp - vpCost;
+        let newHp = currentHp;
+        let vpOverflow = false;
 
-          // Update UI
-          document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
-          document.getElementById('currentVpValue').textContent = newVp;
-
-          // Save to sessionStorage
-          pokemonData[46] = newVp;
-          sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
-
-          // Persist to database
-          try {
-            await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
-          } catch (error) {
-            console.error('Error updating VP:', error);
-          }
-
-          // Close popup
-          popup.style.display = 'none';
-        } else {
-          showError('Not enough VP to use this move!');
+        // Handle VP overflow to HP
+        if (newVp < 0) {
+          const excessVpCost = Math.abs(newVp);
+          newVp = 0;
+          newHp = Math.max(currentHp - excessVpCost, 0);
+          vpOverflow = true;
         }
+
+        // Update UI
+        document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
+        document.getElementById('currentVpValue').textContent = newVp;
+        document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
+        document.getElementById('currentHpValue').textContent = newHp;
+
+        // Save to sessionStorage
+        pokemonData[46] = newVp;
+        pokemonData[45] = newHp;
+        sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
+        // Persist to database
+        try {
+          await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
+          if (vpOverflow) {
+            await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp);
+          }
+        } catch (error) {
+          console.error('Error updating stats:', error);
+        }
+
+        // Close popup
+        popup.style.display = 'none';
       });
 
       // Hover effect for X button

@@ -860,8 +860,8 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
-          padding-bottom: clamp(0.75rem, 1.5vh, 1rem);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          padding-bottom: clamp(0.5rem, 1vh, 0.75rem);
           border-bottom: clamp(2px, 0.4vw, 3px) solid #FFDE00;
         }
 
@@ -963,7 +963,7 @@ export function renderPokemonCard(pokemonName) {
           padding: clamp(0.75rem, 1.5vh, 1rem);
           border: clamp(2px, 0.4vw, 3px) solid #333;
           border-radius: clamp(8px, 1.5vw, 10px);
-          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
           font-weight: 900;
           cursor: pointer;
           transition: all 0.3s ease;
@@ -1045,7 +1045,7 @@ export function renderPokemonCard(pokemonName) {
         .combat-section-separator {
           height: clamp(2px, 0.4vw, 3px);
           background: linear-gradient(90deg, transparent 0%, #FFDE00 50%, transparent 100%);
-          margin: clamp(1.5rem, 3vh, 2rem) 0;
+          margin: clamp(0.5rem, 1vh, 0.75rem) 0;
         }
 
         /* Back button - matches trainer-card style */
@@ -1421,15 +1421,15 @@ export function renderPokemonCard(pokemonName) {
       <!-- Combat Tracker Popup -->
       <div id="combatTrackerPopup" class="popup-overlay">
         <div class="popup-content" style="max-width: min(90vw, 550px);">
-          <div class="popup-header">
+          <div class="popup-header" style="position: sticky; top: 0; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); z-index: 10; padding-top: clamp(1rem, 2vh, 1.5rem);">
             <div class="popup-title">Combat Tracker</div>
             <button class="popup-close" id="closeCombatTracker">×</button>
           </div>
           <div class="popup-body">
             <div class="combat-tracker-container">
               <!-- Trainer Section -->
-              <div style="margin-bottom: clamp(1rem, 2vh, 1.5rem);">
-                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.75rem, 1.5vh, 1rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">Trainer</div>
+              <div style="margin-bottom: clamp(0.5rem, 1vh, 0.75rem);">
+                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${trainerData[1]}</div>
                 <div class="combat-stats-row">
                   <div class="combat-stat-column">
                     <div class="combat-stat-label">HP</div>
@@ -1445,7 +1445,7 @@ export function renderPokemonCard(pokemonName) {
                 <div class="combat-buttons">
                   <button id="addTrainerStats" class="combat-btn combat-btn-add">➕ Add</button>
                   <button id="removeTrainerStats" class="combat-btn combat-btn-remove">➖ Remove</button>
-                  <button id="fullRestoreTrainer" class="combat-btn combat-btn-restore">✨ Restore</button>
+                  <button id="fullRestoreTrainer" class="combat-btn combat-btn-restore">✨ Full Restore</button>
                 </div>
               </div>
 
@@ -1453,7 +1453,7 @@ export function renderPokemonCard(pokemonName) {
 
               <!-- Pokemon Section -->
               <div>
-                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.75rem, 1.5vh, 1rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">Pokemon</div>
+                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${pokemonData[2]}</div>
 
                 <!-- Type Effectiveness Buttons -->
                 ${weaknesses.length > 0 ? `
@@ -1490,7 +1490,7 @@ export function renderPokemonCard(pokemonName) {
                 <div class="combat-buttons">
                   <button id="addStats" class="combat-btn combat-btn-add">➕ Add</button>
                   <button id="removeStats" class="combat-btn combat-btn-remove">➖ Remove</button>
-                  <button id="fullRestore" class="combat-btn combat-btn-restore">✨ Restore</button>
+                  <button id="fullRestore" class="combat-btn combat-btn-restore">✨ Full Restore</button>
                 </div>
               </div>
             </div>
@@ -2362,7 +2362,7 @@ function showMoveDetails(moveName) {
       popupContent.style.cssText = 'background: white; border-radius: clamp(15px, 2vh, 20px); padding: 0; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
 
       popupContent.innerHTML = `
-        <div id="movePopupHeader" style="padding: clamp(1.2rem, 2vh, 1.5rem); border-radius: clamp(15px, 2vh, 20px) clamp(15px, 2vh, 20px) 0 0; position: relative; display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
+        <div id="movePopupHeader" style="padding: clamp(1.2rem, 2vh, 1.5rem); border-radius: clamp(15px, 2vh, 20px) clamp(15px, 2vh, 20px) 0 0; border-bottom: 2px solid rgba(0,0,0,0.2); position: relative; display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
           <button id="closeMovePopupX" style="position: absolute; top: clamp(0.8rem, 1.5vh, 1.2rem); right: clamp(0.8rem, 1.5vh, 1.2rem); background: rgba(0,0,0,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; width: clamp(32px, 5vh, 40px); height: clamp(32px, 5vh, 40px); font-size: clamp(1.2rem, 2.2vh, 1.5rem); font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
           <h2 id="moveNamePopup" style="margin: 0; font-size: clamp(1.5rem, 2.8vh, 2rem); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;"></h2>
           <div id="moveTypePopup" style="display: inline-block; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: clamp(0.85rem, 1.5vh, 1rem); font-weight: 700; background: rgba(255,255,255,0.3);"></div>

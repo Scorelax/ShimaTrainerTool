@@ -68,15 +68,16 @@ export function renderNewPokemon() {
 
         .register-container {
           display: flex;
-          justify-content: space-around;
+          justify-content: space-between;
+          align-items: flex-start;
           width: 90%;
-          max-width: clamp(900px, 95vw, 1200px);
+          max-width: clamp(900px, 95vw, 1400px);
           gap: clamp(1.5rem, 3vw, 2rem);
         }
 
         .pokemon-list {
-          width: 45%;
-          max-height: 65vh;
+          width: 58%;
+          max-height: 70vh;
           overflow-y: auto;
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           border-radius: clamp(15px, 3vw, 20px);
@@ -140,27 +141,40 @@ export function renderNewPokemon() {
         }
 
         .pokemon-details {
-          width: 50%;
+          width: 38%;
           text-align: center;
-          display: none;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-start;
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           border-radius: clamp(15px, 3vw, 20px);
           padding: clamp(1.5rem, 3vw, 2rem);
           box-shadow: 0 clamp(8px, 2vh, 10px) clamp(25px, 5vw, 30px) rgba(0,0,0,0.3);
+          min-height: 60vh;
         }
 
         .pokemon-details.visible {
-          display: block;
+          /* Always visible now, this class can remain for compatibility */
+        }
+
+        .pokemon-details.empty {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #999;
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          font-style: italic;
         }
 
         .pokemon-details img {
-          width: min(30vw, 35vh);
-          height: min(30vw, 35vh);
+          width: min(20vw, 250px);
+          height: min(20vw, 250px);
           background-color: #f0f0f0;
           border-radius: clamp(8px, 1.5vw, 15px);
           object-fit: contain;
-          margin-bottom: clamp(1rem, 3vh, 2rem);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
         }
 
         .pokemon-details .detail-item {
@@ -225,12 +239,15 @@ export function renderNewPokemon() {
           </ul>
         </div>
 
-        <div class="pokemon-details" id="pokemonDetails">
-          <img src="" alt="Pokemon" id="pokemonImage" onerror="this.src='assets/Pokeball.png'">
-          <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
-          <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
-          <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
-          <button class="register-btn" id="registerBtn">Register Pokemon</button>
+        <div class="pokemon-details empty" id="pokemonDetails">
+          <div id="pokemonDetailsContent" style="display: none; width: 100%; flex-direction: column; align-items: center;">
+            <img src="" alt="Pokemon" id="pokemonImage" onerror="this.src='assets/Pokeball.png'">
+            <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
+            <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
+            <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
+            <button class="register-btn" id="registerBtn">Register Pokemon</button>
+          </div>
+          <div id="pokemonPlaceholder">Select a Pokemon to view details</div>
         </div>
       </div>
     </div>
@@ -344,6 +361,10 @@ async function selectPokemon(pokemon, listItem) {
   const typeText = pokemon[5] ? `${pokemon[4]} / ${pokemon[5]}` : pokemon[4];
   document.getElementById('pokemonType').textContent = typeText;
 
+  // Hide placeholder and show content
+  document.getElementById('pokemonPlaceholder').style.display = 'none';
+  document.getElementById('pokemonDetailsContent').style.display = 'flex';
+  document.getElementById('pokemonDetails').classList.remove('empty');
   document.getElementById('pokemonDetails').classList.add('visible');
 }
 

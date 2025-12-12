@@ -2270,13 +2270,13 @@ function showMoveDetails(moveName) {
     // Extract needed data (convert to numbers to avoid string concatenation)
     const type1 = pokemonData[5] || '';
     const type2 = pokemonData[6] || '';
-    const str = parseInt(pokemonData[7]) || 10;
-    const dex = parseInt(pokemonData[8]) || 10;
-    const con = parseInt(pokemonData[9]) || 10;
-    const int = parseInt(pokemonData[10]) || 10;
-    const wis = parseInt(pokemonData[11]) || 10;
-    const cha = parseInt(pokemonData[12]) || 10;
-    const proficiency = parseInt(pokemonData[33]) || 2;
+    const str = parseInt(pokemonData[15]) || 10;
+    const dex = parseInt(pokemonData[16]) || 10;
+    const con = parseInt(pokemonData[17]) || 10;
+    const int = parseInt(pokemonData[18]) || 10;
+    const wis = parseInt(pokemonData[19]) || 10;
+    const cha = parseInt(pokemonData[20]) || 10;
+    const proficiency = parseInt(pokemonData[31]) || 2;
     const stabBonusValue = parseInt(pokemonData[34]) || 2;
     const heldItemsStr = pokemonData[35] || '';
     const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];

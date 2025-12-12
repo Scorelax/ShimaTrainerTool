@@ -147,11 +147,8 @@ export function renderNewPokemon() {
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          border-radius: clamp(15px, 3vw, 20px);
+          background: transparent;
           padding: clamp(1.5rem, 3vw, 2rem);
-          box-shadow: 0 clamp(8px, 2vh, 10px) clamp(25px, 5vw, 30px) rgba(0,0,0,0.3);
           min-height: 60vh;
         }
 
@@ -163,24 +160,42 @@ export function renderNewPokemon() {
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #999;
-          font-size: clamp(1rem, 2vw, 1.2rem);
+          color: #FFDE00;
+          font-size: clamp(1.1rem, 2.2vw, 1.4rem);
           font-style: italic;
+          font-weight: 600;
+          text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
 
         .pokemon-details img {
-          width: min(20vw, 250px);
-          height: min(20vw, 250px);
-          background-color: #f0f0f0;
-          border-radius: clamp(8px, 1.5vw, 15px);
-          object-fit: contain;
+          width: 85%;
+          max-width: 300px;
+          aspect-ratio: 1;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          object-fit: cover;
           margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          background-color: #fff;
+          transition: transform 0.3s, filter 0.3s;
+        }
+
+        .pokemon-details img:hover {
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
 
         .pokemon-details .detail-item {
-          font-size: clamp(1rem, 2vw, 1.3rem);
-          margin-bottom: clamp(0.5rem, 1.5vh, 1rem);
-          color: #333;
+          font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          color: #FFDE00;
+          font-weight: 700;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .pokemon-details .detail-item strong {
+          color: white;
+          font-weight: 900;
         }
 
         .register-btn {

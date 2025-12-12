@@ -113,55 +113,13 @@ export function renderPokemonForm() {
           outline: none;
         }
 
-        .collapsible-section {
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
-        }
-
-        .collapsible-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+        .abilities-container {
           padding: clamp(0.75rem, 1.5vh, 1rem);
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
-          color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
           border-radius: clamp(10px, 2vw, 15px);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
-          cursor: pointer;
-          font-size: clamp(1.1rem, 2.2vw, 1.3rem);
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.2vw, 1px);
-          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 20px) rgba(0,0,0,0.3);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .collapsible-header:hover {
-          transform: translateY(clamp(-1px, -0.3vh, -2px));
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4),
-                      0 0 clamp(15px, 2.5vh, 20px) rgba(255,222,0,0.4);
-        }
-
-        .arrow {
-          transition: transform 0.3s;
-        }
-
-        .arrow.open {
-          transform: rotate(90deg);
-        }
-
-        .collapsible-content {
-          display: none;
-          padding: clamp(0.75rem, 1.5vh, 1rem);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
-          border-top: none;
-          border-radius: 0 0 clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px);
-          max-height: clamp(200px, 35vh, 300px);
+          max-height: clamp(250px, 40vh, 350px);
           overflow-y: auto;
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-        }
-
-        .collapsible-content.open {
-          display: block;
         }
 
         .checkbox-item {
@@ -272,12 +230,9 @@ export function renderPokemonForm() {
           </div>
 
           <!-- Abilities Section -->
-          <div class="collapsible-section">
-            <div class="collapsible-header" id="abilitiesHeader">
-              <span>Abilities</span>
-              <span class="arrow" id="abilitiesArrow">▶</span>
-            </div>
-            <div class="collapsible-content" id="abilitiesContent">
+          <div class="form-group">
+            <label>Abilities</label>
+            <div class="abilities-container" id="abilitiesContent">
               <!-- Abilities will be populated dynamically -->
             </div>
           </div>
@@ -315,16 +270,6 @@ export function attachPokemonFormListeners() {
 
   // Populate abilities
   populateAbilityOptions(selectedPokemonData);
-
-  // Collapsible abilities section
-  const header = document.getElementById('abilitiesHeader');
-  const content = document.getElementById('abilitiesContent');
-  const arrow = document.getElementById('abilitiesArrow');
-
-  header?.addEventListener('click', () => {
-    content.classList.toggle('open');
-    arrow.classList.toggle('open');
-  });
 
   // Cancel button
   document.getElementById('cancelButton')?.addEventListener('click', () => {

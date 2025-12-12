@@ -2362,37 +2362,37 @@ function showMoveDetails(moveName) {
       popupContent.style.cssText = 'background: white; border-radius: clamp(15px, 2vh, 20px); padding: 0; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
 
       popupContent.innerHTML = `
-        <div id="movePopupHeader" style="padding: clamp(1.5rem, 2.5vh, 2rem); border-radius: clamp(15px, 2vh, 20px) clamp(15px, 2vh, 20px) 0 0; position: relative;">
+        <div id="movePopupHeader" style="padding: clamp(1.2rem, 2vh, 1.5rem); border-radius: clamp(15px, 2vh, 20px) clamp(15px, 2vh, 20px) 0 0; position: relative; display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
           <button id="closeMovePopupX" style="position: absolute; top: clamp(0.8rem, 1.5vh, 1.2rem); right: clamp(0.8rem, 1.5vh, 1.2rem); background: rgba(0,0,0,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; width: clamp(32px, 5vh, 40px); height: clamp(32px, 5vh, 40px); font-size: clamp(1.2rem, 2.2vh, 1.5rem); font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
           <h2 id="moveNamePopup" style="margin: 0; font-size: clamp(1.5rem, 2.8vh, 2rem); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;"></h2>
-          <div id="moveTypePopup" style="display: inline-block; margin-top: 0.5rem; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: clamp(0.85rem, 1.5vh, 1rem); font-weight: 700; background: rgba(255,255,255,0.3);"></div>
+          <div id="moveTypePopup" style="display: inline-block; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: clamp(0.85rem, 1.5vh, 1rem); font-weight: 700; background: rgba(255,255,255,0.3);"></div>
         </div>
-        <div style="padding: clamp(1.5rem, 2.5vh, 2rem); background: white; border-radius: 0 0 clamp(15px, 2vh, 20px) clamp(15px, 2vh, 20px);">
-          <div style="font-size: clamp(0.9rem, 1.6vh, 1.05rem); line-height: 1.6; color: #333;">
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+        <div id="movePopupBody" style="padding: clamp(1.2rem, 2vh, 1.5rem); border-radius: 0 0 clamp(15px, 2vh, 20px) clamp(15px, 2vh, 20px);">
+          <div style="font-size: clamp(0.9rem, 1.6vh, 1.05rem); line-height: 1.5;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-bottom: 0.8rem;">
               <div><strong>Modifier:</strong> <span id="moveModifierPopup"></span></div>
               <div><strong>Action Type:</strong> <span id="moveActionTypePopup"></span></div>
               <div><strong>VP Cost:</strong> <span id="moveVPCostPopup"></span></div>
               <div><strong>Duration:</strong> <span id="moveDurationPopup"></span></div>
               <div style="grid-column: 1 / -1;"><strong>Range:</strong> <span id="moveRangePopup"></span></div>
             </div>
-            <div style="margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 8px;">
-              <strong>Description:</strong> <div id="moveDescriptionPopup" style="margin-top: 0.5rem;"></div>
+            <div style="margin-bottom: 0.8rem; padding: 0.8rem; background: rgba(0,0,0,0.1); border-radius: 8px;">
+              <strong>Description:</strong> <div id="moveDescriptionPopup" style="margin-top: 0.4rem;"></div>
             </div>
-            <div style="margin-bottom: 1rem;">
+            <div style="margin-bottom: 0.8rem;">
               <strong>Higher Levels:</strong> <span id="moveHigherLevelsPopup"></span>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: #e8f5e9; border-radius: 8px;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 0.8rem; padding: 0.8rem; background: rgba(0,0,0,0.15); border-radius: 8px;">
               <div>
-                <strong>Attack Roll:</strong> <span id="attackRollBonus" style="font-size: 1.2em; color: #2e7d32;">+</span>
-                <div id="attackRollBreakdown" style="font-size: 0.75em; color: #555; margin-top: 0.3rem;"></div>
+                <strong>Attack Roll:</strong> <span id="attackRollBonus" style="font-size: 1.2em; font-weight: bold;">+</span>
+                <div id="attackRollBreakdown" style="font-size: 0.75em; opacity: 0.8; margin-top: 0.3rem;"></div>
               </div>
               <div>
-                <strong>Damage Roll:</strong> <span id="damageRollBonus" style="font-size: 1.2em; color: #c62828;">+</span>
-                <div id="damageRollBreakdown" style="font-size: 0.75em; color: #555; margin-top: 0.3rem;"></div>
+                <strong>Damage Roll:</strong> <span id="damageRollBonus" style="font-size: 1.2em; font-weight: bold;">+</span>
+                <div id="damageRollBreakdown" style="font-size: 0.75em; opacity: 0.8; margin-top: 0.3rem;"></div>
               </div>
             </div>
-            <div style="margin-bottom: 1.5rem; padding: 1rem; background: #fff3e0; border-radius: 8px; border-left: 4px solid #ff9800;">
+            <div style="margin-bottom: 1rem; padding: 0.8rem; background: rgba(0,0,0,0.1); border-radius: 8px; border-left: 4px solid rgba(0,0,0,0.3);">
               <strong style="display: block; margin-bottom: 0.5rem;">Held Items:</strong>
               <div id="heldItemsInfo"></div>
             </div>
@@ -2500,12 +2500,15 @@ function showMoveDetails(moveName) {
     document.getElementById('damageRollBreakdown').textContent = damageBreakdown;
     document.getElementById('heldItemsInfo').innerHTML = heldItemsInfo;
 
-    // Apply type color to popup header
+    // Apply type color to popup header and body
     const bgColor = getMoveTypeColor(move[1]);
     const textColor = getTextColorForBackground(bgColor);
     const header = document.getElementById('movePopupHeader');
+    const body = document.getElementById('movePopupBody');
     header.style.backgroundColor = bgColor;
     header.style.color = textColor;
+    body.style.backgroundColor = bgColor;
+    body.style.color = textColor;
     document.getElementById('moveTypePopup').style.color = textColor;
 
     popup.style.display = 'flex';

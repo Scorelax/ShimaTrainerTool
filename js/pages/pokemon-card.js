@@ -2267,17 +2267,17 @@ function showMoveDetails(moveName) {
     const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
     const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
 
-    // Extract needed data
+    // Extract needed data (convert to numbers to avoid string concatenation)
     const type1 = pokemonData[5] || '';
     const type2 = pokemonData[6] || '';
-    const str = pokemonData[7] || 10;
-    const dex = pokemonData[8] || 10;
-    const con = pokemonData[9] || 10;
-    const int = pokemonData[10] || 10;
-    const wis = pokemonData[11] || 10;
-    const cha = pokemonData[12] || 10;
-    const proficiency = pokemonData[33] || 2;
-    const stabBonusValue = pokemonData[34] || 2;
+    const str = parseInt(pokemonData[7]) || 10;
+    const dex = parseInt(pokemonData[8]) || 10;
+    const con = parseInt(pokemonData[9]) || 10;
+    const int = parseInt(pokemonData[10]) || 10;
+    const wis = parseInt(pokemonData[11]) || 10;
+    const cha = parseInt(pokemonData[12]) || 10;
+    const proficiency = parseInt(pokemonData[33]) || 2;
+    const stabBonusValue = parseInt(pokemonData[34]) || 2;
     const heldItemsStr = pokemonData[35] || '';
     const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
@@ -2306,12 +2306,10 @@ function showMoveDetails(moveName) {
     };
 
     // Get highest stat modifier from move's allowed modifiers
-    let highestMod = 0;
-    moveModifiers.forEach(mod => {
-      if (modifierValues[mod] !== undefined && modifierValues[mod] > highestMod) {
-        highestMod = modifierValues[mod];
-      }
-    });
+    const allowedModifiers = moveModifiers
+      .map(mod => modifierValues[mod])
+      .filter(val => val !== undefined);
+    const highestMod = allowedModifiers.length > 0 ? Math.max(...allowedModifiers) : 0;
 
     // Calculate Attack Roll bonus
     const proficiencyBonus = hasSTAB ? proficiency : 0;

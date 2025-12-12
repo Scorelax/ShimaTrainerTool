@@ -2262,36 +2262,124 @@ function showMoveDetails(moveName) {
   const move = window.allMoves.find(m => m[0] === moveName);
 
   if (move) {
+    // Get Pokemon and trainer data from sessionStorage
+    const pokemonName = sessionStorage.getItem('selectedPokemonName');
+    const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
+    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+
+    // Extract needed data
+    const type1 = pokemonData[5] || '';
+    const type2 = pokemonData[6] || '';
+    const str = pokemonData[7] || 10;
+    const dex = pokemonData[8] || 10;
+    const con = pokemonData[9] || 10;
+    const int = pokemonData[10] || 10;
+    const wis = pokemonData[11] || 10;
+    const cha = pokemonData[12] || 10;
+    const proficiency = pokemonData[33] || 2;
+    const stabBonus = pokemonData[34] || 2;
+    const heldItemsStr = pokemonData[35] || '';
+    const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
+
+    // Get Pokemon types for STAB calculation
+    const pokemonTypes = [type1, type2].filter(t => t);
+    const moveType = move[1];
+    const hasSTAB = pokemonTypes.includes(moveType);
+
+    // Get stat modifiers
+    const strMod = Math.floor((str - 10) / 2);
+    const dexMod = Math.floor((dex - 10) / 2);
+    const conMod = Math.floor((con - 10) / 2);
+    const intMod = Math.floor((int - 10) / 2);
+    const wisMod = Math.floor((wis - 10) / 2);
+    const chaMod = Math.floor((cha - 10) / 2);
+
+    // Parse move modifiers (e.g., "STR/DEX")
+    const moveModifiers = move[2].split('/').map(m => m.trim().toUpperCase());
+    const modifierValues = {
+      'STR': strMod,
+      'DEX': dexMod,
+      'CON': conMod,
+      'INT': intMod,
+      'WIS': wisMod,
+      'CHA': chaMod
+    };
+
+    // Get highest stat modifier from move's allowed modifiers
+    let highestMod = 0;
+    moveModifiers.forEach(mod => {
+      if (modifierValues[mod] !== undefined && modifierValues[mod] > highestMod) {
+        highestMod = modifierValues[mod];
+      }
+    });
+
+    // Calculate Attack Roll bonus
+    const proficiencyBonus = hasSTAB ? proficiency : 0;
+    const attackRollBonus = proficiencyBonus + highestMod;
+
+    // Calculate Damage Roll bonus
+    const stabBonus = hasSTAB ? parseInt(stabBonus) : 0;
+    const damageRollBonus = stabBonus + highestMod;
+
+    // Get held items info
+    const heldItemsInfo = heldItems.length > 0
+      ? heldItems.map(itemName => {
+          const itemsData = JSON.parse(sessionStorage.getItem('items')) || [];
+          const item = itemsData.find(i => i.name === itemName);
+          return item ? `<div style="margin-bottom: 0.8rem;"><strong>${item.name}:</strong> ${item.effect || item.description || 'No description'}</div>` : `<div style="margin-bottom: 0.8rem;"><strong>${itemName}:</strong> No description available</div>`;
+        }).join('')
+      : '<div style="color: #999;">No held items</div>';
+
     // Create popup if it doesn't exist
     let popup = document.getElementById('moveDetailsPopup');
     if (!popup) {
       popup = document.createElement('div');
       popup.id = 'moveDetailsPopup';
-      popup.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;';
+      popup.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px);';
 
       const popupContent = document.createElement('div');
-      popupContent.style.cssText = 'background: white; border-radius: 1.3vh; padding: 2.6vh; max-width: 65vh; width: 90%; max-height: 80vh; overflow-y: auto;';
+      popupContent.id = 'movePopupContent';
+      popupContent.style.cssText = 'background: white; border-radius: clamp(15px, 2vh, 20px); padding: 0; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
 
       popupContent.innerHTML = `
-        <h2 id="moveNamePopup" style="margin-top: 0; color: #333; font-size: clamp(1.4rem, 2.4vh, 2.4vh);"></h2>
-        <div style="font-size: clamp(0.9rem, 1.5vh, 1.5vh); line-height: 1.6; color: black;">
-          <p><strong>Type:</strong> <span id="moveTypePopup"></span></p>
-          <p><strong>Modifier:</strong> <span id="moveModifierPopup"></span></p>
-          <p><strong>Action Type:</strong> <span id="moveActionTypePopup"></span></p>
-          <p><strong>VP Cost:</strong> <span id="moveVPCostPopup"></span></p>
-          <p><strong>Duration:</strong> <span id="moveDurationPopup"></span></p>
-          <p><strong>Range:</strong> <span id="moveRangePopup"></span></p>
-          <p><strong>Description:</strong> <span id="moveDescriptionPopup"></span></p>
-          <p><strong>Higher Levels:</strong> <span id="moveHigherLevelsPopup"></span></p>
+        <div id="movePopupHeader" style="padding: clamp(1.5rem, 2.5vh, 2rem); border-radius: clamp(15px, 2vh, 20px) clamp(15px, 2vh, 20px) 0 0; position: relative;">
+          <button id="closeMovePopupX" style="position: absolute; top: clamp(0.8rem, 1.5vh, 1.2rem); right: clamp(0.8rem, 1.5vh, 1.2rem); background: rgba(0,0,0,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; width: clamp(32px, 5vh, 40px); height: clamp(32px, 5vh, 40px); font-size: clamp(1.2rem, 2.2vh, 1.5rem); font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
+          <h2 id="moveNamePopup" style="margin: 0; font-size: clamp(1.5rem, 2.8vh, 2rem); font-weight: 900; text-transform: uppercase; letter-spacing: 1px;"></h2>
+          <div id="moveTypePopup" style="display: inline-block; margin-top: 0.5rem; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: clamp(0.85rem, 1.5vh, 1rem); font-weight: 700; background: rgba(255,255,255,0.3);"></div>
         </div>
-        <button id="closeMovePopup" style="margin-top: 2vh; padding: 1.3vh 2.6vh; background: #f44336; color: white; border: none; border-radius: 0.6vh; cursor: pointer; font-size: clamp(0.8rem, 1.3vh, 1.3vh);">Close</button>
+        <div style="padding: clamp(1.5rem, 2.5vh, 2rem); background: white; border-radius: 0 0 clamp(15px, 2vh, 20px) clamp(15px, 2vh, 20px);">
+          <div style="font-size: clamp(0.9rem, 1.6vh, 1.05rem); line-height: 1.6; color: #333;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+              <div><strong>Modifier:</strong> <span id="moveModifierPopup"></span></div>
+              <div><strong>Action Type:</strong> <span id="moveActionTypePopup"></span></div>
+              <div><strong>VP Cost:</strong> <span id="moveVPCostPopup"></span></div>
+              <div><strong>Duration:</strong> <span id="moveDurationPopup"></span></div>
+              <div style="grid-column: 1 / -1;"><strong>Range:</strong> <span id="moveRangePopup"></span></div>
+            </div>
+            <div style="margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 8px;">
+              <strong>Description:</strong> <div id="moveDescriptionPopup" style="margin-top: 0.5rem;"></div>
+            </div>
+            <div style="margin-bottom: 1rem;">
+              <strong>Higher Levels:</strong> <span id="moveHigherLevelsPopup"></span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: #e8f5e9; border-radius: 8px;">
+              <div><strong>Attack Roll:</strong> <span id="attackRollBonus" style="font-size: 1.2em; color: #2e7d32;">+</span></div>
+              <div><strong>Damage Roll:</strong> <span id="damageRollBonus" style="font-size: 1.2em; color: #c62828;">+</span></div>
+            </div>
+            <div style="margin-bottom: 1.5rem; padding: 1rem; background: #fff3e0; border-radius: 8px; border-left: 4px solid #ff9800;">
+              <strong style="display: block; margin-bottom: 0.5rem;">Held Items:</strong>
+              <div id="heldItemsInfo"></div>
+            </div>
+          </div>
+          <button id="useMoveButton" style="width: 100%; padding: clamp(0.8rem, 1.5vh, 1rem); background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: clamp(1rem, 1.8vh, 1.1rem); font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 12px rgba(76,175,80,0.3);">Use Move</button>
+        </div>
       `;
 
       popup.appendChild(popupContent);
       document.body.appendChild(popup);
 
-      // Close button listener
-      document.getElementById('closeMovePopup').addEventListener('click', () => {
+      // Close X button listener
+      document.getElementById('closeMovePopupX').addEventListener('click', () => {
         popup.style.display = 'none';
       });
 
@@ -2300,6 +2388,59 @@ function showMoveDetails(moveName) {
         if (e.target.id === 'moveDetailsPopup') {
           popup.style.display = 'none';
         }
+      });
+
+      // Use Move button listener
+      document.getElementById('useMoveButton').addEventListener('click', async () => {
+        const vpCost = parseInt(move[4]) || 0;
+        const currentVpText = document.getElementById('combatCurrentVP')?.textContent || '0 / 0';
+        const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+
+        if (currentVp >= vpCost) {
+          const newVp = currentVp - vpCost;
+
+          // Update UI
+          document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
+          document.getElementById('currentVpValue').textContent = newVp;
+
+          // Save to sessionStorage
+          pokemonData[46] = newVp;
+          sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
+          // Persist to database
+          try {
+            await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
+          } catch (error) {
+            console.error('Error updating VP:', error);
+          }
+
+          // Close popup
+          popup.style.display = 'none';
+        } else {
+          showError('Not enough VP to use this move!');
+        }
+      });
+
+      // Hover effect for X button
+      const closeBtn = document.getElementById('closeMovePopupX');
+      closeBtn.addEventListener('mouseenter', () => {
+        closeBtn.style.background = 'rgba(255,255,255,0.3)';
+        closeBtn.style.transform = 'scale(1.1)';
+      });
+      closeBtn.addEventListener('mouseleave', () => {
+        closeBtn.style.background = 'rgba(0,0,0,0.2)';
+        closeBtn.style.transform = 'scale(1)';
+      });
+
+      // Hover effect for Use Move button
+      const useMoveBtn = document.getElementById('useMoveButton');
+      useMoveBtn.addEventListener('mouseenter', () => {
+        useMoveBtn.style.transform = 'translateY(-2px)';
+        useMoveBtn.style.boxShadow = '0 6px 16px rgba(76,175,80,0.4)';
+      });
+      useMoveBtn.addEventListener('mouseleave', () => {
+        useMoveBtn.style.transform = 'translateY(0)';
+        useMoveBtn.style.boxShadow = '0 4px 12px rgba(76,175,80,0.3)';
       });
     }
 
@@ -2313,12 +2454,17 @@ function showMoveDetails(moveName) {
     document.getElementById('moveRangePopup').textContent = move[6];
     document.getElementById('moveDescriptionPopup').textContent = move[7];
     document.getElementById('moveHigherLevelsPopup').textContent = move[8];
+    document.getElementById('attackRollBonus').textContent = `+${attackRollBonus}`;
+    document.getElementById('damageRollBonus').textContent = `+${damageRollBonus}`;
+    document.getElementById('heldItemsInfo').innerHTML = heldItemsInfo;
 
-    // Apply type color to popup
+    // Apply type color to popup header
     const bgColor = getMoveTypeColor(move[1]);
     const textColor = getTextColorForBackground(bgColor);
-    popup.querySelector('div').style.backgroundColor = bgColor;
-    popup.querySelector('div').style.color = textColor;
+    const header = document.getElementById('movePopupHeader');
+    header.style.backgroundColor = bgColor;
+    header.style.color = textColor;
+    document.getElementById('moveTypePopup').style.color = textColor;
 
     popup.style.display = 'flex';
   }

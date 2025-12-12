@@ -1584,6 +1584,23 @@ export function attachPokemonCardListeners() {
       if (response.status === 'success') {
         pokemonData[38] = isChecked ? response.slot : '';
         sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
+        // Update trainer data in sessionStorage
+        if (isChecked && response.slot) {
+          // Add to party slot (indices 26-31 are party slots)
+          const slotIndex = 26 + parseInt(response.slot) - 1;
+          trainerData[slotIndex] = pokemonData[2];
+        } else if (!isChecked) {
+          // Remove from party slot
+          for (let i = 26; i <= 31; i++) {
+            if (trainerData[i] === pokemonData[2]) {
+              trainerData[i] = '';
+              break;
+            }
+          }
+        }
+        sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+
         showSuccess(isChecked ? 'Added to active party!' : 'Removed from active party!');
       } else {
         e.target.checked = !isChecked;
@@ -1633,6 +1650,9 @@ export function attachPokemonCardListeners() {
             }
           }
         }
+
+        // Update trainer data timestamp to trigger refresh
+        sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
 
         showSuccess(isChecked ? 'Added to utility slot!' : 'Removed from utility slot!');
       } else {

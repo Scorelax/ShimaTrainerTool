@@ -285,7 +285,7 @@ export function renderPokemonCard(pokemonName) {
           display: grid;
           grid-template-columns: 1fr;
           gap: clamp(2rem, 4vw, 4rem);
-          padding: clamp(1rem, 2vh, 2rem) clamp(1rem, 2vw, 3rem) clamp(1rem, 2vh, 1.5rem);
+          padding: clamp(1rem, 2vh, 2rem) clamp(0.5rem, 1vw, 1rem) clamp(1rem, 2vh, 1.5rem);
           min-height: auto;
           position: relative;
           z-index: 1;
@@ -298,12 +298,18 @@ export function renderPokemonCard(pokemonName) {
           transform: translateX(-50%);
           color: white;
           margin: 0;
+          padding: 0 clamp(70px, 15vw, 100px);
           font-size: clamp(2rem, 5vw, 3rem);
           text-transform: uppercase;
           letter-spacing: clamp(1px, 0.5vw, 3px);
           text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
           z-index: 1000;
+          white-space: nowrap;
+          width: auto;
+          max-width: calc(100vw - 140px);
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         /* Page visibility classes */

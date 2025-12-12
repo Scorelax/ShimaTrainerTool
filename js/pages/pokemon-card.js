@@ -73,7 +73,10 @@ export function renderPokemonCard(pokemonName) {
     }
   }
   const stabBonus = pokemonData[34] || 2;
-  const heldItem = pokemonData[35] || 'None';
+  const heldItemsStr = pokemonData[35] || '';
+
+  // Parse held items (comma-separated)
+  const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
   // Type chart data for weaknesses, resistances, immunities (index 53)
   const typeChartValues = pokemonData[53] ? pokemonData[53].split(',').map(Number) : [];
@@ -238,6 +241,13 @@ export function renderPokemonCard(pokemonName) {
   const abilityButtonsHTML = parsedAbilities.length > 0
     ? parsedAbilities.map((ability, index) =>
         `<button class="ability-button" data-ability-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0 0.3vh; font-weight: bold; vertical-align: middle;">${ability.name}</button>`
+      ).join(' ')
+    : 'None';
+
+  // Generate held items buttons HTML
+  const heldItemsHTML = heldItems.length > 0
+    ? heldItems.map((item, index) =>
+        `<button class="held-item-button" data-item-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0 0.3vh; font-weight: bold; vertical-align: middle;">${item}</button>`
       ).join(' ')
     : 'None';
 
@@ -1309,7 +1319,7 @@ export function renderPokemonCard(pokemonName) {
             </div>
             <div class="info-item">
               <span class="info-item-label">Held Item:</span>
-              <span class="info-item-value">${heldItem !== 'None' ? `<button class="held-item-button" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0 0.3vh; font-weight: bold; vertical-align: middle;">${heldItem}</button>` : 'None'}</span>
+              <span class="info-item-value">${heldItemsHTML}</span>
             </div>
             <div class="info-item-column">
               <span class="info-item-label">Movement:</span>
@@ -1636,7 +1646,6 @@ export function attachPokemonCardListeners() {
           sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
           sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
         }
-        showSuccess(isChecked ? 'Added to active party!' : 'Removed from active party!');
       } else {
         // Rollback on failure
         pokemonData[38] = originalPokemonSlot;
@@ -1710,7 +1719,7 @@ export function attachPokemonCardListeners() {
       );
 
       if (response.status === 'success') {
-        showSuccess(isChecked ? 'Added to utility slot!' : 'Removed from utility slot!');
+        // Success - no message needed, update was already instant
       } else {
         // Rollback on failure
         pokemonData[56] = originalUtilityStatus;
@@ -1772,44 +1781,47 @@ export function attachPokemonCardListeners() {
     }
   });
 
-  // Held item button click listener
-  document.querySelector('.held-item-button')?.addEventListener('click', () => {
-    const heldItemPopup = document.getElementById('heldItemPopup');
-    const heldItemContent = document.getElementById('heldItemContent');
+  // Held item button click listeners
+  document.querySelectorAll('.held-item-button').forEach(button => {
+    button.addEventListener('click', (e) => {
+      const itemIndex = parseInt(e.target.dataset.itemIndex);
+      const heldItemPopup = document.getElementById('heldItemPopup');
+      const heldItemContent = document.getElementById('heldItemContent');
 
-    // Get held item from pokemon data
-    const heldItem = pokemonData[35] || 'None';
+      // Get the specific item from the heldItems array
+      const itemName = heldItems[itemIndex];
 
-    if (heldItem !== 'None') {
-      // Look up item details from sessionStorage
-      const itemsData = JSON.parse(sessionStorage.getItem('items')) || [];
-      const item = itemsData.find(i => i.name === heldItem);
+      if (itemName) {
+        // Look up item details from sessionStorage
+        const itemsData = JSON.parse(sessionStorage.getItem('items')) || [];
+        const item = itemsData.find(i => i.name === itemName);
 
-      if (item) {
-        heldItemContent.innerHTML = `
-          <div style="margin-bottom: 1rem;">
-            <div style="font-weight: 900; font-size: clamp(1.05rem, 2.2vw, 1.2rem); margin-bottom: 0.5rem; color: #FFDE00; text-transform: uppercase;">
-              ${item.name}
+        if (item) {
+          heldItemContent.innerHTML = `
+            <div style="margin-bottom: 1rem;">
+              <div style="font-weight: 900; font-size: clamp(1.05rem, 2.2vw, 1.2rem); margin-bottom: 0.5rem; color: #FFDE00; text-transform: uppercase;">
+                ${item.name}
+              </div>
+              <div style="color: #c0c0c0; font-size: clamp(0.9rem, 1.9vw, 1rem);">
+                ${item.effect || item.description || 'No description available'}
+              </div>
             </div>
-            <div style="color: #c0c0c0; font-size: clamp(0.9rem, 1.9vw, 1rem);">
-              ${item.effect || item.description || 'No description available'}
+          `;
+        } else {
+          heldItemContent.innerHTML = `
+            <div style="color: #c0c0c0;">
+              ${itemName}
+              <br><br>
+              <em>Item description not found in database.</em>
             </div>
-          </div>
-        `;
+          `;
+        }
       } else {
-        heldItemContent.innerHTML = `
-          <div style="color: #c0c0c0;">
-            ${heldItem}
-            <br><br>
-            <em>Item description not found in database.</em>
-          </div>
-        `;
+        heldItemContent.innerHTML = '<div style="color: #c0c0c0;">No held item</div>';
       }
-    } else {
-      heldItemContent.innerHTML = '<div style="color: #c0c0c0;">No held item</div>';
-    }
 
-    heldItemPopup.classList.add('active');
+      heldItemPopup.classList.add('active');
+    });
   });
 
   // Close held item popup

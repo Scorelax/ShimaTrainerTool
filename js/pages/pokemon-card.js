@@ -2493,19 +2493,18 @@ function showMoveDetails(moveName) {
         pokemonData[45] = newHp;
         sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
 
-        // Persist to database
-        try {
-          await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp);
-          if (vpOverflow) {
-            await PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp);
-          }
-        } catch (error) {
-          console.error('Error updating stats:', error);
-        }
-
-        // Close both popups
+        // Close both popups immediately
         document.getElementById('useMoveConfirmPopup').style.display = 'none';
         popup.style.display = 'none';
+
+        // Persist to database in background (don't wait)
+        PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp)
+          .catch(error => console.error('Error updating VP:', error));
+
+        if (vpOverflow) {
+          PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp)
+            .catch(error => console.error('Error updating HP:', error));
+        }
       });
 
       // Confirmation No button

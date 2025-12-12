@@ -258,6 +258,43 @@ export function renderEvolution() {
           font-weight: bold;
         }
 
+        .stat-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .stat-button {
+          width: 30px;
+          height: 30px;
+          font-size: 1.3rem;
+          font-weight: bold;
+          border: 2px solid #FFDE00;
+          border-radius: 5px;
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+          color: white;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+
+        .stat-button:hover {
+          transform: scale(1.1);
+          box-shadow: 0 2px 8px rgba(76,175,80,0.4);
+        }
+
+        .stat-button:active {
+          transform: scale(0.95);
+        }
+
+        .stat-button:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          transform: none;
+        }
+
         .stat-input input {
           width: 60px;
           font-size: 1.1rem;
@@ -406,27 +443,51 @@ export function renderEvolution() {
 
           <div class="stat-input">
             <span>STR (<span id="currentStr">0</span> → <span class="new-stat" id="newStr">0</span>)</span>
-            <input type="number" id="strPoints" value="0" min="0">
+            <div class="stat-controls">
+              <button type="button" class="stat-button" data-stat="str" data-action="decrease">−</button>
+              <input type="number" id="strPoints" value="0" min="0" readonly>
+              <button type="button" class="stat-button" data-stat="str" data-action="increase">+</button>
+            </div>
           </div>
           <div class="stat-input">
             <span>DEX (<span id="currentDex">0</span> → <span class="new-stat" id="newDex">0</span>)</span>
-            <input type="number" id="dexPoints" value="0" min="0">
+            <div class="stat-controls">
+              <button type="button" class="stat-button" data-stat="dex" data-action="decrease">−</button>
+              <input type="number" id="dexPoints" value="0" min="0" readonly>
+              <button type="button" class="stat-button" data-stat="dex" data-action="increase">+</button>
+            </div>
           </div>
           <div class="stat-input">
             <span>CON (<span id="currentCon">0</span> → <span class="new-stat" id="newCon">0</span>)</span>
-            <input type="number" id="conPoints" value="0" min="0">
+            <div class="stat-controls">
+              <button type="button" class="stat-button" data-stat="con" data-action="decrease">−</button>
+              <input type="number" id="conPoints" value="0" min="0" readonly>
+              <button type="button" class="stat-button" data-stat="con" data-action="increase">+</button>
+            </div>
           </div>
           <div class="stat-input">
             <span>INT (<span id="currentInt">0</span> → <span class="new-stat" id="newInt">0</span>)</span>
-            <input type="number" id="intPoints" value="0" min="0">
+            <div class="stat-controls">
+              <button type="button" class="stat-button" data-stat="int" data-action="decrease">−</button>
+              <input type="number" id="intPoints" value="0" min="0" readonly>
+              <button type="button" class="stat-button" data-stat="int" data-action="increase">+</button>
+            </div>
           </div>
           <div class="stat-input">
             <span>WIS (<span id="currentWis">0</span> → <span class="new-stat" id="newWis">0</span>)</span>
-            <input type="number" id="wisPoints" value="0" min="0">
+            <div class="stat-controls">
+              <button type="button" class="stat-button" data-stat="wis" data-action="decrease">−</button>
+              <input type="number" id="wisPoints" value="0" min="0" readonly>
+              <button type="button" class="stat-button" data-stat="wis" data-action="increase">+</button>
+            </div>
           </div>
           <div class="stat-input">
             <span>CHA (<span id="currentCha">0</span> → <span class="new-stat" id="newCha">0</span>)</span>
-            <input type="number" id="chaPoints" value="0" min="0">
+            <div class="stat-controls">
+              <button type="button" class="stat-button" data-stat="cha" data-action="decrease">−</button>
+              <input type="number" id="chaPoints" value="0" min="0" readonly>
+              <button type="button" class="stat-button" data-stat="cha" data-action="increase">+</button>
+            </div>
           </div>
 
           <div class="modal-buttons">
@@ -480,9 +541,9 @@ export function attachEvolutionListeners() {
   document.getElementById('confirmEvolutionBtn')?.addEventListener('click', confirmEvolution);
   document.getElementById('cancelEvolutionBtn')?.addEventListener('click', cancelEvolution);
 
-  // Stat point inputs
-  ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(stat => {
-    document.getElementById(`${stat}Points`)?.addEventListener('input', updateAllocatedPoints);
+  // Stat +/- buttons
+  document.querySelectorAll('.stat-button').forEach(button => {
+    button.addEventListener('click', handleStatButton);
   });
 
   // Back button
@@ -604,6 +665,30 @@ function evolvePokemon() {
   document.getElementById('evolutionModal').classList.add('visible');
 }
 
+function handleStatButton(e) {
+  const stat = e.currentTarget.dataset.stat;
+  const action = e.currentTarget.dataset.action;
+  const input = document.getElementById(`${stat}Points`);
+  let currentValue = parseInt(input.value) || 0;
+
+  if (action === 'increase') {
+    // Only increase if we have remaining points
+    const remainingPoints = availableSkillPoints - allocatedSkillPoints;
+    if (remainingPoints > 0) {
+      currentValue++;
+      input.value = currentValue;
+      updateAllocatedPoints();
+    }
+  } else if (action === 'decrease') {
+    // Only decrease if value is greater than 0
+    if (currentValue > 0) {
+      currentValue--;
+      input.value = currentValue;
+      updateAllocatedPoints();
+    }
+  }
+}
+
 function updateAllocatedPoints() {
   const str = parseInt(document.getElementById('strPoints').value) || 0;
   const dex = parseInt(document.getElementById('dexPoints').value) || 0;
@@ -616,6 +701,23 @@ function updateAllocatedPoints() {
 
   const remainingPoints = availableSkillPoints - allocatedSkillPoints;
   document.getElementById('remainingPoints').textContent = Math.max(0, remainingPoints);
+
+  // Enable/disable buttons based on remaining points and current values
+  const stats = { str, dex, con, int, wis, cha };
+  Object.keys(stats).forEach(stat => {
+    const increaseBtn = document.querySelector(`.stat-button[data-stat="${stat}"][data-action="increase"]`);
+    const decreaseBtn = document.querySelector(`.stat-button[data-stat="${stat}"][data-action="decrease"]`);
+
+    // Disable increase button if no points remaining
+    if (increaseBtn) {
+      increaseBtn.disabled = remainingPoints <= 0;
+    }
+
+    // Disable decrease button if current value is 0
+    if (decreaseBtn) {
+      decreaseBtn.disabled = stats[stat] <= 0;
+    }
+  });
 
   updateNewStats();
 }
@@ -808,47 +910,38 @@ async function confirmEvolution() {
       currentPokemon[56] || ''     // Utility Slot
     ];
 
-    // Call API to evolve Pokemon
-    const response = await PokemonAPI.evolve(
+    // Clean up pre-evolved Pokemon from cache IMMEDIATELY
+    const preEvolvedKey = `pokemon_${currentPokemon[2].toLowerCase()}`;
+    sessionStorage.removeItem(preEvolvedKey);
+
+    // Clear pokemon list cache
+    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    if (trainerData) {
+      sessionStorage.removeItem(`pokemonList_${trainerData[1]}`);
+    }
+
+    // Store evolved Pokemon in session IMMEDIATELY
+    sessionStorage.setItem(`pokemon_${evolvedPokemonData[2].toLowerCase()}`, JSON.stringify(evolvedPokemonData));
+    sessionStorage.setItem('selectedPokemonName', evolvedPokemonData[2]);
+
+    // Navigate to pokemon card IMMEDIATELY
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'pokemon-card', pokemonName: evolvedPokemonData[2] }
+    }));
+
+    // Call API to evolve Pokemon in background (don't wait)
+    PokemonAPI.evolve(
       currentPokemon[2],
       currentPokemon[0],
       evolvedPokemonData
-    );
-
-    if (response.status === 'success') {
-      const finalEvolvedPokemon = response.newPokemonData || evolvedPokemonData;
-
-      // Clean up pre-evolved Pokemon from cache
-      const preEvolvedKey = `pokemon_${currentPokemon[2].toLowerCase()}`;
-      sessionStorage.removeItem(preEvolvedKey);
-
-      // Clear pokemon list cache
-      const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-      if (trainerData) {
-        sessionStorage.removeItem(`pokemonList_${trainerData[1]}`);
+    ).then(response => {
+      if (response.status === 'success' && response.newPokemonData) {
+        // Update sessionStorage with server-calculated values if provided
+        sessionStorage.setItem(`pokemon_${response.newPokemonData[2].toLowerCase()}`, JSON.stringify(response.newPokemonData));
       }
-
-      // Store evolved Pokemon in session
-      sessionStorage.setItem(`pokemon_${finalEvolvedPokemon[2].toLowerCase()}`, JSON.stringify(finalEvolvedPokemon));
-      sessionStorage.setItem('selectedPokemonName', finalEvolvedPokemon[2]);
-
-      showSuccess(`Your Pokemon has evolved into ${finalEvolvedPokemon[2]}!`);
-
-      // Navigate to pokemon card
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('navigate', {
-          detail: { route: 'pokemon-card', pokemonName: finalEvolvedPokemon[2] }
-        }));
-      }, 2000);
-    } else {
-      showError(response.message || 'Evolution failed');
-      // Reload evolution page
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('navigate', {
-          detail: { route: 'evolution' }
-        }));
-      }, 2000);
-    }
+    }).catch(error => {
+      console.error('Error persisting evolution to database:', error);
+    });
   } catch (error) {
     console.error('Error during evolution:', error);
     showError('Evolution failed. Please try again.');

@@ -1020,11 +1020,26 @@ async function confirmEvolution() {
 
     console.log('[Evolution] Received response from server:', response);
 
-    if (response.status === 'success' && response.newPokemonData) {
-      // Use server-calculated data (has HP, VP, modifiers, etc.)
-      const finalEvolvedPokemon = response.newPokemonData;
+    if (response.status === 'success') {
+      let finalEvolvedPokemon;
 
-      console.log('[Evolution] Final evolved Pokemon from server:', {
+      if (response.newPokemonData) {
+        // Server returned the calculated data (preferred)
+        finalEvolvedPokemon = response.newPokemonData;
+        console.log('[Evolution] Using newPokemonData from server response');
+      } else {
+        // Fallback: Server updated database but didn't return data, so fetch it
+        console.log('[Evolution] Server didnt return newPokemonData, fetching from database...');
+        const fetchResponse = await PokemonAPI.get(currentPokemon[0], evolvedPokemonData[2]);
+        if (fetchResponse.status === 'success' && fetchResponse.data) {
+          finalEvolvedPokemon = fetchResponse.data;
+          console.log('[Evolution] Fetched evolved Pokemon from database');
+        } else {
+          throw new Error('Failed to fetch evolved Pokemon data from database');
+        }
+      }
+
+      console.log('[Evolution] Final evolved Pokemon:', {
         name: finalEvolvedPokemon[2],
         image: finalEvolvedPokemon[1],
         hitDice: finalEvolvedPokemon[9],
@@ -1056,8 +1071,8 @@ async function confirmEvolution() {
         detail: { route: 'pokemon-card', pokemonName: finalEvolvedPokemon[2] }
       }));
     } else {
-      console.error('[Evolution] API returned invalid response:', response);
-      throw new Error('Evolution API returned invalid response');
+      console.error('[Evolution] API returned error:', response);
+      throw new Error('Evolution failed: ' + (response.message || 'Unknown error'));
     }
   } catch (error) {
     console.error('Error during evolution:', error);

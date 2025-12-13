@@ -298,7 +298,7 @@ export function renderPokemonCard(pokemonName) {
           transform: translateX(-50%);
           color: white;
           margin: 0;
-          padding: 0 clamp(70px, 15vw, 100px);
+          padding: 0 clamp(75px, 16vw, 110px);
           font-size: clamp(2rem, 5vw, 3rem);
           text-transform: uppercase;
           letter-spacing: clamp(1px, 0.5vw, 3px);
@@ -307,7 +307,7 @@ export function renderPokemonCard(pokemonName) {
           z-index: 1000;
           white-space: nowrap;
           width: auto;
-          max-width: calc(100vw - 30vw);
+          max-width: calc(100vw - 20px);
           overflow: hidden;
           text-overflow: ellipsis;
         }

@@ -439,13 +439,7 @@ export function renderEvolution() {
 
         @media (max-width: 768px) {
           .evolution-container {
-            flex-direction: column;
             gap: clamp(1rem, 2.5vw, 2rem);
-          }
-
-          .evolution-list,
-          .pokemon-details {
-            width: 100%;
           }
         }
 
@@ -457,14 +451,13 @@ export function renderEvolution() {
 
         @media (max-width: 480px) {
           .evolution-container {
+            flex-direction: column;
             gap: clamp(0.5rem, 1.5vw, 1rem);
           }
-        }
 
-        @media (max-width: 360px) {
-          .evolution-container {
-            flex-direction: column;
-            gap: clamp(0.75rem, 2vh, 1rem);
+          .evolution-list,
+          .pokemon-details {
+            width: 100%;
           }
         }
       </style>

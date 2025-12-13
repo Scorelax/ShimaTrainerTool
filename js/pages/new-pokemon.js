@@ -228,6 +228,39 @@ export function renderNewPokemon() {
           padding: clamp(1rem, 3vh, 2rem);
         }
 
+        .back-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          font-weight: bold;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+        }
+
+        .back-button:hover {
+          transform: scale(1.15);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        .back-button:active {
+          transform: scale(1.08);
+        }
+
         @media (max-width: 1024px) {
           .register-container {
             gap: clamp(1.5rem, 3vw, 2.5rem);
@@ -236,13 +269,7 @@ export function renderNewPokemon() {
 
         @media (max-width: 768px) {
           .register-container {
-            flex-direction: column;
             gap: clamp(1rem, 2.5vw, 2rem);
-          }
-
-          .pokemon-list,
-          .pokemon-details {
-            width: 100%;
           }
         }
 
@@ -254,14 +281,13 @@ export function renderNewPokemon() {
 
         @media (max-width: 480px) {
           .register-container {
+            flex-direction: column;
             gap: clamp(0.5rem, 1.5vw, 1rem);
           }
-        }
 
-        @media (max-width: 360px) {
-          .register-container {
-            flex-direction: column;
-            gap: clamp(0.75rem, 2vh, 1rem);
+          .pokemon-list,
+          .pokemon-details {
+            width: 100%;
           }
         }
       </style>
@@ -291,6 +317,8 @@ export function renderNewPokemon() {
           <div id="pokemonPlaceholder">Select a Pokemon to view details</div>
         </div>
       </div>
+
+      <button class="back-button" id="backButton">←</button>
     </div>
   `;
 
@@ -310,6 +338,13 @@ export function attachNewPokemonListeners() {
 
   // Register button
   document.getElementById('registerBtn')?.addEventListener('click', registerPokemon);
+
+  // Back button
+  document.getElementById('backButton')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'my-pokemon' }
+    }));
+  });
 }
 
 async function loadEncounteredPokemon() {

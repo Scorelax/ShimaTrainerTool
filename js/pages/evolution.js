@@ -889,8 +889,8 @@ async function confirmEvolution() {
 
     console.log('[Evolution] Type effectiveness response:', typeResponse);
 
-    const typematchupsString = typeResponse.effectiveness ?
-      typeResponse.effectiveness.join(', ') : '';
+    const typematchupsString = (typeResponse.data || typeResponse.effectiveness) ?
+      (typeResponse.data || typeResponse.effectiveness).join(', ') : '';
 
     console.log('[Evolution] Type matchups string:', typematchupsString);
 

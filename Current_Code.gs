@@ -835,7 +835,16 @@ function handlePokemonRoute(action, params) {
       const calculatedData = calculateModifiers(evolveData, "None", "None");
       if (calculatedData.status === 'success') {
         // Then replace in sheet
-        return replacePokemonInSheet(params.currentName, params.trainer, calculatedData.newPokemonData);
+        const replaceResult = replacePokemonInSheet(params.currentName, params.trainer, calculatedData.newPokemonData);
+        if (replaceResult.status === 'success') {
+          // Return both the success message AND the calculated Pokemon data
+          return {
+            status: 'success',
+            message: replaceResult.message,
+            newPokemonData: calculatedData.newPokemonData
+          };
+        }
+        return replaceResult;
       }
       return calculatedData;
 

@@ -956,21 +956,19 @@ async function handleFormSubmit(pokemonName, originalNature) {
     pokemonData[37] = customMoves.join(', ');
     pokemonData[50] = selectedFeats.join(', ');
 
-    // Update session storage
+    // Update session storage IMMEDIATELY
     sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
 
-    // Send to API
-    await PokemonAPI.update(pokemonData);
+    // Navigate back to pokemon card IMMEDIATELY
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'pokemon-card', pokemonName: pokemonName }
+    }));
 
-    // Show success message
-    showSuccess(`${pokemonData[2]}'s info is updated!`);
-
-    // Navigate back to pokemon card
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('navigate', {
-        detail: { route: 'pokemon-card', pokemonName: pokemonName }
-      }));
-    }, 1000);
+    // Update database in background (don't wait)
+    PokemonAPI.update(pokemonData).catch(error => {
+      console.error('Error updating Pokemon in database:', error);
+      showError('Failed to save Pokemon changes to database');
+    });
 
   } catch (error) {
     console.error('Error updating Pokemon:', error);

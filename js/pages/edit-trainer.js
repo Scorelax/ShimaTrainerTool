@@ -713,21 +713,19 @@ async function handleFormSubmit() {
     trainerData[31] = Math.floor((wis - 10) / 2);  // WIS modifier
     trainerData[32] = Math.floor((cha - 10) / 2);  // CHA modifier
 
-    // Update session storage
+    // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-    // Send to API
-    await TrainerAPI.update(trainerData);
+    // Navigate back to trainer info IMMEDIATELY
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'trainer-info' }
+    }));
 
-    // Show success message
-    showSuccess(`${trainerData[1]}'s info is updated!`);
-
-    // Navigate back to trainer info
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('navigate', {
-        detail: { route: 'trainer-info' }
-      }));
-    }, 1000);
+    // Update database in background (don't wait)
+    TrainerAPI.update(trainerData).catch(error => {
+      console.error('Error updating Trainer in database:', error);
+      showError('Failed to save Trainer changes to database');
+    });
 
   } catch (error) {
     console.error('Error updating trainer:', error);

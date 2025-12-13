@@ -83,15 +83,15 @@ export function renderEvolution() {
 
         .evolution-container {
           display: flex;
-          justify-content: space-around;
+          justify-content: space-between;
           width: 90%;
-          max-width: 1200px;
+          max-width: clamp(900px, 95vw, 1400px);
           flex-grow: 1;
-          gap: 2rem;
+          gap: clamp(1.5rem, 3vw, 2rem);
         }
 
         .evolution-list {
-          width: 45%;
+          width: 58%;
           max-height: 65vh;
           overflow-y: auto;
           border: clamp(3px, 0.5vw, 4px) solid #FFDE00;
@@ -143,33 +143,61 @@ export function renderEvolution() {
         }
 
         .pokemon-details {
-          width: 50%;
+          width: 38%;
           text-align: center;
-          display: none;
-          color: black;
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          border: clamp(3px, 0.5vw, 4px) solid #FFDE00;
-          border-radius: clamp(15px, 2.5vw, 20px);
-          padding: clamp(1.25rem, 2.5vw, 1.5rem);
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-start;
+          background: transparent;
+          padding: clamp(1.5rem, 3vw, 2rem);
+          min-height: 60vh;
         }
 
         .pokemon-details.visible {
-          display: block;
+          /* Always visible structure, class remains for compatibility */
+        }
+
+        .pokemon-details.empty {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #FFDE00;
+          font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+          font-style: italic;
+          font-weight: 600;
+          text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
 
         .pokemon-details img {
-          width: 250px;
-          height: 250px;
-          background-color: #f0f0f0;
-          border-radius: 10px;
-          object-fit: contain;
-          margin-bottom: 20px;
+          width: 85%;
+          max-width: 300px;
+          aspect-ratio: 1;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          object-fit: cover;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          background-color: #fff;
+          transition: transform 0.3s, filter 0.3s;
+        }
+
+        .pokemon-details img:hover {
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
 
         .pokemon-details .detail-item {
-          font-size: 1.2rem;
-          margin-bottom: 10px;
+          font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          color: #FFDE00;
+          font-weight: 700;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .pokemon-details .detail-item strong {
+          color: white;
+          font-weight: 900;
         }
 
         .evolve-button {
@@ -403,14 +431,40 @@ export function renderEvolution() {
           transform: scale(1.05);
         }
 
+        @media (max-width: 1024px) {
+          .evolution-container {
+            gap: clamp(1.5rem, 3vw, 2.5rem);
+          }
+        }
+
         @media (max-width: 768px) {
           .evolution-container {
             flex-direction: column;
+            gap: clamp(1rem, 2.5vw, 2rem);
           }
 
           .evolution-list,
           .pokemon-details {
             width: 100%;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .evolution-container {
+            gap: clamp(0.75rem, 2vw, 1.5rem);
+          }
+        }
+
+        @media (max-width: 480px) {
+          .evolution-container {
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+          }
+        }
+
+        @media (max-width: 360px) {
+          .evolution-container {
+            flex-direction: column;
+            gap: clamp(0.75rem, 2vh, 1rem);
           }
         }
       </style>
@@ -425,12 +479,15 @@ export function renderEvolution() {
           </ul>
         </div>
 
-        <div class="pokemon-details" id="pokemonDetails">
-          <img src="" alt="Pokemon" id="pokemonImage" onerror="this.src='assets/Pokeball.png'">
-          <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
-          <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
-          <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
-          <button class="evolve-button" id="evolveButton">Evolve Pokemon</button>
+        <div class="pokemon-details empty" id="pokemonDetails">
+          <div id="pokemonDetailsContent" style="display: none; width: 100%; flex-direction: column; align-items: center;">
+            <img src="" alt="Pokemon" id="pokemonImage" onerror="this.src='assets/Pokeball.png'">
+            <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
+            <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
+            <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
+            <button class="evolve-button" id="evolveButton">Evolve Pokemon</button>
+          </div>
+          <div id="pokemonPlaceholder">Select an evolution to view details</div>
         </div>
       </div>
 
@@ -595,12 +652,30 @@ function displayEvolutionOptions(options) {
 async function selectEvolution(pokemon, listItem) {
   selectedPokemon = pokemon;
 
+  console.log('[Evolution] Selected Pokemon from API:', {
+    name: pokemon[1],
+    dexEntry: pokemon[2],
+    image: pokemon[0],
+    primaryType: pokemon[4],
+    secondaryType: pokemon[5],
+    hitDice: pokemon[10],
+    vitalityDice: pokemon[12],
+    fullData: pokemon
+  });
+
   // Update selected styling
   document.querySelectorAll('.evolution-list li').forEach(li => li.classList.remove('selected'));
   listItem.classList.add('selected');
 
-  // Display details
+  // Display details and resolve image URL
   const imageUrl = pokemon[0] || await resolveImageUrl(pokemon[1], pokemon[2]);
+
+  // Store resolved image URL back into selectedPokemon for later use
+  if (!pokemon[0]) {
+    selectedPokemon[0] = imageUrl;
+    console.log('[Evolution] Resolved and stored image URL:', imageUrl);
+  }
+
   document.getElementById('pokemonImage').src = imageUrl;
   document.getElementById('pokemonName').textContent = pokemon[1];
   document.getElementById('pokemonDexEntry').textContent = pokemon[2];
@@ -608,6 +683,10 @@ async function selectEvolution(pokemon, listItem) {
   const typeText = pokemon[5] ? `${pokemon[4]} / ${pokemon[5]}` : pokemon[4];
   document.getElementById('pokemonType').textContent = typeText;
 
+  // Hide placeholder and show content
+  document.getElementById('pokemonPlaceholder').style.display = 'none';
+  document.getElementById('pokemonDetailsContent').style.display = 'flex';
+  document.getElementById('pokemonDetails').classList.remove('empty');
   document.getElementById('pokemonDetails').classList.add('visible');
 }
 
@@ -798,12 +877,22 @@ async function confirmEvolution() {
     ].join(', ');
 
     // Get type effectiveness
+    console.log('[Evolution] Fetching type effectiveness for:', {
+      primaryType: selectedPokemon[4],
+      secondaryType: selectedPokemon[5]
+    });
+
     const typeResponse = await GameDataAPI.getTypeEffectiveness(
       selectedPokemon[4],
       selectedPokemon[5]
     );
+
+    console.log('[Evolution] Type effectiveness response:', typeResponse);
+
     const typematchupsString = typeResponse.effectiveness ?
       typeResponse.effectiveness.join(', ') : '';
+
+    console.log('[Evolution] Type matchups string:', typematchupsString);
 
     // Map abilities from current to evolved Pokemon
     const currentAbilitiesRaw = currentPokemon[7] || '';
@@ -849,7 +938,7 @@ async function confirmEvolution() {
           return '';
         })();
 
-    // Build evolved Pokemon data array
+    // Build evolved Pokemon data array with placeholders for calculated values
     const evolvedPokemonData = [
       currentPokemon[0],           // Trainer Name
       selectedPokemon[0],          // Image
@@ -861,9 +950,9 @@ async function confirmEvolution() {
       evolvedAbilitiesString,      // Abilities
       selectedPokemon[9],          // AC
       selectedPokemon[10],         // Hit Dice
-      '',                          // HP (calculated)
+      '',                          // HP (will be calculated by server)
       selectedPokemon[12],         // Vitality Dice
-      '',                          // VP (calculated)
+      '',                          // VP (will be calculated by server)
       movementDataString,          // Speed
       selectedPokemon[15],         // Total Stats
       newSTR,                      // Strength
@@ -910,38 +999,66 @@ async function confirmEvolution() {
       currentPokemon[56] || ''     // Utility Slot
     ];
 
-    // Clean up pre-evolved Pokemon from cache IMMEDIATELY
-    const preEvolvedKey = `pokemon_${currentPokemon[2].toLowerCase()}`;
-    sessionStorage.removeItem(preEvolvedKey);
+    // Log what we're sending to the server
+    console.log('[Evolution] Sending evolvedPokemonData to server:', {
+      name: evolvedPokemonData[2],
+      image: evolvedPokemonData[1],
+      hitDice: evolvedPokemonData[9],
+      hp: evolvedPokemonData[10],
+      vitalityDice: evolvedPokemonData[11],
+      vp: evolvedPokemonData[12],
+      typeMatchups: evolvedPokemonData[53],
+      fullData: evolvedPokemonData
+    });
 
-    // Clear pokemon list cache
-    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-    if (trainerData) {
-      sessionStorage.removeItem(`pokemonList_${trainerData[1]}`);
-    }
-
-    // Store evolved Pokemon in session IMMEDIATELY
-    sessionStorage.setItem(`pokemon_${evolvedPokemonData[2].toLowerCase()}`, JSON.stringify(evolvedPokemonData));
-    sessionStorage.setItem('selectedPokemonName', evolvedPokemonData[2]);
-
-    // Navigate to pokemon card IMMEDIATELY
-    window.dispatchEvent(new CustomEvent('navigate', {
-      detail: { route: 'pokemon-card', pokemonName: evolvedPokemonData[2] }
-    }));
-
-    // Call API to evolve Pokemon in background (don't wait)
-    PokemonAPI.evolve(
+    // Call API to evolve Pokemon and wait for full calculated data
+    const response = await PokemonAPI.evolve(
       currentPokemon[2],
       currentPokemon[0],
       evolvedPokemonData
-    ).then(response => {
-      if (response.status === 'success' && response.newPokemonData) {
-        // Update sessionStorage with server-calculated values if provided
-        sessionStorage.setItem(`pokemon_${response.newPokemonData[2].toLowerCase()}`, JSON.stringify(response.newPokemonData));
+    );
+
+    console.log('[Evolution] Received response from server:', response);
+
+    if (response.status === 'success' && response.newPokemonData) {
+      // Use server-calculated data (has HP, VP, modifiers, etc.)
+      const finalEvolvedPokemon = response.newPokemonData;
+
+      console.log('[Evolution] Final evolved Pokemon from server:', {
+        name: finalEvolvedPokemon[2],
+        image: finalEvolvedPokemon[1],
+        hitDice: finalEvolvedPokemon[9],
+        hp: finalEvolvedPokemon[10],
+        vitalityDice: finalEvolvedPokemon[11],
+        vp: finalEvolvedPokemon[12],
+        typeMatchups: finalEvolvedPokemon[53],
+        fullData: finalEvolvedPokemon
+      });
+
+      // Clean up pre-evolved Pokemon from cache
+      const preEvolvedKey = `pokemon_${currentPokemon[2].toLowerCase()}`;
+      sessionStorage.removeItem(preEvolvedKey);
+
+      // Clear pokemon list cache
+      const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+      if (trainerData) {
+        sessionStorage.removeItem(`pokemonList_${trainerData[1]}`);
       }
-    }).catch(error => {
-      console.error('Error persisting evolution to database:', error);
-    });
+
+      // Store evolved Pokemon with all calculated values
+      sessionStorage.setItem(`pokemon_${finalEvolvedPokemon[2].toLowerCase()}`, JSON.stringify(finalEvolvedPokemon));
+      sessionStorage.setItem('selectedPokemonName', finalEvolvedPokemon[2]);
+
+      console.log('[Evolution] Stored in sessionStorage, about to navigate');
+
+      // Navigate to pokemon card
+      window.dispatchEvent(new CustomEvent('navigate', {
+        detail: { route: 'pokemon-card', pokemonName: finalEvolvedPokemon[2] }
+      }));
+    } else {
+      console.error('[Evolution] API returned invalid response:', response);
+      throw new Error('Evolution API returned invalid response');
+    }
   } catch (error) {
     console.error('Error during evolution:', error);
     showError('Evolution failed. Please try again.');

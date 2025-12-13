@@ -228,14 +228,40 @@ export function renderNewPokemon() {
           padding: clamp(1rem, 3vh, 2rem);
         }
 
+        @media (max-width: 1024px) {
+          .register-container {
+            gap: clamp(1.5rem, 3vw, 2.5rem);
+          }
+        }
+
         @media (max-width: 768px) {
           .register-container {
             flex-direction: column;
+            gap: clamp(1rem, 2.5vw, 2rem);
           }
 
           .pokemon-list,
           .pokemon-details {
             width: 100%;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .register-container {
+            gap: clamp(0.75rem, 2vw, 1.5rem);
+          }
+        }
+
+        @media (max-width: 480px) {
+          .register-container {
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+          }
+        }
+
+        @media (max-width: 360px) {
+          .register-container {
+            flex-direction: column;
+            gap: clamp(0.75rem, 2vh, 1rem);
           }
         }
       </style>

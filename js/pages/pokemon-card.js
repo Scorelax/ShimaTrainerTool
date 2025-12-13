@@ -307,7 +307,7 @@ export function renderPokemonCard(pokemonName) {
           z-index: 1000;
           white-space: nowrap;
           width: auto;
-          max-width: calc(100vw - 140px);
+          max-width: calc(100vw - 30vw);
           overflow: hidden;
           text-overflow: ellipsis;
         }

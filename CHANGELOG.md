@@ -4,6 +4,223 @@ This file tracks all changes made to the project across development sessions.
 
 ---
 
+## Session: 2025-12-13 - Evolution Page Overhaul, Responsive Improvements, and Optimistic Updates
+
+### Part 1: Evolution Page Complete Redesign (`js/pages/evolution.js`)
+
+**Layout Changes - 60/40 Split**:
+1. **Evolution List (Left Side - 58%)**
+   - Contains selectable evolution options
+   - Scrollable list with search functionality
+   - Selected item highlighted with red gradient
+
+2. **Pokemon Details (Right Side - 38%)**
+   - Always visible preview area
+   - Transparent background (no white box)
+   - Card styling with yellow borders and shadows
+   - Matches new-pokemon page design
+   - Placeholder text: "Select an evolution to view details"
+
+3. **Container Styling**:
+   - `max-width: clamp(900px, 95vw, 1400px)` for wider displays
+   - `justify-content: space-between` for proper spacing
+   - Dynamic gap sizing with clamp for responsiveness
+
+**API Flow & Data Persistence Fixes**:
+1. **Problem Identified**:
+   - Client was navigating before server calculated HP/VP
+   - Type matchups string was empty (using wrong property)
+   - Server wasn't returning calculated Pokemon data
+   - Image URL not being stored in Pokemon array
+
+2. **Type Matchups Fix**:
+   - Changed from `typeResponse.effectiveness` to `typeResponse.data`
+   - GameDataAPI returns array in `data` property
+   - Now properly joins 18 type effectiveness values
+
+3. **Image URL Resolution**:
+   - Resolves image URL when evolution is selected
+   - Stores back into `selectedPokemon[0]` for later use
+   - Prevents empty image field in evolved Pokemon data
+
+4. **Server Response Enhancement** (`Current_Code.gs`):
+   - Modified evolve endpoint to return `newPokemonData`
+   - Server calculates HP, VP, and all modifiers
+   - Returns: `{status, message, newPokemonData}`
+   - Client receives fully calculated Pokemon data
+
+5. **Fallback Mechanism**:
+   - If server doesn't include `newPokemonData`, fetch from database
+   - Uses `PokemonAPI.get()` to retrieve evolved Pokemon
+   - Ensures evolution works even if Apps Script not updated
+   - Graceful degradation for compatibility
+
+6. **Data Flow**:
+   - Send Pokemon data with empty HP/VP to server
+   - Server calculates using full formula with feats
+   - Wait for server response before navigation
+   - Store calculated data in sessionStorage
+   - Navigate only after all data ready
+
+**Debugging & Logging**:
+- Added comprehensive console logging at every step
+- Logs Pokemon selection with full data
+- Logs image URL resolution
+- Logs type effectiveness fetch and result
+- Logs data sent to server
+- Logs server response
+- Logs final Pokemon data before storage
+- All logs prefixed with `[Evolution]` for easy filtering
+
+**Responsive Breakpoints**:
+- **1024px**: Adjusted gap spacing
+- **768px**: Maintained gap spacing (no column switch)
+- **600px**: Further gap reduction
+- **480px**: Switch to column layout, full width for both sections
+- **360px**: Minimal gap, full column layout
+- Matches pokemon-card breakpoint structure
+
+### Part 2: New-Pokemon Page Improvements (`js/pages/new-pokemon.js`)
+
+**Back Button Addition**:
+1. **Styling**: Circular button matching other pages
+   - Fixed position top-left corner
+   - White gradient background with yellow border
+   - Arrow symbol: ←
+   - Scale animation on hover (1.15x)
+   - Shadow and glow effects
+
+2. **Functionality**:
+   - Navigates to 'my-pokemon' page
+   - Consistent with evolution and pokemon-card pages
+   - Added event listener in `attachNewPokemonListeners()`
+
+**Responsive Breakpoints**:
+- **1024px**: Gap adjustment
+- **768px**: Maintained side-by-side layout
+- **600px**: Further gap reduction
+- **480px**: Switch to column layout
+- Previously switched at 768px (too early for tablets)
+- Now tablets show proper 60/40 split layout
+
+### Part 3: Pokemon-Card Title Extension (`js/pages/pokemon-card.js`)
+
+**Problem**:
+- Title showing "..." ellipsis too early
+- Lots of horizontal space still available
+- `max-width: calc(100vw - 140px)` only accounted for minimum padding
+- Actual padding is `clamp(70px, 15vw, 100px)` which varies by screen size
+
+**Solution**:
+1. **Max-Width Adjustment**:
+   - Changed from `calc(100vw - 140px)` to `calc(100vw - 20px)`
+   - Now uses almost full screen width
+   - Accounts for dynamic padding properly
+
+2. **Padding Refinement**:
+   - Adjusted to `clamp(75px, 16vw, 110px)`
+   - Slightly increased to better accommodate back button
+   - Prevents overlap with back button at all screen sizes
+
+3. **Result**:
+   - Title can be much longer before truncating
+   - Only shows "..." when actually near screen edges
+   - Better use of available horizontal space
+   - No more premature truncation
+
+### Part 4: Tablet Layout Fixes (Evolution & New-Pokemon)
+
+**Problem**:
+- Tablets (768px width) showed column layout
+- Pokemon preview appearing below form instead of beside it
+- 60/40 split not visible on tablets
+
+**Root Cause**:
+- Breakpoint at 768px switching to column layout
+- 768px is common tablet landscape width
+- Should maintain side-by-side layout for tablets
+
+**Solution**:
+- Changed column switch breakpoint from **768px to 480px**
+- Tablets (768px-1024px) now show side-by-side layout
+- Only phones (under 480px) show column layout
+- Applied to both evolution.js and new-pokemon.js
+
+**Affected Devices**:
+- ✅ Desktop (1024px+): Side-by-side (always worked)
+- ✅ Tablet landscape/portrait (768px-1024px): Side-by-side (fixed)
+- ✅ Large phones (480px-768px): Side-by-side (bonus improvement)
+- ✅ Small phones (<480px): Column layout (appropriate)
+
+### Part 5: Edit Pages Optimistic Updates (`js/pages/edit-pokemon.js`, `js/pages/edit-trainer.js`)
+
+**Edit-Pokemon Changes**:
+1. **Before**:
+   - Waited for API response (1-2 seconds)
+   - Showed "Pokemon's info is updated!" success popup
+   - Delayed navigation by 1 additional second
+   - Total delay: 2-3 seconds
+
+2. **After**:
+   - Updates sessionStorage immediately
+   - Navigates to pokemon-card instantly (0 delay)
+   - API call runs in background without await
+   - Removed success popup message
+   - Only shows error if database update fails
+   - Total delay: **0 seconds**
+
+3. **Implementation**:
+   ```javascript
+   // Update sessionStorage IMMEDIATELY
+   sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
+   // Navigate IMMEDIATELY
+   window.dispatchEvent(new CustomEvent('navigate', {
+     detail: { route: 'pokemon-card', pokemonName: pokemonName }
+   }));
+
+   // Database update in background
+   PokemonAPI.update(pokemonData).catch(error => {
+     console.error('Error updating Pokemon in database:', error);
+     showError('Failed to save Pokemon changes to database');
+   });
+   ```
+
+**Edit-Trainer Changes**:
+1. **Before**:
+   - Waited for API response (1-2 seconds)
+   - Showed "Trainer's info is updated!" success popup
+   - Delayed navigation by 1 additional second
+   - Total delay: 2-3 seconds
+
+2. **After**:
+   - Updates sessionStorage immediately
+   - Navigates to trainer-info instantly (0 delay)
+   - API call runs in background without await
+   - Removed success popup message
+   - Only shows error if database update fails
+   - Total delay: **0 seconds**
+
+3. **Implementation**: Same pattern as edit-pokemon
+
+**Benefits**:
+- App feels significantly faster and more responsive
+- User sees changes immediately in the UI
+- No waiting for server response
+- No popup interruptions
+- Database still gets updated asynchronously
+- Matches pattern from "Use Move" feature
+- Error handling preserved for database failures
+
+**Technical Notes**:
+- SessionStorage is the source of truth for UI
+- Database is persistence layer updated asynchronously
+- If database update fails, error appears but UI already updated
+- User can continue working while database syncs
+- Same pattern used throughout app for consistency
+
+---
+
 ## Session: 2025-01-12 - Pokemon Card Improvements and Move Popup Overhaul
 
 ### Part 1: Move Details Popup Complete Redesign (`js/pages/pokemon-card.js`)

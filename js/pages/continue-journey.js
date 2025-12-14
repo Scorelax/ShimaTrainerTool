@@ -278,20 +278,20 @@ export async function renderContinueJourney() {
         @media (max-width: 1024px) {
           .trainer-container {
             grid-template-columns: repeat(4, 1fr);
-            gap: clamp(1rem, 1.8vw, 1.5rem);
+            gap: clamp(0.8rem, 1.5vw, 1.2rem);
           }
           .trainer-box {
-            max-width: 23vw;
+            max-width: 20vw;
           }
         }
 
         @media (max-width: 768px) {
           .trainer-container {
             grid-template-columns: repeat(4, 1fr);
-            gap: clamp(0.8rem, 1.5vw, 1.2rem);
+            gap: clamp(0.6rem, 1.2vw, 1rem);
           }
           .trainer-box {
-            max-width: 24vw;
+            max-width: 20vw;
           }
         }
 

@@ -1,6 +1,19 @@
 // Continue Journey Page - Trainer Selection with PIN
 import { TrainerAPI } from '../api.js';
 
+// Progress tracking utility
+function updateLoadingProgress(percent, text) {
+  const fill = document.getElementById('loading-progress-fill');
+  const progressText = document.getElementById('loading-progress-text');
+
+  if (fill) {
+    fill.style.width = `${percent}%`;
+  }
+  if (progressText && text) {
+    progressText.textContent = text;
+  }
+}
+
 export async function renderContinueJourney() {
   // Fetch trainers
   const response = await TrainerAPI.getAll();
@@ -328,11 +341,14 @@ export function attachContinueJourneyListeners() {
 
       // Show fullscreen loading background
       document.getElementById('loading-screen').classList.add('active');
+      updateLoadingProgress(0, 'Connecting to server...');
 
       try {
         // Fetch trainer data with Pokemon
+        updateLoadingProgress(10, 'Loading trainer data...');
         const response = await TrainerAPI.get(selectedTrainer.name);
 
+        updateLoadingProgress(30, 'Processing trainer information...');
         // Store in session storage (matching original behavior)
         sessionStorage.setItem('trainerData', JSON.stringify(response.data.trainerData));
         response.data.pokemonData.forEach((pokemon) => {
@@ -343,11 +359,14 @@ export function attachContinueJourneyListeners() {
         sessionStorage.setItem('unlockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokeball.png');
         sessionStorage.setItem('lockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Grey%20Pokeball.png');
 
+        updateLoadingProgress(50, 'Loading Pokemon data...');
+
         // Check if Pokemon Trainer or Conduit
         const trainerClass = response.data.trainerData[39]; // Index for trainer class
 
         if (trainerClass === "Pokemon Trainer") {
           // Load game data for Pokemon Trainer
+          updateLoadingProgress(60, 'Loading game data...');
           const gameData = await import('../api.js').then(m => m.GameDataAPI.getAll());
           console.log('Game data response:', gameData);
           console.log('gameData keys:', Object.keys(gameData));
@@ -357,6 +376,7 @@ export function attachContinueJourneyListeners() {
           const actualData = gameData.data || gameData;
           console.log('actualData keys:', Object.keys(actualData));
 
+          updateLoadingProgress(75, 'Processing items and moves...');
           // Store game data in session storage
           sessionStorage.setItem('items', JSON.stringify(actualData.itemsData.items));
           sessionStorage.setItem('trainerPaths', JSON.stringify(actualData.trainerPaths));
@@ -369,12 +389,14 @@ export function attachContinueJourneyListeners() {
           sessionStorage.setItem('pokemonFeats', JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
           sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));
 
+          updateLoadingProgress(95, 'Almost ready...');
           // Navigate to trainer card
           window.dispatchEvent(new CustomEvent('navigate', {
             detail: { route: 'trainer-card' }
           }));
         } else {
           // Load conduit data
+          updateLoadingProgress(60, 'Loading conduit data...');
           const conduitData = await import('../api.js').then(m => m.GameDataAPI.getConduit());
           console.log('Conduit data response:', conduitData);
           console.log('conduitData keys:', Object.keys(conduitData));
@@ -383,6 +405,7 @@ export function attachContinueJourneyListeners() {
           const actualData = conduitData.data || conduitData;
           console.log('actualData keys:', Object.keys(actualData));
 
+          updateLoadingProgress(75, 'Processing conduit abilities...');
           // Store conduit data in session storage
           sessionStorage.setItem('items', JSON.stringify(actualData.itemsData.items));
           sessionStorage.setItem('conduitFeatures', JSON.stringify(actualData.conduitFeatures));
@@ -393,6 +416,7 @@ export function attachContinueJourneyListeners() {
           sessionStorage.setItem('pokemonFeats', JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
           sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));
 
+          updateLoadingProgress(95, 'Almost ready...');
           // Navigate to conduit card
           window.dispatchEvent(new CustomEvent('navigate', {
             detail: { route: 'conduit-card' }
@@ -401,6 +425,7 @@ export function attachContinueJourneyListeners() {
 
       } catch (err) {
         console.error('Error loading trainer:', err);
+        updateLoadingProgress(0, 'Error loading data');
         // Show error in content area since modal is closed
         document.getElementById('content').innerHTML = `
           <div class="error" style="text-align: center; padding: 2rem; color: red;">

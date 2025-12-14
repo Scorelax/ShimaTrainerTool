@@ -43,21 +43,69 @@ body {
   display: none;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   color: white;
   z-index: 9999;
+  padding-bottom: 10vh;
 }
 
 .loading-screen.active {
   display: flex;
 }
 
-.loading-screen p {
+.loading-screen > p {
   display: none;
 }
 
 .pokeball-loader {
   display: none;
+}
+
+.loading-progress-container {
+  width: 80%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.loading-progress-bar {
+  width: 100%;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 15px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.loading-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 50%, #4CAF50 100%);
+  background-size: 200% 100%;
+  border-radius: 12px;
+  transition: width 0.5s ease-out;
+  animation: shimmer 2s linear infinite;
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.6);
+}
+
+.loading-progress-text {
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  margin: 0;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes spin {

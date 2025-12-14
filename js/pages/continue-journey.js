@@ -26,6 +26,12 @@ export async function renderContinueJourney() {
                        0 0 clamp(10px, 3vw, 25px) rgba(255,222,0,0.3);
         }
 
+        .continue-journey-page {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
         .trainer-list-container {
           display: flex;
           flex-direction: column;

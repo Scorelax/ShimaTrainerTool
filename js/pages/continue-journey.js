@@ -26,80 +26,58 @@ export async function renderContinueJourney() {
                        0 0 clamp(10px, 3vw, 25px) rgba(255,222,0,0.3);
         }
 
-        .trainer-container {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 2vh 2vw;
-          width: 90%;
-          max-width: 90vw;
-          margin: 0 auto;
-          padding: 2vh 2vw;
-          box-sizing: border-box;
-          justify-items: center;
-        }
-
-        .trainer-box {
-          width: 100%;
-          max-width: 20vw;
-          aspect-ratio: 0.85;
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
-          border-radius: clamp(10px, 2vw, 20px);
+        .trainer-list-container {
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: space-between;
-          padding: 1.5vh 1vw;
+          width: 90%;
+          max-width: min(100vw, 1200px);
+        }
+
+        .trainer-container {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: clamp(1rem, 3vw, 2.5rem);
+          width: 100%;
+          margin-bottom: clamp(1.5rem, 5vh, 3rem);
+        }
+
+        .trainer-box {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          background: transparent;
+          padding: 0;
           cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-sizing: border-box;
-          box-shadow: 0 clamp(5px, 1.5vh, 15px) clamp(15px, 4vw, 35px) rgba(0,0,0,0.3),
-                      inset 0 clamp(-3px, -0.6vh, -5px) 0 rgba(0,0,0,0.05);
-          position: relative;
-          overflow: hidden;
-        }
-
-        .trainer-box::before {
-          content: '';
-          position: absolute;
-          top: -50%;
-          left: -50%;
-          width: 200%;
-          height: 200%;
-          background: radial-gradient(circle, rgba(255,222,0,0.1) 0%, transparent 70%);
-          opacity: 0;
-          transition: opacity 0.3s;
-        }
-
-        .trainer-box:hover::before {
-          opacity: 1;
+          transition: transform 0.3s, filter 0.3s;
         }
 
         .trainer-box:hover {
-          transform: translateY(clamp(-8px, -1.5vh, -12px)) scale(1.03);
-          box-shadow: 0 clamp(8px, 2vh, 18px) clamp(25px, 5vw, 45px) rgba(0,0,0,0.4),
-                      inset 0 clamp(-3px, -0.6vh, -5px) 0 rgba(0,0,0,0.05),
-                      0 0 clamp(15px, 4vw, 35px) rgba(255,222,0,0.5);
-          border-color: #FFC700;
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
 
         .trainer-image {
-          width: 90%;
-          height: 70%;
+          width: 85%;
+          height: auto;
+          aspect-ratio: 1;
+          border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
-          border-radius: clamp(10px, 2vw, 20px);
-          box-shadow: 0 clamp(3px, 1vh, 8px) clamp(10px, 2.5vw, 20px) rgba(0,0,0,0.2);
-          border: clamp(2px, 0.3vw, 4px) solid #F0F0F0;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          background-color: #fff;
+          cursor: pointer;
         }
 
         .trainer-name {
           font-size: clamp(0.9rem, 1.8vw, 1.3rem);
-          margin-top: 1vh;
           text-align: center;
-          color: #333333;
+          color: white;
           font-weight: 800;
           text-transform: uppercase;
-          letter-spacing: clamp(0.25px, 0.1vw, 0.75px);
+          letter-spacing: clamp(0.5px, 0.1vw, 1px);
+          text-shadow: 0 clamp(2px, 0.5vh, 3px) clamp(4px, 1vh, 6px) rgba(0,0,0,0.8);
         }
 
         /* PIN Modal */
@@ -275,43 +253,9 @@ export async function renderContinueJourney() {
         }
 
         /* Responsive layout for smaller screens */
-        @media (max-width: 1366px) {
-          .trainer-container {
-            grid-template-columns: repeat(4, 1fr);
-            gap: clamp(1rem, 1.8vw, 1.5rem);
-          }
-          .trainer-box {
-            max-width: 20vw;
-          }
-        }
-
-        @media (max-width: 1024px) {
-          .trainer-container {
-            grid-template-columns: repeat(4, 1fr);
-            gap: clamp(0.8rem, 1.5vw, 1.2rem);
-          }
-          .trainer-box {
-            max-width: 20vw;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .trainer-container {
-            grid-template-columns: repeat(4, 1fr);
-            gap: clamp(0.6rem, 1.2vw, 1rem);
-          }
-          .trainer-box {
-            max-width: 20vw;
-          }
-        }
-
         @media (max-width: 600px) {
           .trainer-container {
             grid-template-columns: repeat(2, 1fr);
-            gap: clamp(0.75rem, 1.5vw, 1rem);
-          }
-          .trainer-box {
-            max-width: 45vw;
           }
         }
 
@@ -319,30 +263,20 @@ export async function renderContinueJourney() {
           .trainer-container {
             grid-template-columns: 1fr;
           }
-          .trainer-box {
-            max-width: 80vw;
-          }
-        }
-
-        @media (max-width: 360px) {
-          .trainer-container {
-            gap: clamp(0.5rem, 1vw, 0.75rem);
-          }
-          .trainer-box {
-            max-width: 85vw;
-          }
         }
       </style>
 
       <h1>Continue Journey</h1>
 
-      <div class="trainer-container">
-        ${trainers.map(trainer => `
-          <div class="trainer-box" data-trainer-id="${trainer.id}" data-trainer-name="${trainer.name}" data-trainer-pin="${trainer.pinCode}">
-            <img class="trainer-image" src="${trainer.image || 'assets/Pokeball.png'}" alt="${trainer.name}">
-            <div class="trainer-name">${trainer.name || 'Unnamed Trainer'}</div>
-          </div>
-        `).join('')}
+      <div class="trainer-list-container">
+        <div class="trainer-container">
+          ${trainers.map(trainer => `
+            <div class="trainer-box" data-trainer-id="${trainer.id}" data-trainer-name="${trainer.name}" data-trainer-pin="${trainer.pinCode}">
+              <img class="trainer-image" src="${trainer.image || 'assets/Pokeball.png'}" alt="${trainer.name}">
+              <div class="trainer-name">${trainer.name || 'Unnamed Trainer'}</div>
+            </div>
+          `).join('')}
+        </div>
       </div>
 
       <button class="back-button" data-route="index">←</button>

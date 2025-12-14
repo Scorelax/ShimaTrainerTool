@@ -246,40 +246,9 @@ export function renderMyPokemon() {
           padding: clamp(1.5rem, 4vh, 4rem);
         }
 
-        @media (max-width: 1024px) {
-          .pokemon-grid {
-            grid-template-columns: repeat(3, 1fr);
-            gap: clamp(0.9rem, 2.7vw, 2.2rem);
-          }
-        }
-
-        @media (max-width: 768px) {
-          .pokemon-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: clamp(0.8rem, 2.5vw, 2rem);
-          }
-        }
-
-        @media (max-width: 600px) {
-          .pokemon-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: clamp(0.75rem, 2.2vw, 1.5rem);
-          }
-        }
-
         @media (max-width: 480px) {
           .pokemon-grid {
             grid-template-columns: 1fr;
-          }
-        }
-
-        @media (max-width: 360px) {
-          .pokemon-grid {
-            gap: clamp(0.75rem, 2vh, 1rem);
-          }
-
-          .pokemon-list-container {
-            padding: clamp(0.5rem, 1vh, 0.75rem);
           }
         }
       </style>

@@ -269,11 +269,10 @@ export class PokemonAPI {
   /**
    * Recalculate Pokemon stats based on feats
    */
-  static async recalculateStats(pokemonData, statChoices, newFeats) {
+  static async recalculateStats(pokemonData, oldFeats) {
     return API.request('pokemon', 'recalculate-stats', {
       data: JSON.stringify(pokemonData),
-      statChoices: JSON.stringify(statChoices),
-      newFeats: newFeats
+      oldFeats: oldFeats
     }, {
       useCache: false
     });

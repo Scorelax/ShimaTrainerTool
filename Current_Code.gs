@@ -791,14 +791,14 @@ function handlePokemonRoute(action, params) {
       return updatePokemonDataInSheet(updateData);
 
     case 'recalculate-stats':
-      // GET: ?route=pokemon&action=recalculate-stats&data={...}&statChoices=[...]&newFeats=...
+      // GET: ?route=pokemon&action=recalculate-stats&data={...}&oldFeats=...
       if (!params.data) {
         throw new Error('Missing pokemon data');
       }
       const recalcData = JSON.parse(params.data);
-      const statChoices = params.statChoices ? JSON.parse(params.statChoices) : [];
-      const newFeats = params.newFeats || '';
-      const recalcResult = calculateModifiers(recalcData, statChoices, newFeats);
+      const oldFeatsStr = params.oldFeats || '';
+      const newFeatsStr = recalcData[50] || '';
+      const recalcResult = applyFeatChanges(recalcData, oldFeatsStr, newFeatsStr);
       return recalcResult;
 
     case 'evolution-options':
@@ -1675,6 +1675,234 @@ function calculateModifiers(newPokemonData, statIncreases, newFeats) {
         return {
             status: 'error',
             message: 'Failed to calculate modifiers due to error: ' + error.toString(),
+        };
+    }
+}
+
+// Apply feat changes incrementally (add new feats, remove old feats)
+function applyFeatChanges(pokemonData, oldFeatsStr, newFeatsStr) {
+    try {
+        Logger.log("Starting applyFeatChanges");
+        Logger.log("Old feats: " + oldFeatsStr);
+        Logger.log("New feats: " + newFeatsStr);
+
+        const oldFeats = oldFeatsStr ? oldFeatsStr.split(',').map(f => f.trim()).filter(f => f) : [];
+        const newFeats = newFeatsStr ? newFeatsStr.split(',').map(f => f.trim()).filter(f => f) : [];
+
+        // Find added and removed feats
+        const addedFeats = newFeats.filter(f => !oldFeats.includes(f));
+        const removedFeats = oldFeats.filter(f => !newFeats.includes(f));
+
+        Logger.log("Added feats: " + addedFeats.join(', '));
+        Logger.log("Removed feats: " + removedFeats.join(', '));
+
+        // Get current stats
+        let strength = parseInt(pokemonData[15], 10);
+        let dexterity = parseInt(pokemonData[16], 10);
+        let constitution = parseInt(pokemonData[17], 10);
+        let intelligence = parseInt(pokemonData[18], 10);
+        let wisdom = parseInt(pokemonData[19], 10);
+        let charisma = parseInt(pokemonData[20], 10);
+        let ac = parseInt(pokemonData[8], 10);
+        let speed = parseInt(pokemonData[24], 10);
+        let hp = parseInt(pokemonData[10], 10);
+        let vp = parseInt(pokemonData[12], 10);
+
+        const level = parseInt(pokemonData[4], 10);
+        const hitDice = parseInt(pokemonData[9], 10);
+        const vitalityDice = parseInt(pokemonData[11], 10);
+
+        // Parse current skills
+        let skills = pokemonData[22] ? pokemonData[22].split(',').map(s => s.trim()).filter(s => s) : [];
+
+        // Helper to parse feat name and choice
+        function parseFeat(feat) {
+            const match = feat.match(/^(.+?)\s*\((.+?)\)$/);
+            return {
+                name: match ? match[1].trim() : feat,
+                choice: match ? match[2].trim() : null
+            };
+        }
+
+        // Helper to add skill
+        function addSkill(skillName) {
+            const existing = skills.findIndex(s => s.toLowerCase() === skillName.toLowerCase());
+            if (existing >= 0) {
+                // Upgrade to double proficiency
+                skills[existing] = skillName + '+';
+            } else if (!skills.some(s => s === skillName + '+')) {
+                skills.push(skillName);
+            }
+        }
+
+        // Helper to remove skill
+        function removeSkill(skillName) {
+            const plusIndex = skills.indexOf(skillName + '+');
+            if (plusIndex >= 0) {
+                // Downgrade from double to single proficiency
+                skills[plusIndex] = skillName;
+            } else {
+                // Remove skill entirely
+                skills = skills.filter(s => s.toLowerCase() !== skillName.toLowerCase());
+            }
+        }
+
+        // Remove old feats
+        for (const feat of removedFeats) {
+            const { name, choice } = parseFeat(feat);
+            Logger.log("Removing feat: " + name + (choice ? " (" + choice + ")" : ""));
+
+            if (name === 'Acrobat') {
+                if (dexterity > 1) dexterity -= 1;
+                removeSkill('Acrobatics');
+            } else if (name === 'Actor') {
+                if (charisma > 1) charisma -= 1;
+            } else if (name === 'Athlete') {
+                if (choice === 'STR' && strength > 1) strength -= 1;
+                else if (choice === 'DEX' && dexterity > 1) dexterity -= 1;
+            } else if (name === 'Brawny') {
+                if (strength > 1) strength -= 1;
+                removeSkill('Athletics');
+            } else if (name === 'Durable') {
+                if (constitution > 1) constitution -= 1;
+            } else if (name === 'Observant') {
+                if (choice === 'INT' && intelligence > 1) intelligence -= 1;
+                else if (choice === 'WIS' && wisdom > 1) wisdom -= 1;
+            } else if (name === 'Perceptive') {
+                if (wisdom > 1) wisdom -= 1;
+                removeSkill('Perception');
+            } else if (name === 'Quick-Fingered') {
+                if (dexterity > 1) dexterity -= 1;
+            } else if (name === 'Resilient') {
+                if (choice === 'STR' && strength > 1) strength -= 1;
+                else if (choice === 'DEX' && dexterity > 1) dexterity -= 1;
+                else if (choice === 'CON' && constitution > 1) constitution -= 1;
+                else if (choice === 'INT' && intelligence > 1) intelligence -= 1;
+                else if (choice === 'WIS' && wisdom > 1) wisdom -= 1;
+                else if (choice === 'CHA' && charisma > 1) charisma -= 1;
+            } else if (name === 'Stealthy') {
+                if (dexterity > 1) dexterity -= 1;
+                removeSkill('Stealth');
+            } else if (name === 'AC Up') {
+                ac -= 1;
+            } else if (name === 'Mobile') {
+                speed -= 10;
+            } else if (name === 'Tough') {
+                hp -= level * 2;
+            } else if (name === 'Tireless') {
+                vp -= Math.ceil(level / 2) * vitalityDice;
+            }
+        }
+
+        // Add new feats
+        for (const feat of addedFeats) {
+            const { name, choice } = parseFeat(feat);
+            Logger.log("Adding feat: " + name + (choice ? " (" + choice + ")" : ""));
+
+            if (name === 'Acrobat') {
+                if (dexterity < 20) dexterity += 1;
+                addSkill('Acrobatics');
+            } else if (name === 'Actor') {
+                if (charisma < 20) charisma += 1;
+            } else if (name === 'Athlete') {
+                if (choice === 'STR' && strength < 20) strength += 1;
+                else if (choice === 'DEX' && dexterity < 20) dexterity += 1;
+            } else if (name === 'Brawny') {
+                if (strength < 20) strength += 1;
+                addSkill('Athletics');
+            } else if (name === 'Durable') {
+                if (constitution < 20) constitution += 1;
+            } else if (name === 'Observant') {
+                if (choice === 'INT' && intelligence < 20) intelligence += 1;
+                else if (choice === 'WIS' && wisdom < 20) wisdom += 1;
+            } else if (name === 'Perceptive') {
+                if (wisdom < 20) wisdom += 1;
+                addSkill('Perception');
+            } else if (name === 'Quick-Fingered') {
+                if (dexterity < 20) dexterity += 1;
+            } else if (name === 'Resilient') {
+                if (choice === 'STR' && strength < 20) strength += 1;
+                else if (choice === 'DEX' && dexterity < 20) dexterity += 1;
+                else if (choice === 'CON' && constitution < 20) constitution += 1;
+                else if (choice === 'INT' && intelligence < 20) intelligence += 1;
+                else if (choice === 'WIS' && wisdom < 20) wisdom += 1;
+                else if (choice === 'CHA' && charisma < 20) charisma += 1;
+            } else if (name === 'Stealthy') {
+                if (dexterity < 20) dexterity += 1;
+                addSkill('Stealth');
+            } else if (name === 'AC Up') {
+                ac += 1;
+            } else if (name === 'Mobile') {
+                speed += 10;
+            } else if (name === 'Tough') {
+                hp += level * 2;
+            } else if (name === 'Tireless') {
+                vp += Math.ceil(level / 2) * vitalityDice;
+            }
+        }
+
+        // Recalculate HP and VP based on new CON
+        const { hp: recalcHp, vp: recalcVp } = calculateHpVp(
+            strength, dexterity, constitution, intelligence, wisdom, charisma,
+            level, hitDice, vitalityDice, pokemonData[33]
+        );
+
+        // Apply Tough and Tireless if they're still active
+        hp = recalcHp;
+        vp = recalcVp;
+        if (newFeats.some(f => parseFeat(f).name === 'Tough')) {
+            hp += level * 2;
+        }
+        if (newFeats.some(f => parseFeat(f).name === 'Tireless')) {
+            vp += Math.ceil(level / 2) * vitalityDice;
+        }
+
+        // Calculate modifiers
+        const strModifier = Math.floor((strength - 10) / 2);
+        const dexModifier = Math.floor((dexterity - 10) / 2);
+        const conModifier = Math.floor((constitution - 10) / 2);
+        const intModifier = Math.floor((intelligence - 10) / 2);
+        const wisModifier = Math.floor((wisdom - 10) / 2);
+        const chaModifier = Math.floor((charisma - 10) / 2);
+
+        const proficiencyBonus = level <= 4 ? 2 : level <= 8 ? 3 : level <= 12 ? 4 : level <= 16 ? 5 : 6;
+        const initiative = newFeats.some(f => parseFeat(f).name === 'Alert') ? dexModifier + 5 : dexModifier;
+        const stabBonus = level <= 2 ? 0 : level <= 6 ? 2 : level <= 10 ? 4 : level <= 14 ? 6 : level <= 18 ? 8 : 10;
+
+        // Update pokemonData
+        pokemonData[8] = ac;
+        pokemonData[10] = hp;
+        pokemonData[12] = vp;
+        pokemonData[15] = strength;
+        pokemonData[16] = dexterity;
+        pokemonData[17] = constitution;
+        pokemonData[18] = intelligence;
+        pokemonData[19] = wisdom;
+        pokemonData[20] = charisma;
+        pokemonData[22] = skills.join(', ');
+        pokemonData[24] = speed;
+        pokemonData[30] = initiative;
+        pokemonData[31] = proficiencyBonus;
+        pokemonData[34] = stabBonus;
+        pokemonData[39] = strModifier;
+        pokemonData[40] = dexModifier;
+        pokemonData[41] = conModifier;
+        pokemonData[42] = intModifier;
+        pokemonData[43] = wisModifier;
+        pokemonData[44] = chaModifier;
+
+        Logger.log("Feat changes applied successfully");
+
+        return {
+            status: 'success',
+            newPokemonData: pokemonData
+        };
+
+    } catch (error) {
+        Logger.log("Error in applyFeatChanges: " + error.toString());
+        return {
+            status: 'error',
+            message: 'Failed to apply feat changes: ' + error.toString()
         };
     }
 }

@@ -37,10 +37,6 @@ export function renderEditPokemon(pokemonName) {
   const selectedFeats = feats ? feats.split(',').map(s => s.trim()).filter(s => s) : [];
   const existingCustomMoves = customMoves ? customMoves.split(',').map(m => m.trim()).filter(m => m) : [];
 
-  // Store original data for comparison
-  const originalFeats = [...selectedFeats];
-  const originalSkills = [...selectedSkills];
-
   const html = `
     <div class="edit-pokemon-page">
       <style>
@@ -1094,7 +1090,9 @@ async function handleFormSubmit(pokemonName, originalNature) {
   const form = document.getElementById('editPokemonForm');
   const pokemonDataStr = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
   const pokemonData = JSON.parse(pokemonDataStr);
-  const originalFeats = (pokemonData[50] || '').split(',').map(f => f.trim()).filter(f => f);
+
+  // Store ORIGINAL feats from database for backend comparison
+  const originalFeatsFromDb = pokemonData[50] || '';
   const originalSkills = (pokemonData[22] || '').split(',').map(s => s.trim()).filter(s => s);
 
   try {
@@ -1117,22 +1115,23 @@ async function handleFormSubmit(pokemonName, originalNature) {
     let selectedFeats = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
       .map(cb => cb.value);
 
-    // Detect newly added feats
+    // Parse original feats to detect newly added ones
+    const originalFeats = originalFeatsFromDb.split(',').map(f => f.trim()).filter(f => f);
     const newFeats = selectedFeats.filter(f => !originalFeats.includes(f) && !f.includes('('));
     const featChoices = {};
 
     // Process feats that need choices or special handling
     for (const feat of newFeats) {
-      // Handle feats with stat choices
+      // Handle feats with stat choices - append choice to feat name
       if (feat === 'Athlete') {
         const choice = await showFeatChoicePopup('Athlete', ['STR', 'DEX']);
-        featChoices['Athlete'] = choice;
+        selectedFeats = selectedFeats.map(f => f === 'Athlete' ? `Athlete (${choice})` : f);
       } else if (feat === 'Observant') {
         const choice = await showFeatChoicePopup('Observant', ['INT', 'WIS']);
-        featChoices['Observant'] = choice;
+        selectedFeats = selectedFeats.map(f => f === 'Observant' ? `Observant (${choice})` : f);
       } else if (feat === 'Resilient') {
         const choice = await showFeatChoicePopup('Resilient', ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']);
-        featChoices['Resilient'] = choice;
+        selectedFeats = selectedFeats.map(f => f === 'Resilient' ? `Resilient (${choice})` : f);
       }
       // Handle Skilled feat
       else if (feat === 'Skilled') {
@@ -1156,32 +1155,6 @@ async function handleFormSubmit(pokemonName, originalNature) {
         const fullFeatName = await showTerrainAdeptPopup();
         // Replace the feat in the list with the full name
         selectedFeats = selectedFeats.map(f => f === 'Terrain Adept' ? fullFeatName : f);
-      }
-      // Handle feats that grant skill proficiency
-      else if (feat === 'Acrobat') {
-        if (selectedSkills.includes('Acrobatics')) {
-          selectedSkills = selectedSkills.map(s => s === 'Acrobatics' ? 'Acrobatics+' : s);
-        } else if (!selectedSkills.includes('Acrobatics+')) {
-          selectedSkills.push('Acrobatics');
-        }
-      } else if (feat === 'Brawny') {
-        if (selectedSkills.includes('Athletics')) {
-          selectedSkills = selectedSkills.map(s => s === 'Athletics' ? 'Athletics+' : s);
-        } else if (!selectedSkills.includes('Athletics+')) {
-          selectedSkills.push('Athletics');
-        }
-      } else if (feat === 'Perceptive') {
-        if (selectedSkills.includes('Perception')) {
-          selectedSkills = selectedSkills.map(s => s === 'Perception' ? 'Perception+' : s);
-        } else if (!selectedSkills.includes('Perception+')) {
-          selectedSkills.push('Perception');
-        }
-      } else if (feat === 'Stealthy') {
-        if (selectedSkills.includes('Stealth')) {
-          selectedSkills = selectedSkills.map(s => s === 'Stealth' ? 'Stealth+' : s);
-        } else if (!selectedSkills.includes('Stealth+')) {
-          selectedSkills.push('Stealth');
-        }
       }
       // Handle Hidden Ability feat
       else if (feat === 'Hidden Ability') {
@@ -1223,33 +1196,32 @@ async function handleFormSubmit(pokemonName, originalNature) {
     pokemonData[18] = int;
     pokemonData[19] = wis;
     pokemonData[20] = cha;
-    pokemonData[22] = selectedSkills.join(', ');
     pokemonData[32] = nature;
     pokemonData[33] = loyalty;
     pokemonData[35] = heldItemsString;
     pokemonData[37] = customMoves.join(', ');
     pokemonData[50] = selectedFeats.join(', ');
 
-    // If feats were added/changed, recalculate stats through backend
-    if (newFeats.length > 0 || originalFeats.length !== selectedFeats.length) {
+    // If feats changed, apply feat changes incrementally
+    const featsChanged = JSON.stringify(selectedFeats.sort()) !== JSON.stringify(originalFeats.sort());
+    if (featsChanged) {
       try {
-        // Call backend to recalculate with feat choices
-        const statChoices = [];
-        if (featChoices['Athlete']) statChoices.push(featChoices['Athlete']);
-        if (featChoices['Observant']) statChoices.push(featChoices['Observant']);
-        if (featChoices['Resilient']) statChoices.push(featChoices['Resilient']);
-
-        const newFeatsList = newFeats.join(',');
-        const response = await PokemonAPI.recalculateStats(pokemonData, statChoices, newFeatsList);
+        // Backend will apply incremental changes (add new, remove old)
+        const response = await PokemonAPI.recalculateStats(pokemonData, originalFeatsFromDb);
 
         if (response.status === 'success' && response.newPokemonData) {
-          // Use the recalculated data
+          // Use the recalculated data (including skills)
           Object.assign(pokemonData, response.newPokemonData);
         }
       } catch (error) {
         console.error('Error recalculating stats:', error);
-        // Continue anyway with manual values
+        showError('Failed to recalculate stats. Please check your feats.');
+        // Don't continue - this is a critical error
+        return;
       }
+    } else {
+      // No feat changes, just update skills normally
+      pokemonData[22] = selectedSkills.join(', ');
     }
 
     // Update session storage IMMEDIATELY

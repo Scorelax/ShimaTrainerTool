@@ -244,6 +244,28 @@ export function renderPokemonCard(pokemonName) {
       ).join(' ')
     : 'None';
 
+  // Parse feats and get details from pokemonFeats database
+  const parsedFeats = [];
+  if (feats) {
+    const pokemonFeatsData = JSON.parse(sessionStorage.getItem('pokemonFeats') || '[]');
+    const featsList = feats.split(',').map(f => f.trim()).filter(f => f);
+
+    featsList.forEach((featName) => {
+      const featData = pokemonFeatsData.find(f => f.name === featName);
+      parsedFeats.push({
+        name: featName,
+        description: featData ? (featData.effect || featData.description || 'No description available') : 'No description available'
+      });
+    });
+  }
+
+  // Generate feat buttons HTML
+  const featButtonsHTML = parsedFeats.length > 0
+    ? parsedFeats.map((feat, index) =>
+        `<button class="feat-button" data-feat-index="${index}" style="background-color: white; color: black; border: 2px solid #333; border-radius: 0.6vh; padding: 0.8vh 1.5vh; font-size: clamp(0.75rem, 1.5vw, 0.9rem); cursor: pointer; margin: 0 0.3vh; font-weight: bold; vertical-align: middle;">${feat.name}</button>`
+      ).join(' ')
+    : 'None';
+
   // Generate held items buttons HTML
   const heldItemsHTML = heldItems.length > 0
     ? heldItems.map((item, index) =>
@@ -1331,6 +1353,10 @@ export function renderPokemonCard(pokemonName) {
               <span class="info-item-label">Held Item:</span>
               <span class="info-item-value">${heldItemsHTML}</span>
             </div>
+            <div class="info-item">
+              <span class="info-item-label">Feats:</span>
+              <span class="info-item-value">${featButtonsHTML}</span>
+            </div>
             <div class="info-item-column">
               <span class="info-item-label">Movement:</span>
               <span class="info-item-value" id="movementValue">${movementDisplay}</span>
@@ -1414,6 +1440,17 @@ export function renderPokemonCard(pokemonName) {
             <button class="popup-close" id="closeAbilityPopup">×</button>
           </div>
           <div class="popup-body" id="abilityPopupContent"></div>
+        </div>
+      </div>
+
+      <!-- Feat Popup -->
+      <div id="featPopup" class="popup-overlay">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title" id="featPopupTitle">Feat</div>
+            <button class="popup-close" id="closeFeatPopup">×</button>
+          </div>
+          <div class="popup-body" id="featPopupContent"></div>
         </div>
       </div>
 
@@ -1510,8 +1547,9 @@ export function renderPokemonCard(pokemonName) {
     </div>
   `;
 
-  // Store parsed abilities and type effectiveness data for event listener use
+  // Store parsed abilities, feats, and type effectiveness data for event listener use
   window.pokemonAbilities = parsedAbilities;
+  window.pokemonFeats = parsedFeats;
   window.typeEffectiveness = { weaknesses, resistances, immunities };
 
   return html;
@@ -1788,6 +1826,32 @@ export function attachPokemonCardListeners() {
   document.getElementById('abilityPopup')?.addEventListener('click', (e) => {
     if (e.target.id === 'abilityPopup') {
       document.getElementById('abilityPopup').classList.remove('active');
+    }
+  });
+
+  // Feat button click listeners
+  document.querySelectorAll('.feat-button').forEach(button => {
+    button.addEventListener('click', (e) => {
+      const index = parseInt(e.target.dataset.featIndex);
+      if (window.pokemonFeats && window.pokemonFeats[index]) {
+        const feat = window.pokemonFeats[index];
+        document.getElementById('featPopupTitle').textContent = feat.name;
+        document.getElementById('featPopupContent').textContent = feat.description;
+        const featPopup = document.getElementById('featPopup');
+        featPopup.classList.add('active');
+      }
+    });
+  });
+
+  // Close feat popup button
+  document.getElementById('closeFeatPopup')?.addEventListener('click', () => {
+    document.getElementById('featPopup').classList.remove('active');
+  });
+
+  // Close feat popup when clicking outside
+  document.getElementById('featPopup')?.addEventListener('click', (e) => {
+    if (e.target.id === 'featPopup') {
+      document.getElementById('featPopup').classList.remove('active');
     }
   });
 

@@ -40,7 +40,7 @@ export async function renderContinueJourney() {
 
         .trainer-box {
           width: 100%;
-          max-width: 22vw;
+          max-width: 20vw;
           aspect-ratio: 0.85;
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
           border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
@@ -275,6 +275,16 @@ export async function renderContinueJourney() {
         }
 
         /* Responsive layout for smaller screens */
+        @media (max-width: 1366px) {
+          .trainer-container {
+            grid-template-columns: repeat(4, 1fr);
+            gap: clamp(1rem, 1.8vw, 1.5rem);
+          }
+          .trainer-box {
+            max-width: 20vw;
+          }
+        }
+
         @media (max-width: 1024px) {
           .trainer-container {
             grid-template-columns: repeat(4, 1fr);

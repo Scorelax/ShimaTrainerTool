@@ -252,18 +252,6 @@ export async function renderContinueJourney() {
           transform: scale(1.05);
         }
 
-        /* Responsive layout for smaller screens */
-        @media (max-width: 600px) {
-          .trainer-container {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 480px) {
-          .trainer-container {
-            grid-template-columns: 1fr;
-          }
-        }
       </style>
 
       <h1>Continue Journey</h1>

@@ -275,31 +275,23 @@ export async function renderContinueJourney() {
         }
 
         /* Responsive layout for smaller screens */
-        @media (max-width: 1200px) {
-          .trainer-container {
-            grid-template-columns: repeat(3, 1fr);
-          }
-          .trainer-box {
-            max-width: 28vw;
-          }
-        }
-
         @media (max-width: 1024px) {
           .trainer-container {
-            grid-template-columns: repeat(3, 1fr);
-            gap: clamp(1rem, 2vw, 1.5rem);
+            grid-template-columns: repeat(4, 1fr);
+            gap: clamp(1rem, 1.8vw, 1.5rem);
           }
           .trainer-box {
-            max-width: 30vw;
+            max-width: 23vw;
           }
         }
 
         @media (max-width: 768px) {
           .trainer-container {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(4, 1fr);
+            gap: clamp(0.8rem, 1.5vw, 1.2rem);
           }
           .trainer-box {
-            max-width: 42vw;
+            max-width: 24vw;
           }
         }
 

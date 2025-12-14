@@ -790,6 +790,17 @@ function handlePokemonRoute(action, params) {
       const updateData = JSON.parse(params.data);
       return updatePokemonDataInSheet(updateData);
 
+    case 'recalculate-stats':
+      // GET: ?route=pokemon&action=recalculate-stats&data={...}&statChoices=[...]&newFeats=...
+      if (!params.data) {
+        throw new Error('Missing pokemon data');
+      }
+      const recalcData = JSON.parse(params.data);
+      const statChoices = params.statChoices ? JSON.parse(params.statChoices) : [];
+      const newFeats = params.newFeats || '';
+      const recalcResult = calculateModifiers(recalcData, statChoices, newFeats);
+      return recalcResult;
+
     case 'evolution-options':
       // GET: ?route=pokemon&action=evolution-options&dexEntry=25&limit=20
       const dexEntry = parseInt(params.dexEntry);
@@ -1643,6 +1654,14 @@ function calculateModifiers(newPokemonData, statIncreases, newFeats) {
 
         // Calculate Initiative
         newPokemonData[30] = feats.includes("Alert") ? dexmodifier + 5 : dexmodifier;
+
+        // Handle Mobile feat (+10 speed)
+        if(newSkills.includes("Mobile")){
+          if (feats.includes("Mobile")) {
+            Logger.log("Applying Mobile Feat buffs");
+            newPokemonData[24] = parseInt(newPokemonData[24], 10) + 10;
+          }
+        }
 
         // Calculate Proficiency Bonus
         newPokemonData[31] = level <= 4 ? 2 : level <= 8 ? 3 : level <= 12 ? 4 : level <= 16 ? 5 : 6;

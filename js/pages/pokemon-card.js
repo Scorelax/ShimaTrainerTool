@@ -644,6 +644,26 @@ export function renderPokemonCard(pokemonName) {
                       0 0 10px rgba(255,222,0,0.5);
         }
 
+        .skill-item.double-proficiency {
+          background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+          color: white;
+          border-color: #4A148C;
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 15px rgba(156,39,176,0.6);
+          animation: doubleProfGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes doubleProfGlow {
+          from {
+            box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                        0 0 15px rgba(156,39,176,0.6);
+          }
+          to {
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5),
+                        0 0 20px rgba(156,39,176,0.8);
+          }
+        }
+
         .skill-name {
           font-weight: 900;
           text-transform: uppercase;
@@ -1292,10 +1312,17 @@ export function renderPokemonCard(pokemonName) {
               ${allSkills.map(skill => {
                 const skillKey = skill.name.toLowerCase();
                 const proficiencyLevel = skillCounts[skillKey] || 0;
+
+                // Check if this skill has double proficiency (+ suffix in original data)
+                const hasDoubleProficiency = skillsArray.some(s =>
+                  s.toLowerCase() === skillKey + '+' || s === skill.name + '+'
+                );
+
                 const skillClass = proficiencyLevel >= 1 ? 'unlocked' : '';
+                const doubleProfClass = hasDoubleProficiency ? 'double-proficiency' : '';
 
                 return `
-                  <div class="skill-item ${skillClass}">
+                  <div class="skill-item ${skillClass} ${doubleProfClass}">
                     <div class="skill-name">${skill.name}</div>
                     <div class="skill-modifier">(${skill.stat})</div>
                   </div>

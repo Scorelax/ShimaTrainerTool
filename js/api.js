@@ -267,6 +267,19 @@ export class PokemonAPI {
   }
 
   /**
+   * Recalculate Pokemon stats based on feats
+   */
+  static async recalculateStats(pokemonData, statChoices, newFeats) {
+    return API.request('pokemon', 'recalculate-stats', {
+      data: JSON.stringify(pokemonData),
+      statChoices: JSON.stringify(statChoices),
+      newFeats: newFeats
+    }, {
+      useCache: false
+    });
+  }
+
+  /**
    * Get abilities for a specific Pokemon species
    */
   static async getAbilities(pokemonName) {

@@ -33,9 +33,13 @@ export function renderEditPokemon(pokemonName) {
   const feats = pokemonData[50] || '';
   const customMoves = pokemonData[37] || '';
 
-  const selectedSkills = skills ? skills.split(',').map(s => s.trim()) : [];
-  const selectedFeats = feats ? feats.split(',').map(s => s.trim()) : [];
+  const selectedSkills = skills ? skills.split(',').map(s => s.trim()).filter(s => s) : [];
+  const selectedFeats = feats ? feats.split(',').map(s => s.trim()).filter(s => s) : [];
   const existingCustomMoves = customMoves ? customMoves.split(',').map(m => m.trim()).filter(m => m) : [];
+
+  // Store original data for comparison
+  const originalFeats = [...selectedFeats];
+  const originalSkills = [...selectedSkills];
 
   const html = `
     <div class="edit-pokemon-page">
@@ -939,10 +943,159 @@ function recalculateStatsForNatureChange(oldNatureName, newNatureName, pokemonDa
   }
 }
 
+// Helper function to show feat choice popup
+function showFeatChoicePopup(featName, choices) {
+  return new Promise((resolve) => {
+    const popup = document.createElement('div');
+    popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; justify-content: center; align-items: center;';
+
+    const content = document.createElement('div');
+    content.style.cssText = 'background: white; padding: 2rem; border-radius: 15px; max-width: 400px; width: 90%;';
+
+    content.innerHTML = `
+      <h2 style="margin: 0 0 1rem 0;">${featName} - Choose Stat</h2>
+      <p style="margin: 0 0 1rem 0;">Which ability score would you like to increase?</p>
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        ${choices.map(choice => `
+          <button class="choice-btn" data-choice="${choice}" style="padding: 0.75rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">
+            ${choice}
+          </button>
+        `).join('')}
+      </div>
+    `;
+
+    popup.appendChild(content);
+    document.body.appendChild(popup);
+
+    popup.querySelectorAll('.choice-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const choice = btn.dataset.choice;
+        document.body.removeChild(popup);
+        resolve(choice);
+      });
+    });
+  });
+}
+
+// Helper function for Skilled feat
+function showSkilledFeatPopup() {
+  return new Promise((resolve) => {
+    const skillsData = JSON.parse(sessionStorage.getItem('skills') || '[]');
+
+    const popup = document.createElement('div');
+    popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; justify-content: center; align-items: center;';
+
+    const content = document.createElement('div');
+    content.style.cssText = 'background: white; padding: 2rem; border-radius: 15px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;';
+
+    content.innerHTML = `
+      <h2 style="margin: 0 0 1rem 0;">Skilled Feat - Choose Proficiency</h2>
+      <p style="margin: 0 0 1rem 0;">Choose a skill or enter a custom tool:</p>
+      <select id="skillChoice" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; font-size: 1rem;">
+        <option value="">-- Select a Skill --</option>
+        ${skillsData.map(skill => `<option value="${skill.name}">${skill.name}</option>`).join('')}
+      </select>
+      <p style="margin: 0.5rem 0;">OR enter a custom tool:</p>
+      <input type="text" id="customTool" placeholder="e.g., Cook's Utensils" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; font-size: 1rem;">
+      <button id="confirmChoice" style="width: 100%; padding: 0.75rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">Confirm</button>
+    `;
+
+    popup.appendChild(content);
+    document.body.appendChild(popup);
+
+    document.getElementById('confirmChoice').addEventListener('click', () => {
+      const skillChoice = document.getElementById('skillChoice').value;
+      const customTool = document.getElementById('customTool').value.trim();
+      const choice = customTool || skillChoice;
+
+      if (choice) {
+        document.body.removeChild(popup);
+        resolve(choice);
+      } else {
+        alert('Please select a skill or enter a custom tool');
+      }
+    });
+  });
+}
+
+// Helper function for Type Adept
+function showTypeAdeptPopup() {
+  const types = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'];
+
+  return new Promise((resolve) => {
+    const popup = document.createElement('div');
+    popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; justify-content: center; align-items: center;';
+
+    const content = document.createElement('div');
+    content.style.cssText = 'background: white; padding: 2rem; border-radius: 15px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;';
+
+    content.innerHTML = `
+      <h2 style="margin: 0 0 1rem 0;">Type Adept - Choose Type</h2>
+      <p style="margin: 0 0 1rem 0;">Which type should this feat apply to?</p>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+        ${types.map(type => `
+          <button class="type-choice" data-type="${type}" style="padding: 0.75rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
+            ${type}
+          </button>
+        `).join('')}
+      </div>
+    `;
+
+    popup.appendChild(content);
+    document.body.appendChild(popup);
+
+    popup.querySelectorAll('.type-choice').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.dataset.type;
+        document.body.removeChild(popup);
+        resolve(`Type Adept (${type})`);
+      });
+    });
+  });
+}
+
+// Helper function for Terrain Adept
+function showTerrainAdeptPopup() {
+  const terrains = ['Coastal', 'Swamp', 'Forest', 'Arctic', 'Desert', 'Grassland', 'Hill', 'Mountain', 'Underwater'];
+
+  return new Promise((resolve) => {
+    const popup = document.createElement('div');
+    popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; justify-content: center; align-items: center;';
+
+    const content = document.createElement('div');
+    content.style.cssText = 'background: white; padding: 2rem; border-radius: 15px; max-width: 400px; width: 90%;';
+
+    content.innerHTML = `
+      <h2 style="margin: 0 0 1rem 0;">Terrain Adept - Choose Terrain</h2>
+      <p style="margin: 0 0 1rem 0;">Which terrain should this feat apply to?</p>
+      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+        ${terrains.map(terrain => `
+          <button class="terrain-choice" data-terrain="${terrain}" style="padding: 0.75rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">
+            ${terrain}
+          </button>
+        `).join('')}
+      </div>
+    `;
+
+    popup.appendChild(content);
+    document.body.appendChild(popup);
+
+    popup.querySelectorAll('.terrain-choice').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const terrain = btn.dataset.terrain;
+        document.body.removeChild(popup);
+        resolve(`Terrain Adept (${terrain})`);
+      });
+    });
+  });
+}
+
 async function handleFormSubmit(pokemonName, originalNature) {
   const form = document.getElementById('editPokemonForm');
   const pokemonDataStr = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
   const pokemonData = JSON.parse(pokemonDataStr);
+  const originalFeats = (pokemonData[50] || '').split(',').map(f => f.trim()).filter(f => f);
+  const originalSkills = (pokemonData[22] || '').split(',').map(s => s.trim()).filter(s => s);
 
   try {
     // Gather form data
@@ -957,14 +1110,93 @@ async function handleFormSubmit(pokemonName, originalNature) {
     const nature = form.nature.value;
 
     // Get selected skills
-    const selectedSkills = Array.from(form.querySelectorAll('input[name="skills"]:checked'))
+    let selectedSkills = Array.from(form.querySelectorAll('input[name="skills"]:checked'))
       .map(cb => cb.value);
 
     // Get selected feats
-    const selectedFeats = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
+    let selectedFeats = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
       .map(cb => cb.value);
 
-    // Get selected abilities
+    // Detect newly added feats
+    const newFeats = selectedFeats.filter(f => !originalFeats.includes(f) && !f.includes('('));
+    const featChoices = {};
+
+    // Process feats that need choices or special handling
+    for (const feat of newFeats) {
+      // Handle feats with stat choices
+      if (feat === 'Athlete') {
+        const choice = await showFeatChoicePopup('Athlete', ['STR', 'DEX']);
+        featChoices['Athlete'] = choice;
+      } else if (feat === 'Observant') {
+        const choice = await showFeatChoicePopup('Observant', ['INT', 'WIS']);
+        featChoices['Observant'] = choice;
+      } else if (feat === 'Resilient') {
+        const choice = await showFeatChoicePopup('Resilient', ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']);
+        featChoices['Resilient'] = choice;
+      }
+      // Handle Skilled feat
+      else if (feat === 'Skilled') {
+        const choice = await showSkilledFeatPopup();
+        // Add the chosen skill/tool to the skills list
+        if (choice && !selectedSkills.includes(choice) && !selectedSkills.includes(choice + '+')) {
+          selectedSkills.push(choice);
+        } else if (choice && selectedSkills.includes(choice)) {
+          // Upgrade to double proficiency
+          selectedSkills = selectedSkills.map(s => s === choice ? choice + '+' : s);
+        }
+      }
+      // Handle Type Adept
+      else if (feat === 'Type Adept') {
+        const fullFeatName = await showTypeAdeptPopup();
+        // Replace the feat in the list with the full name
+        selectedFeats = selectedFeats.map(f => f === 'Type Adept' ? fullFeatName : f);
+      }
+      // Handle Terrain Adept
+      else if (feat === 'Terrain Adept') {
+        const fullFeatName = await showTerrainAdeptPopup();
+        // Replace the feat in the list with the full name
+        selectedFeats = selectedFeats.map(f => f === 'Terrain Adept' ? fullFeatName : f);
+      }
+      // Handle feats that grant skill proficiency
+      else if (feat === 'Acrobat') {
+        if (selectedSkills.includes('Acrobatics')) {
+          selectedSkills = selectedSkills.map(s => s === 'Acrobatics' ? 'Acrobatics+' : s);
+        } else if (!selectedSkills.includes('Acrobatics+')) {
+          selectedSkills.push('Acrobatics');
+        }
+      } else if (feat === 'Brawny') {
+        if (selectedSkills.includes('Athletics')) {
+          selectedSkills = selectedSkills.map(s => s === 'Athletics' ? 'Athletics+' : s);
+        } else if (!selectedSkills.includes('Athletics+')) {
+          selectedSkills.push('Athletics');
+        }
+      } else if (feat === 'Perceptive') {
+        if (selectedSkills.includes('Perception')) {
+          selectedSkills = selectedSkills.map(s => s === 'Perception' ? 'Perception+' : s);
+        } else if (!selectedSkills.includes('Perception+')) {
+          selectedSkills.push('Perception');
+        }
+      } else if (feat === 'Stealthy') {
+        if (selectedSkills.includes('Stealth')) {
+          selectedSkills = selectedSkills.map(s => s === 'Stealth' ? 'Stealth+' : s);
+        } else if (!selectedSkills.includes('Stealth+')) {
+          selectedSkills.push('Stealth');
+        }
+      }
+      // Handle Hidden Ability feat
+      else if (feat === 'Hidden Ability') {
+        // Auto-check the last ability in the abilities list
+        const abilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]'));
+        if (abilityCheckboxes.length > 0) {
+          // Uncheck all first
+          abilityCheckboxes.forEach(cb => cb.checked = false);
+          // Check the last one (hidden ability)
+          abilityCheckboxes[abilityCheckboxes.length - 1].checked = true;
+        }
+      }
+    }
+
+    // Get selected abilities (after potential Hidden Ability auto-selection)
     const selectedAbilities = Array.from(document.querySelectorAll('input[name="abilities"]:checked'))
       .map(cb => cb.value);
     const abilitiesString = selectedAbilities.join('|');
@@ -997,6 +1229,28 @@ async function handleFormSubmit(pokemonName, originalNature) {
     pokemonData[35] = heldItemsString;
     pokemonData[37] = customMoves.join(', ');
     pokemonData[50] = selectedFeats.join(', ');
+
+    // If feats were added/changed, recalculate stats through backend
+    if (newFeats.length > 0 || originalFeats.length !== selectedFeats.length) {
+      try {
+        // Call backend to recalculate with feat choices
+        const statChoices = [];
+        if (featChoices['Athlete']) statChoices.push(featChoices['Athlete']);
+        if (featChoices['Observant']) statChoices.push(featChoices['Observant']);
+        if (featChoices['Resilient']) statChoices.push(featChoices['Resilient']);
+
+        const newFeatsList = newFeats.join(',');
+        const response = await PokemonAPI.recalculateStats(pokemonData, statChoices, newFeatsList);
+
+        if (response.status === 'success' && response.newPokemonData) {
+          // Use the recalculated data
+          Object.assign(pokemonData, response.newPokemonData);
+        }
+      } catch (error) {
+        console.error('Error recalculating stats:', error);
+        // Continue anyway with manual values
+      }
+    }
 
     // Update session storage IMMEDIATELY
     sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));

@@ -12,7 +12,7 @@ export function renderEditPokemon(pokemonName) {
 
   const pokemonData = JSON.parse(pokemonDataStr);
   const natures = JSON.parse(sessionStorage.getItem('natures') || '[]');
-  const pokemonFeatsData = JSON.parse(sessionStorage.getItem('pokemonFeats') || '{"pokemonFeats": []}');
+  const pokemonFeatsData = JSON.parse(sessionStorage.getItem('pokemonFeats') || '[]');
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
@@ -465,6 +465,26 @@ export function renderEditPokemon(pokemonName) {
           transform: scale(1.08);
         }
 
+        @media (max-width: 1024px) {
+          .form-container {
+            max-width: clamp(600px, 92vw, 800px);
+          }
+
+          .form-grid {
+            gap: clamp(0.9rem, 2.2vw, 1.3rem);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .form-container {
+            max-width: clamp(550px, 95vw, 750px);
+          }
+
+          .form-grid {
+            gap: clamp(0.8rem, 2vw, 1.2rem);
+          }
+        }
+
         @media (max-width: 600px) {
           .form-grid {
             grid-template-columns: 1fr;
@@ -472,6 +492,28 @@ export function renderEditPokemon(pokemonName) {
 
           .form-group.full-width {
             grid-column: 1;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .form-container {
+            max-width: 90vw;
+            padding: clamp(1.5rem, 3vw, 2.5rem);
+          }
+
+          .button-group {
+            flex-direction: column;
+          }
+
+          .button {
+            width: 100%;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .form-container {
+            max-width: 95vw;
+            padding: clamp(1.2rem, 2.5vw, 2rem);
           }
         }
       </style>
@@ -612,7 +654,7 @@ export function renderEditPokemon(pokemonName) {
               <span class="arrow" id="featsArrow">▶</span>
             </div>
             <div class="collapsible-content" id="featsContent">
-              ${(pokemonFeatsData.pokemonFeats || []).map(feat => `
+              ${(pokemonFeatsData || []).map(feat => `
                 <div class="checkbox-item">
                   <input type="checkbox" id="feat_${feat.name.replace(/\s+/g, '_')}" name="feats" value="${feat.name}" ${selectedFeats.includes(feat.name) ? 'checked' : ''} />
                   <label for="feat_${feat.name.replace(/\s+/g, '_')}">${feat.name}</label>

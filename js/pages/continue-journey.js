@@ -284,6 +284,16 @@ export async function renderContinueJourney() {
           }
         }
 
+        @media (max-width: 1024px) {
+          .trainer-container {
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(1rem, 2vw, 1.5rem);
+          }
+          .trainer-box {
+            max-width: 30vw;
+          }
+        }
+
         @media (max-width: 768px) {
           .trainer-container {
             grid-template-columns: repeat(2, 1fr);
@@ -293,12 +303,31 @@ export async function renderContinueJourney() {
           }
         }
 
+        @media (max-width: 600px) {
+          .trainer-container {
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.75rem, 1.5vw, 1rem);
+          }
+          .trainer-box {
+            max-width: 45vw;
+          }
+        }
+
         @media (max-width: 480px) {
           .trainer-container {
             grid-template-columns: 1fr;
           }
           .trainer-box {
             max-width: 80vw;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .trainer-container {
+            gap: clamp(0.5rem, 1vw, 0.75rem);
+          }
+          .trainer-box {
+            max-width: 85vw;
           }
         }
       </style>

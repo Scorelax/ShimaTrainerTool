@@ -142,6 +142,41 @@ export function renderNewJourney() {
           grid-template-columns: 1fr 1fr;
           gap: clamp(0.75rem, 1vw, 1rem);
         }
+
+        @media (max-width: 1024px) {
+          .stats-grid {
+            gap: clamp(0.6rem, 0.9vw, 0.9rem);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .stats-grid {
+            gap: clamp(0.5rem, 0.8vw, 0.8rem);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+            gap: clamp(0.75rem, 1vw, 1rem);
+          }
+        }
+
+        @media (max-width: 480px) {
+          .button-group {
+            flex-direction: column;
+          }
+
+          .button {
+            width: 100%;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .form-container {
+            padding: clamp(1rem, 2vh, 1.5rem);
+          }
+        }
       </style>
 
       <h1>New Journey</h1>

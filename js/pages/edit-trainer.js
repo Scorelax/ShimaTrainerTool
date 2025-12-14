@@ -392,6 +392,54 @@ export function renderEditTrainer() {
         .back-button:active {
           transform: scale(1.08);
         }
+
+        @media (max-width: 1024px) {
+          .form-container {
+            max-width: clamp(500px, 75vw, 700px);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .form-container {
+            max-width: clamp(450px, 80vw, 650px);
+          }
+
+          .button-group {
+            gap: clamp(0.9rem, 1.8vw, 1.3rem);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .form-container {
+            max-width: clamp(400px, 85vw, 600px);
+          }
+
+          .button-group {
+            gap: clamp(0.8rem, 1.6vw, 1.2rem);
+          }
+        }
+
+        @media (max-width: 480px) {
+          .form-container {
+            max-width: 90vw;
+            padding: clamp(1.5rem, 3vw, 2.5rem);
+          }
+
+          .button-group {
+            flex-direction: column;
+          }
+
+          .button {
+            width: 100%;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .form-container {
+            max-width: 95vw;
+            padding: clamp(1.2rem, 2.5vw, 2rem);
+          }
+        }
       </style>
 
       <!-- Back Button -->

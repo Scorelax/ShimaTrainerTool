@@ -163,6 +163,56 @@ export function renderIndex() {
         .cache-reset-icon {
           font-size: clamp(1rem, 2.5vw, 1.3rem);
         }
+
+        @media (max-width: 1024px) {
+          .landing-buttons {
+            max-width: min(65vw, 75vh);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .landing-buttons {
+            max-width: min(70vw, 80vh);
+            gap: clamp(0.9rem, 2.2vh, 1.8rem);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .landing-buttons {
+            max-width: min(75vw, 85vh);
+            gap: clamp(0.8rem, 2vh, 1.5rem);
+          }
+
+          .landing-button {
+            padding: clamp(1.2rem, 2.5vh, 2rem) clamp(1.5rem, 4vw, 3rem);
+          }
+        }
+
+        @media (max-width: 480px) {
+          .landing-buttons {
+            max-width: 85vw;
+          }
+
+          .landing-button {
+            padding: clamp(1rem, 2vh, 1.5rem) clamp(1.2rem, 3.5vw, 2rem);
+          }
+
+          .cache-reset-button {
+            padding: clamp(0.5rem, 1.2vh, 0.7rem) clamp(0.8rem, 2vw, 1rem);
+            font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+          }
+        }
+
+        @media (max-width: 360px) {
+          .landing-buttons {
+            max-width: 90vw;
+            gap: clamp(0.75rem, 1.8vh, 1.2rem);
+          }
+
+          .landing-page {
+            padding: clamp(0.75rem, 2vh, 2rem);
+          }
+        }
       </style>
 
       <!-- Cache Reset Button -->

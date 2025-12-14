@@ -204,6 +204,55 @@ export function renderPokemonForm() {
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4),
                       0 0 clamp(15px, 2.5vh, 20px) rgba(238,21,21,0.5);
         }
+
+        @media (max-width: 1024px) {
+          .form-container {
+            max-width: clamp(400px, 65vw, 600px);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .form-container {
+            max-width: clamp(400px, 70vw, 600px);
+          }
+
+          .button-group {
+            gap: clamp(0.65rem, 1.8vw, 0.9rem);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .form-container {
+            max-width: clamp(350px, 75vw, 550px);
+          }
+
+          .button-group {
+            gap: clamp(0.6rem, 1.5vw, 0.8rem);
+          }
+        }
+
+        @media (max-width: 480px) {
+          .form-container {
+            max-width: 85vw;
+            padding: clamp(1.2rem, 2.5vw, 2rem);
+          }
+
+          .button-group {
+            flex-direction: column;
+            gap: clamp(0.75rem, 1.5vh, 1rem);
+          }
+
+          .button {
+            width: 100%;
+          }
+        }
+
+        @media (max-width: 360px) {
+          .form-container {
+            max-width: 90vw;
+            padding: clamp(1rem, 2vw, 1.5rem);
+          }
+        }
       </style>
 
       <h1>Register ${pokemonName}</h1>

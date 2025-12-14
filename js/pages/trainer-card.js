@@ -467,6 +467,40 @@ export function renderTrainerCard() {
         }
 
         /* Responsive adjustments */
+        @media (max-width: 1024px) {
+          .party-grid {
+            gap: clamp(0.9rem, 2vw, 1.3rem);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .party-grid {
+            gap: clamp(0.8rem, 1.8vw, 1.2rem);
+          }
+
+          .utility-container {
+            left: calc(50% + clamp(120px, 16vw, 160px));
+          }
+        }
+
+        @media (max-width: 600px) {
+          .party-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.75rem, 1.5vw, 1rem);
+          }
+
+          .utility-container {
+            position: static;
+            margin-top: clamp(1rem, 2vh, 1.5rem);
+            margin-left: 0;
+          }
+
+          .trainer-utility-wrapper {
+            flex-direction: column;
+            align-items: center;
+          }
+        }
+
         @media (max-width: 480px) {
           .utility-container {
             position: static;
@@ -481,6 +515,12 @@ export function renderTrainerCard() {
 
           .party-grid {
             gap: clamp(0.75rem, 1.5vw, 1rem);
+          }
+        }
+
+        @media (max-width: 360px) {
+          .party-grid {
+            gap: clamp(0.5rem, 1vw, 0.75rem);
           }
         }
       </style>

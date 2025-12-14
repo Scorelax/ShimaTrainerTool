@@ -326,8 +326,8 @@ export function attachContinueJourneyListeners() {
       // Correct PIN - load trainer data
       document.getElementById('pinModal').classList.remove('active');
 
-      // Show loading
-      document.getElementById('content').innerHTML = '<div class="loading">Loading trainer data...</div>';
+      // Show fullscreen loading background
+      document.getElementById('loading-screen').classList.add('active');
 
       try {
         // Fetch trainer data with Pokemon

@@ -139,6 +139,9 @@ class Router {
     const html = renderTrainerCard();
     content.innerHTML = html;
     attachTrainerCardListeners();
+
+    // Hide loading screen if it's active
+    document.getElementById('loading-screen')?.classList.remove('active');
   }
 
   async renderConduitCard(params) {
@@ -151,6 +154,9 @@ class Router {
         <button data-route="index">Back to Home</button>
       </div>
     `;
+
+    // Hide loading screen if it's active
+    document.getElementById('loading-screen')?.classList.remove('active');
   }
 
   async renderTrainerInfo(params) {
@@ -180,6 +186,9 @@ class Router {
     const html = renderPokemonCard(pokemonName);
     content.innerHTML = html;
     attachPokemonCardListeners();
+
+    // Hide loading screen if it's active
+    document.getElementById('loading-screen')?.classList.remove('active');
   }
 
   async renderEditPokemon(params) {

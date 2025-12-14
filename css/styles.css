@@ -36,7 +36,10 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: #667eea;
+  background-image: url('https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   display: none;
   flex-direction: column;
   align-items: center;
@@ -49,13 +52,12 @@ body {
   display: flex;
 }
 
+.loading-screen p {
+  display: none;
+}
+
 .pokeball-loader {
-  width: 60px;
-  height: 60px;
-  border: 8px solid white;
-  border-radius: 50%;
-  border-top-color: #ff6b6b;
-  animation: spin 1s linear infinite;
+  display: none;
 }
 
 @keyframes spin {

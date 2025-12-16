@@ -1467,11 +1467,11 @@ export function renderTrainerInfo() {
         <div class="info-buttons-grid">
           <button class="info-button full-width" id="inventoryButton">Inventory</button>
           <button class="info-button" id="trainerBuffsButton">Trainer Buffs</button>
-          <button class="info-button" id="affinityButton">Affinity</button>
           <button class="info-button" id="gearButton">Gear</button>
           <button class="info-button" id="specializationButton">Specialization</button>
           <button class="info-button" id="featsButton">Feats</button>
           <button class="info-button" id="trainerPathButton">Trainer Path</button>
+          <button class="info-button" id="affinityButton">Affinity</button>
         </div>
       </div>
 

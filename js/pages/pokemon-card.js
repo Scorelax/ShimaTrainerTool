@@ -2291,7 +2291,7 @@ function getMoveTypeColor(moveType) {
     "Fighting": "#e68c2e",
     "Flying": "#A890F0",
     "Poison": "#A040A0",
-    "Ground": "#DEB887",
+    "Ground": "#A67C52",
     "Rock": "#a85d16",
     "Bug": "#A8B820",
     "Ghost": "#705898",

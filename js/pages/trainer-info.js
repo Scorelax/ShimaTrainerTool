@@ -2517,91 +2517,86 @@ export function attachTrainerInfoListeners() {
 
   document.getElementById('closeTrainerPath')?.addEventListener('click', () => closePopup('trainerPathPopup'));
 
-  // Affinity button - fixed to show 2 stages with effects and improved effects
+  // Affinity button - shows base effect at level 2, improved effect at level 7
   document.getElementById('affinityButton')?.addEventListener('click', () => {
     if (!trainerData) return;
 
     const trainerLevel = parseInt(trainerData[2], 10) || 1;
     const affinitiesStr = trainerData[23] || '';
-    const affinitiesStored = affinitiesStr ? affinitiesStr.split(',').map(a => a.trim()) : [];
+    const affinitiesStored = affinitiesStr ? affinitiesStr.split(',').map(a => a.trim()).filter(a => a) : [];
     const affinitiesDataStr = sessionStorage.getItem('affinities');
     const content = document.getElementById('affinityContent');
 
     let html = '';
 
-    // First Affinity (Level 2)
-    if (trainerLevel >= 2 && affinitiesStored.length >= 1) {
+    // Check if affinity is selected
+    if (affinitiesStored.length >= 1) {
       const affName = affinitiesStored[0];
-      let effect = 'No effect found.';
 
       if (affinitiesDataStr) {
         const affinitiesData = JSON.parse(affinitiesDataStr);
         const affData = affinitiesData.find(a => a.name === affName);
+
         if (affData) {
-          effect = affData.effect || 'No effect found.';
-        }
-      }
-
-      html += `
-        <div class="popup-item">
-          <div class="popup-item-title">${affName}</div>
-          <div class="popup-item-effect">${effect}</div>
-        </div>
-      `;
-    } else if (trainerLevel >= 2) {
-      html += `
-        <div class="popup-item popup-item-locked">
-          <div class="popup-item-title">First Affinity</div>
-          <div class="popup-item-effect">Not selected yet</div>
-        </div>
-      `;
-    } else {
-      html += `
-        <div class="popup-item popup-item-locked">
-          <div class="popup-item-title">First Affinity</div>
-          <div class="popup-item-effect">Unlocks at level 2</div>
-        </div>
-      `;
-    }
-
-    // Second Affinity / Improved Affinity (Level 7)
-    if (trainerLevel >= 7 && affinitiesStored.length >= 2) {
-      const affName = affinitiesStored[1];
-      let effect = 'No effect found.';
-
-      if (affinitiesDataStr) {
-        const affinitiesData = JSON.parse(affinitiesDataStr);
-        const affData = affinitiesData.find(a => a.name === affName);
-        if (affData) {
-          // Check if it's the same affinity (improved) or different
-          if (affName === affinitiesStored[0]) {
-            effect = affData.improvedEffect || affData.effect || 'No improved effect found.';
-          } else {
-            effect = affData.effect || 'No effect found.';
+          // Level 2-6: Show base effect
+          if (trainerLevel >= 2 && trainerLevel < 7) {
+            html += `
+              <div class="popup-item">
+                <div class="popup-item-title">${affName}</div>
+                <div class="popup-item-effect">${affData.effect || 'No effect found.'}</div>
+              </div>
+              <div class="popup-item popup-item-locked">
+                <div class="popup-item-title">${affName} (Improved)</div>
+                <div class="popup-item-effect">Unlocks at level 7</div>
+              </div>
+            `;
           }
+          // Level 7+: Show both base and improved effects
+          else if (trainerLevel >= 7) {
+            html += `
+              <div class="popup-item">
+                <div class="popup-item-title">${affName}</div>
+                <div class="popup-item-effect">${affData.effect || 'No effect found.'}</div>
+              </div>
+              <div class="popup-item">
+                <div class="popup-item-title">${affName} (Improved)</div>
+                <div class="popup-item-effect">${affData.improvedEffect || 'No improved effect found.'}</div>
+              </div>
+            `;
+          }
+          // Below level 2: Not yet unlocked
+          else {
+            html += `
+              <div class="popup-item popup-item-locked">
+                <div class="popup-item-title">Affinity</div>
+                <div class="popup-item-effect">Unlocks at level 2</div>
+              </div>
+            `;
+          }
+        } else {
+          html = `<p style="text-align: center; color: #999;">Affinity "${affName}" not found in data.</p>`;
         }
+      } else {
+        html = `<p style="text-align: center; color: #999;">Affinity data not loaded.</p>`;
       }
-
-      html += `
-        <div class="popup-item">
-          <div class="popup-item-title">${affName}${affName === affinitiesStored[0] ? ' (Improved)' : ''}</div>
-          <div class="popup-item-effect">${effect}</div>
-        </div>
-      `;
-    } else if (trainerLevel >= 7) {
-      html += `
-        <div class="popup-item popup-item-locked">
-          <div class="popup-item-title">Improved Affinity</div>
-          <div class="popup-item-effect">Not selected yet</div>
-        </div>
-      `;
-    } else {
-      html += `
-        <div class="popup-item popup-item-locked">
-          <div class="popup-item-title">Improved Affinity</div>
-          <div class="popup-item-effect">Unlocks at level 7</div>
-        </div>
-      `;
+    }
+    // No affinity selected yet
+    else {
+      if (trainerLevel >= 2) {
+        html += `
+          <div class="popup-item popup-item-locked">
+            <div class="popup-item-title">Affinity</div>
+            <div class="popup-item-effect">Not selected yet</div>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="popup-item popup-item-locked">
+            <div class="popup-item-title">Affinity</div>
+            <div class="popup-item-effect">Unlocks at level 2</div>
+          </div>
+        `;
+      }
     }
 
     content.innerHTML = html || '<p style="text-align: center; color: #999;">No affinities available.</p>';

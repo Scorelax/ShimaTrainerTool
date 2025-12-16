@@ -461,7 +461,8 @@ function registerPokemonForTrainer(trainerName, newPokemonData) {
 
     return {
       status: 'success',
-      message: `${trainerName} caught a ${newPokemonData[2]}!`
+      message: `${trainerName} caught a ${newPokemonData[2]}!`,
+      newPokemonData: newPokemonData
     };
 }
 

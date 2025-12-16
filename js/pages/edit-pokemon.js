@@ -1120,7 +1120,12 @@ async function handleFormSubmit(pokemonName, originalNature) {
 
     // Parse original feats to detect newly added ones
     const originalFeats = originalFeatsFromDb.split(',').map(f => f.trim()).filter(f => f);
-    const newFeats = selectedFeats.filter(f => !originalFeats.includes(f) && !f.includes('('));
+    // Normalize feat names for comparison (case-insensitive, trimmed)
+    const originalFeatsNormalized = originalFeats.map(f => f.toLowerCase().trim());
+    const newFeats = selectedFeats.filter(f => {
+      const baseFeatName = f.split('(')[0].trim(); // Remove any parenthetical suffix for comparison
+      return !originalFeatsNormalized.includes(baseFeatName.toLowerCase()) && !f.includes('(');
+    });
     const featChoices = {};
 
     // Process feats that need choices or special handling
@@ -1161,12 +1166,12 @@ async function handleFormSubmit(pokemonName, originalNature) {
       }
       // Handle Hidden Ability feat
       else if (feat === 'Hidden Ability') {
-        // Auto-check the last ability in the abilities list
+        // Only auto-select if no ability is currently checked
         const abilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]'));
-        if (abilityCheckboxes.length > 0) {
-          // Uncheck all first
-          abilityCheckboxes.forEach(cb => cb.checked = false);
-          // Check the last one (hidden ability)
+        const anyChecked = abilityCheckboxes.some(cb => cb.checked);
+
+        if (abilityCheckboxes.length > 0 && !anyChecked) {
+          // Only auto-check the last ability if none are selected
           abilityCheckboxes[abilityCheckboxes.length - 1].checked = true;
         }
       }

@@ -235,8 +235,12 @@ export function renderTrainerInfo() {
 
         .info-buttons-grid {
           display: grid;
-          grid-template-columns: auto auto;
+          grid-template-columns: 1fr 1fr;
           gap: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .info-button.full-width {
+          grid-column: 1 / -1;
         }
 
         .info-button {
@@ -603,6 +607,40 @@ export function renderTrainerInfo() {
 
         .popup-category-title:first-child {
           margin-top: 0;
+        }
+
+        /* Trainer Buffs specific styles */
+        .skill-item-container {
+          border: clamp(2px, 0.4vw, 2px) solid rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          margin: clamp(0.75rem, 1.5vh, 1rem);
+          padding: clamp(0.75rem, 1.5vw, 1rem);
+          width: 95%;
+          box-sizing: border-box;
+          background: linear-gradient(135deg, rgba(255,222,0,0.12) 0%, rgba(255,222,0,0.06) 100%);
+        }
+
+        .skill-name-header {
+          text-align: center;
+          font-weight: 900;
+          font-size: clamp(1.05rem, 2.2vw, 1.2rem);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          color: #FFDE00;
+          text-transform: uppercase;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+        }
+
+        .skill-effect-box {
+          border: 1px solid rgba(255,222,0,0.3);
+          border-radius: clamp(5px, 1vw, 8px);
+          padding: clamp(0.6rem, 1.2vw, 0.8rem);
+          text-align: left;
+          height: auto;
+          background: rgba(0,0,0,0.2);
+          color: #e0e0e0;
+          font-size: clamp(0.9rem, 1.9vw, 1rem);
+          line-height: 1.5;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
         /* Special Inventory Popup Styles */
@@ -1427,7 +1465,8 @@ export function renderTrainerInfo() {
         </div>
 
         <div class="info-buttons-grid">
-          <button class="info-button" id="inventoryButton">Inventory</button>
+          <button class="info-button full-width" id="inventoryButton">Inventory</button>
+          <button class="info-button" id="trainerBuffsButton">Trainer Buffs</button>
           <button class="info-button" id="affinityButton">Affinity</button>
           <button class="info-button" id="gearButton">Gear</button>
           <button class="info-button" id="specializationButton">Specialization</button>
@@ -1639,6 +1678,16 @@ export function renderTrainerInfo() {
               <span class="btn-text">No</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="trainerBuffsPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Trainer Buffs</div>
+            <button class="popup-close" id="closeTrainerBuffs">×</button>
+          </div>
+          <div class="popup-body" id="trainerBuffsContent"></div>
         </div>
       </div>
 
@@ -1907,12 +1956,103 @@ export function attachTrainerInfoListeners() {
     openPopup('inventoryPopup');
   }
 
+  // Helper function to show Trainer Buffs popup
+  function showTrainerSkillsPopup() {
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) {
+      showError('Trainer data not found.');
+      return;
+    }
+
+    const trainerData = JSON.parse(trainerDataRaw);
+    const trainerLevel = parseInt(trainerData[2], 10); // Trainer level
+
+    // Fetch skills and nationalities data from sessionStorage
+    const skillsDataRaw = sessionStorage.getItem('skills');
+    const nationalitiesDataRaw = sessionStorage.getItem('nationalities');
+
+    if (!skillsDataRaw || !nationalitiesDataRaw) {
+      showError('Skills or nationalities data not found.');
+      return;
+    }
+
+    const skillsData = JSON.parse(skillsDataRaw);
+    const nationalitiesData = JSON.parse(nationalitiesDataRaw);
+    const nationality = nationalitiesData.find(n => n.nationality === trainerData[38]);
+
+    // Build the popup content
+    let content = '';
+
+    // Add nationality region buff first if it exists
+    if (nationality) {
+      content += `
+        <div class="skill-item-container">
+          <h3 class="skill-name-header">${nationality.regionBuff}</h3>
+          <div class="skill-effect-box">${nationality.effect}</div>
+        </div>
+      `;
+    }
+
+    // Track skills by name to handle duplicates (higher level versions)
+    const skillsByName = new Map();
+
+    // Loop through each skill and display them
+    skillsData.forEach(skill => {
+      const skillLevel = skill.level;
+      const skillName = skill.name;
+      let skillEffect;
+
+      // Show the effect if the trainer's level is high enough, otherwise show lock message
+      if (trainerLevel >= skillLevel) {
+        skillEffect = skill.fullEffect; // Use full effect for unlocked skills
+      } else {
+        skillEffect = `Unlocks at level ${skillLevel}`;
+      }
+
+      // Check if we already have this skill name
+      const existingSkill = skillsByName.get(skillName);
+
+      if (existingSkill) {
+        // If the current skill's level is higher and unlocked, update the existing skill's effect
+        if (trainerLevel >= skillLevel && skillLevel > existingSkill.level) {
+          skillsByName.set(skillName, { level: skillLevel, effect: skillEffect });
+        }
+      } else {
+        // Add new skill
+        skillsByName.set(skillName, { level: skillLevel, effect: skillEffect });
+      }
+    });
+
+    // Build HTML for all skills
+    skillsByName.forEach((skillData, skillName) => {
+      content += `
+        <div class="skill-item-container">
+          <h3 class="skill-name-header">${skillName}</h3>
+          <div class="skill-effect-box">${skillData.effect}</div>
+        </div>
+      `;
+    });
+
+    // Set the content
+    document.getElementById('trainerBuffsContent').innerHTML = content;
+
+    // Open the popup
+    openPopup('trainerBuffsPopup');
+  }
+
   // Inventory button - calls the refresh function
   document.getElementById('inventoryButton')?.addEventListener('click', () => {
     refreshInventoryDisplay();
   });
 
   document.getElementById('closeInventory')?.addEventListener('click', () => closePopup('inventoryPopup'));
+
+  // Trainer Buffs button
+  document.getElementById('trainerBuffsButton')?.addEventListener('click', () => {
+    showTrainerSkillsPopup();
+  });
+
+  document.getElementById('closeTrainerBuffs')?.addEventListener('click', () => closePopup('trainerBuffsPopup'));
 
   // ============================================================================
   // INVENTORY MODAL HANDLERS

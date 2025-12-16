@@ -244,6 +244,7 @@ export function renderTrainerInfo() {
         }
 
         .info-button {
+          flex: 1 1 0;
           padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(0.7rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
           border: clamp(2px, 0.4vw, 3px) solid #FFDE00;

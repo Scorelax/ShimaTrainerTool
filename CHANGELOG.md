@@ -4,6 +4,175 @@ This file tracks all changes made to the project across development sessions.
 
 ---
 
+## Session: 2025-12-16 - Trainer Info Enhancements, Affinity System Fix, and Edit-Pokemon Improvements
+
+### Part 1: Trainer Buffs Button Addition (`js/pages/trainer-info.js`)
+
+**Button Layout Redesign**:
+1. **Inventory Button**
+   - Made full-width on its own line
+   - Added `full-width` class that sets `width: 100%`
+   - Creates clear visual separation from other buttons
+
+2. **Trainer Buffs Button Added**
+   - New button positioned on second row with Gear
+   - Shows nationality region buff and trainer skills
+   - Displays base and improved effects based on level
+   - Access to all unlocked trainer skills at a glance
+
+3. **Button Grid Layout Changes**
+   - Changed from fixed 2-column grid to flexible layout
+   - Used `display: flex` with `flex-wrap: wrap`
+   - Added `flex: 1 1 0` to buttons for equal growth
+   - Buttons now fill full container width on each row
+   - Each row matches width of Inventory button above
+   - More cohesive visual alignment
+
+4. **Final Button Order**:
+   - Row 1: Inventory (full-width)
+   - Row 2: Trainer Buffs, Gear
+   - Row 3: Specialization, Feats
+   - Row 4: Trainer Path, Affinity
+
+**Trainer Buffs Popup Implementation**:
+1. **showTrainerSkillsPopup() Function** (lines 1925-2007)
+   - Fetches trainer level from sessionStorage
+   - Loads skills and nationalities data
+   - Displays nationality region buff first (if available)
+   - Shows all trainer skills with unlock status
+   - Unlocked skills show full effect description
+   - Locked skills show "Unlocks at level X"
+   - Handles duplicate skill names (shows highest level version)
+
+2. **Popup Structure**:
+   - Standard popup overlay with close button
+   - Content area with skill containers
+   - Each skill in bordered box with title and effect
+   - Yellow gradient styling matching other popups
+
+3. **CSS Styles** (lines 612-644):
+   - `.skill-item-container`: Yellow borders, gradient background
+   - `.skill-name-header`: Uppercase yellow text, centered
+   - `.skill-effect-box`: Dark background for effect text
+   - All responsive with clamp() for sizing
+
+**Backend Data Source**:
+- Backend already loads skills data from spreadsheet
+- `loadAffinities()` at lines 2162-2176 loads effect + improvedEffect
+- Frontend now correctly displays both from sessionStorage
+
+### Part 2: Affinity System Fix (`js/pages/trainer-info.js`)
+
+**Problem**:
+- Old logic allowed selecting second/different affinity at level 7
+- Should instead show improved version of same affinity
+- improvedEffect field wasn't being displayed
+
+**Solution** (lines 2520-2604):
+1. **Single Affinity Progression**
+   - Level 2-6: Shows base effect + locked "Improved" preview
+   - Level 7+: Shows both base effect AND improved effect
+   - Same affinity name with "(Improved)" suffix for level 7
+   - Removed logic for selecting second affinity
+
+2. **Data Structure**:
+   - Backend loads: `effect` and `improvedEffect`
+   - Frontend checks trainer level and affinity selection
+   - Displays appropriate effect based on level threshold
+
+3. **Display Logic**:
+   ```javascript
+   if (trainerLevel >= 2 && trainerLevel < 7) {
+     // Show base effect + locked improved
+   } else if (trainerLevel >= 7) {
+     // Show both base + improved effects
+   }
+   ```
+
+**Backend Support**:
+- `loadAffinities()` function (current_code.gs:2162-2176)
+- Reads from FEATS_DATA_SHEET row 58, columns 1-5
+- Fields: name, shortEffect, effect, improvedShortEffect, improvedEffect
+- Data already available, frontend now uses it correctly
+
+### Part 3: Ground Type Color Adjustment (`js/pages/pokemon-card.js`)
+
+**Problem**:
+- Ground type color (#DEB887 - BurlyWood) too similar to Normal type
+- Appeared tan/beige instead of brown
+- Hard to distinguish types at a glance
+
+**Solution** (line 2294):
+- Changed Ground from `#DEB887` to `#A67C52`
+- New color is medium brown
+- Better differentiation from Normal type (`#A8A878`)
+- More accurate representation of Ground typing
+
+**Affected Elements**:
+- Move type buttons in move list
+- Type indicators in move details popup
+- Type badges throughout pokemon-card page
+- Uses `getMoveTypeColor()` function for consistency
+
+### Part 4: Edit-Pokemon Ability Unchecking Fix (`js/pages/edit-pokemon.js`)
+
+**Problem Identified**:
+- Abilities getting unchecked unexpectedly when editing Pokemon
+- Users had to re-edit and re-select abilities
+- Caused by Hidden Ability feat logic triggering incorrectly
+
+**Root Causes**:
+1. **Hidden Ability Feat Logic** (lines 1167-1178)
+   - Was unchecking ALL abilities before auto-selecting hidden ability
+   - Triggered when "Hidden Ability" detected as "new" feat
+   - Feat comparison had formatting mismatches (spaces, case)
+   - SessionStorage data inconsistencies caused false positives
+
+2. **Feat Comparison Issues** (lines 1121-1128)
+   - Simple string comparison: `!originalFeats.includes(f)`
+   - Case-sensitive matching
+   - No trimming or normalization
+   - Parenthetical suffixes not handled
+
+**Solutions Implemented**:
+
+1. **Protected Ability Selection** (lines 1168-1177)
+   - Hidden Ability now ADDS to existing abilities
+   - Does not uncheck or remove existing selections
+   - Only checks hidden ability if not already checked
+   - Preserves all manually selected abilities
+   ```javascript
+   const hiddenAbilityCheckbox = abilityCheckboxes[abilityCheckboxes.length - 1];
+   if (!hiddenAbilityCheckbox.checked) {
+     hiddenAbilityCheckbox.checked = true;
+   }
+   ```
+
+2. **Improved Feat Comparison** (lines 1121-1128)
+   - Case-insensitive comparison using `.toLowerCase()`
+   - Trimmed whitespace for consistency
+   - Extracts base feat name (strips parenthetical suffixes)
+   - Prevents false positives from formatting differences
+   ```javascript
+   const originalFeatsNormalized = originalFeats.map(f => f.toLowerCase().trim());
+   const baseFeatName = f.split('(')[0].trim();
+   return !originalFeatsNormalized.includes(baseFeatName.toLowerCase());
+   ```
+
+**Result**:
+- Abilities remain checked during Pokemon edits
+- Hidden Ability feat correctly adds hidden ability
+- No more unexpected loss of ability selections
+- Robust comparison handles formatting variations
+
+**Technical Notes**:
+- Hidden Ability feat gives access to 3rd ability slot (hidden ability)
+- Should work additively with regular abilities
+- Pokemon can have multiple abilities selected
+- Form submission gathers all checked abilities as pipe-separated string
+
+---
+
 ## Session: 2025-12-13 - Evolution Page Overhaul, Responsive Improvements, and Optimistic Updates
 
 ### Part 1: Evolution Page Complete Redesign (`js/pages/evolution.js`)

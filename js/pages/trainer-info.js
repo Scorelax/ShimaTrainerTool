@@ -234,13 +234,13 @@ export function renderTrainerInfo() {
         }
 
         .info-buttons-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
+          display: flex;
+          flex-wrap: wrap;
           gap: clamp(0.5rem, 1vh, 0.75rem);
         }
 
         .info-button.full-width {
-          grid-column: 1 / -1;
+          width: 100%;
         }
 
         .info-button {

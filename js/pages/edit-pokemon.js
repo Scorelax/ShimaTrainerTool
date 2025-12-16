@@ -1091,9 +1091,12 @@ async function handleFormSubmit(pokemonName, originalNature) {
   const pokemonDataStr = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
   const pokemonData = JSON.parse(pokemonDataStr);
 
-  // Store ORIGINAL feats from database for backend comparison
+  // Store ORIGINAL values from database for comparison
   const originalFeatsFromDb = pokemonData[50] || '';
   const originalSkills = (pokemonData[22] || '').split(',').map(s => s.trim()).filter(s => s);
+  const originalLevel = parseInt(pokemonData[4], 10);
+  const originalCon = parseInt(pokemonData[17], 10);
+  const originalLoyalty = parseInt(pokemonData[33], 10) || 0;
 
   try {
     // Gather form data
@@ -1202,25 +1205,30 @@ async function handleFormSubmit(pokemonName, originalNature) {
     pokemonData[37] = customMoves.join(', ');
     pokemonData[50] = selectedFeats.join(', ');
 
-    // If feats changed, apply feat changes incrementally
+    // Check if any stat affecting HP/VP changed
     const featsChanged = JSON.stringify(selectedFeats.sort()) !== JSON.stringify(originalFeats.sort());
-    if (featsChanged) {
+    const levelChanged = level !== originalLevel;
+    const conChanged = con !== originalCon;
+    const loyaltyChanged = loyalty !== originalLoyalty;
+    const needsRecalculation = featsChanged || levelChanged || conChanged || loyaltyChanged;
+
+    if (needsRecalculation) {
       try {
-        // Backend will apply incremental changes (add new, remove old)
+        // Backend will recalculate stats (feats + HP/VP)
         const response = await PokemonAPI.recalculateStats(pokemonData, originalFeatsFromDb);
 
         if (response.status === 'success' && response.newPokemonData) {
-          // Use the recalculated data (including skills)
+          // Use the recalculated data (including skills and HP/VP)
           Object.assign(pokemonData, response.newPokemonData);
         }
       } catch (error) {
         console.error('Error recalculating stats:', error);
-        showError('Failed to recalculate stats. Please check your feats.');
+        showError('Failed to recalculate stats. Please try again.');
         // Don't continue - this is a critical error
         return;
       }
     } else {
-      // No feat changes, just update skills normally
+      // No changes affecting calculations, just update skills normally
       pokemonData[22] = selectedSkills.join(', ');
     }
 

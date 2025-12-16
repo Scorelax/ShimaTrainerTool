@@ -414,10 +414,53 @@ function getPokemonListByTrainer(trainerName) {
 // ------------------------------------------------------------------Write Pokémon to Google Sheet Start-----------------------------------------------
 // Function to register the Pokémon for the trainer with additional data
 function registerPokemonForTrainer(trainerName, newPokemonData) {
+    // Calculate HP and VP before saving
+    const level = parseInt(newPokemonData[4], 10);
+    const hd = parseInt(newPokemonData[9], 10);
+    const vd = parseInt(newPokemonData[11], 10);
+    const str = parseInt(newPokemonData[15], 10);
+    const dex = parseInt(newPokemonData[16], 10);
+    const con = parseInt(newPokemonData[17], 10);
+    const int = parseInt(newPokemonData[18], 10);
+    const wis = parseInt(newPokemonData[19], 10);
+    const cha = parseInt(newPokemonData[20], 10);
+    const loyalty = parseInt(newPokemonData[33], 10) || 0;
+
+    // Calculate HP/VP
+    const { hp, vp } = calculateHpVp(str, dex, con, int, wis, cha, level, hd, vd, loyalty);
+
+    // Calculate modifiers
+    const strMod = Math.floor((str - 10) / 2);
+    const dexMod = Math.floor((dex - 10) / 2);
+    const conMod = Math.floor((con - 10) / 2);
+    const intMod = Math.floor((int - 10) / 2);
+    const wisMod = Math.floor((wis - 10) / 2);
+    const chaMod = Math.floor((cha - 10) / 2);
+
+    // Calculate other values
+    const proficiencyBonus = level <= 4 ? 2 : level <= 8 ? 3 : level <= 12 ? 4 : level <= 16 ? 5 : 6;
+    const initiative = dexMod;
+    const stabBonus = level <= 2 ? 0 : level <= 6 ? 2 : level <= 10 ? 4 : level <= 14 ? 6 : level <= 18 ? 8 : 10;
+
+    // Update pokemonData with calculated values
+    newPokemonData[10] = hp;
+    newPokemonData[12] = vp;
+    newPokemonData[30] = initiative;
+    newPokemonData[31] = proficiencyBonus;
+    newPokemonData[34] = stabBonus;
+    newPokemonData[39] = strMod;
+    newPokemonData[40] = dexMod;
+    newPokemonData[41] = conMod;
+    newPokemonData[42] = intMod;
+    newPokemonData[43] = wisMod;
+    newPokemonData[44] = chaMod;
+    newPokemonData[45] = hp; // currentHP
+    newPokemonData[46] = vp; // currentVP
+
     POKEMON_DATA_SHEET.appendRow(newPokemonData);
 
-    return { 
-      status: 'success', 
+    return {
+      status: 'success',
       message: `${trainerName} caught a ${newPokemonData[2]}!`
     };
 }

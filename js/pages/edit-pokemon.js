@@ -1166,13 +1166,14 @@ async function handleFormSubmit(pokemonName, originalNature) {
       }
       // Handle Hidden Ability feat
       else if (feat === 'Hidden Ability') {
-        // Only auto-select if no ability is currently checked
+        // Add the hidden ability (last one) to existing abilities
         const abilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]'));
-        const anyChecked = abilityCheckboxes.some(cb => cb.checked);
-
-        if (abilityCheckboxes.length > 0 && !anyChecked) {
-          // Only auto-check the last ability if none are selected
-          abilityCheckboxes[abilityCheckboxes.length - 1].checked = true;
+        if (abilityCheckboxes.length > 0) {
+          const hiddenAbilityCheckbox = abilityCheckboxes[abilityCheckboxes.length - 1];
+          // Check the hidden ability if not already checked
+          if (!hiddenAbilityCheckbox.checked) {
+            hiddenAbilityCheckbox.checked = true;
+          }
         }
       }
     }

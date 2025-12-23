@@ -46,7 +46,7 @@ body {
   justify-content: flex-end;
   color: white;
   z-index: 9999;
-  padding-bottom: calc(33vh - 80px); /* Position in bottom third, accounting for progress bar height */
+  padding-bottom: calc(20vh - 80px); /* Position in bottom fifth, accounting for progress bar height */
 }
 
 .loading-screen.active {

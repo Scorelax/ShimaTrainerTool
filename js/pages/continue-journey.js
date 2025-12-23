@@ -1,6 +1,58 @@
 // Continue Journey Page - Trainer Selection with PIN
 import { TrainerAPI } from '../api.js';
 
+// Splash image configuration
+const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/splashes/';
+const SPLASH_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
+const MAX_SPLASH_IMAGES = 20; // Maximum number of splash images to check for
+
+// Select a random splash image with priority for "session"
+async function selectSplashImage() {
+  // Helper function to check if an image exists
+  async function imageExists(url) {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // First, try to find "session" image with any extension
+  for (const format of SPLASH_FORMATS) {
+    const sessionUrl = `${SPLASH_BASE_URL}session.${format}`;
+    if (await imageExists(sessionUrl)) {
+      console.log('[Splash] Using session image:', sessionUrl);
+      return sessionUrl;
+    }
+  }
+
+  // If no session image, collect available splash images
+  const availableSplashes = [];
+
+  for (let i = 1; i <= MAX_SPLASH_IMAGES; i++) {
+    for (const format of SPLASH_FORMATS) {
+      const splashUrl = `${SPLASH_BASE_URL}splash-${i}.${format}`;
+      if (await imageExists(splashUrl)) {
+        availableSplashes.push(splashUrl);
+        break; // Found this number, move to next
+      }
+    }
+  }
+
+  // If we found splash images, pick a random one
+  if (availableSplashes.length > 0) {
+    const randomIndex = Math.floor(Math.random() * availableSplashes.length);
+    const selectedSplash = availableSplashes[randomIndex];
+    console.log('[Splash] Using random splash image:', selectedSplash);
+    return selectedSplash;
+  }
+
+  // Fallback to default background if no splash images found
+  console.log('[Splash] No splash images found, using default background');
+  return 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+}
+
 // Progress tracking utility
 function updateLoadingProgress(percent, text) {
   const fill = document.getElementById('loading-progress-fill');
@@ -339,8 +391,13 @@ export function attachContinueJourneyListeners() {
       // Correct PIN - load trainer data
       document.getElementById('pinModal').classList.remove('active');
 
+      // Select and apply splash image
+      const loadingScreen = document.getElementById('loading-screen');
+      const splashImageUrl = await selectSplashImage();
+      loadingScreen.style.backgroundImage = `url('${splashImageUrl}')`;
+
       // Show fullscreen loading background
-      document.getElementById('loading-screen').classList.add('active');
+      loadingScreen.classList.add('active');
       updateLoadingProgress(0, 'Connecting to server...');
 
       try {

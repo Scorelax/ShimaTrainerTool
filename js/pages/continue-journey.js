@@ -3,8 +3,8 @@ import { TrainerAPI } from '../api.js';
 
 // Splash image configuration
 const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/splashes/';
-const SPLASH_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
-const MAX_SPLASH_IMAGES = 20; // Maximum number of splash images to check for
+const MAX_SPLASH_IMAGES = 20; // Maximum number of splash images
+const DEFAULT_BACKGROUND = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
 
 // Select a random splash image with priority for "session"
 async function selectSplashImage() {
@@ -18,39 +18,25 @@ async function selectSplashImage() {
     }
   }
 
-  // First, try to find "session" image with any extension
-  for (const format of SPLASH_FORMATS) {
-    const sessionUrl = `${SPLASH_BASE_URL}session.${format}`;
-    if (await imageExists(sessionUrl)) {
-      console.log('[Splash] Using session image:', sessionUrl);
-      return sessionUrl;
-    }
+  // First, check if session.png exists
+  const sessionUrl = `${SPLASH_BASE_URL}session.png`;
+  if (await imageExists(sessionUrl)) {
+    console.log('[Splash] Using session image:', sessionUrl);
+    return sessionUrl;
   }
 
-  // If no session image, collect available splash images
-  const availableSplashes = [];
+  // If no session image, pick a random splash image
+  const randomNumber = Math.floor(Math.random() * MAX_SPLASH_IMAGES) + 1;
+  const randomSplashUrl = `${SPLASH_BASE_URL}splash-${randomNumber}.png`;
 
-  for (let i = 1; i <= MAX_SPLASH_IMAGES; i++) {
-    for (const format of SPLASH_FORMATS) {
-      const splashUrl = `${SPLASH_BASE_URL}splash-${i}.${format}`;
-      if (await imageExists(splashUrl)) {
-        availableSplashes.push(splashUrl);
-        break; // Found this number, move to next
-      }
-    }
+  if (await imageExists(randomSplashUrl)) {
+    console.log('[Splash] Using random splash image:', randomSplashUrl);
+    return randomSplashUrl;
   }
 
-  // If we found splash images, pick a random one
-  if (availableSplashes.length > 0) {
-    const randomIndex = Math.floor(Math.random() * availableSplashes.length);
-    const selectedSplash = availableSplashes[randomIndex];
-    console.log('[Splash] Using random splash image:', selectedSplash);
-    return selectedSplash;
-  }
-
-  // Fallback to default background if no splash images found
+  // Fallback to default background if splash image not found
   console.log('[Splash] No splash images found, using default background');
-  return 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+  return DEFAULT_BACKGROUND;
 }
 
 // Progress tracking utility
@@ -360,6 +346,17 @@ export async function renderContinueJourney() {
 
 export function attachContinueJourneyListeners() {
   let selectedTrainer = null;
+  let preloadedSplashImage = null;
+
+  // Preload splash image in background while user selects trainer
+  console.log('[Splash] Preloading splash image...');
+  selectSplashImage().then(url => {
+    preloadedSplashImage = url;
+    console.log('[Splash] Preloaded:', url);
+  }).catch(err => {
+    console.log('[Splash] Preload error:', err);
+    preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+  });
 
   // Trainer box click handlers
   document.querySelectorAll('.trainer-box').forEach(box => {
@@ -391,12 +388,11 @@ export function attachContinueJourneyListeners() {
       // Correct PIN - load trainer data
       document.getElementById('pinModal').classList.remove('active');
 
-      // Select and apply splash image
+      // Show fullscreen loading background immediately with preloaded splash image
       const loadingScreen = document.getElementById('loading-screen');
-      const splashImageUrl = await selectSplashImage();
-      loadingScreen.style.backgroundImage = `url('${splashImageUrl}')`;
-
-      // Show fullscreen loading background
+      if (preloadedSplashImage) {
+        loadingScreen.style.backgroundImage = `url('${preloadedSplashImage}')`;
+      }
       loadingScreen.classList.add('active');
       updateLoadingProgress(0, 'Connecting to server...');
 

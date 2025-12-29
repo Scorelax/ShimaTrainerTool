@@ -6,7 +6,7 @@ const IMG_BACKGROUND = 'https://raw.githubusercontent.com/Benjakronk/shima-poked
 const POKEMON_DATA_URL = 'https://script.google.com/macros/s/AKfycbwIT3OS2bdCv2kkDPh6IjRRirv17iPnuttlPcY47LCHBbpNPuHF_IjVq0mCt7TkkWoW/exec?action=pokemon';
 const MOVE_DATA_URL = 'https://script.google.com/macros/s/AKfycbz5jkSQ1HuCpCrbg_mePsfLDaoesjCvrX_fCAhJvTC5V3IddYmtjVJnh4_2YaX37Dkj/exec?action=moves';
 const ITEMS_DATA = 'https://script.google.com/macros/s/AKfycbwIT3OS2bdCv2kkDPh6IjRRirv17iPnuttlPcY47LCHBbpNPuHF_IjVq0mCt7TkkWoW/exec?action=items';
-const REGISTERED_POKEMON_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/registered_pokemon.json';
+const REGISTERED_POKEMON_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/pokedex_config.json';
 const SPREADSHEET = SpreadsheetApp.openById('1lt2EE5lSeEhYyVDjC1KcpuVU8_VitHpNqeRh6lknSJM');
 const TRAINER_DATA_SHEET = SPREADSHEET.getSheetByName('Trainer Data');
 const POKEMON_DATA_SHEET = SPREADSHEET.getSheetByName('Pokemon Data');
@@ -193,23 +193,69 @@ function fetchRegisteredPokemon() {
     const response = UrlFetchApp.fetch(REGISTERED_POKEMON_URL);
     const data = JSON.parse(response.getContentText());
     const endTime = Date.now();
-    
-    // Update cache
+
+    // Update cache with both registered names and full config
     cachedRegisteredNames = data.registered;
+    cachedPokedexConfig = data; // Store full config (visibility, defaults, extraSearchableMoves, splashCount)
     cacheTimestamp = now;
-    
+
     Logger.log('fetchRegisteredPokemon: ' + (endTime - startTime) + ' ms');
     return data.registered;
   } catch (error) {
     Logger.log("Error fetching registered Pokémon: " + error.toString());
-    
+
     // Return cached data if available, even if expired
     if (cachedRegisteredNames) {
       Logger.log('Using expired cache due to fetch error');
       return cachedRegisteredNames;
     }
-    
+
     return [];
+  }
+}
+
+// Function to get the full Pokedex config (visibility, defaults, etc.)
+// This is for future use when implementing visibility controls
+function getPokedexConfig() {
+  const now = Date.now();
+
+  // Return cached config if available and not expired
+  if (cachedPokedexConfig && cacheTimestamp && (now - cacheTimestamp < CACHE_DURATION)) {
+    Logger.log('Using cached Pokedex config');
+    return cachedPokedexConfig;
+  }
+
+  // If cache is expired or not available, fetch new data
+  const startTime = Date.now();
+  try {
+    const response = UrlFetchApp.fetch(REGISTERED_POKEMON_URL);
+    const data = JSON.parse(response.getContentText());
+    const endTime = Date.now();
+
+    // Update cache
+    cachedPokedexConfig = data;
+    cachedRegisteredNames = data.registered;
+    cacheTimestamp = now;
+
+    Logger.log('getPokedexConfig: ' + (endTime - startTime) + ' ms');
+    return data;
+  } catch (error) {
+    Logger.log("Error fetching Pokedex config: " + error.toString());
+
+    // Return cached data if available, even if expired
+    if (cachedPokedexConfig) {
+      Logger.log('Using expired Pokedex config cache due to fetch error');
+      return cachedPokedexConfig;
+    }
+
+    // Return minimal structure if no cache available
+    return {
+      registered: [],
+      visibility: {},
+      defaults: {},
+      extraSearchableMoves: [],
+      splashCount: 0
+    };
   }
 }
 
@@ -237,8 +283,9 @@ function batchResolveImageUrls(pokemonList) {
   return results;
 }
 
-// Caching mechanism for registered pokemon names
+// Caching mechanism for registered pokemon names and config
 let cachedRegisteredNames = null;
+let cachedPokedexConfig = null; // Full config including visibility, defaults, etc.
 let cacheTimestamp = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 

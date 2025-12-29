@@ -2,6 +2,7 @@
 
 import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
+import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 
 // Module-level state
 let selectedPokemon = null;
@@ -562,11 +563,14 @@ export function renderEvolution() {
   return html;
 }
 
-export function attachEvolutionListeners() {
+export async function attachEvolutionListeners() {
   // Reset state
   selectedPokemon = null;
   allocatedSkillPoints = 0;
   evolutionOptions = [];
+
+  // Initialize visibility system
+  await initializeVisibility();
 
   // Load current Pokemon data
   const selectedPokemonName = sessionStorage.getItem('selectedPokemonName');
@@ -890,6 +894,7 @@ async function confirmEvolution() {
     // Map abilities from current to evolved Pokemon
     const currentAbilitiesRaw = currentPokemon[7] || '';
     const evolvedAbilities = [];
+    const evolvedPokemonName = selectedPokemon[1]; // Name at index 1
 
     if (currentAbilitiesRaw) {
       const currentAbilities = currentAbilitiesRaw.split('|').map(a => a.trim()).filter(a => a);
@@ -907,6 +912,11 @@ async function confirmEvolution() {
 
         if (colonIndex !== -1 && colonIndex < 3) {
           slotIndex = parseInt(abilityData.substring(0, colonIndex));
+        }
+
+        // Check if hidden ability (slotIndex 2) should be visible
+        if (slotIndex === 2 && !isFieldVisible(evolvedPokemonName, 'hiddenAbility')) {
+          return; // Skip hidden ability if not visible for evolved Pokemon
         }
 
         const evolvedAbilityData = evolvedPokemonAbilities[slotIndex];

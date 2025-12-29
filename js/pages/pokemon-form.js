@@ -2,6 +2,7 @@
 
 import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
+import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 
 export function renderPokemonForm() {
   // Load selected Pokemon data from session storage
@@ -314,8 +315,11 @@ export function renderPokemonForm() {
   return html;
 }
 
-export function attachPokemonFormListeners() {
+export async function attachPokemonFormListeners() {
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
+
+  // Initialize visibility system
+  await initializeVisibility();
 
   // Populate abilities
   populateAbilityOptions(selectedPokemonData);
@@ -340,6 +344,8 @@ function populateAbilityOptions(selectedPokemonData) {
 
   abilitiesContent.innerHTML = '';
 
+  const pokemonName = selectedPokemonData[1] || 'Unknown';
+
   // Get all three possible abilities (indices 6, 7, 8)
   // 0 = primary, 1 = secondary, 2 = hidden
   const abilities = [
@@ -351,6 +357,11 @@ function populateAbilityOptions(selectedPokemonData) {
   abilities.forEach((abilityData, slotIndex) => {
     // Skip empty abilities
     if (!abilityData) return;
+
+    // Check if hidden ability (slotIndex 2) should be visible
+    if (slotIndex === 2 && !isFieldVisible(pokemonName, 'hiddenAbility')) {
+      return; // Skip hidden ability if not visible
+    }
 
     // Parse ability data (format: "AbilityName,Description")
     const parts = abilityData.split(',');

@@ -482,6 +482,16 @@ export class GameDataAPI {
       cacheKey: `type-effectiveness:${type1}${type2 ? ':' + type2 : ''}`
     });
   }
+
+  /**
+   * Get Pokedex config (visibility settings, defaults, etc.)
+   */
+  static async getPokedexConfig() {
+    return API.request('game-data', 'pokedex-config', {}, {
+      cacheKey: 'game-data:pokedex-config',
+      useCache: true
+    });
+  }
 }
 
 // ============================================================================

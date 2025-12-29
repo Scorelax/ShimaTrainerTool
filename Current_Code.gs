@@ -1064,6 +1064,13 @@ function handleGameDataRoute(action, params) {
         data: calculateTypeEffectiveness(params.type1, params.type2)
       };
 
+    case 'pokedex-config':
+      // GET: ?route=game-data&action=pokedex-config
+      return {
+        status: 'success',
+        data: getPokedexConfig()
+      };
+
     default:
       throw new Error('Unknown game-data action: ' + action);
   }
@@ -1101,7 +1108,7 @@ function handleTestRoute() {
     endpoints: {
       pokemon: ['list', 'registered-list', 'get', 'register', 'update', 'evolution-options', 'party-status', 'utility-slot', 'live-stats'],
       trainer: ['list', 'get', 'create', 'update', 'inventory', 'gear', 'money', 'live-stats'],
-      gameData: ['all', 'conduit', 'moves', 'natures', 'type-effectiveness'],
+      gameData: ['all', 'conduit', 'moves', 'natures', 'type-effectiveness', 'pokedex-config'],
       battle: ['calculate-damage', 'roll-initiative']
     }
   };

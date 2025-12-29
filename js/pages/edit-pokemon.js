@@ -2,6 +2,7 @@
 
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
+import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 
 export function renderEditPokemon(pokemonName) {
   // Load Pokemon data from session storage
@@ -679,11 +680,14 @@ export function renderEditPokemon(pokemonName) {
   return html;
 }
 
-export function attachEditPokemonListeners() {
+export async function attachEditPokemonListeners() {
   const pokemonName = sessionStorage.getItem('selectedPokemonName');
   const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
+
+  // Initialize visibility system
+  await initializeVisibility();
 
   // Collapsible sections
   ['skills', 'feats', 'abilities', 'nature'].forEach(section => {
@@ -1299,6 +1303,8 @@ function populateAbilities(abilities, pokemonData) {
 
   abilitiesContent.innerHTML = '';
 
+  const pokemonName = pokemonData[2] || 'Unknown'; // Pokemon name at index 2
+
   abilities.forEach((abilityData, index) => {
     const colonIndex = abilityData.indexOf(':');
     let slotIndex = index;
@@ -1307,6 +1313,12 @@ function populateAbilities(abilities, pokemonData) {
     if (colonIndex !== -1 && colonIndex < 3) {
       slotIndex = parseInt(abilityData.substring(0, colonIndex));
       abilityString = abilityData.substring(colonIndex + 1);
+    }
+
+    // Check if this is the hidden ability (last one) and if it should be visible
+    const isHiddenAbility = index === abilities.length - 1;
+    if (isHiddenAbility && !isFieldVisible(pokemonName, 'hiddenAbility')) {
+      return; // Skip hidden ability if not visible
     }
 
     const parts = abilityString.split(',');

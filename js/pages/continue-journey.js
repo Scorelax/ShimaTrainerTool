@@ -90,7 +90,7 @@ export async function renderContinueJourney() {
 
         .trainer-container {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(3, 1fr);
           gap: clamp(1rem, 3vw, 2.5rem);
           width: 100%;
           margin-bottom: clamp(1.5rem, 5vh, 3rem);

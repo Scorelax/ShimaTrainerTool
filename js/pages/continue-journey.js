@@ -53,7 +53,10 @@ function updateLoadingProgress(percent, text) {
 }
 
 export async function renderContinueJourney() {
-  // Return initial HTML immediately with loading state
+  // Fetch trainers
+  const response = await TrainerAPI.getAll();
+  const trainers = response.data || [];
+
   const html = `
     <div class="continue-journey-page">
       <style>
@@ -311,8 +314,13 @@ export async function renderContinueJourney() {
       <h1>Continue Journey</h1>
 
       <div class="trainer-list-container">
-        <div class="trainer-container" id="trainerContainer">
-          <div style="color: white; text-align: center; padding: 2rem; font-size: 1.2rem;">Loading trainers...</div>
+        <div class="trainer-container">
+          ${trainers.map(trainer => `
+            <div class="trainer-box" data-trainer-id="${trainer.id}" data-trainer-name="${trainer.name}" data-trainer-pin="${trainer.pinCode}">
+              <img class="trainer-image" src="${trainer.image || 'assets/Pokeball.png'}" alt="${trainer.name}">
+              <div class="trainer-name">${trainer.name || 'Unnamed Trainer'}</div>
+            </div>
+          `).join('')}
         </div>
       </div>
 
@@ -340,51 +348,6 @@ export function attachContinueJourneyListeners() {
   let selectedTrainer = null;
   let preloadedSplashImage = null;
 
-  // Fetch trainers and populate the page
-  const trainerContainer = document.getElementById('trainerContainer');
-  TrainerAPI.getAll()
-    .then(response => {
-      const trainers = response.data || [];
-
-      // Populate trainers
-      trainerContainer.innerHTML = trainers.map(trainer => `
-        <div class="trainer-box" data-trainer-id="${trainer.id}" data-trainer-name="${trainer.name}" data-trainer-pin="${trainer.pinCode}">
-          <img class="trainer-image" src="${trainer.image || 'assets/Pokeball.png'}" alt="${trainer.name}">
-          <div class="trainer-name">${trainer.name || 'Unnamed Trainer'}</div>
-        </div>
-      `).join('');
-
-      // Attach click handlers to trainer boxes
-      document.querySelectorAll('.trainer-box').forEach(box => {
-        box.addEventListener('click', () => {
-          selectedTrainer = {
-            id: box.dataset.trainerId,
-            name: box.dataset.trainerName,
-            pinCode: box.dataset.trainerPin
-          };
-
-          // Show PIN modal
-          const modal = document.getElementById('pinModal');
-          const input = document.getElementById('pinInput');
-          const error = document.getElementById('pinError');
-
-          modal.classList.add('active');
-          input.value = '';
-          error.textContent = '';
-          input.focus();
-        });
-      });
-    })
-    .catch(error => {
-      console.error('Error loading trainers:', error);
-      trainerContainer.innerHTML = `
-        <div style="color: white; text-align: center; padding: 2rem;">
-          <p style="font-size: 1.2rem; margin-bottom: 1rem;">Failed to load trainers</p>
-          <button onclick="window.location.reload()" style="padding: 0.5rem 1rem; font-size: 1rem;">Retry</button>
-        </div>
-      `;
-    });
-
   // Preload splash image in background while user selects trainer
   console.log('[Splash] Preloading splash image...');
   selectSplashImage().then(url => {
@@ -393,6 +356,27 @@ export function attachContinueJourneyListeners() {
   }).catch(err => {
     console.log('[Splash] Preload error:', err);
     preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+  });
+
+  // Trainer box click handlers
+  document.querySelectorAll('.trainer-box').forEach(box => {
+    box.addEventListener('click', () => {
+      selectedTrainer = {
+        id: box.dataset.trainerId,
+        name: box.dataset.trainerName,
+        pinCode: box.dataset.trainerPin
+      };
+
+      // Show PIN modal
+      const modal = document.getElementById('pinModal');
+      const input = document.getElementById('pinInput');
+      const error = document.getElementById('pinError');
+
+      modal.classList.add('active');
+      input.value = '';
+      error.textContent = '';
+      input.focus();
+    });
   });
 
   // PIN submit

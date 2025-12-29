@@ -8,8 +8,31 @@ export function renderNewJourney() {
     <div class="new-journey-page">
       <style>
         body, .content {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          background:
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
           min-height: 100vh;
+          position: relative;
+          overflow-x: hidden;
+        }
+
+        .new-journey-page::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image:
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 50px 50px, 80px 80px;
+          background-position: 0 0, 40px 40px;
+          pointer-events: none;
+          opacity: 0.5;
+          z-index: 0;
         }
 
         .new-journey-page {
@@ -17,51 +40,59 @@ export function renderNewJourney() {
           flex-direction: column;
           align-items: center;
           padding: 2vh 1vw;
-          min-height: 85vh;
+          min-height: 80vh;
+          position: relative;
+        }
+
+        .new-journey-page > * {
+          position: relative;
+          z-index: 1;
         }
 
         .new-journey-page h1 {
           color: white;
           margin-bottom: 2vh;
-          font-size: clamp(2rem, 4vw, 3rem);
+          font-size: clamp(1.5rem, 4vw, 2.5rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.5vw, 2px);
+          text-shadow: 0 clamp(2px, 0.5vh, 4px) clamp(5px, 1.5vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
-          letter-spacing: clamp(0.5px, 0.1vw, 1px);
-          text-shadow: 0 clamp(2px, 0.4vh, 4px) clamp(5px, 1vh, 10px) rgba(0,0,0,0.5),
-                       0 0 clamp(10px, 2vw, 20px) rgba(255,222,0,0.3);
         }
 
         .form-container {
-          width: 90%;
-          max-width: clamp(400px, 65vw, 650px);
+          width: 100%;
+          max-width: clamp(400px, 60vw, 600px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          border: clamp(2px, 0.4vw, 4px) solid #FFDE00;
-          padding: clamp(1.5rem, 2.5vh, 2.5rem);
-          border-radius: clamp(15px, 2.5vw, 25px);
-          box-shadow: 0 clamp(8px, 1.5vh, 15px) clamp(20px, 4vh, 40px) rgba(0,0,0,0.4),
-                      inset 0 clamp(-2px, -0.4vh, -4px) 0 rgba(0,0,0,0.05);
+          padding: clamp(1.5rem, 3vw, 2.5rem);
+          border-radius: clamp(15px, 3vw, 25px);
+          border: clamp(2px, 0.5vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.4),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.05);
+          margin-bottom: 2vh;
           max-height: 70vh;
           overflow-y: auto;
         }
 
         .form-group {
-          margin-bottom: clamp(1rem, 1.5vh, 1.5rem);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
         }
 
         .form-group label {
           display: block;
           font-weight: bold;
-          font-size: clamp(0.95rem, 1.5vw, 1.1rem);
-          margin-bottom: clamp(0.3rem, 0.5vh, 0.5rem);
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          margin-bottom: clamp(0.3rem, 1vh, 0.5rem);
           color: #333;
         }
 
-        .form-group input,
+        .form-group input[type="number"],
+        .form-group input[type="text"],
         .form-group select {
           width: 100%;
-          padding: clamp(0.5rem, 0.75vh, 0.75rem);
-          font-size: clamp(0.9rem, 1.4vw, 1rem);
-          border: clamp(1px, 0.2vw, 2px) solid #ccc;
-          border-radius: clamp(3px, 0.5vw, 5px);
+          padding: clamp(0.5rem, 1.5vh, 0.75rem);
+          font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+          border: clamp(1px, 0.3vw, 2px) solid #ccc;
+          border-radius: clamp(3px, 0.8vw, 5px);
           box-sizing: border-box;
         }
 
@@ -72,69 +103,86 @@ export function renderNewJourney() {
         }
 
         .skills-section {
-          max-height: clamp(150px, 20vh, 200px);
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 15px);
+          max-height: clamp(250px, 40vh, 350px);
           overflow-y: auto;
-          border: clamp(1px, 0.1vw, 1px) solid #ccc;
-          border-radius: clamp(3px, 0.5vw, 5px);
-          padding: clamp(0.75rem, 1vh, 1rem);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
         }
 
         .skill-item {
           display: flex;
-          align-items: center;
-          margin-bottom: clamp(0.3rem, 0.5vh, 0.5rem);
+          align-items: flex-start;
+          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
         }
 
         .skill-item input[type="checkbox"] {
-          margin-right: clamp(0.3rem, 0.5vw, 0.5rem);
-          transform: scale(clamp(1.0, 1.5vw, 1.2));
+          margin-right: clamp(0.5rem, 1vw, 0.75rem);
+          margin-top: clamp(0.15rem, 0.4vh, 0.25rem);
+          transform: scale(clamp(1.2, 0.3vw, 1.5));
+          cursor: pointer;
         }
 
         .skill-item label {
-          font-size: clamp(0.85rem, 1.3vw, 0.95rem);
+          font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+          cursor: pointer;
           margin: 0;
         }
 
         .button-group {
           display: flex;
-          gap: clamp(0.75rem, 1vw, 1rem);
+          gap: clamp(0.75rem, 2vw, 1rem);
           justify-content: center;
-          margin-top: 2vh;
+          margin-top: clamp(1.5rem, 3vh, 2rem);
         }
 
         .button {
-          padding: clamp(0.75rem, 1vh, 1rem) clamp(1.5rem, 2vw, 2rem);
-          border: clamp(2px, 0.3vw, 3px) solid #FFDE00;
-          border-radius: clamp(10px, 1.5vw, 15px);
-          font-size: clamp(1rem, 1.6vw, 1.2rem);
-          font-weight: 900;
+          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1.5rem, 3vw, 2rem);
+          border: none;
+          border-radius: clamp(3px, 0.8vw, 5px);
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          font-weight: bold;
           cursor: pointer;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 clamp(3px, 0.5vh, 5px) clamp(10px, 1.5vh, 15px) rgba(0,0,0,0.2);
+          transition: all 0.3s;
         }
 
         .button-primary {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 15px);
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 20px) rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .button-primary:hover {
-          transform: translateY(clamp(-2px, -0.3vh, -3px));
-          box-shadow: 0 clamp(5px, 0.8vh, 8px) clamp(15px, 2vh, 20px) rgba(76,175,80,0.5),
-                      0 0 clamp(15px, 2vw, 20px) rgba(255,222,0,0.5);
-          border-color: #FFC700;
+          transform: translateY(clamp(-1px, -0.3vh, -2px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 2.5vh, 20px) rgba(76,175,80,0.5);
         }
 
         .button-secondary {
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(10px, 2vw, 15px);
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 20px) rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .button-secondary:hover {
-          transform: translateY(clamp(-2px, -0.3vh, -3px));
-          box-shadow: 0 clamp(5px, 0.8vh, 8px) clamp(15px, 2vh, 20px) rgba(238,21,21,0.5),
-                      0 0 clamp(15px, 2vw, 20px) rgba(255,222,0,0.5);
-          border-color: #FFC700;
+          transform: translateY(clamp(-1px, -0.3vh, -2px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 2.5vh, 20px) rgba(238,21,21,0.5);
         }
 
         .stats-grid {
@@ -144,27 +192,53 @@ export function renderNewJourney() {
         }
 
         @media (max-width: 1024px) {
+          .form-container {
+            max-width: clamp(400px, 65vw, 600px);
+          }
+
           .stats-grid {
             gap: clamp(0.6rem, 0.9vw, 0.9rem);
           }
         }
 
         @media (max-width: 768px) {
+          .form-container {
+            max-width: clamp(400px, 70vw, 600px);
+          }
+
           .stats-grid {
             gap: clamp(0.5rem, 0.8vw, 0.8rem);
+          }
+
+          .button-group {
+            gap: clamp(0.65rem, 1.8vw, 0.9rem);
           }
         }
 
         @media (max-width: 600px) {
+          .form-container {
+            max-width: clamp(350px, 75vw, 550px);
+          }
+
           .stats-grid {
             grid-template-columns: 1fr;
             gap: clamp(0.75rem, 1vw, 1rem);
           }
+
+          .button-group {
+            gap: clamp(0.6rem, 1.5vw, 0.8rem);
+          }
         }
 
         @media (max-width: 480px) {
+          .form-container {
+            max-width: 85vw;
+            padding: clamp(1.2rem, 2.5vw, 2rem);
+          }
+
           .button-group {
             flex-direction: column;
+            gap: clamp(0.75rem, 1.5vh, 1rem);
           }
 
           .button {

@@ -644,6 +644,72 @@ export function renderTrainerInfo() {
           box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
+        .skill-header-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .charge-dots {
+          display: flex;
+          gap: clamp(4px, 0.8vw, 6px);
+          align-items: center;
+        }
+
+        .charge-dot {
+          width: clamp(10px, 2vw, 14px);
+          height: clamp(10px, 2vw, 14px);
+          border-radius: 50%;
+          display: inline-block;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .charge-dot.filled {
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+          border: 2px solid #FFDE00;
+          box-shadow: 0 0 8px rgba(76,175,80,0.6);
+        }
+
+        .charge-dot.empty {
+          background: rgba(100,100,100,0.4);
+          border: 2px solid rgba(150,150,150,0.5);
+        }
+
+        .use-buff-button {
+          margin-top: clamp(0.5rem, 1vh, 0.75rem);
+          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          cursor: pointer;
+          box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          width: 100%;
+        }
+
+        .use-buff-button:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2vh, 18px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 2.5vh, 20px) rgba(76,175,80,0.5);
+        }
+
+        .use-buff-button:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .use-buff-button:disabled {
+          background: linear-gradient(135deg, #666 0%, #555 100%);
+          border-color: #888;
+          cursor: not-allowed;
+          opacity: 0.6;
+        }
+
         /* Special Inventory Popup Styles */
         #inventoryPopup .popup-content {
           max-width: min(90vw, 900px);
@@ -1957,6 +2023,73 @@ export function attachTrainerInfoListeners() {
     openPopup('inventoryPopup');
   }
 
+  // Helper function to get max charges for a buff based on trainer level
+  function getMaxCharges(buffName, trainerLevel) {
+    switch (buffName) {
+      case 'Second Wind':
+        if (trainerLevel >= 7) return 5;
+        if (trainerLevel >= 3) return 2;
+        return 0;
+      case 'Rapid Orders':
+        return trainerLevel >= 6 ? 1 : 0;
+      case 'Unbreakable Bond':
+        return trainerLevel >= 13 ? 1 : 0;
+      case 'Elemental Synergy':
+        return trainerLevel >= 18 ? 1 : 0;
+      case 'Master Trainer':
+        return trainerLevel >= 20 ? 2 : 0;
+      default:
+        return 0;
+    }
+  }
+
+  // Helper function to create charge indicator dots
+  function createChargeDots(currentCharges, maxCharges) {
+    if (maxCharges === 0) return '';
+
+    let dotsHTML = '<div class="charge-dots">';
+    for (let i = 0; i < maxCharges; i++) {
+      const filled = i < currentCharges;
+      dotsHTML += `<span class="charge-dot ${filled ? 'filled' : 'empty'}"></span>`;
+    }
+    dotsHTML += '</div>';
+    return dotsHTML;
+  }
+
+  // Helper function to use a buff (decrement charge)
+  async function useBuff(buffName, chargeIndex) {
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) {
+      showError('Trainer data not found.');
+      return;
+    }
+
+    const trainerData = JSON.parse(trainerDataRaw);
+    const currentCharges = parseInt(trainerData[chargeIndex], 10) || 0;
+
+    if (currentCharges <= 0) {
+      showError(`No charges remaining for ${buffName}`);
+      return;
+    }
+
+    // Decrement charge
+    trainerData[chargeIndex] = currentCharges - 1;
+
+    // Update session storage
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Update database
+    try {
+      await TrainerAPI.update(trainerData);
+    } catch (error) {
+      console.error('Error updating trainer data:', error);
+      showError('Failed to save buff usage to database');
+    }
+
+    // Refresh the popup to show updated charges
+    showTrainerSkillsPopup();
+  }
+
   // Helper function to show Trainer Buffs popup
   function showTrainerSkillsPopup() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
@@ -1967,6 +2100,13 @@ export function attachTrainerInfoListeners() {
 
     const trainerData = JSON.parse(trainerDataRaw);
     const trainerLevel = parseInt(trainerData[2], 10); // Trainer level
+
+    // Get buff charges from trainer data (indices 40-44)
+    const secondWindCharges = parseInt(trainerData[40], 10) || 0;
+    const rapidOrdersCharges = parseInt(trainerData[41], 10) || 0;
+    const unbreakableBondCharges = parseInt(trainerData[42], 10) || 0;
+    const elementalSynergyCharges = parseInt(trainerData[43], 10) || 0;
+    const masterTrainerCharges = parseInt(trainerData[44], 10) || 0;
 
     // Fetch skills and nationalities data from sessionStorage
     const skillsDataRaw = sessionStorage.getItem('skills');
@@ -1997,6 +2137,15 @@ export function attachTrainerInfoListeners() {
     // Track skills by name to handle duplicates (higher level versions)
     const skillsByName = new Map();
 
+    // Define the trainer buff skills with their charge data
+    const trainerBuffs = [
+      { name: 'Second Wind', charges: secondWindCharges, index: 40 },
+      { name: 'Rapid Orders', charges: rapidOrdersCharges, index: 41 },
+      { name: 'Unbreakable Bond', charges: unbreakableBondCharges, index: 42 },
+      { name: 'Elemental Synergy', charges: elementalSynergyCharges, index: 43 },
+      { name: 'Master Trainer', charges: masterTrainerCharges, index: 44 }
+    ];
+
     // Loop through each skill and display them
     skillsData.forEach(skill => {
       const skillLevel = skill.level;
@@ -2016,26 +2165,55 @@ export function attachTrainerInfoListeners() {
       if (existingSkill) {
         // If the current skill's level is higher and unlocked, update the existing skill's effect
         if (trainerLevel >= skillLevel && skillLevel > existingSkill.level) {
-          skillsByName.set(skillName, { level: skillLevel, effect: skillEffect });
+          skillsByName.set(skillName, { level: skillLevel, effect: skillEffect, isUnlocked: trainerLevel >= skillLevel });
         }
       } else {
         // Add new skill
-        skillsByName.set(skillName, { level: skillLevel, effect: skillEffect });
+        skillsByName.set(skillName, { level: skillLevel, effect: skillEffect, isUnlocked: trainerLevel >= skillLevel });
       }
     });
 
-    // Build HTML for all skills
+    // Build HTML for all skills (with charge tracking for trainer buffs)
     skillsByName.forEach((skillData, skillName) => {
-      content += `
-        <div class="skill-item-container">
-          <h3 class="skill-name-header">${skillName}</h3>
-          <div class="skill-effect-box">${skillData.effect}</div>
-        </div>
-      `;
+      // Check if this skill is a trainer buff
+      const buffData = trainerBuffs.find(b => b.name === skillName);
+
+      if (buffData && skillData.isUnlocked) {
+        const maxCharges = getMaxCharges(buffData.name, trainerLevel);
+        const chargeDots = createChargeDots(buffData.charges, maxCharges);
+        const useButtonDisabled = buffData.charges <= 0 ? 'disabled' : '';
+
+        content += `
+          <div class="skill-item-container">
+            <div class="skill-header-row">
+              <h3 class="skill-name-header">${skillName}</h3>
+              ${chargeDots}
+            </div>
+            <div class="skill-effect-box">${skillData.effect}</div>
+            <button class="use-buff-button" data-buff-name="${buffData.name}" data-buff-index="${buffData.index}" ${useButtonDisabled}>Use</button>
+          </div>
+        `;
+      } else {
+        content += `
+          <div class="skill-item-container">
+            <h3 class="skill-name-header">${skillName}</h3>
+            <div class="skill-effect-box">${skillData.effect}</div>
+          </div>
+        `;
+      }
     });
 
     // Set the content
     document.getElementById('trainerBuffsContent').innerHTML = content;
+
+    // Add event listeners to Use buttons
+    document.querySelectorAll('.use-buff-button').forEach(button => {
+      button.addEventListener('click', async () => {
+        const buffName = button.dataset.buffName;
+        const buffIndex = parseInt(button.dataset.buffIndex, 10);
+        await useBuff(buffName, buffIndex);
+      });
+    });
 
     // Open the popup
     openPopup('trainerBuffsPopup');

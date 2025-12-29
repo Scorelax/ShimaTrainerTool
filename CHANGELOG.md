@@ -61,6 +61,66 @@ This file tracks all changes made to the project across development sessions.
 - Maintained optimistic UI updates pattern for instant user feedback
 - All database writes remain non-blocking for smooth UX
 
+### Pokedex Config Migration (`Current_Code.gs`)
+
+**URL Update**:
+1. **Changed Registration Source**
+   - Old URL: `registered_pokemon.json` (simple array structure)
+   - New URL: `pokedex_config.json` (comprehensive config structure)
+   - Maintains backward compatibility - still returns `registered` array
+
+2. **New Config Structure**
+   - `registered`: Array of registered Pokemon names (same as before)
+   - `visibility`: Per-Pokemon visibility settings object
+   - `defaults`: Default visibility settings for unconfigured Pokemon
+   - `extraSearchableMoves`: Additional moves for search functionality
+   - `splashCount`: Number of available splash screen images
+
+**Caching System Enhancement**:
+1. **Added Full Config Cache**
+   - New variable: `cachedPokedexConfig` to store complete config
+   - Existing `cachedRegisteredNames` preserved for quick access
+   - Both share same 5-minute cache duration
+   - Cache updates happen atomically on fetch
+
+2. **Updated fetchRegisteredPokemon()**
+   - Now caches both registered names and full config
+   - Still returns just registered names array (no breaking changes)
+   - Improved error handling with fallback to expired cache
+
+**New Function: getPokedexConfig()**
+1. **Purpose**
+   - Retrieves full Pokedex configuration for future visibility controls
+   - Infrastructure ready but not yet used in player-facing features
+   - Maintains same cache behavior as fetchRegisteredPokemon()
+
+2. **Return Structure**
+   ```javascript
+   {
+     registered: [],           // Array of Pokemon names
+     visibility: {},           // Per-Pokemon visibility settings
+     defaults: {},             // Default visibility settings
+     extraSearchableMoves: [], // Additional searchable moves
+     splashCount: 0            // Number of splash images
+   }
+   ```
+
+3. **Error Handling**
+   - Returns cached config if fetch fails
+   - Returns minimal structure if no cache available
+   - Logs all errors for debugging
+
+**Future Use Cases**:
+- Per-Pokemon visibility controls (types, abilities, stats, moves, etc.)
+- Gradual Pokemon reveal based on player progression
+- Custom move visibility and search settings
+- Dynamic splash screen image count
+
+**Player Impact**:
+- No changes to current player experience
+- Infrastructure prepared for future visibility features
+- Maintains same performance characteristics
+
 ---
 
 ## Session: 2025-12-16 - Trainer Info Enhancements, Affinity System Fix, and Edit-Pokemon Improvements

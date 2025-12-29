@@ -102,29 +102,20 @@ export function renderNewJourney() {
           outline: none;
         }
 
-        .skills-section {
-          padding: clamp(0.75rem, 1.5vh, 1rem);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
-          border-radius: clamp(10px, 2vw, 15px);
-          max-height: clamp(250px, 40vh, 350px);
-          overflow-y: auto;
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-        }
-
-        .skill-item {
+        .checkbox-item {
           display: flex;
           align-items: flex-start;
           margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
         }
 
-        .skill-item input[type="checkbox"] {
+        .checkbox-item input[type="checkbox"] {
           margin-right: clamp(0.5rem, 1vw, 0.75rem);
           margin-top: clamp(0.15rem, 0.4vh, 0.25rem);
           transform: scale(clamp(1.2, 0.3vw, 1.5));
           cursor: pointer;
         }
 
-        .skill-item label {
+        .checkbox-item label {
           font-size: clamp(0.95rem, 1.8vw, 1.1rem);
           cursor: pointer;
           margin: 0;
@@ -183,6 +174,91 @@ export function renderNewJourney() {
           transform: translateY(clamp(-1px, -0.3vh, -2px));
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 3.5vh, 30px) rgba(0,0,0,0.4),
                       0 0 clamp(15px, 2.5vh, 20px) rgba(238,21,21,0.5);
+        }
+
+        .back-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          font-weight: bold;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+        }
+
+        .back-button:hover {
+          transform: scale(1.15);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        .back-button:active {
+          transform: scale(1.08);
+        }
+
+        .collapsible-section {
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .collapsible-header {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          cursor: pointer;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-weight: 900;
+          font-size: clamp(1rem, 2vw, 1.2rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
+          transition: all 0.3s;
+        }
+
+        .collapsible-header:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2vh, 18px) rgba(0,0,0,0.4);
+        }
+
+        .arrow {
+          transition: transform 0.3s;
+          font-size: clamp(1rem, 2vw, 1.2rem);
+        }
+
+        .arrow.open {
+          transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s ease-out;
+          padding: 0 clamp(0.75rem, 1.5vh, 1rem);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-top: none;
+          border-radius: 0 0 clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+        }
+
+        .collapsible-content.open {
+          max-height: clamp(250px, 40vh, 350px);
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          overflow-y: auto;
         }
 
         .stats-grid {
@@ -349,78 +425,82 @@ export function renderNewJourney() {
             </select>
           </div>
 
-          <div class="form-group">
-            <label>Skills</label>
-            <div class="skills-section">
-              <div class="skill-item">
+          <!-- Skills Section -->
+          <div class="collapsible-section">
+            <div class="collapsible-header" id="skillsHeader">
+              <span>Skills</span>
+              <span class="arrow" id="skillsArrow">▶</span>
+            </div>
+            <div class="collapsible-content" id="skillsContent">
+              <div class="checkbox-item">
                 <input type="checkbox" id="athletics" name="skills" value="Athletics" />
                 <label for="athletics">Athletics (STR)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="acrobatics" name="skills" value="Acrobatics" />
                 <label for="acrobatics">Acrobatics (DEX)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="sleightOfHand" name="skills" value="Sleight of Hand" />
                 <label for="sleightOfHand">Sleight of Hand (DEX)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="stealth" name="skills" value="Stealth" />
                 <label for="stealth">Stealth (DEX)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="arcana" name="skills" value="Arcana" />
                 <label for="arcana">Arcana (INT)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="history" name="skills" value="History" />
                 <label for="history">History (INT)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="investigation" name="skills" value="Investigation" />
                 <label for="investigation">Investigation (INT)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="nature" name="skills" value="Nature" />
                 <label for="nature">Nature (INT)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="religion" name="skills" value="Religion" />
                 <label for="religion">Religion (INT)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="animalHandling" name="skills" value="Animal Handling" />
                 <label for="animalHandling">Animal Handling (WIS)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="insight" name="skills" value="Insight" />
                 <label for="insight">Insight (WIS)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="medicine" name="skills" value="Medicine" />
                 <label for="medicine">Medicine (WIS)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="perception" name="skills" value="Perception" />
                 <label for="perception">Perception (WIS)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="survival" name="skills" value="Survival" />
                 <label for="survival">Survival (WIS)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="deception" name="skills" value="Deception" />
                 <label for="deception">Deception (CHA)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="intimidation" name="skills" value="Intimidation" />
                 <label for="intimidation">Intimidation (CHA)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="performance" name="skills" value="Performance" />
                 <label for="performance">Performance (CHA)</label>
               </div>
-              <div class="skill-item">
+              <div class="checkbox-item">
                 <input type="checkbox" id="persuasion" name="skills" value="Persuasion" />
                 <label for="persuasion">Persuasion (CHA)</label>
               </div>
@@ -458,6 +538,9 @@ export function renderNewJourney() {
           </div>
         </form>
       </div>
+
+      <!-- Back Button -->
+      <button class="back-button" id="backButton">←</button>
     </div>
   `;
 
@@ -465,11 +548,28 @@ export function renderNewJourney() {
 }
 
 export function attachNewJourneyListeners() {
+  // Back button
+  document.getElementById('backButton')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'index' }
+    }));
+  });
+
   // Cancel button
   document.getElementById('cancelBtn')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'index' }
     }));
+  });
+
+  // Collapsible skills section
+  const skillsHeader = document.getElementById('skillsHeader');
+  const skillsContent = document.getElementById('skillsContent');
+  const skillsArrow = document.getElementById('skillsArrow');
+
+  skillsHeader?.addEventListener('click', () => {
+    skillsContent.classList.toggle('open');
+    skillsArrow.classList.toggle('open');
   });
 
   // Form submission

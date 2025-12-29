@@ -59,8 +59,11 @@ const TRAINER_COLUMN_INDICES = {
   gear: 37,
   region: 38,
   trainerClass: 39,
-  currentHD: 40,
-  currentVD: 41
+  secondWindCharges: 40,
+  rapidOrdersCharges: 41,
+  unbreakableBondCharges: 42,
+  elementalSynergyCharges: 43,
+  masterTrainerCharges: 44
 };
 const POKEMON_COLUMN_INDICES = {
   trainername: 0,

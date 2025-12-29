@@ -121,6 +121,117 @@ This file tracks all changes made to the project across development sessions.
 - Infrastructure prepared for future visibility features
 - Maintains same performance characteristics
 
+### Hidden Ability Visibility Implementation
+
+**Overview**:
+Implemented comprehensive visibility controls to hide Pokemon hidden abilities based on Pokedex config settings. This allows gradual reveal of Pokemon information as players discover more about them.
+
+**New Visibility System (js/utils/visibility.js)**:
+1. **Purpose**
+   - Central module for checking Pokemon data visibility
+   - Caches Pokedex config for performance
+   - Provides simple API for visibility checks
+
+2. **Key Functions**
+   - `initializeVisibility()`: Loads Pokedex config from server
+   - `getPokemonVisibility(pokemonName)`: Gets full visibility settings for a Pokemon
+   - `isFieldVisible(pokemonName, field)`: Checks if specific field should be visible
+   - `getPokedexConfig()`: Returns cached config for direct access
+
+3. **Visibility Logic**
+   - Checks Pokemon name (case-insensitive) against config
+   - Falls back to defaults if Pokemon not explicitly configured
+   - Returns all visible if config not loaded (fail-safe)
+
+**Backend Updates (Current_Code.gs)**:
+- Added `'pokedex-config'` action to `handleGameDataRoute()`
+- Calls `getPokedexConfig()` to return full configuration
+- Updated test endpoint to include new action
+
+**Frontend API (js/api.js)**:
+- Added `GameDataAPI.getPokedexConfig()` method
+- Fetches config with caching (30-minute cache duration)
+- Cache key: `'game-data:pokedex-config'`
+
+**Page-Specific Changes**:
+
+1. **pokemon-form.js** (Pokemon Registration):
+   - Import visibility helpers in header
+   - Made `attachPokemonFormListeners()` async
+   - Initialize visibility before populating abilities
+   - Updated `populateAbilityOptions()`:
+     - Skip rendering ability when `slotIndex === 2` (hidden ability)
+     - Check `isFieldVisible(pokemonName, 'hiddenAbility')`
+     - Hidden ability checkbox not created if not visible
+
+2. **edit-pokemon.js** (Pokemon Editing):
+   - Import visibility helpers in header
+   - Made `attachEditPokemonListeners()` async
+   - Initialize visibility before loading abilities
+   - Updated `populateAbilities()`:
+     - Check if ability is last in array (hidden ability)
+     - Skip rendering if `isFieldVisible(pokemonName, 'hiddenAbility')` returns false
+     - Prevents hidden ability from being selected
+
+3. **evolution.js** (Pokemon Evolution):
+   - Import visibility helpers in header
+   - Made `attachEvolutionListeners()` async
+   - Initialize visibility on page load
+   - Updated ability mapping section:
+     - Check `slotIndex === 2` during ability mapping
+     - Skip mapping hidden ability if not visible for evolved Pokemon
+     - Prevents hidden ability from transferring to evolved form
+
+**Technical Details**:
+
+Hidden Ability Identification:
+- In Pokedex data: Index 8 (third ability slot)
+- In ability arrays: SlotIndex 2 (0 = primary, 1 = secondary, 2 = hidden)
+- In form rendering: Last ability in abilities array
+
+Visibility Check Flow:
+```javascript
+// Example: Checking hidden ability visibility
+if (slotIndex === 2 && !isFieldVisible(pokemonName, 'hiddenAbility')) {
+  return; // Skip rendering
+}
+```
+
+Config Structure for Hidden Ability:
+```javascript
+{
+  "visibility": {
+    "salamandrop": {
+      "hiddenAbility": false  // Hidden ability not visible
+    },
+    "octuber": {
+      "hiddenAbility": true   // Hidden ability visible
+    }
+  },
+  "defaults": {
+    "hiddenAbility": false    // Default for unconfigured Pokemon
+  }
+}
+```
+
+**Player Impact**:
+- Hidden abilities now respect visibility settings in Pokedex config
+- Players can only see/select hidden abilities for Pokemon with `hiddenAbility: true`
+- Gradual Pokemon discovery supported - can reveal abilities over time
+- Evolution preserves visibility rules (won't map hidden ability if not visible)
+- Seamless experience - abilities simply don't appear if not visible
+
+**Future Extensibility**:
+The visibility system is designed to support additional fields:
+- `primaryAbility`, `secondaryAbility`: Control regular ability visibility
+- `stats`: Hide/show base stats
+- `types`: Control type information visibility
+- `moves`: Limit visible moves
+- `evolution`: Hide evolution information
+- `senses`: Control sense data visibility
+
+All infrastructure in place - just add checks in relevant rendering functions.
+
 ---
 
 ## Session: 2025-12-16 - Trainer Info Enhancements, Affinity System Fix, and Edit-Pokemon Improvements

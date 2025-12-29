@@ -710,6 +710,63 @@ export function renderTrainerInfo() {
           opacity: 0.6;
         }
 
+        .rest-buttons-container {
+          display: flex;
+          gap: clamp(0.75rem, 1.5vw, 1rem);
+          justify-content: center;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          padding: clamp(0.75rem, 1.5vw, 1rem);
+          border-bottom: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+        }
+
+        .rest-button {
+          flex: 1;
+          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1rem, 2vw, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(10px, 2vw, 15px);
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.2vw, 1px);
+          cursor: pointer;
+          box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(0.3rem, 0.8vw, 0.5rem);
+        }
+
+        .short-rest-button {
+          background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+          color: white;
+        }
+
+        .short-rest-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2vh, 18px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 2.5vh, 20px) rgba(74,144,226,0.5);
+        }
+
+        .long-rest-button {
+          background: linear-gradient(135deg, #7B68EE 0%, #6A5ACD 100%);
+          color: white;
+        }
+
+        .long-rest-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2vh, 18px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 2.5vh, 20px) rgba(123,104,238,0.5);
+        }
+
+        .rest-button:active {
+          transform: translateY(0);
+        }
+
+        .rest-icon {
+          font-size: clamp(1.1rem, 2.2vw, 1.3rem);
+        }
+
         /* Special Inventory Popup Styles */
         #inventoryPopup .popup-content {
           max-width: min(90vw, 900px);
@@ -2090,6 +2147,71 @@ export function attachTrainerInfoListeners() {
     showTrainerSkillsPopup();
   }
 
+  // Helper function to handle short rest (refills Second Wind only)
+  async function handleShortRest() {
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) {
+      showError('Trainer data not found.');
+      return;
+    }
+
+    const trainerData = JSON.parse(trainerDataRaw);
+    const trainerLevel = parseInt(trainerData[2], 10);
+
+    // Refill Second Wind charges
+    const maxSecondWind = getMaxCharges('Second Wind', trainerLevel);
+    trainerData[40] = maxSecondWind;
+
+    // Update session storage
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Update database
+    try {
+      await TrainerAPI.update(trainerData);
+      showSuccess('Short rest completed! Second Wind charges restored.');
+    } catch (error) {
+      console.error('Error updating trainer data:', error);
+      showError('Failed to save short rest to database');
+    }
+
+    // Refresh the popup to show updated charges
+    showTrainerSkillsPopup();
+  }
+
+  // Helper function to handle long rest (refills all buffs)
+  async function handleLongRest() {
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) {
+      showError('Trainer data not found.');
+      return;
+    }
+
+    const trainerData = JSON.parse(trainerDataRaw);
+    const trainerLevel = parseInt(trainerData[2], 10);
+
+    // Refill all buff charges to max
+    trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
+    trainerData[41] = getMaxCharges('Rapid Orders', trainerLevel);
+    trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
+    trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
+    trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+
+    // Update session storage
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Update database
+    try {
+      await TrainerAPI.update(trainerData);
+      showSuccess('Long rest completed! All buff charges restored.');
+    } catch (error) {
+      console.error('Error updating trainer data:', error);
+      showError('Failed to save long rest to database');
+    }
+
+    // Refresh the popup to show updated charges
+    showTrainerSkillsPopup();
+  }
+
   // Helper function to show Trainer Buffs popup
   function showTrainerSkillsPopup() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
@@ -2123,6 +2245,20 @@ export function attachTrainerInfoListeners() {
 
     // Build the popup content
     let content = '';
+
+    // Add rest buttons at the top
+    content += `
+      <div class="rest-buttons-container">
+        <button class="rest-button short-rest-button" id="shortRestButton">
+          <span class="rest-icon">☀️</span>
+          Short Rest
+        </button>
+        <button class="rest-button long-rest-button" id="longRestButton">
+          <span class="rest-icon">🌙</span>
+          Long Rest
+        </button>
+      </div>
+    `;
 
     // Add nationality region buff first if it exists
     if (nationality) {
@@ -2213,6 +2349,15 @@ export function attachTrainerInfoListeners() {
         const buffIndex = parseInt(button.dataset.buffIndex, 10);
         await useBuff(buffName, buffIndex);
       });
+    });
+
+    // Add event listeners to Rest buttons
+    document.getElementById('shortRestButton')?.addEventListener('click', async () => {
+      await handleShortRest();
+    });
+
+    document.getElementById('longRestButton')?.addEventListener('click', async () => {
+      await handleLongRest();
     });
 
     // Open the popup

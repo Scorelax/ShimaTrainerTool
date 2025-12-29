@@ -2114,7 +2114,7 @@ export function attachTrainerInfoListeners() {
   }
 
   // Helper function to use a buff (decrement charge)
-  async function useBuff(buffName, chargeIndex) {
+  function useBuff(buffName, chargeIndex) {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       showError('Trainer data not found.');
@@ -2132,23 +2132,21 @@ export function attachTrainerInfoListeners() {
     // Decrement charge
     trainerData[chargeIndex] = currentCharges - 1;
 
-    // Update session storage
+    // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-    // Update database
-    try {
-      await TrainerAPI.update(trainerData);
-    } catch (error) {
+    // Refresh the popup to show updated charges IMMEDIATELY
+    showTrainerSkillsPopup();
+
+    // Update database in background (non-blocking)
+    TrainerAPI.update(trainerData).catch(error => {
       console.error('Error updating trainer data:', error);
       showError('Failed to save buff usage to database');
-    }
-
-    // Refresh the popup to show updated charges
-    showTrainerSkillsPopup();
+    });
   }
 
   // Helper function to handle short rest (refills Second Wind only)
-  async function handleShortRest() {
+  function handleShortRest() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       showError('Trainer data not found.');
@@ -2162,24 +2160,24 @@ export function attachTrainerInfoListeners() {
     const maxSecondWind = getMaxCharges('Second Wind', trainerLevel);
     trainerData[40] = maxSecondWind;
 
-    // Update session storage
+    // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-    // Update database
-    try {
-      await TrainerAPI.update(trainerData);
-      showSuccess('Short rest completed! Second Wind charges restored.');
-    } catch (error) {
+    // Refresh the popup to show updated charges IMMEDIATELY
+    showTrainerSkillsPopup();
+
+    // Show success message
+    showSuccess('Short rest completed! Second Wind charges restored.');
+
+    // Update database in background (non-blocking)
+    TrainerAPI.update(trainerData).catch(error => {
       console.error('Error updating trainer data:', error);
       showError('Failed to save short rest to database');
-    }
-
-    // Refresh the popup to show updated charges
-    showTrainerSkillsPopup();
+    });
   }
 
   // Helper function to handle long rest (refills all buffs)
-  async function handleLongRest() {
+  function handleLongRest() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       showError('Trainer data not found.');
@@ -2196,20 +2194,20 @@ export function attachTrainerInfoListeners() {
     trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
     trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
 
-    // Update session storage
+    // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-    // Update database
-    try {
-      await TrainerAPI.update(trainerData);
-      showSuccess('Long rest completed! All buff charges restored.');
-    } catch (error) {
+    // Refresh the popup to show updated charges IMMEDIATELY
+    showTrainerSkillsPopup();
+
+    // Show success message
+    showSuccess('Long rest completed! All buff charges restored.');
+
+    // Update database in background (non-blocking)
+    TrainerAPI.update(trainerData).catch(error => {
       console.error('Error updating trainer data:', error);
       showError('Failed to save long rest to database');
-    }
-
-    // Refresh the popup to show updated charges
-    showTrainerSkillsPopup();
+    });
   }
 
   // Helper function to show Trainer Buffs popup
@@ -2344,20 +2342,20 @@ export function attachTrainerInfoListeners() {
 
     // Add event listeners to Use buttons
     document.querySelectorAll('.use-buff-button').forEach(button => {
-      button.addEventListener('click', async () => {
+      button.addEventListener('click', () => {
         const buffName = button.dataset.buffName;
         const buffIndex = parseInt(button.dataset.buffIndex, 10);
-        await useBuff(buffName, buffIndex);
+        useBuff(buffName, buffIndex);
       });
     });
 
     // Add event listeners to Rest buttons
-    document.getElementById('shortRestButton')?.addEventListener('click', async () => {
-      await handleShortRest();
+    document.getElementById('shortRestButton')?.addEventListener('click', () => {
+      handleShortRest();
     });
 
-    document.getElementById('longRestButton')?.addEventListener('click', async () => {
-      await handleLongRest();
+    document.getElementById('longRestButton')?.addEventListener('click', () => {
+      handleLongRest();
     });
 
     // Open the popup

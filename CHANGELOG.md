@@ -4,6 +4,65 @@ This file tracks all changes made to the project across development sessions.
 
 ---
 
+## Session: 2025-12-29 - Rest System Logic Update and Second Wind Charge Tracking Removal
+
+### Rest System Overhaul (`js/pages/trainer-info.js`)
+
+**Short Rest Changes**:
+1. **Functionality Updated**
+   - Now only restores trainer HP and VP to maximum values
+   - No longer restores buff charges
+   - Provides instant feedback with updated UI
+   - Success message: "Short rest completed! Trainer HP and VP fully restored."
+
+2. **Implementation Details**
+   - Reads trainer max HP/VP from indices 11-12
+   - Updates current HP/VP at indices 34-35
+   - Session storage updated immediately for instant UI response
+   - Database update happens in background (non-blocking)
+
+**Long Rest Changes**:
+1. **Comprehensive Restoration**
+   - Restores trainer HP and VP to maximum
+   - Refills all buff charges (Rapid Orders, Unbreakable Bond, Elemental Synergy, Master Trainer)
+   - Restores HP and VP for all active Pokemon
+   - Excludes Second Wind from charge restoration (manually tracked)
+
+2. **Active Pokemon Restoration**
+   - Added `restoreActivePokemonHP()` helper function
+   - Searches all Pokemon in session storage
+   - Identifies Pokemon belonging to current trainer
+   - Filters for active status (index 29 === 'TRUE')
+   - Restores each active Pokemon's HP/VP to max
+   - Updates both session storage and database
+
+3. **Implementation Details**
+   - Buff charges restored at indices 41-44 (excluding index 40)
+   - Uses `getMaxCharges()` to calculate proper charge amounts based on trainer level
+   - Background database updates for both trainer and Pokemon data
+   - Success message: "Long rest completed! Trainer and active Pokemon fully restored, buff charges refilled."
+
+**Second Wind Charge Tracking Removal**:
+1. **Rationale**
+   - Second Wind is "once per combat" ability
+   - Manual tracking is simpler than automated charge system
+   - Removed from automated charge tracking to avoid confusion
+
+2. **Changes Made**
+   - Removed `secondWindCharges` variable from `showTrainerSkillsPopup()`
+   - Excluded Second Wind from `trainerBuffs` array
+   - Second Wind still displays in popup but without charge dots or Use button
+   - Added comments clarifying Second Wind is excluded from tracking
+   - Data field at index 40 preserved but no longer actively managed
+
+**Code Quality Improvements**:
+- Added clear comments explaining Second Wind exclusion
+- Updated function documentation to reflect new behavior
+- Maintained optimistic UI updates pattern for instant user feedback
+- All database writes remain non-blocking for smooth UX
+
+---
+
 ## Session: 2025-12-16 - Trainer Info Enhancements, Affinity System Fix, and Edit-Pokemon Improvements
 
 ### Part 1: Trainer Buffs Button Addition (`js/pages/trainer-info.js`)

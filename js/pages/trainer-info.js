@@ -2145,7 +2145,7 @@ export function attachTrainerInfoListeners() {
     });
   }
 
-  // Helper function to handle short rest (refills Second Wind only)
+  // Helper function to handle short rest (restores trainer HP/VP only)
   function handleShortRest() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
@@ -2154,11 +2154,12 @@ export function attachTrainerInfoListeners() {
     }
 
     const trainerData = JSON.parse(trainerDataRaw);
-    const trainerLevel = parseInt(trainerData[2], 10);
 
-    // Refill Second Wind charges
-    const maxSecondWind = getMaxCharges('Second Wind', trainerLevel);
-    trainerData[40] = maxSecondWind;
+    // Restore trainer HP and VP to max
+    const maxHP = parseInt(trainerData[11], 10);
+    const maxVP = parseInt(trainerData[12], 10);
+    trainerData[34] = maxHP; // currentHP
+    trainerData[35] = maxVP; // currentVP
 
     // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
@@ -2167,7 +2168,7 @@ export function attachTrainerInfoListeners() {
     showTrainerSkillsPopup();
 
     // Show success message
-    showSuccess('Short rest completed! Second Wind charges restored.');
+    showSuccess('Short rest completed! Trainer HP and VP fully restored.');
 
     // Update database in background (non-blocking)
     TrainerAPI.update(trainerData).catch(error => {
@@ -2176,8 +2177,8 @@ export function attachTrainerInfoListeners() {
     });
   }
 
-  // Helper function to handle long rest (refills all buffs)
-  function handleLongRest() {
+  // Helper function to handle long rest (restores trainer HP/VP, buff charges, and active Pokemon HP/VP)
+  async function handleLongRest() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       showError('Trainer data not found.');
@@ -2186,9 +2187,15 @@ export function attachTrainerInfoListeners() {
 
     const trainerData = JSON.parse(trainerDataRaw);
     const trainerLevel = parseInt(trainerData[2], 10);
+    const trainerName = trainerData[1];
 
-    // Refill all buff charges to max
-    trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
+    // Restore trainer HP and VP to max
+    const maxHP = parseInt(trainerData[11], 10);
+    const maxVP = parseInt(trainerData[12], 10);
+    trainerData[34] = maxHP; // currentHP
+    trainerData[35] = maxVP; // currentVP
+
+    // Refill all buff charges to max (excluding Second Wind - index 40)
     trainerData[41] = getMaxCharges('Rapid Orders', trainerLevel);
     trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
     trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
@@ -2201,13 +2208,50 @@ export function attachTrainerInfoListeners() {
     showTrainerSkillsPopup();
 
     // Show success message
-    showSuccess('Long rest completed! All buff charges restored.');
+    showSuccess('Long rest completed! Trainer and active Pokemon fully restored, buff charges refilled.');
 
-    // Update database in background (non-blocking)
+    // Update trainer in database (non-blocking)
     TrainerAPI.update(trainerData).catch(error => {
       console.error('Error updating trainer data:', error);
       showError('Failed to save long rest to database');
     });
+
+    // Restore active Pokemon HP/VP in background
+    restoreActivePokemonHP(trainerName);
+  }
+
+  // Helper function to restore all active Pokemon HP/VP to full
+  async function restoreActivePokemonHP(trainerName) {
+    try {
+      // Get all Pokemon for this trainer from session storage
+      const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
+
+      for (const key of allPokemonKeys) {
+        const pokemonDataStr = sessionStorage.getItem(key);
+        if (!pokemonDataStr) continue;
+
+        const pokemonData = JSON.parse(pokemonDataStr);
+
+        // Check if this Pokemon belongs to current trainer and is active
+        if (pokemonData[0] === trainerName && pokemonData[29] === 'TRUE') { // trainername at 0, isActive at 29
+          // Restore HP and VP to max
+          const maxHP = parseInt(pokemonData[11], 10);
+          const maxVP = parseInt(pokemonData[12], 10);
+          pokemonData[13] = maxHP; // currentHP
+          pokemonData[14] = maxVP; // currentVP
+
+          // Update session storage
+          sessionStorage.setItem(key, JSON.stringify(pokemonData));
+
+          // Update database in background
+          PokemonAPI.update(pokemonData).catch(error => {
+            console.error(`Error updating Pokemon ${pokemonData[2]}:`, error);
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error restoring active Pokemon HP:', error);
+    }
   }
 
   // Helper function to show Trainer Buffs popup
@@ -2221,8 +2265,8 @@ export function attachTrainerInfoListeners() {
     const trainerData = JSON.parse(trainerDataRaw);
     const trainerLevel = parseInt(trainerData[2], 10); // Trainer level
 
-    // Get buff charges from trainer data (indices 40-44)
-    const secondWindCharges = parseInt(trainerData[40], 10) || 0;
+    // Get buff charges from trainer data (indices 41-44)
+    // Note: index 40 (Second Wind) is not tracked as it's once per combat
     const rapidOrdersCharges = parseInt(trainerData[41], 10) || 0;
     const unbreakableBondCharges = parseInt(trainerData[42], 10) || 0;
     const elementalSynergyCharges = parseInt(trainerData[43], 10) || 0;
@@ -2272,8 +2316,8 @@ export function attachTrainerInfoListeners() {
     const skillsByName = new Map();
 
     // Define the trainer buff skills with their charge data
+    // Note: Second Wind is excluded as it's once per combat (manually tracked)
     const trainerBuffs = [
-      { name: 'Second Wind', charges: secondWindCharges, index: 40 },
       { name: 'Rapid Orders', charges: rapidOrdersCharges, index: 41 },
       { name: 'Unbreakable Bond', charges: unbreakableBondCharges, index: 42 },
       { name: 'Elemental Synergy', charges: elementalSynergyCharges, index: 43 },

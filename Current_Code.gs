@@ -1019,6 +1019,27 @@ function handleTrainerRoute(action, params) {
       // GET: ?route=trainer&action=money&trainer=Ash&amount=5000
       return writeMoney(params.trainer, parseInt(params.amount));
 
+    case 'affinity':
+      // GET: ?route=trainer&action=affinity&trainer=Ash&affinity=Bug
+      if (!params.trainer || !params.affinity) {
+        throw new Error('Missing trainer name or affinity');
+      }
+      return writeAffinity(params.trainer, params.affinity);
+
+    case 'specialization':
+      // GET: ?route=trainer&action=specialization&trainer=Ash&specialization=Researcher
+      if (!params.trainer || !params.specialization) {
+        throw new Error('Missing trainer name or specialization');
+      }
+      return writeSpecialization(params.trainer, params.specialization);
+
+    case 'trainer-path':
+      // GET: ?route=trainer&action=trainer-path&trainer=Ash&path=Ace Trainer
+      if (!params.trainer || !params.path) {
+        throw new Error('Missing trainer name or path');
+      }
+      return writeTrainerPath(params.trainer, params.path);
+
     default:
       throw new Error('Unknown trainer action: ' + action);
   }
@@ -2534,29 +2555,53 @@ function writeComment(trainerName, pokemonName, comment) {
 }
 
 function writeAffinity(trainerName, affinity) {
-    const sheet = TRAINER_DATA_SHEET;
-    const row = findTrainerRow(trainerName, sheet);
+    try {
+        const sheet = TRAINER_DATA_SHEET;
+        const row = findTrainerRow(trainerName, sheet);
 
-    if (row) {
-        sheet.getRange(row, 24).setValue(affinity);
+        if (row) {
+            sheet.getRange(row, 24).setValue(affinity);
+            return { status: 'success', message: 'Affinity saved successfully' };
+        } else {
+            return { status: 'error', message: 'Trainer not found' };
+        }
+    } catch (error) {
+        Logger.log(`Error writing affinity for ${trainerName}: ${error}`);
+        return { status: 'error', message: 'Failed to write affinity' };
     }
 }
 
 function writeSpecialization(trainerName, specialization) {
-    const sheet = TRAINER_DATA_SHEET;
-    const row = findTrainerRow(trainerName, sheet);
+    try {
+        const sheet = TRAINER_DATA_SHEET;
+        const row = findTrainerRow(trainerName, sheet);
 
-    if (row) {
-        sheet.getRange(row, 25).setValue(specialization);
+        if (row) {
+            sheet.getRange(row, 25).setValue(specialization);
+            return { status: 'success', message: 'Specialization saved successfully' };
+        } else {
+            return { status: 'error', message: 'Trainer not found' };
+        }
+    } catch (error) {
+        Logger.log(`Error writing specialization for ${trainerName}: ${error}`);
+        return { status: 'error', message: 'Failed to write specialization' };
     }
 }
 
 function writeTrainerPath(trainerName, trainerPath) {
-    const sheet = TRAINER_DATA_SHEET;
-    const row = findTrainerRow(trainerName, sheet);
+    try {
+        const sheet = TRAINER_DATA_SHEET;
+        const row = findTrainerRow(trainerName, sheet);
 
-    if (row) {
-        sheet.getRange(row, 26).setValue(trainerPath);
+        if (row) {
+            sheet.getRange(row, 26).setValue(trainerPath);
+            return { status: 'success', message: 'Trainer path saved successfully' };
+        } else {
+            return { status: 'error', message: 'Trainer not found' };
+        }
+    } catch (error) {
+        Logger.log(`Error writing trainer path for ${trainerName}: ${error}`);
+        return { status: 'error', message: 'Failed to write trainer path' };
     }
 }
 

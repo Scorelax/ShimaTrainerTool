@@ -56,23 +56,39 @@ FIXED in edit-trainer.js:
 - Added code to get money value when saving (line 734)
 - Added code to update trainerData[19] with money value (line 758)
 
-BUG FIX #7: Pokemon registration array structure mismatch (CRITICAL)
-------------------------------------------------------------------------
-ROOT CAUSE: Database schema uses POKEMON_COLUMN_INDICES with 3 separate ability
-fields (primaryability, secondaryability, hiddenability at indices 7, 8, 9), but
-backend functions were using old hardcoded indices that expected a single ability
-field. This caused ALL data after index 7 to be stored in wrong columns!
+BUG FIX #7: Pokemon registration array structure mismatch (CRITICAL - FIXED)
+------------------------------------------------------------------------------
+ROOT CAUSE: The actual database has SINGLE ability column at index 7 (pipe-separated
+for multiple abilities), NOT three separate columns. Previous "fix" incorrectly
+assumed 3 ability columns, making the problem worse by shifting all data.
+
+ACTUAL DATABASE SCHEMA (57 fields):
+Trainer Name, Image, Name, Dex Entry, Level, Primary Type, Secondary Type, Ability,
+AC, Hit Dice, HP, Vitality Dice, VP, Speed, Total Stats, Strength, Dexterity,
+Constitution, Intelligence, Wisdom, Charisma, Saving Throws, Skills, Starting Moves,
+Level 2 Moves, Level 6 Moves, Level 10 Moves, Level 14 Moves, Level 18 Moves,
+Evolution Requirement, Initiative, Proficiency Bonus, Nature, Loyalty, STAB,
+Held Item, Nickname, Custom Moves, In Active Party, strmodifier, dexmodifier,
+conmodifier, intmodifier, wismodifier, chamodifier, CurrentHP, CurrentVP, CurrentAC,
+Comment, Senses, Feats, Gear, Flavor text, Type matchups, Current HD, Current VD,
+Utility Slot
+
+FIXED in js/pages/pokemon-form.js:
+- Removed ability splitting code (no longer splits into 3 fields)
+- Now sends single combined ability string at index 7
+- Rebuilt entire array to exactly match database schema
+
+FIXED in js/pages/edit-pokemon.js:
+- Removed ability splitting code
+- Updates pokemonData[7] with combined abilities
+
+FIXED in js/pages/evolution.js:
+- Removed ability splitting code
+- Sends single combined ability field for evolved Pokemon
 
 FIXED in Current_Code.gs (BACKEND):
-- registerPokemonForTrainer() now uses POKEMON_COLUMN_INDICES constants
-- storeTrainerAndPokemonData() reads using POKEMON_COLUMN_INDICES and transforms
-  data to match frontend expectations (combines 3 abilities into 1 pipe-separated
-  string for backward compatibility)
-
-FIXED in js/pages/pokemon-form.js (FRONTEND):
-- Moved senses from index 51 to correct position 41
-- Moved feats from index 52 to correct position 42
-- Reorganized extended fields to match schema
+- registerPokemonForTrainer() uses correct indices (single ability at index 7)
+- storeTrainerAndPokemonData() simplified to use REGISTERED_POKEMON_COLUMN_INDICES
 
 IMPORTANT: This fix requires deploying the updated Current_Code.gs to Google Apps
 Script! See deployment steps below.

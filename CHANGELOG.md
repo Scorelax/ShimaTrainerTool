@@ -4,6 +4,301 @@ This file tracks all changes made to the project across development sessions.
 
 ---
 
+## Session: 2025-12-30 (Continuation) - Affinity/Specialization/Trainer-Path Selection System
+
+### Overview
+Implemented comprehensive selection system allowing trainers to choose and manage their Affinity, Specialization, and Trainer Path directly from the UI. Previously, these values could only be set manually or were stuck as "None" with no way to select them.
+
+### Backend Changes (`Current_Code.gs`)
+
+**New API Routes** (handleTrainerRoute):
+1. **Affinity Route**
+   - Endpoint: `?route=trainer&action=affinity&trainer=Ash&affinity=Bug`
+   - Saves affinity to trainer data (index 23)
+   - Returns success/error response
+
+2. **Specialization Route**
+   - Endpoint: `?route=trainer&action=specialization&trainer=Ash&specialization=Researcher`
+   - Saves specialization to trainer data (index 24)
+   - Returns success/error response
+
+3. **Trainer Path Route**
+   - Endpoint: `?route=trainer&action=trainer-path&trainer=Ash&path=Ace Trainer`
+   - Saves trainer path to trainer data (index 25)
+   - Returns success/error response
+
+**Function Updates**:
+- `writeAffinity()`: Added try/catch and proper response objects
+- `writeSpecialization()`: Added try/catch and proper response objects
+- `writeTrainerPath()`: Added try/catch and proper response objects
+- All functions return `{status: 'success', message: '...'}` or `{status: 'error', message: '...'}`
+
+### Frontend API Changes (`js/api.js`)
+
+**New TrainerAPI Methods**:
+1. **updateAffinity(trainerName, affinity)**
+   - Sends affinity update to backend
+   - Invalidates trainer cache after save
+   - Returns backend response
+
+2. **updateSpecialization(trainerName, specialization)**
+   - Sends specialization update to backend
+   - Invalidates trainer cache after save
+   - Returns backend response
+
+3. **updateTrainerPath(trainerName, path)**
+   - Sends trainer path update to backend
+   - Invalidates trainer cache after save
+   - Returns backend response
+
+### HTML Structure (`js/pages/trainer-info.js`)
+
+**New Popup: Affinity Selection**
+- `affinitySelectionPopup`: Modal popup for selecting affinity
+  - Header with title and close button (×)
+  - `.affinity-grid`: 3-column grid of affinity choices
+  - `.affinity-selection-effect-box`: Preview area showing selected affinity effect
+  - `#chooseAffinityButton`: Confirm button (disabled until selection made)
+
+**New Popup: Specialization Selection**
+- `specializationSelectionPopup`: Modal popup for selecting specialization
+  - Header with title and close button (×)
+  - `.specialization-grid`: 3-column grid of specialization choices
+  - `.specialization-selection-effect-box`: Preview area showing selected specialization effect
+  - `#chooseSpecializationButton`: Confirm button (disabled until selection made)
+
+**Trainer Path Enhancement**
+- Updated trainer path popup to show clickable buttons for each available path when no path is selected
+- Inline selection (no separate popup needed)
+
+### CSS Styling (`css/styles.css`)
+
+**Affinity/Specialization Grids**:
+```css
+.affinity-grid, .specialization-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+```
+
+**Selection Buttons**:
+```css
+.affinity-item, .specialization-item {
+  padding: 10px;
+  border-radius: 5px;
+  text-align: center;
+  background-color: #f44336; /* Red */
+  color: white;
+  cursor: pointer;
+  border: 1px solid black;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-weight: bold;
+}
+
+.affinity-item:hover, .specialization-item:hover {
+  background-color: darkred;
+  transform: scale(1.05);
+}
+```
+
+**Effect Preview Boxes**:
+```css
+.affinity-selection-effect-box,
+.specialization-selection-effect-box {
+  border: 1px solid black;
+  border-radius: 5px;
+  padding: 15px;
+  background-color: #f0f9ff; /* Light blue */
+  color: black;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  min-height: 80px;
+}
+```
+
+**Responsive Design**:
+- Desktop (1024px+): 3 columns
+- Tablet (768px-1024px): 2 columns
+- Phone (<768px): 1 column
+
+### JavaScript Logic (`js/pages/trainer-info.js`)
+
+**Affinity Selection Flow**:
+
+1. **showAffinitySelection()**
+   - Loads affinity data from sessionStorage
+   - Creates grid of clickable affinity buttons
+   - Shows selection popup
+   - Closes main affinity popup
+
+2. **selectAffinity(affinity)**
+   - Displays selected affinity name and effect in preview box
+   - Checks trainer level to determine which effect to show:
+     - Level 2-6: Shows base effect
+     - Level 7+: Shows improved effect if selecting same affinity
+   - Enables "Choose Affinity" button
+   - Attaches save handler to button
+
+3. **saveAffinity(affinity)**
+   - Updates affinity based on trainer level:
+     - Level < 7: Sets first affinity (index 0)
+     - Level >= 7: Sets second affinity (index 1)
+   - Saves to sessionStorage immediately (optimistic update)
+   - Sends save request to backend via TrainerAPI
+   - On success: Closes selection popup, reopens main affinity popup
+   - On error: Shows alert with error message
+
+**Specialization Selection Flow**:
+
+1. **showSpecializationSelection()**
+   - Loads specialization data from sessionStorage
+   - Creates grid of clickable specialization buttons
+   - Shows selection popup
+   - Closes main specialization popup
+
+2. **selectSpecialization(specialization)**
+   - Displays selected specialization name and effect in preview box
+   - Enables "Choose Specialization" button
+   - Attaches save handler to button
+
+3. **saveSpecialization(specialization)**
+   - Updates trainer specialization (index 24)
+   - Saves to sessionStorage immediately (optimistic update)
+   - Sends save request to backend via TrainerAPI
+   - On success: Closes selection popup, reopens main specialization popup
+   - On error: Shows alert with error message
+
+**Trainer Path Selection Flow**:
+
+1. **saveTrainerPath(trainerPath)**
+   - Updates trainer path (index 25)
+   - Saves to sessionStorage immediately (optimistic update)
+   - Sends save request to backend via TrainerAPI
+   - On success: Reopens trainer path popup to show selected path
+   - On error: Shows alert with error message
+
+**Button Handler Updates**:
+
+**Affinity Button**:
+- If no affinity selected and level >= 2: Shows "Select Affinity" button
+- If affinity selected: Shows current affinity with level-appropriate effects
+- If level < 2: Shows "Unlocks at level 2" message
+
+**Specialization Button**:
+- Shows 3 stages (level 2, 10, 17)
+- For unlocked but unchosen stages: Shows "Select Specialization" button
+- For chosen stages: Shows specialization name and effect
+- For locked stages: Shows "Unlocks at level X" message
+
+**Trainer Path Button**:
+- If no path selected: Shows clickable buttons for all available paths
+- If path selected: Shows path stages with level-based progression
+
+**Close Button Handlers**:
+- Added event listeners for `closeAffinitySelection` button
+- Added event listeners for `closeSpecializationSelection` button
+- Both close their respective popups
+
+### Technical Implementation Details
+
+**Global Function Exposure**:
+```javascript
+window.showAffinitySelection = showAffinitySelection;
+window.showSpecializationSelection = showSpecializationSelection;
+window.saveTrainerPath = saveTrainerPath;
+```
+- Functions exposed globally to work with onclick handlers in dynamically generated HTML
+
+**Dynamic Imports**:
+- TrainerAPI imported dynamically in save functions to avoid circular dependencies
+- Uses `await import('../api.js')` pattern
+
+**Optimistic Updates**:
+- SessionStorage updated immediately when selection made
+- UI reflects changes instantly
+- Backend save happens asynchronously
+- Rollback handled via error alerts (user can retry)
+
+**Data Format**:
+- **Affinity**: Stored as comma-separated string (e.g., "Bug, Bug" for improved at level 7)
+  - Index 0: First affinity (level 2)
+  - Index 1: Second affinity (level 7, usually same as first for improved effect)
+- **Specialization**: Stored as comma-separated string (e.g., "Researcher, Scientist, Professor")
+  - Index 0: First specialization (level 2)
+  - Index 1: Second specialization (level 10)
+  - Index 2: Third specialization (level 17)
+- **Trainer Path**: Stored as single string (e.g., "Ace Trainer")
+
+### User Experience Flow
+
+**Selecting Affinity** (Example):
+1. Trainer (level 4) clicks "Affinity" button
+2. Sees "Select Affinity" button in popup
+3. Clicks "Select Affinity"
+4. Sees grid of all 18 affinities (Bug, Dragon, Electric, etc.)
+5. Clicks "Electric"
+6. Preview shows: "**Electric**: Your Electric-type moves deal +2 damage"
+7. Clicks "Choose Affinity" button
+8. Popup closes, affinity saved to database
+9. Main affinity popup reopens showing selected affinity
+
+**Selecting Specialization** (Example):
+1. Trainer (level 10) clicks "Specialization" button
+2. Sees first specialization (Researcher) and "Select Specialization" for second slot
+3. Clicks "Select Specialization"
+4. Sees grid of all specializations
+5. Clicks "Scientist"
+6. Preview shows effect
+7. Clicks "Choose Specialization"
+8. Saved and popup updates
+
+**Selecting Trainer Path** (Example):
+1. Trainer (level 1) clicks "Trainer Path" button
+2. Sees buttons for all available paths (Ace Trainer, Ranger, Breeder, etc.)
+3. Clicks "Ace Trainer"
+4. Path saved immediately
+5. Popup refreshes to show Ace Trainer progression stages
+
+### Deployment Requirements
+
+**CRITICAL**: Backend changes require deployment to Google Apps Script!
+
+**Deployment Steps**:
+1. Open Google Apps Script project
+2. Copy entire `Current_Code.gs` file
+3. Paste into Apps Script editor (replace all code)
+4. Save (Ctrl+S)
+5. Deploy → Manage deployments → Edit → New version
+6. Add description: "Add affinity/specialization/trainer-path selection API routes"
+7. Click "Deploy"
+8. Test selection features in the app
+
+**Without deployment**:
+- Selection UI will work
+- SessionStorage will update
+- Backend saves will fail with errors
+- Data won't persist to database
+
+### Testing Checklist
+
+After deployment, test:
+- [ ] Affinity selection (level 2+)
+- [ ] Specialization selection (levels 2, 10, 17)
+- [ ] Trainer path selection
+- [ ] Effect preview shows correct information
+- [ ] Selections save to database
+- [ ] Selections persist after page reload
+- [ ] Improved affinity effect shows at level 7+
+- [ ] Level requirements enforced (no selection before unlock)
+- [ ] Close buttons work on all popups
+- [ ] Responsive layout works on mobile/tablet
+
+---
+
 ## Session: 2025-12-29 - Rest System Logic Update and Second Wind Charge Tracking Removal
 
 ### Rest System Overhaul (`js/pages/trainer-info.js`)

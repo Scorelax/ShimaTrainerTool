@@ -437,3 +437,84 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================================
+   AFFINITY & SPECIALIZATION SELECTION POPUPS
+   ============================================================================ */
+
+.affinity-grid,
+.specialization-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.affinity-item,
+.specialization-item {
+  padding: 10px;
+  border-radius: 5px;
+  text-align: center;
+  background-color: #f44336;
+  color: white;
+  cursor: pointer;
+  border: 1px solid black;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-weight: bold;
+}
+
+.affinity-item:hover,
+.specialization-item:hover {
+  background-color: darkred;
+  transform: scale(1.05);
+}
+
+.affinity-item:active,
+.specialization-item:active {
+  transform: scale(0.98);
+}
+
+.affinity-selection-effect-box,
+.specialization-selection-effect-box {
+  border: 1px solid black;
+  border-radius: 5px;
+  padding: 15px;
+  text-align: left;
+  background-color: #f0f9ff;
+  color: black;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  min-height: 80px;
+}
+
+.affinity-selection-effect-box strong,
+.specialization-selection-effect-box strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+  color: #d32f2f;
+}
+
+.popup-footer {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Responsive adjustments for selection grids */
+@media (max-width: 768px) {
+  .affinity-grid,
+  .specialization-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .affinity-grid,
+  .specialization-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1849,6 +1849,38 @@ export function renderTrainerInfo() {
         </div>
       </div>
 
+      <div class="popup-overlay" id="affinitySelectionPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Select Affinity</div>
+            <button class="popup-close" id="closeAffinitySelection">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="affinity-grid"></div>
+            <div class="affinity-selection-effect-box">Select an affinity to see its effect.</div>
+            <div class="popup-footer">
+              <button id="chooseAffinityButton" class="popup-button" disabled>Choose Affinity</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="specializationSelectionPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Select Specialization</div>
+            <button class="popup-close" id="closeSpecializationSelection">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="specialization-grid"></div>
+            <div class="specialization-selection-effect-box">Select a specialization to see its effect.</div>
+            <div class="popup-footer">
+              <button id="chooseSpecializationButton" class="popup-button" disabled>Choose Specialization</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="popup-overlay" id="gearPopup">
         <div class="popup-content">
           <div class="popup-header">

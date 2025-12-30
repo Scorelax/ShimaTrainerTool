@@ -1343,35 +1343,33 @@ function populateAbilities(abilities, pokemonData) {
   });
 
   // Check currently selected abilities
-  // Support both old format (single field at index 7) and new format (3 fields at indices 7, 8, 9)
   let currentAbilities = [];
   const ability7 = pokemonData[7] || '';
-  const ability8 = pokemonData[8] || '';
-  const ability9 = pokemonData[9] || '';
 
-  // Check if old format (contains pipe separator) or new format (separate fields)
-  if (ability7.includes('|')) {
-    // Old format: single field with pipe-separated values
-    currentAbilities = ability7.split('|').map(a => a.trim()).filter(a => a);
-  } else {
-    // New format: three separate fields
-    if (ability7) currentAbilities.push(ability7);
-    if (ability8) currentAbilities.push(ability8);
-    if (ability9) currentAbilities.push(ability9);
+  // Ensure ability7 is a string
+  const abilityString = typeof ability7 === 'string' ? ability7 : String(ability7 || '');
+
+  // Split by pipe separator to get individual abilities
+  if (abilityString && abilityString.includes('|')) {
+    currentAbilities = abilityString.split('|').map(a => a.trim()).filter(a => a);
+  } else if (abilityString) {
+    currentAbilities = [abilityString];
   }
 
   currentAbilities.forEach(abilityData => {
-    const colonIndex = abilityData.indexOf(':');
+    // Ensure abilityData is a string
+    const abilityStr = typeof abilityData === 'string' ? abilityData : String(abilityData);
+    const colonIndex = abilityStr.indexOf(':');
 
     if (colonIndex !== -1 && colonIndex < 3) {
-      const slotIndex = abilityData.substring(0, colonIndex);
+      const slotIndex = abilityStr.substring(0, colonIndex);
       const checkbox = document.getElementById(`ability${slotIndex}`);
       if (checkbox) {
         checkbox.checked = true;
       }
     } else {
       // Legacy format - match by name
-      const abilityName = abilityData.split(';')[0].trim();
+      const abilityName = abilityStr.split(';')[0].trim();
       const checkboxes = document.querySelectorAll('input[name="abilities"]');
       checkboxes.forEach(checkbox => {
         const checkboxValue = checkbox.value;

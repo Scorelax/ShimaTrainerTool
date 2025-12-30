@@ -380,10 +380,10 @@ function populateAbilityOptions(selectedPokemonData) {
     // Store slotIndex:name;description format
     checkbox.value = slotIndex + ':' + abilityName + ';' + abilityDescription;
 
-    // Create label with name and description
+    // Create label with only name (description still saved in checkbox value for display in Pokemon card)
     const label = document.createElement('label');
     label.htmlFor = `ability${slotIndex}`;
-    label.innerHTML = `<strong>${abilityName}</strong><span class="ability-description">${abilityDescription}</span>`;
+    label.textContent = abilityName;
 
     div.appendChild(checkbox);
     div.appendChild(label);

@@ -414,6 +414,19 @@ export function attachContinueJourneyListeners() {
 
         updateLoadingProgress(50, 'Loading Pokemon data...');
 
+        // Load complete Pokemon data (all registered Pokemon with abilities, moves, stats)
+        // This is cached in session storage to avoid slow API calls later
+        try {
+          const completePokemonData = await import('../api.js').then(m => m.PokemonAPI.getRegisteredList());
+          if (completePokemonData.status === 'success') {
+            sessionStorage.setItem('completePokemonData', JSON.stringify(completePokemonData.data));
+            console.log('[Cache] Stored complete Pokemon data for', completePokemonData.data.length, 'Pokemon');
+          }
+        } catch (error) {
+          console.error('[Cache] Failed to load complete Pokemon data:', error);
+          // Continue anyway - app will fall back to individual API calls if needed
+        }
+
         // Check if Pokemon Trainer or Conduit
         const trainerClass = response.data.trainerData[39]; // Index for trainer class
 

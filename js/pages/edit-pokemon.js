@@ -1277,6 +1277,33 @@ async function loadAbilities(pokemonData) {
   }
 
   try {
+    // First check if we have cached Pokemon data in session storage
+    const cachedDataStr = sessionStorage.getItem('completePokemonData');
+    if (cachedDataStr) {
+      try {
+        const completePokemonData = JSON.parse(cachedDataStr);
+        const pokemonInfo = completePokemonData.find(p => p[1] === currentPokemonName);
+
+        if (pokemonInfo) {
+          // Pokemon found in cache! Use abilities from indices 6, 7, 8
+          const abilities = [
+            pokemonInfo[6],  // Primary ability
+            pokemonInfo[7],  // Secondary ability
+            pokemonInfo[8]   // Hidden ability
+          ].filter(a => a && a !== ''); // Remove empty abilities
+
+          console.log('[Cache HIT] Using cached abilities for', currentPokemonName);
+          populateAbilities(abilities, pokemonData);
+          return;
+        }
+      } catch (cacheError) {
+        console.warn('[Cache] Error reading cached data:', cacheError);
+        // Fall through to API call
+      }
+    }
+
+    // Cache miss or error - fall back to API call
+    console.log('[Cache MISS] Fetching abilities from API for', currentPokemonName);
     const response = await PokemonAPI.getAbilities(currentPokemonName);
     if (response.status === 'success') {
       populateAbilities(response.abilities, pokemonData);
@@ -1288,7 +1315,7 @@ async function loadAbilities(pokemonData) {
       showError('Failed to load Pokemon abilities');
     }
   } catch (error) {
-    console.error('Error calling getPokemonAbilities:', error);
+    console.error('Error loading abilities:', error);
     if (abilitiesContent) {
       abilitiesContent.innerHTML = '<div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #f44336;">Failed to load abilities</div>';
     }

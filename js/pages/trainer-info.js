@@ -2828,9 +2828,11 @@ export function attachTrainerInfoListeners() {
       } else if (trainerLevel >= stage.level) {
         // Unlocked but not chosen
         html += `
-          <div class="popup-item popup-item-locked">
+          <div class="popup-item">
             <div class="popup-item-title">${stage.label}</div>
-            <div class="popup-item-effect">Not selected yet</div>
+            <div class="popup-item-effect">
+              <button class="popup-button" onclick="showSpecializationSelection()">Select Specialization</button>
+            </div>
           </div>
         `;
       } else {
@@ -2860,7 +2862,24 @@ export function attachTrainerInfoListeners() {
     const content = document.getElementById('trainerPathContent');
 
     if (!trainerPathName || trainerPathName === 'None') {
-      content.innerHTML = '<p style="text-align: center; color: #999;">No trainer path selected.</p>';
+      // Show selection buttons for available trainer paths
+      if (trainerPathsDataStr) {
+        const trainerPathsData = JSON.parse(trainerPathsDataStr);
+        let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+        trainerPathsData.forEach(path => {
+          html += `
+            <button class="popup-button" onclick='saveTrainerPath(${JSON.stringify(path).replace(/'/g, "&apos;")})' style="width: 100%;">
+              ${path.name}
+            </button>
+          `;
+        });
+
+        html += '</div>';
+        content.innerHTML = html;
+      } else {
+        content.innerHTML = '<p style="text-align: center; color: #999;">No trainer paths available.</p>';
+      }
       openPopup('trainerPathPopup');
       return;
     }
@@ -2985,9 +3004,11 @@ export function attachTrainerInfoListeners() {
     else {
       if (trainerLevel >= 2) {
         html += `
-          <div class="popup-item popup-item-locked">
+          <div class="popup-item">
             <div class="popup-item-title">Affinity</div>
-            <div class="popup-item-effect">Not selected yet</div>
+            <div class="popup-item-effect">
+              <button class="popup-button" onclick="showAffinitySelection()">Select Affinity</button>
+            </div>
           </div>
         `;
       } else {
@@ -3005,6 +3026,8 @@ export function attachTrainerInfoListeners() {
   });
 
   document.getElementById('closeAffinity')?.addEventListener('click', () => closePopup('affinityPopup'));
+  document.getElementById('closeAffinitySelection')?.addEventListener('click', () => closePopup('affinitySelectionPopup'));
+  document.getElementById('closeSpecializationSelection')?.addEventListener('click', () => closePopup('specializationSelectionPopup'));
 
   // Gear button
   document.getElementById('gearButton')?.addEventListener('click', () => {
@@ -3226,4 +3249,206 @@ export function attachTrainerInfoListeners() {
       window.location.reload();
     }
   });
+}
+
+// ============================================================================
+// AFFINITY SELECTION
+// ============================================================================
+
+// Make functions globally accessible for onclick handlers
+window.showAffinitySelection = showAffinitySelection;
+window.showSpecializationSelection = showSpecializationSelection;
+window.saveTrainerPath = saveTrainerPath;
+
+function showAffinitySelection() {
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const affinitiesData = JSON.parse(sessionStorage.getItem('affinities') || '[]');
+  const affinitiesStored = trainerData[23] ? trainerData[23].split(',').map(a => a.trim()).filter(a => a) : [];
+
+  const affinityGrid = document.querySelector('.affinity-grid');
+  const affinityEffectBox = document.querySelector('.affinity-selection-effect-box');
+  const chooseButton = document.getElementById('chooseAffinityButton');
+
+  affinityGrid.innerHTML = '';
+  affinityEffectBox.innerHTML = 'Select an affinity to see its effect.';
+  chooseButton.disabled = true;
+
+  // Create button for each affinity
+  affinitiesData.forEach(affinity => {
+    const button = document.createElement('div');
+    button.className = 'affinity-item';
+    button.textContent = affinity.name;
+    button.onclick = () => selectAffinity(affinity);
+    affinityGrid.appendChild(button);
+  });
+
+  // Show the popup
+  document.getElementById('affinitySelectionPopup').style.display = 'flex';
+  // Close the main affinity popup
+  document.getElementById('affinityPopup').style.display = 'none';
+}
+
+function selectAffinity(affinity) {
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const affinityEffectBox = document.querySelector('.affinity-selection-effect-box');
+  const chooseButton = document.getElementById('chooseAffinityButton');
+  const trainerLevel = parseInt(trainerData[2], 10) || 1;
+  const affinitiesStored = trainerData[23] ? trainerData[23].split(',').map(a => a.trim()).filter(a => a) : [];
+  const firstAffinity = affinitiesStored[0] || null;
+
+  let effectToShow = affinity.effect;
+
+  // If level 7+ and selecting same affinity as first, show improved effect
+  if (trainerLevel >= 7 && affinity.name === firstAffinity) {
+    effectToShow = affinity.improvedEffect || affinity.effect;
+  }
+
+  // Update effect box
+  affinityEffectBox.innerHTML = `<strong>${affinity.name}</strong><p>${effectToShow}</p>`;
+
+  // Enable choose button
+  chooseButton.disabled = false;
+  chooseButton.onclick = () => saveAffinity(affinity);
+}
+
+async function saveAffinity(affinity) {
+  if (!affinity) return;
+
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const trainerName = trainerData[1];
+  const trainerLevel = parseInt(trainerData[2], 10) || 1;
+  let affinitiesStored = trainerData[23] ? trainerData[23].split(',').map(a => a.trim()).filter(a => a) : [];
+
+  // Update affinity based on level
+  if (trainerLevel < 7) {
+    affinitiesStored[0] = affinity.name; // First affinity
+  } else {
+    affinitiesStored[1] = affinity.name; // Second affinity (or improved)
+  }
+
+  const affinityString = affinitiesStored.join(', ');
+  trainerData[23] = affinityString;
+
+  // Update session storage immediately
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+  // Save to backend
+  try {
+    const { TrainerAPI } = await import('../api.js');
+    const response = await TrainerAPI.updateAffinity(trainerName, affinityString);
+    if (response.status === 'success') {
+      // Close selection popup
+      document.getElementById('affinitySelectionPopup').style.display = 'none';
+      // Reopen main affinity popup to show the updated affinity
+      document.getElementById('affinityButton').click();
+    } else {
+      alert(response.message || 'Failed to save affinity');
+    }
+  } catch (error) {
+    console.error('Error saving affinity:', error);
+    alert('Failed to save affinity');
+  }
+}
+
+// ============================================================================
+// SPECIALIZATION SELECTION
+// ============================================================================
+
+function showSpecializationSelection() {
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const specializationsData = JSON.parse(sessionStorage.getItem('specializations') || '[]');
+
+  const specializationGrid = document.querySelector('.specialization-grid');
+  const specializationEffectBox = document.querySelector('.specialization-selection-effect-box');
+  const chooseButton = document.getElementById('chooseSpecializationButton');
+
+  specializationGrid.innerHTML = '';
+  specializationEffectBox.innerHTML = 'Select a specialization to see its effect.';
+  chooseButton.disabled = true;
+
+  // Create button for each specialization
+  specializationsData.forEach(spec => {
+    const button = document.createElement('div');
+    button.className = 'specialization-item';
+    button.textContent = spec.name;
+    button.onclick = () => selectSpecialization(spec);
+    specializationGrid.appendChild(button);
+  });
+
+  // Show the popup
+  document.getElementById('specializationSelectionPopup').style.display = 'flex';
+  // Close the main specialization popup
+  document.getElementById('specializationPopup').style.display = 'none';
+}
+
+function selectSpecialization(specialization) {
+  const specializationEffectBox = document.querySelector('.specialization-selection-effect-box');
+  const chooseButton = document.getElementById('chooseSpecializationButton');
+
+  // Update effect box
+  specializationEffectBox.innerHTML = `<strong>${specialization.name}</strong><p>${specialization.effect || 'No effect description available.'}</p>`;
+
+  // Enable choose button
+  chooseButton.disabled = false;
+  chooseButton.onclick = () => saveSpecialization(specialization);
+}
+
+async function saveSpecialization(specialization) {
+  if (!specialization) return;
+
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const trainerName = trainerData[1];
+
+  trainerData[24] = specialization.name;
+
+  // Update session storage immediately
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+  // Save to backend
+  try {
+    const { TrainerAPI } = await import('../api.js');
+    const response = await TrainerAPI.updateSpecialization(trainerName, specialization.name);
+    if (response.status === 'success') {
+      // Close selection popup
+      document.getElementById('specializationSelectionPopup').style.display = 'none';
+      // Reopen main specialization popup to show the updated specialization
+      document.getElementById('specializationButton').click();
+    } else {
+      alert(response.message || 'Failed to save specialization');
+    }
+  } catch (error) {
+    console.error('Error saving specialization:', error);
+    alert('Failed to save specialization');
+  }
+}
+
+// ============================================================================
+// TRAINER PATH SELECTION
+// ============================================================================
+
+async function saveTrainerPath(trainerPath) {
+  if (!trainerPath) return;
+
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  const trainerName = trainerData[1];
+
+  trainerData[25] = trainerPath.name;
+
+  // Update session storage immediately
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+  // Save to backend
+  try {
+    const { TrainerAPI } = await import('../api.js');
+    const response = await TrainerAPI.updateTrainerPath(trainerName, trainerPath.name);
+    if (response.status === 'success') {
+      // Reopen trainer path popup to show the updated path
+      document.getElementById('trainerPathButton').click();
+    } else {
+      alert(response.message || 'Failed to save trainer path');
+    }
+  } catch (error) {
+    console.error('Error saving trainer path:', error);
+    alert('Failed to save trainer path');
+  }
 }

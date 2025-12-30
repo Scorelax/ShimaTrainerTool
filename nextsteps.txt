@@ -126,42 +126,55 @@ FIXED in Current_Code.gs (BACKEND):
 IMPORTANT: This fix requires deploying the updated Current_Code.gs to Google Apps
 Script! See deployment steps below.
 
-STILL TO FIX:
-- Affinity/specialization/trainer-path selection logic (COMPLEX - see below)
+BUG FIX #10: Affinity/Specialization/Trainer-Path Selection (FIXED)
+--------------------------------------------------------------------
+FIXED: Implemented full selection system for choosing affinity, specialization,
+and trainer path from the UI.
 
-NOTE ON AFFINITY/SPECIALIZATION/TRAINER-PATH SELECTION
--------------------------------------------------------
-This bug fix is more complex than the others and requires porting the selection
-system from the reference implementation (_reference/trainer_info.html).
+BACKEND CHANGES (Current_Code.gs):
+- Added route: ?route=trainer&action=affinity&trainer=Ash&affinity=Bug
+- Added route: ?route=trainer&action=specialization&trainer=Ash&specialization=Researcher
+- Added route: ?route=trainer&action=trainer-path&trainer=Ash&path=Ace Trainer
+- Updated writeAffinity(), writeSpecialization(), writeTrainerPath() with error handling
 
-Current behavior:
-- When affinity/specialization/trainer-path are "None", popups just show message
-- No way to select/change these values from the UI
+FRONTEND API CHANGES (js/api.js):
+- Added TrainerAPI.updateAffinity(trainerName, affinity)
+- Added TrainerAPI.updateSpecialization(trainerName, specialization)
+- Added TrainerAPI.updateTrainerPath(trainerName, path)
+- All methods invalidate trainer cache after saving
 
-Required changes (from reference implementation):
-1. Add new HTML popups for selection:
-   - affinitySelectionPopup (with affinity-grid for choices)
-   - specializationSelectionPopup (with specialization-grid for choices)
-   - Trainer path: inline selection in existing popup when no path chosen
+FRONTEND HTML (js/pages/trainer-info.js):
+- Added affinitySelectionPopup with affinity-grid and effect preview box
+- Added specializationSelectionPopup with specialization-grid and effect preview box
+- Both have close buttons and "Choose" buttons (disabled until selection)
 
-2. Add CSS styling for:
-   - .affinity-grid, .affinity-item, .affinity-selection-effect-box
-   - .specialization-grid, .specialization-item, .specialization-selection-effect-box
-   - Selection button states and hover effects
+FRONTEND CSS (css/styles.css):
+- Added .affinity-grid / .specialization-grid: 3-column grid (responsive)
+- Added .affinity-item / .specialization-item: Red buttons with hover effects
+- Added .affinity-selection-effect-box / .specialization-selection-effect-box: Effect preview
+- Responsive: 2 columns on tablets, 1 column on phones
 
-3. JavaScript logic to implement:
-   - showAffinitySelection(availableAffinities, selectedAffinities)
-   - selectAffinity(affinity) - shows effect in selection box
-   - saveAffinity(selectedAffinity) - saves to backend via API
-   - Similar functions for specialization
-   - Trainer path: inline clickable items when none chosen
+FRONTEND JAVASCRIPT (js/pages/trainer-info.js):
+- showAffinitySelection(): Displays grid of all affinities
+- selectAffinity(affinity): Previews effect, enables choose button
+- saveAffinity(affinity): Saves to backend, updates session storage
+- showSpecializationSelection(): Displays grid of all specializations
+- selectSpecialization(spec): Previews effect, enables choose button
+- saveSpecialization(spec): Saves to backend, updates session storage
+- saveTrainerPath(path): Saves trainer path to backend
+- Updated button click handlers to show selection UI when no value chosen
+- Added close button event listeners for selection popups
 
-4. Backend API endpoints needed:
-   - writeAffinity(trainerName, affinityString)
-   - writeSpecialization(trainerName, specializationString)
-   - writeTrainerPath(trainerName, trainerPathName)
+HOW IT WORKS:
+1. When trainer clicks Affinity/Specialization/Trainer Path button:
+   - If not selected: Shows "Select..." button (level requirement checked)
+   - If selected: Shows current effect with level progression
+2. Clicking "Select..." opens selection popup with grid of choices
+3. Clicking a choice shows its effect in preview box
+4. Clicking "Choose" button saves to database and closes popup
+5. Reopens main popup to show the newly selected value
 
-This should be implemented as a separate feature after testing the other bug fixes.
+IMPORTANT: This requires deploying the updated Current_Code.gs to Google Apps Script!
 
 ========================================
 

@@ -525,25 +525,25 @@ async function handleFormSubmit() {
       nature,                      // Nature
       loyalty,                     // Loyalty
       '',                          // STAB (to be calculated)
-      heldItem,                    // Held Item
-      nickname,                    // Nickname
-      '',                          // Custom Moves
-      '',                          // In Active Party
-      '',                          // STR Modifier (to be calculated)
-      '',                          // DEX Modifier (to be calculated)
-      '',                          // CON Modifier (to be calculated)
-      '',                          // INT Modifier (to be calculated)
-      '',                          // WIS Modifier (to be calculated)
-      '',                          // CHA Modifier (to be calculated)
-      '',                          // currentHP
-      '',                          // currentVP
-      '',                          // currentAC
-      '',                          // comments
-      sensesDataString,            // Senses
-      '',                          // Feats
-      '',                          // Gear
-      selectedPokemonData[33],     // Flavor text
-      typematchupsString           // Type matchups
+      heldItem,                    // Held Item (index 37)
+      nickname,                    // Nickname (index 38)
+      '',                          // Custom Moves (index 39)
+      '',                          // In Active Party (index 40)
+      sensesDataString,            // Senses (index 41)
+      '',                          // Feats (index 42)
+      '',                          // STR Modifier (index 43 - to be calculated by backend)
+      '',                          // DEX Modifier (index 44 - to be calculated by backend)
+      '',                          // CON Modifier (index 45 - to be calculated by backend)
+      '',                          // INT Modifier (index 46 - to be calculated by backend)
+      '',                          // WIS Modifier (index 47 - to be calculated by backend)
+      '',                          // CHA Modifier (index 48 - to be calculated by backend)
+      '',                          // currentHP (index 49 - to be calculated by backend)
+      '',                          // currentVP (index 50 - to be calculated by backend)
+      '',                          // currentAC (index 51)
+      '',                          // comments (index 52)
+      '',                          // gear (index 53)
+      selectedPokemonData[33],     // Flavor text (index 54)
+      typematchupsString           // Type matchups (index 55)
     ];
 
     // Register the Pokemon

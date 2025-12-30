@@ -465,16 +465,17 @@ function getPokemonListByTrainer(trainerName) {
 // Function to register the Pokémon for the trainer with additional data
 function registerPokemonForTrainer(trainerName, newPokemonData) {
     // Calculate HP and VP before saving
-    const level = parseInt(newPokemonData[4], 10);
-    const hd = parseInt(newPokemonData[9], 10);
-    const vd = parseInt(newPokemonData[11], 10);
-    const str = parseInt(newPokemonData[15], 10);
-    const dex = parseInt(newPokemonData[16], 10);
-    const con = parseInt(newPokemonData[17], 10);
-    const int = parseInt(newPokemonData[18], 10);
-    const wis = parseInt(newPokemonData[19], 10);
-    const cha = parseInt(newPokemonData[20], 10);
-    const loyalty = parseInt(newPokemonData[33], 10) || 0;
+    // Use POKEMON_COLUMN_INDICES for correct array positions
+    const level = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.level], 10);
+    const hd = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.hitdice], 10);
+    const vd = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.vitalitydice], 10);
+    const str = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.strenght], 10);
+    const dex = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.dexterity], 10);
+    const con = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.constitution], 10);
+    const int = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.intelligence], 10);
+    const wis = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.wisdom], 10);
+    const cha = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.charisma], 10);
+    const loyalty = parseInt(newPokemonData[POKEMON_COLUMN_INDICES.loyalty], 10) || 0;
 
     // Calculate HP/VP
     const { hp, vp } = calculateHpVp(str, dex, con, int, wis, cha, level, hd, vd, loyalty);
@@ -492,26 +493,32 @@ function registerPokemonForTrainer(trainerName, newPokemonData) {
     const initiative = dexMod;
     const stabBonus = level <= 2 ? 0 : level <= 6 ? 2 : level <= 10 ? 4 : level <= 14 ? 6 : level <= 18 ? 8 : 10;
 
-    // Update pokemonData with calculated values
-    newPokemonData[10] = hp;
-    newPokemonData[12] = vp;
-    newPokemonData[30] = initiative;
-    newPokemonData[31] = proficiencyBonus;
-    newPokemonData[34] = stabBonus;
-    newPokemonData[39] = strMod;
-    newPokemonData[40] = dexMod;
-    newPokemonData[41] = conMod;
-    newPokemonData[42] = intMod;
-    newPokemonData[43] = wisMod;
-    newPokemonData[44] = chaMod;
-    newPokemonData[45] = hp; // currentHP
-    newPokemonData[46] = vp; // currentVP
+    // Update pokemonData with calculated values using POKEMON_COLUMN_INDICES
+    newPokemonData[POKEMON_COLUMN_INDICES.hp] = hp;
+    newPokemonData[POKEMON_COLUMN_INDICES.vp] = vp;
+    newPokemonData[POKEMON_COLUMN_INDICES.initiative] = initiative;
+    newPokemonData[POKEMON_COLUMN_INDICES.proficiencybonus] = proficiencyBonus;
+    newPokemonData[POKEMON_COLUMN_INDICES.stab] = stabBonus;
+
+    // Note: stat modifiers, currentHP, currentVP, currentAC, etc. are NOT in POKEMON_COLUMN_INDICES
+    // They are only in the extended sheet schema - adding them beyond index 42 (feats)
+    // The backend will calculate and append these if the array is long enough
+    if (newPokemonData.length > 43) {
+      newPokemonData[43] = strMod;   // STR modifier (index 43)
+      newPokemonData[44] = dexMod;   // DEX modifier (index 44)
+      newPokemonData[45] = conMod;   // CON modifier (index 45)
+      newPokemonData[46] = intMod;   // INT modifier (index 46)
+      newPokemonData[47] = wisMod;   // WIS modifier (index 47)
+      newPokemonData[48] = chaMod;   // CHA modifier (index 48)
+      newPokemonData[49] = hp;       // currentHP (index 49)
+      newPokemonData[50] = vp;       // currentVP (index 50)
+    }
 
     POKEMON_DATA_SHEET.appendRow(newPokemonData);
 
     return {
       status: 'success',
-      message: `${trainerName} caught a ${newPokemonData[2]}!`,
+      message: `${trainerName} caught a ${newPokemonData[POKEMON_COLUMN_INDICES.name]}!`,
       newPokemonData: newPokemonData
     };
 }
@@ -1213,17 +1220,80 @@ function storeTrainerAndPokemonData(trainerName) {
     });
     Logger.log('Trainer Result: ' + JSON.stringify(trainerResult));
 
-    const pokemonEntries = pokemonData.filter(row => row[REGISTERED_POKEMON_COLUMN_INDICES.trainername].toLowerCase() === trainerName.toLowerCase());
+    const pokemonEntries = pokemonData.filter(row => row[POKEMON_COLUMN_INDICES.trainername].toLowerCase() === trainerName.toLowerCase());
     Logger.log('Pokemon Entries: ' + JSON.stringify(pokemonEntries));
 
-    // For pokemon data, preserve null/undefined but keep 0 values
-    const pokemonResults = pokemonEntries.map(pokemon => 
-        Object.keys(REGISTERED_POKEMON_COLUMN_INDICES).map(field => {
-            const value = pokemon[REGISTERED_POKEMON_COLUMN_INDICES[field]];
-            // Only convert to empty string if value is null or undefined, NOT if it's 0
-            return (value === null || value === undefined) ? "" : value;
-        })
-    );
+    // For pokemon data, read using POKEMON_COLUMN_INDICES but transform to match frontend expectations
+    // Frontend expects data in old format with combined ability field at index 7
+    const pokemonResults = pokemonEntries.map(pokemon => {
+        // Combine the 3 ability fields (indices 7, 8, 9) into one pipe-separated string
+        const abilities = [
+            pokemon[POKEMON_COLUMN_INDICES.primaryability],
+            pokemon[POKEMON_COLUMN_INDICES.secondaryability],
+            pokemon[POKEMON_COLUMN_INDICES.hiddenability]
+        ].filter(a => a && a !== '').join('|');
+
+        // Build array matching REGISTERED_POKEMON_COLUMN_INDICES format for frontend compatibility
+        return [
+            pokemon[POKEMON_COLUMN_INDICES.trainername] || '',
+            pokemon[POKEMON_COLUMN_INDICES.image] || '',
+            pokemon[POKEMON_COLUMN_INDICES.name] || '',
+            pokemon[POKEMON_COLUMN_INDICES.dexentry] || '',
+            pokemon[POKEMON_COLUMN_INDICES.level] || '',
+            pokemon[POKEMON_COLUMN_INDICES.primarytype] || '',
+            pokemon[POKEMON_COLUMN_INDICES.secondarytype] || '',
+            abilities,  // Combined abilities at index 7
+            pokemon[POKEMON_COLUMN_INDICES.ac] || '',
+            pokemon[POKEMON_COLUMN_INDICES.hitdice] || '',
+            pokemon[POKEMON_COLUMN_INDICES.hp] || '',
+            pokemon[POKEMON_COLUMN_INDICES.vitalitydice] || '',
+            pokemon[POKEMON_COLUMN_INDICES.vp] || '',
+            pokemon[POKEMON_COLUMN_INDICES.speed] || '',
+            pokemon[POKEMON_COLUMN_INDICES.totalstats] || '',
+            pokemon[POKEMON_COLUMN_INDICES.strenght] || '',
+            pokemon[POKEMON_COLUMN_INDICES.dexterity] || '',
+            pokemon[POKEMON_COLUMN_INDICES.constitution] || '',
+            pokemon[POKEMON_COLUMN_INDICES.intelligence] || '',
+            pokemon[POKEMON_COLUMN_INDICES.wisdom] || '',
+            pokemon[POKEMON_COLUMN_INDICES.charisma] || '',
+            pokemon[POKEMON_COLUMN_INDICES.savingthrows] || '',
+            pokemon[POKEMON_COLUMN_INDICES.skills] || '',
+            pokemon[POKEMON_COLUMN_INDICES.startingmoves] || '',
+            pokemon[POKEMON_COLUMN_INDICES.level2moves] || '',
+            pokemon[POKEMON_COLUMN_INDICES.level6moves] || '',
+            pokemon[POKEMON_COLUMN_INDICES.level10moves] || '',
+            pokemon[POKEMON_COLUMN_INDICES.level14moves] || '',
+            pokemon[POKEMON_COLUMN_INDICES.level18moves] || '',
+            pokemon[POKEMON_COLUMN_INDICES.evolutionrequirement] || '',
+            pokemon[POKEMON_COLUMN_INDICES.initiative] || '',
+            pokemon[POKEMON_COLUMN_INDICES.proficiencybonus] || '',
+            pokemon[POKEMON_COLUMN_INDICES.nature] || '',
+            pokemon[POKEMON_COLUMN_INDICES.loyalty] || '',
+            pokemon[POKEMON_COLUMN_INDICES.stab] || '',
+            pokemon[POKEMON_COLUMN_INDICES.helditem] || '',
+            pokemon[POKEMON_COLUMN_INDICES.nickname] || '',
+            pokemon[POKEMON_COLUMN_INDICES.custommoves] || '',
+            pokemon[POKEMON_COLUMN_INDICES.inactiveparty] || '',
+            pokemon[43] !== null && pokemon[43] !== undefined ? pokemon[43] : '',  // strmodifier
+            pokemon[44] !== null && pokemon[44] !== undefined ? pokemon[44] : '',  // dexmodifier
+            pokemon[45] !== null && pokemon[45] !== undefined ? pokemon[45] : '',  // conmodifier
+            pokemon[46] !== null && pokemon[46] !== undefined ? pokemon[46] : '',  // intmodifier
+            pokemon[47] !== null && pokemon[47] !== undefined ? pokemon[47] : '',  // wismodifier
+            pokemon[48] !== null && pokemon[48] !== undefined ? pokemon[48] : '',  // chamodifier
+            pokemon[49] !== null && pokemon[49] !== undefined ? pokemon[49] : '',  // currentHP
+            pokemon[50] !== null && pokemon[50] !== undefined ? pokemon[50] : '',  // currentVP
+            pokemon[51] !== null && pokemon[51] !== undefined ? pokemon[51] : '',  // currentAC
+            pokemon[52] !== null && pokemon[52] !== undefined ? pokemon[52] : '',  // comment
+            pokemon[POKEMON_COLUMN_INDICES.senses] || '',                            // senses at index 49 in returned array
+            pokemon[POKEMON_COLUMN_INDICES.feats] || '',                             // feats at index 50 in returned array
+            pokemon[53] !== null && pokemon[53] !== undefined ? pokemon[53] : '',  // gear at index 51
+            pokemon[54] !== null && pokemon[54] !== undefined ? pokemon[54] : '',  // flavortext at index 52
+            pokemon[55] !== null && pokemon[55] !== undefined ? pokemon[55] : '',  // typematchups at index 53
+            pokemon[56] !== null && pokemon[56] !== undefined ? pokemon[56] : '',  // currentHD at index 54
+            pokemon[57] !== null && pokemon[57] !== undefined ? pokemon[57] : '',  // currentVD at index 55
+            pokemon[58] !== null && pokemon[58] !== undefined ? pokemon[58] : ''   // utilityslot at index 56
+        ];
+    });
 
     Logger.log('Pokemon Results: ' + JSON.stringify(pokemonResults));
 

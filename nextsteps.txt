@@ -56,6 +56,27 @@ FIXED in edit-trainer.js:
 - Added code to get money value when saving (line 734)
 - Added code to update trainerData[19] with money value (line 758)
 
+BUG FIX #7: Pokemon registration array structure mismatch (CRITICAL)
+------------------------------------------------------------------------
+ROOT CAUSE: Database schema uses POKEMON_COLUMN_INDICES with 3 separate ability
+fields (primaryability, secondaryability, hiddenability at indices 7, 8, 9), but
+backend functions were using old hardcoded indices that expected a single ability
+field. This caused ALL data after index 7 to be stored in wrong columns!
+
+FIXED in Current_Code.gs (BACKEND):
+- registerPokemonForTrainer() now uses POKEMON_COLUMN_INDICES constants
+- storeTrainerAndPokemonData() reads using POKEMON_COLUMN_INDICES and transforms
+  data to match frontend expectations (combines 3 abilities into 1 pipe-separated
+  string for backward compatibility)
+
+FIXED in js/pages/pokemon-form.js (FRONTEND):
+- Moved senses from index 51 to correct position 41
+- Moved feats from index 52 to correct position 42
+- Reorganized extended fields to match schema
+
+IMPORTANT: This fix requires deploying the updated Current_Code.gs to Google Apps
+Script! See deployment steps below.
+
 STILL TO FIX:
 - Affinity/specialization/trainer-path selection logic (COMPLEX - see below)
 
@@ -92,6 +113,28 @@ Required changes (from reference implementation):
    - writeTrainerPath(trainerName, trainerPathName)
 
 This should be implemented as a separate feature after testing the other bug fixes.
+
+========================================
+
+CRITICAL: DEPLOY CURRENT_CODE.GS TO GOOGLE APPS SCRIPT
+=======================================================
+
+The bug fix #7 requires deploying the updated Current_Code.gs to Google Apps Script.
+Without this deployment, Pokemon registration will continue to fail!
+
+DEPLOYMENT STEPS:
+1. Go to your Google Apps Script project
+2. Open the Code.gs file
+3. Copy the ENTIRE contents of "Current_Code.gs" from your local project
+4. Paste it into the Apps Script editor, replacing all existing code
+5. Save the file (Ctrl+S or File > Save)
+6. Click "Deploy" > "Manage deployments"
+7. Click the "Edit" icon (pencil) next to your existing deployment
+8. Under "Version", select "New version"
+9. Add description: "Fix Pokemon registration array structure mismatch"
+10. Click "Deploy"
+11. Test registering a new Pokemon in the app
+12. If it works, check the Google Sheet to verify data is in correct columns
 
 ========================================
 

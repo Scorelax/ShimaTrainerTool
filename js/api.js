@@ -424,6 +424,57 @@ export class TrainerAPI {
       useCache: false
     });
   }
+
+  /**
+   * Update trainer affinity
+   */
+  static async updateAffinity(trainerName, affinity) {
+    const result = await API.request('trainer', 'affinity', {
+      trainer: trainerName,
+      affinity
+    }, {
+      useCache: false
+    });
+
+    // Invalidate trainer cache
+    cache.remove(`trainer:${trainerName}`);
+
+    return result;
+  }
+
+  /**
+   * Update trainer specialization
+   */
+  static async updateSpecialization(trainerName, specialization) {
+    const result = await API.request('trainer', 'specialization', {
+      trainer: trainerName,
+      specialization
+    }, {
+      useCache: false
+    });
+
+    // Invalidate trainer cache
+    cache.remove(`trainer:${trainerName}`);
+
+    return result;
+  }
+
+  /**
+   * Update trainer path
+   */
+  static async updateTrainerPath(trainerName, path) {
+    const result = await API.request('trainer', 'trainer-path', {
+      trainer: trainerName,
+      path
+    }, {
+      useCache: false
+    });
+
+    // Invalidate trainer cache
+    cache.remove(`trainer:${trainerName}`);
+
+    return result;
+  }
 }
 
 // ============================================================================

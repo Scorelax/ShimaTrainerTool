@@ -430,6 +430,13 @@ async function selectPokemon(pokemon, listItem) {
 
   // Show details
   const imageUrl = pokemon[0] || await resolveImageUrl(pokemon[1], pokemon[2]);
+
+  // IMPORTANT: Store resolved image URL back into pokemon object
+  // so it's available when registering the Pokemon
+  if (!pokemon[0]) {
+    pokemon[0] = imageUrl;
+  }
+
   document.getElementById('pokemonImage').src = imageUrl;
   document.getElementById('pokemonName').textContent = pokemon[1];
   document.getElementById('pokemonDexEntry').textContent = pokemon[2];

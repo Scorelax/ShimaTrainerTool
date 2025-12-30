@@ -346,6 +346,11 @@ function populateAbilityOptions(selectedPokemonData) {
 
   const pokemonName = selectedPokemonData[1] || 'Unknown';
 
+  // Debug logging
+  console.log('[Pokemon Form] selectedPokemonData:', selectedPokemonData);
+  console.log('[Pokemon Form] Image URL:', selectedPokemonData[0]);
+  console.log('[Pokemon Form] Pokemon Name:', pokemonName);
+
   // Get all three possible abilities (indices 6, 7, 8)
   // 0 = primary, 1 = secondary, 2 = hidden
   const abilities = [
@@ -353,6 +358,8 @@ function populateAbilityOptions(selectedPokemonData) {
     selectedPokemonData[7],
     selectedPokemonData[8]
   ];
+
+  console.log('[Pokemon Form] Abilities from data:', abilities);
 
   abilities.forEach((abilityData, slotIndex) => {
     // Skip empty abilities
@@ -416,6 +423,9 @@ async function handleFormSubmit() {
     // Get selected abilities - combine into single pipe-separated string
     const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
     const selectedAbilities = selectedAbilityCheckboxes.map(cb => cb.value).join('|');
+
+    console.log('[Pokemon Form] Selected ability checkboxes:', selectedAbilityCheckboxes.length);
+    console.log('[Pokemon Form] Selected abilities string:', selectedAbilities);
 
     // Apply nature modifiers to stats
     const natureData = natures.find(n => n.name === nature);
@@ -531,12 +541,24 @@ async function handleFormSubmit() {
       ''                           // 56: Utility Slot
     ];
 
+    console.log('[Pokemon Form] newPokemonData array:');
+    console.log('[Pokemon Form] - Index 1 (Image):', newPokemonData[1]);
+    console.log('[Pokemon Form] - Index 7 (Abilities):', newPokemonData[7]);
+    console.log('[Pokemon Form] - Full array:', newPokemonData);
+
     // Register the Pokemon
     const response = await PokemonAPI.register(trainerData[1], newPokemonData);
+
+    console.log('[Pokemon Form] Backend response:', response);
 
     if (response.status === 'success') {
       // Update session storage with new Pokemon
       const finalPokemonData = response.newPokemonData || newPokemonData;
+
+      console.log('[Pokemon Form] finalPokemonData:');
+      console.log('[Pokemon Form] - Index 1 (Image):', finalPokemonData[1]);
+      console.log('[Pokemon Form] - Index 7 (Abilities):', finalPokemonData[7]);
+
       sessionStorage.setItem(`pokemon_${selectedPokemonData[1].toLowerCase()}`, JSON.stringify(finalPokemonData));
 
       // Update complete Pokemon data

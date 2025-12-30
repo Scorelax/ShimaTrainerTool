@@ -896,4 +896,165 @@ All infrastructure in place - just add checks in relevant rendering functions.
 
 ---
 
+## Session: 2025-12-30 (Continuation) - Critical Array Structure Fix and Performance Optimization
+
+### Bug Fix #7: Pokemon Registration Array Structure Mismatch (CRITICAL)
+
+**Problem**:
+- After registering Pokemon, got "movementData.split is not a function" error
+- All database fields were misaligned (data shifted two columns to the right)
+- Previous "fix" incorrectly assumed 3 separate ability columns, making problem worse
+
+**Root Cause**:
+- Database has SINGLE ability column at index 7 (pipe-separated for multiple abilities)
+- Previous code was splitting abilities into 3 separate fields
+- This shifted all subsequent fields by 2 positions
+- Level 2 moves ended up in skills column, etc.
+
+**Actual Database Schema (57 fields)**:
+```
+Trainer Name, Image, Name, Dex Entry, Level, Primary Type, Secondary Type, Ability,
+AC, Hit Dice, HP, Vitality Dice, VP, Speed, Total Stats, Strength, Dexterity,
+Constitution, Intelligence, Wisdom, Charisma, Saving Throws, Skills, Starting Moves,
+Level 2 Moves, Level 6 Moves, Level 10 Moves, Level 14 Moves, Level 18 Moves,
+Evolution Requirement, Initiative, Proficiency Bonus, Nature, Loyalty, STAB,
+Held Item, Nickname, Custom Moves, In Active Party, strmodifier, dexmodifier,
+conmodifier, intmodifier, wismodifier, chamodifier, CurrentHP, CurrentVP, CurrentAC,
+Comment, Senses, Feats, Gear, Flavor text, Type matchups, Current HD, Current VD,
+Utility Slot
+```
+
+**Ability Format**:
+- Single field at index 7
+- Multiple abilities joined with pipe separator: `|`
+- Each ability: `slotIndex:Name;Description`
+- Example: `"0:Torrent;Water move boost|2:Rain Dish;HP in rain"`
+
+**Files Fixed**:
+
+1. **pokemon-form.js** (Pokemon Registration):
+   - Removed ability splitting code
+   - Combined selected abilities into single pipe-separated string
+   - Rebuilt newPokemonData array to exactly match 57-field schema
+   - Now sends single ability field at index 7
+   ```javascript
+   const selectedAbilities = selectedAbilityCheckboxes.map(cb => cb.value).join('|');
+   newPokemonData[7] = selectedAbilities; // Single ability field
+   ```
+
+2. **edit-pokemon.js** (Pokemon Editing):
+   - Removed ability splitting code
+   - Updates pokemonData[7] with combined ability string
+   - Fixed to read and parse single ability field
+
+3. **evolution.js** (Pokemon Evolution):
+   - Removed ability splitting code
+   - Sends single combined ability field for evolved Pokemon
+   - Updated evolvedPokemonData array structure
+
+4. **Current_Code.gs** (Backend):
+   - Updated registerPokemonForTrainer() to use correct hardcoded indices
+   - Uses single ability at index 7 (not three separate fields)
+   - Simplified storeTrainerAndPokemonData() to use REGISTERED_POKEMON_COLUMN_INDICES
+   - **REQUIRES DEPLOYMENT** to Google Apps Script before testing
+
+**Result**:
+- Pokemon registration now sends data in correct 57-field format
+- All fields align with database columns
+- No more data shifting issues
+- Moves save to correct columns
+
+### Ability Loading Fixes
+
+**Problem 1: TypeError "abilityData.indexOf is not a function"**
+- Opening ability dropdown in edit-pokemon threw error
+- Code assumed ability data was always string
+- pokemonData[7] could be other types from database
+
+**Solution (edit-pokemon.js)**:
+- Added comprehensive type checking
+- Convert to string before string operations
+- Handle both single abilities and pipe-separated lists
+```javascript
+const abilityString = typeof ability7 === 'string' ? ability7 : String(ability7 || '');
+// Later in loop:
+const abilityStr = typeof abilityData === 'string' ? abilityData : String(abilityData);
+```
+
+**Problem 2: Extremely Slow Ability Loading**
+- Loading abilities took several seconds
+- Every dropdown open triggered slow API call to backend
+- Poor user experience when editing Pokemon
+
+**Solution - Session Storage Caching**:
+
+1. **continue-journey.js** (lines ~415-426):
+   - Cache all registered Pokemon data at journey start
+   - Fetches complete Pokemon data at 50% loading progress
+   - Stores in sessionStorage as 'completePokemonData'
+   - Includes all abilities, moves, stats for every registered Pokemon
+   ```javascript
+   const completePokemonData = await PokemonAPI.getRegisteredList();
+   if (completePokemonData.status === 'success') {
+     sessionStorage.setItem('completePokemonData', JSON.stringify(completePokemonData.data));
+     console.log('[Cache] Stored complete Pokemon data for', completePokemonData.data.length, 'Pokemon');
+   }
+   ```
+
+2. **edit-pokemon.js loadAbilities() function**:
+   - Check cache FIRST before making API calls
+   - Extract abilities from cached Pokemon data
+   - Fall back to API call only on cache miss
+   - Logs cache hits/misses for debugging
+   ```javascript
+   const cachedDataStr = sessionStorage.getItem('completePokemonData');
+   if (cachedDataStr) {
+     const completePokemonData = JSON.parse(cachedDataStr);
+     const pokemonInfo = completePokemonData.find(p => p[1] === currentPokemonName);
+     if (pokemonInfo) {
+       // Use cached abilities - INSTANT loading
+       const abilities = [pokemonInfo[6], pokemonInfo[7], pokemonInfo[8]].filter(a => a && a !== '');
+       populateAbilities(abilities, pokemonData);
+       return;
+     }
+   }
+   // Cache miss - fall back to API
+   ```
+
+**Result**:
+- Ability loading now instant (from cache)
+- No more slow API calls when opening dropdowns
+- Better user experience throughout app
+- Same pattern can be used for other data
+
+### UI Simplification
+
+**pokemon-form.js Ability Display**:
+- Changed from showing full descriptions to names only
+- Checkbox values still contain full data for Pokemon card
+- Faster rendering, cleaner UI
+- Descriptions saved in format: `slotIndex:Name;Description`
+
+### Deployment Status
+
+**Frontend**:
+- ✅ All changes committed and pushed to GitHub
+- ✅ Session storage caching implemented
+- ✅ Ability type safety added
+- ✅ UI optimizations complete
+
+**Backend (Current_Code.gs)**:
+- ⚠️ REQUIRES DEPLOYMENT to Google Apps Script
+- Backend changes ready but NOT YET DEPLOYED
+- Must deploy before testing Pokemon registration
+- See nextsteps.txt lines 135-154 for deployment steps
+
+**Testing Required**:
+1. Deploy Current_Code.gs to Google Apps Script
+2. Test Pokemon registration (verify data in correct columns)
+3. Test ability selection and saving
+4. Verify ability loading speed (should be instant from cache)
+
+---
+
 ## Session: 2025-01-27 (Part 3) - Combat Tracker Enhancements

@@ -382,6 +382,8 @@ async function populateAbilityOptions(selectedPokemonData) {
     const parts = abilityData.split(',');
     const abilityName = parts[0].trim();
 
+    console.log(`[Pokemon Form] Creating checkbox for ability ${slotIndex}: "${abilityName}"`);
+
     // Create checkbox - value is just the name
     const div = document.createElement('div');
     div.className = 'checkbox-item';
@@ -401,6 +403,15 @@ async function populateAbilityOptions(selectedPokemonData) {
     div.appendChild(label);
     abilitiesContent.appendChild(div);
   });
+
+  // Debug: Check if checkboxes exist in DOM
+  setTimeout(() => {
+    const allCheckboxes = document.querySelectorAll('input[name="abilities"]');
+    console.log('[Pokemon Form] Total ability checkboxes in DOM:', allCheckboxes.length);
+    allCheckboxes.forEach(cb => {
+      console.log(`  - Checkbox id="${cb.id}" value="${cb.value}" checked=${cb.checked}`);
+    });
+  }, 100);
 }
 
 async function handleFormSubmit() {
@@ -425,8 +436,16 @@ async function handleFormSubmit() {
     const heldItem = form.heldItem.value;
     const nickname = form.nickname.value;
 
+    // Debug: Check all ability checkboxes before getting checked ones
+    const allAbilityCheckboxes = document.querySelectorAll('input[name="abilities"]');
+    console.log('[Pokemon Form] [SUBMIT] All ability checkboxes:', allAbilityCheckboxes.length);
+    allAbilityCheckboxes.forEach(cb => {
+      console.log(`  - id="${cb.id}" value="${cb.value}" checked=${cb.checked}`);
+    });
+
     // Get selected abilities and format them
     const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
+    console.log('[Pokemon Form] Selected ability checkboxes:', selectedAbilityCheckboxes.length);
 
     // Get full ability data from cache
     const cachedDataStr = sessionStorage.getItem('completePokemonData');
@@ -449,7 +468,6 @@ async function handleFormSubmit() {
       return `${slotIndex}:${name};${description}`;
     }).join('|');
 
-    console.log('[Pokemon Form] Selected ability checkboxes:', selectedAbilityCheckboxes.length);
     console.log('[Pokemon Form] Selected abilities string:', selectedAbilities);
 
     // Apply nature modifiers to stats

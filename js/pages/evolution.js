@@ -953,39 +953,25 @@ async function confirmEvolution() {
       }
     }
 
-    // Split evolved abilities into primary (slot 0), secondary (slot 1), and hidden (slot 2)
-    let primaryAbility = '';
-    let secondaryAbility = '';
-    let hiddenAbility = '';
-
-    evolvedAbilities.forEach(abilityData => {
-      const colonIndex = abilityData.indexOf(':');
-      if (colonIndex !== -1) {
-        const slotIndex = parseInt(abilityData.substring(0, colonIndex));
-        if (slotIndex === 0) primaryAbility = abilityData;
-        else if (slotIndex === 1) secondaryAbility = abilityData;
-        else if (slotIndex === 2) hiddenAbility = abilityData;
-      }
-    });
+    // Combine evolved abilities into single pipe-separated string
+    const evolvedAbilitiesString = evolvedAbilities.join('|');
 
     // Build evolved Pokemon data array with placeholders for calculated values
     const evolvedPokemonData = [
-      currentPokemon[0],           // Trainer Name
-      selectedPokemon[0],          // Image
-      selectedPokemon[1],          // Name
-      selectedPokemon[2],          // Dex Entry
-      currentPokemon[4],           // Level
-      selectedPokemon[4],          // Primary Type
-      selectedPokemon[5],          // Secondary Type
-      primaryAbility,              // Primary Ability
-      secondaryAbility,            // Secondary Ability
-      hiddenAbility,               // Hidden Ability
-      selectedPokemon[9],          // AC
-      selectedPokemon[10],         // Hit Dice
-      '',                          // HP (will be calculated by server)
-      selectedPokemon[12],         // Vitality Dice
-      '',                          // VP (will be calculated by server)
-      movementDataString,          // Speed
+      currentPokemon[0],           // 0: Trainer Name
+      selectedPokemon[0],          // 1: Image
+      selectedPokemon[1],          // 2: Name
+      selectedPokemon[2],          // 3: Dex Entry
+      currentPokemon[4],           // 4: Level
+      selectedPokemon[4],          // 5: Primary Type
+      selectedPokemon[5],          // 6: Secondary Type
+      evolvedAbilitiesString,      // 7: Ability (combined with pipes)
+      selectedPokemon[9],          // 8: AC
+      selectedPokemon[10],         // 9: Hit Dice
+      '',                          // 10: HP (will be calculated by server)
+      selectedPokemon[12],         // 11: Vitality Dice
+      '',                          // 12: VP (will be calculated by server)
+      movementDataString,          // 13: Speed
       selectedPokemon[15],         // Total Stats
       newSTR,                      // Strength
       newDEX,                      // Dexterity

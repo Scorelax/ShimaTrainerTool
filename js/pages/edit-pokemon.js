@@ -1186,22 +1186,6 @@ async function handleFormSubmit(pokemonName, originalNature) {
     const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
     const abilitiesString = selectedAbilityCheckboxes.map(cb => cb.value).join('|');
 
-    // Split abilities into primary (slot 0), secondary (slot 1), and hidden (slot 2)
-    let primaryAbility = '';
-    let secondaryAbility = '';
-    let hiddenAbility = '';
-
-    selectedAbilityCheckboxes.forEach(cb => {
-      const value = cb.value;
-      const colonIndex = value.indexOf(':');
-      if (colonIndex !== -1) {
-        const slotIndex = parseInt(value.substring(0, colonIndex));
-        if (slotIndex === 0) primaryAbility = value;
-        else if (slotIndex === 1) secondaryAbility = value;
-        else if (slotIndex === 2) hiddenAbility = value;
-      }
-    });
-
     // Get held items from chips
     const heldItemChips = Array.from(document.querySelectorAll('#heldItemsContainer .chip'));
     const heldItems = heldItemChips.map(chip =>
@@ -1217,9 +1201,7 @@ async function handleFormSubmit(pokemonName, originalNature) {
 
     // Update Pokemon data array
     pokemonData[4] = level;
-    pokemonData[7] = primaryAbility;    // Primary Ability
-    pokemonData[8] = secondaryAbility;  // Secondary Ability
-    pokemonData[9] = hiddenAbility;     // Hidden Ability
+    pokemonData[7] = abilitiesString;   // Ability (combined with pipes)
     pokemonData[15] = str;
     pokemonData[16] = dex;
     pokemonData[17] = con;

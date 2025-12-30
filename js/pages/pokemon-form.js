@@ -413,25 +413,9 @@ async function handleFormSubmit() {
     const heldItem = form.heldItem.value;
     const nickname = form.nickname.value;
 
-    // Get selected abilities - need to split into 3 separate fields for database
+    // Get selected abilities - combine into single pipe-separated string
     const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
     const selectedAbilities = selectedAbilityCheckboxes.map(cb => cb.value).join('|');
-
-    // Split abilities into primary (slot 0), secondary (slot 1), and hidden (slot 2)
-    let primaryAbility = '';
-    let secondaryAbility = '';
-    let hiddenAbility = '';
-
-    selectedAbilityCheckboxes.forEach(cb => {
-      const value = cb.value;
-      const colonIndex = value.indexOf(':');
-      if (colonIndex !== -1) {
-        const slotIndex = parseInt(value.substring(0, colonIndex));
-        if (slotIndex === 0) primaryAbility = value;
-        else if (slotIndex === 1) secondaryAbility = value;
-        else if (slotIndex === 2) hiddenAbility = value;
-      }
-    });
 
     // Apply nature modifiers to stats
     const natureData = natures.find(n => n.name === nature);
@@ -486,64 +470,65 @@ async function handleFormSubmit() {
     const typematchupsString = typeResponse.data ?
       typeResponse.data.join(', ') : '';
 
-    // Build new Pokemon data array
+    // Build new Pokemon data array matching exact database schema
     const newPokemonData = [
-      trainerData[1],              // Trainer name
-      selectedPokemonData[0],      // Image
-      selectedPokemonData[1],      // Name
-      selectedPokemonData[2],      // Dex Entry
-      level,                       // Level
-      selectedPokemonData[4],      // Primary Type
-      selectedPokemonData[5],      // Secondary Type
-      primaryAbility,              // Primary Ability
-      secondaryAbility,            // Secondary Ability
-      hiddenAbility,               // Hidden Ability
-      selectedPokemonData[9],      // AC
-      selectedPokemonData[10],     // Hit Dice
-      '',                          // HP (to be calculated)
-      selectedPokemonData[12],     // Vitality Dice
-      '',                          // VP (to be calculated)
-      movementDataString,          // Speed
-      selectedPokemonData[15],     // Total Stats
-      modifiedPokemonData[16],     // Strength
-      modifiedPokemonData[17],     // Dexterity
-      modifiedPokemonData[18],     // Constitution
-      modifiedPokemonData[19],     // Intelligence
-      modifiedPokemonData[20],     // Wisdom
-      modifiedPokemonData[21],     // Charisma
-      selectedPokemonData[22],     // Saving Throws
-      selectedPokemonData[23],     // Skills
-      selectedPokemonData[24],     // Starting Moves
-      selectedPokemonData[25],     // Level 2 Moves
-      selectedPokemonData[26],     // Level 6 Moves
-      selectedPokemonData[27],     // Level 10 Moves
-      selectedPokemonData[28],     // Level 14 Moves
-      selectedPokemonData[29],     // Level 18 Moves
-      selectedPokemonData[30],     // Evolution Requirement
-      '',                          // Initiative (to be calculated)
-      '',                          // Proficiency Bonus (to be calculated)
-      nature,                      // Nature
-      loyalty,                     // Loyalty
-      '',                          // STAB (to be calculated)
-      heldItem,                    // Held Item (index 37)
-      nickname,                    // Nickname (index 38)
-      '',                          // Custom Moves (index 39)
-      '',                          // In Active Party (index 40)
-      sensesDataString,            // Senses (index 41)
-      '',                          // Feats (index 42)
-      '',                          // STR Modifier (index 43 - to be calculated by backend)
-      '',                          // DEX Modifier (index 44 - to be calculated by backend)
-      '',                          // CON Modifier (index 45 - to be calculated by backend)
-      '',                          // INT Modifier (index 46 - to be calculated by backend)
-      '',                          // WIS Modifier (index 47 - to be calculated by backend)
-      '',                          // CHA Modifier (index 48 - to be calculated by backend)
-      '',                          // currentHP (index 49 - to be calculated by backend)
-      '',                          // currentVP (index 50 - to be calculated by backend)
-      '',                          // currentAC (index 51)
-      '',                          // comments (index 52)
-      '',                          // gear (index 53)
-      selectedPokemonData[33],     // Flavor text (index 54)
-      typematchupsString           // Type matchups (index 55)
+      trainerData[1],              // 0: Trainer Name
+      selectedPokemonData[0],      // 1: Image
+      selectedPokemonData[1],      // 2: Name
+      selectedPokemonData[2],      // 3: Dex Entry
+      level,                       // 4: Level
+      selectedPokemonData[4],      // 5: Primary Type
+      selectedPokemonData[5],      // 6: Secondary Type
+      selectedAbilities,           // 7: Ability (combined with pipes)
+      selectedPokemonData[9],      // 8: AC
+      selectedPokemonData[10],     // 9: Hit Dice
+      '',                          // 10: HP (to be calculated)
+      selectedPokemonData[12],     // 11: Vitality Dice
+      '',                          // 12: VP (to be calculated)
+      movementDataString,          // 13: Speed
+      selectedPokemonData[15],     // 14: Total Stats
+      modifiedPokemonData[16],     // 15: Strength
+      modifiedPokemonData[17],     // 16: Dexterity
+      modifiedPokemonData[18],     // 17: Constitution
+      modifiedPokemonData[19],     // 18: Intelligence
+      modifiedPokemonData[20],     // 19: Wisdom
+      modifiedPokemonData[21],     // 20: Charisma
+      selectedPokemonData[22],     // 21: Saving Throws
+      selectedPokemonData[23],     // 22: Skills
+      selectedPokemonData[24],     // 23: Starting Moves
+      selectedPokemonData[25],     // 24: Level 2 Moves
+      selectedPokemonData[26],     // 25: Level 6 Moves
+      selectedPokemonData[27],     // 26: Level 10 Moves
+      selectedPokemonData[28],     // 27: Level 14 Moves
+      selectedPokemonData[29],     // 28: Level 18 Moves
+      selectedPokemonData[30],     // 29: Evolution Requirement
+      '',                          // 30: Initiative (to be calculated)
+      '',                          // 31: Proficiency Bonus (to be calculated)
+      nature,                      // 32: Nature
+      loyalty,                     // 33: Loyalty
+      '',                          // 34: STAB (to be calculated)
+      heldItem,                    // 35: Held Item
+      nickname,                    // 36: Nickname
+      '',                          // 37: Custom Moves
+      '',                          // 38: In Active Party
+      '',                          // 39: strmodifier (to be calculated by backend)
+      '',                          // 40: dexmodifier (to be calculated by backend)
+      '',                          // 41: conmodifier (to be calculated by backend)
+      '',                          // 42: intmodifier (to be calculated by backend)
+      '',                          // 43: wismodifier (to be calculated by backend)
+      '',                          // 44: chamodifier (to be calculated by backend)
+      '',                          // 45: CurrentHP (to be calculated by backend)
+      '',                          // 46: CurrentVP (to be calculated by backend)
+      '',                          // 47: CurrentAC
+      '',                          // 48: Comment
+      sensesDataString,            // 49: Senses
+      '',                          // 50: Feats
+      '',                          // 51: Gear
+      selectedPokemonData[33],     // 52: Flavor text
+      typematchupsString,          // 53: Type matchups
+      '',                          // 54: Current HD
+      '',                          // 55: Current VD
+      ''                           // 56: Utility Slot
     ];
 
     // Register the Pokemon

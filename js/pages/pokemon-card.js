@@ -1574,9 +1574,10 @@ export function renderPokemonCard(pokemonName) {
     </div>
   `;
 
-  // Store parsed abilities, feats, and type effectiveness data for event listener use
+  // Store parsed abilities, feats, held items, and type effectiveness data for event listener use
   window.pokemonAbilities = parsedAbilities;
   window.pokemonFeats = parsedFeats;
+  window.heldItems = heldItems;
   window.typeEffectiveness = { weaknesses, resistances, immunities };
 
   return html;
@@ -1889,8 +1890,8 @@ export function attachPokemonCardListeners() {
       const heldItemPopup = document.getElementById('heldItemPopup');
       const heldItemContent = document.getElementById('heldItemContent');
 
-      // Get the specific item from the heldItems array
-      const itemName = heldItems[itemIndex];
+      // Get the specific item from the window.heldItems array
+      const itemName = window.heldItems && window.heldItems[itemIndex];
 
       if (itemName) {
         // Look up item details from sessionStorage

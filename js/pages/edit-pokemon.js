@@ -1183,9 +1183,24 @@ async function handleFormSubmit(pokemonName, originalNature) {
     }
 
     // Get selected abilities (after potential Hidden Ability auto-selection)
-    const selectedAbilities = Array.from(document.querySelectorAll('input[name="abilities"]:checked'))
-      .map(cb => cb.value);
-    const abilitiesString = selectedAbilities.join('|');
+    const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
+    const abilitiesString = selectedAbilityCheckboxes.map(cb => cb.value).join('|');
+
+    // Split abilities into primary (slot 0), secondary (slot 1), and hidden (slot 2)
+    let primaryAbility = '';
+    let secondaryAbility = '';
+    let hiddenAbility = '';
+
+    selectedAbilityCheckboxes.forEach(cb => {
+      const value = cb.value;
+      const colonIndex = value.indexOf(':');
+      if (colonIndex !== -1) {
+        const slotIndex = parseInt(value.substring(0, colonIndex));
+        if (slotIndex === 0) primaryAbility = value;
+        else if (slotIndex === 1) secondaryAbility = value;
+        else if (slotIndex === 2) hiddenAbility = value;
+      }
+    });
 
     // Get held items from chips
     const heldItemChips = Array.from(document.querySelectorAll('#heldItemsContainer .chip'));
@@ -1202,7 +1217,9 @@ async function handleFormSubmit(pokemonName, originalNature) {
 
     // Update Pokemon data array
     pokemonData[4] = level;
-    pokemonData[7] = abilitiesString;
+    pokemonData[7] = primaryAbility;    // Primary Ability
+    pokemonData[8] = secondaryAbility;  // Secondary Ability
+    pokemonData[9] = hiddenAbility;     // Hidden Ability
     pokemonData[15] = str;
     pokemonData[16] = dex;
     pokemonData[17] = con;
@@ -1344,11 +1361,22 @@ function populateAbilities(abilities, pokemonData) {
   });
 
   // Check currently selected abilities
-  const currentAbilitiesRaw = pokemonData[7] || '';
-  const currentAbilities = currentAbilitiesRaw
-    .split('|')
-    .map(ability => ability.trim())
-    .filter(ability => ability);
+  // Support both old format (single field at index 7) and new format (3 fields at indices 7, 8, 9)
+  let currentAbilities = [];
+  const ability7 = pokemonData[7] || '';
+  const ability8 = pokemonData[8] || '';
+  const ability9 = pokemonData[9] || '';
+
+  // Check if old format (contains pipe separator) or new format (separate fields)
+  if (ability7.includes('|')) {
+    // Old format: single field with pipe-separated values
+    currentAbilities = ability7.split('|').map(a => a.trim()).filter(a => a);
+  } else {
+    // New format: three separate fields
+    if (ability7) currentAbilities.push(ability7);
+    if (ability8) currentAbilities.push(ability8);
+    if (ability9) currentAbilities.push(ability9);
+  }
 
   currentAbilities.forEach(abilityData => {
     const colonIndex = abilityData.indexOf(':');

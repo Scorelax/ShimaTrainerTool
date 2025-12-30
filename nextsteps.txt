@@ -1,0 +1,185 @@
+BUGS FIXED IN THIS SESSION (2025-12-30)
+========================================
+
+BUG FIX #1: Held-item button not working in pokemon-card
+---------------------------------------------------------
+FIXED: The held items were not stored in window scope like abilities were.
+- Added window.heldItems assignment
+- Updated event listener to use window.heldItems
+
+BUG FIX #2: Level 2 moves not saving to database
+-------------------------------------------------
+ROOT CAUSE FOUND: Database schema mismatch!
+- Database expects 3 SEPARATE ability columns (primary, secondary, hidden) at indices 7, 8, 9
+- Frontend was sending 1 COMBINED ability field, shifting everything by 2 positions
+- This caused moves to go into the WRONG columns (level 2 moves went into skills column!)
+
+FIXED in pokemon-form.js:
+- Split abilities into 3 separate fields before creating newPokemonData array
+- Now properly sends primaryAbility, secondaryAbility, hiddenAbility at indices 7, 8, 9
+
+FIXED in edit-pokemon.js:
+- Updated to split abilities into 3 fields when saving
+- Added backward compatibility to read both old format (1 field) and new format (3 fields)
+- Existing Pokemon will be automatically migrated when edited
+
+STILL TO FIX:
+- evolution.js (needs same ability split fix)
+- Type matchup calculation in pokemon-form
+- Use Move defaulting to "Circle Throw"
+- Money field missing in trainer-info and edit-trainer
+- Affinity/specialization/trainer-path selection logic
+
+========================================
+
+DEPLOYMENT STEPS FOR POKEDEX CONFIG CHANGES
+==============================================
+
+STEP 1: Update GitHub Repository (IMPORTANT - Do this first!)
+--------------------------------------------------------------
+Make sure the repository owner (Benjakronk) has created and uploaded the
+pokedex_config.json file to:
+
+https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/pokedex_config.json
+
+The file should have the structure shown in your New_RegisteredPokemon.json example.
+If this file doesn't exist yet, the backend will fail when trying to fetch it.
+
+You can test if it exists by visiting that URL in your browser.
+If you get a 404 error, the file hasn't been created yet.
+
+
+STEP 2: Update Google Apps Script
+----------------------------------
+1. Go to your Google Apps Script project
+2. Open the Code.gs file (or whatever you named your main script file)
+3. Copy the ENTIRE contents of "Current_Code.gs" from your local project
+4. Paste it into the Apps Script editor, replacing all existing code
+5. Save the file (Ctrl+S or File > Save)
+
+
+STEP 3: Deploy New Version
+---------------------------
+1. Click "Deploy" > "Manage deployments" in the Apps Script editor
+2. Click the "Edit" icon (pencil) next to your existing deployment
+3. Under "Version", select "New version"
+4. Optionally add a description like "Added Pokedex config and visibility support"
+5. Click "Deploy"
+6. Copy the new Web App URL if it changed (though it usually stays the same)
+
+
+STEP 4: Frontend is Already Ready
+----------------------------------
+The frontend changes are already in your local files (committed to git):
+- js/api.js - updated
+- js/utils/visibility.js - new file created
+- js/pages/pokemon-form.js - updated
+- js/pages/edit-pokemon.js - updated
+- js/pages/evolution.js - updated
+
+Since you're running the app locally/from files, these are already in place.
+No action needed here.
+
+
+STEP 5: Test the Changes
+-------------------------
+After deploying:
+1. Clear your browser cache or do a hard refresh (Ctrl+Shift+R)
+2. Load the app
+3. Try registering a Pokemon or editing one
+4. Check the browser console (F12) for any errors
+5. Verify that hidden abilities appear/don't appear based on the config
+
+
+IMPORTANT NOTES
+---------------
+- The backend change is critical - without deploying the new Current_Code.gs,
+  the frontend won't be able to fetch the Pokedex config
+
+- The old URL won't work anymore - once you deploy, make sure pokedex_config.json
+  exists, otherwise registered Pokemon won't load
+
+- Cache will help - if the new URL fails, the backend will fall back to cached data
+
+
+IF SOMETHING GOES WRONG (Rollback Steps)
+-----------------------------------------
+If you need to rollback quickly:
+1. Go to Apps Script > Deploy > Manage deployments
+2. Click Edit on the deployment
+3. Change "Version" back to a previous version
+4. Click Deploy
+
+
+SUMMARY OF WHAT CHANGED
+------------------------
+Backend (Current_Code.gs):
+- Changed REGISTERED_POKEMON_URL from registered_pokemon.json to pokedex_config.json
+- Added caching for full Pokedex config
+- Added getPokedexConfig() function
+- Added 'pokedex-config' route to API
+
+Frontend:
+- Created visibility helper system (js/utils/visibility.js)
+- Updated pokemon-form, edit-pokemon, and evolution pages to hide hidden abilities
+  when not visible in the config
+- Added API method to fetch Pokedex config
+
+
+WHAT THE NEW CONFIG FILE SHOULD LOOK LIKE
+------------------------------------------
+The pokedex_config.json file should have this structure:
+
+{
+  "registered": [
+    "Octuber",
+    "Salamandrop",
+    "Hydrasylph"
+  ],
+  "visibility": {
+    "octuber": {
+      "types": true,
+      "description": true,
+      "characteristics": true,
+      "primaryAbility": true,
+      "secondaryAbility": true,
+      "hiddenAbility": true,
+      "stats": true,
+      "senses": true,
+      "evolution": true,
+      "moves": true,
+      "movesMaxLevel": 6,
+      "extraVisibleMoves": []
+    },
+    "salamandrop": {
+      "types": false,
+      "description": true,
+      "characteristics": false,
+      "primaryAbility": false,
+      "secondaryAbility": false,
+      "hiddenAbility": false,
+      "stats": false,
+      "senses": false,
+      "evolution": false,
+      "moves": false,
+      "movesMaxLevel": 1,
+      "extraVisibleMoves": []
+    }
+  },
+  "defaults": {
+    "types": false,
+    "description": true,
+    "characteristics": false,
+    "primaryAbility": false,
+    "secondaryAbility": false,
+    "hiddenAbility": false,
+    "stats": false,
+    "senses": false,
+    "evolution": false,
+    "moves": false,
+    "movesMaxLevel": 1,
+    "extraVisibleMoves": []
+  },
+  "extraSearchableMoves": [],
+  "splashCount": 45
+}

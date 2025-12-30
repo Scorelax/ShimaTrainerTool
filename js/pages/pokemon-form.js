@@ -413,10 +413,25 @@ async function handleFormSubmit() {
     const heldItem = form.heldItem.value;
     const nickname = form.nickname.value;
 
-    // Get selected abilities
-    const selectedAbilities = Array.from(document.querySelectorAll('input[name="abilities"]:checked'))
-      .map(cb => cb.value)
-      .join('|');
+    // Get selected abilities - need to split into 3 separate fields for database
+    const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
+    const selectedAbilities = selectedAbilityCheckboxes.map(cb => cb.value).join('|');
+
+    // Split abilities into primary (slot 0), secondary (slot 1), and hidden (slot 2)
+    let primaryAbility = '';
+    let secondaryAbility = '';
+    let hiddenAbility = '';
+
+    selectedAbilityCheckboxes.forEach(cb => {
+      const value = cb.value;
+      const colonIndex = value.indexOf(':');
+      if (colonIndex !== -1) {
+        const slotIndex = parseInt(value.substring(0, colonIndex));
+        if (slotIndex === 0) primaryAbility = value;
+        else if (slotIndex === 1) secondaryAbility = value;
+        else if (slotIndex === 2) hiddenAbility = value;
+      }
+    });
 
     // Apply nature modifiers to stats
     const natureData = natures.find(n => n.name === nature);
@@ -480,7 +495,9 @@ async function handleFormSubmit() {
       level,                       // Level
       selectedPokemonData[4],      // Primary Type
       selectedPokemonData[5],      // Secondary Type
-      selectedAbilities,           // Abilities
+      primaryAbility,              // Primary Ability
+      secondaryAbility,            // Secondary Ability
+      hiddenAbility,               // Hidden Ability
       selectedPokemonData[9],      // AC
       selectedPokemonData[10],     // Hit Dice
       '',                          // HP (to be calculated)

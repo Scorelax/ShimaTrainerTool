@@ -425,23 +425,16 @@ async function handleFormSubmit() {
     return;
   }
 
-  // Show loading
-  document.getElementById('content').innerHTML = '<div class="loading">Registering Pokemon...</div>';
-
   try {
-    // Gather form data
+    // CRITICAL: Gather ALL form data BEFORE showing loading message
+    // (loading message wipes out the entire form!)
+
+    // Gather basic form data
     const level = parseInt(form.level.value);
     const nature = form.nature.value;
     const loyalty = parseInt(form.loyalty.value);
     const heldItem = form.heldItem.value;
     const nickname = form.nickname.value;
-
-    // Debug: Check all ability checkboxes before getting checked ones
-    const allAbilityCheckboxes = document.querySelectorAll('input[name="abilities"]');
-    console.log('[Pokemon Form] [SUBMIT] All ability checkboxes:', allAbilityCheckboxes.length);
-    allAbilityCheckboxes.forEach(cb => {
-      console.log(`  - id="${cb.id}" value="${cb.value}" checked=${cb.checked}`);
-    });
 
     // Get selected abilities and format them
     const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
@@ -469,6 +462,9 @@ async function handleFormSubmit() {
     }).join('|');
 
     console.log('[Pokemon Form] Selected abilities string:', selectedAbilities);
+
+    // NOW show loading (after we've captured all the data)
+    document.getElementById('content').innerHTML = '<div class="loading">Registering Pokemon...</div>';
 
     // Apply nature modifiers to stats
     const natureData = natures.find(n => n.name === nature);

@@ -321,8 +321,8 @@ export async function attachPokemonFormListeners() {
   // Initialize visibility system
   await initializeVisibility();
 
-  // Populate abilities
-  populateAbilityOptions(selectedPokemonData);
+  // Populate abilities from cache or API (like edit-pokemon does)
+  await populateAbilityOptions(selectedPokemonData);
 
   // Cancel button
   document.getElementById('cancelButton')?.addEventListener('click', () => {
@@ -338,64 +338,106 @@ export async function attachPokemonFormListeners() {
   });
 }
 
-function populateAbilityOptions(selectedPokemonData) {
+async function populateAbilityOptions(selectedPokemonData) {
   const abilitiesContent = document.getElementById('abilitiesContent');
   if (!abilitiesContent) return;
 
-  abilitiesContent.innerHTML = '';
-
   const pokemonName = selectedPokemonData[1] || 'Unknown';
 
-  // Debug logging
-  console.log('[Pokemon Form] selectedPokemonData:', selectedPokemonData);
-  console.log('[Pokemon Form] Image URL:', selectedPokemonData[0]);
-  console.log('[Pokemon Form] Pokemon Name:', pokemonName);
+  // Show loading message
+  abilitiesContent.innerHTML = '<div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #666;">Loading abilities...</div>';
 
-  // Get all three possible abilities (indices 6, 7, 8)
-  // 0 = primary, 1 = secondary, 2 = hidden
-  const abilities = [
-    selectedPokemonData[6],
-    selectedPokemonData[7],
-    selectedPokemonData[8]
-  ];
+  try {
+    let abilities = [];
 
-  console.log('[Pokemon Form] Abilities from data:', abilities);
+    // First check if we have cached Pokemon data in session storage
+    const cachedDataStr = sessionStorage.getItem('completePokemonData');
+    if (cachedDataStr) {
+      try {
+        const completePokemonData = JSON.parse(cachedDataStr);
+        const pokemonInfo = completePokemonData.find(p => p[1] === pokemonName);
 
-  abilities.forEach((abilityData, slotIndex) => {
-    // Skip empty abilities
-    if (!abilityData) return;
+        if (pokemonInfo) {
+          // Pokemon found in cache! Use abilities from indices 6, 7, 8
+          abilities = [
+            pokemonInfo[6],  // Primary ability
+            pokemonInfo[7],  // Secondary ability
+            pokemonInfo[8]   // Hidden ability
+          ].filter(a => a && a !== ''); // Remove empty abilities
 
-    // Check if hidden ability (slotIndex 2) should be visible
-    if (slotIndex === 2 && !isFieldVisible(pokemonName, 'hiddenAbility')) {
-      return; // Skip hidden ability if not visible
+          console.log('[Pokemon Form] [Cache HIT] Using cached abilities for', pokemonName);
+        }
+      } catch (cacheError) {
+        console.warn('[Pokemon Form] [Cache] Error reading cached data:', cacheError);
+      }
     }
 
-    // Parse ability data (format: "AbilityName,Description")
-    const parts = abilityData.split(',');
-    const abilityName = parts[0].trim();
-    const abilityDescription = parts.slice(1).join(',').trim();
+    // If no abilities from cache, fall back to API call
+    if (abilities.length === 0) {
+      console.log('[Pokemon Form] [Cache MISS] Fetching abilities from API for', pokemonName);
+      const response = await PokemonAPI.getAbilities(pokemonName);
+      if (response.status === 'success') {
+        abilities = response.abilities;
+      } else {
+        console.error('[Pokemon Form] Error fetching abilities:', response.message);
+        abilitiesContent.innerHTML = '<div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #f44336;">Failed to load abilities</div>';
+        return;
+      }
+    }
 
-    // Create checkbox container
-    const div = document.createElement('div');
-    div.className = 'checkbox-item';
+    // Clear loading message
+    abilitiesContent.innerHTML = '';
 
-    // Create checkbox
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = `ability${slotIndex}`;
-    checkbox.name = 'abilities';
-    // Store slotIndex:name;description format
-    checkbox.value = slotIndex + ':' + abilityName + ';' + abilityDescription;
+    console.log('[Pokemon Form] Abilities loaded:', abilities);
 
-    // Create label with only name (description still saved in checkbox value for display in Pokemon card)
-    const label = document.createElement('label');
-    label.htmlFor = `ability${slotIndex}`;
-    label.textContent = abilityName;
+    // Populate ability checkboxes
+    abilities.forEach((abilityData, index) => {
+      // Parse ability slot index if present (format could be "0:Name,Description" or "Name,Description")
+      const colonIndex = abilityData.indexOf(':');
+      let slotIndex = index;
+      let abilityString = abilityData;
 
-    div.appendChild(checkbox);
-    div.appendChild(label);
-    abilitiesContent.appendChild(div);
-  });
+      if (colonIndex !== -1 && colonIndex < 3) {
+        slotIndex = parseInt(abilityData.substring(0, colonIndex));
+        abilityString = abilityData.substring(colonIndex + 1);
+      }
+
+      // Check if this is the hidden ability (last one) and if it should be visible
+      const isHiddenAbility = index === abilities.length - 1;
+      if (isHiddenAbility && !isFieldVisible(pokemonName, 'hiddenAbility')) {
+        return; // Skip hidden ability if not visible
+      }
+
+      // Parse ability data (format: "AbilityName,Description")
+      const parts = abilityString.split(',');
+      const abilityName = parts[0].trim();
+      const abilityDescription = parts.slice(1).join(',').trim();
+
+      // Create checkbox container
+      const div = document.createElement('div');
+      div.className = 'checkbox-item';
+
+      // Create checkbox
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = `ability${slotIndex}`;
+      checkbox.name = 'abilities';
+      // Store slotIndex:name;description format
+      checkbox.value = slotIndex + ':' + abilityName + ';' + abilityDescription;
+
+      // Create label with only name (description still saved in checkbox value for display in Pokemon card)
+      const label = document.createElement('label');
+      label.htmlFor = `ability${slotIndex}`;
+      label.textContent = abilityName;
+
+      div.appendChild(checkbox);
+      div.appendChild(label);
+      abilitiesContent.appendChild(div);
+    });
+  } catch (error) {
+    console.error('[Pokemon Form] Error loading abilities:', error);
+    abilitiesContent.innerHTML = '<div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #f44336;">Failed to load abilities</div>';
+  }
 }
 
 async function handleFormSubmit() {

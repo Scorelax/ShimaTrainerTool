@@ -23,6 +23,7 @@ export function renderEditTrainer() {
   const trainerWIS = trainerData[9] || 10;
   const trainerCHA = trainerData[10] || 10;
   const trainerAC = trainerData[13] || 10;
+  const trainerMoney = trainerData[19] || 0;
   const trainerLeaguePoints = trainerData[21] || 0;
   const trainerSkills = trainerData[18] || '';
   const trainerFeats = trainerData[33] || '';
@@ -490,6 +491,11 @@ export function renderEditTrainer() {
           </div>
 
           <div class="form-group">
+            <label for="money">Money</label>
+            <input type="number" id="money" name="money" value="${trainerMoney}" min="0" required />
+          </div>
+
+          <div class="form-group">
             <label for="leaguePoints">League Points</label>
             <input type="number" id="leaguePoints" name="leaguePoints" value="${trainerLeaguePoints}" min="0" required />
           </div>
@@ -725,6 +731,7 @@ async function handleFormSubmit() {
     const wis = parseInt(form.wis.value);
     const cha = parseInt(form.cha.value);
     const ac = parseInt(form.ac.value);
+    const money = parseInt(form.money.value);
     const leaguePoints = parseInt(form.leaguePoints.value);
 
     // Get selected skills
@@ -748,6 +755,7 @@ async function handleFormSubmit() {
     trainerData[9] = wis;
     trainerData[10] = cha;
     trainerData[13] = ac;
+    trainerData[19] = money;
     trainerData[21] = leaguePoints;
     trainerData[18] = selectedSkills.length > 0 ? selectedSkills.join(', ') : '';
     trainerData[33] = selectedFeats.length > 0 ? selectedFeats.join(', ') : '';

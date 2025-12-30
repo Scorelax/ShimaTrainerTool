@@ -1583,6 +1583,10 @@ export function renderTrainerInfo() {
             <span class="info-item-value">${trainerSavingThrows}</span>
           </div>
           <div class="info-item">
+            <span class="info-item-label">Money:</span>
+            <span class="info-item-value">${trainerMoney}</span>
+          </div>
+          <div class="info-item">
             <span class="info-item-label">League Points:</span>
             <span class="info-item-value">${trainerLeaguePoints}</span>
           </div>

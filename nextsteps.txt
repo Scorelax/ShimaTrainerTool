@@ -4,8 +4,8 @@ BUGS FIXED IN THIS SESSION (2025-12-30)
 BUG FIX #1: Held-item button not working in pokemon-card
 ---------------------------------------------------------
 FIXED: The held items were not stored in window scope like abilities were.
-- Added window.heldItems assignment
-- Updated event listener to use window.heldItems
+- Added window.heldItems assignment (pokemon-card.js:1580)
+- Updated event listener to use window.heldItems (pokemon-card.js:1894)
 
 BUG FIX #2: Level 2 moves not saving to database
 -------------------------------------------------
@@ -15,20 +15,83 @@ ROOT CAUSE FOUND: Database schema mismatch!
 - This caused moves to go into the WRONG columns (level 2 moves went into skills column!)
 
 FIXED in pokemon-form.js:
-- Split abilities into 3 separate fields before creating newPokemonData array
-- Now properly sends primaryAbility, secondaryAbility, hiddenAbility at indices 7, 8, 9
+- Split abilities into 3 separate fields before creating newPokemonData array (lines 416-434)
+- Now properly sends primaryAbility, secondaryAbility, hiddenAbility at indices 7, 8, 9 (lines 490-502)
 
 FIXED in edit-pokemon.js:
-- Updated to split abilities into 3 fields when saving
-- Added backward compatibility to read both old format (1 field) and new format (3 fields)
+- Updated to split abilities into 3 fields when saving (lines 1186-1203, 1220-1223)
+- Added backward compatibility to read both old format (1 field) and new format (3 fields) (lines 1364-1379)
 - Existing Pokemon will be automatically migrated when edited
 
+FIXED in evolution.js:
+- Added backward compatibility for reading abilities (lines 898-915)
+- Split evolved abilities into 3 separate fields (lines 956-969)
+- Updated evolvedPokemonData array structure (lines 972-983)
+
+BUG FIX #3: Use Move button defaulting to "Circle Throw"
+---------------------------------------------------------
+ROOT CAUSE: Event listener captured stale `move` variable from closure when popup was created.
+FIXED in pokemon-card.js:
+- Modified event listener to read move data from button's dataset attributes (lines 2553-2563)
+- Set dataset attributes when populating move details (lines 2654-2657)
+
+BUG FIX #4: Type matchup calculation not working in pokemon-form
+-----------------------------------------------------------------
+ROOT CAUSE: Backend returns type effectiveness in `data` field, but frontend tried to access `effectiveness` field.
+FIXED in pokemon-form.js:
+- Changed `typeResponse.effectiveness` to `typeResponse.data` (line 486)
+- evolution.js already had fallback to handle both formats
+
+BUG FIX #5: Money field missing from trainer-info display
+----------------------------------------------------------
+FIXED in trainer-info.js:
+- trainerMoney variable was already defined at line 35
+- Added Money field display between Saving Throws and League Points (lines 1585-1588)
+
+BUG FIX #6: Money field missing from edit-trainer
+--------------------------------------------------
+FIXED in edit-trainer.js:
+- Added trainerMoney variable definition (line 26)
+- Added Money input field in form (lines 493-496)
+- Added code to get money value when saving (line 734)
+- Added code to update trainerData[19] with money value (line 758)
+
 STILL TO FIX:
-- evolution.js (needs same ability split fix)
-- Type matchup calculation in pokemon-form
-- Use Move defaulting to "Circle Throw"
-- Money field missing in trainer-info and edit-trainer
-- Affinity/specialization/trainer-path selection logic
+- Affinity/specialization/trainer-path selection logic (COMPLEX - see below)
+
+NOTE ON AFFINITY/SPECIALIZATION/TRAINER-PATH SELECTION
+-------------------------------------------------------
+This bug fix is more complex than the others and requires porting the selection
+system from the reference implementation (_reference/trainer_info.html).
+
+Current behavior:
+- When affinity/specialization/trainer-path are "None", popups just show message
+- No way to select/change these values from the UI
+
+Required changes (from reference implementation):
+1. Add new HTML popups for selection:
+   - affinitySelectionPopup (with affinity-grid for choices)
+   - specializationSelectionPopup (with specialization-grid for choices)
+   - Trainer path: inline selection in existing popup when no path chosen
+
+2. Add CSS styling for:
+   - .affinity-grid, .affinity-item, .affinity-selection-effect-box
+   - .specialization-grid, .specialization-item, .specialization-selection-effect-box
+   - Selection button states and hover effects
+
+3. JavaScript logic to implement:
+   - showAffinitySelection(availableAffinities, selectedAffinities)
+   - selectAffinity(affinity) - shows effect in selection box
+   - saveAffinity(selectedAffinity) - saves to backend via API
+   - Similar functions for specialization
+   - Trainer path: inline clickable items when none chosen
+
+4. Backend API endpoints needed:
+   - writeAffinity(trainerName, affinityString)
+   - writeSpecialization(trainerName, specializationString)
+   - writeTrainerPath(trainerName, trainerPathName)
+
+This should be implemented as a separate feature after testing the other bug fixes.
 
 ========================================
 

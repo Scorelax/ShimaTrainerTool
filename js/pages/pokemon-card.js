@@ -2549,9 +2549,11 @@ function showMoveDetails(moveName) {
       });
 
       // Use Move button listener - show confirmation
+      // Note: This listener is only set up once, so it gets the move data from the button's dataset
       document.getElementById('useMoveButton').addEventListener('click', () => {
-        const vpCost = parseInt(move[4]) || 0;
-        const moveName = move[0];
+        const btn = document.getElementById('useMoveButton');
+        const moveName = btn.dataset.moveName;
+        const vpCost = parseInt(btn.dataset.vpCost) || 0;
 
         // Update confirmation text
         document.getElementById('confirmMoveText').textContent = `Use ${moveName} (${vpCost} VP)?`;
@@ -2648,6 +2650,11 @@ function showMoveDetails(moveName) {
     document.getElementById('attackRollBreakdown').textContent = attackBreakdown;
     document.getElementById('damageRollBreakdown').textContent = damageBreakdown;
     document.getElementById('heldItemsInfo').innerHTML = heldItemsInfo;
+
+    // Set dataset attributes for Use Move button
+    const useMoveBtn = document.getElementById('useMoveButton');
+    useMoveBtn.dataset.moveName = move[0];
+    useMoveBtn.dataset.vpCost = move[4];
 
     // Apply type color to popup header and body
     const bgColor = getMoveTypeColor(move[1]);

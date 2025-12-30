@@ -892,12 +892,27 @@ async function confirmEvolution() {
     console.log('[Evolution] Type matchups string:', typematchupsString);
 
     // Map abilities from current to evolved Pokemon
-    const currentAbilitiesRaw = currentPokemon[7] || '';
     const evolvedAbilities = [];
     const evolvedPokemonName = selectedPokemon[1]; // Name at index 1
 
-    if (currentAbilitiesRaw) {
-      const currentAbilities = currentAbilitiesRaw.split('|').map(a => a.trim()).filter(a => a);
+    // Support both old format (single field at index 7) and new format (3 fields at indices 7, 8, 9)
+    let currentAbilities = [];
+    const ability7 = currentPokemon[7] || '';
+    const ability8 = currentPokemon[8] || '';
+    const ability9 = currentPokemon[9] || '';
+
+    // Check if old format (contains pipe separator) or new format (separate fields)
+    if (ability7.includes('|')) {
+      // Old format: single field with pipe-separated values
+      currentAbilities = ability7.split('|').map(a => a.trim()).filter(a => a);
+    } else {
+      // New format: three separate fields
+      if (ability7) currentAbilities.push(ability7);
+      if (ability8) currentAbilities.push(ability8);
+      if (ability9) currentAbilities.push(ability9);
+    }
+
+    if (currentAbilities.length > 0) {
 
       // Get evolved Pokemon's abilities (pokedex format: "Name, Description")
       const evolvedPokemonAbilities = [
@@ -930,16 +945,28 @@ async function confirmEvolution() {
     }
 
     // Default to primary ability if no mapping
-    const evolvedAbilitiesString = evolvedAbilities.length > 0
-      ? evolvedAbilities.join('|')
-      : (() => {
-          const primaryAbility = selectedPokemon[6];
-          if (primaryAbility) {
-            const parts = primaryAbility.split(',');
-            return '0:' + parts[0].trim() + ';' + parts.slice(1).join(',').trim();
-          }
-          return '';
-        })();
+    if (evolvedAbilities.length === 0) {
+      const primaryAbility = selectedPokemon[6];
+      if (primaryAbility) {
+        const parts = primaryAbility.split(',');
+        evolvedAbilities.push('0:' + parts[0].trim() + ';' + parts.slice(1).join(',').trim());
+      }
+    }
+
+    // Split evolved abilities into primary (slot 0), secondary (slot 1), and hidden (slot 2)
+    let primaryAbility = '';
+    let secondaryAbility = '';
+    let hiddenAbility = '';
+
+    evolvedAbilities.forEach(abilityData => {
+      const colonIndex = abilityData.indexOf(':');
+      if (colonIndex !== -1) {
+        const slotIndex = parseInt(abilityData.substring(0, colonIndex));
+        if (slotIndex === 0) primaryAbility = abilityData;
+        else if (slotIndex === 1) secondaryAbility = abilityData;
+        else if (slotIndex === 2) hiddenAbility = abilityData;
+      }
+    });
 
     // Build evolved Pokemon data array with placeholders for calculated values
     const evolvedPokemonData = [
@@ -950,7 +977,9 @@ async function confirmEvolution() {
       currentPokemon[4],           // Level
       selectedPokemon[4],          // Primary Type
       selectedPokemon[5],          // Secondary Type
-      evolvedAbilitiesString,      // Abilities
+      primaryAbility,              // Primary Ability
+      secondaryAbility,            // Secondary Ability
+      hiddenAbility,               // Hidden Ability
       selectedPokemon[9],          // AC
       selectedPokemon[10],         // Hit Dice
       '',                          // HP (will be calculated by server)

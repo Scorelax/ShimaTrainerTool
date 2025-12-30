@@ -483,8 +483,8 @@ async function handleFormSubmit() {
       selectedPokemonData[4],
       selectedPokemonData[5]
     );
-    const typematchupsString = typeResponse.effectiveness ?
-      typeResponse.effectiveness.join(', ') : '';
+    const typematchupsString = typeResponse.data ?
+      typeResponse.data.join(', ') : '';
 
     // Build new Pokemon data array
     const newPokemonData = [

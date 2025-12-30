@@ -1,6 +1,39 @@
 BUGS FIXED IN THIS SESSION (2025-12-30)
 ========================================
 
+BUG FIX #8: Abilities not loading/saving in pokemon-form (FIXED)
+-----------------------------------------------------------------
+ROOT CAUSE: pokemon-form was trying to read abilities from selectedPokemonData,
+which is the raw Pokedex data clicked in new-pokemon. This data doesn't have
+abilities in the correct format or location.
+
+FIXED in pokemon-form.js:
+- Changed populateAbilityOptions() to async function
+- Added cache-first logic like edit-pokemon.js uses:
+  * Check completePokemonData cache first (indices 6, 7, 8)
+  * Fall back to PokemonAPI.getAbilities() if cache miss
+- Parse ability format consistently (handles "0:Name,Description")
+- Added loading/error messages
+- Added await in attachPokemonFormListeners()
+
+RESULT:
+- Abilities now load instantly from cache (like edit-pokemon)
+- Abilities save correctly when registering Pokemon
+- Consistent behavior across pokemon-form and edit-pokemon
+
+BUG FIX #9: Image URL not being saved when registering Pokemon (FIXED)
+-----------------------------------------------------------------------
+ROOT CAUSE: In new-pokemon.js, when selecting a Pokemon, the image URL was
+resolved and displayed, but NOT stored back into the pokemon object. When
+clicking "Register", selectedPokemon still had empty image URL.
+
+FIXED in new-pokemon.js (selectPokemon function):
+- After resolving image URL, store it back into pokemon[0]
+- This ensures the URL is available when registering the Pokemon
+
+RESULT:
+- Image URLs now correctly saved when registering new Pokemon
+
 BUG FIX #1: Held-item button not working in pokemon-card
 ---------------------------------------------------------
 FIXED: The held items were not stored in window scope like abilities were.

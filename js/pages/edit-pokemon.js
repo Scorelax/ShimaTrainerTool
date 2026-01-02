@@ -1286,10 +1286,11 @@ async function loadAbilities(pokemonData) {
 
         if (pokemonInfo) {
           // Pokemon found in cache! Use abilities from indices 6, 7, 8
+          // Add slot index prefix before filtering to preserve slot information
           const abilities = [
-            pokemonInfo[6],  // Primary ability
-            pokemonInfo[7],  // Secondary ability
-            pokemonInfo[8]   // Hidden ability
+            pokemonInfo[6] ? '0:' + pokemonInfo[6] : '',  // Primary ability (slot 0)
+            pokemonInfo[7] ? '1:' + pokemonInfo[7] : '',  // Secondary ability (slot 1)
+            pokemonInfo[8] ? '2:' + pokemonInfo[8] : ''   // Hidden ability (slot 2)
           ].filter(a => a && a !== ''); // Remove empty abilities
 
           console.log('[Cache HIT] Using cached abilities for', currentPokemonName);
@@ -1341,9 +1342,8 @@ function populateAbilities(abilities, pokemonData) {
       abilityString = abilityData.substring(colonIndex + 1);
     }
 
-    // Check if this is the hidden ability (last one) and if it should be visible
-    const isHiddenAbility = index === abilities.length - 1;
-    if (isHiddenAbility && !isFieldVisible(pokemonName, 'hiddenAbility')) {
+    // Check if this is the hidden ability (slot 2) and if it should be visible
+    if (slotIndex === 2 && !isFieldVisible(pokemonName, 'hiddenAbility')) {
       return; // Skip hidden ability if not visible
     }
 

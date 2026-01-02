@@ -3303,6 +3303,18 @@ function selectAffinity(affinity) {
     effectToShow = affinity.improvedEffect || affinity.effect;
   }
 
+  // Remove selected class from all items
+  document.querySelectorAll('.affinity-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+
+  // Add selected class to clicked item (find by text content)
+  document.querySelectorAll('.affinity-item').forEach(item => {
+    if (item.textContent === affinity.name) {
+      item.classList.add('selected');
+    }
+  });
+
   // Update effect box
   affinityEffectBox.innerHTML = `<strong>${affinity.name}</strong><p>${effectToShow}</p>`;
 
@@ -3384,6 +3396,18 @@ function showSpecializationSelection() {
 function selectSpecialization(specialization) {
   const specializationEffectBox = document.querySelector('.specialization-selection-effect-box');
   const chooseButton = document.getElementById('chooseSpecializationButton');
+
+  // Remove selected class from all items
+  document.querySelectorAll('.specialization-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+
+  // Add selected class to clicked item (find by text content)
+  document.querySelectorAll('.specialization-item').forEach(item => {
+    if (item.textContent === specialization.name) {
+      item.classList.add('selected');
+    }
+  });
 
   // Update effect box
   specializationEffectBox.innerHTML = `<strong>${specialization.name}</strong><p>${specialization.effect || 'No effect description available.'}</p>`;

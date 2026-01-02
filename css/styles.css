@@ -443,15 +443,17 @@ body {
    ============================================================================ */
 
 .affinity-grid,
-.specialization-grid {
+.specialization-grid,
+.trainer-path-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
 .affinity-item,
-.specialization-item {
+.specialization-item,
+.trainer-path-item {
   padding: 1rem;
   border-radius: 12px;
   text-align: center;
@@ -465,26 +467,30 @@ body {
 }
 
 .affinity-item:hover,
-.specialization-item:hover {
+.specialization-item:hover,
+.trainer-path-item:hover {
   transform: translateY(-2px);
   border-color: #667eea;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
 }
 
 .affinity-item:active,
-.specialization-item:active {
+.specialization-item:active,
+.trainer-path-item:active {
   transform: translateY(0);
 }
 
 .affinity-item.selected,
-.specialization-item.selected {
+.specialization-item.selected,
+.trainer-path-item.selected {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-color: #667eea;
 }
 
 .affinity-selection-effect-box,
-.specialization-selection-effect-box {
+.specialization-selection-effect-box,
+.trainer-path-selection-effect-box {
   border: 2px solid #e0e0e0;
   border-radius: 12px;
   padding: 1.5rem;
@@ -499,7 +505,8 @@ body {
 }
 
 .affinity-selection-effect-box strong,
-.specialization-selection-effect-box strong {
+.specialization-selection-effect-box strong,
+.trainer-path-selection-effect-box strong {
   display: block;
   margin-bottom: 0.75rem;
   font-size: 1.2rem;
@@ -508,7 +515,8 @@ body {
 }
 
 .affinity-selection-effect-box p,
-.specialization-selection-effect-box p {
+.specialization-selection-effect-box p,
+.trainer-path-selection-effect-box p {
   margin: 0;
   color: #666;
 }
@@ -549,19 +557,22 @@ body {
 /* Responsive adjustments for selection grids */
 @media (max-width: 768px) {
   .affinity-grid,
-  .specialization-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  .specialization-grid,
+  .trainer-path-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 480px) {
   .affinity-grid,
-  .specialization-grid {
+  .specialization-grid,
+  .trainer-path-grid {
     grid-template-columns: 1fr;
   }
 
   .affinity-selection-effect-box,
-  .specialization-selection-effect-box {
+  .specialization-selection-effect-box,
+  .trainer-path-selection-effect-box {
     padding: 1rem;
     font-size: 0.95rem;
   }

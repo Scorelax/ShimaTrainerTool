@@ -1881,6 +1881,22 @@ export function renderTrainerInfo() {
         </div>
       </div>
 
+      <div class="popup-overlay" id="trainerPathSelectionPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Select Trainer Path</div>
+            <button class="popup-close" id="closeTrainerPathSelection">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="trainer-path-grid"></div>
+            <div class="trainer-path-selection-effect-box">Select a trainer path to see its effect.</div>
+            <div class="popup-footer">
+              <button id="chooseTrainerPathButton" class="popup-button" disabled>Choose Trainer Path</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="popup-overlay" id="gearPopup">
         <div class="popup-content">
           <div class="popup-header">
@@ -2862,25 +2878,13 @@ export function attachTrainerInfoListeners() {
     const content = document.getElementById('trainerPathContent');
 
     if (!trainerPathName || trainerPathName === 'None') {
-      // Show selection buttons for available trainer paths
-      if (trainerPathsDataStr) {
-        const trainerPathsData = JSON.parse(trainerPathsDataStr);
-        let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
-
-        trainerPathsData.forEach(path => {
-          html += `
-            <button class="popup-button" onclick='saveTrainerPath(${JSON.stringify(path).replace(/'/g, "&apos;")})' style="width: 100%;">
-              ${path.name}
-            </button>
-          `;
-        });
-
-        html += '</div>';
-        content.innerHTML = html;
+      // Show selection UI
+      if (trainerLevel >= 3) {
+        showTrainerPathSelection();
       } else {
-        content.innerHTML = '<p style="text-align: center; color: #999;">No trainer paths available.</p>';
+        content.innerHTML = '<p style="text-align: center; color: #999;">Trainer Path unlocks at level 3.</p>';
+        openPopup('trainerPathPopup');
       }
-      openPopup('trainerPathPopup');
       return;
     }
 
@@ -3028,6 +3032,7 @@ export function attachTrainerInfoListeners() {
   document.getElementById('closeAffinity')?.addEventListener('click', () => closePopup('affinityPopup'));
   document.getElementById('closeAffinitySelection')?.addEventListener('click', () => closePopup('affinitySelectionPopup'));
   document.getElementById('closeSpecializationSelection')?.addEventListener('click', () => closePopup('specializationSelectionPopup'));
+  document.getElementById('closeTrainerPathSelection')?.addEventListener('click', () => closePopup('trainerPathSelectionPopup'));
 
   // Gear button
   document.getElementById('gearButton')?.addEventListener('click', () => {
@@ -3258,7 +3263,7 @@ export function attachTrainerInfoListeners() {
 // Make functions globally accessible for onclick handlers
 window.showAffinitySelection = showAffinitySelection;
 window.showSpecializationSelection = showSpecializationSelection;
-window.saveTrainerPath = saveTrainerPath;
+window.showTrainerPathSelection = showTrainerPathSelection;
 
 function showAffinitySelection() {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
@@ -3282,10 +3287,10 @@ function showAffinitySelection() {
     affinityGrid.appendChild(button);
   });
 
-  // Show the popup
-  document.getElementById('affinitySelectionPopup').style.display = 'flex';
+  // Show the popup using class-based approach
+  document.getElementById('affinitySelectionPopup')?.classList.add('active');
   // Close the main affinity popup
-  document.getElementById('affinityPopup').style.display = 'none';
+  document.getElementById('affinityPopup')?.classList.remove('active');
 }
 
 function selectAffinity(affinity) {
@@ -3344,22 +3349,26 @@ async function saveAffinity(affinity) {
   // Update session storage immediately
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-  // Save to backend
-  try {
-    const { TrainerAPI } = await import('../api.js');
-    const response = await TrainerAPI.updateAffinity(trainerName, affinityString);
-    if (response.status === 'success') {
-      // Close selection popup
-      document.getElementById('affinitySelectionPopup').style.display = 'none';
-      // Reopen main affinity popup to show the updated affinity
-      document.getElementById('affinityButton').click();
-    } else {
-      alert(response.message || 'Failed to save affinity');
+  // Close selection popup immediately
+  document.getElementById('affinitySelectionPopup')?.classList.remove('active');
+
+  // Save to backend in the background
+  (async () => {
+    try {
+      const { TrainerAPI } = await import('../api.js');
+      const { showSuccess, showError } = await import('../utils/notifications.js');
+      const response = await TrainerAPI.updateAffinity(trainerName, affinityString);
+      if (response.status === 'success') {
+        showSuccess(`Affinity "${affinity.name}" saved successfully`);
+      } else {
+        showError(response.message || 'Failed to save affinity');
+      }
+    } catch (error) {
+      const { showError } = await import('../utils/notifications.js');
+      console.error('Error saving affinity:', error);
+      showError('Failed to save affinity');
     }
-  } catch (error) {
-    console.error('Error saving affinity:', error);
-    alert('Failed to save affinity');
-  }
+  })();
 }
 
 // ============================================================================
@@ -3387,10 +3396,10 @@ function showSpecializationSelection() {
     specializationGrid.appendChild(button);
   });
 
-  // Show the popup
-  document.getElementById('specializationSelectionPopup').style.display = 'flex';
+  // Show the popup using class-based approach
+  document.getElementById('specializationSelectionPopup')?.classList.add('active');
   // Close the main specialization popup
-  document.getElementById('specializationPopup').style.display = 'none';
+  document.getElementById('specializationPopup')?.classList.remove('active');
 }
 
 function selectSpecialization(specialization) {
@@ -3428,27 +3437,90 @@ async function saveSpecialization(specialization) {
   // Update session storage immediately
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-  // Save to backend
-  try {
-    const { TrainerAPI } = await import('../api.js');
-    const response = await TrainerAPI.updateSpecialization(trainerName, specialization.name);
-    if (response.status === 'success') {
-      // Close selection popup
-      document.getElementById('specializationSelectionPopup').style.display = 'none';
-      // Reopen main specialization popup to show the updated specialization
-      document.getElementById('specializationButton').click();
-    } else {
-      alert(response.message || 'Failed to save specialization');
+  // Close selection popup immediately
+  document.getElementById('specializationSelectionPopup')?.classList.remove('active');
+
+  // Save to backend in the background
+  (async () => {
+    try {
+      const { TrainerAPI } = await import('../api.js');
+      const { showSuccess, showError } = await import('../utils/notifications.js');
+      const response = await TrainerAPI.updateSpecialization(trainerName, specialization.name);
+      if (response.status === 'success') {
+        showSuccess(`Specialization "${specialization.name}" saved successfully`);
+      } else {
+        showError(response.message || 'Failed to save specialization');
+      }
+    } catch (error) {
+      const { showError } = await import('../utils/notifications.js');
+      console.error('Error saving specialization:', error);
+      showError('Failed to save specialization');
     }
-  } catch (error) {
-    console.error('Error saving specialization:', error);
-    alert('Failed to save specialization');
-  }
+  })();
 }
 
 // ============================================================================
 // TRAINER PATH SELECTION
 // ============================================================================
+
+function showTrainerPathSelection() {
+  const trainerPathsData = JSON.parse(sessionStorage.getItem('trainerPaths') || '[]');
+
+  const trainerPathGrid = document.querySelector('.trainer-path-grid');
+  const trainerPathEffectBox = document.querySelector('.trainer-path-selection-effect-box');
+  const chooseButton = document.getElementById('chooseTrainerPathButton');
+
+  trainerPathGrid.innerHTML = '';
+  trainerPathEffectBox.innerHTML = 'Select a trainer path to see its effect.';
+  chooseButton.disabled = true;
+
+  // Create button for each trainer path
+  trainerPathsData.forEach(path => {
+    const button = document.createElement('div');
+    button.className = 'trainer-path-item';
+    button.textContent = path.name;
+    button.onclick = () => selectTrainerPath(path);
+    trainerPathGrid.appendChild(button);
+  });
+
+  // Show the popup using class-based approach
+  document.getElementById('trainerPathSelectionPopup')?.classList.add('active');
+  // Close the main trainer path popup
+  document.getElementById('trainerPathPopup')?.classList.remove('active');
+}
+
+function selectTrainerPath(trainerPath) {
+  const trainerPathEffectBox = document.querySelector('.trainer-path-selection-effect-box');
+  const chooseButton = document.getElementById('chooseTrainerPathButton');
+
+  // Remove selected class from all items
+  document.querySelectorAll('.trainer-path-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+
+  // Add selected class to clicked item (find by text content)
+  document.querySelectorAll('.trainer-path-item').forEach(item => {
+    if (item.textContent === trainerPath.name) {
+      item.classList.add('selected');
+    }
+  });
+
+  // Build effect display from path stages
+  let effectHtml = `<strong>${trainerPath.name}</strong>`;
+  effectHtml += '<p>';
+  if (trainerPath.level3?.name) effectHtml += `Level 3: ${trainerPath.level3.name}<br>`;
+  if (trainerPath.level5?.name) effectHtml += `Level 5: ${trainerPath.level5.name}<br>`;
+  if (trainerPath.level9?.name) effectHtml += `Level 9: ${trainerPath.level9.name}<br>`;
+  if (trainerPath.level15?.name) effectHtml += `Level 15: ${trainerPath.level15.name}`;
+  effectHtml += '</p>';
+
+  // Update effect box
+  trainerPathEffectBox.innerHTML = effectHtml;
+
+  // Enable choose button
+  chooseButton.disabled = false;
+  chooseButton.onclick = () => saveTrainerPath(trainerPath);
+}
 
 async function saveTrainerPath(trainerPath) {
   if (!trainerPath) return;
@@ -3461,18 +3533,24 @@ async function saveTrainerPath(trainerPath) {
   // Update session storage immediately
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-  // Save to backend
-  try {
-    const { TrainerAPI } = await import('../api.js');
-    const response = await TrainerAPI.updateTrainerPath(trainerName, trainerPath.name);
-    if (response.status === 'success') {
-      // Reopen trainer path popup to show the updated path
-      document.getElementById('trainerPathButton').click();
-    } else {
-      alert(response.message || 'Failed to save trainer path');
+  // Close selection popup immediately
+  document.getElementById('trainerPathSelectionPopup')?.classList.remove('active');
+
+  // Save to backend in the background
+  (async () => {
+    try {
+      const { TrainerAPI } = await import('../api.js');
+      const { showSuccess, showError } = await import('../utils/notifications.js');
+      const response = await TrainerAPI.updateTrainerPath(trainerName, trainerPath.name);
+      if (response.status === 'success') {
+        showSuccess(`Trainer Path "${trainerPath.name}" saved successfully`);
+      } else {
+        showError(response.message || 'Failed to save trainer path');
+      }
+    } catch (error) {
+      const { showError } = await import('../utils/notifications.js');
+      console.error('Error saving trainer path:', error);
+      showError('Failed to save trainer path');
     }
-  } catch (error) {
-    console.error('Error saving trainer path:', error);
-    alert('Failed to save trainer path');
-  }
+  })();
 }

@@ -1,5 +1,7 @@
 // Trainer Info Page - Detailed Trainer Information Display
 
+import { showError, showSuccess } from '../utils/notifications.js';
+
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
 

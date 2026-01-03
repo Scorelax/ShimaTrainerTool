@@ -3352,27 +3352,23 @@ async function saveAffinity(affinity) {
   // Close selection popup immediately
   document.getElementById('affinitySelectionPopup')?.classList.remove('active');
 
-  // Save to backend in the background
+  // Reopen affinity popup immediately to show the updated selection
+  setTimeout(() => {
+    document.getElementById('affinityButton')?.click();
+  }, 100);
+
+  // Save to backend silently in the background
   (async () => {
     try {
       const { TrainerAPI } = await import('../api.js');
-      const { showError } = await import('../utils/notifications.js');
       const response = await TrainerAPI.updateAffinity(trainerName, affinityString);
       if (response.status === 'success') {
-        // Reload trainer data from backend
-        const trainerResponse = await TrainerAPI.getTrainer(trainerName);
-        if (trainerResponse.status === 'success') {
-          sessionStorage.setItem('trainerData', JSON.stringify(trainerResponse.trainer));
-          // Re-open affinity popup to show updated data
-          document.getElementById('affinityButton')?.click();
-        }
+        console.log('Affinity saved to backend successfully');
       } else {
-        showError(response.message || 'Failed to save affinity');
+        console.warn('Failed to save affinity to backend:', response.message);
       }
     } catch (error) {
-      const { showError } = await import('../utils/notifications.js');
-      console.error('Error saving affinity:', error);
-      showError('Failed to save affinity');
+      console.error('Error saving affinity to backend:', error);
     }
   })();
 }
@@ -3446,27 +3442,23 @@ async function saveSpecialization(specialization) {
   // Close selection popup immediately
   document.getElementById('specializationSelectionPopup')?.classList.remove('active');
 
-  // Save to backend in the background
+  // Reopen specialization popup immediately to show the updated selection
+  setTimeout(() => {
+    document.getElementById('specializationButton')?.click();
+  }, 100);
+
+  // Save to backend silently in the background
   (async () => {
     try {
       const { TrainerAPI } = await import('../api.js');
-      const { showError } = await import('../utils/notifications.js');
       const response = await TrainerAPI.updateSpecialization(trainerName, specialization.name);
       if (response.status === 'success') {
-        // Reload trainer data from backend
-        const trainerResponse = await TrainerAPI.getTrainer(trainerName);
-        if (trainerResponse.status === 'success') {
-          sessionStorage.setItem('trainerData', JSON.stringify(trainerResponse.trainer));
-          // Re-open specialization popup to show updated data
-          document.getElementById('specializationButton')?.click();
-        }
+        console.log('Specialization saved to backend successfully');
       } else {
-        showError(response.message || 'Failed to save specialization');
+        console.warn('Failed to save specialization to backend:', response.message);
       }
     } catch (error) {
-      const { showError } = await import('../utils/notifications.js');
-      console.error('Error saving specialization:', error);
-      showError('Failed to save specialization');
+      console.error('Error saving specialization to backend:', error);
     }
   })();
 }
@@ -3548,27 +3540,23 @@ async function saveTrainerPath(trainerPath) {
   // Close selection popup immediately
   document.getElementById('trainerPathSelectionPopup')?.classList.remove('active');
 
-  // Save to backend in the background
+  // Reopen trainer path popup immediately to show the updated selection
+  setTimeout(() => {
+    document.getElementById('trainerPathButton')?.click();
+  }, 100);
+
+  // Save to backend silently in the background
   (async () => {
     try {
       const { TrainerAPI } = await import('../api.js');
-      const { showError } = await import('../utils/notifications.js');
       const response = await TrainerAPI.updateTrainerPath(trainerName, trainerPath.name);
       if (response.status === 'success') {
-        // Reload trainer data from backend
-        const trainerResponse = await TrainerAPI.getTrainer(trainerName);
-        if (trainerResponse.status === 'success') {
-          sessionStorage.setItem('trainerData', JSON.stringify(trainerResponse.trainer));
-          // Re-open trainer path popup to show updated data
-          document.getElementById('trainerPathButton')?.click();
-        }
+        console.log('Trainer path saved to backend successfully');
       } else {
-        showError(response.message || 'Failed to save trainer path');
+        console.warn('Failed to save trainer path to backend:', response.message);
       }
     } catch (error) {
-      const { showError } = await import('../utils/notifications.js');
-      console.error('Error saving trainer path:', error);
-      showError('Failed to save trainer path');
+      console.error('Error saving trainer path to backend:', error);
     }
   })();
 }

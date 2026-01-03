@@ -3356,10 +3356,16 @@ async function saveAffinity(affinity) {
   (async () => {
     try {
       const { TrainerAPI } = await import('../api.js');
-      const { showSuccess, showError } = await import('../utils/notifications.js');
+      const { showError } = await import('../utils/notifications.js');
       const response = await TrainerAPI.updateAffinity(trainerName, affinityString);
       if (response.status === 'success') {
-        showSuccess(`Affinity "${affinity.name}" saved successfully`);
+        // Reload trainer data from backend
+        const trainerResponse = await TrainerAPI.getTrainer(trainerName);
+        if (trainerResponse.status === 'success') {
+          sessionStorage.setItem('trainerData', JSON.stringify(trainerResponse.trainer));
+          // Re-open affinity popup to show updated data
+          document.getElementById('affinityButton')?.click();
+        }
       } else {
         showError(response.message || 'Failed to save affinity');
       }
@@ -3444,10 +3450,16 @@ async function saveSpecialization(specialization) {
   (async () => {
     try {
       const { TrainerAPI } = await import('../api.js');
-      const { showSuccess, showError } = await import('../utils/notifications.js');
+      const { showError } = await import('../utils/notifications.js');
       const response = await TrainerAPI.updateSpecialization(trainerName, specialization.name);
       if (response.status === 'success') {
-        showSuccess(`Specialization "${specialization.name}" saved successfully`);
+        // Reload trainer data from backend
+        const trainerResponse = await TrainerAPI.getTrainer(trainerName);
+        if (trainerResponse.status === 'success') {
+          sessionStorage.setItem('trainerData', JSON.stringify(trainerResponse.trainer));
+          // Re-open specialization popup to show updated data
+          document.getElementById('specializationButton')?.click();
+        }
       } else {
         showError(response.message || 'Failed to save specialization');
       }
@@ -3540,10 +3552,16 @@ async function saveTrainerPath(trainerPath) {
   (async () => {
     try {
       const { TrainerAPI } = await import('../api.js');
-      const { showSuccess, showError } = await import('../utils/notifications.js');
+      const { showError } = await import('../utils/notifications.js');
       const response = await TrainerAPI.updateTrainerPath(trainerName, trainerPath.name);
       if (response.status === 'success') {
-        showSuccess(`Trainer Path "${trainerPath.name}" saved successfully`);
+        // Reload trainer data from backend
+        const trainerResponse = await TrainerAPI.getTrainer(trainerName);
+        if (trainerResponse.status === 'success') {
+          sessionStorage.setItem('trainerData', JSON.stringify(trainerResponse.trainer));
+          // Re-open trainer path popup to show updated data
+          document.getElementById('trainerPathButton')?.click();
+        }
       } else {
         showError(response.message || 'Failed to save trainer path');
       }

@@ -2805,10 +2805,12 @@ export function attachTrainerInfoListeners() {
 
   // Specialization button - fixed to show 3 stages with effects
   document.getElementById('specializationButton')?.addEventListener('click', () => {
-    if (!trainerData) return;
+    // Read fresh data from sessionStorage each time
+    const freshTrainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    if (!freshTrainerData) return;
 
-    const trainerLevel = parseInt(trainerData[2], 10) || 1;
-    const specializationsStr = trainerData[24] || '';
+    const trainerLevel = parseInt(freshTrainerData[2], 10) || 1;
+    const specializationsStr = freshTrainerData[24] || '';
     const specializationsStored = specializationsStr ? specializationsStr.split(',').map(s => s.trim()) : [];
     const specializationsDataStr = sessionStorage.getItem('specializations');
     const content = document.getElementById('specializationContent');
@@ -2870,10 +2872,12 @@ export function attachTrainerInfoListeners() {
 
   // Trainer Path button - fixed to show 4 stages with effects
   document.getElementById('trainerPathButton')?.addEventListener('click', () => {
-    if (!trainerData) return;
+    // Read fresh data from sessionStorage each time
+    const freshTrainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    if (!freshTrainerData) return;
 
-    const trainerLevel = parseInt(trainerData[2], 10) || 1;
-    const trainerPathName = trainerData[25] || '';
+    const trainerLevel = parseInt(freshTrainerData[2], 10) || 1;
+    const trainerPathName = freshTrainerData[25] || '';
     const trainerPathsDataStr = sessionStorage.getItem('trainerPaths');
     const content = document.getElementById('trainerPathContent');
 
@@ -2943,10 +2947,12 @@ export function attachTrainerInfoListeners() {
 
   // Affinity button - shows base effect at level 2, improved effect at level 7
   document.getElementById('affinityButton')?.addEventListener('click', () => {
-    if (!trainerData) return;
+    // Read fresh data from sessionStorage each time
+    const freshTrainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    if (!freshTrainerData) return;
 
-    const trainerLevel = parseInt(trainerData[2], 10) || 1;
-    const affinitiesStr = trainerData[23] || '';
+    const trainerLevel = parseInt(freshTrainerData[2], 10) || 1;
+    const affinitiesStr = freshTrainerData[23] || '';
     const affinitiesStored = affinitiesStr ? affinitiesStr.split(',').map(a => a.trim()).filter(a => a) : [];
     const affinitiesDataStr = sessionStorage.getItem('affinities');
     const content = document.getElementById('affinityContent');

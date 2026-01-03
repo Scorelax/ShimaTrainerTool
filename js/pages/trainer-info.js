@@ -2247,8 +2247,8 @@ export function attachTrainerInfoListeners() {
     trainerData[34] = maxHP; // currentHP
     trainerData[35] = maxVP; // currentVP
 
-    // Refill all buff charges to max (excluding Second Wind - index 40)
-    trainerData[41] = getMaxCharges('Rapid Orders', trainerLevel);
+    // Refill all buff charges to max (excluding Rapid Orders - index 41)
+    trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
     trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
     trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
     trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
@@ -2317,9 +2317,9 @@ export function attachTrainerInfoListeners() {
     const trainerData = JSON.parse(trainerDataRaw);
     const trainerLevel = parseInt(trainerData[2], 10); // Trainer level
 
-    // Get buff charges from trainer data (indices 41-44)
-    // Note: index 40 (Second Wind) is not tracked as it's once per combat
-    const rapidOrdersCharges = parseInt(trainerData[41], 10) || 0;
+    // Get buff charges from trainer data (indices 40-44)
+    // Note: index 41 (Rapid Orders) is not tracked as it's once per turn
+    const secondWindCharges = parseInt(trainerData[40], 10) || 0;
     const unbreakableBondCharges = parseInt(trainerData[42], 10) || 0;
     const elementalSynergyCharges = parseInt(trainerData[43], 10) || 0;
     const masterTrainerCharges = parseInt(trainerData[44], 10) || 0;
@@ -2368,9 +2368,9 @@ export function attachTrainerInfoListeners() {
     const skillsByName = new Map();
 
     // Define the trainer buff skills with their charge data
-    // Note: Second Wind is excluded as it's once per combat (manually tracked)
+    // Note: Rapid Orders is excluded as it's once per turn (no charge tracking needed)
     const trainerBuffs = [
-      { name: 'Rapid Orders', charges: rapidOrdersCharges, index: 41 },
+      { name: 'Second Wind', charges: secondWindCharges, index: 40 },
       { name: 'Unbreakable Bond', charges: unbreakableBondCharges, index: 42 },
       { name: 'Elemental Synergy', charges: elementalSynergyCharges, index: 43 },
       { name: 'Master Trainer', charges: masterTrainerCharges, index: 44 }

@@ -444,7 +444,8 @@ body {
 
 .affinity-grid,
 .specialization-grid,
-.trainer-path-grid {
+.trainer-path-grid,
+.pokemon-selection-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
@@ -581,7 +582,8 @@ body {
 @media (max-width: 768px) {
   .affinity-grid,
   .specialization-grid,
-  .trainer-path-grid {
+  .trainer-path-grid,
+  .pokemon-selection-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -589,7 +591,8 @@ body {
 @media (max-width: 480px) {
   .affinity-grid,
   .specialization-grid,
-  .trainer-path-grid {
+  .trainer-path-grid,
+  .pokemon-selection-grid {
     grid-template-columns: 1fr;
   }
 

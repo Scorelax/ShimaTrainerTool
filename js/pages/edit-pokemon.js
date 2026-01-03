@@ -1222,6 +1222,9 @@ async function handleFormSubmit(pokemonName, originalNature) {
     const needsRecalculation = featsChanged || levelChanged || conChanged || loyaltyChanged;
 
     if (needsRecalculation) {
+      // Show loading screen during recalculation
+      document.getElementById('loading-screen')?.classList.add('active');
+
       try {
         // Backend will recalculate stats (feats + HP/VP)
         const response = await PokemonAPI.recalculateStats(pokemonData, originalFeatsFromDb);
@@ -1232,9 +1235,13 @@ async function handleFormSubmit(pokemonName, originalNature) {
         }
       } catch (error) {
         console.error('Error recalculating stats:', error);
+        document.getElementById('loading-screen')?.classList.remove('active');
         showError('Failed to recalculate stats. Please try again.');
         // Don't continue - this is a critical error
         return;
+      } finally {
+        // Hide loading screen
+        document.getElementById('loading-screen')?.classList.remove('active');
       }
     } else {
       // No changes affecting calculations, just update skills normally

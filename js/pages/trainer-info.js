@@ -1897,6 +1897,21 @@ export function renderTrainerInfo() {
         </div>
       </div>
 
+      <div class="popup-overlay" id="shortRestPokemonSelectionPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Select Pokemon to Restore</div>
+            <button class="popup-close" id="closeShortRestPokemonSelection">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="pokemon-selection-grid"></div>
+            <div class="popup-footer">
+              <button id="completeShortRestButton" class="popup-button" disabled>Complete Short Rest</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="popup-overlay" id="gearPopup">
         <div class="popup-content">
           <div class="popup-header">
@@ -2197,8 +2212,8 @@ export function attachTrainerInfoListeners() {
     });
   }
 
-  // Helper function to handle short rest (restores trainer HP/VP only)
-  function handleShortRest() {
+  // Helper function to handle short rest (shows Pokemon selection popup)
+  async function handleShortRest() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       showError('Trainer data not found.');
@@ -2206,27 +2221,29 @@ export function attachTrainerInfoListeners() {
     }
 
     const trainerData = JSON.parse(trainerDataRaw);
+    const trainerName = trainerData[1];
 
-    // Restore trainer HP and VP to max
-    const maxHP = parseInt(trainerData[11], 10);
-    const maxVP = parseInt(trainerData[12], 10);
-    trainerData[34] = maxHP; // currentHP
-    trainerData[35] = maxVP; // currentVP
+    // Get all Pokemon for this trainer
+    const registeredPokemonStr = sessionStorage.getItem('registeredPokemon');
+    if (!registeredPokemonStr) {
+      showError('No Pokemon data found.');
+      return;
+    }
 
-    // Update session storage IMMEDIATELY
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    const registeredPokemon = JSON.parse(registeredPokemonStr);
 
-    // Refresh the popup to show updated charges IMMEDIATELY
-    showTrainerSkillsPopup();
-
-    // Show success message
-    showSuccess('Short rest completed! Trainer HP and VP fully restored.');
-
-    // Update database in background (non-blocking)
-    TrainerAPI.update(trainerData).catch(error => {
-      console.error('Error updating trainer data:', error);
-      showError('Failed to save short rest to database');
+    // Filter for active party Pokemon
+    const activePokemon = registeredPokemon.filter(pokemon => {
+      return pokemon[0] === trainerName && pokemon[38] === true; // index 38 is isInActiveParty
     });
+
+    if (activePokemon.length === 0) {
+      showError('No Pokemon in active party.');
+      return;
+    }
+
+    // Show Pokemon selection popup
+    showShortRestPokemonSelection(activePokemon);
   }
 
   // Helper function to handle long rest (restores trainer HP/VP, buff charges, and active Pokemon HP/VP)
@@ -2284,13 +2301,13 @@ export function attachTrainerInfoListeners() {
 
         const pokemonData = JSON.parse(pokemonDataStr);
 
-        // Check if this Pokemon belongs to current trainer and is active
-        if (pokemonData[0] === trainerName && pokemonData[29] === 'TRUE') { // trainername at 0, isActive at 29
+        // Check if this Pokemon belongs to current trainer and is in active party
+        if (pokemonData[0] === trainerName && pokemonData[38]) { // trainername at 0, isInActiveParty at 38
           // Restore HP and VP to max
-          const maxHP = parseInt(pokemonData[11], 10);
-          const maxVP = parseInt(pokemonData[12], 10);
-          pokemonData[13] = maxHP; // currentHP
-          pokemonData[14] = maxVP; // currentVP
+          const maxHP = parseInt(pokemonData[10], 10); // HP at index 10
+          const maxVP = parseInt(pokemonData[12], 10); // VP at index 12
+          pokemonData[45] = maxHP; // currentHP at index 45
+          pokemonData[46] = maxVP; // currentVP at index 46
 
           // Update session storage
           sessionStorage.setItem(key, JSON.stringify(pokemonData));
@@ -3039,6 +3056,7 @@ export function attachTrainerInfoListeners() {
   document.getElementById('closeAffinitySelection')?.addEventListener('click', () => closePopup('affinitySelectionPopup'));
   document.getElementById('closeSpecializationSelection')?.addEventListener('click', () => closePopup('specializationSelectionPopup'));
   document.getElementById('closeTrainerPathSelection')?.addEventListener('click', () => closePopup('trainerPathSelectionPopup'));
+  document.getElementById('closeShortRestPokemonSelection')?.addEventListener('click', () => closePopup('shortRestPokemonSelectionPopup'));
 
   // Gear button
   document.getElementById('gearButton')?.addEventListener('click', () => {
@@ -3565,4 +3583,121 @@ async function saveTrainerPath(trainerPath) {
       console.error('Error saving trainer path to backend:', error);
     }
   })();
+}
+
+// ============================================================================
+// SHORT REST POKEMON SELECTION FUNCTIONS
+// ============================================================================
+
+function showShortRestPokemonSelection(activePokemon) {
+  const pokemonGrid = document.querySelector('.pokemon-selection-grid');
+  const completeButton = document.getElementById('completeShortRestButton');
+
+  pokemonGrid.innerHTML = '';
+  completeButton.disabled = true;
+
+  // Create selection item for each active Pokemon
+  activePokemon.forEach(pokemon => {
+    const pokemonName = pokemon[1]; // Name at index 1
+    const currentHP = parseInt(pokemon[45], 10); // currentHP at index 45
+    const maxHP = parseInt(pokemon[10], 10); // HP at index 10
+    const currentVP = parseInt(pokemon[46], 10); // currentVP at index 46
+    const maxVP = parseInt(pokemon[12], 10); // VP at index 12
+
+    const item = document.createElement('div');
+    item.className = 'trainer-path-item'; // Reuse existing styling
+    item.innerHTML = `
+      <div style="font-weight: 700; margin-bottom: 0.5rem;">${pokemonName}</div>
+      <div style="font-size: 0.85rem; color: #666;">HP: ${currentHP}/${maxHP}</div>
+      <div style="font-size: 0.85rem; color: #666;">VP: ${currentVP}/${maxVP}</div>
+    `;
+    item.onclick = () => selectShortRestPokemon(pokemon);
+    pokemonGrid.appendChild(item);
+  });
+
+  // Show the popup using class-based approach
+  document.getElementById('shortRestPokemonSelectionPopup')?.classList.add('active');
+  // Close the trainer buffs popup
+  document.getElementById('trainerBuffsPopup')?.classList.remove('active');
+}
+
+function selectShortRestPokemon(pokemon) {
+  const completeButton = document.getElementById('completeShortRestButton');
+
+  // Remove selected class from all items
+  document.querySelectorAll('.pokemon-selection-grid .trainer-path-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+
+  // Add selected class to clicked item (find by Pokemon name)
+  const pokemonName = pokemon[1];
+  document.querySelectorAll('.pokemon-selection-grid .trainer-path-item').forEach(item => {
+    if (item.querySelector('div').textContent === pokemonName) {
+      item.classList.add('selected');
+    }
+  });
+
+  // Enable complete button
+  completeButton.disabled = false;
+  completeButton.onclick = () => completeShortRest(pokemon);
+}
+
+async function completeShortRest(selectedPokemon) {
+  if (!selectedPokemon) return;
+
+  const trainerDataRaw = sessionStorage.getItem('trainerData');
+  if (!trainerDataRaw) {
+    showError('Trainer data not found.');
+    return;
+  }
+
+  const trainerData = JSON.parse(trainerDataRaw);
+
+  // Restore trainer HP and VP to max
+  const maxHP = parseInt(trainerData[11], 10);
+  const maxVP = parseInt(trainerData[12], 10);
+  trainerData[34] = maxHP; // currentHP
+  trainerData[35] = maxVP; // currentVP
+
+  // Update session storage IMMEDIATELY
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+  // Restore selected Pokemon HP and VP
+  const pokemonName = selectedPokemon[1];
+  const pokemonMaxHP = parseInt(selectedPokemon[10], 10);
+  const pokemonMaxVP = parseInt(selectedPokemon[12], 10);
+  selectedPokemon[45] = pokemonMaxHP; // currentHP
+  selectedPokemon[46] = pokemonMaxVP; // currentVP
+
+  // Update Pokemon in sessionStorage
+  const registeredPokemonStr = sessionStorage.getItem('registeredPokemon');
+  if (registeredPokemonStr) {
+    const registeredPokemon = JSON.parse(registeredPokemonStr);
+    const pokemonIndex = registeredPokemon.findIndex(p => p[1] === pokemonName && p[0] === trainerData[1]);
+    if (pokemonIndex !== -1) {
+      registeredPokemon[pokemonIndex] = selectedPokemon;
+      sessionStorage.setItem('registeredPokemon', JSON.stringify(registeredPokemon));
+    }
+  }
+
+  // Close selection popup immediately
+  document.getElementById('shortRestPokemonSelectionPopup')?.classList.remove('active');
+
+  // Reopen trainer buffs popup immediately to show updated trainer HP/VP
+  setTimeout(() => {
+    showTrainerSkillsPopup();
+  }, 100);
+
+  // Show success message
+  showSuccess(`Short rest completed! Trainer and ${pokemonName} HP/VP fully restored.`);
+
+  // Update database in background (non-blocking)
+  try {
+    await TrainerAPI.update(trainerData);
+    const { PokemonAPI } = await import('../api.js');
+    await PokemonAPI.update(selectedPokemon);
+    console.log('Short rest saved to backend successfully');
+  } catch (error) {
+    console.error('Error saving short rest to backend:', error);
+  }
 }

@@ -10,10 +10,18 @@ let pokedexConfig = null;
  * Initialize visibility system by fetching Pokedex config
  */
 export async function initializeVisibility() {
+  // If already loaded, return immediately (no API call needed)
+  if (pokedexConfig) {
+    console.log('[Visibility] Using cached Pokedex config');
+    return true;
+  }
+
   try {
+    console.log('[Visibility] Fetching Pokedex config from API...');
     const result = await GameDataAPI.getPokedexConfig();
     if (result.status === 'success') {
       pokedexConfig = result.data;
+      console.log('[Visibility] Pokedex config loaded successfully');
       return true;
     }
     return false;

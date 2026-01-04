@@ -2,6 +2,7 @@
 
 import { PokemonAPI } from '../api.js';
 import { showError } from '../utils/notifications.js';
+import { initializeVisibility, getPokemonVisibility } from '../utils/visibility.js';
 
 // Module state
 let selectedPokemon = null;
@@ -311,7 +312,7 @@ export function renderNewPokemon() {
             <img src="" alt="Pokemon" id="pokemonImage" onerror="this.src='assets/Pokeball.png'">
             <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
             <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
-            <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
+            <div class="detail-item">Type: <div id="pokemonType" style="display: inline-block;"></div></div>
             <button class="register-btn" id="registerBtn">Register Pokemon</button>
           </div>
           <div id="pokemonPlaceholder">Select a Pokemon to view details</div>
@@ -325,10 +326,13 @@ export function renderNewPokemon() {
   return html;
 }
 
-export function attachNewPokemonListeners() {
+export async function attachNewPokemonListeners() {
   // Reset state
   selectedPokemon = null;
   allEncounteredPokemon = [];
+
+  // Initialize visibility system
+  await initializeVisibility();
 
   // Load encountered Pokemon
   loadEncounteredPokemon();
@@ -441,8 +445,31 @@ async function selectPokemon(pokemon, listItem) {
   document.getElementById('pokemonName').textContent = pokemon[1];
   document.getElementById('pokemonDexEntry').textContent = pokemon[2];
 
-  const typeText = pokemon[5] ? `${pokemon[4]} / ${pokemon[5]}` : pokemon[4];
-  document.getElementById('pokemonType').textContent = typeText;
+  // Get visibility settings for this Pokemon
+  const pokemonName = pokemon[1];
+  const visibility = getPokemonVisibility(pokemonName);
+  const primaryType = pokemon[4];
+  const secondaryType = pokemon[5];
+
+  // Create type buttons based on visibility
+  const typeContainer = document.getElementById('pokemonType');
+  typeContainer.innerHTML = '';
+
+  // Check if types are visible
+  const typesVisible = visibility.types === true;
+
+  if (typesVisible) {
+    // Show actual types as buttons
+    if (primaryType) {
+      typeContainer.appendChild(createTypeButton(primaryType));
+    }
+    if (secondaryType) {
+      typeContainer.appendChild(createTypeButton(secondaryType));
+    }
+  } else {
+    // Show ??? button if types are unknown
+    typeContainer.appendChild(createUnknownTypeButton());
+  }
 
   // Hide placeholder and show content
   document.getElementById('pokemonPlaceholder').style.display = 'none';
@@ -520,4 +547,82 @@ function registerPokemon() {
   window.dispatchEvent(new CustomEvent('navigate', {
     detail: { route: 'pokemon-form' }
   }));
+}
+
+// Helper function to get Pokemon type color
+function getMoveTypeColor(moveType) {
+  const colors = {
+    "Normal": "#A8A878",
+    "Fighting": "#e68c2e",
+    "Flying": "#A890F0",
+    "Poison": "#A040A0",
+    "Ground": "#A67C52",
+    "Rock": "#a85d16",
+    "Bug": "#A8B820",
+    "Ghost": "#705898",
+    "Steel": "#bdbdbd",
+    "Fire": "#f02e07",
+    "Water": "#1E90FF",
+    "Grass": "#32CD32",
+    "Electric": "#FFD700",
+    "Psychic": "#F85888",
+    "Ice": "#58c8ed",
+    "Dragon": "#280dd4",
+    "Dark": "#282729",
+    "Fairy": "#ed919f",
+    "Cosmic": "#120077"
+  };
+
+  return colors[moveType] || "#ffffff";
+}
+
+// Helper function to determine text color based on background
+function getTextColorForBackground(bgColor) {
+  // Convert hex to RGB
+  const hex = bgColor.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Return black for light backgrounds, white for dark
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+// Helper function to create a type button
+function createTypeButton(type) {
+  const bgColor = getMoveTypeColor(type);
+  const textColor = getTextColorForBackground(bgColor);
+
+  const button = document.createElement('span');
+  button.style.display = 'inline-block';
+  button.style.backgroundColor = bgColor;
+  button.style.color = textColor;
+  button.style.padding = '0.3vh 1vh';
+  button.style.borderRadius = '0.5vh';
+  button.style.fontSize = 'clamp(0.7rem, 1.5vw, 0.85rem)';
+  button.style.fontWeight = 'bold';
+  button.style.margin = '0 0.2rem';
+  button.style.textTransform = 'capitalize';
+  button.textContent = type;
+
+  return button;
+}
+
+// Helper function to create unknown type button
+function createUnknownTypeButton() {
+  const button = document.createElement('span');
+  button.style.display = 'inline-block';
+  button.style.backgroundColor = '#14373d';
+  button.style.color = '#ffffff';
+  button.style.padding = '0.3vh 1vh';
+  button.style.borderRadius = '0.5vh';
+  button.style.fontSize = 'clamp(0.7rem, 1.5vw, 0.85rem)';
+  button.style.fontWeight = 'bold';
+  button.style.margin = '0 0.2rem';
+  button.textContent = '???';
+
+  return button;
 }

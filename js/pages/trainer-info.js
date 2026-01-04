@@ -3034,17 +3034,25 @@ export function attachTrainerInfoListeners() {
               // Special handling for Ace Trainer Level 9 (Max Potential)
               if (trainerPathName === 'Ace Trainer' && stage.level === 9) {
                 const maxPotential = freshTrainerData[46] || '';
-                const hasChosen = maxPotential && maxPotential !== '';
+                const hasChosen = maxPotential && maxPotential !== '' && maxPotential !== 'undefined';
 
                 html += `
                   <div class="popup-item">
                     <div class="popup-item-title">${stage.data.name}</div>
                     <div class="popup-item-effect">${stage.data.effect || 'No effect found.'}</div>
                     ${hasChosen
-                      ? `<div style="margin-top: 0.8rem; padding: 0.6rem; background: rgba(76, 175, 80, 0.2); border-radius: 6px; border-left: 4px solid #4CAF50;">
-                           <strong style="color: #2E7D32;">Selected:</strong> ${maxPotential}
+                      ? `<div style="margin-top: 1rem; padding: 0.8rem; background: rgba(76, 175, 80, 0.15); border-radius: 8px; border-left: 4px solid #4CAF50; text-align: center;">
+                           <strong style="color: #2E7D32; font-size: 1.1em;">Selected Boost:</strong>
+                           <span style="color: #1B5E20; font-weight: bold; font-size: 1.2em; margin-left: 0.5rem;">${maxPotential}</span>
                          </div>`
-                      : `<button class="popup-button" id="chooseMaxPotentialButton" style="margin-top: 0.8rem;">Choose Stat Boost</button>`
+                      : `<div style="margin-top: 1rem; text-align: center;">
+                           <button class="popup-button" id="chooseMaxPotentialButton"
+                                   style="width: 100%; padding: 0.8rem 1.5rem; background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
+                                          color: #333; border: 2px solid #FFD700; border-radius: 8px; font-size: 1rem;
+                                          font-weight: bold; cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 8px rgba(255, 222, 0, 0.3);">
+                             Choose Stat Boost
+                           </button>
+                         </div>`
                     }
                   </div>
                 `;

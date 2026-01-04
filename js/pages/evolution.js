@@ -943,16 +943,20 @@ async function confirmEvolution() {
     const ability8 = currentPokemon[8] || '';
     const ability9 = currentPokemon[9] || '';
 
+    console.log('[Evolution] Current Pokemon abilities:', { ability7, ability8, ability9 });
+
     // Check if old format (contains pipe separator) or new format (separate fields)
-    if (ability7.includes('|')) {
+    if (typeof ability7 === 'string' && ability7.includes('|')) {
       // Old format: single field with pipe-separated values
       currentAbilities = ability7.split('|').map(a => a.trim()).filter(a => a);
     } else {
-      // New format: three separate fields
-      if (ability7) currentAbilities.push(ability7);
-      if (ability8) currentAbilities.push(ability8);
-      if (ability9) currentAbilities.push(ability9);
+      // New format: three separate fields - only add if they are non-empty strings
+      if (ability7 && typeof ability7 === 'string') currentAbilities.push(ability7);
+      if (ability8 && typeof ability8 === 'string') currentAbilities.push(ability8);
+      if (ability9 && typeof ability9 === 'string') currentAbilities.push(ability9);
     }
+
+    console.log('[Evolution] Parsed current abilities:', currentAbilities);
 
     if (currentAbilities.length > 0) {
 
@@ -963,7 +967,15 @@ async function confirmEvolution() {
         selectedPokemon[8]   // Hidden
       ];
 
+      console.log('[Evolution] Evolved Pokemon abilities from Pokedex:', evolvedPokemonAbilities);
+
       currentAbilities.forEach(abilityData => {
+        // Ensure abilityData is a string before calling indexOf
+        if (typeof abilityData !== 'string') {
+          console.warn('[Evolution] Skipping non-string ability data:', abilityData);
+          return;
+        }
+
         const colonIndex = abilityData.indexOf(':');
         let slotIndex = 0;
 

@@ -1828,7 +1828,7 @@ function applyFeatChanges(pokemonData, oldFeatsStr, newFeatsStr) {
         let wisdom = parseInt(pokemonData[19], 10);
         let charisma = parseInt(pokemonData[20], 10);
         let ac = parseInt(pokemonData[8], 10);
-        let speed = parseInt(pokemonData[24], 10);
+        let speed = parseInt(pokemonData[13], 10);  // FIXED: Speed is at index 13, not 24
         let hp = parseInt(pokemonData[10], 10);
         let vp = parseInt(pokemonData[12], 10);
 
@@ -1997,6 +1997,7 @@ function applyFeatChanges(pokemonData, oldFeatsStr, newFeatsStr) {
         pokemonData[8] = ac;
         pokemonData[10] = hp;
         pokemonData[12] = vp;
+        pokemonData[13] = speed;  // FIXED: Speed is at index 13, not 24
         pokemonData[15] = strength;
         pokemonData[16] = dexterity;
         pokemonData[17] = constitution;
@@ -2004,7 +2005,6 @@ function applyFeatChanges(pokemonData, oldFeatsStr, newFeatsStr) {
         pokemonData[19] = wisdom;
         pokemonData[20] = charisma;
         pokemonData[22] = skills.join(', ');
-        pokemonData[24] = speed;
         pokemonData[30] = initiative;
         pokemonData[31] = proficiencyBonus;
         pokemonData[34] = stabBonus;

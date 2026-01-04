@@ -39,8 +39,7 @@ export function renderPokemonCard(pokemonName) {
   const cha = pokemonData[20] || 10;
   const savingThrow = pokemonData[21] || 'None';
   const skills = pokemonData[22] || '';
-  const proficiency = pokemonData[23] || 2;
-  const speed = pokemonData[24] || 30;
+  // Note: proficiency is not stored at index 23 (that's Starting Moves), using proficiencyBonus instead
   const initiative = pokemonData[30] || 0;
   const proficiencyBonus = pokemonData[31] || 2;
   const nature = pokemonData[32] || '';

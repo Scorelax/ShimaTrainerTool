@@ -319,6 +319,17 @@ export function renderPokemonForm() {
 export async function attachPokemonFormListeners() {
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
 
+  // Preload splash image in background while user fills out form
+  let preloadedSplashImage = null;
+  console.log('[Pokemon Form] Preloading splash image...');
+  selectSplashImage().then(url => {
+    preloadedSplashImage = url;
+    console.log('[Pokemon Form] Preloaded splash:', url);
+  }).catch(err => {
+    console.log('[Pokemon Form] Preload error:', err);
+    preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+  });
+
   // Initialize visibility system
   await initializeVisibility();
 
@@ -618,8 +629,8 @@ async function handleFormSubmit() {
     console.log('[Pokemon Form] - Index 7 (Abilities):', newPokemonData[7]);
     console.log('[Pokemon Form] - Full array:', newPokemonData);
 
-    // Show loading screen immediately, splash image will load in background
-    showLoadingWithSplash(selectSplashImage());
+    // Show loading screen with preloaded splash image
+    showLoadingWithSplash(preloadedSplashImage);
 
     // Register the Pokemon
     const response = await PokemonAPI.register(trainerData[1], newPokemonData);

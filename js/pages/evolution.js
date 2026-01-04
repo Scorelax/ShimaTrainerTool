@@ -570,6 +570,17 @@ export async function attachEvolutionListeners() {
   allocatedSkillPoints = 0;
   evolutionOptions = [];
 
+  // Preload splash image in background while user fills out form
+  let preloadedSplashImage = null;
+  console.log('[Evolution] Preloading splash image...');
+  selectSplashImage().then(url => {
+    preloadedSplashImage = url;
+    console.log('[Evolution] Preloaded splash:', url);
+  }).catch(err => {
+    console.log('[Evolution] Preload error:', err);
+    preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+  });
+
   // Initialize visibility system
   await initializeVisibility();
 
@@ -1084,8 +1095,8 @@ async function confirmEvolution() {
       fullData: evolvedPokemonData
     });
 
-    // Show loading screen immediately, splash image will load in background
-    showLoadingWithSplash(selectSplashImage());
+    // Show loading screen with preloaded splash image
+    showLoadingWithSplash(preloadedSplashImage);
 
     // Call API to evolve Pokemon and wait for full calculated data
     const response = await PokemonAPI.evolve(

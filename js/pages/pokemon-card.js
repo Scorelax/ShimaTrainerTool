@@ -71,29 +71,8 @@ export function renderPokemonCard(pokemonName) {
       nerfedStat = statNameMapping[nerfStatFull] || '';
     }
   }
-  let stabBonus = pokemonData[34] || 2;
+  const stabBonus = pokemonData[34] || 2;
   const heldItemsStr = pokemonData[35] || '';
-
-  // Apply Type Master STAB bonus (Level 3+)
-  const trainerPath = trainerData[25] || '';
-  const trainerLevel = parseInt(trainerData[2]) || 1;
-  const specializationsStr = trainerData[24] || '';
-
-  if (trainerPath === 'Type Master' && trainerLevel >= 3 && specializationsStr) {
-    const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
-    const pokemonTypes = [type1, type2].filter(t => t);
-
-    // Check how many of the Pokemon's types match specializations
-    let typeMatches = 0;
-    pokemonTypes.forEach(pokemonType => {
-      if (specializations.includes(pokemonType)) {
-        typeMatches++;
-      }
-    });
-
-    // Add +1 STAB per matching type (+2 if dual type matches both specializations)
-    stabBonus += typeMatches;
-  }
 
   // Parse held items (comma-separated)
   const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
@@ -2492,7 +2471,7 @@ function showMoveDetails(moveName) {
     const wis = parseInt(pokemonData[19]) || 10;
     const cha = parseInt(pokemonData[20]) || 10;
     const proficiency = parseInt(pokemonData[31]) || 2;
-    let stabBonusValue = parseInt(pokemonData[34]) || 2;
+    const stabBonusValue = parseInt(pokemonData[34]) || 2;
     const heldItemsStr = pokemonData[35] || '';
     const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
@@ -2501,24 +2480,22 @@ function showMoveDetails(moveName) {
     const moveType = move[1];
     const hasSTAB = pokemonTypes.includes(moveType);
 
-    // Apply Type Master STAB bonus (Level 3+)
+    // Type Master setup
     const trainerPath = trainerData[25] || '';
     const trainerLevel = parseInt(trainerData[2]) || 1;
     const specializationsStr = trainerData[24] || '';
 
+    // Type Master Level 3: +1 damage per Pokemon type matching specialization
+    let typeMasterDamageBonus = 0;
     if (trainerPath === 'Type Master' && trainerLevel >= 3 && specializationsStr) {
       const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
 
-      // Check how many of the Pokemon's types match specializations
-      let typeMatches = 0;
+      // Count how many Pokemon types match specializations
       pokemonTypes.forEach(pokemonType => {
         if (specializations.includes(pokemonType)) {
-          typeMatches++;
+          typeMasterDamageBonus++;
         }
       });
-
-      // Add +1 STAB per matching type (+2 if dual type matches both specializations)
-      stabBonusValue += typeMatches;
     }
 
     // Get stat modifiers
@@ -2552,26 +2529,22 @@ function showMoveDetails(moveName) {
     // Check for Ace Trainer bonus (Level 3+: +1 to attack and damage)
     const aceTrainerBonus = (trainerPath === 'Ace Trainer' && trainerLevel >= 3) ? 1 : 0;
 
-    // Check for Type Master bonus (Level 5+: +2 to attack with moves of specialization type)
+    // Type Master Level 5: +2 to attack if Pokemon type matches AND move type matches specialization
     let typeMasterAttackBonus = 0;
-    if (trainerPath === 'Type Master' && trainerLevel >= 5) {
-      const specializationsStr = trainerData[24] || '';
-      if (specializationsStr) {
-        const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
-        const pokemonTypes = [type1, type2].filter(t => t);
+    if (trainerPath === 'Type Master' && trainerLevel >= 5 && specializationsStr) {
+      const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
 
-        // Check if Pokemon has a type matching a specialization
-        const pokemonHasSpecializationType = pokemonTypes.some(pokemonType =>
-          specializations.includes(pokemonType)
-        );
+      // Check if Pokemon has a type matching a specialization
+      const pokemonHasSpecializationType = pokemonTypes.some(pokemonType =>
+        specializations.includes(pokemonType)
+      );
 
-        // Check if the move type matches a specialization
-        const moveMatchesSpecialization = specializations.includes(moveType);
+      // Check if the move type matches a specialization
+      const moveMatchesSpecialization = specializations.includes(moveType);
 
-        // Apply bonus if Pokemon type matches AND move type matches
-        if (pokemonHasSpecializationType && moveMatchesSpecialization) {
-          typeMasterAttackBonus = 2;
-        }
+      // Apply bonus if Pokemon type matches AND move type matches
+      if (pokemonHasSpecializationType && moveMatchesSpecialization) {
+        typeMasterAttackBonus = 2;
       }
     }
 
@@ -2581,7 +2554,7 @@ function showMoveDetails(moveName) {
 
     // Calculate Damage Roll bonus
     const stabBonus = hasSTAB ? stabBonusValue : 0;
-    const damageRollBonus = stabBonus + highestMod + aceTrainerBonus;
+    const damageRollBonus = stabBonus + highestMod + aceTrainerBonus + typeMasterDamageBonus;
 
     // Create breakdown text
     const attackBreakdownParts = [];
@@ -2608,6 +2581,9 @@ function showMoveDetails(moveName) {
     }
     if (aceTrainerBonus > 0) {
       damageBreakdownParts.push(`Ace Trainer +${aceTrainerBonus}`);
+    }
+    if (typeMasterDamageBonus > 0) {
+      damageBreakdownParts.push(`Type Master +${typeMasterDamageBonus}`);
     }
     const damageBreakdown = damageBreakdownParts.length > 0 ? `(${damageBreakdownParts.join(', ')})` : '';
 

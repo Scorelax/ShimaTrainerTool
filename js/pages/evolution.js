@@ -2,7 +2,7 @@
 
 import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
-import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
+import { isFieldVisible, initializeVisibility, getPokemonVisibility } from '../utils/visibility.js';
 
 // Module-level state
 let selectedPokemon = null;
@@ -610,18 +610,60 @@ export async function attachEvolutionListeners() {
 }
 
 async function loadEvolutionOptions() {
-  const currentDexEntry = currentPokemon[3];
+  const currentPokemonName = currentPokemon[2]; // Pokemon name at index 2
 
   try {
-    const result = await PokemonAPI.getEvolutionOptions(currentDexEntry, 20);
+    // Get visibility settings for current Pokemon
+    const visibility = getPokemonVisibility(currentPokemonName);
+    const evoToTargets = visibility.evoToTargets || {};
 
-    if (result.status === 'success') {
-      evolutionOptions = result.data;
-      displayEvolutionOptions(evolutionOptions);
-    } else {
-      showError('Failed to load evolution options');
-      document.getElementById('pokemonList').innerHTML = '<li>Failed to load options</li>';
+    console.log('[Evolution] Checking evoToTargets for', currentPokemonName, ':', evoToTargets);
+
+    // Get target Pokemon names where value is true
+    const targetNames = Object.keys(evoToTargets).filter(name => evoToTargets[name] === true);
+
+    if (targetNames.length === 0) {
+      console.log('[Evolution] No evolution targets defined in config');
+      document.getElementById('pokemonList').innerHTML = '<li style="text-align: center; color: #666;">This Pokemon\'s evolution is currently not available in the registered Pokedex.</li>';
+      evolutionOptions = [];
+      return;
     }
+
+    console.log('[Evolution] Target evolution names:', targetNames);
+
+    // Get complete Pokemon data from cache
+    const completePokemonDataStr = sessionStorage.getItem('completePokemonData');
+    if (!completePokemonDataStr) {
+      console.error('[Evolution] No complete Pokemon data in cache');
+      document.getElementById('pokemonList').innerHTML = '<li style="text-align: center; color: #666;">This Pokemon\'s evolution is currently not available in the registered Pokedex.</li>';
+      evolutionOptions = [];
+      return;
+    }
+
+    const completePokemonData = JSON.parse(completePokemonDataStr);
+
+    // Find evolution targets in complete Pokemon data
+    evolutionOptions = [];
+    for (const targetName of targetNames) {
+      const targetPokemon = completePokemonData.find(p =>
+        p[1].toLowerCase() === targetName.toLowerCase()
+      );
+
+      if (targetPokemon) {
+        evolutionOptions.push(targetPokemon);
+        console.log('[Evolution] Found evolution target:', targetPokemon[1]);
+      } else {
+        console.log('[Evolution] Evolution target not found in registered Pokedex:', targetName);
+      }
+    }
+
+    if (evolutionOptions.length === 0) {
+      console.log('[Evolution] No evolution targets found in registered Pokedex');
+      document.getElementById('pokemonList').innerHTML = '<li style="text-align: center; color: #666;">This Pokemon\'s evolution is currently not available in the registered Pokedex.</li>';
+    } else {
+      displayEvolutionOptions(evolutionOptions);
+    }
+
   } catch (error) {
     console.error('Error loading evolution options:', error);
     showError('Failed to load evolution options');

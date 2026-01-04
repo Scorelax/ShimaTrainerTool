@@ -1084,9 +1084,8 @@ async function confirmEvolution() {
       fullData: evolvedPokemonData
     });
 
-    // Select and show splash image
-    const splashUrl = await selectSplashImage();
-    showLoadingWithSplash(splashUrl);
+    // Show loading screen immediately, splash image will load in background
+    showLoadingWithSplash(selectSplashImage());
 
     // Call API to evolve Pokemon and wait for full calculated data
     const response = await PokemonAPI.evolve(

@@ -44,15 +44,33 @@ export async function selectSplashImage() {
 
 /**
  * Show loading screen with a splash image
- * @param {string} splashUrl - URL of the splash image to use
+ * If splashUrl is a Promise, show loading immediately with default, then update when ready
+ * @param {string|Promise<string>} splashUrl - URL of the splash image or Promise that resolves to URL
  */
 export function showLoadingWithSplash(splashUrl) {
   const loadingScreen = document.getElementById('loading-screen');
-  if (loadingScreen) {
-    if (splashUrl) {
-      loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
-    }
-    loadingScreen.classList.add('active');
+  if (!loadingScreen) return;
+
+  // Show loading screen immediately
+  loadingScreen.classList.add('active');
+
+  // Handle splash image URL
+  if (splashUrl instanceof Promise) {
+    // If it's a Promise, set default background first, then update when ready
+    loadingScreen.style.backgroundImage = `url('${DEFAULT_BACKGROUND}')`;
+    splashUrl.then(url => {
+      if (url && loadingScreen.classList.contains('active')) {
+        loadingScreen.style.backgroundImage = `url('${url}')`;
+      }
+    }).catch(() => {
+      // Keep default background on error
+    });
+  } else if (splashUrl) {
+    // If it's already a URL string, use it immediately
+    loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
+  } else {
+    // No URL provided, use default
+    loadingScreen.style.backgroundImage = `url('${DEFAULT_BACKGROUND}')`;
   }
 }
 

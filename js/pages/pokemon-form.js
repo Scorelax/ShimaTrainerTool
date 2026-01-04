@@ -618,9 +618,8 @@ async function handleFormSubmit() {
     console.log('[Pokemon Form] - Index 7 (Abilities):', newPokemonData[7]);
     console.log('[Pokemon Form] - Full array:', newPokemonData);
 
-    // Select and show splash image
-    const splashUrl = await selectSplashImage();
-    showLoadingWithSplash(splashUrl);
+    // Show loading screen immediately, splash image will load in background
+    showLoadingWithSplash(selectSplashImage());
 
     // Register the Pokemon
     const response = await PokemonAPI.register(trainerData[1], newPokemonData);

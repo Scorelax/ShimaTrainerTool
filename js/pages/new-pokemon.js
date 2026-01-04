@@ -315,7 +315,7 @@ export function renderNewPokemon() {
             <div class="detail-item">Type: <div id="pokemonType" style="display: inline-block;"></div></div>
             <button class="register-btn" id="registerBtn">Register Pokemon</button>
           </div>
-          <div id="pokemonPlaceholder">Select a Pokemon to view details</div>
+          <div id="pokemonPlaceholder"></div>
         </div>
       </div>
 

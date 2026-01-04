@@ -1571,6 +1571,23 @@ export function renderPokemonCard(pokemonName) {
           </div>
         </div>
       </div>
+
+      <!-- Evolution Confirmation Popup -->
+      <div id="evolutionConfirmPopup" class="popup-overlay">
+        <div class="popup-content" style="max-width: min(90vw, 450px);">
+          <div class="popup-header">
+            <div class="popup-title">Evolve Pokemon</div>
+            <button class="popup-close" id="closeEvolutionConfirm">×</button>
+          </div>
+          <div class="popup-body" style="text-align: center;">
+            <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">Would you like to evolve <strong>${name}</strong>?</p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+              <button id="confirmEvolutionBtn" class="popup-button" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;">Evolve</button>
+              <button id="cancelEvolutionBtn" class="popup-button" style="background: #999; color: white; padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -1637,14 +1654,27 @@ export function attachPokemonCardListeners() {
     }));
   });
 
-  // Pokemon image click - prompt for evolution
+  // Pokemon image click - show evolution confirmation popup
   document.getElementById('pokemonImage')?.addEventListener('click', () => {
-    const confirmEvolution = confirm(`Would you like to evolve ${pokemonName}?`);
-    if (confirmEvolution) {
-      window.dispatchEvent(new CustomEvent('navigate', {
-        detail: { route: 'evolution' }
-      }));
-    }
+    document.getElementById('evolutionConfirmPopup')?.classList.add('active');
+  });
+
+  // Evolution confirmation popup - close button
+  document.getElementById('closeEvolutionConfirm')?.addEventListener('click', () => {
+    document.getElementById('evolutionConfirmPopup')?.classList.remove('active');
+  });
+
+  // Evolution confirmation popup - confirm button
+  document.getElementById('confirmEvolutionBtn')?.addEventListener('click', () => {
+    document.getElementById('evolutionConfirmPopup')?.classList.remove('active');
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'evolution' }
+    }));
+  });
+
+  // Evolution confirmation popup - cancel button
+  document.getElementById('cancelEvolutionBtn')?.addEventListener('click', () => {
+    document.getElementById('evolutionConfirmPopup')?.classList.remove('active');
   });
 
   // Battle Page button

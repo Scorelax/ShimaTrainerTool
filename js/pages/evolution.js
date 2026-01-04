@@ -481,7 +481,7 @@ export function renderEvolution() {
             <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
             <button class="evolve-button" id="evolveButton">Evolve Pokemon</button>
           </div>
-          <div id="pokemonPlaceholder">Select an evolution to view details</div>
+          <div id="pokemonPlaceholder"></div>
         </div>
       </div>
 

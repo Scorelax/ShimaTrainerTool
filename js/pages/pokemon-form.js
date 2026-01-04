@@ -487,18 +487,50 @@ async function handleFormSubmit() {
       }
     }
 
+    // Apply Ace Trainer Max Potential bonus (Level 9)
+    const trainerPath = trainerData[25] || '';
+    const maxPotential = trainerData[46] || '';
+    if (trainerPath === 'Ace Trainer' && maxPotential && maxPotential !== '') {
+      if (maxPotential === 'STR') {
+        modifiedPokemonData[16] = (modifiedPokemonData[16] || 10) + 1;
+      } else if (maxPotential === 'DEX') {
+        modifiedPokemonData[17] = (modifiedPokemonData[17] || 10) + 1;
+      } else if (maxPotential === 'CON') {
+        modifiedPokemonData[18] = (modifiedPokemonData[18] || 10) + 1;
+      }
+      // Speed bonus will be applied to movement data below
+    }
+
     // Format movement and senses data
     const movementData = selectedPokemonData[31] || {};
     const sensesData = selectedPokemonData[32] || {};
 
-    const movementDataString = [
+    // Apply Speed bonus for Max Potential if selected
+    let movementArray = [
       movementData.walking || '-',
       movementData.climbing || '-',
       movementData.flying || '-',
       movementData.hovering || '-',
       movementData.swimming || '-',
       movementData.burrowing || '-'
-    ].join(', ');
+    ];
+
+    if (trainerPath === 'Ace Trainer' && maxPotential === 'Speed') {
+      movementArray = movementArray.map(movement => {
+        if (movement === '-') return movement;
+        // Parse movement like "Walk 30 ft"
+        const match = movement.match(/^(.+?)\s+(\d+)\s*(.*)$/);
+        if (match) {
+          const type = match[1];
+          const speed = parseInt(match[2], 10);
+          const unit = match[3] || 'ft';
+          return `${type} ${speed + 10} ${unit}`.trim();
+        }
+        return movement;
+      });
+    }
+
+    const movementDataString = movementArray.join(', ');
 
     const sensesDataString = [
       sensesData.sight || '-',

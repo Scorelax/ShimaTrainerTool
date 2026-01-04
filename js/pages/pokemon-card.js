@@ -1246,6 +1246,69 @@ export function renderPokemonCard(pokemonName) {
             padding-top: 0;
           }
         }
+
+        /* Battle Dice Tracker Styles */
+        .battle-dice-container {
+          margin-bottom: 1rem;
+          padding: 0.8rem;
+          background: rgba(255, 222, 0, 0.15);
+          border-radius: 8px;
+          border-left: 4px solid rgba(255, 222, 0, 0.6);
+        }
+
+        .battle-dice-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.5rem;
+        }
+
+        .charge-dots {
+          display: flex;
+          gap: clamp(0.3rem, 0.6vw, 0.5rem);
+          flex-wrap: wrap;
+        }
+
+        .charge-dot {
+          width: clamp(14px, 2vw, 18px);
+          height: clamp(14px, 2vw, 18px);
+          border-radius: 50%;
+          border: clamp(2px, 0.3vw, 3px) solid rgba(255, 222, 0, 0.8);
+          transition: all 0.3s ease;
+        }
+
+        .charge-dot.filled {
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
+          box-shadow: 0 0 clamp(5px, 1vw, 8px) rgba(255, 222, 0, 0.5);
+        }
+
+        .charge-dot.empty {
+          background: rgba(0, 0, 0, 0.2);
+          border-color: rgba(255, 222, 0, 0.3);
+        }
+
+        .use-battle-dice-button {
+          padding: 0.5rem 1rem;
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
+          color: #333;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: clamp(0.85rem, 1.5vh, 0.95rem);
+          font-weight: bold;
+          transition: all 0.3s;
+          box-shadow: 0 3px 10px rgba(255, 222, 0, 0.3);
+        }
+
+        .use-battle-dice-button:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(255, 222, 0, 0.4);
+        }
+
+        .use-battle-dice-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
       </style>
 
       <h1>${displayName} #${dexEntry}</h1>
@@ -2445,13 +2508,18 @@ function showMoveDetails(moveName) {
     // Find which stat is being used (for display purposes)
     const usedStat = moveModifiers.find(mod => modifierValues[mod] === highestMod) || '';
 
+    // Check for Ace Trainer bonus (Level 3+: +1 to attack and damage)
+    const trainerPath = trainerData[25] || '';
+    const trainerLevel = parseInt(trainerData[2]) || 1;
+    const aceTrainerBonus = (trainerPath === 'Ace Trainer' && trainerLevel >= 3) ? 1 : 0;
+
     // Calculate Attack Roll bonus
     const proficiencyBonus = hasSTAB ? proficiency : 0;
-    const attackRollBonus = proficiencyBonus + highestMod;
+    const attackRollBonus = proficiencyBonus + highestMod + aceTrainerBonus;
 
     // Calculate Damage Roll bonus
     const stabBonus = hasSTAB ? stabBonusValue : 0;
-    const damageRollBonus = stabBonus + highestMod;
+    const damageRollBonus = stabBonus + highestMod + aceTrainerBonus;
 
     // Create breakdown text
     const attackBreakdownParts = [];
@@ -2461,6 +2529,9 @@ function showMoveDetails(moveName) {
     if (highestMod !== 0) {
       attackBreakdownParts.push(`${usedStat} ${highestMod >= 0 ? '+' : ''}${highestMod}`);
     }
+    if (aceTrainerBonus > 0) {
+      attackBreakdownParts.push(`Ace Trainer +${aceTrainerBonus}`);
+    }
     const attackBreakdown = attackBreakdownParts.length > 0 ? `(${attackBreakdownParts.join(', ')})` : '';
 
     const damageBreakdownParts = [];
@@ -2469,6 +2540,9 @@ function showMoveDetails(moveName) {
     }
     if (highestMod !== 0) {
       damageBreakdownParts.push(`${usedStat} ${highestMod >= 0 ? '+' : ''}${highestMod}`);
+    }
+    if (aceTrainerBonus > 0) {
+      damageBreakdownParts.push(`Ace Trainer +${aceTrainerBonus}`);
     }
     const damageBreakdown = damageBreakdownParts.length > 0 ? `(${damageBreakdownParts.join(', ')})` : '';
 
@@ -2527,6 +2601,7 @@ function showMoveDetails(moveName) {
               <strong style="display: block; margin-bottom: 0.5rem;">Held Items:</strong>
               <div id="heldItemsInfo"></div>
             </div>
+            <div id="battleDiceContainer"></div>
           </div>
           <button id="useMoveButton" style="width: 100%; padding: clamp(0.8rem, 1.5vh, 1rem); background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: clamp(1rem, 1.8vh, 1.1rem); font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 12px rgba(76,175,80,0.3);">Use Move</button>
         </div>
@@ -2679,6 +2754,89 @@ function showMoveDetails(moveName) {
     document.getElementById('attackRollBreakdown').textContent = attackBreakdown;
     document.getElementById('damageRollBreakdown').textContent = damageBreakdown;
     document.getElementById('heldItemsInfo').innerHTML = heldItemsInfo;
+
+    // Populate battle dice tracker for Ace Trainer
+    const trainerPath = trainerData[25] || '';
+    const battleDiceContainer = document.getElementById('battleDiceContainer');
+
+    if (trainerPath === 'Ace Trainer') {
+      const battleDiceData = trainerData[45] || '';
+      let currentCharges = 0;
+      let maxCharges = 0;
+
+      if (battleDiceData) {
+        // Parse format "5 - 4" (max - current)
+        const parts = battleDiceData.split('-').map(p => p.trim());
+        if (parts.length === 2) {
+          maxCharges = parseInt(parts[0], 10) || 0;
+          currentCharges = parseInt(parts[1], 10) || 0;
+        }
+      }
+
+      // Create charge dots HTML
+      let chargeDotsHTML = '<div class="charge-dots">';
+      for (let i = 0; i < maxCharges; i++) {
+        const filled = i < currentCharges;
+        chargeDotsHTML += `<span class="charge-dot ${filled ? 'filled' : 'empty'}"></span>`;
+      }
+      chargeDotsHTML += '</div>';
+
+      // Build battle dice UI
+      const useButtonDisabled = currentCharges <= 0 ? 'disabled' : '';
+      battleDiceContainer.innerHTML = `
+        <div class="battle-dice-container">
+          <div class="battle-dice-header">
+            <strong>Battle Dice (d6):</strong>
+            ${chargeDotsHTML}
+          </div>
+          <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 0.6rem;">
+            Add 1d6 to your next attack or damage roll
+          </div>
+          <button class="use-battle-dice-button" id="useBattleDiceButton" ${useButtonDisabled}>Use Battle Dice</button>
+        </div>
+      `;
+
+      // Add event listener for Use Battle Dice button
+      const useBattleDiceBtn = document.getElementById('useBattleDiceButton');
+      if (useBattleDiceBtn) {
+        useBattleDiceBtn.addEventListener('click', () => {
+          if (currentCharges > 0) {
+            // Decrement charge
+            currentCharges--;
+
+            // Update trainer data
+            trainerData[45] = `${maxCharges} - ${currentCharges}`;
+            sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+            // Update UI
+            const chargeDots = battleDiceContainer.querySelectorAll('.charge-dot');
+            chargeDots.forEach((dot, index) => {
+              if (index < currentCharges) {
+                dot.classList.add('filled');
+                dot.classList.remove('empty');
+              } else {
+                dot.classList.remove('filled');
+                dot.classList.add('empty');
+              }
+            });
+
+            // Disable button if no charges left
+            if (currentCharges <= 0) {
+              useBattleDiceBtn.disabled = true;
+            }
+
+            // Persist to database in background
+            TrainerAPI.update(trainerData)
+              .catch(error => console.error('Error updating battle dice:', error));
+
+            // Show success message
+            showSuccess('Battle Dice used! Roll 1d6 and add to attack or damage.');
+          }
+        });
+      }
+    } else {
+      battleDiceContainer.innerHTML = '';
+    }
 
     // Set dataset attributes for Use Move button
     const useMoveBtn = document.getElementById('useMoveButton');

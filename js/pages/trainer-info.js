@@ -1539,6 +1539,57 @@ export function renderTrainerInfo() {
             grid-template-columns: 1fr;
           }
         }
+
+        /* Max Potential Selection Styles */
+        .max-potential-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: clamp(1rem, 2vw, 1.5rem);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .max-potential-item {
+          padding: clamp(1rem, 2vh, 1.5rem);
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 245, 245, 0.9) 100%);
+          border: clamp(2px, 0.3vw, 3px) solid rgba(0, 0, 0, 0.1);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          text-align: center;
+        }
+
+        .max-potential-item:hover {
+          transform: translateY(-2px);
+          border-color: #FFDE00;
+          box-shadow: 0 4px 12px rgba(255, 222, 0, 0.3);
+        }
+
+        .max-potential-item.selected {
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
+          border-color: #FFDE00;
+          box-shadow: 0 4px 12px rgba(255, 222, 0, 0.5);
+        }
+
+        .max-potential-stat-name {
+          font-size: clamp(1.1rem, 2vw, 1.3rem);
+          font-weight: 800;
+          margin-bottom: 0.5rem;
+          color: #333;
+        }
+
+        .max-potential-item.selected .max-potential-stat-name {
+          color: #000;
+        }
+
+        .max-potential-stat-effect {
+          font-size: clamp(0.85rem, 1.5vw, 0.95rem);
+          color: #666;
+          line-height: 1.4;
+        }
+
+        .max-potential-item.selected .max-potential-stat-effect {
+          color: #333;
+        }
       </style>
 
       <!-- Back Button -->
@@ -1894,6 +1945,41 @@ export function renderTrainerInfo() {
             <div class="trainer-path-selection-effect-box">Select a trainer path to see its effect.</div>
             <div class="popup-footer">
               <button id="chooseTrainerPathButton" class="popup-button" disabled>Choose Trainer Path</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="maxPotentialSelectionPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Choose Max Potential Boost</div>
+            <button class="popup-close" id="closeMaxPotentialSelection">×</button>
+          </div>
+          <div class="popup-body">
+            <p style="text-align: center; margin-bottom: 1.5rem; color: #666;">
+              This is a permanent boost that will apply to all current and future Pokemon.
+            </p>
+            <div class="max-potential-grid">
+              <div class="max-potential-item" data-stat="Speed">
+                <div class="max-potential-stat-name">Speed</div>
+                <div class="max-potential-stat-effect">+10 to all movement types</div>
+              </div>
+              <div class="max-potential-item" data-stat="STR">
+                <div class="max-potential-stat-name">Strength</div>
+                <div class="max-potential-stat-effect">+1 to STR</div>
+              </div>
+              <div class="max-potential-item" data-stat="DEX">
+                <div class="max-potential-stat-name">Dexterity</div>
+                <div class="max-potential-stat-effect">+1 to DEX</div>
+              </div>
+              <div class="max-potential-item" data-stat="CON">
+                <div class="max-potential-stat-name">Constitution</div>
+                <div class="max-potential-stat-effect">+1 to CON (also increases HP/VP)</div>
+              </div>
+            </div>
+            <div class="popup-footer">
+              <button id="confirmMaxPotentialButton" class="popup-button" disabled>Confirm Selection</button>
             </div>
           </div>
         </div>
@@ -2279,6 +2365,14 @@ export function attachTrainerInfoListeners() {
     trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
     trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
     trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+
+    // Refill battle dice for Ace Trainer (index 45)
+    const trainerPath = trainerData[25] || '';
+    if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
+      const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
+      const maxBattleDice = 1 + wisModifier;
+      trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
+    }
 
     // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
@@ -2937,12 +3031,31 @@ export function attachTrainerInfoListeners() {
           if (stage.data) {
             if (trainerLevel >= stage.level) {
               // Unlocked
-              html += `
-                <div class="popup-item">
-                  <div class="popup-item-title">${stage.data.name}</div>
-                  <div class="popup-item-effect">${stage.data.effect || 'No effect found.'}</div>
-                </div>
-              `;
+              // Special handling for Ace Trainer Level 9 (Max Potential)
+              if (trainerPathName === 'Ace Trainer' && stage.level === 9) {
+                const maxPotential = freshTrainerData[46] || '';
+                const hasChosen = maxPotential && maxPotential !== '';
+
+                html += `
+                  <div class="popup-item">
+                    <div class="popup-item-title">${stage.data.name}</div>
+                    <div class="popup-item-effect">${stage.data.effect || 'No effect found.'}</div>
+                    ${hasChosen
+                      ? `<div style="margin-top: 0.8rem; padding: 0.6rem; background: rgba(76, 175, 80, 0.2); border-radius: 6px; border-left: 4px solid #4CAF50;">
+                           <strong style="color: #2E7D32;">Selected:</strong> ${maxPotential}
+                         </div>`
+                      : `<button class="popup-button" id="chooseMaxPotentialButton" style="margin-top: 0.8rem;">Choose Stat Boost</button>`
+                    }
+                  </div>
+                `;
+              } else {
+                html += `
+                  <div class="popup-item">
+                    <div class="popup-item-title">${stage.data.name}</div>
+                    <div class="popup-item-effect">${stage.data.effect || 'No effect found.'}</div>
+                  </div>
+                `;
+              }
             } else {
               // Locked
               html += `
@@ -2968,6 +3081,14 @@ export function attachTrainerInfoListeners() {
 
     content.innerHTML = html || '<p style="text-align: center; color: #999;">No path stages available.</p>';
     openPopup('trainerPathPopup');
+
+    // Add event listener for Choose Max Potential button (if it exists)
+    const chooseMaxPotentialBtn = document.getElementById('chooseMaxPotentialButton');
+    if (chooseMaxPotentialBtn) {
+      chooseMaxPotentialBtn.addEventListener('click', () => {
+        showMaxPotentialSelection();
+      });
+    }
   });
 
   document.getElementById('closeTrainerPath')?.addEventListener('click', () => closePopup('trainerPathPopup'));
@@ -3702,5 +3823,169 @@ async function completeShortRest(selectedPokemon) {
     console.log('Short rest saved to backend successfully');
   } catch (error) {
     console.error('Error saving short rest to backend:', error);
+  }
+}
+
+// Show Max Potential Selection Popup
+function showMaxPotentialSelection() {
+  const maxPotentialGrid = document.querySelector('.max-potential-grid');
+  const confirmButton = document.getElementById('confirmMaxPotentialButton');
+  let selectedStat = null;
+
+  // Remove selected class from all items
+  document.querySelectorAll('.max-potential-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+
+  // Reset confirm button
+  confirmButton.disabled = true;
+
+  // Add click handlers to all stat items
+  document.querySelectorAll('.max-potential-item').forEach(item => {
+    item.addEventListener('click', () => {
+      // Remove selected from all
+      document.querySelectorAll('.max-potential-item').forEach(i => {
+        i.classList.remove('selected');
+      });
+
+      // Add selected to clicked item
+      item.classList.add('selected');
+      selectedStat = item.dataset.stat;
+
+      // Enable confirm button
+      confirmButton.disabled = false;
+    });
+  });
+
+  // Confirm button handler
+  confirmButton.onclick = async () => {
+    if (!selectedStat) return;
+
+    // Close the selection popup
+    closePopup('maxPotentialSelectionPopup');
+
+    // Show loading message
+    showSuccess('Applying Max Potential boost to all Pokemon...');
+
+    // Apply the boost
+    await applyMaxPotentialBoost(selectedStat);
+
+    // Reopen trainer path popup to show updated selection
+    setTimeout(() => {
+      document.getElementById('trainerPathButton')?.click();
+    }, 500);
+  };
+
+  // Close button handler
+  document.getElementById('closeMaxPotentialSelection')?.addEventListener('click', () => {
+    closePopup('maxPotentialSelectionPopup');
+  });
+
+  // Show the popup
+  closePopup('trainerPathPopup');
+  openPopup('maxPotentialSelectionPopup');
+}
+
+// Apply Max Potential Boost to all Pokemon
+async function applyMaxPotentialBoost(stat) {
+  const trainerDataRaw = sessionStorage.getItem('trainerData');
+  if (!trainerDataRaw) {
+    showError('Trainer data not found.');
+    return;
+  }
+
+  const trainerData = JSON.parse(trainerDataRaw);
+  const trainerName = trainerData[1];
+
+  // Save the chosen stat in trainer data (index 46)
+  trainerData[46] = stat;
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+  // Get all Pokemon for this trainer
+  const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
+  const trainerPokemon = allPokemonKeys.filter(key => {
+    const pokemonData = JSON.parse(sessionStorage.getItem(key));
+    return pokemonData[0] === trainerName; // Check if Pokemon belongs to this trainer
+  });
+
+  const { PokemonAPI } = await import('../api.js');
+
+  // Apply boost to each Pokemon
+  for (const pokemonKey of trainerPokemon) {
+    const pokemonData = JSON.parse(sessionStorage.getItem(pokemonKey));
+
+    if (stat === 'Speed') {
+      // Increase all movement types by 10
+      const movementData = pokemonData[29] || ''; // Movement is at index 29
+      if (movementData) {
+        const movementParts = movementData.split(',').map(part => part.trim());
+        const boostedMovement = movementParts.map(movement => {
+          // Parse movement like "Walk 30 ft" or "Fly 60 ft"
+          const match = movement.match(/^(.+?)\s+(\d+)\s*(.*)$/);
+          if (match) {
+            const type = match[1];
+            const speed = parseInt(match[2], 10);
+            const unit = match[3] || 'ft';
+            return `${type} ${speed + 10} ${unit}`.trim();
+          }
+          return movement;
+        });
+        pokemonData[29] = boostedMovement.join(', ');
+      }
+    } else if (stat === 'STR') {
+      // Increase STR by 1
+      const currentSTR = parseInt(pokemonData[15], 10) || 10;
+      pokemonData[15] = currentSTR + 1;
+    } else if (stat === 'DEX') {
+      // Increase DEX by 1
+      const currentDEX = parseInt(pokemonData[16], 10) || 10;
+      pokemonData[16] = currentDEX + 1;
+    } else if (stat === 'CON') {
+      // Increase CON by 1 and recalculate HP/VP
+      const currentCON = parseInt(pokemonData[17], 10) || 10;
+      const newCON = currentCON + 1;
+      pokemonData[17] = newCON;
+
+      // Recalculate modifier
+      const oldModifier = Math.floor((currentCON - 10) / 2);
+      const newModifier = Math.floor((newCON - 10) / 2);
+      const modifierIncrease = newModifier - oldModifier;
+
+      // Increase HP and VP by the modifier increase per level
+      const pokemonLevel = parseInt(pokemonData[4], 10) || 1;
+      const hpIncrease = modifierIncrease * pokemonLevel;
+      const vpIncrease = modifierIncrease * pokemonLevel;
+
+      // Update max HP and VP
+      const currentMaxHP = parseInt(pokemonData[10], 10) || 0;
+      const currentMaxVP = parseInt(pokemonData[12], 10) || 0;
+      pokemonData[10] = currentMaxHP + hpIncrease;
+      pokemonData[12] = currentMaxVP + vpIncrease;
+
+      // Also update current HP and VP
+      const currentHP = parseInt(pokemonData[45], 10) || 0;
+      const currentVP = parseInt(pokemonData[46], 10) || 0;
+      pokemonData[45] = currentHP + hpIncrease;
+      pokemonData[46] = currentVP + vpIncrease;
+    }
+
+    // Update in session storage
+    sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
+
+    // Update in database
+    try {
+      await PokemonAPI.update(pokemonData);
+    } catch (error) {
+      console.error(`Error updating Pokemon ${pokemonData[2]}:`, error);
+    }
+  }
+
+  // Update trainer data in database
+  try {
+    await TrainerAPI.update(trainerData);
+    showSuccess(`Max Potential boost (${stat}) applied to all Pokemon!`);
+  } catch (error) {
+    console.error('Error updating trainer data:', error);
+    showError('Failed to save Max Potential selection.');
   }
 }

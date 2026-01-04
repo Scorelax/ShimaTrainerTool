@@ -762,12 +762,43 @@ async function handleFormSubmit() {
     trainerData[37] = gearItems.length > 0 ? gearItems.join(', ') : 'None';
 
     // Calculate modifiers (D&D 5e rules)
+    const oldWisModifier = trainerData[31] || 0;
     trainerData[27] = Math.floor((str - 10) / 2);  // STR modifier
     trainerData[28] = Math.floor((dex - 10) / 2);  // DEX modifier
     trainerData[29] = Math.floor((con - 10) / 2);  // CON modifier
     trainerData[30] = Math.floor((int - 10) / 2);  // INT modifier
     trainerData[31] = Math.floor((wis - 10) / 2);  // WIS modifier
     trainerData[32] = Math.floor((cha - 10) / 2);  // CHA modifier
+
+    // Recalculate Battle Dice if WIS modifier changed for Ace Trainer
+    const trainerPath = trainerData[25] || '';
+    const newWisModifier = trainerData[31];
+    if (trainerPath === 'Ace Trainer' && level >= 5 && oldWisModifier !== newWisModifier) {
+      const battleDiceData = trainerData[45] || '';
+      let oldMax = 1 + oldWisModifier;
+      let oldCurrent = oldMax;
+
+      // Parse existing battle dice format "max - current"
+      if (battleDiceData) {
+        const parts = battleDiceData.split('-').map(p => p.trim());
+        if (parts.length === 2) {
+          oldMax = parseInt(parts[0], 10) || oldMax;
+          oldCurrent = parseInt(parts[1], 10) || oldCurrent;
+        }
+      }
+
+      // Calculate how many were used
+      const used = oldMax - oldCurrent;
+
+      // Calculate new max and current
+      const newMax = 1 + newWisModifier;
+      const newCurrent = Math.max(0, newMax - used); // Ensure not negative
+
+      // Update battle dice
+      trainerData[45] = `${newMax} - ${newCurrent}`;
+
+      console.log(`Battle Dice updated: ${oldMax} - ${oldCurrent} -> ${newMax} - ${newCurrent}`);
+    }
 
     // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));

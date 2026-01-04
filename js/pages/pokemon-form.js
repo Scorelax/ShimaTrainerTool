@@ -3,6 +3,7 @@
 import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
+import { selectSplashImage, showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
 export function renderPokemonForm() {
   // Load selected Pokemon data from session storage
@@ -585,6 +586,10 @@ async function handleFormSubmit() {
     console.log('[Pokemon Form] - Index 7 (Abilities):', newPokemonData[7]);
     console.log('[Pokemon Form] - Full array:', newPokemonData);
 
+    // Select and show splash image
+    const splashUrl = await selectSplashImage();
+    showLoadingWithSplash(splashUrl);
+
     // Register the Pokemon
     const response = await PokemonAPI.register(trainerData[1], newPokemonData);
 
@@ -605,6 +610,9 @@ async function handleFormSubmit() {
       completePokemonData.push(finalPokemonData);
       sessionStorage.setItem('completePokemonData', JSON.stringify(completePokemonData));
 
+      // Hide loading screen
+      hideLoading();
+
       showSuccess(`${trainerData[1]} caught a ${selectedPokemonData[1]}!`);
 
       // Navigate to my pokemon page
@@ -614,6 +622,7 @@ async function handleFormSubmit() {
         }));
       }, 2000);
     } else {
+      hideLoading();
       showError(response.message || 'Failed to register Pokemon');
       // Reload form
       setTimeout(() => {
@@ -624,6 +633,7 @@ async function handleFormSubmit() {
     }
   } catch (error) {
     console.error('Error registering Pokemon:', error);
+    hideLoading();
     showError('Failed to register Pokemon');
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('navigate', {

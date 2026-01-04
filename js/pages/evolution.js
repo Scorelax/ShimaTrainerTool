@@ -3,6 +3,7 @@
 import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { isFieldVisible, initializeVisibility, getPokemonVisibility } from '../utils/visibility.js';
+import { selectSplashImage, showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
 // Module-level state
 let selectedPokemon = null;
@@ -1083,6 +1084,10 @@ async function confirmEvolution() {
       fullData: evolvedPokemonData
     });
 
+    // Select and show splash image
+    const splashUrl = await selectSplashImage();
+    showLoadingWithSplash(splashUrl);
+
     // Call API to evolve Pokemon and wait for full calculated data
     const response = await PokemonAPI.evolve(
       currentPokemon[2],
@@ -1138,6 +1143,9 @@ async function confirmEvolution() {
 
       console.log('[Evolution] Stored in sessionStorage, about to navigate');
 
+      // Hide loading screen
+      hideLoading();
+
       // Navigate to pokemon card
       window.dispatchEvent(new CustomEvent('navigate', {
         detail: { route: 'pokemon-card', pokemonName: finalEvolvedPokemon[2] }
@@ -1148,6 +1156,7 @@ async function confirmEvolution() {
     }
   } catch (error) {
     console.error('Error during evolution:', error);
+    hideLoading();
     showError('Evolution failed. Please try again.');
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('navigate', {

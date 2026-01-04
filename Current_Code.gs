@@ -1828,7 +1828,23 @@ function applyFeatChanges(pokemonData, oldFeatsStr, newFeatsStr) {
         let wisdom = parseInt(pokemonData[19], 10);
         let charisma = parseInt(pokemonData[20], 10);
         let ac = parseInt(pokemonData[8], 10);
-        let speed = parseInt(pokemonData[13], 10);  // FIXED: Speed is at index 13, not 24
+
+        // Parse movement data (comma-separated: walking,climbing,flying,hovering,swimming,burrowing)
+        // Format: "45ft, -, -, -, -, -" or just "45" (legacy)
+        const movementData = pokemonData[13] || '30ft, -, -, -, -, -';
+        let movementValues = [];
+        if (typeof movementData === 'string' && movementData.includes(',')) {
+            // New format: comma-separated
+            movementValues = movementData.split(',').map(v => v.trim());
+        } else {
+            // Legacy format or single value: just the walking speed
+            const walkingSpeed = typeof movementData === 'number' ? movementData : parseInt(movementData, 10);
+            movementValues = [walkingSpeed + 'ft', '-', '-', '-', '-', '-'];
+        }
+
+        // Extract walking speed as integer for Mobile feat calculation
+        let walkingSpeed = parseInt(movementValues[0], 10) || 30;
+
         let hp = parseInt(pokemonData[10], 10);
         let vp = parseInt(pokemonData[12], 10);
 
@@ -1910,7 +1926,7 @@ function applyFeatChanges(pokemonData, oldFeatsStr, newFeatsStr) {
             } else if (name === 'AC Up') {
                 ac -= 1;
             } else if (name === 'Mobile') {
-                speed -= 10;
+                walkingSpeed -= 10;
             } else if (name === 'Tough') {
                 hp -= level * 2;
             } else if (name === 'Tireless') {
@@ -1957,7 +1973,7 @@ function applyFeatChanges(pokemonData, oldFeatsStr, newFeatsStr) {
             } else if (name === 'AC Up') {
                 ac += 1;
             } else if (name === 'Mobile') {
-                speed += 10;
+                walkingSpeed += 10;
             } else if (name === 'Tough') {
                 hp += level * 2;
             } else if (name === 'Tireless') {
@@ -1997,7 +2013,11 @@ function applyFeatChanges(pokemonData, oldFeatsStr, newFeatsStr) {
         pokemonData[8] = ac;
         pokemonData[10] = hp;
         pokemonData[12] = vp;
-        pokemonData[13] = speed;  // FIXED: Speed is at index 13, not 24
+
+        // Reconstruct movement data with updated walking speed
+        movementValues[0] = walkingSpeed + 'ft';
+        pokemonData[13] = movementValues.join(', ');
+
         pokemonData[15] = strength;
         pokemonData[16] = dexterity;
         pokemonData[17] = constitution;

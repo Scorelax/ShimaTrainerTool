@@ -2,6 +2,10 @@
 
 import { TrainerAPI } from '../api.js';
 import { showToast, showSuccess, showError } from '../utils/notifications.js';
+import { selectSplashImage, showLoadingWithSplash, hideLoading } from '../utils/splash.js';
+
+// Module-level variable for preloaded splash image
+let preloadedSplashImage = null;
 
 export function renderEditTrainer() {
   // Load trainer data from session storage
@@ -567,6 +571,16 @@ export function renderEditTrainer() {
 }
 
 export function attachEditTrainerListeners() {
+  // Preload splash image in background while user edits
+  console.log('[Edit Trainer] Preloading splash image...');
+  selectSplashImage().then(url => {
+    preloadedSplashImage = url;
+    console.log('[Edit Trainer] Preloaded splash:', url);
+  }).catch(err => {
+    console.log('[Edit Trainer] Preload error:', err);
+    preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+  });
+
   // Collapsible sections
   ['skills', 'feats'].forEach(section => {
     const header = document.getElementById(`${section}Header`);
@@ -718,8 +732,8 @@ async function handleFormSubmit() {
   const trainerDataStr = sessionStorage.getItem('trainerData');
   const trainerData = JSON.parse(trainerDataStr);
 
-  // Show loading
-  document.getElementById('content').innerHTML = '<div class="loading">Saving changes...</div>';
+  // Show loading screen with preloaded splash image
+  showLoadingWithSplash(preloadedSplashImage);
 
   try {
     // Gather form data
@@ -816,6 +830,7 @@ async function handleFormSubmit() {
 
   } catch (error) {
     console.error('Error updating trainer:', error);
+    hideLoading();
     showError('Failed to update trainer data');
 
     // Reload the form

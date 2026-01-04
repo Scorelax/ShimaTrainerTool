@@ -3,6 +3,7 @@
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
+import { selectSplashImage, showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
 export function renderEditPokemon(pokemonName) {
   // Load Pokemon data from session storage
@@ -686,6 +687,17 @@ export async function attachEditPokemonListeners() {
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
+  // Preload splash image in background while user edits
+  let preloadedSplashImage = null;
+  console.log('[Edit Pokemon] Preloading splash image...');
+  selectSplashImage().then(url => {
+    preloadedSplashImage = url;
+    console.log('[Edit Pokemon] Preloaded splash:', url);
+  }).catch(err => {
+    console.log('[Edit Pokemon] Preload error:', err);
+    preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+  });
+
   // Initialize visibility system
   await initializeVisibility();
 
@@ -1222,8 +1234,8 @@ async function handleFormSubmit(pokemonName, originalNature) {
     const needsRecalculation = featsChanged || levelChanged || conChanged || loyaltyChanged;
 
     if (needsRecalculation) {
-      // Show loading screen during recalculation
-      document.getElementById('loading-screen')?.classList.add('active');
+      // Show loading screen with preloaded splash image during recalculation
+      showLoadingWithSplash(preloadedSplashImage);
 
       try {
         // Backend will recalculate stats (feats + HP/VP)
@@ -1235,13 +1247,13 @@ async function handleFormSubmit(pokemonName, originalNature) {
         }
       } catch (error) {
         console.error('Error recalculating stats:', error);
-        document.getElementById('loading-screen')?.classList.remove('active');
+        hideLoading();
         showError('Failed to recalculate stats. Please try again.');
         // Don't continue - this is a critical error
         return;
       } finally {
         // Hide loading screen
-        document.getElementById('loading-screen')?.classList.remove('active');
+        hideLoading();
       }
     } else {
       // No changes affecting calculations, just update skills normally

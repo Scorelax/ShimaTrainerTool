@@ -2560,7 +2560,7 @@ function showMoveDetails(moveName) {
     // Check for Ace Trainer bonus (Level 3+: +1 to attack and damage)
     const aceTrainerBonus = (trainerPath === 'Ace Trainer' && trainerLevel >= 3) ? 1 : 0;
 
-    // Type Master Level 5: +1 to attack if Pokemon type matches AND move type matches specialization
+    // Type Master Level 5: +2 to attack if Pokemon type matches AND move type matches specialization
     let typeMasterAttackBonus = 0;
     if (trainerPath === 'Type Master' && trainerLevel >= 5 && specializationsStr) {
       const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
@@ -2578,7 +2578,7 @@ function showMoveDetails(moveName) {
 
       // Apply bonus if Pokemon type matches AND move type matches
       if (pokemonHasSpecializationType && moveMatchesSpecialization) {
-        typeMasterAttackBonus = 1;
+        typeMasterAttackBonus = 2;
       }
     }
 

@@ -3870,7 +3870,7 @@ function showMaxPotentialSelection() {
     if (!selectedStat) return;
 
     // Close the selection popup
-    closePopup('maxPotentialSelectionPopup');
+    document.getElementById('maxPotentialSelectionPopup')?.classList.remove('active');
 
     // Show loading message
     showSuccess('Applying Max Potential boost to all Pokemon...');
@@ -3886,12 +3886,12 @@ function showMaxPotentialSelection() {
 
   // Close button handler
   document.getElementById('closeMaxPotentialSelection')?.addEventListener('click', () => {
-    closePopup('maxPotentialSelectionPopup');
+    document.getElementById('maxPotentialSelectionPopup')?.classList.remove('active');
   });
 
   // Show the popup
-  closePopup('trainerPathPopup');
-  openPopup('maxPotentialSelectionPopup');
+  document.getElementById('trainerPathPopup')?.classList.remove('active');
+  document.getElementById('maxPotentialSelectionPopup')?.classList.add('active');
 }
 
 // Apply Max Potential Boost to all Pokemon

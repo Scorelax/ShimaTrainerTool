@@ -63,7 +63,9 @@ const TRAINER_COLUMN_INDICES = {
   rapidOrdersCharges: 41,
   unbreakableBondCharges: 42,
   elementalSynergyCharges: 43,
-  masterTrainerCharges: 44
+  masterTrainerCharges: 44,
+  battleDice: 45,
+  maxPotential: 46
 };
 const POKEMON_COLUMN_INDICES = {
   trainername: 0,
@@ -673,15 +675,20 @@ function createTrainer(trainer) {
             intmodifier, // Calculated INT modifier
             wismodifier, // Calculated WIS modifier
             chamodifier, // Calculated CHA modifier
-            '', // Placeholder for feats
-            '', // Placeholder for currentHP
-            '', // Placeholder for currentVP
-            '', // Placeholder for currentAC
-            '', // Placeholder for gear
-            trainer.nationality, // Nationality
-            trainer.trainerClass, //Trainer Class
-            '',     // Placeholder for current HD
-            ''      // Placeholder for current VD        
+            '', // Placeholder for feats (33)
+            '', // Placeholder for currentHP (34)
+            '', // Placeholder for currentVP (35)
+            '', // Placeholder for currentAC (36)
+            '', // Placeholder for gear (37)
+            trainer.nationality, // Nationality (38)
+            trainer.trainerClass, // Trainer Class (39)
+            '', // Placeholder for Second Wind Charges (40)
+            '', // Placeholder for Rapid Orders Charges (41)
+            '', // Placeholder for Unbreakable Bond Charges (42)
+            '', // Placeholder for Elemental Synergy Charges (43)
+            '', // Placeholder for Master Trainer Charges (44)
+            '', // Placeholder for Battle Dice (45)
+            ''  // Placeholder for Max Potential (46)
         ];
 
         TRAINER_DATA_SHEET.appendRow(rowData);

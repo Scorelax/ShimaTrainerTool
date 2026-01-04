@@ -2785,7 +2785,7 @@ function showMoveDetails(moveName) {
       const useButtonDisabled = currentCharges <= 0 ? 'disabled' : '';
       battleDiceContainer.innerHTML = `
         <div class="battle-dice-container">
-          <div class="battle-dice-header">
+          <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
             <strong>Battle Dice (d6):</strong>
             ${chargeDotsHTML}
           </div>

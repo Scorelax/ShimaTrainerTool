@@ -2756,7 +2756,7 @@ function showMoveDetails(moveName) {
     document.getElementById('heldItemsInfo').innerHTML = heldItemsInfo;
 
     // Populate battle dice tracker for Ace Trainer
-    const trainerPath = trainerData[25] || '';
+    // Note: trainerPath already declared above for Ace Trainer bonus calculation
     const battleDiceContainer = document.getElementById('battleDiceContainer');
 
     if (trainerPath === 'Ace Trainer') {

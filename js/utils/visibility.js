@@ -7,21 +7,36 @@ import { GameDataAPI } from '../api.js';
 let pokedexConfig = null;
 
 /**
- * Initialize visibility system by fetching Pokedex config
+ * Initialize visibility system by loading Pokedex config from sessionStorage or API
  */
 export async function initializeVisibility() {
-  // If already loaded, return immediately (no API call needed)
+  // If already loaded in memory, return immediately
   if (pokedexConfig) {
-    console.log('[Visibility] Using cached Pokedex config');
+    console.log('[Visibility] Using cached Pokedex config from memory');
     return true;
   }
 
+  // Check sessionStorage first (loaded in continue-journey)
+  const cachedConfig = sessionStorage.getItem('pokedexConfig');
+  if (cachedConfig) {
+    try {
+      pokedexConfig = JSON.parse(cachedConfig);
+      console.log('[Visibility] Using cached Pokedex config from sessionStorage');
+      return true;
+    } catch (error) {
+      console.error('[Visibility] Failed to parse cached Pokedex config:', error);
+    }
+  }
+
+  // Fall back to API call if not in sessionStorage
   try {
     console.log('[Visibility] Fetching Pokedex config from API...');
     const result = await GameDataAPI.getPokedexConfig();
     if (result.status === 'success') {
       pokedexConfig = result.data;
-      console.log('[Visibility] Pokedex config loaded successfully');
+      // Store in sessionStorage for future use
+      sessionStorage.setItem('pokedexConfig', JSON.stringify(result.data));
+      console.log('[Visibility] Pokedex config loaded successfully from API');
       return true;
     }
     return false;

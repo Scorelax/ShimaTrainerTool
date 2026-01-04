@@ -427,6 +427,19 @@ export function attachContinueJourneyListeners() {
           // Continue anyway - app will fall back to individual API calls if needed
         }
 
+        // Load Pokedex config (visibility settings for Pokemon data)
+        // This is cached in session storage to avoid API calls on every page
+        try {
+          const pokedexConfig = await import('../api.js').then(m => m.GameDataAPI.getPokedexConfig());
+          if (pokedexConfig.status === 'success') {
+            sessionStorage.setItem('pokedexConfig', JSON.stringify(pokedexConfig.data));
+            console.log('[Cache] Stored Pokedex config');
+          }
+        } catch (error) {
+          console.error('[Cache] Failed to load Pokedex config:', error);
+          // Continue anyway - app will fall back to API call if needed
+        }
+
         // Check if Pokemon Trainer or Conduit
         const trainerClass = response.data.trainerData[39]; // Index for trainer class
 

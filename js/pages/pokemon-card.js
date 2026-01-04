@@ -2492,7 +2492,7 @@ function showMoveDetails(moveName) {
     const wis = parseInt(pokemonData[19]) || 10;
     const cha = parseInt(pokemonData[20]) || 10;
     const proficiency = parseInt(pokemonData[31]) || 2;
-    const stabBonusValue = parseInt(pokemonData[34]) || 2;
+    let stabBonusValue = parseInt(pokemonData[34]) || 2;
     const heldItemsStr = pokemonData[35] || '';
     const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
@@ -2500,6 +2500,26 @@ function showMoveDetails(moveName) {
     const pokemonTypes = [type1, type2].filter(t => t);
     const moveType = move[1];
     const hasSTAB = pokemonTypes.includes(moveType);
+
+    // Apply Type Master STAB bonus (Level 3+)
+    const trainerPath = trainerData[25] || '';
+    const trainerLevel = parseInt(trainerData[2]) || 1;
+    const specializationsStr = trainerData[24] || '';
+
+    if (trainerPath === 'Type Master' && trainerLevel >= 3 && specializationsStr) {
+      const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
+
+      // Check how many of the Pokemon's types match specializations
+      let typeMatches = 0;
+      pokemonTypes.forEach(pokemonType => {
+        if (specializations.includes(pokemonType)) {
+          typeMatches++;
+        }
+      });
+
+      // Add +1 STAB per matching type (+2 if dual type matches both specializations)
+      stabBonusValue += typeMatches;
+    }
 
     // Get stat modifiers
     const strMod = Math.floor((str - 10) / 2);
@@ -2530,8 +2550,6 @@ function showMoveDetails(moveName) {
     const usedStat = moveModifiers.find(mod => modifierValues[mod] === highestMod) || '';
 
     // Check for Ace Trainer bonus (Level 3+: +1 to attack and damage)
-    const trainerPath = trainerData[25] || '';
-    const trainerLevel = parseInt(trainerData[2]) || 1;
     const aceTrainerBonus = (trainerPath === 'Ace Trainer' && trainerLevel >= 3) ? 1 : 0;
 
     // Check for Type Master bonus (Level 5+: +2 to attack with moves of specialization type)

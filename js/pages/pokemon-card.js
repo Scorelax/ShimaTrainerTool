@@ -2789,10 +2789,12 @@ function showMoveDetails(moveName) {
             <strong>Battle Dice (d6):</strong>
             ${chargeDotsHTML}
           </div>
-          <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 0.6rem;">
-            Add 1d6 to your next attack or damage roll
+          <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: space-between;">
+            <div style="font-size: 0.85rem; opacity: 0.9;">
+              Add 1d6 to your next attack or damage roll
+            </div>
+            <button class="use-battle-dice-button" id="useBattleDiceButton" ${useButtonDisabled} style="flex-shrink: 0;">Use Battle Dice</button>
           </div>
-          <button class="use-battle-dice-button" id="useBattleDiceButton" ${useButtonDisabled}>Use Battle Dice</button>
         </div>
       `;
 

@@ -798,11 +798,6 @@ async function handleFormSubmit() {
       trainerData[45] = `${newMax} - ${newCurrent}`;
 
       console.log(`Battle Dice updated: ${oldMax} - ${oldCurrent} -> ${newMax} - ${newCurrent}`);
-
-      // Show notification about Battle Dice recalculation
-      setTimeout(() => {
-        showSuccess(`Battle Dice recalculated: ${newCurrent}/${newMax} charges available (WIS modifier changed)`);
-      }, 100);
     }
 
     // Update session storage IMMEDIATELY

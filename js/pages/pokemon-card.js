@@ -2485,14 +2485,39 @@ function showMoveDetails(moveName) {
     const trainerLevel = parseInt(trainerData[2]) || 1;
     const specializationsStr = trainerData[24] || '';
 
+    // Mapping from specialization names to Pokemon types
+    const specializationToType = {
+      'Bird Keeper': 'Flying',
+      'Bug Maniac': 'Bug',
+      'Camper': 'Ground',
+      'Dragon Tamer': 'Dragon',
+      'Engineer': 'Electric',
+      'Pyromaniac': 'Fire',
+      'Gardener': 'Grass',
+      'Martial Artist': 'Fighting',
+      'Mountaineer': 'Rock',
+      'Mystic': 'Ghost',
+      'Steel Worker': 'Steel',
+      'Psychic': 'Psychic',
+      'Swimmer': 'Water',
+      'Charmer': 'Fairy',
+      'Shadow': 'Dark',
+      'Alchemist': 'Poison',
+      'Team Player': 'Normal',
+      'Ice Skater': 'Ice'
+    };
+
     // Type Master Level 3: +1 damage per Pokemon type matching specialization
     let typeMasterDamageBonus = 0;
     if (trainerPath === 'Type Master' && trainerLevel >= 3 && specializationsStr) {
       const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
 
+      // Convert specialization names to Pokemon types
+      const specializationTypes = specializations.map(spec => specializationToType[spec]).filter(t => t);
+
       // Count how many Pokemon types match specializations
       pokemonTypes.forEach(pokemonType => {
-        if (specializations.includes(pokemonType)) {
+        if (specializationTypes.includes(pokemonType)) {
           typeMasterDamageBonus++;
         }
       });
@@ -2534,13 +2559,16 @@ function showMoveDetails(moveName) {
     if (trainerPath === 'Type Master' && trainerLevel >= 5 && specializationsStr) {
       const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
 
+      // Convert specialization names to Pokemon types
+      const specializationTypes = specializations.map(spec => specializationToType[spec]).filter(t => t);
+
       // Check if Pokemon has a type matching a specialization
       const pokemonHasSpecializationType = pokemonTypes.some(pokemonType =>
-        specializations.includes(pokemonType)
+        specializationTypes.includes(pokemonType)
       );
 
       // Check if the move type matches a specialization
-      const moveMatchesSpecialization = specializations.includes(moveType);
+      const moveMatchesSpecialization = specializationTypes.includes(moveType);
 
       // Apply bonus if Pokemon type matches AND move type matches
       if (pokemonHasSpecializationType && moveMatchesSpecialization) {

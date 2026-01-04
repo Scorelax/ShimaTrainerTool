@@ -2225,19 +2225,27 @@ export function attachTrainerInfoListeners() {
     const trainerData = JSON.parse(trainerDataRaw);
     const trainerName = trainerData[1];
 
-    // Get all Pokemon for this trainer
-    const registeredPokemonStr = sessionStorage.getItem('registeredPokemon');
-    if (!registeredPokemonStr) {
+    // Get all Pokemon for this trainer from session storage
+    const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
+
+    if (allPokemonKeys.length === 0) {
       showError('No Pokemon data found.');
       return;
     }
 
-    const registeredPokemon = JSON.parse(registeredPokemonStr);
-
     // Filter for active party Pokemon
-    const activePokemon = registeredPokemon.filter(pokemon => {
-      return pokemon[0] === trainerName && pokemon[38] === true; // index 38 is isInActiveParty
-    });
+    const activePokemon = [];
+    for (const key of allPokemonKeys) {
+      const pokemonDataStr = sessionStorage.getItem(key);
+      if (!pokemonDataStr) continue;
+
+      const pokemonData = JSON.parse(pokemonDataStr);
+
+      // Check if this Pokemon belongs to current trainer and is in active party
+      if (pokemonData[0] === trainerName && pokemonData[38] === true) { // index 38 is isInActiveParty
+        activePokemon.push(pokemonData);
+      }
+    }
 
     if (activePokemon.length === 0) {
       showError('No Pokemon in active party.');
@@ -3672,15 +3680,8 @@ async function completeShortRest(selectedPokemon) {
   selectedPokemon[46] = pokemonMaxVP; // currentVP
 
   // Update Pokemon in sessionStorage
-  const registeredPokemonStr = sessionStorage.getItem('registeredPokemon');
-  if (registeredPokemonStr) {
-    const registeredPokemon = JSON.parse(registeredPokemonStr);
-    const pokemonIndex = registeredPokemon.findIndex(p => p[1] === pokemonName && p[0] === trainerData[1]);
-    if (pokemonIndex !== -1) {
-      registeredPokemon[pokemonIndex] = selectedPokemon;
-      sessionStorage.setItem('registeredPokemon', JSON.stringify(registeredPokemon));
-    }
-  }
+  const pokemonKey = `pokemon_${pokemonName.toLowerCase()}`;
+  sessionStorage.setItem(pokemonKey, JSON.stringify(selectedPokemon));
 
   // Close selection popup immediately
   document.getElementById('shortRestPokemonSelectionPopup')?.classList.remove('active');

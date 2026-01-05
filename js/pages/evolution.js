@@ -1085,7 +1085,7 @@ async function confirmEvolution() {
     });
 
     // Show loading screen with preloaded splash image from sessionStorage
-    const splashUrl = sessionStorage.getItem('preloadedSplashImage') || 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+    const splashUrl = sessionStorage.getItem('preloadedSplashImage');
     showLoadingWithSplash(splashUrl);
 
     // Call API to evolve Pokemon and wait for full calculated data

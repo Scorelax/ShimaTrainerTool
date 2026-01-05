@@ -660,7 +660,7 @@ async function handleFormSubmit() {
     console.log('[Pokemon Form] - Full array:', newPokemonData);
 
     // Show loading screen with preloaded splash image from sessionStorage
-    const splashUrl = sessionStorage.getItem('preloadedSplashImage') || 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+    const splashUrl = sessionStorage.getItem('preloadedSplashImage');
     showLoadingWithSplash(splashUrl);
 
     // Register the Pokemon

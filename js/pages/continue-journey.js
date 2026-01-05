@@ -3,9 +3,9 @@ import { TrainerAPI } from '../api.js';
 
 // Splash image configuration
 const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/splashes/';
-const MAX_SPLASH_IMAGES = 20; // Maximum number of splash images
+const MAX_SPLASH_IMAGES = 20; // Maximum number of splash images (splash-1.png through splash-20.png)
 
-// Select and preload a random splash image (assume all files exist)
+// Select and preload a random splash image (no fallback to default background)
 async function selectAndPreloadSplashImage() {
   // Randomly pick splash-1.png through splash-20.png (assume they all exist)
   const randomNumber = Math.floor(Math.random() * MAX_SPLASH_IMAGES) + 1;
@@ -21,7 +21,7 @@ async function selectAndPreloadSplashImage() {
       resolve(splashUrl);
     };
     img.onerror = () => {
-      console.log('[Splash] Image failed to load, will display anyway');
+      console.log('[Splash] Image failed to load, using splash anyway');
       resolve(splashUrl); // Still resolve with URL - browser will try again when displaying
     };
     img.src = splashUrl;
@@ -344,7 +344,7 @@ export function attachContinueJourneyListeners() {
     console.log('[Splash] Preloaded:', url);
   }).catch(err => {
     console.log('[Splash] Preload error:', err);
-    preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+    // No fallback - splash images should always exist
   });
 
   // Trainer box click handlers

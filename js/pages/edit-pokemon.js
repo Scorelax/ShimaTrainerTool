@@ -1224,7 +1224,7 @@ async function handleFormSubmit(pokemonName, originalNature) {
 
     if (needsRecalculation) {
       // Show loading screen with preloaded splash image from sessionStorage during recalculation
-      const splashUrl = sessionStorage.getItem('preloadedSplashImage') || 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+      const splashUrl = sessionStorage.getItem('preloadedSplashImage');
       showLoadingWithSplash(splashUrl);
 
       try {

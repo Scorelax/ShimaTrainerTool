@@ -683,13 +683,12 @@ async function handleFormSubmit() {
       completePokemonData.push(finalPokemonData);
       sessionStorage.setItem('completePokemonData', JSON.stringify(completePokemonData));
 
-      // Hide loading screen
-      hideLoading();
-
+      // Show success message (keep loading screen visible)
       showSuccess(`${trainerData[1]} caught a ${selectedPokemonData[1]}!`);
 
-      // Navigate to my pokemon page
+      // Navigate to my pokemon page and hide loading after navigation
       setTimeout(() => {
+        hideLoading();
         window.dispatchEvent(new CustomEvent('navigate', {
           detail: { route: 'my-pokemon' }
         }));

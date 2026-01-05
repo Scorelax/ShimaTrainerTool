@@ -50,8 +50,12 @@ export function showLoadingWithSplash(splashUrl) {
   const loadingScreen = document.getElementById('loading-screen');
   if (loadingScreen) {
     if (splashUrl) {
+      // Set background image first (before making visible)
       loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
+      // Force a reflow to ensure image is set before showing
+      loadingScreen.offsetHeight;
     }
+    // Now show the loading screen
     loadingScreen.classList.add('active');
   }
 }

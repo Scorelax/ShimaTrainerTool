@@ -2,7 +2,7 @@
 
 import { TrainerAPI } from '../api.js';
 import { showToast, showSuccess, showError } from '../utils/notifications.js';
-import { selectSplashImage, showLoadingWithSplash, hideLoading } from '../utils/splash.js';
+import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
 export function renderEditTrainer() {
   // Load trainer data from session storage

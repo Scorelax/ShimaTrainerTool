@@ -4,39 +4,28 @@ import { TrainerAPI } from '../api.js';
 // Splash image configuration
 const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/splashes/';
 const MAX_SPLASH_IMAGES = 20; // Maximum number of splash images
-const DEFAULT_BACKGROUND = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
 
-// Select a random splash image with priority for "session"
-async function selectSplashImage() {
-  // Helper function to check if an image exists
-  async function imageExists(url) {
-    try {
-      const response = await fetch(url, { method: 'HEAD' });
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  // First, check if session.png exists
-  const sessionUrl = `${SPLASH_BASE_URL}session.png`;
-  if (await imageExists(sessionUrl)) {
-    console.log('[Splash] Using session image:', sessionUrl);
-    return sessionUrl;
-  }
-
-  // If no session image, pick a random splash image
+// Select and preload a random splash image (assume all files exist)
+async function selectAndPreloadSplashImage() {
+  // Randomly pick splash-1.png through splash-20.png (assume they all exist)
   const randomNumber = Math.floor(Math.random() * MAX_SPLASH_IMAGES) + 1;
-  const randomSplashUrl = `${SPLASH_BASE_URL}splash-${randomNumber}.png`;
+  const splashUrl = `${SPLASH_BASE_URL}splash-${randomNumber}.png`;
 
-  if (await imageExists(randomSplashUrl)) {
-    console.log('[Splash] Using random splash image:', randomSplashUrl);
-    return randomSplashUrl;
-  }
+  console.log('[Splash] Selected splash image:', splashUrl);
 
-  // Fallback to default background if splash image not found
-  console.log('[Splash] No splash images found, using default background');
-  return DEFAULT_BACKGROUND;
+  // Preload the image so it's cached by the browser for instant display
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      console.log('[Splash] Image preloaded successfully');
+      resolve(splashUrl);
+    };
+    img.onerror = () => {
+      console.log('[Splash] Image failed to load, will display anyway');
+      resolve(splashUrl); // Still resolve with URL - browser will try again when displaying
+    };
+    img.src = splashUrl;
+  });
 }
 
 // Progress tracking utility
@@ -470,7 +459,7 @@ export function attachContinueJourneyListeners() {
 
           updateLoadingProgress(85, 'Loading splash images...');
           // Preload splash image for instant display on other pages
-          const splashUrl = await selectSplashImage();
+          const splashUrl = await selectAndPreloadSplashImage();
           sessionStorage.setItem('preloadedSplashImage', splashUrl);
           console.log('[Continue Journey] Preloaded splash image:', splashUrl);
 

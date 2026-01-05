@@ -3,7 +3,7 @@
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
-import { selectSplashImage, showLoadingWithSplash, hideLoading } from '../utils/splash.js';
+import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
 export function renderEditPokemon(pokemonName) {
   // Load Pokemon data from session storage

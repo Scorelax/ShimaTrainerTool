@@ -5,6 +5,9 @@ import { showSuccess, showError } from '../utils/notifications.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 import { selectSplashImage, showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
+// Module-level variable for preloaded splash image
+let preloadedSplashImage = null;
+
 export function renderPokemonForm() {
   // Load selected Pokemon data from session storage
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
@@ -320,7 +323,6 @@ export async function attachPokemonFormListeners() {
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
 
   // Preload splash image in background while user fills out form
-  let preloadedSplashImage = null;
   console.log('[Pokemon Form] Preloading splash image...');
   selectSplashImage().then(url => {
     preloadedSplashImage = url;

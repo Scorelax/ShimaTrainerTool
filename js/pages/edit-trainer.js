@@ -814,6 +814,9 @@ async function handleFormSubmit() {
     // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
+    // Hide loading screen
+    hideLoading();
+
     // Navigate back to trainer info IMMEDIATELY
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'trainer-info' }

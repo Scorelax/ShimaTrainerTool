@@ -26,7 +26,6 @@ export function hideLoading() {
   const loadingScreen = document.getElementById('loading-screen');
   if (loadingScreen) {
     loadingScreen.classList.remove('active');
-    // Reset background image
-    loadingScreen.style.backgroundImage = '';
+    // Keep background image set for instant display next time
   }
 }

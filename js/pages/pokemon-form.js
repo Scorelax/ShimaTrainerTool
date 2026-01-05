@@ -353,6 +353,14 @@ export function renderPokemonForm() {
 export async function attachPokemonFormListeners() {
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
 
+  // Set splash image on loading screen immediately (before it's shown)
+  const loadingScreen = document.getElementById('loading-screen');
+  const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+  if (loadingScreen && splashUrl) {
+    loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
+    console.log('[Pokemon Form] Set splash image on loading screen:', splashUrl);
+  }
+
   // Initialize visibility system
   await initializeVisibility();
 

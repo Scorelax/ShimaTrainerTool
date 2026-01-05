@@ -570,6 +570,14 @@ export async function attachEvolutionListeners() {
   allocatedSkillPoints = 0;
   evolutionOptions = [];
 
+  // Set splash image on loading screen immediately (before it's shown)
+  const loadingScreen = document.getElementById('loading-screen');
+  const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+  if (loadingScreen && splashUrl) {
+    loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
+    console.log('[Evolution] Set splash image on loading screen:', splashUrl);
+  }
+
   // Initialize visibility system
   await initializeVisibility();
 
@@ -864,6 +872,10 @@ async function confirmEvolution() {
     return;
   }
 
+  // Show loading screen IMMEDIATELY before any processing
+  const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+  showLoadingWithSplash(splashUrl);
+
   // Read input values BEFORE clearing the DOM
   const str = parseInt(document.getElementById('strPoints').value) || 0;
   const dex = parseInt(document.getElementById('dexPoints').value) || 0;
@@ -1084,11 +1096,7 @@ async function confirmEvolution() {
       fullData: evolvedPokemonData
     });
 
-    // Show loading screen with preloaded splash image from sessionStorage
-    const splashUrl = sessionStorage.getItem('preloadedSplashImage');
-    showLoadingWithSplash(splashUrl);
-
-    // Call API to evolve Pokemon and wait for full calculated data
+    // Call API to evolve Pokemon and wait for full calculated data (loading screen already shown)
     const response = await PokemonAPI.evolve(
       currentPokemon[2],
       currentPokemon[0],

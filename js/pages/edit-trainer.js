@@ -568,6 +568,14 @@ export function renderEditTrainer() {
 }
 
 export function attachEditTrainerListeners() {
+  // Set splash image on loading screen immediately (before it's shown)
+  const loadingScreen = document.getElementById('loading-screen');
+  const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+  if (loadingScreen && splashUrl) {
+    loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
+    console.log('[Edit Trainer] Set splash image on loading screen:', splashUrl);
+  }
+
   // Collapsible sections
   ['skills', 'feats'].forEach(section => {
     const header = document.getElementById(`${section}Header`);
@@ -673,6 +681,11 @@ export function attachEditTrainerListeners() {
   // Form submission
   document.getElementById('editTrainerForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // Show loading screen IMMEDIATELY before any processing
+    const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+    showLoadingWithSplash(splashUrl);
+
     await handleFormSubmit();
   });
 }
@@ -718,10 +731,6 @@ async function handleFormSubmit() {
   const form = document.getElementById('editTrainerForm');
   const trainerDataStr = sessionStorage.getItem('trainerData');
   const trainerData = JSON.parse(trainerDataStr);
-
-  // Show loading screen with preloaded splash image from sessionStorage
-  const splashUrl = sessionStorage.getItem('preloadedSplashImage');
-  showLoadingWithSplash(splashUrl);
 
   try {
     // Gather form data

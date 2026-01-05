@@ -687,6 +687,14 @@ export async function attachEditPokemonListeners() {
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
+  // Set splash image on loading screen immediately (before it's shown)
+  const loadingScreen = document.getElementById('loading-screen');
+  const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+  if (loadingScreen && splashUrl) {
+    loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
+    console.log('[Edit Pokemon] Set splash image on loading screen:', splashUrl);
+  }
+
   // Initialize visibility system
   await initializeVisibility();
 

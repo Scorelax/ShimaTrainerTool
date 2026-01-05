@@ -84,6 +84,56 @@ export function renderPokemonCard(pokemonName) {
     "Steel", "Fire", "Water", "Grass", "Electric", "Psychic", "Ice", "Dragon", "Dark", "Fairy"
   ];
 
+  // Mapping from specialization names to Pokemon types
+  const specializationToType = {
+    'Bird Keeper': 'Flying',
+    'Bug Maniac': 'Bug',
+    'Camper': 'Ground',
+    'Dragon Tamer': 'Dragon',
+    'Engineer': 'Electric',
+    'Pyromaniac': 'Fire',
+    'Gardener': 'Grass',
+    'Martial Artist': 'Fighting',
+    'Mountaineer': 'Rock',
+    'Mystic': 'Ghost',
+    'Steel Worker': 'Steel',
+    'Psychic': 'Psychic',
+    'Swimmer': 'Water',
+    'Charmer': 'Fairy',
+    'Shadow': 'Dark',
+    'Alchemist': 'Poison',
+    'Team Player': 'Normal',
+    'Ice Skater': 'Ice'
+  };
+
+  // Type Master Level 9: Resistance shift for first specialization type
+  const trainerPath = trainerData[25] || '';
+  const trainerLevel = parseInt(trainerData[2]) || 1;
+  const specializationsStr = trainerData[24] || '';
+
+  if (trainerPath === 'Type Master' && trainerLevel >= 9 && specializationsStr) {
+    const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
+    if (specializations.length > 0) {
+      const firstSpecialization = specializations[0];
+      const firstSpecType = specializationToType[firstSpecialization];
+
+      if (firstSpecType) {
+        const typeIndex = typeNames.indexOf(firstSpecType);
+        if (typeIndex !== -1 && typeChartValues[typeIndex] !== undefined) {
+          const currentValue = typeChartValues[typeIndex];
+          // Shift resistance down: 2→1, 1→0.5, 0.5→0
+          if (currentValue === 2) {
+            typeChartValues[typeIndex] = 1;
+          } else if (currentValue === 1) {
+            typeChartValues[typeIndex] = 0.5;
+          } else if (currentValue === 0.5) {
+            typeChartValues[typeIndex] = 0;
+          }
+        }
+      }
+    }
+  }
+
   const weaknesses = [];
   const resistances = [];
   const immunities = [];
@@ -2478,7 +2528,7 @@ function showMoveDetails(moveName) {
     // Get Pokemon types for STAB calculation
     const pokemonTypes = [type1, type2].filter(t => t);
     const moveType = move[1];
-    const hasSTAB = pokemonTypes.includes(moveType);
+    let hasSTAB = pokemonTypes.includes(moveType);
 
     // Type Master setup
     const trainerPath = trainerData[25] || '';
@@ -2506,6 +2556,22 @@ function showMoveDetails(moveName) {
       'Team Player': 'Normal',
       'Ice Skater': 'Ice'
     };
+
+    // Type Master Level 15: Universal STAB for Pokemon matching specialization types
+    if (!hasSTAB && trainerPath === 'Type Master' && trainerLevel >= 15 && specializationsStr) {
+      const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
+      const specializationTypes = specializations.map(spec => specializationToType[spec]).filter(t => t);
+
+      // Check if Pokemon has any type matching a specialization
+      const pokemonMatchesSpecialization = pokemonTypes.some(pokemonType =>
+        specializationTypes.includes(pokemonType)
+      );
+
+      // Grant STAB on all moves if Pokemon type matches specialization
+      if (pokemonMatchesSpecialization) {
+        hasSTAB = true;
+      }
+    }
 
     // Type Master Level 3: +1 damage per Pokemon type matching specialization (only if move type also matches)
     let typeMasterDamageBonus = 0;

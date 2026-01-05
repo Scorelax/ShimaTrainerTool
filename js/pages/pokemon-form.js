@@ -258,7 +258,41 @@ export function renderPokemonForm() {
             padding: clamp(1rem, 2vw, 1.5rem);
           }
         }
+
+        .back-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          left: clamp(15px, 3vw, 20px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          border: 3px solid rgba(255,222,0,0.8);
+          border-radius: 50%;
+          width: clamp(45px, 10vw, 60px);
+          height: clamp(45px, 10vw, 60px);
+          font-size: clamp(1.2rem, 3vw, 1.8rem);
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .back-button:hover {
+          transform: scale(1.15);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        .back-button:active {
+          transform: scale(1.08);
+        }
       </style>
+
+      <!-- Back Button -->
+      <button class="back-button" id="backButton">←</button>
 
       <h1>Register ${pokemonName}</h1>
 
@@ -337,6 +371,13 @@ export async function attachPokemonFormListeners() {
 
   // Populate abilities from cache or API (like edit-pokemon does)
   await populateAbilityOptions(selectedPokemonData);
+
+  // Back button
+  document.getElementById('backButton')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'my-pokemon' }
+    }));
+  });
 
   // Cancel button
   document.getElementById('cancelButton')?.addEventListener('click', () => {

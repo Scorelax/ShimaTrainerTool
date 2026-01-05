@@ -339,7 +339,7 @@ export function attachContinueJourneyListeners() {
 
   // Preload splash image in background while user selects trainer
   console.log('[Splash] Preloading splash image...');
-  selectSplashImage().then(url => {
+  selectAndPreloadSplashImage().then(url => {
     preloadedSplashImage = url;
     console.log('[Splash] Preloaded:', url);
   }).catch(err => {

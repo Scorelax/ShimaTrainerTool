@@ -384,6 +384,11 @@ export async function attachPokemonFormListeners() {
   // Form submission
   document.getElementById('pokemonForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    // Show loading screen IMMEDIATELY before any processing
+    const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+    showLoadingWithSplash(splashUrl);
+
     await handleFormSubmit();
   });
 }
@@ -667,11 +672,7 @@ async function handleFormSubmit() {
     console.log('[Pokemon Form] - Index 7 (Abilities):', newPokemonData[7]);
     console.log('[Pokemon Form] - Full array:', newPokemonData);
 
-    // Show loading screen with preloaded splash image from sessionStorage
-    const splashUrl = sessionStorage.getItem('preloadedSplashImage');
-    showLoadingWithSplash(splashUrl);
-
-    // Register the Pokemon
+    // Register the Pokemon (loading screen already shown)
     const response = await PokemonAPI.register(trainerData[1], newPokemonData);
 
     console.log('[Pokemon Form] Backend response:', response);

@@ -468,6 +468,12 @@ export function attachContinueJourneyListeners() {
           sessionStorage.setItem('pokemonFeats', JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
           sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));
 
+          updateLoadingProgress(85, 'Loading splash images...');
+          // Preload splash image for instant display on other pages
+          const splashUrl = await selectSplashImage();
+          sessionStorage.setItem('preloadedSplashImage', splashUrl);
+          console.log('[Continue Journey] Preloaded splash image:', splashUrl);
+
           updateLoadingProgress(95, 'Almost ready...');
           // Navigate to trainer card
           window.dispatchEvent(new CustomEvent('navigate', {

@@ -5,9 +5,6 @@ import { showSuccess, showError } from '../utils/notifications.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 import { selectSplashImage, showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
-// Module-level variable for preloaded splash image
-let preloadedSplashImage = null;
-
 export function renderPokemonForm() {
   // Load selected Pokemon data from session storage
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
@@ -356,16 +353,6 @@ export function renderPokemonForm() {
 export async function attachPokemonFormListeners() {
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
 
-  // Preload splash image in background while user fills out form
-  console.log('[Pokemon Form] Preloading splash image...');
-  selectSplashImage().then(url => {
-    preloadedSplashImage = url;
-    console.log('[Pokemon Form] Preloaded splash:', url);
-  }).catch(err => {
-    console.log('[Pokemon Form] Preload error:', err);
-    preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
-  });
-
   // Initialize visibility system
   await initializeVisibility();
 
@@ -672,8 +659,9 @@ async function handleFormSubmit() {
     console.log('[Pokemon Form] - Index 7 (Abilities):', newPokemonData[7]);
     console.log('[Pokemon Form] - Full array:', newPokemonData);
 
-    // Show loading screen with preloaded splash image
-    showLoadingWithSplash(preloadedSplashImage);
+    // Show loading screen with preloaded splash image from sessionStorage
+    const splashUrl = sessionStorage.getItem('preloadedSplashImage') || 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+    showLoadingWithSplash(splashUrl);
 
     // Register the Pokemon
     const response = await PokemonAPI.register(trainerData[1], newPokemonData);

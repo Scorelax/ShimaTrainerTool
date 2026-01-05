@@ -687,17 +687,6 @@ export async function attachEditPokemonListeners() {
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
   const moves = JSON.parse(sessionStorage.getItem('moves') || '[]');
 
-  // Preload splash image in background while user edits
-  let preloadedSplashImage = null;
-  console.log('[Edit Pokemon] Preloading splash image...');
-  selectSplashImage().then(url => {
-    preloadedSplashImage = url;
-    console.log('[Edit Pokemon] Preloaded splash:', url);
-  }).catch(err => {
-    console.log('[Edit Pokemon] Preload error:', err);
-    preloadedSplashImage = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
-  });
-
   // Initialize visibility system
   await initializeVisibility();
 
@@ -1234,8 +1223,9 @@ async function handleFormSubmit(pokemonName, originalNature) {
     const needsRecalculation = featsChanged || levelChanged || conChanged || loyaltyChanged;
 
     if (needsRecalculation) {
-      // Show loading screen with preloaded splash image during recalculation
-      showLoadingWithSplash(preloadedSplashImage);
+      // Show loading screen with preloaded splash image from sessionStorage during recalculation
+      const splashUrl = sessionStorage.getItem('preloadedSplashImage') || 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
+      showLoadingWithSplash(splashUrl);
 
       try {
         // Backend will recalculate stats (feats + HP/VP)

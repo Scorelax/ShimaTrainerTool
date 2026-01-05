@@ -1,0 +1,53 @@
+{
+  "registered": [
+    "Octuber",
+    "Salamandrop",
+    "Hydrasylph"
+  ],
+  "visibility": {
+    "octuber": {
+      "types": true,
+      "description": true,
+      "characteristics": true,
+      "primaryAbility": true,
+      "secondaryAbility": true,
+      "hiddenAbility": true,
+      "stats": true,
+      "senses": true,
+      "evolution": true,
+      "moves": true,
+      "movesMaxLevel": 6,
+      "extraVisibleMoves": []
+    },
+    "salamandrop": {
+      "types": false,
+      "description": true,
+      "characteristics": false,
+      "primaryAbility": false,
+      "secondaryAbility": false,
+      "hiddenAbility": false,
+      "stats": false,
+      "senses": false,
+      "evolution": false,
+      "moves": false,
+      "movesMaxLevel": 1,
+      "extraVisibleMoves": []
+    }
+  },
+  "defaults": {
+    "types": false,
+    "description": true,
+    "characteristics": false,
+    "primaryAbility": false,
+    "secondaryAbility": false,
+    "hiddenAbility": false,
+    "stats": false,
+    "senses": false,
+    "evolution": false,
+    "moves": false,
+    "movesMaxLevel": 1,
+    "extraVisibleMoves": []
+  },
+  "extraSearchableMoves": [],
+  "splashCount": 45
+}

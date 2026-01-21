@@ -609,18 +609,6 @@ async function handleFormSubmit() {
     // Extract Size from selectedPokemonData (index 34 - at end of array from code.gs)
     const pokemonSize = selectedPokemonData[34] || '';
 
-    console.log('[SIZE DEBUG] ===== FULL selectedPokemonData array =====');
-    console.log(selectedPokemonData);
-    console.log('[SIZE DEBUG] selectedPokemonData length:', selectedPokemonData.length);
-    console.log('[SIZE DEBUG] selectedPokemonData[34] (Size):', pokemonSize);
-    console.log('[SIZE DEBUG] Last 5 indices of selectedPokemonData:', {
-      index30: selectedPokemonData[30],
-      index31: selectedPokemonData[31],
-      index32: selectedPokemonData[32],
-      index33: selectedPokemonData[33],
-      index34: selectedPokemonData[34]
-    });
-
     // Build new Pokemon data array matching exact database schema
     const newPokemonData = [
       trainerData[1],              // 0: Trainer Name
@@ -686,15 +674,6 @@ async function handleFormSubmit() {
     console.log('[Pokemon Form] newPokemonData array:');
     console.log('[Pokemon Form] - Index 1 (Image):', newPokemonData[1]);
     console.log('[Pokemon Form] - Index 7 (Abilities):', newPokemonData[7]);
-    console.log('[SIZE DEBUG] newPokemonData.length:', newPokemonData.length);
-    console.log('[SIZE DEBUG] newPokemonData[57] (Size):', newPokemonData[57]);
-    console.log('[SIZE DEBUG] Last 5 indices of newPokemonData:', {
-      index53: newPokemonData[53],
-      index54: newPokemonData[54],
-      index55: newPokemonData[55],
-      index56: newPokemonData[56],
-      index57: newPokemonData[57]
-    });
     console.log('[Pokemon Form] - Full array:', newPokemonData);
 
     // Register the Pokemon (loading screen already shown)

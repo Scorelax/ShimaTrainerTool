@@ -356,10 +356,7 @@ function getCompletePokemonData() {
       const endTime = Date.now();
       Logger.log('getCompletePokemonData: ' + (endTime - startTime) + ' ms');
 
-      // Log Size data from CSV
-      Logger.log('[SIZE DEBUG] Pokemon: ' + row[2] + ', Size from row[9]: "' + row[9] + '"');
-
-      const result = [
+      return [
         imageUrl,       // 0: image
         row[2],         // 1: name
         row[1],         // 2: id
@@ -394,12 +391,8 @@ function getCompletePokemonData() {
         movementData,   // 31: Movement data
         sensesData,     // 32: Sense data
         row[6],         // 33: Flavor text
-        row[9]          // 34: Size (NEW)
+        row[9]          // 34: Size
       ];
-
-      Logger.log('[SIZE DEBUG] Result array index 34 (Size): "' + result[34] + '", Array length: ' + result.length);
-
-      return result;
     });
     Logger.log("FORMATTEDDATA: " + JSON.stringify(formattedData, null, 2));
     // Return the formatted data to the client
@@ -490,12 +483,6 @@ function getPokemonListByTrainer(trainerName) {
 // ------------------------------------------------------------------Write Pokémon to Google Sheet Start-----------------------------------------------
 // Function to register the Pokémon for the trainer with additional data
 function registerPokemonForTrainer(trainerName, newPokemonData) {
-    // Log incoming data
-    Logger.log('[SIZE DEBUG - REGISTER] Pokemon Name: ' + newPokemonData[2]);
-    Logger.log('[SIZE DEBUG - REGISTER] newPokemonData.length: ' + newPokemonData.length);
-    Logger.log('[SIZE DEBUG - REGISTER] Size at index 57: "' + newPokemonData[57] + '"');
-    Logger.log('[SIZE DEBUG - REGISTER] Last 5 indices: [53]=' + newPokemonData[53] + ', [54]=' + newPokemonData[54] + ', [55]=' + newPokemonData[55] + ', [56]=' + newPokemonData[56] + ', [57]=' + newPokemonData[57]);
-
     // Calculate HP and VP before saving
     // Use exact indices matching database schema (single ability at index 7)
     const level = parseInt(newPokemonData[4], 10);   // Level
@@ -540,14 +527,7 @@ function registerPokemonForTrainer(trainerName, newPokemonData) {
     newPokemonData[45] = hp;              // CurrentHP
     newPokemonData[46] = vp;              // CurrentVP
 
-    // Log before writing to sheet
-    Logger.log('[SIZE DEBUG - BEFORE WRITE] Final array length: ' + newPokemonData.length);
-    Logger.log('[SIZE DEBUG - BEFORE WRITE] Size at index 57: "' + newPokemonData[57] + '"');
-    Logger.log('[SIZE DEBUG - BEFORE WRITE] Full array: ' + JSON.stringify(newPokemonData));
-
     POKEMON_DATA_SHEET.appendRow(newPokemonData);
-
-    Logger.log('[SIZE DEBUG - AFTER WRITE] Data written to sheet successfully');
 
     return {
       status: 'success',

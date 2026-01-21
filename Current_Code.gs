@@ -2926,7 +2926,8 @@ function formatPokemonData(row) {
     row[14],        // evolutionReq
     movementData,   // Movement data
     sensesData,     // Sense data
-    row[6]          // Flavor text
+    row[6],         // Flavor text
+    row[9]          // Size (NEW)
   ];
 }
 
@@ -3012,7 +3013,8 @@ function getRegisteredPokemonList() {
           row[14],      // 30: Evolution Requirement
           movementData, // 31: Movement Data
           sensesData,   // 32: Senses Data
-          row[6]        // 33: Flavor text
+          row[6],       // 33: Flavor text
+          row[9]        // 34: Size (NEW)
         ];
       })
       .sort((a, b) => a[2] - b[2]); // Sort by dex entry

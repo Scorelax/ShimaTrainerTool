@@ -100,6 +100,9 @@ class Router {
   async render(route, params) {
     const content = document.getElementById('content');
 
+    // Scroll to top on navigation
+    window.scrollTo(0, 0);
+
     // Show loading state
     content.innerHTML = '<div class="loading">Loading...</div>';
 

@@ -169,7 +169,8 @@ const REGISTERED_POKEMON_COLUMN_INDICES = {
   typematchups: 53,
   currentHD: 54,
   currentVD: 55,
-  utilityslot: 56
+  utilityslot: 56,
+  size: 57
 };
 
 // ------------------------------------------------------------------Import Pokémon information Start--------------------------------------------------
@@ -341,40 +342,41 @@ function getCompletePokemonData() {
       Logger.log('getCompletePokemonData: ' + (endTime - startTime) + ' ms');
 
       return [
-        imageUrl,       // image
-        row[2],         // name
-        row[1],         // id
-        row[19],        // level
-        row[7],         // primaryType
-        row[8],         // secondaryType
-        formatAbility(primaryAbility),  // Formatted primaryAbility
-        formatAbility(secondaryAbility),  // Formatted secondaryAbility
-        formatAbility(hiddenAbility),  // Formatted hiddenAbility
-        row[20],        // ac
-        row[21],        // hitDice
-        row[22],        // hp
-        row[23],        // vitalityDice
-        row[24],        // vp
-        row[25],        // speed
-        row[26],        // totalstats
-        row[27],        // strength
-        row[28],        // dexterity
-        row[29],        // constitution
-        row[30],        // intelligence
-        row[31],        // wisdom
-        row[32],        // charisma
-        row[33],        // savingThrows
-        row[34],        // skills
-        sanitizeMoves(row[35], 4),  // moves.starting
-        sanitizeMoves(row[36], 4),  // moves.level2
-        sanitizeMoves(row[37], 4),  // moves.level6
-        sanitizeMoves(row[38], 4),  // moves.level10
-        sanitizeMoves(row[39], 3),  // moves.level14
-        sanitizeMoves(row[40], 3),  // moves.level18
-        row[14],        // evolutionReq 
-        movementData,   // Movement data
-        sensesData,      // Sense data  
-        row[6]     // Flavor text
+        imageUrl,       // 0: image
+        row[2],         // 1: name
+        row[1],         // 2: id
+        row[19],        // 3: level
+        row[7],         // 4: primaryType
+        row[8],         // 5: secondaryType
+        formatAbility(primaryAbility),  // 6: Formatted primaryAbility
+        formatAbility(secondaryAbility),  // 7: Formatted secondaryAbility
+        formatAbility(hiddenAbility),  // 8: Formatted hiddenAbility
+        row[20],        // 9: ac
+        row[21],        // 10: hitDice
+        row[22],        // 11: hp
+        row[23],        // 12: vitalityDice
+        row[24],        // 13: vp
+        row[25],        // 14: speed
+        row[26],        // 15: totalstats
+        row[27],        // 16: strength
+        row[28],        // 17: dexterity
+        row[29],        // 18: constitution
+        row[30],        // 19: intelligence
+        row[31],        // 20: wisdom
+        row[32],        // 21: charisma
+        row[33],        // 22: savingThrows
+        row[34],        // 23: skills
+        sanitizeMoves(row[35], 4),  // 24: moves.starting
+        sanitizeMoves(row[36], 4),  // 25: moves.level2
+        sanitizeMoves(row[37], 4),  // 26: moves.level6
+        sanitizeMoves(row[38], 4),  // 27: moves.level10
+        sanitizeMoves(row[39], 3),  // 28: moves.level14
+        sanitizeMoves(row[40], 3),  // 29: moves.level18
+        row[14],        // 30: evolutionReq
+        movementData,   // 31: Movement data
+        sensesData,     // 32: Sense data
+        row[6],         // 33: Flavor text
+        row[9]          // 34: Size (NEW)
       ];
     });
     Logger.log("FORMATTEDDATA: " + JSON.stringify(formattedData, null, 2));

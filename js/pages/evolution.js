@@ -1023,6 +1023,9 @@ async function confirmEvolution() {
     // Combine evolved abilities into single pipe-separated string
     const evolvedAbilitiesString = evolvedAbilities.join('|');
 
+    // Extract Size from evolved Pokemon data (index 34 - at end of array from code.gs)
+    const evolvedSize = selectedPokemon[34] || '';
+
     // Build evolved Pokemon data array with placeholders for calculated values
     const evolvedPokemonData = [
       currentPokemon[0],           // 0: Trainer Name
@@ -1039,49 +1042,50 @@ async function confirmEvolution() {
       selectedPokemon[12],         // 11: Vitality Dice
       '',                          // 12: VP (will be calculated by server)
       movementDataString,          // 13: Speed
-      selectedPokemon[15],         // Total Stats
-      newSTR,                      // Strength
-      newDEX,                      // Dexterity
-      newCON,                      // Constitution
-      newINT,                      // Intelligence
-      newWIS,                      // Wisdom
-      newCHA,                      // Charisma
-      selectedPokemon[22],         // Saving Throws
-      combinedSkills,              // Skills
-      selectedPokemon[24],         // Starting Moves
-      selectedPokemon[25],         // Level 2 Moves
-      selectedPokemon[26],         // Level 6 Moves
-      selectedPokemon[27],         // Level 10 Moves
-      selectedPokemon[28],         // Level 14 Moves
-      selectedPokemon[29],         // Level 18 Moves
-      selectedPokemon[30],         // Evolution Requirement
-      '',                          // Initiative (calculated)
-      '',                          // Proficiency Bonus (calculated)
-      currentPokemon[32],          // Nature
-      currentPokemon[33],          // Loyalty
-      currentPokemon[34],          // STAB
-      currentPokemon[35] || '',    // Held Item
-      currentPokemon[36] || '',    // Nickname
-      currentPokemon[37] || '',    // Custom Moves
-      currentPokemon[38] || '',    // In Active Party
-      '',                          // STR modifier (calculated)
-      '',                          // DEX modifier (calculated)
-      '',                          // CON modifier (calculated)
-      '',                          // INT modifier (calculated)
-      '',                          // WIS modifier (calculated)
-      '',                          // CHA modifier (calculated)
-      currentPokemon[45] || '',    // CurrentHP
-      currentPokemon[46] || '',    // CurrentVP
-      currentPokemon[47] || '',    // CurrentAC
-      currentPokemon[48] || '',    // Comment
-      sensesDataString,            // Senses
-      currentPokemon[50] || '',    // Feats
-      currentPokemon[51] || '',    // Gear
-      selectedPokemon[33] || '',   // Flavor text
-      typematchupsString,          // Type matchups
-      currentPokemon[54] || '',    // Current HD
-      currentPokemon[55] || '',    // Current VD
-      currentPokemon[56] || ''     // Utility Slot
+      selectedPokemon[15],         // 14: Total Stats
+      newSTR,                      // 15: Strength
+      newDEX,                      // 16: Dexterity
+      newCON,                      // 17: Constitution
+      newINT,                      // 18: Intelligence
+      newWIS,                      // 19: Wisdom
+      newCHA,                      // 20: Charisma
+      selectedPokemon[22],         // 21: Saving Throws
+      combinedSkills,              // 22: Skills
+      selectedPokemon[24],         // 23: Starting Moves
+      selectedPokemon[25],         // 24: Level 2 Moves
+      selectedPokemon[26],         // 25: Level 6 Moves
+      selectedPokemon[27],         // 26: Level 10 Moves
+      selectedPokemon[28],         // 27: Level 14 Moves
+      selectedPokemon[29],         // 28: Level 18 Moves
+      selectedPokemon[30],         // 29: Evolution Requirement
+      '',                          // 30: Initiative (calculated)
+      '',                          // 31: Proficiency Bonus (calculated)
+      currentPokemon[32],          // 32: Nature
+      currentPokemon[33],          // 33: Loyalty
+      currentPokemon[34],          // 34: STAB
+      currentPokemon[35] || '',    // 35: Held Item
+      currentPokemon[36] || '',    // 36: Nickname
+      currentPokemon[37] || '',    // 37: Custom Moves
+      currentPokemon[38] || '',    // 38: In Active Party
+      '',                          // 39: STR modifier (calculated)
+      '',                          // 40: DEX modifier (calculated)
+      '',                          // 41: CON modifier (calculated)
+      '',                          // 42: INT modifier (calculated)
+      '',                          // 43: WIS modifier (calculated)
+      '',                          // 44: CHA modifier (calculated)
+      currentPokemon[45] || '',    // 45: CurrentHP
+      currentPokemon[46] || '',    // 46: CurrentVP
+      currentPokemon[47] || '',    // 47: CurrentAC
+      currentPokemon[48] || '',    // 48: Comment
+      sensesDataString,            // 49: Senses
+      currentPokemon[50] || '',    // 50: Feats
+      currentPokemon[51] || '',    // 51: Gear
+      selectedPokemon[33] || '',   // 52: Flavor text
+      typematchupsString,          // 53: Type matchups
+      currentPokemon[54] || '',    // 54: Current HD
+      currentPokemon[55] || '',    // 55: Current VD
+      currentPokemon[56] || '',    // 56: Utility Slot
+      evolvedSize                  // 57: Size (NEW - read from index 34 of completePokemonData)
     ];
 
     // Log what we're sending to the server

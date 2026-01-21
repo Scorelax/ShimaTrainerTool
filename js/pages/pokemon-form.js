@@ -606,6 +606,9 @@ async function handleFormSubmit() {
     const typematchupsString = typeResponse.data ?
       typeResponse.data.join(', ') : '';
 
+    // Extract Size from selectedPokemonData (index 34 - at end of array from code.gs)
+    const pokemonSize = selectedPokemonData[34] || '';
+
     // Build new Pokemon data array matching exact database schema
     const newPokemonData = [
       trainerData[1],              // 0: Trainer Name
@@ -664,7 +667,8 @@ async function handleFormSubmit() {
       typematchupsString,          // 53: Type matchups
       '',                          // 54: Current HD
       '',                          // 55: Current VD
-      ''                           // 56: Utility Slot
+      '',                          // 56: Utility Slot
+      pokemonSize                  // 57: Size (NEW - read from index 34 of completePokemonData)
     ];
 
     console.log('[Pokemon Form] newPokemonData array:');

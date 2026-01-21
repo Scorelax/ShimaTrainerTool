@@ -467,6 +467,16 @@ export function renderPokemonCard(pokemonName) {
           text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
+        .info-item-row {
+          display: flex;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .info-item-half {
+          flex: 1;
+          min-width: 0;
+        }
+
         .info-item-label {
           font-weight: 900;
           text-transform: uppercase;
@@ -1378,17 +1388,19 @@ export function renderPokemonCard(pokemonName) {
           </div>
 
           <div class="trainer-info-list">
-            <div class="info-item">
-              <span class="info-item-label">Level:</span>
-              <span class="info-item-value" id="pokemonLevel">${level}</span>
+            <div class="info-item-row">
+              <div class="info-item info-item-half">
+                <span class="info-item-label">Level:</span>
+                <span class="info-item-value" id="pokemonLevel">${level}</span>
+              </div>
+              <div class="info-item info-item-half">
+                <span class="info-item-label">Size:</span>
+                <span class="info-item-value" id="pokemonSize">${size}</span>
+              </div>
             </div>
             <div class="info-item">
               <span class="info-item-label">Typing:</span>
               <span class="info-item-value" id="pokemonTyping">${typingButtons}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-item-label">Size:</span>
-              <span class="info-item-value" id="pokemonSize">${size}</span>
             </div>
             <div class="info-item">
               <span class="info-item-label">Saving Throw(s):</span>

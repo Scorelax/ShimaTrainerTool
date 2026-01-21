@@ -609,6 +609,8 @@ async function handleFormSubmit() {
     // Extract Size from selectedPokemonData (index 34 - at end of array from code.gs)
     const pokemonSize = selectedPokemonData[34] || '';
 
+    console.log('[SIZE DEBUG] ===== FULL selectedPokemonData array =====');
+    console.log(selectedPokemonData);
     console.log('[SIZE DEBUG] selectedPokemonData length:', selectedPokemonData.length);
     console.log('[SIZE DEBUG] selectedPokemonData[34] (Size):', pokemonSize);
     console.log('[SIZE DEBUG] Last 5 indices of selectedPokemonData:', {

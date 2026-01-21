@@ -77,6 +77,9 @@ export function renderPokemonCard(pokemonName) {
   // Parse held items (comma-separated)
   const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
+  // Size field (index 57)
+  const size = pokemonData[57] || 'Unknown';
+
   // Type chart data for weaknesses, resistances, immunities (index 53)
   const typeChartValues = pokemonData[53] ? pokemonData[53].split(',').map(Number) : [];
   const typeNames = [
@@ -1382,6 +1385,10 @@ export function renderPokemonCard(pokemonName) {
             <div class="info-item">
               <span class="info-item-label">Typing:</span>
               <span class="info-item-value" id="pokemonTyping">${typingButtons}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-item-label">Size:</span>
+              <span class="info-item-value" id="pokemonSize">${size}</span>
             </div>
             <div class="info-item">
               <span class="info-item-label">Saving Throw(s):</span>

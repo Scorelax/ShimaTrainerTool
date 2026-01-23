@@ -65,7 +65,9 @@ const TRAINER_COLUMN_INDICES = {
   elementalSynergyCharges: 43,
   masterTrainerCharges: 44,
   battleDice: 45,
-  maxPotential: 46
+  maxPotential: 46,
+  currentHD: 47,
+  currentVD: 48
 };
 const POKEMON_COLUMN_INDICES = {
   trainername: 0,

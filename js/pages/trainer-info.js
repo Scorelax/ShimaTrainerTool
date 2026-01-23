@@ -2301,7 +2301,49 @@ export function attachTrainerInfoListeners() {
   }
 
   // Helper function to handle short rest (shows Pokemon selection popup)
+  // Short rest - restores trainer buff charges only (no HP/VP restoration)
   async function handleShortRest() {
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) {
+      showError('Trainer data not found.');
+      return;
+    }
+
+    const trainerData = JSON.parse(trainerDataRaw);
+    const trainerLevel = parseInt(trainerData[2], 10);
+
+    // Refill all buff charges to max (excluding Rapid Orders - index 41)
+    trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
+    trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
+    trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
+    trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+
+    // Refill battle dice for Ace Trainer (index 45)
+    const trainerPath = trainerData[25] || '';
+    if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
+      const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
+      const maxBattleDice = 1 + wisModifier;
+      trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
+    }
+
+    // Update session storage IMMEDIATELY
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Refresh the popup to show updated charges
+    showTrainerSkillsPopup();
+
+    // Show success message
+    showSuccess('Short rest completed! Buff charges refilled.');
+
+    // Update trainer in database (non-blocking)
+    TrainerAPI.update(trainerData).catch(error => {
+      console.error('Error updating trainer data:', error);
+      showError('Failed to save short rest to database');
+    });
+  }
+
+  // Helper function to handle long rest (restores trainer HP/VP, buff charges, half HD/VD dice, and ONE active Pokemon HP/VP)
+  async function handleLongRest() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       showError('Trainer data not found.');
@@ -2338,93 +2380,8 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    // Show Pokemon selection popup
-    showShortRestPokemonSelection(activePokemon);
-  }
-
-  // Helper function to handle long rest (restores trainer HP/VP, buff charges, and active Pokemon HP/VP)
-  async function handleLongRest() {
-    const trainerDataRaw = sessionStorage.getItem('trainerData');
-    if (!trainerDataRaw) {
-      showError('Trainer data not found.');
-      return;
-    }
-
-    const trainerData = JSON.parse(trainerDataRaw);
-    const trainerLevel = parseInt(trainerData[2], 10);
-    const trainerName = trainerData[1];
-
-    // Restore trainer HP and VP to max
-    const maxHP = parseInt(trainerData[11], 10);
-    const maxVP = parseInt(trainerData[12], 10);
-    trainerData[34] = maxHP; // currentHP
-    trainerData[35] = maxVP; // currentVP
-
-    // Refill all buff charges to max (excluding Rapid Orders - index 41)
-    trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
-    trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
-    trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
-    trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
-
-    // Refill battle dice for Ace Trainer (index 45)
-    const trainerPath = trainerData[25] || '';
-    if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
-      const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
-      const maxBattleDice = 1 + wisModifier;
-      trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
-    }
-
-    // Update session storage IMMEDIATELY
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-
-    // Refresh the popup to show updated charges IMMEDIATELY
-    showTrainerSkillsPopup();
-
-    // Show success message
-    showSuccess('Long rest completed! Trainer and active Pokemon fully restored, buff charges refilled.');
-
-    // Update trainer in database (non-blocking)
-    TrainerAPI.update(trainerData).catch(error => {
-      console.error('Error updating trainer data:', error);
-      showError('Failed to save long rest to database');
-    });
-
-    // Restore active Pokemon HP/VP in background
-    restoreActivePokemonHP(trainerName);
-  }
-
-  // Helper function to restore all active Pokemon HP/VP to full
-  async function restoreActivePokemonHP(trainerName) {
-    try {
-      // Get all Pokemon for this trainer from session storage
-      const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
-
-      for (const key of allPokemonKeys) {
-        const pokemonDataStr = sessionStorage.getItem(key);
-        if (!pokemonDataStr) continue;
-
-        const pokemonData = JSON.parse(pokemonDataStr);
-
-        // Check if this Pokemon belongs to current trainer and is in active party
-        if (pokemonData[0] === trainerName && pokemonData[38]) { // trainername at 0, isInActiveParty at 38
-          // Restore HP and VP to max
-          const maxHP = parseInt(pokemonData[10], 10); // HP at index 10
-          const maxVP = parseInt(pokemonData[12], 10); // VP at index 12
-          pokemonData[45] = maxHP; // currentHP at index 45
-          pokemonData[46] = maxVP; // currentVP at index 46
-
-          // Update session storage
-          sessionStorage.setItem(key, JSON.stringify(pokemonData));
-
-          // Update database in background
-          PokemonAPI.update(pokemonData).catch(error => {
-            console.error(`Error updating Pokemon ${pokemonData[2]}:`, error);
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error restoring active Pokemon HP:', error);
-    }
+    // Show Pokemon selection popup for long rest
+    showLongRestPokemonSelection(activePokemon);
   }
 
   // Helper function to show Trainer Buffs popup
@@ -3728,19 +3685,29 @@ async function saveTrainerPath(trainerPath) {
 // SHORT REST POKEMON SELECTION FUNCTIONS
 // ============================================================================
 
-function showShortRestPokemonSelection(activePokemon) {
+// Show Pokemon selection popup for long rest
+function showLongRestPokemonSelection(activePokemon) {
   const pokemonGrid = document.querySelector('.pokemon-selection-grid');
   const completeButton = document.getElementById('completeShortRestButton');
+  const popupTitle = document.querySelector('#shortRestPokemonSelectionPopup .popup-title');
 
   pokemonGrid.innerHTML = '';
   completeButton.disabled = true;
 
+  // Update popup title and button text for long rest
+  if (popupTitle) {
+    popupTitle.textContent = 'Long Rest - Select Pokemon';
+  }
+  if (completeButton) {
+    completeButton.textContent = 'Complete Long Rest';
+  }
+
   // Create selection item for each active Pokemon
   activePokemon.forEach(pokemon => {
-    const pokemonName = pokemon[1]; // Name at index 1
-    const currentHP = parseInt(pokemon[45], 10); // currentHP at index 45
+    const pokemonName = pokemon[2]; // Name at index 2
+    const currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10); // currentHP at index 45, fallback to max
     const maxHP = parseInt(pokemon[10], 10); // HP at index 10
-    const currentVP = parseInt(pokemon[46], 10); // currentVP at index 46
+    const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10); // currentVP at index 46, fallback to max
     const maxVP = parseInt(pokemon[12], 10); // VP at index 12
 
     const item = document.createElement('div');
@@ -3750,7 +3717,7 @@ function showShortRestPokemonSelection(activePokemon) {
       <div style="font-size: 0.85rem; color: #666;">HP: ${currentHP}/${maxHP}</div>
       <div style="font-size: 0.85rem; color: #666;">VP: ${currentVP}/${maxVP}</div>
     `;
-    item.onclick = () => selectShortRestPokemon(pokemon);
+    item.onclick = () => selectLongRestPokemon(pokemon);
     pokemonGrid.appendChild(item);
   });
 
@@ -3760,7 +3727,7 @@ function showShortRestPokemonSelection(activePokemon) {
   document.getElementById('trainerBuffsPopup')?.classList.remove('active');
 }
 
-function selectShortRestPokemon(pokemon) {
+function selectLongRestPokemon(pokemon) {
   const completeButton = document.getElementById('completeShortRestButton');
 
   // Remove selected class from all items
@@ -3769,7 +3736,7 @@ function selectShortRestPokemon(pokemon) {
   });
 
   // Add selected class to clicked item (find by Pokemon name)
-  const pokemonName = pokemon[1];
+  const pokemonName = pokemon[2]; // Name at index 2
   document.querySelectorAll('.pokemon-selection-grid .trainer-path-item').forEach(item => {
     if (item.querySelector('div').textContent === pokemonName) {
       item.classList.add('selected');
@@ -3778,10 +3745,11 @@ function selectShortRestPokemon(pokemon) {
 
   // Enable complete button
   completeButton.disabled = false;
-  completeButton.onclick = () => completeShortRest(pokemon);
+  completeButton.onclick = () => completeLongRest(pokemon);
 }
 
-async function completeShortRest(selectedPokemon) {
+// Complete long rest - restores trainer HP/VP, buffs, half HD/VD dice, and one Pokemon
+async function completeLongRest(selectedPokemon) {
   if (!selectedPokemon) return;
 
   const trainerDataRaw = sessionStorage.getItem('trainerData');
@@ -3791,6 +3759,7 @@ async function completeShortRest(selectedPokemon) {
   }
 
   const trainerData = JSON.parse(trainerDataRaw);
+  const trainerLevel = parseInt(trainerData[2], 10);
 
   // Restore trainer HP and VP to max
   const maxHP = parseInt(trainerData[11], 10);
@@ -3798,11 +3767,38 @@ async function completeShortRest(selectedPokemon) {
   trainerData[34] = maxHP; // currentHP
   trainerData[35] = maxVP; // currentVP
 
+  // Refill all buff charges to max (excluding Rapid Orders - index 41)
+  trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
+  trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
+  trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
+  trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+
+  // Refill battle dice for Ace Trainer (index 45)
+  const trainerPath = trainerData[25] || '';
+  if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
+    const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
+    const maxBattleDice = 1 + wisModifier;
+    trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
+  }
+
+  // Restore half of HD dice and VD dice (indices 47 and 48)
+  // HD max is at index 3 (hitDice), VD max is at index 4 (vitalityDice)
+  const maxHD = parseInt(trainerData[3], 10) || 0;
+  const maxVD = parseInt(trainerData[4], 10) || 0;
+  const currentHD = parseInt(trainerData[47], 10) || 0;
+  const currentVD = parseInt(trainerData[48], 10) || 0;
+
+  // Restore half of max dice (rounded down), capped at max
+  const hdToRestore = Math.floor(maxHD / 2);
+  const vdToRestore = Math.floor(maxVD / 2);
+  trainerData[47] = Math.min(currentHD + hdToRestore, maxHD);
+  trainerData[48] = Math.min(currentVD + vdToRestore, maxVD);
+
   // Update session storage IMMEDIATELY
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
   // Restore selected Pokemon HP and VP
-  const pokemonName = selectedPokemon[1];
+  const pokemonName = selectedPokemon[2]; // Name at index 2
   const pokemonMaxHP = parseInt(selectedPokemon[10], 10);
   const pokemonMaxVP = parseInt(selectedPokemon[12], 10);
   selectedPokemon[45] = pokemonMaxHP; // currentHP
@@ -3821,16 +3817,18 @@ async function completeShortRest(selectedPokemon) {
   }, 100);
 
   // Show success message
-  showSuccess(`Short rest completed! Trainer and ${pokemonName} HP/VP fully restored.`);
+  const hdRestored = trainerData[47] - currentHD;
+  const vdRestored = trainerData[48] - currentVD;
+  showSuccess(`Long rest completed! Trainer and ${pokemonName} fully restored. HD +${hdRestored}, VD +${vdRestored}.`);
 
   // Update database in background (non-blocking)
   try {
     await TrainerAPI.update(trainerData);
     const { PokemonAPI } = await import('../api.js');
     await PokemonAPI.update(selectedPokemon);
-    console.log('Short rest saved to backend successfully');
+    console.log('Long rest saved to backend successfully');
   } catch (error) {
-    console.error('Error saving short rest to backend:', error);
+    console.error('Error saving long rest to backend:', error);
   }
 }
 

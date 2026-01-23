@@ -1,0 +1,20 @@
+{
+  "name": "Pokemon D&D Trainer Tool",
+  "short_name": "Pokemon D&D",
+  "description": "Pokemon D&D Trainer Management Tool",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#FF6B6B",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/Pokeball.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "utilities"],
+  "lang": "en"
+}

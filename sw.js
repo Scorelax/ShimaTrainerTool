@@ -1,17 +1,17 @@
 // Service Worker for Pokemon D&D Trainer Tool
-const CACHE_NAME = 'pokemon-dnd-v1';
+const CACHE_NAME = 'pokemon-dnd-v2';
 
-// Files to cache for offline use
+// Files to cache for offline use (relative paths for subdirectory hosting)
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/styles.css',
-  '/js/main.js',
-  '/js/api.js',
-  '/js/router.js',
-  '/assets/Pokeball.png',
-  '/assets/Grey Pokeball.png',
-  '/assets/background.jpg'
+  './',
+  './index.html',
+  './css/styles.css',
+  './js/main.js',
+  './js/api.js',
+  './js/router.js',
+  './assets/Pokeball.png',
+  './assets/Grey Pokeball.png',
+  './assets/background.jpg'
 ];
 
 // Install event - cache static assets
@@ -92,7 +92,7 @@ self.addEventListener('fetch', (event) => {
           .catch(() => {
             // Network failed, return offline fallback if available
             if (event.request.mode === 'navigate') {
-              return caches.match('/index.html');
+              return caches.match('./index.html');
             }
             return null;
           });

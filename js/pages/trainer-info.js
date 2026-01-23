@@ -246,20 +246,22 @@ export function renderTrainerInfo() {
         }
 
         .info-button {
-          padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(0.7rem, 1.5vw, 1rem);
+          padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.3rem, 0.8vw, 0.5rem);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
-          border-radius: clamp(8px, 1.5vw, 12px);
+          border: clamp(2px, 0.3vw, 2px) solid #FFDE00;
+          border-radius: clamp(6px, 1vw, 8px);
           color: white;
-          font-size: clamp(0.75rem, 1.5vw, 0.9rem);
-          white-space: nowrap;
-          font-weight: 900;
+          font-size: clamp(0.6rem, 1.2vw, 0.75rem);
+          font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: clamp(0.2px, 0.15vw, 0.4px);
+          letter-spacing: 0.2px;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-          text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+          text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          min-width: 0;
         }
 
         .info-button:hover {
@@ -1482,8 +1484,8 @@ export function renderTrainerInfo() {
           }
 
           .info-button {
-            font-size: clamp(0.75rem, 1.6vw, 0.9rem);
-            padding: clamp(0.5rem, 1.2vh, 0.7rem) clamp(0.6rem, 1.5vw, 0.9rem);
+            font-size: clamp(0.55rem, 1.1vw, 0.7rem);
+            padding: clamp(0.35rem, 0.8vh, 0.5rem) clamp(0.25rem, 0.6vw, 0.4rem);
           }
         }
 

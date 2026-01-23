@@ -2196,11 +2196,14 @@ export function attachPokemonCardListeners() {
     const newHp = Math.min(currentHp + hpChange, maxHp);
     const newVp = Math.min(currentVp + vpChange, maxVp);
 
-    // Update UI
+    // Update UI (combat popup)
     document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
     document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
-    document.getElementById('currentHpValue').textContent = newHp;
-    document.getElementById('currentVpValue').textContent = newVp;
+    // Update Battle Page stats (may not exist if on Info Page)
+    const currentHpEl = document.getElementById('currentHpValue');
+    const currentVpEl = document.getElementById('currentVpValue');
+    if (currentHpEl) currentHpEl.textContent = newHp;
+    if (currentVpEl) currentVpEl.textContent = newVp;
 
     // Save to sessionStorage
     pokemonData[45] = newHp;
@@ -2250,11 +2253,14 @@ export function attachPokemonCardListeners() {
 
     newHp = Math.max(newHp - (hpChange > 0 && vpChange === 0 ? hpChange : 0), 0);
 
-    // Update UI
+    // Update UI (combat popup)
     document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
     document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
-    document.getElementById('currentHpValue').textContent = newHp;
-    document.getElementById('currentVpValue').textContent = newVp;
+    // Update Battle Page stats (may not exist if on Info Page)
+    const currentHpEl = document.getElementById('currentHpValue');
+    const currentVpEl = document.getElementById('currentVpValue');
+    if (currentHpEl) currentHpEl.textContent = newHp;
+    if (currentVpEl) currentVpEl.textContent = newVp;
 
     // Save to sessionStorage
     pokemonData[45] = newHp;
@@ -2295,11 +2301,14 @@ export function attachPokemonCardListeners() {
     const [, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
     const [, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
 
-    // Update UI
+    // Update UI (combat popup)
     document.getElementById('combatCurrentHP').textContent = `${maxHp} / ${maxHp}`;
     document.getElementById('combatCurrentVP').textContent = `${maxVp} / ${maxVp}`;
-    document.getElementById('currentHpValue').textContent = maxHp;
-    document.getElementById('currentVpValue').textContent = maxVp;
+    // Update Battle Page stats (may not exist if on Info Page)
+    const currentHpEl = document.getElementById('currentHpValue');
+    const currentVpEl = document.getElementById('currentVpValue');
+    if (currentHpEl) currentHpEl.textContent = maxHp;
+    if (currentVpEl) currentVpEl.textContent = maxVp;
 
     // Save to sessionStorage
     pokemonData[45] = maxHp;
@@ -2828,7 +2837,10 @@ function showMoveDetails(moveName) {
 
       // Confirmation Yes button
       document.getElementById('confirmUseMoveYes').addEventListener('click', async () => {
-        const vpCost = parseInt(move[4]) || 0;
+        // Get VP cost from the button's dataset (updated each time a move is shown)
+        // NOT from the closure variable which only captures the first move
+        const useMoveBtn = document.getElementById('useMoveButton');
+        const vpCost = parseInt(useMoveBtn.dataset.vpCost) || 0;
         const currentVpText = document.getElementById('combatCurrentVP')?.textContent || '0 / 0';
         const currentHpText = document.getElementById('combatCurrentHP')?.textContent || '0 / 0';
         const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
@@ -2846,11 +2858,14 @@ function showMoveDetails(moveName) {
           vpOverflow = true;
         }
 
-        // Update UI
+        // Update UI (combat popup)
         document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
-        document.getElementById('currentVpValue').textContent = newVp;
         document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
-        document.getElementById('currentHpValue').textContent = newHp;
+        // Update Battle Page stats (may not exist if on Info Page)
+        const currentVpEl = document.getElementById('currentVpValue');
+        const currentHpEl = document.getElementById('currentHpValue');
+        if (currentVpEl) currentVpEl.textContent = newVp;
+        if (currentHpEl) currentHpEl.textContent = newHp;
 
         // Save to sessionStorage
         pokemonData[46] = newVp;

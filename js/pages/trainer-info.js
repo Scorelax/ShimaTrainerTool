@@ -3771,15 +3771,34 @@ async function completeShortRestHealing() {
 
   // Get CON modifier for HD healing
   const conModifier = parseInt(trainerData[29], 10) || 0;
-  // Get WIS modifier for VD healing (or use another stat if preferred)
+  // Get WIS modifier for VD healing
   const wisModifier = parseInt(trainerData[31], 10) || 0;
 
-  // Calculate healing: each HD heals 1d8 + CON mod (we'll use average of 4.5 + CON)
-  // Each VD heals 1d8 + WIS mod (we'll use average of 4.5 + WIS)
-  // For now, let's just prompt for the roll result or use a simple formula
-  // Using average roll (4.5 rounded to 5) + modifier per die
-  const hpHealed = hdToUse > 0 ? hdToUse * (5 + conModifier) : 0;
-  const vpHealed = vdToUse > 0 ? vdToUse * (5 + wisModifier) : 0;
+  // Roll dice for healing
+  // Helper function to roll a d8
+  const rollD8 = () => Math.floor(Math.random() * 8) + 1;
+
+  // Roll HD dice and calculate HP healing
+  let hpHealed = 0;
+  const hdRolls = [];
+  for (let i = 0; i < hdToUse; i++) {
+    const roll = rollD8();
+    hdRolls.push(roll);
+    hpHealed += roll + conModifier;
+  }
+
+  // Roll VD dice and calculate VP healing
+  let vpHealed = 0;
+  const vdRolls = [];
+  for (let i = 0; i < vdToUse; i++) {
+    const roll = rollD8();
+    vdRolls.push(roll);
+    vpHealed += roll + wisModifier;
+  }
+
+  // Ensure healing is at least 0 (in case of negative modifiers)
+  hpHealed = Math.max(hpHealed, 0);
+  vpHealed = Math.max(vpHealed, 0);
 
   // Apply healing (capped at max)
   const newHP = Math.min(currentHP + hpHealed, maxHP);
@@ -3802,10 +3821,17 @@ async function completeShortRestHealing() {
     showTrainerSkillsPopup();
   }, 100);
 
-  // Show success message
+  // Build success message with roll details
   const actualHpHealed = newHP - currentHP;
   const actualVpHealed = newVP - currentVP;
-  showSuccess(`Short rest completed! Healed ${actualHpHealed} HP and ${actualVpHealed} VP.`);
+  let message = 'Short rest completed!';
+  if (hdToUse > 0) {
+    message += ` HD rolls: [${hdRolls.join(', ')}] + ${conModifier} CON = ${hpHealed} (healed ${actualHpHealed} HP).`;
+  }
+  if (vdToUse > 0) {
+    message += ` VD rolls: [${vdRolls.join(', ')}] + ${wisModifier} WIS = ${vpHealed} (healed ${actualVpHealed} VP).`;
+  }
+  showSuccess(message);
 
   // Update database in background
   TrainerAPI.update(trainerData).catch(error => {

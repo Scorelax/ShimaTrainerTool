@@ -2000,6 +2000,46 @@ export function renderTrainerInfo() {
         </div>
       </div>
 
+      <div class="popup-overlay" id="shortRestHealingPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Short Rest - Use Hit Dice</div>
+            <button class="popup-close" id="closeShortRestHealing">×</button>
+          </div>
+          <div class="popup-body">
+            <div style="margin-bottom: 1rem;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span>Current HP:</span>
+                <span id="shortRestCurrentHP">0 / 0</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Current VP:</span>
+                <span id="shortRestCurrentVP">0 / 0</span>
+              </div>
+            </div>
+            <div style="border-top: 1px solid #ddd; padding-top: 1rem; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <label for="hdToUse" style="font-weight: 600;">HD to use:</label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="number" id="hdToUse" min="0" value="0" style="width: 60px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; text-align: center;">
+                  <span id="hdAvailable">/ 0 available</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <label for="vdToUse" style="font-weight: 600;">VD to use:</label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="number" id="vdToUse" min="0" value="0" style="width: 60px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; text-align: center;">
+                  <span id="vdAvailable">/ 0 available</span>
+                </div>
+              </div>
+            </div>
+            <div class="popup-footer">
+              <button id="completeShortRestHealingButton" class="popup-button">Complete Short Rest</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="popup-overlay" id="gearPopup">
         <div class="popup-content">
           <div class="popup-header">
@@ -2301,7 +2341,7 @@ export function attachTrainerInfoListeners() {
   }
 
   // Helper function to handle short rest (shows Pokemon selection popup)
-  // Short rest - restores trainer buff charges only (no HP/VP restoration)
+  // Short rest - allows player to spend HD/VD dice to heal HP/VP
   async function handleShortRest() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
@@ -2310,36 +2350,19 @@ export function attachTrainerInfoListeners() {
     }
 
     const trainerData = JSON.parse(trainerDataRaw);
-    const trainerLevel = parseInt(trainerData[2], 10);
 
-    // Refill all buff charges to max (excluding Rapid Orders - index 41)
-    trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
-    trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
-    trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
-    trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+    // Get current and max values
+    const currentHD = parseInt(trainerData[47], 10) || 0;
+    const currentVD = parseInt(trainerData[48], 10) || 0;
+    const maxHD = parseInt(trainerData[3], 10) || 0;
+    const maxVD = parseInt(trainerData[4], 10) || 0;
+    const currentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
+    const currentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
+    const maxHP = parseInt(trainerData[11], 10);
+    const maxVP = parseInt(trainerData[12], 10);
 
-    // Refill battle dice for Ace Trainer (index 45)
-    const trainerPath = trainerData[25] || '';
-    if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
-      const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
-      const maxBattleDice = 1 + wisModifier;
-      trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
-    }
-
-    // Update session storage IMMEDIATELY
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-
-    // Refresh the popup to show updated charges
-    showTrainerSkillsPopup();
-
-    // Show success message
-    showSuccess('Short rest completed! Buff charges refilled.');
-
-    // Update trainer in database (non-blocking)
-    TrainerAPI.update(trainerData).catch(error => {
-      console.error('Error updating trainer data:', error);
-      showError('Failed to save short rest to database');
-    });
+    // Show short rest popup with HD/VD input
+    showShortRestPopup(currentHD, maxHD, currentVD, maxVD, currentHP, maxHP, currentVP, maxVP);
   }
 
   // Helper function to handle long rest (restores trainer HP/VP, buff charges, half HD/VD dice, and ONE active Pokemon HP/VP)
@@ -3153,6 +3176,8 @@ export function attachTrainerInfoListeners() {
   document.getElementById('closeSpecializationSelection')?.addEventListener('click', () => closePopup('specializationSelectionPopup'));
   document.getElementById('closeTrainerPathSelection')?.addEventListener('click', () => closePopup('trainerPathSelectionPopup'));
   document.getElementById('closeShortRestPokemonSelection')?.addEventListener('click', () => closePopup('shortRestPokemonSelectionPopup'));
+  document.getElementById('closeShortRestHealing')?.addEventListener('click', () => closePopup('shortRestHealingPopup'));
+  document.getElementById('completeShortRestHealingButton')?.addEventListener('click', () => completeShortRestHealing());
 
   // Gear button
   document.getElementById('gearButton')?.addEventListener('click', () => {
@@ -3682,8 +3707,112 @@ async function saveTrainerPath(trainerPath) {
 }
 
 // ============================================================================
-// SHORT REST POKEMON SELECTION FUNCTIONS
+// SHORT REST AND LONG REST FUNCTIONS
 // ============================================================================
+
+// Show short rest popup for HD/VD healing
+function showShortRestPopup(currentHD, maxHD, currentVD, maxVD, currentHP, maxHP, currentVP, maxVP) {
+  // Update display values
+  document.getElementById('shortRestCurrentHP').textContent = `${currentHP} / ${maxHP}`;
+  document.getElementById('shortRestCurrentVP').textContent = `${currentVP} / ${maxVP}`;
+  document.getElementById('hdAvailable').textContent = `/ ${currentHD} available`;
+  document.getElementById('vdAvailable').textContent = `/ ${currentVD} available`;
+
+  // Reset input fields
+  const hdInput = document.getElementById('hdToUse');
+  const vdInput = document.getElementById('vdToUse');
+  hdInput.value = 0;
+  hdInput.max = currentHD;
+  vdInput.value = 0;
+  vdInput.max = currentVD;
+
+  // Show the popup
+  document.getElementById('shortRestHealingPopup')?.classList.add('active');
+  // Close the trainer buffs popup
+  document.getElementById('trainerBuffsPopup')?.classList.remove('active');
+}
+
+// Complete short rest - use HD/VD dice to heal
+async function completeShortRestHealing() {
+  const trainerDataRaw = sessionStorage.getItem('trainerData');
+  if (!trainerDataRaw) {
+    showError('Trainer data not found.');
+    return;
+  }
+
+  const trainerData = JSON.parse(trainerDataRaw);
+
+  const hdToUse = parseInt(document.getElementById('hdToUse').value, 10) || 0;
+  const vdToUse = parseInt(document.getElementById('vdToUse').value, 10) || 0;
+
+  if (hdToUse === 0 && vdToUse === 0) {
+    showError('Please enter at least 1 HD or VD to use.');
+    return;
+  }
+
+  const currentHD = parseInt(trainerData[47], 10) || 0;
+  const currentVD = parseInt(trainerData[48], 10) || 0;
+
+  // Validate available dice
+  if (hdToUse > currentHD) {
+    showError(`Not enough HD available. You have ${currentHD}.`);
+    return;
+  }
+  if (vdToUse > currentVD) {
+    showError(`Not enough VD available. You have ${currentVD}.`);
+    return;
+  }
+
+  // Get current and max HP/VP
+  const currentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
+  const currentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
+  const maxHP = parseInt(trainerData[11], 10);
+  const maxVP = parseInt(trainerData[12], 10);
+
+  // Get CON modifier for HD healing
+  const conModifier = parseInt(trainerData[29], 10) || 0;
+  // Get WIS modifier for VD healing (or use another stat if preferred)
+  const wisModifier = parseInt(trainerData[31], 10) || 0;
+
+  // Calculate healing: each HD heals 1d8 + CON mod (we'll use average of 4.5 + CON)
+  // Each VD heals 1d8 + WIS mod (we'll use average of 4.5 + WIS)
+  // For now, let's just prompt for the roll result or use a simple formula
+  // Using average roll (4.5 rounded to 5) + modifier per die
+  const hpHealed = hdToUse > 0 ? hdToUse * (5 + conModifier) : 0;
+  const vpHealed = vdToUse > 0 ? vdToUse * (5 + wisModifier) : 0;
+
+  // Apply healing (capped at max)
+  const newHP = Math.min(currentHP + hpHealed, maxHP);
+  const newVP = Math.min(currentVP + vpHealed, maxVP);
+
+  // Subtract used dice
+  trainerData[47] = currentHD - hdToUse;
+  trainerData[48] = currentVD - vdToUse;
+  trainerData[34] = newHP;
+  trainerData[35] = newVP;
+
+  // Update session storage
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+  // Close popup
+  document.getElementById('shortRestHealingPopup')?.classList.remove('active');
+
+  // Reopen trainer buffs popup to show updated values
+  setTimeout(() => {
+    showTrainerSkillsPopup();
+  }, 100);
+
+  // Show success message
+  const actualHpHealed = newHP - currentHP;
+  const actualVpHealed = newVP - currentVP;
+  showSuccess(`Short rest completed! Healed ${actualHpHealed} HP and ${actualVpHealed} VP.`);
+
+  // Update database in background
+  TrainerAPI.update(trainerData).catch(error => {
+    console.error('Error updating trainer data:', error);
+    showError('Failed to save short rest to database');
+  });
+}
 
 // Show Pokemon selection popup for long rest
 function showLongRestPokemonSelection(activePokemon) {

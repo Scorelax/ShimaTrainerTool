@@ -1489,21 +1489,21 @@ export function renderTrainerInfo() {
           }
         }
 
-        /* Small mobile phones - compact 2-column layout with 3-column grids */
+        /* Small mobile phones - even more compact 2 columns */
         @media (max-width: 480px) {
           .trainer-info-page {
-            grid-template-columns: 28% 1fr;
+            grid-template-columns: minmax(42%, 48%) 1fr;
             gap: clamp(0.5rem, 1.5vw, 1rem);
             padding: clamp(0.75rem, 1.5vh, 1.25rem) clamp(0.4rem, 0.8vw, 0.75rem);
           }
 
           .ability-container {
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: clamp(0.3rem, 1vw, 0.5rem);
           }
 
           .skills-grid {
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: clamp(0.3rem, 1vw, 0.5rem);
           }
 
@@ -1515,48 +1515,38 @@ export function renderTrainerInfo() {
           .stat-main-container {
             gap: clamp(0.5rem, 2vw, 1rem);
           }
-
-          .info-item {
-            font-size: clamp(0.7rem, 1.6vw, 0.9rem);
-            padding: clamp(0.25rem, 0.6vh, 0.4rem) clamp(0.4rem, 1vw, 0.6rem);
-          }
-
-          .info-button {
-            font-size: clamp(0.5rem, 1vw, 0.65rem);
-            padding: clamp(0.3rem, 0.7vh, 0.45rem) clamp(0.2rem, 0.5vw, 0.35rem);
-          }
         }
 
-        /* Very small screens (360px and below) - keep 2-column layout with 3-column grids */
-        @media (max-width: 380px) {
+        /* Very small screens - keep 2 columns, just more compact */
+        @media (max-width: 360px) {
           .trainer-info-page {
-            grid-template-columns: 25% 1fr;
-            gap: clamp(0.3rem, 0.8vw, 0.6rem);
-            padding: clamp(0.5rem, 1vh, 0.75rem) clamp(0.25rem, 0.5vw, 0.4rem);
+            grid-template-columns: 30% 1fr;
+            gap: clamp(0.4rem, 1vw, 0.75rem);
+            padding: clamp(0.5rem, 1vh, 1rem) clamp(0.3rem, 0.6vw, 0.5rem);
           }
 
           .ability-container {
-            grid-template-columns: repeat(3, 1fr);
-            gap: clamp(0.15rem, 0.5vw, 0.3rem);
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.2rem, 0.8vw, 0.4rem);
           }
 
           .skills-grid {
-            grid-template-columns: repeat(3, 1fr);
-            gap: clamp(0.15rem, 0.5vw, 0.3rem);
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.2rem, 0.8vw, 0.4rem);
           }
 
           .info-item {
-            font-size: clamp(0.6rem, 1.4vw, 0.8rem);
-            padding: clamp(0.15rem, 0.4vh, 0.3rem) clamp(0.25rem, 0.6vw, 0.4rem);
+            font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+            padding: clamp(0.2rem, 0.5vh, 0.35rem) clamp(0.3rem, 0.8vw, 0.5rem);
           }
 
           .info-button {
-            font-size: clamp(0.45rem, 0.9vw, 0.55rem);
-            padding: clamp(0.2rem, 0.5vh, 0.35rem) clamp(0.15rem, 0.4vw, 0.25rem);
+            font-size: clamp(0.5rem, 1vw, 0.6rem);
+            padding: clamp(0.25rem, 0.6vh, 0.4rem) clamp(0.2rem, 0.5vw, 0.35rem);
           }
 
           .stat-main-container {
-            gap: clamp(0.2rem, 0.6vw, 0.4rem);
+            gap: clamp(0.3rem, 1vw, 0.6rem);
           }
         }
 

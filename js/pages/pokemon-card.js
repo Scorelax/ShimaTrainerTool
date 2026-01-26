@@ -372,11 +372,11 @@ export function renderPokemonCard(pokemonName) {
           transform: translateX(-50%);
           color: white;
           margin: 0;
-          padding: 0 clamp(75px, 16vw, 110px);
-          font-size: clamp(2rem, 5vw, 3rem);
+          padding: 0 clamp(50px, 12vw, 110px);
+          font-size: clamp(1rem, 4vw, 3rem);
           text-transform: uppercase;
-          letter-spacing: clamp(1px, 0.5vw, 3px);
-          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
+          letter-spacing: clamp(0.5px, 0.3vw, 3px);
+          text-shadow: 0 clamp(2px, 0.6vh, 4px) clamp(6px, 1.5vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
           z-index: 1000;
           white-space: nowrap;
@@ -1265,74 +1265,64 @@ export function renderPokemonCard(pokemonName) {
           }
         }
 
-        /* Small mobile phones - compact 2-column layout with 3-column grids */
+        /* Small mobile phones - compact 2 columns */
         @media (max-width: 480px) {
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: 28% 1fr;
+            grid-template-columns: 45% 1fr;
             gap: clamp(0.5rem, 1.5vw, 1rem);
           }
 
           .ability-container {
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: clamp(0.3rem, 1vw, 0.5rem);
           }
 
           .skills-grid {
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: clamp(0.3rem, 1vw, 0.5rem);
           }
 
           .info-buttons-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: 1fr;
             gap: clamp(0.4rem, 1vh, 0.6rem);
           }
 
           .stat-main-container {
             gap: clamp(0.5rem, 2vw, 1rem);
           }
-
-          .info-item {
-            font-size: clamp(0.7rem, 1.6vw, 0.9rem);
-            padding: clamp(0.25rem, 0.6vh, 0.4rem) clamp(0.4rem, 1vw, 0.6rem);
-          }
-
-          .info-button {
-            font-size: clamp(0.55rem, 1.1vw, 0.7rem);
-            padding: clamp(0.3rem, 0.7vh, 0.45rem) clamp(0.3rem, 0.7vw, 0.5rem);
-          }
         }
 
-        /* Very small screens (360px and below) - keep 2-column layout with 3-column grids */
-        @media (max-width: 380px) {
+        /* Very small screens - keep 2 columns, just more compact */
+        @media (max-width: 360px) {
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: 25% 1fr;
-            gap: clamp(0.3rem, 0.8vw, 0.6rem);
+            grid-template-columns: 30% 1fr;
+            gap: clamp(0.4rem, 1vw, 0.75rem);
           }
 
           .ability-container {
-            grid-template-columns: repeat(3, 1fr);
-            gap: clamp(0.15rem, 0.5vw, 0.3rem);
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.2rem, 0.8vw, 0.4rem);
           }
 
           .skills-grid {
-            grid-template-columns: repeat(3, 1fr);
-            gap: clamp(0.15rem, 0.5vw, 0.3rem);
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.2rem, 0.8vw, 0.4rem);
           }
 
           .info-item {
-            font-size: clamp(0.6rem, 1.4vw, 0.8rem);
-            padding: clamp(0.15rem, 0.4vh, 0.3rem) clamp(0.25rem, 0.6vw, 0.4rem);
+            font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+            padding: clamp(0.2rem, 0.5vh, 0.35rem) clamp(0.3rem, 0.8vw, 0.5rem);
           }
 
           .info-button {
-            font-size: clamp(0.5rem, 1vw, 0.6rem);
-            padding: clamp(0.25rem, 0.6vh, 0.4rem) clamp(0.2rem, 0.5vw, 0.35rem);
+            font-size: clamp(0.6rem, 1.3vw, 0.75rem);
+            padding: clamp(0.35rem, 0.8vh, 0.5rem) clamp(0.4rem, 1vw, 0.6rem);
           }
 
           .stat-main-container {
-            gap: clamp(0.2rem, 0.6vw, 0.4rem);
+            gap: clamp(0.3rem, 1vw, 0.6rem);
           }
         }
 

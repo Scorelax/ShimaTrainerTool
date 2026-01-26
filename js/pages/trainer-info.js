@@ -1517,36 +1517,27 @@ export function renderTrainerInfo() {
           }
         }
 
-        /* Very small screens - keep 2 columns, just more compact */
+        /* Very small screens - final fallback single column if needed */
         @media (max-width: 360px) {
           .trainer-info-page {
-            grid-template-columns: 30% 1fr;
-            gap: clamp(0.4rem, 1vw, 0.75rem);
-            padding: clamp(0.5rem, 1vh, 1rem) clamp(0.3rem, 0.6vw, 0.5rem);
+            grid-template-columns: 1fr;
+            gap: clamp(0.75rem, 2vh, 1rem);
+          }
+
+          .left-column {
+            padding-top: clamp(5rem, 10vh, 6rem);
+          }
+
+          .right-column {
+            padding-top: clamp(0.5rem, 1vh, 1rem);
           }
 
           .ability-container {
             grid-template-columns: repeat(2, 1fr);
-            gap: clamp(0.2rem, 0.8vw, 0.4rem);
           }
 
           .skills-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: clamp(0.2rem, 0.8vw, 0.4rem);
-          }
-
-          .info-item {
-            font-size: clamp(0.65rem, 1.5vw, 0.85rem);
-            padding: clamp(0.2rem, 0.5vh, 0.35rem) clamp(0.3rem, 0.8vw, 0.5rem);
-          }
-
-          .info-button {
-            font-size: clamp(0.5rem, 1vw, 0.6rem);
-            padding: clamp(0.25rem, 0.6vh, 0.4rem) clamp(0.2rem, 0.5vw, 0.35rem);
-          }
-
-          .stat-main-container {
-            gap: clamp(0.3rem, 1vw, 0.6rem);
+            grid-template-columns: 1fr;
           }
         }
 

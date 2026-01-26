@@ -372,11 +372,11 @@ export function renderPokemonCard(pokemonName) {
           transform: translateX(-50%);
           color: white;
           margin: 0;
-          padding: 0 clamp(50px, 12vw, 110px);
-          font-size: clamp(1rem, 4vw, 3rem);
+          padding: 0 clamp(75px, 16vw, 110px);
+          font-size: clamp(2rem, 5vw, 3rem);
           text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.3vw, 3px);
-          text-shadow: 0 clamp(2px, 0.6vh, 4px) clamp(6px, 1.5vh, 10px) rgba(0,0,0,0.8);
+          letter-spacing: clamp(1px, 0.5vw, 3px);
+          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
           z-index: 1000;
           white-space: nowrap;
@@ -1293,36 +1293,20 @@ export function renderPokemonCard(pokemonName) {
           }
         }
 
-        /* Very small screens - keep 2 columns, just more compact */
+        /* Very small screens - single column fallback */
         @media (max-width: 360px) {
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: 30% 1fr;
-            gap: clamp(0.4rem, 1vw, 0.75rem);
+            grid-template-columns: 1fr;
+            gap: clamp(0.75rem, 2vh, 1rem);
           }
 
-          .ability-container {
-            grid-template-columns: repeat(2, 1fr);
-            gap: clamp(0.2rem, 0.8vw, 0.4rem);
+          .left-column {
+            padding-top: clamp(5rem, 10vh, 6rem);
           }
 
-          .skills-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: clamp(0.2rem, 0.8vw, 0.4rem);
-          }
-
-          .info-item {
-            font-size: clamp(0.65rem, 1.5vw, 0.85rem);
-            padding: clamp(0.2rem, 0.5vh, 0.35rem) clamp(0.3rem, 0.8vw, 0.5rem);
-          }
-
-          .info-button {
-            font-size: clamp(0.6rem, 1.3vw, 0.75rem);
-            padding: clamp(0.35rem, 0.8vh, 0.5rem) clamp(0.4rem, 1vw, 0.6rem);
-          }
-
-          .stat-main-container {
-            gap: clamp(0.3rem, 1vw, 0.6rem);
+          .right-column {
+            padding-top: 0;
           }
         }
 

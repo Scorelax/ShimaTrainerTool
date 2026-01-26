@@ -466,21 +466,153 @@ export function renderTrainerCard() {
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(76,175,80,0.5);
         }
 
-        /* Responsive adjustments */
-        @media (max-width: 480px) {
+        /* Tablet - keep layout, adjust sizes */
+        @media (max-width: 768px) {
+          .trainer-image-container {
+            width: clamp(140px, 22vw, 200px);
+            height: clamp(140px, 22vw, 200px);
+          }
+
           .utility-container {
-            position: static;
-            margin-top: clamp(1rem, 2vh, 1.5rem);
-            margin-left: 0;
+            left: calc(50% + clamp(90px, 14vw, 130px));
+          }
+
+          .utility-slot {
+            width: clamp(80px, 16vw, 130px);
           }
 
           .trainer-utility-wrapper {
-            flex-direction: column;
-            align-items: center;
+            min-height: clamp(220px, 30vw, 300px);
+          }
+        }
+
+        /* Mobile phones - keep side-by-side layout */
+        @media (max-width: 480px) {
+          .trainer-image-container {
+            width: clamp(100px, 28vw, 150px);
+            height: clamp(100px, 28vw, 150px);
+            border-width: clamp(2px, 0.5vw, 4px);
+          }
+
+          .trainer-name {
+            font-size: clamp(0.9rem, 2.5vw, 1.3rem);
+          }
+
+          .trainer-level {
+            font-size: clamp(0.75rem, 2vw, 1rem);
+          }
+
+          .utility-container {
+            left: calc(50% + clamp(70px, 18vw, 100px));
+            bottom: clamp(1.5rem, 4vh, 2.5rem);
+          }
+
+          .utility-slot {
+            width: clamp(60px, 18vw, 100px);
+          }
+
+          .utility-label {
+            font-size: clamp(0.7rem, 1.8vw, 1rem);
+          }
+
+          .utility-slot .pokemon-name {
+            font-size: clamp(0.7rem, 1.8vw, 1rem);
+          }
+
+          .utility-slot .pokemon-level {
+            font-size: clamp(0.6rem, 1.5vw, 0.85rem);
+          }
+
+          .trainer-utility-wrapper {
+            min-height: clamp(160px, 38vw, 240px);
           }
 
           .party-grid {
-            gap: clamp(0.75rem, 1.5vw, 1rem);
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+          }
+
+          .pokemon-slot img {
+            border-width: clamp(2px, 0.4vw, 3px);
+          }
+
+          .pokemon-slot .pokemon-name {
+            font-size: clamp(0.7rem, 1.8vw, 1rem);
+          }
+
+          .pokemon-slot .pokemon-level {
+            font-size: clamp(0.6rem, 1.5vw, 0.85rem);
+          }
+
+          .my-pokemon-button {
+            padding: clamp(0.6rem, 1.5vh, 1rem) clamp(1.2rem, 3vw, 2rem);
+            font-size: clamp(0.9rem, 2.2vw, 1.3rem);
+            border-width: clamp(2px, 0.4vw, 3px);
+          }
+        }
+
+        /* Very small screens - even more compact but keep layout */
+        @media (max-width: 360px) {
+          .trainer-image-container {
+            width: clamp(80px, 24vw, 110px);
+            height: clamp(80px, 24vw, 110px);
+          }
+
+          .trainer-name {
+            font-size: clamp(0.8rem, 2.2vw, 1rem);
+          }
+
+          .trainer-level {
+            font-size: clamp(0.65rem, 1.8vw, 0.85rem);
+          }
+
+          .utility-container {
+            left: calc(50% + clamp(55px, 15vw, 75px));
+            bottom: clamp(1rem, 3vh, 2rem);
+          }
+
+          .utility-slot {
+            width: clamp(50px, 15vw, 70px);
+          }
+
+          .utility-label {
+            font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+            margin-bottom: clamp(0.25rem, 0.5vh, 0.4rem);
+          }
+
+          .utility-slot .pokemon-name {
+            font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+          }
+
+          .utility-slot .pokemon-level {
+            font-size: clamp(0.5rem, 1.3vw, 0.7rem);
+          }
+
+          .trainer-utility-wrapper {
+            min-height: clamp(130px, 35vw, 180px);
+            margin-bottom: clamp(0.5rem, 1vh, 1rem);
+          }
+
+          .party-grid {
+            gap: clamp(0.4rem, 1vw, 0.75rem);
+          }
+
+          .pokemon-slot .pokemon-name {
+            font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+          }
+
+          .pokemon-slot .pokemon-level {
+            font-size: clamp(0.5rem, 1.3vw, 0.7rem);
+          }
+
+          .my-pokemon-button {
+            padding: clamp(0.5rem, 1.2vh, 0.8rem) clamp(1rem, 2.5vw, 1.5rem);
+            font-size: clamp(0.8rem, 2vw, 1.1rem);
+          }
+
+          .back-button {
+            width: clamp(35px, 10vw, 45px);
+            height: clamp(35px, 10vw, 45px);
+            font-size: clamp(1.2rem, 3vw, 1.6rem);
           }
         }
       </style>

@@ -298,6 +298,109 @@ export async function renderContinueJourney() {
           transform: scale(1.05);
         }
 
+        /* Tablet - keep 3 columns, adjust sizes */
+        @media (max-width: 768px) {
+          .trainer-container {
+            gap: clamp(0.75rem, 2vw, 1.5rem);
+          }
+
+          .trainer-image {
+            border-width: clamp(2px, 0.5vw, 3px);
+          }
+
+          .trainer-name {
+            font-size: clamp(0.8rem, 1.6vw, 1.1rem);
+          }
+        }
+
+        /* Mobile phones - keep 3 columns */
+        @media (max-width: 480px) {
+          .continue-journey-page h1 {
+            font-size: clamp(1.2rem, 3.5vw, 1.8rem);
+            margin-top: 1.5vh;
+            margin-bottom: 1.5vh;
+          }
+
+          .trainer-container {
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+          }
+
+          .trainer-image {
+            border-width: clamp(2px, 0.4vw, 3px);
+            border-radius: clamp(8px, 2vw, 12px);
+          }
+
+          .trainer-name {
+            font-size: clamp(0.7rem, 1.5vw, 0.95rem);
+          }
+
+          .back-button {
+            width: clamp(35px, 9vw, 50px);
+            height: clamp(35px, 9vw, 50px);
+            font-size: clamp(1rem, 2.5vw, 1.8rem);
+          }
+        }
+
+        /* Very small screens - keep 3 columns, more compact */
+        @media (max-width: 360px) {
+          .continue-journey-page h1 {
+            font-size: clamp(1rem, 3vw, 1.4rem);
+            margin-top: 1vh;
+            margin-bottom: 1vh;
+          }
+
+          .trainer-list-container {
+            width: 95%;
+          }
+
+          .trainer-container {
+            gap: clamp(0.4rem, 1vw, 0.75rem);
+          }
+
+          .trainer-image {
+            width: 90%;
+            border-width: 2px;
+            border-radius: clamp(6px, 1.5vw, 10px);
+          }
+
+          .trainer-name {
+            font-size: clamp(0.6rem, 1.4vw, 0.8rem);
+          }
+
+          .trainer-box:hover {
+            transform: translateY(-2px);
+          }
+
+          .back-button {
+            width: clamp(30px, 8vw, 40px);
+            height: clamp(30px, 8vw, 40px);
+            font-size: clamp(0.9rem, 2.2vw, 1.4rem);
+            top: clamp(8px, 1.5vh, 15px);
+            left: clamp(8px, 1.5vw, 15px);
+          }
+
+          .pin-modal-content {
+            padding: 2vh 2vw;
+            max-width: min(85vw, 70vh);
+          }
+
+          .pin-modal-content h2 {
+            font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+            margin-bottom: clamp(0.75rem, 2vh, 1.5rem);
+          }
+
+          .pin-input {
+            width: clamp(140px, 40vw, 200px);
+            height: clamp(40px, 8vh, 60px);
+            font-size: clamp(1.2rem, 2.5vw, 2rem);
+          }
+
+          .pin-submit, .pin-cancel {
+            font-size: clamp(0.85rem, 1.8vw, 1.2rem);
+            padding: clamp(0.5rem, 1.2vh, 1rem) clamp(1rem, 2.5vw, 1.8rem);
+          }
+        }
+
       </style>
 
       <h1>Continue Journey</h1>

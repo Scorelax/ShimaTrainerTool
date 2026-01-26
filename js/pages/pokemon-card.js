@@ -1293,20 +1293,36 @@ export function renderPokemonCard(pokemonName) {
           }
         }
 
-        /* Very small screens - single column fallback */
+        /* Very small screens - keep 2 columns, just more compact */
         @media (max-width: 360px) {
           .info-page-grid,
           .battle-page-grid {
-            grid-template-columns: 1fr;
-            gap: clamp(0.75rem, 2vh, 1rem);
+            grid-template-columns: 30% 1fr;
+            gap: clamp(0.4rem, 1vw, 0.75rem);
           }
 
-          .left-column {
-            padding-top: clamp(5rem, 10vh, 6rem);
+          .ability-container {
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.2rem, 0.8vw, 0.4rem);
           }
 
-          .right-column {
-            padding-top: 0;
+          .skills-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: clamp(0.2rem, 0.8vw, 0.4rem);
+          }
+
+          .info-item {
+            font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+            padding: clamp(0.2rem, 0.5vh, 0.35rem) clamp(0.3rem, 0.8vw, 0.5rem);
+          }
+
+          .info-button {
+            font-size: clamp(0.6rem, 1.3vw, 0.75rem);
+            padding: clamp(0.35rem, 0.8vh, 0.5rem) clamp(0.4rem, 1vw, 0.6rem);
+          }
+
+          .stat-main-container {
+            gap: clamp(0.3rem, 1vw, 0.6rem);
           }
         }
 

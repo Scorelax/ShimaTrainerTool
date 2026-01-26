@@ -15,7 +15,8 @@
       "Bash(curl:*)",
       "Bash(git merge:*)",
       "WebFetch(domain:api.github.com)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []

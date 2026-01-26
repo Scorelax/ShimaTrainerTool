@@ -372,11 +372,11 @@ export function renderPokemonCard(pokemonName) {
           transform: translateX(-50%);
           color: white;
           margin: 0;
-          padding: 0 clamp(75px, 16vw, 110px);
-          font-size: clamp(2rem, 5vw, 3rem);
+          padding: 0 clamp(50px, 12vw, 110px);
+          font-size: clamp(1rem, 4vw, 3rem);
           text-transform: uppercase;
-          letter-spacing: clamp(1px, 0.5vw, 3px);
-          text-shadow: 0 clamp(3px, 0.8vh, 4px) clamp(8px, 2vh, 10px) rgba(0,0,0,0.8);
+          letter-spacing: clamp(0.5px, 0.3vw, 3px);
+          text-shadow: 0 clamp(2px, 0.6vh, 4px) clamp(6px, 1.5vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
           z-index: 1000;
           white-space: nowrap;

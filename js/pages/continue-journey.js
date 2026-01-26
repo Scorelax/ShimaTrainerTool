@@ -380,8 +380,9 @@ export async function renderContinueJourney() {
           }
 
           .pin-modal-content {
-            padding: 2vh 2vw;
-            max-width: min(85vw, 70vh);
+            padding: 2.5vh 4vw;
+            width: 95%;
+            max-width: min(90vw, 75vh);
           }
 
           .pin-modal-content h2 {

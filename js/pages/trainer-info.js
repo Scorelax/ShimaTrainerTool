@@ -2009,7 +2009,7 @@ export function renderTrainerInfo() {
             <button class="popup-close" id="closeShortRestSelection">×</button>
           </div>
           <div class="popup-body">
-            <p style="margin-bottom: 1rem; color: #666;">Select trainer and/or Pokemon to heal during this short rest:</p>
+            <p style="margin-bottom: 1rem; color: #aaa;">Select trainer and/or Pokemon to heal during this short rest:</p>
             <div id="shortRestSelectionList" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
               <!-- Dynamically populated -->
             </div>
@@ -2027,8 +2027,8 @@ export function renderTrainerInfo() {
             <div class="popup-title">Short Rest - <span id="shortRestEntityName">Trainer</span></div>
             <button class="popup-close" id="closeShortRestHealing">×</button>
           </div>
-          <div class="popup-body">
-            <div style="text-align: center; margin-bottom: 0.75rem; color: #666; font-size: 0.9rem;">
+          <div class="popup-body" style="color: #e0e0e0;">
+            <div style="text-align: center; margin-bottom: 0.75rem; color: #aaa; font-size: 0.9rem;">
               <span id="shortRestProgress">1 / 1</span>
             </div>
             <div style="margin-bottom: 1rem;">
@@ -2041,28 +2041,28 @@ export function renderTrainerInfo() {
                 <span id="shortRestCurrentVP">0 / 0</span>
               </div>
             </div>
-            <div style="border-top: 1px solid #ddd; padding-top: 1rem; margin-bottom: 1rem;">
+            <div style="border-top: 1px solid #555; padding-top: 1rem; margin-bottom: 1rem;">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
                 <label for="hdToUse" style="font-weight: 600;">HD to use:</label>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <input type="number" id="hdToUse" min="0" value="0" style="width: 60px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; text-align: center;">
+                  <input type="number" id="hdToUse" min="0" value="0" style="width: 60px; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; text-align: center; background: #3a3a3a; color: white;">
                   <span id="hdAvailable">/ 0 available</span>
                 </div>
               </div>
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                 <label for="hpToHeal" style="font-weight: 600;">HP healed:</label>
-                <input type="number" id="hpToHeal" min="0" value="0" style="width: 80px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; text-align: center;">
+                <input type="number" id="hpToHeal" min="0" value="0" style="width: 80px; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; text-align: center; background: #3a3a3a; color: white;">
               </div>
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
                 <label for="vdToUse" style="font-weight: 600;">VD to use:</label>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <input type="number" id="vdToUse" min="0" value="0" style="width: 60px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; text-align: center;">
+                  <input type="number" id="vdToUse" min="0" value="0" style="width: 60px; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; text-align: center; background: #3a3a3a; color: white;">
                   <span id="vdAvailable">/ 0 available</span>
                 </div>
               </div>
               <div style="display: flex; align-items: center; justify-content: space-between;">
                 <label for="vpToHeal" style="font-weight: 600;">VP healed:</label>
-                <input type="number" id="vpToHeal" min="0" value="0" style="width: 80px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; text-align: center;">
+                <input type="number" id="vpToHeal" min="0" value="0" style="width: 80px; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; text-align: center; background: #3a3a3a; color: white;">
               </div>
             </div>
             <div class="popup-footer">
@@ -2421,6 +2421,8 @@ export function attachTrainerInfoListeners() {
   }
 
   // Helper function to show Trainer Buffs popup
+  // Expose to window so module-level rest functions can call it
+  window.showTrainerSkillsPopup = showTrainerSkillsPopup;
   function showTrainerSkillsPopup() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
@@ -3767,7 +3769,7 @@ function showShortRestSelectionPopup() {
   const trainerCurrentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? trainerMaxVD : parseInt(trainerData[48], 10);
 
   const trainerItem = document.createElement('label');
-  trainerItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer;';
+  trainerItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer; color: #333;';
   trainerItem.innerHTML = `
     <input type="checkbox" value="trainer" style="width: 20px; height: 20px; cursor: pointer;">
     <div style="flex: 1;">
@@ -3790,7 +3792,7 @@ function showShortRestSelectionPopup() {
     const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pokemonMaxVD : parseInt(pokemon[55], 10);
 
     const pokemonItem = document.createElement('label');
-    pokemonItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer;';
+    pokemonItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer; color: #333;';
     pokemonItem.innerHTML = `
       <input type="checkbox" value="pokemon_${pokemonName.toLowerCase()}" style="width: 20px; height: 20px; cursor: pointer;">
       <div style="flex: 1;">
@@ -3852,7 +3854,7 @@ function showShortRestHealingForm() {
     document.getElementById('shortRestHealingPopup')?.classList.remove('active');
     showSuccess('Short rest completed for all selected!');
     setTimeout(() => {
-      showTrainerSkillsPopup();
+      if (window.showTrainerSkillsPopup) window.showTrainerSkillsPopup();
     }, 100);
     return;
   }
@@ -4143,7 +4145,7 @@ async function completeLongRest(selectedPokemon) {
 
   // Reopen trainer buffs popup immediately to show updated trainer HP/VP
   setTimeout(() => {
-    showTrainerSkillsPopup();
+    if (window.showTrainerSkillsPopup) window.showTrainerSkillsPopup();
   }, 100);
 
   // Show success message

@@ -508,18 +508,18 @@ export function renderPokemonCard(pokemonName) {
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
           border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
           border-radius: clamp(8px, 1.5vw, 12px);
-          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+          font-size: clamp(0.65rem, 1.4vw, 0.8rem);
           font-weight: 700;
           color: white;
           text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
         .info-item-half .info-item-label {
-          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+          font-size: clamp(0.65rem, 1.4vw, 0.8rem);
         }
 
         .info-item-half span:not(.info-item-label) {
-          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+          font-size: clamp(0.65rem, 1.4vw, 0.8rem);
         }
 
         .info-item-column {
@@ -895,7 +895,7 @@ export function renderPokemonCard(pokemonName) {
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.4vw, 1px);
-          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          font-size: clamp(1rem, 2.2vw, 1.4rem);
           text-align: center;
         }
 
@@ -909,13 +909,13 @@ export function renderPokemonCard(pokemonName) {
         .move-item {
           background: rgba(255,255,255,0.9);
           color: #333;
-          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
+          padding: clamp(0.4rem, 0.8vh, 0.6rem) clamp(0.6rem, 1.2vw, 0.85rem);
           border-radius: clamp(8px, 1.5vw, 12px);
           text-align: center;
           font-weight: 700;
           white-space: nowrap;
           width: auto;
-          font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+          font-size: clamp(0.65rem, 1.3vw, 0.8rem);
           cursor: pointer;
           transition: all 0.3s;
           border: 2px solid rgba(0,0,0,0.2);

@@ -3855,7 +3855,7 @@ function showShortRestHealingForm() {
   if (shortRestCurrentIndex >= shortRestQueue.length) {
     // All done
     document.getElementById('shortRestHealingPopup')?.classList.remove('active');
-    showSuccess('Short rest completed for all selected!');
+    // Short rest complete - no popup needed
     setTimeout(() => {
       if (window.showTrainerSkillsPopup) window.showTrainerSkillsPopup();
     }, 100);
@@ -4154,7 +4154,7 @@ async function completeLongRest(selectedPokemon) {
   // Show success message
   const hdRestored = trainerData[47] - currentHD;
   const vdRestored = trainerData[48] - currentVD;
-  showSuccess(`Long rest completed! Trainer and ${pokemonName} fully restored. HD +${hdRestored}, VD +${vdRestored}.`);
+  // Long rest complete - no popup needed
 
   // Update database in background (non-blocking)
   TrainerAPI.update(trainerData).then(() => {

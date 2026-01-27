@@ -3761,8 +3761,10 @@ function showShortRestSelectionPopup() {
   const trainerMaxHP = parseInt(trainerData[11], 10);
   const trainerCurrentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
   const trainerMaxVP = parseInt(trainerData[12], 10);
-  const trainerCurrentHD = parseInt(trainerData[47], 10) || 0;
-  const trainerCurrentVD = parseInt(trainerData[48], 10) || 0;
+  const trainerMaxHD = parseInt(trainerData[3], 10) || 0;
+  const trainerMaxVD = parseInt(trainerData[4], 10) || 0;
+  const trainerCurrentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? trainerMaxHD : parseInt(trainerData[47], 10);
+  const trainerCurrentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? trainerMaxVD : parseInt(trainerData[48], 10);
 
   const trainerItem = document.createElement('label');
   trainerItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer;';
@@ -3782,8 +3784,10 @@ function showShortRestSelectionPopup() {
     const maxHP = parseInt(pokemon[10], 10);
     const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
     const maxVP = parseInt(pokemon[12], 10);
-    const currentHD = parseInt(pokemon[54], 10) || 0;
-    const currentVD = parseInt(pokemon[55], 10) || 0;
+    const pokemonMaxHD = parseInt(pokemon[9], 10) || 0;
+    const pokemonMaxVD = parseInt(pokemon[11], 10) || 0;
+    const currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? pokemonMaxHD : parseInt(pokemon[54], 10);
+    const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pokemonMaxVD : parseInt(pokemon[55], 10);
 
     const pokemonItem = document.createElement('label');
     pokemonItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer;';
@@ -3865,16 +3869,20 @@ function showShortRestHealingForm() {
 
   if (isTrainer) {
     const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-    currentHD = parseInt(trainerData[47], 10) || 0;
-    currentVD = parseInt(trainerData[48], 10) || 0;
+    const maxHD = parseInt(trainerData[3], 10) || 0;
+    const maxVD = parseInt(trainerData[4], 10) || 0;
+    currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? maxHD : parseInt(trainerData[47], 10);
+    currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? maxVD : parseInt(trainerData[48], 10);
     currentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
     maxHP = parseInt(trainerData[11], 10);
     currentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
     maxVP = parseInt(trainerData[12], 10);
   } else {
     const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
-    currentHD = parseInt(pokemon[54], 10) || 0;
-    currentVD = parseInt(pokemon[55], 10) || 0;
+    const maxHD = parseInt(pokemon[9], 10) || 0;
+    const maxVD = parseInt(pokemon[11], 10) || 0;
+    currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? maxHD : parseInt(pokemon[54], 10);
+    currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? maxVD : parseInt(pokemon[55], 10);
     currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
     maxHP = parseInt(pokemon[10], 10);
     currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
@@ -3931,8 +3939,10 @@ async function processShortRestHealing() {
   if (isTrainer) {
     // Process trainer healing
     const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-    const currentHD = parseInt(trainerData[47], 10) || 0;
-    const currentVD = parseInt(trainerData[48], 10) || 0;
+    const trMaxHD = parseInt(trainerData[3], 10) || 0;
+    const trMaxVD = parseInt(trainerData[4], 10) || 0;
+    const currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? trMaxHD : parseInt(trainerData[47], 10);
+    const currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? trMaxVD : parseInt(trainerData[48], 10);
 
     if (hdToUse > currentHD) {
       showError(`Not enough HD available. You have ${currentHD}.`);
@@ -3965,8 +3975,10 @@ async function processShortRestHealing() {
   } else {
     // Process Pokemon healing
     const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
-    const currentHD = parseInt(pokemon[54], 10) || 0;
-    const currentVD = parseInt(pokemon[55], 10) || 0;
+    const pkMaxHD = parseInt(pokemon[9], 10) || 0;
+    const pkMaxVD = parseInt(pokemon[11], 10) || 0;
+    const currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? pkMaxHD : parseInt(pokemon[54], 10);
+    const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pkMaxVD : parseInt(pokemon[55], 10);
 
     if (hdToUse > currentHD) {
       showError(`Not enough HD available. You have ${currentHD}.`);
@@ -3993,8 +4005,7 @@ async function processShortRestHealing() {
     sessionStorage.setItem(entity.storageKey, JSON.stringify(pokemon));
 
     // Update database in background
-    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-    PokemonAPI.update(trainerData[1], pokemon).catch(error => {
+    PokemonAPI.update(pokemon).catch(error => {
       console.error('Error updating Pokemon data:', error);
     });
   }
@@ -4104,8 +4115,8 @@ async function completeLongRest(selectedPokemon) {
   // HD max is at index 3 (hitDice), VD max is at index 4 (vitalityDice)
   const maxHD = parseInt(trainerData[3], 10) || 0;
   const maxVD = parseInt(trainerData[4], 10) || 0;
-  const currentHD = parseInt(trainerData[47], 10) || 0;
-  const currentVD = parseInt(trainerData[48], 10) || 0;
+  const currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? maxHD : parseInt(trainerData[47], 10);
+  const currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? maxVD : parseInt(trainerData[48], 10);
 
   // Restore half of max dice (rounded down), capped at max
   const hdToRestore = Math.floor(maxHD / 2);
@@ -4141,14 +4152,17 @@ async function completeLongRest(selectedPokemon) {
   showSuccess(`Long rest completed! Trainer and ${pokemonName} fully restored. HD +${hdRestored}, VD +${vdRestored}.`);
 
   // Update database in background (non-blocking)
-  try {
-    await TrainerAPI.update(trainerData);
-    const { PokemonAPI } = await import('../api.js');
-    await PokemonAPI.update(selectedPokemon);
-    console.log('Long rest saved to backend successfully');
-  } catch (error) {
-    console.error('Error saving long rest to backend:', error);
-  }
+  TrainerAPI.update(trainerData).then(() => {
+    console.log('Long rest trainer data saved to backend');
+  }).catch(error => {
+    console.error('Error saving trainer long rest to backend:', error);
+  });
+
+  PokemonAPI.update(selectedPokemon).then(() => {
+    console.log('Long rest Pokemon data saved to backend');
+  }).catch(error => {
+    console.error('Error saving Pokemon long rest to backend:', error);
+  });
 }
 
 // Show Max Potential Selection Popup

@@ -2308,6 +2308,8 @@ export function attachTrainerInfoListeners() {
   }
 
   // Helper function to get max charges for a buff based on trainer level
+  // Expose to window so module-level rest functions can call it
+  window.getMaxCharges = getMaxCharges;
   function getMaxCharges(buffName, trainerLevel) {
     switch (buffName) {
       case 'Second Wind':
@@ -4101,10 +4103,10 @@ async function completeLongRest(selectedPokemon) {
   trainerData[35] = maxVP; // currentVP
 
   // Refill all buff charges to max (excluding Rapid Orders - index 41)
-  trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
-  trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
-  trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
-  trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+  trainerData[40] = window.getMaxCharges('Second Wind', trainerLevel);
+  trainerData[42] = window.getMaxCharges('Unbreakable Bond', trainerLevel);
+  trainerData[43] = window.getMaxCharges('Elemental Synergy', trainerLevel);
+  trainerData[44] = window.getMaxCharges('Master Trainer', trainerLevel);
 
   // Refill battle dice for Ace Trainer (index 45)
   const trainerPath = trainerData[25] || '';

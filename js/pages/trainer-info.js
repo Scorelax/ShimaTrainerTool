@@ -2405,8 +2405,9 @@ export function attachTrainerInfoListeners() {
 
       const pokemonData = JSON.parse(pokemonDataStr);
 
-      // Check if this Pokemon belongs to current trainer and is in active party
-      if (pokemonData[0] === trainerName && pokemonData[38] === true) { // index 38 is isInActiveParty
+      // Check if this Pokemon is in active party (index 38 is slot number 1-6)
+      const slotNumber = parseInt(pokemonData[38], 10);
+      if (slotNumber && slotNumber >= 1 && slotNumber <= 6) {
         activePokemon.push(pokemonData);
       }
     }

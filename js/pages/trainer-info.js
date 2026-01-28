@@ -195,12 +195,20 @@ export function renderTrainerInfo() {
         .info-item.clickable {
           cursor: pointer;
           transition: all 0.3s ease;
+          border-color: rgba(255,222,0,0.7);
+          background: linear-gradient(135deg, rgba(59,76,202,0.3) 0%, rgba(46,63,160,0.2) 100%);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         }
 
         .info-item.clickable:hover {
           border-color: #FFDE00;
-          background: linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.12) 100%);
-          transform: translateY(-1px);
+          background: linear-gradient(135deg, rgba(59,76,202,0.5) 0%, rgba(46,63,160,0.4) 100%);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+
+        .info-item.clickable:active {
+          transform: translateY(0);
         }
 
         .info-item-label {
@@ -1749,7 +1757,7 @@ export function renderTrainerInfo() {
           </div>
           <div class="info-item clickable" id="moneyButton">
             <span class="info-item-label">Money:</span>
-            <span class="info-item-value" id="moneyDisplay">${trainerMoney}</span>
+            <span class="info-item-value" id="moneyDisplay">₽${trainerMoney}</span>
           </div>
           <div class="info-item">
             <span class="info-item-label">League Points:</span>
@@ -2212,7 +2220,7 @@ export function renderTrainerInfo() {
           <div class="popup-body">
             <div class="money-display-box">
               <span class="money-label">Current Balance:</span>
-              <span class="money-amount" id="moneyPopupAmount">${trainerMoney}</span>
+              <span class="money-amount" id="moneyPopupAmount">₽${trainerMoney}</span>
             </div>
             <div class="money-input-container">
               <input type="number" id="moneyInput" class="money-input" placeholder="Enter amount" min="0">
@@ -3440,7 +3448,7 @@ export function attachTrainerInfoListeners() {
   document.getElementById('moneyButton')?.addEventListener('click', () => {
     if (!trainerData) return;
     const currentMoney = parseInt(trainerData[19], 10) || 0;
-    document.getElementById('moneyPopupAmount').textContent = currentMoney;
+    document.getElementById('moneyPopupAmount').textContent = '₽' + currentMoney;
     document.getElementById('moneyInput').value = '';
     openPopup('moneyPopup');
   });
@@ -3457,8 +3465,8 @@ export function attachTrainerInfoListeners() {
     trainerData[19] = newMoney;
 
     // Update displays
-    document.getElementById('moneyPopupAmount').textContent = newMoney;
-    document.getElementById('moneyDisplay').textContent = newMoney;
+    document.getElementById('moneyPopupAmount').textContent = '₽' + newMoney;
+    document.getElementById('moneyDisplay').textContent = '₽' + newMoney;
 
     // Save to sessionStorage immediately
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
@@ -3486,8 +3494,8 @@ export function attachTrainerInfoListeners() {
     trainerData[19] = newMoney;
 
     // Update displays
-    document.getElementById('moneyPopupAmount').textContent = newMoney;
-    document.getElementById('moneyDisplay').textContent = newMoney;
+    document.getElementById('moneyPopupAmount').textContent = '₽' + newMoney;
+    document.getElementById('moneyDisplay').textContent = '₽' + newMoney;
 
     // Save to sessionStorage immediately
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));

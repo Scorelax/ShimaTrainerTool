@@ -1033,6 +1033,10 @@ export function renderTrainerInfo() {
           gap: clamp(1rem, 2vh, 1.5rem);
         }
 
+        .detail-section {
+          flex: 1;
+        }
+
         .detail-section h4 {
           font-size: clamp(1rem, 2.2vw, 1.2rem);
           color: #FFDE00;
@@ -1081,7 +1085,7 @@ export function renderTrainerInfo() {
 
         .inventory-actions {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(2, 1fr);
           gap: clamp(0.5rem, 1vw, 0.75rem);
         }
 
@@ -1090,18 +1094,22 @@ export function renderTrainerInfo() {
           flex-direction: row;
           align-items: center;
           justify-content: center;
-          gap: clamp(0.25rem, 0.5vw, 0.4rem);
-          padding: clamp(0.4rem, 0.9vh, 0.6rem) clamp(0.5rem, 1vw, 0.75rem);
+          gap: clamp(0.3rem, 0.6vw, 0.5rem);
+          padding: clamp(0.5rem, 1.1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
           border: clamp(2px, 0.3vw, 2.5px) solid #333;
-          border-radius: clamp(6px, 1.2vw, 10px);
+          border-radius: clamp(8px, 1.5vw, 12px);
           cursor: pointer;
           transition: all 0.3s ease;
-          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+          font-size: clamp(0.8rem, 1.7vw, 0.95rem);
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.2px, 0.15vw, 0.4px);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
           color: white;
+        }
+
+        .inventory-actions .action-btn.full-width {
+          grid-column: 1 / -1;
         }
 
         .inventory-actions .action-btn:hover:not(:disabled) {
@@ -1116,11 +1124,11 @@ export function renderTrainerInfo() {
         }
 
         .btn-icon {
-          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-size: clamp(0.9rem, 1.9vw, 1.1rem);
         }
 
         .btn-text {
-          font-size: clamp(0.65rem, 1.4vw, 0.8rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
         }
 
         /* Inventory Action Modals */
@@ -1883,7 +1891,7 @@ export function renderTrainerInfo() {
                   <span class="btn-icon">✏️</span>
                   <span class="btn-text">Edit</span>
                 </button>
-                <button class="action-btn" id="removeItemButton" disabled>
+                <button class="action-btn full-width" id="removeItemButton" disabled>
                   <span class="btn-icon">🗑️</span>
                   <span class="btn-text">Remove</span>
                 </button>
@@ -2776,30 +2784,26 @@ export function attachTrainerInfoListeners() {
       inventoryItems.push(`${selectedItemName} (x${quantity})`);
     }
 
-    // Update sessionStorage
+    // Update sessionStorage immediately
     trainerData[20] = inventoryItems.join(', ');
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-    // Show loading overlay
-    const modal = document.getElementById('addItemModal');
-    modal.style.opacity = '0.5';
-    modal.style.pointerEvents = 'none';
+    // Close modal immediately
+    document.getElementById('addItemModal').style.display = 'none';
 
-    // Update database
+    // Clear the search input for next time
+    document.getElementById('itemSearch').value = '';
+    document.getElementById('itemQuantity').value = '1';
+
+    // Refresh inventory display immediately with updated data
+    refreshInventoryDisplay();
+
+    // Update database in background
     import('../api.js').then(({ TrainerAPI }) => {
       TrainerAPI.update(trainerData).then(() => {
-        // Close modal
-        modal.style.display = 'none';
-        modal.style.opacity = '1';
-        modal.style.pointerEvents = 'auto';
-
-        // Refresh inventory display with updated data
-        refreshInventoryDisplay();
+        console.log('Inventory updated in database');
       }).catch(error => {
         console.error('Failed to update inventory in database:', error);
-        modal.style.opacity = '1';
-        modal.style.pointerEvents = 'auto';
-        alert('Failed to save to database. Please try again.');
       });
     });
   });
@@ -2874,30 +2878,22 @@ export function attachTrainerInfoListeners() {
     });
 
     if (found) {
-      // Update sessionStorage
+      // Update sessionStorage immediately
       trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-      // Show loading overlay
-      const modal = document.getElementById('editItemModal');
-      modal.style.opacity = '0.5';
-      modal.style.pointerEvents = 'none';
+      // Close modal immediately
+      document.getElementById('editItemModal').style.display = 'none';
 
-      // Update database
+      // Refresh inventory display immediately with updated data
+      refreshInventoryDisplay();
+
+      // Update database in background
       import('../api.js').then(({ TrainerAPI }) => {
         TrainerAPI.update(trainerData).then(() => {
-          // Close modal
-          modal.style.display = 'none';
-          modal.style.opacity = '1';
-          modal.style.pointerEvents = 'auto';
-
-          // Refresh inventory display with updated data
-          refreshInventoryDisplay();
+          console.log('Inventory updated in database');
         }).catch(error => {
           console.error('Failed to update inventory in database:', error);
-          modal.style.opacity = '1';
-          modal.style.pointerEvents = 'auto';
-          alert('Failed to save to database. Please try again.');
         });
       });
     }
@@ -2940,26 +2936,18 @@ export function attachTrainerInfoListeners() {
       trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-      // Show loading overlay
-      const modal = document.getElementById('removeItemModal');
-      modal.style.opacity = '0.5';
-      modal.style.pointerEvents = 'none';
+      // Close modal immediately
+      document.getElementById('removeItemModal').style.display = 'none';
 
-      // Update database
+      // Refresh inventory display immediately
+      refreshInventoryDisplay();
+
+      // Update database in background
       import('../api.js').then(({ TrainerAPI }) => {
         TrainerAPI.update(trainerData).then(() => {
-          // Close modal
-          modal.style.display = 'none';
-          modal.style.opacity = '1';
-          modal.style.pointerEvents = 'auto';
-
-          // Refresh inventory display with updated data
-          refreshInventoryDisplay();
+          console.log('Inventory updated in database');
         }).catch(error => {
           console.error('Failed to update inventory in database:', error);
-          modal.style.opacity = '1';
-          modal.style.pointerEvents = 'auto';
-          alert('Failed to save to database. Please try again.');
         });
       });
     }

@@ -192,6 +192,17 @@ export function renderTrainerInfo() {
           text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
+        .info-item.clickable {
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .info-item.clickable:hover {
+          border-color: #FFDE00;
+          background: linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.12) 100%);
+          transform: translateY(-1px);
+        }
+
         .info-item-label {
           font-weight: 900;
           text-transform: uppercase;
@@ -566,6 +577,89 @@ export function renderTrainerInfo() {
           color: #e0e0e0;
           font-size: clamp(0.95rem, 2vw, 1.1rem);
           line-height: 1.6;
+        }
+
+        /* Money Popup Styles */
+        .money-display-box {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: clamp(1rem, 2vh, 1.5rem);
+          background: linear-gradient(135deg, rgba(255,222,0,0.15) 0%, rgba(255,222,0,0.08) 100%);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.5);
+          border-radius: clamp(10px, 2vw, 15px);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .money-label {
+          font-weight: 700;
+          color: #e0e0e0;
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+        }
+
+        .money-amount {
+          font-weight: 900;
+          color: #FFDE00;
+          font-size: clamp(1.4rem, 3vw, 1.8rem);
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .money-input-container {
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+        }
+
+        .money-input {
+          width: 100%;
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          background: rgba(0,0,0,0.3);
+          border: 2px solid rgba(255,255,255,0.2);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+          font-weight: 700;
+          text-align: center;
+        }
+
+        .money-input:focus {
+          outline: none;
+          border-color: #FFDE00;
+        }
+
+        .money-buttons {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: clamp(0.75rem, 1.5vw, 1rem);
+        }
+
+        .money-btn {
+          padding: clamp(0.75rem, 1.5vh, 1rem);
+          border: none;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .money-btn-add {
+          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+          color: white;
+        }
+
+        .money-btn-add:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(76,175,80,0.4);
+        }
+
+        .money-btn-remove {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        .money-btn-remove:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(238,21,21,0.4);
         }
 
         .popup-item {
@@ -1653,9 +1747,9 @@ export function renderTrainerInfo() {
             <span class="info-item-label">Saving Throws:</span>
             <span class="info-item-value">${trainerSavingThrows}</span>
           </div>
-          <div class="info-item">
+          <div class="info-item clickable" id="moneyButton">
             <span class="info-item-label">Money:</span>
-            <span class="info-item-value">${trainerMoney}</span>
+            <span class="info-item-value" id="moneyDisplay">${trainerMoney}</span>
           </div>
           <div class="info-item">
             <span class="info-item-label">League Points:</span>
@@ -2106,6 +2200,28 @@ export function renderTrainerInfo() {
             <button class="popup-close" id="closeFeats">×</button>
           </div>
           <div class="popup-body" id="featsContent"></div>
+        </div>
+      </div>
+
+      <div class="popup-overlay" id="moneyPopup">
+        <div class="popup-content" style="max-width: min(90vw, 400px);">
+          <div class="popup-header">
+            <div class="popup-title">Money</div>
+            <button class="popup-close" id="closeMoneyPopup">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="money-display-box">
+              <span class="money-label">Current Balance:</span>
+              <span class="money-amount" id="moneyPopupAmount">${trainerMoney}</span>
+            </div>
+            <div class="money-input-container">
+              <input type="number" id="moneyInput" class="money-input" placeholder="Enter amount" min="0">
+            </div>
+            <div class="money-buttons">
+              <button class="money-btn money-btn-add" id="addMoneyBtn">+ Add</button>
+              <button class="money-btn money-btn-remove" id="removeMoneyBtn">− Remove</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -3319,6 +3435,75 @@ export function attachTrainerInfoListeners() {
   });
 
   document.getElementById('closeFeats')?.addEventListener('click', () => closePopup('featsPopup'));
+
+  // Money button
+  document.getElementById('moneyButton')?.addEventListener('click', () => {
+    if (!trainerData) return;
+    const currentMoney = parseInt(trainerData[19], 10) || 0;
+    document.getElementById('moneyPopupAmount').textContent = currentMoney;
+    document.getElementById('moneyInput').value = '';
+    openPopup('moneyPopup');
+  });
+
+  document.getElementById('closeMoneyPopup')?.addEventListener('click', () => closePopup('moneyPopup'));
+
+  document.getElementById('addMoneyBtn')?.addEventListener('click', () => {
+    const input = document.getElementById('moneyInput');
+    const amount = parseInt(input.value, 10);
+    if (isNaN(amount) || amount <= 0) return;
+
+    const currentMoney = parseInt(trainerData[19], 10) || 0;
+    const newMoney = currentMoney + amount;
+    trainerData[19] = newMoney;
+
+    // Update displays
+    document.getElementById('moneyPopupAmount').textContent = newMoney;
+    document.getElementById('moneyDisplay').textContent = newMoney;
+
+    // Save to sessionStorage immediately
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Close popup
+    closePopup('moneyPopup');
+
+    // Write to database in background
+    import('../api.js').then(({ TrainerAPI }) => {
+      TrainerAPI.updateMoney(trainerData[1], newMoney).then(() => {
+        console.log('Money saved to backend');
+      }).catch(error => {
+        console.error('Error saving money to backend:', error);
+      });
+    });
+  });
+
+  document.getElementById('removeMoneyBtn')?.addEventListener('click', () => {
+    const input = document.getElementById('moneyInput');
+    const amount = parseInt(input.value, 10);
+    if (isNaN(amount) || amount <= 0) return;
+
+    const currentMoney = parseInt(trainerData[19], 10) || 0;
+    const newMoney = Math.max(0, currentMoney - amount);
+    trainerData[19] = newMoney;
+
+    // Update displays
+    document.getElementById('moneyPopupAmount').textContent = newMoney;
+    document.getElementById('moneyDisplay').textContent = newMoney;
+
+    // Save to sessionStorage immediately
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Close popup
+    closePopup('moneyPopup');
+
+    // Write to database in background
+    import('../api.js').then(({ TrainerAPI }) => {
+      TrainerAPI.updateMoney(trainerData[1], newMoney).then(() => {
+        console.log('Money saved to backend');
+      }).catch(error => {
+        console.error('Error saving money to backend:', error);
+      });
+    });
+  });
 
   // HP/VP Combat Tracker buttons
   const openCombatTracker = () => {

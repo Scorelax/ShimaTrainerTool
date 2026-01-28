@@ -65,11 +65,13 @@ export function renderPokemonForm() {
         .pokemon-form-page h1 {
           color: white;
           margin-bottom: 2vh;
-          font-size: clamp(1.5rem, 4vw, 2.5rem);
+          font-size: clamp(1.3rem, 3.5vw, 2.5rem);
           text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.5vw, 2px);
+          letter-spacing: clamp(0.3px, 0.3vw, 1.5px);
           text-shadow: 0 clamp(2px, 0.5vh, 4px) clamp(5px, 1.5vh, 10px) rgba(0,0,0,0.8);
           font-weight: 900;
+          padding: 0 clamp(0.5rem, 1vw, 1rem);
+          white-space: nowrap;
         }
 
         .form-container {

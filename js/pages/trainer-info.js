@@ -95,8 +95,8 @@ export function renderTrainerInfo() {
         .trainer-info-page {
           display: grid;
           grid-template-columns: minmax(25%, 30%) 1fr;
-          gap: clamp(2rem, 4vw, 4rem);
-          padding: clamp(1rem, 2vh, 2rem) clamp(1rem, 2vw, 3rem) clamp(1rem, 2vh, 1.5rem);
+          gap: clamp(1.5rem, 3vw, 3rem);
+          padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(0.5rem, 1vw, 2rem) clamp(0.75rem, 1.5vh, 1rem);
           min-height: auto;
           position: relative;
           z-index: 1;
@@ -251,7 +251,7 @@ export function renderTrainerInfo() {
           border: clamp(2px, 0.3vw, 2px) solid #FFDE00;
           border-radius: clamp(6px, 1vw, 8px);
           color: white;
-          font-size: clamp(0.6rem, 1.2vw, 0.75rem);
+          font-size: clamp(0.65rem, 1.4vw, 0.85rem);
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.2px;
@@ -262,6 +262,14 @@ export function renderTrainerInfo() {
           overflow: hidden;
           text-overflow: ellipsis;
           min-width: 0;
+          white-space: nowrap;
+        }
+
+        .info-button.allow-wrap {
+          white-space: normal;
+          overflow: visible;
+          text-overflow: clip;
+          line-height: 1.2;
         }
 
         .info-button:hover {
@@ -1493,7 +1501,7 @@ export function renderTrainerInfo() {
           }
 
           .info-button {
-            font-size: clamp(0.55rem, 1.1vw, 0.7rem);
+            font-size: clamp(0.6rem, 1.3vw, 0.8rem);
             padding: clamp(0.45rem, 1vh, 0.6rem) clamp(0.25rem, 0.6vw, 0.4rem);
           }
         }
@@ -1656,13 +1664,13 @@ export function renderTrainerInfo() {
         </div>
 
         <div class="info-buttons-grid">
-          <button class="info-button full-width" id="inventoryButton">Inventory</button>
-          <button class="info-button" id="trainerBuffsButton">Trainer Buffs</button>
+          <button class="info-button" id="inventoryButton">Inventory</button>
           <button class="info-button" id="gearButton">Gear</button>
-          <button class="info-button" id="specializationButton">Specialization</button>
           <button class="info-button" id="featsButton">Feats</button>
-          <button class="info-button" id="trainerPathButton">Trainer Path</button>
           <button class="info-button" id="affinityButton">Affinity</button>
+          <button class="info-button allow-wrap" id="trainerBuffsButton">Trainer Buffs</button>
+          <button class="info-button allow-wrap" id="trainerPathButton">Trainer Path</button>
+          <button class="info-button full-width" id="specializationButton">Specialization</button>
         </div>
       </div>
 

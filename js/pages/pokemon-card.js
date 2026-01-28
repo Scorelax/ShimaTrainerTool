@@ -685,7 +685,7 @@ export function renderPokemonCard(pokemonName) {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: clamp(0.35rem, 0.8vh, 0.5rem);
+          padding: clamp(0.35rem, 0.8vh, 0.5rem) clamp(0.5rem, 1.2vw, 0.75rem);
           border: clamp(2px, 0.3vw, 2.5px) solid #333;
           border-radius: clamp(7px, 1.3vw, 10px);
           text-align: center;

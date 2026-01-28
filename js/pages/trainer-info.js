@@ -477,7 +477,7 @@ export function renderTrainerInfo() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: clamp(0.3rem, 0.7vh, 0.45rem);
+          padding: clamp(0.3rem, 0.7vh, 0.45rem) clamp(0.5rem, 1.2vw, 0.75rem);
           border: clamp(2px, 0.3vw, 2.5px) solid #333;
           border-radius: clamp(6px, 1.2vw, 9px);
           text-align: center;

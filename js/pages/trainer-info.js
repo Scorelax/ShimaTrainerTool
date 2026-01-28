@@ -1082,35 +1082,32 @@ export function renderTrainerInfo() {
         .inventory-actions {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: clamp(0.75rem, 1.5vw, 1rem);
+          gap: clamp(0.5rem, 1vw, 0.75rem);
         }
 
         .inventory-actions .action-btn {
           display: flex;
-          flex-direction: column;
+          flex-direction: row;
           align-items: center;
           justify-content: center;
-          gap: clamp(0.3rem, 0.8vh, 0.5rem);
-          padding: clamp(0.8rem, 1.8vh, 1.2rem);
-          border: clamp(2px, 0.4vw, 3px) solid #333;
-          border-radius: clamp(10px, 2vw, 15px);
+          gap: clamp(0.25rem, 0.5vw, 0.4rem);
+          padding: clamp(0.4rem, 0.9vh, 0.6rem) clamp(0.5rem, 1vw, 0.75rem);
+          border: clamp(2px, 0.3vw, 2.5px) solid #333;
+          border-radius: clamp(6px, 1.2vw, 10px);
           cursor: pointer;
           transition: all 0.3s ease;
-          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
-        }
-
-        .inventory-actions .action-btn {
+          letter-spacing: clamp(0.2px, 0.15vw, 0.4px);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
           color: white;
         }
 
         .inventory-actions .action-btn:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 clamp(6px, 1.5vh, 10px) clamp(20px, 4vw, 30px) rgba(0,0,0,0.5),
-                      0 0 clamp(15px, 3vw, 25px) rgba(59,76,202,0.6);
+          box-shadow: 0 clamp(4px, 1vh, 6px) clamp(12px, 2.5vw, 18px) rgba(0,0,0,0.4),
+                      0 0 clamp(10px, 2vw, 15px) rgba(59,76,202,0.5);
         }
 
         .inventory-actions .action-btn:disabled {
@@ -1119,11 +1116,11 @@ export function renderTrainerInfo() {
         }
 
         .btn-icon {
-          font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
         }
 
         .btn-text {
-          font-size: clamp(0.85rem, 1.9vw, 1rem);
+          font-size: clamp(0.65rem, 1.4vw, 0.8rem);
         }
 
         /* Inventory Action Modals */
@@ -1393,7 +1390,7 @@ export function renderTrainerInfo() {
           }
 
           .inventory-actions {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(3, 1fr);
           }
         }
 

@@ -466,9 +466,9 @@ export function renderTrainerInfo() {
         .skills-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: clamp(0.4rem, 1.2vw, 0.6rem);
-          padding: clamp(0.5rem, 1.5vw, 0.8rem);
-          border-radius: clamp(10px, 2vw, 15px);
+          gap: clamp(0.3rem, 1vw, 0.5rem);
+          padding: clamp(0.4rem, 1.2vw, 0.6rem);
+          border-radius: clamp(8px, 1.5vw, 12px);
           background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
         }
 
@@ -477,37 +477,38 @@ export function renderTrainerInfo() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: clamp(0.35rem, 0.8vh, 0.5rem);
-          border: clamp(2px, 0.3vw, 2.5px) solid #333;
-          border-radius: clamp(7px, 1.3vw, 10px);
+          padding: clamp(0.25rem, 0.6vh, 0.4rem);
+          border: clamp(1.5px, 0.25vw, 2px) solid #333;
+          border-radius: clamp(6px, 1.1vw, 8px);
           text-align: center;
           background: linear-gradient(135deg, rgba(100,100,100,0.4) 0%, rgba(80,80,80,0.4) 100%);
-          font-size: clamp(0.65rem, 1.3vw, 0.75rem);
+          font-size: clamp(0.55rem, 1.1vw, 0.65rem);
           font-weight: 700;
           color: rgba(255,255,255,0.5);
-          box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
           transition: all 0.3s ease;
+          min-width: 0;
         }
 
         .skill-item.unlocked {
           background: linear-gradient(135deg, #FFDE00 0%, #FFC700 100%);
           color: black;
           border-color: #333;
-          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
-                      0 0 10px rgba(255,222,0,0.5);
+          box-shadow: 0 4px 10px rgba(0,0,0,0.4),
+                      0 0 8px rgba(255,222,0,0.5);
         }
 
         .skill-name {
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: clamp(0.15px, 0.12vw, 0.3px);
-          font-size: clamp(0.65rem, 1.3vw, 0.75rem);
+          letter-spacing: clamp(0.1px, 0.1vw, 0.25px);
+          font-size: clamp(0.55rem, 1.1vw, 0.65rem);
         }
 
         .skill-modifier {
-          font-size: clamp(0.6rem, 1.2vw, 0.7rem);
+          font-size: clamp(0.5rem, 1vw, 0.6rem);
           opacity: 0.8;
-          margin-top: clamp(1.5px, 0.25vh, 2.5px);
+          margin-top: clamp(1px, 0.2vh, 2px);
         }
 
         /* Popup Modal Styles */

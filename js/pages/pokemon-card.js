@@ -172,6 +172,8 @@ export function renderPokemonCard(pokemonName) {
   const feats = pokemonData[50] || '';
   const flavorText = pokemonData[52] || '';
   const inUtilitySlot = pokemonData[56] === 1 || pokemonData[56] === '1';
+  const commentsRaw = pokemonData[48] || '';
+  const comments = commentsRaw ? commentsRaw.split(';').map(c => c.trim()).filter(c => c) : [];
 
   // Movement data (index 13 is comma-separated: walking,climbing,flying,hovering,swimming,burrowing)
   const movementData = pokemonData[13] || '';
@@ -935,6 +937,96 @@ export function renderPokemonCard(pokemonName) {
           padding: clamp(1rem, 2vh, 1.5rem);
         }
 
+        /* Comment Popup Styles */
+        .comments-list {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .comment-box {
+          position: relative;
+          background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 100%);
+          border: 2px solid rgba(255,222,0,0.3);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          padding: clamp(0.5rem, 1vh, 0.75rem);
+          padding-right: clamp(2rem, 5vw, 2.5rem);
+        }
+
+        .comment-textarea {
+          width: 100%;
+          min-height: 60px;
+          background: rgba(0,0,0,0.3);
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 6px;
+          color: #e0e0e0;
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-family: inherit;
+          padding: clamp(0.4rem, 0.8vh, 0.6rem);
+          resize: vertical;
+          line-height: 1.5;
+        }
+
+        .comment-textarea:focus {
+          outline: none;
+          border-color: #FFDE00;
+        }
+
+        .comment-delete-btn {
+          position: absolute;
+          top: clamp(0.3rem, 0.6vh, 0.5rem);
+          right: clamp(0.3rem, 0.6vw, 0.5rem);
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: clamp(22px, 4.5vw, 28px);
+          height: clamp(22px, 4.5vw, 28px);
+          font-size: clamp(0.8rem, 1.6vw, 1rem);
+          font-weight: bold;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
+        }
+
+        .comment-add-btn {
+          width: 100%;
+          padding: clamp(0.6rem, 1.2vh, 0.8rem);
+          background: linear-gradient(135deg, rgba(255,222,0,0.2) 0%, rgba(255,222,0,0.1) 100%);
+          border: 2px dashed rgba(255,222,0,0.4);
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: #FFDE00;
+          font-size: clamp(0.85rem, 1.8vw, 1rem);
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .comment-add-btn:hover {
+          background: linear-gradient(135deg, rgba(255,222,0,0.3) 0%, rgba(255,222,0,0.2) 100%);
+        }
+
+        .comment-save-btn {
+          width: 100%;
+          padding: clamp(0.6rem, 1.2vh, 0.8rem);
+          margin-top: clamp(0.5rem, 1vh, 0.75rem);
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border: none;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(0.9rem, 1.8vw, 1.05rem);
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .comment-save-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(102,126,234,0.4);
+        }
+
         /* Popup Modal Styles */
         .popup-overlay {
           display: none;
@@ -1415,6 +1507,7 @@ export function renderPokemonCard(pokemonName) {
           </div>
 
           <div class="info-buttons-grid">
+            <button class="info-button" id="commentsButton">Comments (${comments.length})</button>
             <button class="info-button" id="editPokemonButton">Edit Pokémon</button>
             <button class="info-button" id="battlePageButton">Battle Page</button>
           </div>
@@ -1716,6 +1809,28 @@ export function renderPokemonCard(pokemonName) {
               <button id="confirmEvolutionBtn" class="popup-button" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;">Evolve</button>
               <button id="cancelEvolutionBtn" class="popup-button" style="background: #999; color: white; padding: 0.75rem 2rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;">Cancel</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comments Popup -->
+      <div id="commentsPopup" class="popup-overlay">
+        <div class="popup-content" style="max-width: min(90vw, 550px);">
+          <div class="popup-header">
+            <div class="popup-title">Comments</div>
+            <button class="popup-close" id="closeCommentsPopup">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="comments-list" id="commentsList">
+              ${comments.length > 0 ? comments.map((comment, i) => `
+                <div class="comment-box" data-comment-index="${i}">
+                  <textarea class="comment-textarea">${comment}</textarea>
+                  <button class="comment-delete-btn" data-comment-index="${i}">&times;</button>
+                </div>
+              `).join('') : ''}
+            </div>
+            <button class="comment-add-btn" id="addCommentBtn">+ Add Comment</button>
+            <button class="comment-save-btn" id="saveCommentsBtn">Save Comments</button>
           </div>
         </div>
       </div>
@@ -2096,6 +2211,80 @@ export function attachPokemonCardListeners() {
     if (e.target.id === 'heldItemPopup') {
       document.getElementById('heldItemPopup').classList.remove('active');
     }
+  });
+
+  // Comments popup
+  document.getElementById('commentsButton')?.addEventListener('click', () => {
+    document.getElementById('commentsPopup').classList.add('active');
+  });
+
+  document.getElementById('closeCommentsPopup')?.addEventListener('click', () => {
+    document.getElementById('commentsPopup').classList.remove('active');
+  });
+
+  document.getElementById('commentsPopup')?.addEventListener('click', (e) => {
+    if (e.target.id === 'commentsPopup') {
+      document.getElementById('commentsPopup').classList.remove('active');
+    }
+  });
+
+  // Add comment button
+  document.getElementById('addCommentBtn')?.addEventListener('click', () => {
+    const commentsList = document.getElementById('commentsList');
+    const newIndex = commentsList.querySelectorAll('.comment-box').length;
+    const newBox = document.createElement('div');
+    newBox.className = 'comment-box';
+    newBox.dataset.commentIndex = newIndex;
+    newBox.innerHTML = `
+      <textarea class="comment-textarea" placeholder="Write a comment..."></textarea>
+      <button class="comment-delete-btn" data-comment-index="${newIndex}">&times;</button>
+    `;
+    commentsList.appendChild(newBox);
+
+    // Attach delete listener to the new box
+    newBox.querySelector('.comment-delete-btn').addEventListener('click', () => {
+      newBox.remove();
+    });
+
+    // Focus the new textarea
+    newBox.querySelector('.comment-textarea').focus();
+  });
+
+  // Delete comment buttons (for pre-existing comments)
+  document.querySelectorAll('.comment-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.comment-box').remove();
+    });
+  });
+
+  // Save comments button
+  document.getElementById('saveCommentsBtn')?.addEventListener('click', () => {
+    const textareas = document.querySelectorAll('#commentsList .comment-textarea');
+    const newComments = [];
+    textareas.forEach(ta => {
+      const val = ta.value.trim();
+      if (val) newComments.push(val);
+    });
+
+    const commentsString = newComments.join(';');
+    pokemonData[48] = commentsString;
+
+    // Update button count
+    const commentsBtn = document.getElementById('commentsButton');
+    if (commentsBtn) commentsBtn.textContent = `Comments (${newComments.length})`;
+
+    // Save to sessionStorage immediately
+    sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+
+    // Persist to database in background
+    PokemonAPI.update(pokemonData).then(() => {
+      console.log('Comments saved to backend');
+    }).catch(error => {
+      console.error('Error saving comments to backend:', error);
+    });
+
+    // Close popup
+    document.getElementById('commentsPopup').classList.remove('active');
   });
 
   // Current HP/VP boxes click listeners - open combat tracker

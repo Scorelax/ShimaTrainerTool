@@ -248,8 +248,8 @@ export function renderPokemonCard(pokemonName) {
   };
   const typingButtons = type2 ? `${createTypeButton(type1)}${createTypeButton(type2)}` : createTypeButton(type1);
 
-  // Format saving throws - replace newlines with commas
-  const savingThrowFormatted = savingThrow.replace(/\n/g, ', ');
+  // Format saving throws - keep as newline-separated for column layout
+  const savingThrowFormatted = savingThrow;
 
   // STAB display
   const stab = `+${stabBonus}`;
@@ -1494,8 +1494,8 @@ export function renderPokemonCard(pokemonName) {
               <span class="info-item-label">Typing:</span>
               <span class="info-item-value" id="pokemonTyping">${typingButtons}</span>
             </div>
-            <div class="info-item">
-              <span class="info-item-label">Saving Throw(s):</span>
+            <div class="info-item-column">
+              <span class="info-item-label">Saving Throws:</span>
               <span class="info-item-value" id="pokemonSavingThrow">${savingThrowFormatted}</span>
             </div>
             ${sensesArray.length > 0 ? `

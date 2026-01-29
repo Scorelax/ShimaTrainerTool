@@ -613,24 +613,7 @@ export function renderPokemonCard(pokemonName) {
 
         .battle-toggle-btn {
           background: linear-gradient(135deg, #3B4CCA 0%, #3B4CCA 45%, #FFDE00 50%, #EE1515 55%, #EE1515 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: clamp(0.4rem, 0.8vw, 0.6rem);
           border-color: #FFDE00;
-        }
-
-        .battle-btn-text {
-          text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        .battle-btn-vs {
-          font-size: clamp(0.65rem, 1.3vw, 0.8rem);
-          font-weight: 900;
-          background: rgba(0,0,0,0.4);
-          padding: clamp(1px, 0.2vh, 2px) clamp(4px, 0.8vw, 6px);
-          border-radius: clamp(4px, 0.8vw, 6px);
-          letter-spacing: 1px;
         }
 
         .right-column {
@@ -1529,9 +1512,9 @@ export function renderPokemonCard(pokemonName) {
           </div>
 
           <div class="info-buttons-grid">
-            <button class="info-button" id="commentsButton">Comments (${comments.length})</button>
-            <button class="info-button" id="editPokemonButton">Edit Pokémon</button>
-            <button class="info-button battle-toggle-btn" id="battlePageButton"><span class="battle-btn-text">⚔️ Battle Page</span><span class="battle-btn-vs">VS</span></button>
+            <button class="info-button" id="commentsButton">💬 Comments (${comments.length})</button>
+            <button class="info-button" id="editPokemonButton">✏️ Edit Pokémon</button>
+            <button class="info-button battle-toggle-btn" id="battlePageButton">⚔️ Battle Page</button>
           </div>
         </div>
 
@@ -1897,7 +1880,7 @@ export function attachPokemonCardListeners() {
       battlePage.classList.remove('hidden-page');
       battlePage.classList.add('active-page');
       if (battlePageButton) {
-        battlePageButton.innerHTML = '<span class="battle-btn-text">📋 Info Page</span><span class="battle-btn-vs">VS</span>';
+        battlePageButton.textContent = 'ℹ️ Info Page';
       }
     } else {
       // Switch to info page
@@ -1906,7 +1889,7 @@ export function attachPokemonCardListeners() {
       infoPage.classList.remove('hidden-page');
       infoPage.classList.add('active-page');
       if (battlePageButton) {
-        battlePageButton.innerHTML = '<span class="battle-btn-text">⚔️ Battle Page</span><span class="battle-btn-vs">VS</span>';
+        battlePageButton.textContent = '⚔️ Battle Page';
       }
     }
   }
@@ -2956,6 +2939,7 @@ function showMoveDetails(moveName) {
               <div><strong>Action Type:</strong> <span id="moveActionTypePopup"></span></div>
               <div><strong>VP Cost:</strong> <span id="moveVPCostPopup"></span></div>
               <div><strong>Duration:</strong> <span id="moveDurationPopup"></span></div>
+              <div><strong>Size:</strong> <span id="moveSizePopup"></span></div>
               <div style="grid-column: 1 / -1;"><strong>Range:</strong> <span id="moveRangePopup"></span></div>
             </div>
             <div style="margin-bottom: 0.8rem; padding: 0.8rem; background: rgba(0,0,0,0.1); border-radius: 8px;">
@@ -3129,6 +3113,7 @@ function showMoveDetails(moveName) {
     document.getElementById('moveActionTypePopup').textContent = move[3];
     document.getElementById('moveVPCostPopup').textContent = move[4];
     document.getElementById('moveDurationPopup').textContent = move[5];
+    document.getElementById('moveSizePopup').textContent = move[9] || 'N/A';
     document.getElementById('moveRangePopup').textContent = move[6];
     document.getElementById('moveDescriptionPopup').textContent = move[7];
     document.getElementById('moveHigherLevelsPopup').textContent = move[8];

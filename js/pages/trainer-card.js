@@ -396,44 +396,64 @@ export function renderTrainerCard() {
           font-size: clamp(1rem, 2vw, 1.3rem);
         }
 
-        .pokemon-center-container {
+        /* Poké Center - Mirrored utility slot on the left */
+        .pokecenter-container {
+          position: absolute;
+          right: calc(50% + clamp(130px, 18vw, 180px));
+          bottom: clamp(2.5rem, 5vh, 3.5rem);
           display: flex;
           flex-direction: column;
           align-items: center;
+          z-index: 1;
+          cursor: pointer;
+        }
+
+        .pokecenter-label {
+          color: white;
+          font-size: clamp(1rem, 2vw, 1.4rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+
+        .pokecenter-slot {
+          width: clamp(120px, 20vw, 180px);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          background: transparent;
+          padding: 0;
+          border-radius: 0;
+          border: none;
           cursor: pointer;
           transition: transform 0.3s, filter 0.3s;
         }
 
-        .pokemon-center-container:hover {
+        .pokecenter-slot:hover {
           transform: translateY(clamp(-3px, -0.8vh, -5px));
           filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
 
-        .pokemon-center-icon {
+        .pokecenter-slot img {
           width: 85%;
-          max-width: clamp(100px, 17vw, 153px);
+          height: auto;
           aspect-ratio: 1;
           border-radius: clamp(12px, 2.5vw, 18px);
+          object-fit: cover;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
           background-color: #fff;
-          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          overflow: hidden;
         }
 
-        .pokemon-center-icon img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .pokemon-center-label {
+        .pokecenter-slot .pokecenter-name {
           font-size: clamp(1.1rem, 2.4vw, 1.5rem);
           font-weight: 900;
           color: #FFDE00;
           text-align: center;
+          margin-bottom: clamp(0.2rem, 0.5vh, 0.3rem);
           text-shadow: 0 2px 6px rgba(0,0,0,0.8);
-          text-transform: uppercase;
         }
 
         /* Back Button */
@@ -573,6 +593,14 @@ export function renderTrainerCard() {
             width: clamp(80px, 16vw, 130px);
           }
 
+          .pokecenter-container {
+            right: calc(50% + clamp(90px, 14vw, 130px));
+          }
+
+          .pokecenter-slot {
+            width: clamp(80px, 16vw, 130px);
+          }
+
           .trainer-utility-wrapper {
             min-height: clamp(220px, 30vw, 300px);
           }
@@ -613,6 +641,23 @@ export function renderTrainerCard() {
 
           .utility-slot .pokemon-level {
             font-size: clamp(0.6rem, 1.5vw, 0.85rem);
+          }
+
+          .pokecenter-container {
+            right: calc(50% + clamp(70px, 18vw, 100px));
+            bottom: clamp(1.5rem, 4vh, 2.5rem);
+          }
+
+          .pokecenter-slot {
+            width: clamp(60px, 18vw, 100px);
+          }
+
+          .pokecenter-label {
+            font-size: clamp(0.7rem, 1.8vw, 1rem);
+          }
+
+          .pokecenter-slot .pokecenter-name {
+            font-size: clamp(0.7rem, 1.8vw, 1rem);
           }
 
           .trainer-utility-wrapper {
@@ -675,6 +720,24 @@ export function renderTrainerCard() {
             font-size: clamp(0.6rem, 1.5vw, 0.8rem);
           }
 
+          .pokecenter-container {
+            right: calc(50% + clamp(55px, 15vw, 75px));
+            bottom: clamp(1rem, 3vh, 2rem);
+          }
+
+          .pokecenter-slot {
+            width: clamp(50px, 15vw, 70px);
+          }
+
+          .pokecenter-label {
+            font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+            margin-bottom: clamp(0.25rem, 0.5vh, 0.4rem);
+          }
+
+          .pokecenter-slot .pokecenter-name {
+            font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+          }
+
           .utility-slot .pokemon-level {
             font-size: clamp(0.5rem, 1.3vw, 0.7rem);
           }
@@ -721,6 +784,15 @@ export function renderTrainerCard() {
           </div>
           <div class="trainer-name">${trainerName}</div>
           <div class="trainer-level">Level ${trainerLevel}</div>
+        </div>
+
+        <!-- Poké Center - Mirrored on left -->
+        <div class="pokecenter-container" id="pokemonCenterBtn">
+          <div class="pokecenter-label">Poké Center</div>
+          <div class="pokecenter-slot">
+            <img src="assets/pokecenter.png" alt="Poké Center">
+            <div class="pokecenter-name">Heal All</div>
+          </div>
         </div>
 
         <!-- Utility Container -->
@@ -786,10 +858,6 @@ export function renderTrainerCard() {
             <span class="rest-btn-icon">🌙</span>
             <span class="rest-btn-label">Long Rest</span>
           </button>
-        </div>
-        <div class="pokemon-center-container" id="pokemonCenterBtn">
-          <div class="pokemon-center-icon"><img src="assets/pokecenter.png" alt="Poké Center"></div>
-          <div class="pokemon-center-label">Poké Center</div>
         </div>
       </div>
 

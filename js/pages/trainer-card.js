@@ -543,24 +543,6 @@ export function renderTrainerCard() {
         }
 
         .exit-confirm {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
-          color: white;
-          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
-          font-weight: 900;
-          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1.5rem, 3vw, 2rem);
-          border: none;
-          border-radius: clamp(12px, 2.5vw, 18px);
-          cursor: pointer;
-          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 18px) rgba(238,21,21,0.4);
-          transition: all 0.3s;
-        }
-
-        .exit-confirm:hover {
-          transform: translateY(clamp(-2px, -0.5vh, -3px));
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(238,21,21,0.5);
-        }
-
-        .exit-cancel {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
           font-size: clamp(1.1rem, 2.3vw, 1.5rem);
@@ -573,9 +555,27 @@ export function renderTrainerCard() {
           transition: all 0.3s;
         }
 
-        .exit-cancel:hover {
+        .exit-confirm:hover {
           transform: translateY(clamp(-2px, -0.5vh, -3px));
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(76,175,80,0.5);
+        }
+
+        .exit-cancel {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
+          font-weight: 900;
+          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1.5rem, 3vw, 2rem);
+          border: none;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          cursor: pointer;
+          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 18px) rgba(238,21,21,0.4);
+          transition: all 0.3s;
+        }
+
+        .exit-cancel:hover {
+          transform: translateY(clamp(-2px, -0.5vh, -3px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(238,21,21,0.5);
         }
 
         /* Tablet - keep layout, adjust sizes */

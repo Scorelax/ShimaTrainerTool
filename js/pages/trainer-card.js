@@ -396,6 +396,10 @@ export function renderTrainerCard() {
           font-size: clamp(1rem, 2vw, 1.3rem);
         }
 
+        .pokemon-center-btn {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+        }
+
         /* Back Button */
         .back-button {
           position: fixed;
@@ -747,6 +751,22 @@ export function renderTrainerCard() {
             <span class="rest-btn-label">Long Rest</span>
           </button>
         </div>
+        <button class="rest-btn pokemon-center-btn" id="pokemonCenterBtn">
+          <span class="rest-btn-icon">🏥</span>
+          <span class="rest-btn-label">Pokémon Center</span>
+        </button>
+      </div>
+
+      <!-- Pokemon Center Confirmation Modal -->
+      <div class="exit-modal" id="pokemonCenterModal">
+        <div class="exit-modal-content">
+          <h2>Pokémon Center</h2>
+          <p>Fully restore HP, VP, HD and VD for the trainer and all Pokémon?</p>
+          <div class="exit-buttons">
+            <button class="exit-confirm" id="pokemonCenterConfirm">Yes, Restore All</button>
+            <button class="exit-cancel" id="pokemonCenterCancel">Cancel</button>
+          </div>
+        </div>
       </div>
 
       <!-- Exit Confirmation Modal -->
@@ -820,6 +840,84 @@ export function attachTrainerCardListeners() {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'trainer-info' }
     }));
+  });
+
+  // Pokemon Center button - show confirmation
+  document.getElementById('pokemonCenterBtn')?.addEventListener('click', () => {
+    document.getElementById('pokemonCenterModal').classList.add('active');
+  });
+
+  document.getElementById('pokemonCenterCancel')?.addEventListener('click', () => {
+    document.getElementById('pokemonCenterModal').classList.remove('active');
+  });
+
+  document.getElementById('pokemonCenterConfirm')?.addEventListener('click', () => {
+    document.getElementById('pokemonCenterModal').classList.remove('active');
+
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) return;
+
+    const trainerData = JSON.parse(trainerDataRaw);
+
+    // Restore trainer HP, VP, HD, VD to max
+    trainerData[34] = parseInt(trainerData[11], 10); // currentHP = maxHP
+    trainerData[35] = parseInt(trainerData[12], 10); // currentVP = maxVP
+    trainerData[47] = parseInt(trainerData[3], 10);  // currentHD = maxHD
+    trainerData[48] = parseInt(trainerData[4], 10);  // currentVD = maxVD
+
+    // Refill all buff charges
+    const trainerLevel = parseInt(trainerData[2], 10);
+    if (window.getMaxCharges) {
+      trainerData[40] = window.getMaxCharges('Second Wind', trainerLevel);
+      trainerData[41] = window.getMaxCharges('Rapid Orders', trainerLevel);
+      trainerData[42] = window.getMaxCharges('Unbreakable Bond', trainerLevel);
+      trainerData[43] = window.getMaxCharges('Elemental Synergy', trainerLevel);
+      trainerData[44] = window.getMaxCharges('Master Trainer', trainerLevel);
+    }
+
+    // Refill battle dice for Ace Trainer
+    const trainerPath = trainerData[25] || '';
+    if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
+      const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
+      const maxBattleDice = 1 + wisModifier;
+      trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
+    }
+
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Restore ALL Pokemon (active party and stored)
+    const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
+    const pokemonToUpdate = [];
+
+    allPokemonKeys.forEach(key => {
+      const pokemonData = JSON.parse(sessionStorage.getItem(key));
+      if (!pokemonData) return;
+
+      // Restore HP, VP, HD, VD to max
+      pokemonData[45] = parseInt(pokemonData[10], 10); // currentHP = maxHP
+      pokemonData[46] = parseInt(pokemonData[12], 10); // currentVP = maxVP
+      pokemonData[54] = parseInt(pokemonData[9], 10);  // currentHD = maxHD
+      pokemonData[55] = parseInt(pokemonData[11], 10); // currentVD = maxVD
+
+      sessionStorage.setItem(key, JSON.stringify(pokemonData));
+      pokemonToUpdate.push(pokemonData);
+    });
+
+    // Update database in background
+    import('../api.js').then(({ TrainerAPI, PokemonAPI }) => {
+      TrainerAPI.update(trainerData).then(() => {
+        console.log('Pokemon Center: trainer data saved');
+      }).catch(err => console.error('Pokemon Center: trainer save error:', err));
+
+      pokemonToUpdate.forEach(pokemon => {
+        PokemonAPI.update(pokemon).then(() => {
+          console.log(`Pokemon Center: ${pokemon[2]} saved`);
+        }).catch(err => console.error(`Pokemon Center: ${pokemon[2]} save error:`, err));
+      });
+    });
+
+    // Reload to reflect changes
+    window.location.reload();
   });
 
   // Back button - show exit confirmation

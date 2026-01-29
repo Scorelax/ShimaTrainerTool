@@ -2128,7 +2128,7 @@ export function renderTrainerInfo() {
       <div class="popup-overlay" id="shortRestPokemonSelectionPopup">
         <div class="popup-content">
           <div class="popup-header">
-            <div class="popup-title">Select Pokemon to Restore</div>
+            <div class="popup-title">SHORT REST</div>
             <button class="popup-close" id="closeShortRestPokemonSelection">×</button>
           </div>
           <div class="popup-body">
@@ -2144,11 +2144,10 @@ export function renderTrainerInfo() {
       <div class="popup-overlay" id="shortRestSelectionPopup">
         <div class="popup-content">
           <div class="popup-header">
-            <div class="popup-title">Short Rest - Select Who to Heal</div>
+            <div class="popup-title">SHORT REST</div>
             <button class="popup-close" id="closeShortRestSelection">×</button>
           </div>
           <div class="popup-body">
-            <p style="margin-bottom: 1rem; color: #aaa;">Select trainer and/or Pokemon to heal during this short rest:</p>
             <div id="shortRestSelectionList" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
               <!-- Dynamically populated -->
             </div>
@@ -2163,7 +2162,7 @@ export function renderTrainerInfo() {
       <div class="popup-overlay" id="shortRestHealingPopup">
         <div class="popup-content">
           <div class="popup-header">
-            <div class="popup-title">Short Rest - <span id="shortRestEntityName">Trainer</span></div>
+            <div class="popup-title">SHORT REST - <span id="shortRestEntityName">Trainer</span></div>
             <button class="popup-close" id="closeShortRestHealing">×</button>
           </div>
           <div class="popup-body" style="color: #e0e0e0;">
@@ -4300,7 +4299,7 @@ function showLongRestPokemonSelection(activePokemon) {
 
   // Update popup title and button text for long rest
   if (popupTitle) {
-    popupTitle.textContent = 'Long Rest - Select Pokemon';
+    popupTitle.textContent = 'LONG REST';
   }
   if (completeButton) {
     completeButton.textContent = 'Complete Long Rest';

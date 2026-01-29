@@ -1671,16 +1671,35 @@ async function completeLongRest(selectedPokemon) {
   // Update session storage
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-  // Restore selected Pokemon HP and VP
-  const pokemonName = selectedPokemon[2];
-  const pokemonMaxHP = parseInt(selectedPokemon[10], 10);
-  const pokemonMaxVP = parseInt(selectedPokemon[12], 10);
-  selectedPokemon[45] = pokemonMaxHP;
-  selectedPokemon[46] = pokemonMaxVP;
+  // Restore half HD/VD for ALL active party Pokemon, and full HP/VP for the selected one
+  const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
+  const pokemonToUpdate = [];
 
-  // Update Pokemon in sessionStorage
-  const pokemonKey = `pokemon_${pokemonName.toLowerCase()}`;
-  sessionStorage.setItem(pokemonKey, JSON.stringify(selectedPokemon));
+  allPokemonKeys.forEach(key => {
+    const pokemonData = JSON.parse(sessionStorage.getItem(key));
+    if (!pokemonData) return;
+
+    const slotNumber = parseInt(pokemonData[38], 10);
+    if (!slotNumber || slotNumber < 1 || slotNumber > 6) return; // Skip non-active Pokemon
+
+    // Restore half HD/VD for all active party Pokemon
+    const pkMaxHD = parseInt(pokemonData[9], 10) || 0;
+    const pkMaxVD = parseInt(pokemonData[11], 10) || 0;
+    const pkCurrentHD = (pokemonData[54] === '' || pokemonData[54] === null || pokemonData[54] === undefined) ? pkMaxHD : parseInt(pokemonData[54], 10);
+    const pkCurrentVD = (pokemonData[55] === '' || pokemonData[55] === null || pokemonData[55] === undefined) ? pkMaxVD : parseInt(pokemonData[55], 10);
+
+    pokemonData[54] = Math.min(pkCurrentHD + Math.floor(pkMaxHD / 2), pkMaxHD);
+    pokemonData[55] = Math.min(pkCurrentVD + Math.floor(pkMaxVD / 2), pkMaxVD);
+
+    // Restore full HP/VP only for the selected Pokemon
+    if (pokemonData[2] === selectedPokemon[2]) {
+      pokemonData[45] = parseInt(pokemonData[10], 10);
+      pokemonData[46] = parseInt(pokemonData[12], 10);
+    }
+
+    sessionStorage.setItem(key, JSON.stringify(pokemonData));
+    pokemonToUpdate.push(pokemonData);
+  });
 
   // Close selection popup and reload
   document.getElementById('shortRestPokemonSelectionPopup')?.classList.remove('active');
@@ -1695,9 +1714,11 @@ async function completeLongRest(selectedPokemon) {
     console.error('Error saving trainer long rest to backend:', error);
   });
 
-  PokemonAPI.update(selectedPokemon).then(() => {
-    console.log('Long rest Pokemon data saved to backend');
-  }).catch(error => {
-    console.error('Error saving Pokemon long rest to backend:', error);
+  pokemonToUpdate.forEach(pokemon => {
+    PokemonAPI.update(pokemon).then(() => {
+      console.log(`Long rest: ${pokemon[2]} saved to backend`);
+    }).catch(error => {
+      console.error(`Error saving ${pokemon[2]} long rest to backend:`, error);
+    });
   });
 }

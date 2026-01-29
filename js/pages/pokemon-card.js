@@ -611,6 +611,28 @@ export function renderPokemonCard(pokemonName) {
           transform: translateY(0);
         }
 
+        .battle-toggle-btn {
+          background: linear-gradient(135deg, #3B4CCA 0%, #3B4CCA 45%, #FFDE00 50%, #EE1515 55%, #EE1515 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(0.4rem, 0.8vw, 0.6rem);
+          border-color: #FFDE00;
+        }
+
+        .battle-btn-text {
+          text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .battle-btn-vs {
+          font-size: clamp(0.65rem, 1.3vw, 0.8rem);
+          font-weight: 900;
+          background: rgba(0,0,0,0.4);
+          padding: clamp(1px, 0.2vh, 2px) clamp(4px, 0.8vw, 6px);
+          border-radius: clamp(4px, 0.8vw, 6px);
+          letter-spacing: 1px;
+        }
+
         .right-column {
           display: flex;
           flex-direction: column;
@@ -1509,7 +1531,7 @@ export function renderPokemonCard(pokemonName) {
           <div class="info-buttons-grid">
             <button class="info-button" id="commentsButton">Comments (${comments.length})</button>
             <button class="info-button" id="editPokemonButton">Edit Pokémon</button>
-            <button class="info-button" id="battlePageButton">Battle Page</button>
+            <button class="info-button battle-toggle-btn" id="battlePageButton"><span class="battle-btn-text">⚔️ Battle Page</span><span class="battle-btn-vs">VS</span></button>
           </div>
         </div>
 
@@ -1875,7 +1897,7 @@ export function attachPokemonCardListeners() {
       battlePage.classList.remove('hidden-page');
       battlePage.classList.add('active-page');
       if (battlePageButton) {
-        battlePageButton.textContent = 'Info Page';
+        battlePageButton.innerHTML = '<span class="battle-btn-text">📋 Info Page</span><span class="battle-btn-vs">VS</span>';
       }
     } else {
       // Switch to info page
@@ -1884,7 +1906,7 @@ export function attachPokemonCardListeners() {
       infoPage.classList.remove('hidden-page');
       infoPage.classList.add('active-page');
       if (battlePageButton) {
-        battlePageButton.textContent = 'Battle Page';
+        battlePageButton.innerHTML = '<span class="battle-btn-text">⚔️ Battle Page</span><span class="battle-btn-vs">VS</span>';
       }
     }
   }

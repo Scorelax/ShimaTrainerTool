@@ -1,5 +1,31 @@
 // Trainer Card Page - Hub with Trainer Image, Party Slots, and Utility Slot
 
+import { showError } from '../utils/notifications.js';
+
+// Helper function to get max charges for a buff based on trainer level
+function getMaxCharges(buffName, trainerLevel) {
+  switch (buffName) {
+    case 'Second Wind':
+      if (trainerLevel >= 7) return 5;
+      if (trainerLevel >= 3) return 2;
+      return 0;
+    case 'Rapid Orders':
+      return trainerLevel >= 6 ? 1 : 0;
+    case 'Unbreakable Bond':
+      return trainerLevel >= 13 ? 1 : 0;
+    case 'Elemental Synergy':
+      return trainerLevel >= 18 ? 1 : 0;
+    case 'Master Trainer':
+      return trainerLevel >= 20 ? 2 : 0;
+    default:
+      return 0;
+  }
+}
+
+// Short rest state management
+let shortRestQueue = [];
+let shortRestCurrentIndex = 0;
+
 export function renderTrainerCard() {
   // Load trainer data from session storage
   const trainerDataStr = sessionStorage.getItem('trainerData');
@@ -490,6 +516,83 @@ export function renderTrainerCard() {
           transform: scale(1.05);
         }
 
+        /* Popup Overlay Styles (for rest popups) */
+        .popup-overlay {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.7);
+          z-index: 2000;
+          justify-content: center;
+          align-items: center;
+          backdrop-filter: blur(3px);
+        }
+
+        .popup-overlay.active {
+          display: flex;
+        }
+
+        .popup-content {
+          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 20px);
+          padding: clamp(1.5rem, 3vw, 2.5rem);
+          max-width: min(90vw, 600px);
+          max-height: 80vh;
+          overflow-y: auto;
+          position: relative;
+          box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+        }
+
+        .popup-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          padding-bottom: clamp(0.75rem, 1.5vh, 1rem);
+          border-bottom: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+        }
+
+        .popup-title {
+          font-size: clamp(1.3rem, 3vw, 1.8rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          color: #FFDE00;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .popup-close {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: 50%;
+          width: clamp(35px, 7vw, 45px);
+          height: clamp(35px, 7vw, 45px);
+          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+          font-weight: bold;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          flex-shrink: 0;
+        }
+
+        .popup-close:hover {
+          transform: scale(1.1) rotate(90deg);
+          box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+
+        .popup-body {
+          color: #e0e0e0;
+          font-size: clamp(0.95rem, 2vw, 1.1rem);
+          line-height: 1.6;
+        }
+
         /* Exit Confirmation Modal */
         .exit-modal {
           display: none;
@@ -883,6 +986,92 @@ export function renderTrainerCard() {
           </div>
         </div>
       </div>
+
+      <!-- Short Rest Selection Popup -->
+      <div class="popup-overlay" id="shortRestSelectionPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">SHORT REST</div>
+            <button class="popup-close" id="closeShortRestSelection">×</button>
+          </div>
+          <div class="popup-body">
+            <div id="shortRestSelectionList" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+              <!-- Dynamically populated -->
+            </div>
+            <div class="popup-footer">
+              <button id="continueShortRestButton" class="popup-button">Continue</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Short Rest Healing Popup -->
+      <div class="popup-overlay" id="shortRestHealingPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">SHORT REST - <span id="shortRestEntityName">Trainer</span></div>
+            <button class="popup-close" id="closeShortRestHealing">×</button>
+          </div>
+          <div class="popup-body" style="color: #e0e0e0;">
+            <div style="text-align: center; margin-bottom: 0.75rem; color: #aaa; font-size: 0.9rem;">
+              <span id="shortRestProgress">1 / 1</span>
+            </div>
+            <div style="margin-bottom: 1rem;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <span>Current HP:</span>
+                <span id="shortRestCurrentHP">0 / 0</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span>Current VP:</span>
+                <span id="shortRestCurrentVP">0 / 0</span>
+              </div>
+            </div>
+            <div style="border-top: 1px solid #555; padding-top: 1rem; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                <label for="hdToUse" style="font-weight: 600;">HD to use:</label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="number" id="hdToUse" min="0" value="0" style="width: 60px; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; text-align: center; background: #3a3a3a; color: white;">
+                  <span id="hdAvailable">/ 0 available</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <label for="hpToHeal" style="font-weight: 600;">HP healed:</label>
+                <input type="number" id="hpToHeal" min="0" value="0" style="width: 80px; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; text-align: center; background: #3a3a3a; color: white;">
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                <label for="vdToUse" style="font-weight: 600;">VD to use:</label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="number" id="vdToUse" min="0" value="0" style="width: 60px; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; text-align: center; background: #3a3a3a; color: white;">
+                  <span id="vdAvailable">/ 0 available</span>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <label for="vpToHeal" style="font-weight: 600;">VP healed:</label>
+                <input type="number" id="vpToHeal" min="0" value="0" style="width: 80px; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; text-align: center; background: #3a3a3a; color: white;">
+              </div>
+            </div>
+            <div class="popup-footer">
+              <button id="completeShortRestHealingButton" class="popup-button">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Long Rest Pokemon Selection Popup -->
+      <div class="popup-overlay" id="shortRestPokemonSelectionPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">SHORT REST</div>
+            <button class="popup-close" id="closeShortRestPokemonSelection">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="pokemon-selection-grid"></div>
+            <div class="popup-footer">
+              <button id="completeShortRestButton" class="popup-button" disabled>Complete Short Rest</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -930,19 +1119,13 @@ export function attachTrainerCardListeners() {
     }));
   });
 
-  // Rest buttons - navigate to trainer-info and auto-trigger rest
+  // Rest buttons - open rest popups directly
   document.getElementById('shortRestBtn')?.addEventListener('click', () => {
-    sessionStorage.setItem('pendingRest', 'short');
-    window.dispatchEvent(new CustomEvent('navigate', {
-      detail: { route: 'trainer-info' }
-    }));
+    showShortRestSelectionPopup();
   });
 
   document.getElementById('longRestBtn')?.addEventListener('click', () => {
-    sessionStorage.setItem('pendingRest', 'long');
-    window.dispatchEvent(new CustomEvent('navigate', {
-      detail: { route: 'trainer-info' }
-    }));
+    handleLongRest();
   });
 
   // Pokemon Center button - show confirmation
@@ -970,13 +1153,11 @@ export function attachTrainerCardListeners() {
 
     // Refill all buff charges
     const trainerLevel = parseInt(trainerData[2], 10);
-    if (window.getMaxCharges) {
-      trainerData[40] = window.getMaxCharges('Second Wind', trainerLevel);
-      trainerData[41] = window.getMaxCharges('Rapid Orders', trainerLevel);
-      trainerData[42] = window.getMaxCharges('Unbreakable Bond', trainerLevel);
-      trainerData[43] = window.getMaxCharges('Elemental Synergy', trainerLevel);
-      trainerData[44] = window.getMaxCharges('Master Trainer', trainerLevel);
-    }
+    trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
+    trainerData[41] = getMaxCharges('Rapid Orders', trainerLevel);
+    trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
+    trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
+    trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
 
     // Refill battle dice for Ace Trainer
     const trainerPath = trainerData[25] || '';
@@ -1042,5 +1223,481 @@ export function attachTrainerCardListeners() {
   // Exit cancel
   document.getElementById('exitCancel')?.addEventListener('click', () => {
     document.getElementById('exitModal').classList.remove('active');
+  });
+
+  // Rest popup close listeners
+  document.getElementById('closeShortRestPokemonSelection')?.addEventListener('click', () => {
+    document.getElementById('shortRestPokemonSelectionPopup').classList.remove('active');
+  });
+  document.getElementById('closeShortRestSelection')?.addEventListener('click', () => {
+    document.getElementById('shortRestSelectionPopup').classList.remove('active');
+  });
+  document.getElementById('closeShortRestHealing')?.addEventListener('click', () => {
+    document.getElementById('shortRestHealingPopup').classList.remove('active');
+  });
+  document.getElementById('continueShortRestButton')?.addEventListener('click', () => startShortRestHealing());
+  document.getElementById('completeShortRestHealingButton')?.addEventListener('click', () => processShortRestHealing());
+}
+
+// ============================================================================
+// SHORT REST AND LONG REST FUNCTIONS
+// ============================================================================
+
+function handleLongRest() {
+  const trainerDataRaw = sessionStorage.getItem('trainerData');
+  if (!trainerDataRaw) {
+    showError('Trainer data not found.');
+    return;
+  }
+
+  const trainerData = JSON.parse(trainerDataRaw);
+
+  // Get all Pokemon for this trainer from session storage
+  const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
+
+  if (allPokemonKeys.length === 0) {
+    showError('No Pokemon data found.');
+    return;
+  }
+
+  // Filter for active party Pokemon
+  const activePokemon = [];
+  for (const key of allPokemonKeys) {
+    const pokemonDataStr = sessionStorage.getItem(key);
+    if (!pokemonDataStr) continue;
+
+    const pokemonData = JSON.parse(pokemonDataStr);
+
+    // Check if this Pokemon is in active party (index 38 is slot number 1-6)
+    const slotNumber = parseInt(pokemonData[38], 10);
+    if (slotNumber && slotNumber >= 1 && slotNumber <= 6) {
+      activePokemon.push(pokemonData);
+    }
+  }
+
+  if (activePokemon.length === 0) {
+    showError('No Pokemon in active party.');
+    return;
+  }
+
+  // Show Pokemon selection popup for long rest
+  showLongRestPokemonSelection(activePokemon);
+}
+
+function showShortRestSelectionPopup() {
+  const trainerDataRaw = sessionStorage.getItem('trainerData');
+  if (!trainerDataRaw) {
+    showError('Trainer data not found.');
+    return;
+  }
+
+  const trainerData = JSON.parse(trainerDataRaw);
+  const trainerName = trainerData[1];
+
+  // Get all active party Pokemon
+  const allPokemonKeys = Object.keys(sessionStorage).filter(key => key.startsWith('pokemon_'));
+  const activePokemon = [];
+
+  allPokemonKeys.forEach(key => {
+    const pokemon = JSON.parse(sessionStorage.getItem(key));
+    const slotNumber = parseInt(pokemon[38], 10);
+    if (slotNumber && slotNumber >= 1 && slotNumber <= 6) {
+      activePokemon.push(pokemon);
+    }
+  });
+
+  // Build selection list
+  const selectionList = document.getElementById('shortRestSelectionList');
+  selectionList.innerHTML = '';
+
+  // Add trainer option
+  const trainerCurrentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
+  const trainerMaxHP = parseInt(trainerData[11], 10);
+  const trainerCurrentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
+  const trainerMaxVP = parseInt(trainerData[12], 10);
+  const trainerMaxHD = parseInt(trainerData[3], 10) || 0;
+  const trainerMaxVD = parseInt(trainerData[4], 10) || 0;
+  const trainerCurrentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? trainerMaxHD : parseInt(trainerData[47], 10);
+  const trainerCurrentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? trainerMaxVD : parseInt(trainerData[48], 10);
+
+  const trainerItem = document.createElement('label');
+  trainerItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer; color: #333;';
+  trainerItem.innerHTML = `
+    <input type="checkbox" value="trainer" style="width: 20px; height: 20px; cursor: pointer;">
+    <div style="flex: 1;">
+      <div style="font-weight: 700;">${trainerName} (Trainer)</div>
+      <div style="font-size: 0.85rem; color: #666;">HP: ${trainerCurrentHP}/${trainerMaxHP} | VP: ${trainerCurrentVP}/${trainerMaxVP} | HD: ${trainerCurrentHD} | VD: ${trainerCurrentVD}</div>
+    </div>
+  `;
+  selectionList.appendChild(trainerItem);
+
+  // Add Pokemon options
+  activePokemon.forEach(pokemon => {
+    const pokemonName = pokemon[2];
+    const currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
+    const maxHP = parseInt(pokemon[10], 10);
+    const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
+    const maxVP = parseInt(pokemon[12], 10);
+    const pokemonMaxHD = parseInt(pokemon[9], 10) || 0;
+    const pokemonMaxVD = parseInt(pokemon[11], 10) || 0;
+    const currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? pokemonMaxHD : parseInt(pokemon[54], 10);
+    const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pokemonMaxVD : parseInt(pokemon[55], 10);
+
+    const pokemonItem = document.createElement('label');
+    pokemonItem.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f5f5f5; border-radius: 8px; cursor: pointer; color: #333;';
+    pokemonItem.innerHTML = `
+      <input type="checkbox" value="pokemon_${pokemonName.toLowerCase()}" style="width: 20px; height: 20px; cursor: pointer;">
+      <div style="flex: 1;">
+        <div style="font-weight: 700;">${pokemonName}</div>
+        <div style="font-size: 0.85rem; color: #666;">HP: ${currentHP}/${maxHP} | VP: ${currentVP}/${maxVP} | HD: ${currentHD} | VD: ${currentVD}</div>
+      </div>
+    `;
+    selectionList.appendChild(pokemonItem);
+  });
+
+  // Show the popup
+  document.getElementById('shortRestSelectionPopup')?.classList.add('active');
+}
+
+function startShortRestHealing() {
+  const selectionList = document.getElementById('shortRestSelectionList');
+  const checkboxes = selectionList.querySelectorAll('input[type="checkbox"]:checked');
+
+  if (checkboxes.length === 0) {
+    showError('Please select at least one trainer or Pokemon to heal.');
+    return;
+  }
+
+  // Build the healing queue
+  shortRestQueue = [];
+  shortRestCurrentIndex = 0;
+
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+
+  checkboxes.forEach(checkbox => {
+    if (checkbox.value === 'trainer') {
+      shortRestQueue.push({
+        type: 'trainer',
+        name: trainerData[1],
+        storageKey: 'trainerData'
+      });
+    } else {
+      const storageKey = checkbox.value;
+      const pokemon = JSON.parse(sessionStorage.getItem(storageKey));
+      shortRestQueue.push({
+        type: 'pokemon',
+        name: pokemon[2],
+        storageKey: storageKey
+      });
+    }
+  });
+
+  // Close selection popup and show first healing form
+  document.getElementById('shortRestSelectionPopup')?.classList.remove('active');
+  showShortRestHealingForm();
+}
+
+function showShortRestHealingForm() {
+  if (shortRestCurrentIndex >= shortRestQueue.length) {
+    // All done
+    document.getElementById('shortRestHealingPopup')?.classList.remove('active');
+    window.location.reload();
+    return;
+  }
+
+  const entity = shortRestQueue[shortRestCurrentIndex];
+  const isTrainer = entity.type === 'trainer';
+
+  // Update title and progress
+  document.getElementById('shortRestEntityName').textContent = entity.name;
+  document.getElementById('shortRestProgress').textContent = `${shortRestCurrentIndex + 1} / ${shortRestQueue.length}`;
+
+  // Get entity data
+  let currentHD, currentVD, currentHP, maxHP, currentVP, maxVP;
+
+  if (isTrainer) {
+    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    const maxHD = parseInt(trainerData[3], 10) || 0;
+    const maxVD = parseInt(trainerData[4], 10) || 0;
+    currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? maxHD : parseInt(trainerData[47], 10);
+    currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? maxVD : parseInt(trainerData[48], 10);
+    currentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
+    maxHP = parseInt(trainerData[11], 10);
+    currentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
+    maxVP = parseInt(trainerData[12], 10);
+  } else {
+    const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
+    const maxHD = parseInt(pokemon[9], 10) || 0;
+    const maxVD = parseInt(pokemon[11], 10) || 0;
+    currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? maxHD : parseInt(pokemon[54], 10);
+    currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? maxVD : parseInt(pokemon[55], 10);
+    currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
+    maxHP = parseInt(pokemon[10], 10);
+    currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
+    maxVP = parseInt(pokemon[12], 10);
+  }
+
+  // Update display values
+  document.getElementById('shortRestCurrentHP').textContent = `${currentHP} / ${maxHP}`;
+  document.getElementById('shortRestCurrentVP').textContent = `${currentVP} / ${maxVP}`;
+  document.getElementById('hdAvailable').textContent = `/ ${currentHD} available`;
+  document.getElementById('vdAvailable').textContent = `/ ${currentVD} available`;
+
+  // Reset input fields
+  const hdInput = document.getElementById('hdToUse');
+  const vdInput = document.getElementById('vdToUse');
+  const hpInput = document.getElementById('hpToHeal');
+  const vpInput = document.getElementById('vpToHeal');
+  hdInput.value = 0;
+  hdInput.max = currentHD;
+  vdInput.value = 0;
+  vdInput.max = currentVD;
+  hpInput.value = 0;
+  vpInput.value = 0;
+
+  // Update button text
+  const button = document.getElementById('completeShortRestHealingButton');
+  if (shortRestCurrentIndex === shortRestQueue.length - 1) {
+    button.textContent = 'Complete Short Rest';
+  } else {
+    button.textContent = 'Next';
+  }
+
+  // Show the popup
+  document.getElementById('shortRestHealingPopup')?.classList.add('active');
+}
+
+async function processShortRestHealing() {
+  const entity = shortRestQueue[shortRestCurrentIndex];
+  const isTrainer = entity.type === 'trainer';
+
+  const hdToUse = parseInt(document.getElementById('hdToUse').value, 10) || 0;
+  const vdToUse = parseInt(document.getElementById('vdToUse').value, 10) || 0;
+  const hpToHeal = parseInt(document.getElementById('hpToHeal').value, 10) || 0;
+  const vpToHeal = parseInt(document.getElementById('vpToHeal').value, 10) || 0;
+
+  // Allow skipping (0 HD and 0 VD) - just move to next
+  if (hdToUse === 0 && vdToUse === 0 && hpToHeal === 0 && vpToHeal === 0) {
+    shortRestCurrentIndex++;
+    showShortRestHealingForm();
+    return;
+  }
+
+  const { TrainerAPI, PokemonAPI } = await import('../api.js');
+
+  if (isTrainer) {
+    // Process trainer healing
+    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    const trMaxHD = parseInt(trainerData[3], 10) || 0;
+    const trMaxVD = parseInt(trainerData[4], 10) || 0;
+    const currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? trMaxHD : parseInt(trainerData[47], 10);
+    const currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? trMaxVD : parseInt(trainerData[48], 10);
+
+    if (hdToUse > currentHD) {
+      showError(`Not enough HD available. You have ${currentHD}.`);
+      return;
+    }
+    if (vdToUse > currentVD) {
+      showError(`Not enough VD available. You have ${currentVD}.`);
+      return;
+    }
+
+    const currentHP = parseInt(trainerData[34], 10) || parseInt(trainerData[11], 10);
+    const currentVP = parseInt(trainerData[35], 10) || parseInt(trainerData[12], 10);
+    const maxHP = parseInt(trainerData[11], 10);
+    const maxVP = parseInt(trainerData[12], 10);
+
+    const newHP = Math.min(currentHP + hpToHeal, maxHP);
+    const newVP = Math.min(currentVP + vpToHeal, maxVP);
+
+    trainerData[47] = currentHD - hdToUse;
+    trainerData[48] = currentVD - vdToUse;
+    trainerData[34] = newHP;
+    trainerData[35] = newVP;
+
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Update database in background
+    TrainerAPI.update(trainerData).catch(error => {
+      console.error('Error updating trainer data:', error);
+    });
+  } else {
+    // Process Pokemon healing
+    const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
+    const pkMaxHD = parseInt(pokemon[9], 10) || 0;
+    const pkMaxVD = parseInt(pokemon[11], 10) || 0;
+    const currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? pkMaxHD : parseInt(pokemon[54], 10);
+    const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pkMaxVD : parseInt(pokemon[55], 10);
+
+    if (hdToUse > currentHD) {
+      showError(`Not enough HD available. You have ${currentHD}.`);
+      return;
+    }
+    if (vdToUse > currentVD) {
+      showError(`Not enough VD available. You have ${currentVD}.`);
+      return;
+    }
+
+    const currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
+    const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
+    const maxHP = parseInt(pokemon[10], 10);
+    const maxVP = parseInt(pokemon[12], 10);
+
+    const newHP = Math.min(currentHP + hpToHeal, maxHP);
+    const newVP = Math.min(currentVP + vpToHeal, maxVP);
+
+    pokemon[54] = currentHD - hdToUse;
+    pokemon[55] = currentVD - vdToUse;
+    pokemon[45] = newHP;
+    pokemon[46] = newVP;
+
+    sessionStorage.setItem(entity.storageKey, JSON.stringify(pokemon));
+
+    // Update database in background
+    PokemonAPI.update(pokemon).catch(error => {
+      console.error('Error updating Pokemon data:', error);
+    });
+  }
+
+  // Move to next entity
+  shortRestCurrentIndex++;
+  showShortRestHealingForm();
+}
+
+function showLongRestPokemonSelection(activePokemon) {
+  const pokemonGrid = document.querySelector('.pokemon-selection-grid');
+  const completeButton = document.getElementById('completeShortRestButton');
+  const popupTitle = document.querySelector('#shortRestPokemonSelectionPopup .popup-title');
+
+  pokemonGrid.innerHTML = '';
+  completeButton.disabled = true;
+
+  // Update popup title and button text for long rest
+  if (popupTitle) {
+    popupTitle.textContent = 'LONG REST';
+  }
+  if (completeButton) {
+    completeButton.textContent = 'Complete Long Rest';
+  }
+
+  // Create selection item for each active Pokemon
+  activePokemon.forEach(pokemon => {
+    const pokemonName = pokemon[2];
+    const currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
+    const maxHP = parseInt(pokemon[10], 10);
+    const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
+    const maxVP = parseInt(pokemon[12], 10);
+
+    const item = document.createElement('div');
+    item.className = 'trainer-path-item';
+    item.innerHTML = `
+      <div style="font-weight: 700; margin-bottom: 0.5rem;">${pokemonName}</div>
+      <div style="font-size: 0.85rem; color: #666;">HP: ${currentHP}/${maxHP}</div>
+      <div style="font-size: 0.85rem; color: #666;">VP: ${currentVP}/${maxVP}</div>
+    `;
+    item.onclick = () => selectLongRestPokemon(pokemon);
+    pokemonGrid.appendChild(item);
+  });
+
+  // Show the popup
+  document.getElementById('shortRestPokemonSelectionPopup')?.classList.add('active');
+}
+
+function selectLongRestPokemon(pokemon) {
+  const completeButton = document.getElementById('completeShortRestButton');
+
+  // Remove selected class from all items
+  document.querySelectorAll('.pokemon-selection-grid .trainer-path-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+
+  // Add selected class to clicked item (find by Pokemon name)
+  const pokemonName = pokemon[2];
+  document.querySelectorAll('.pokemon-selection-grid .trainer-path-item').forEach(item => {
+    if (item.querySelector('div').textContent === pokemonName) {
+      item.classList.add('selected');
+    }
+  });
+
+  // Enable complete button
+  completeButton.disabled = false;
+  completeButton.onclick = () => completeLongRest(pokemon);
+}
+
+async function completeLongRest(selectedPokemon) {
+  if (!selectedPokemon) return;
+
+  const trainerDataRaw = sessionStorage.getItem('trainerData');
+  if (!trainerDataRaw) {
+    showError('Trainer data not found.');
+    return;
+  }
+
+  const trainerData = JSON.parse(trainerDataRaw);
+  const trainerLevel = parseInt(trainerData[2], 10);
+
+  // Restore trainer HP and VP to max
+  const maxHP = parseInt(trainerData[11], 10);
+  const maxVP = parseInt(trainerData[12], 10);
+  trainerData[34] = maxHP;
+  trainerData[35] = maxVP;
+
+  // Refill all buff charges to max
+  trainerData[40] = getMaxCharges('Second Wind', trainerLevel);
+  trainerData[41] = getMaxCharges('Rapid Orders', trainerLevel);
+  trainerData[42] = getMaxCharges('Unbreakable Bond', trainerLevel);
+  trainerData[43] = getMaxCharges('Elemental Synergy', trainerLevel);
+  trainerData[44] = getMaxCharges('Master Trainer', trainerLevel);
+
+  // Refill battle dice for Ace Trainer (index 45)
+  const trainerPath = trainerData[25] || '';
+  if (trainerPath === 'Ace Trainer' && trainerLevel >= 5) {
+    const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
+    const maxBattleDice = 1 + wisModifier;
+    trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
+  }
+
+  // Restore half of HD dice and VD dice
+  const maxHD = parseInt(trainerData[3], 10) || 0;
+  const maxVD = parseInt(trainerData[4], 10) || 0;
+  const currentHD = (trainerData[47] === '' || trainerData[47] === null || trainerData[47] === undefined) ? maxHD : parseInt(trainerData[47], 10);
+  const currentVD = (trainerData[48] === '' || trainerData[48] === null || trainerData[48] === undefined) ? maxVD : parseInt(trainerData[48], 10);
+
+  const hdToRestore = Math.floor(maxHD / 2);
+  const vdToRestore = Math.floor(maxVD / 2);
+  trainerData[47] = Math.min(currentHD + hdToRestore, maxHD);
+  trainerData[48] = Math.min(currentVD + vdToRestore, maxVD);
+
+  // Update session storage
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+  // Restore selected Pokemon HP and VP
+  const pokemonName = selectedPokemon[2];
+  const pokemonMaxHP = parseInt(selectedPokemon[10], 10);
+  const pokemonMaxVP = parseInt(selectedPokemon[12], 10);
+  selectedPokemon[45] = pokemonMaxHP;
+  selectedPokemon[46] = pokemonMaxVP;
+
+  // Update Pokemon in sessionStorage
+  const pokemonKey = `pokemon_${pokemonName.toLowerCase()}`;
+  sessionStorage.setItem(pokemonKey, JSON.stringify(selectedPokemon));
+
+  // Close selection popup and reload
+  document.getElementById('shortRestPokemonSelectionPopup')?.classList.remove('active');
+  window.location.reload();
+
+  // Update database in background
+  const { TrainerAPI, PokemonAPI } = await import('../api.js');
+
+  TrainerAPI.update(trainerData).then(() => {
+    console.log('Long rest trainer data saved to backend');
+  }).catch(error => {
+    console.error('Error saving trainer long rest to backend:', error);
+  });
+
+  PokemonAPI.update(selectedPokemon).then(() => {
+    console.log('Long rest Pokemon data saved to backend');
+  }).catch(error => {
+    console.error('Error saving Pokemon long rest to backend:', error);
   });
 }

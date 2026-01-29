@@ -1008,6 +1008,8 @@ export function renderTrainerInfo() {
 
         .item-info-card {
           flex: 1;
+          display: flex;
+          flex-direction: column;
           background: linear-gradient(135deg, #353535 0%, #2d2d2d 100%);
           border-radius: clamp(10px, 2vw, 15px);
           padding: clamp(1.2rem, 2.5vw, 2rem);
@@ -1087,10 +1089,16 @@ export function renderTrainerInfo() {
         }
 
         .inventory-actions {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
           gap: clamp(0.5rem, 1vw, 0.75rem);
-          justify-items: center;
+        }
+
+        .inventory-actions-row {
+          display: flex;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+          justify-content: center;
         }
 
         .inventory-actions .action-btn {
@@ -1113,7 +1121,7 @@ export function renderTrainerInfo() {
         }
 
         .inventory-actions .action-btn.full-width {
-          grid-column: 1 / -1;
+          width: 100%;
         }
 
         .inventory-actions .action-btn:hover:not(:disabled) {
@@ -1887,14 +1895,16 @@ export function renderTrainerInfo() {
                 </div>
               </div>
               <div class="inventory-actions">
-                <button class="action-btn" id="addItemButton">
-                  <span class="btn-icon">➕</span>
-                  <span class="btn-text">Add</span>
-                </button>
-                <button class="action-btn" id="editItemButton" disabled>
-                  <span class="btn-icon">✏️</span>
-                  <span class="btn-text">Edit</span>
-                </button>
+                <div class="inventory-actions-row">
+                  <button class="action-btn" id="addItemButton">
+                    <span class="btn-icon">➕</span>
+                    <span class="btn-text">Add</span>
+                  </button>
+                  <button class="action-btn" id="editItemButton" disabled>
+                    <span class="btn-icon">✏️</span>
+                    <span class="btn-text">Edit</span>
+                  </button>
+                </div>
                 <button class="action-btn full-width" id="removeItemButton" disabled>
                   <span class="btn-icon">🗑️</span>
                   <span class="btn-text">Remove</span>
@@ -2432,7 +2442,17 @@ export function attachTrainerInfoListeners() {
     // Re-select previously selected item if it still exists
     if (selectedItemData) {
       const previousName = selectedItemData.name;
-      const matchingItem = document.querySelector(`.inventory-list-item[data-item*='"name":"${previousName.replace(/'/g, "\\'")}"]`);
+      let matchingItem = null;
+
+      document.querySelectorAll('.inventory-list-item').forEach(el => {
+        try {
+          const itemData = JSON.parse(el.dataset.item);
+          if (itemData.name === previousName) {
+            matchingItem = el;
+          }
+        } catch (e) {}
+      });
+
       if (matchingItem) {
         // Expand the parent category
         const parentList = matchingItem.closest('.item-list');

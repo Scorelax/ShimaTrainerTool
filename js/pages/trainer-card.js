@@ -396,8 +396,41 @@ export function renderTrainerCard() {
           font-size: clamp(1rem, 2vw, 1.3rem);
         }
 
-        .pokemon-center-btn {
+        .pokemon-center-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          cursor: pointer;
+          transition: transform 0.3s, filter 0.3s;
+        }
+
+        .pokemon-center-container:hover {
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
+        }
+
+        .pokemon-center-icon {
+          width: 85%;
+          max-width: clamp(100px, 17vw, 153px);
+          aspect-ratio: 1;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: clamp(2.5rem, 6vw, 4rem);
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+        }
+
+        .pokemon-center-label {
+          font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+          font-weight: 900;
+          color: #FFDE00;
+          text-align: center;
+          text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+          text-transform: uppercase;
         }
 
         /* Back Button */
@@ -751,16 +784,16 @@ export function renderTrainerCard() {
             <span class="rest-btn-label">Long Rest</span>
           </button>
         </div>
-        <button class="rest-btn pokemon-center-btn" id="pokemonCenterBtn">
-          <span class="rest-btn-icon">🏥</span>
-          <span class="rest-btn-label">Pokémon Center</span>
-        </button>
+        <div class="pokemon-center-container" id="pokemonCenterBtn">
+          <div class="pokemon-center-icon">🏥</div>
+          <div class="pokemon-center-label">Poké Center</div>
+        </div>
       </div>
 
       <!-- Pokemon Center Confirmation Modal -->
       <div class="exit-modal" id="pokemonCenterModal">
         <div class="exit-modal-content">
-          <h2>Pokémon Center</h2>
+          <h2>Poké Center</h2>
           <p>Fully restore HP, VP, HD and VD for the trainer and all Pokémon?</p>
           <div class="exit-buttons">
             <button class="exit-confirm" id="pokemonCenterConfirm">Yes, Restore All</button>

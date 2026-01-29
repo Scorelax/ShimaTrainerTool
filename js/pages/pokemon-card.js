@@ -2939,7 +2939,7 @@ function showMoveDetails(moveName) {
               <div><strong>Action Type:</strong> <span id="moveActionTypePopup"></span></div>
               <div><strong>VP Cost:</strong> <span id="moveVPCostPopup"></span></div>
               <div><strong>Duration:</strong> <span id="moveDurationPopup"></span></div>
-              <div><strong>Size:</strong> <span id="moveSizePopup"></span></div>
+              <div><strong>Pokémon Size:</strong> <span id="moveSizePopup"></span></div>
               <div style="grid-column: 1 / -1;"><strong>Range:</strong> <span id="moveRangePopup"></span></div>
             </div>
             <div style="margin-bottom: 0.8rem; padding: 0.8rem; background: rgba(0,0,0,0.1); border-radius: 8px;">
@@ -3113,7 +3113,7 @@ function showMoveDetails(moveName) {
     document.getElementById('moveActionTypePopup').textContent = move[3];
     document.getElementById('moveVPCostPopup').textContent = move[4];
     document.getElementById('moveDurationPopup').textContent = move[5];
-    document.getElementById('moveSizePopup').textContent = move[9] || 'N/A';
+    document.getElementById('moveSizePopup').textContent = pokemonData[57] || 'Unknown';
     document.getElementById('moveRangePopup').textContent = move[6];
     document.getElementById('moveDescriptionPopup').textContent = move[7];
     document.getElementById('moveHigherLevelsPopup').textContent = move[8];

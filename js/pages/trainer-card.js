@@ -416,12 +416,15 @@ export function renderTrainerCard() {
           border-radius: clamp(12px, 2.5vw, 18px);
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: clamp(2.5rem, 6vw, 4rem);
+          background-color: #fff;
           margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          overflow: hidden;
+        }
+
+        .pokemon-center-icon img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
         }
 
         .pokemon-center-label {
@@ -785,7 +788,7 @@ export function renderTrainerCard() {
           </button>
         </div>
         <div class="pokemon-center-container" id="pokemonCenterBtn">
-          <div class="pokemon-center-icon">🏥</div>
+          <div class="pokemon-center-icon"><img src="assets/pokecenter.png" alt="Poké Center"></div>
           <div class="pokemon-center-label">Poké Center</div>
         </div>
       </div>

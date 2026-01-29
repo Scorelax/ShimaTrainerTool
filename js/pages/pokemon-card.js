@@ -2445,7 +2445,7 @@ export function attachPokemonCardListeners() {
       vpOverflow = true;
     }
 
-    newHp = Math.max(newHp - (hpChange > 0 && vpChange === 0 ? hpChange : 0), 0);
+    newHp = Math.max(newHp - hpChange, 0);
 
     // Update UI (combat popup)
     document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
@@ -2582,7 +2582,7 @@ export function attachPokemonCardListeners() {
       vpOverflow = true;
     }
 
-    newHp = Math.max(newHp - (hpChange > 0 && vpChange === 0 ? hpChange : 0), 0);
+    newHp = Math.max(newHp - hpChange, 0);
 
     // Update UI
     document.getElementById('trainerCombatCurrentHP').textContent = `${newHp} / ${maxHp}`;

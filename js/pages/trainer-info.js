@@ -3673,6 +3673,21 @@ export function attachTrainerInfoListeners() {
       window.location.reload();
     }
   });
+
+  // Check for pending rest triggered from trainer-card
+  const pendingRest = sessionStorage.getItem('pendingRest');
+  if (pendingRest) {
+    sessionStorage.removeItem('pendingRest');
+    // Open trainer buffs popup first, then trigger the rest
+    showTrainerSkillsPopup();
+    setTimeout(() => {
+      if (pendingRest === 'short') {
+        handleShortRest();
+      } else if (pendingRest === 'long') {
+        handleLongRest();
+      }
+    }, 100);
+  }
 }
 
 // ============================================================================

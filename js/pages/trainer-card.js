@@ -344,6 +344,58 @@ export function renderTrainerCard() {
           box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2vh, 18px) rgba(0,0,0,0.4);
         }
 
+        /* Bottom Buttons Container */
+        .bottom-buttons-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: clamp(0.8rem, 1.5vh, 1.2rem);
+        }
+
+        .rest-buttons-row {
+          display: flex;
+          gap: clamp(1rem, 2vw, 1.5rem);
+        }
+
+        .rest-btn {
+          display: flex;
+          align-items: center;
+          gap: clamp(0.3rem, 0.6vw, 0.5rem);
+          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.6);
+          border-radius: clamp(10px, 2vw, 15px);
+          color: white;
+          font-weight: 800;
+          font-size: clamp(0.8rem, 1.6vw, 1rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 clamp(4px, 0.8vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.3);
+        }
+
+        .short-rest-btn {
+          background: linear-gradient(135deg, #E8A317 0%, #C68A0A 100%);
+        }
+
+        .long-rest-btn {
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+        }
+
+        .rest-btn:hover {
+          transform: translateY(clamp(-2px, -0.5vh, -3px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 3vw, 20px) rgba(255,222,0,0.4);
+        }
+
+        .rest-btn:active {
+          transform: translateY(0);
+        }
+
+        .rest-btn-icon {
+          font-size: clamp(1rem, 2vw, 1.3rem);
+        }
+
         /* Back Button */
         .back-button {
           position: fixed;
@@ -682,8 +734,20 @@ export function renderTrainerCard() {
         </div>
       </div>
 
-      <!-- My Pokemon Button -->
-      <button class="my-pokemon-button" id="myPokemonButton">My Pokemon</button>
+      <!-- My Pokemon Button with Rest Buttons -->
+      <div class="bottom-buttons-container">
+        <button class="my-pokemon-button" id="myPokemonButton">My Pokemon</button>
+        <div class="rest-buttons-row">
+          <button class="rest-btn short-rest-btn" id="shortRestBtn">
+            <span class="rest-btn-icon">☀️</span>
+            <span class="rest-btn-label">Short Rest</span>
+          </button>
+          <button class="rest-btn long-rest-btn" id="longRestBtn">
+            <span class="rest-btn-icon">🌙</span>
+            <span class="rest-btn-label">Long Rest</span>
+          </button>
+        </div>
+      </div>
 
       <!-- Exit Confirmation Modal -->
       <div class="exit-modal" id="exitModal">
@@ -740,6 +804,21 @@ export function attachTrainerCardListeners() {
   document.getElementById('myPokemonButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'my-pokemon' }
+    }));
+  });
+
+  // Rest buttons - navigate to trainer-info and auto-trigger rest
+  document.getElementById('shortRestBtn')?.addEventListener('click', () => {
+    sessionStorage.setItem('pendingRest', 'short');
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'trainer-info' }
+    }));
+  });
+
+  document.getElementById('longRestBtn')?.addEventListener('click', () => {
+    sessionStorage.setItem('pendingRest', 'long');
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'trainer-info' }
     }));
   });
 

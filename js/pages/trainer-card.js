@@ -791,7 +791,6 @@ export function renderTrainerCard() {
           <div class="pokecenter-label">Poké Center</div>
           <div class="pokecenter-slot">
             <img src="assets/pokecenter.png" alt="Poké Center">
-            <div class="pokecenter-name">Heal All</div>
           </div>
         </div>
 

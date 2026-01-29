@@ -1020,7 +1020,9 @@ export function renderTrainerInfo() {
         .item-name {
           font-size: clamp(1.5rem, 3.5vw, 2rem);
           color: #FFDE00;
-          margin: 0 0 clamp(1rem, 2vh, 1.5rem) 0;
+          margin: 0;
+          padding-bottom: clamp(0.6rem, 1.2vh, 1rem);
+          border-bottom: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.3vw, 1px);
@@ -1031,6 +1033,7 @@ export function renderTrainerInfo() {
           display: flex;
           flex-direction: column;
           gap: clamp(1rem, 2vh, 1.5rem);
+          flex: 1;
         }
 
         .detail-section {
@@ -1087,6 +1090,7 @@ export function renderTrainerInfo() {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
           gap: clamp(0.5rem, 1vw, 0.75rem);
+          justify-items: center;
         }
 
         .inventory-actions .action-btn {
@@ -2424,6 +2428,40 @@ export function attachTrainerInfoListeners() {
         document.getElementById('removeItemButton').disabled = false;
       });
     });
+
+    // Re-select previously selected item if it still exists
+    if (selectedItemData) {
+      const previousName = selectedItemData.name;
+      const matchingItem = document.querySelector(`.inventory-list-item[data-item*='"name":"${previousName.replace(/'/g, "\\'")}"]`);
+      if (matchingItem) {
+        // Expand the parent category
+        const parentList = matchingItem.closest('.item-list');
+        const parentHeader = parentList?.previousElementSibling;
+        if (parentList) parentList.classList.add('expanded');
+        if (parentHeader) parentHeader.classList.add('active');
+
+        // Select the item
+        matchingItem.classList.add('selected');
+        selectedItemData = JSON.parse(matchingItem.dataset.item);
+
+        // Update info panel with fresh data
+        document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+        document.getElementById('descriptionText').textContent = selectedItemData.description;
+        document.getElementById('effectText').textContent = selectedItemData.effect;
+
+        // Keep buttons enabled
+        document.getElementById('editItemButton').disabled = false;
+        document.getElementById('removeItemButton').disabled = false;
+      } else {
+        // Item was removed, reset info panel
+        selectedItemData = null;
+        document.getElementById('selectedItemName').textContent = 'Select an item';
+        document.getElementById('descriptionText').textContent = 'Choose an item from your inventory to view its details.';
+        document.getElementById('effectText').textContent = 'Item effects will appear here.';
+        document.getElementById('editItemButton').disabled = true;
+        document.getElementById('removeItemButton').disabled = true;
+      }
+    }
 
     // Add Item button - Opens add modal
     document.getElementById('addItemButton')?.addEventListener('click', function() {

@@ -2939,8 +2939,8 @@ function showMoveDetails(moveName) {
               <div><strong>Action Type:</strong> <span id="moveActionTypePopup"></span></div>
               <div><strong>VP Cost:</strong> <span id="moveVPCostPopup"></span></div>
               <div><strong>Duration:</strong> <span id="moveDurationPopup"></span></div>
+              <div><strong>Range:</strong> <span id="moveRangePopup"></span></div>
               <div><strong>Pokémon Size:</strong> <span id="moveSizePopup"></span></div>
-              <div style="grid-column: 1 / -1;"><strong>Range:</strong> <span id="moveRangePopup"></span></div>
             </div>
             <div style="margin-bottom: 0.8rem; padding: 0.8rem; background: rgba(0,0,0,0.1); border-radius: 8px;">
               <strong>Description:</strong> <div id="moveDescriptionPopup" style="margin-top: 0.4rem;"></div>

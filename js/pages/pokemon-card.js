@@ -79,6 +79,7 @@ export function renderPokemonCard(pokemonName) {
 
   // Size field (index 57)
   const size = pokemonData[57] || 'Unknown';
+  const hasBrawny = (pokemonData[50] || '').split(',').map(f => f.trim()).some(f => f === 'Brawny');
 
   // Type chart data for weaknesses, resistances, immunities (index 53)
   const typeChartValues = pokemonData[53] ? pokemonData[53].split(',').map(Number) : [];
@@ -1492,7 +1493,7 @@ export function renderPokemonCard(pokemonName) {
               </div>
               <div class="info-item info-item-half">
                 <span class="info-item-label">Size:</span>
-                <span class="info-item-value" id="pokemonSize">${size}</span>
+                <span class="info-item-value" id="pokemonSize" ${hasBrawny ? 'style="color: #FFDE00; font-weight: 900;"' : ''}>${size}</span>
               </div>
             </div>
             <div class="info-item">
@@ -3113,7 +3114,15 @@ function showMoveDetails(moveName) {
     document.getElementById('moveActionTypePopup').textContent = move[3];
     document.getElementById('moveVPCostPopup').textContent = move[4];
     document.getElementById('moveDurationPopup').textContent = move[5];
-    document.getElementById('moveSizePopup').textContent = pokemonData[57] || 'Unknown';
+    const sizeEl = document.getElementById('moveSizePopup');
+    sizeEl.textContent = pokemonData[57] || 'Unknown';
+    if (hasBrawny) {
+      sizeEl.style.color = '#FFDE00';
+      sizeEl.style.fontWeight = '900';
+    } else {
+      sizeEl.style.color = '';
+      sizeEl.style.fontWeight = '';
+    }
     document.getElementById('moveRangePopup').textContent = move[6];
     document.getElementById('moveDescriptionPopup').textContent = move[7];
     document.getElementById('moveHigherLevelsPopup').textContent = move[8];

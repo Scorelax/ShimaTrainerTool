@@ -1177,6 +1177,14 @@ async function handleFormSubmit(pokemonName, originalNature) {
         // Replace the feat in the list with the full name
         selectedFeats = selectedFeats.map(f => f === 'Terrain Adept' ? fullFeatName : f);
       }
+      // Handle Quick-Fingered feat - add Sleight of Hand proficiency
+      else if (feat === 'Quick-Fingered') {
+        if (!selectedSkills.includes('Sleight of Hand') && !selectedSkills.includes('Sleight of Hand+')) {
+          selectedSkills.push('Sleight of Hand');
+        } else if (selectedSkills.includes('Sleight of Hand')) {
+          selectedSkills = selectedSkills.map(s => s === 'Sleight of Hand' ? 'Sleight of Hand+' : s);
+        }
+      }
       // Handle Hidden Ability feat
       else if (feat === 'Hidden Ability') {
         // Add the hidden ability (last one) to existing abilities

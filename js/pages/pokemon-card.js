@@ -715,12 +715,20 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .skill-item.double-proficiency {
-          background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+          background: linear-gradient(135deg, #FFDE00 0%, #FFC700 45%, #9C27B0 55%, #7B1FA2 100%);
           color: white;
           border-color: #4A148C;
           box-shadow: 0 6px 15px rgba(0,0,0,0.4),
                       0 0 15px rgba(156,39,176,0.6);
           animation: doubleProfGlow 2s ease-in-out infinite alternate;
+        }
+
+        .skill-item.double-proficiency .skill-name {
+          text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .skill-item.double-proficiency .skill-modifier {
+          text-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
 
         @keyframes doubleProfGlow {

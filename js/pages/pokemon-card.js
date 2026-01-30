@@ -3124,6 +3124,7 @@ function showMoveDetails(moveName) {
     document.getElementById('moveDurationPopup').textContent = move[5];
     const sizeEl = document.getElementById('moveSizePopup');
     sizeEl.textContent = pokemonData[57] || 'Unknown';
+    const hasBrawny = (pokemonData[50] || '').split(',').map(f => f.trim()).some(f => f === 'Brawny');
     if (hasBrawny) {
       sizeEl.style.color = '#FFDE00';
       sizeEl.style.fontWeight = '900';

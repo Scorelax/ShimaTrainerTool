@@ -2342,32 +2342,6 @@ export function attachTrainerInfoListeners() {
       }
     }
 
-    // Add Item button - Opens add modal
-    document.getElementById('addItemButton')?.addEventListener('click', function() {
-      document.getElementById('addItemModal').style.display = 'block';
-      document.getElementById('itemSearch').value = '';
-      document.getElementById('itemQuantity').value = '1';
-      document.getElementById('autocompleteResults').style.display = 'none';
-      setupItemAutocomplete();
-    });
-
-    // Edit Item button - Opens edit modal
-    document.getElementById('editItemButton')?.addEventListener('click', function() {
-      if (!selectedItemData) return;
-
-      document.getElementById('editingItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
-      document.getElementById('editItemQuantity').value = selectedItemData.quantity;
-      document.getElementById('editItemModal').style.display = 'block';
-    });
-
-    // Remove Item button - Opens remove confirmation modal
-    document.getElementById('removeItemButton')?.addEventListener('click', function() {
-      if (!selectedItemData) return;
-
-      document.getElementById('itemToRemove').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
-      document.getElementById('removeItemModal').style.display = 'block';
-    });
-
     openPopup('inventoryPopup');
   }
 
@@ -2571,6 +2545,32 @@ export function attachTrainerInfoListeners() {
   });
 
   document.getElementById('closeInventory')?.addEventListener('click', () => closePopup('inventoryPopup'));
+
+  // Add Item button - Opens add modal
+  document.getElementById('addItemButton')?.addEventListener('click', function() {
+    document.getElementById('addItemModal').style.display = 'block';
+    document.getElementById('itemSearch').value = '';
+    document.getElementById('itemQuantity').value = '1';
+    document.getElementById('autocompleteResults').style.display = 'none';
+    setupItemAutocomplete();
+  });
+
+  // Edit Item button - Opens edit modal
+  document.getElementById('editItemButton')?.addEventListener('click', function() {
+    if (!selectedItemData) return;
+
+    document.getElementById('editingItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+    document.getElementById('editItemQuantity').value = selectedItemData.quantity;
+    document.getElementById('editItemModal').style.display = 'block';
+  });
+
+  // Remove Item button - Opens remove confirmation modal
+  document.getElementById('removeItemButton')?.addEventListener('click', function() {
+    if (!selectedItemData) return;
+
+    document.getElementById('itemToRemove').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+    document.getElementById('removeItemModal').style.display = 'block';
+  });
 
   // Trainer Buffs button
   document.getElementById('trainerBuffsButton')?.addEventListener('click', () => {

@@ -792,22 +792,40 @@ function evolvePokemon() {
   document.getElementById('evolutionModal').classList.add('visible');
 }
 
+const STAT_INDEX_MAP = { str: 15, dex: 16, con: 17, int: 18, wis: 19, cha: 20 };
+
+function getStatCost(baseStat, allocatedPoints) {
+  let cost = 0;
+  for (let i = 0; i < allocatedPoints; i++) {
+    cost += (baseStat + i) >= 20 ? 2 : 1;
+  }
+  return cost;
+}
+
+function getNextPointCost(baseStat, allocatedPoints) {
+  return (baseStat + allocatedPoints) >= 20 ? 2 : 1;
+}
+
+function getLastPointRefund(baseStat, allocatedPoints) {
+  return (baseStat + allocatedPoints - 1) >= 20 ? 2 : 1;
+}
+
 function handleStatButton(e) {
   const stat = e.currentTarget.dataset.stat;
   const action = e.currentTarget.dataset.action;
   const input = document.getElementById(`${stat}Points`);
   let currentValue = parseInt(input.value) || 0;
+  const baseStat = currentPokemon[STAT_INDEX_MAP[stat]];
 
   if (action === 'increase') {
-    // Only increase if we have remaining points
+    const cost = getNextPointCost(baseStat, currentValue);
     const remainingPoints = availableSkillPoints - allocatedSkillPoints;
-    if (remainingPoints > 0) {
+    if (remainingPoints >= cost) {
       currentValue++;
       input.value = currentValue;
       updateAllocatedPoints();
     }
   } else if (action === 'decrease') {
-    // Only decrease if value is greater than 0
     if (currentValue > 0) {
       currentValue--;
       input.value = currentValue;
@@ -824,20 +842,27 @@ function updateAllocatedPoints() {
   const wis = parseInt(document.getElementById('wisPoints').value) || 0;
   const cha = parseInt(document.getElementById('chaPoints').value) || 0;
 
-  allocatedSkillPoints = str + dex + con + int + wis + cha;
+  // Calculate actual cost considering the 20+ threshold (2 points per stat above 20)
+  const stats = { str, dex, con, int, wis, cha };
+  allocatedSkillPoints = 0;
+  Object.keys(stats).forEach(stat => {
+    const baseStat = currentPokemon[STAT_INDEX_MAP[stat]];
+    allocatedSkillPoints += getStatCost(baseStat, stats[stat]);
+  });
 
   const remainingPoints = availableSkillPoints - allocatedSkillPoints;
   document.getElementById('remainingPoints').textContent = Math.max(0, remainingPoints);
 
   // Enable/disable buttons based on remaining points and current values
-  const stats = { str, dex, con, int, wis, cha };
   Object.keys(stats).forEach(stat => {
+    const baseStat = currentPokemon[STAT_INDEX_MAP[stat]];
     const increaseBtn = document.querySelector(`.stat-button[data-stat="${stat}"][data-action="increase"]`);
     const decreaseBtn = document.querySelector(`.stat-button[data-stat="${stat}"][data-action="decrease"]`);
 
-    // Disable increase button if no points remaining
+    // Disable increase button if not enough points for next increase
     if (increaseBtn) {
-      increaseBtn.disabled = remainingPoints <= 0;
+      const nextCost = getNextPointCost(baseStat, stats[stat]);
+      increaseBtn.disabled = remainingPoints < nextCost;
     }
 
     // Disable decrease button if current value is 0

@@ -586,13 +586,13 @@ export async function attachEvolutionListeners() {
   const pokemonDataStr = sessionStorage.getItem(`pokemon_${selectedPokemonName.toLowerCase()}`);
   currentPokemon = JSON.parse(pokemonDataStr);
 
-  // Display current stats in modal
-  document.getElementById('currentStr').textContent = currentPokemon[15];
-  document.getElementById('currentDex').textContent = currentPokemon[16];
-  document.getElementById('currentCon').textContent = currentPokemon[17];
-  document.getElementById('currentInt').textContent = currentPokemon[18];
-  document.getElementById('currentWis').textContent = currentPokemon[19];
-  document.getElementById('currentCha').textContent = currentPokemon[20];
+  // Display current stats in modal (without nature, since nature is reapplied after evolution)
+  document.getElementById('currentStr').textContent = currentPokemon[15] - getNatureModifier('str');
+  document.getElementById('currentDex').textContent = currentPokemon[16] - getNatureModifier('dex');
+  document.getElementById('currentCon').textContent = currentPokemon[17] - getNatureModifier('con');
+  document.getElementById('currentInt').textContent = currentPokemon[18] - getNatureModifier('int');
+  document.getElementById('currentWis').textContent = currentPokemon[19] - getNatureModifier('wis');
+  document.getElementById('currentCha').textContent = currentPokemon[20] - getNatureModifier('cha');
 
   // Load evolution options
   loadEvolutionOptions();
@@ -795,10 +795,28 @@ function evolvePokemon() {
 const STAT_INDEX_MAP = { str: 15, dex: 16, con: 17, int: 18, wis: 19, cha: 20 };
 const EVOLVED_STAT_INDEX_MAP = { str: 16, dex: 17, con: 18, int: 19, wis: 20, cha: 21 };
 const MAX_POINTS_ABOVE_EVOLVED_BASE = 4;
+const STAT_NAME_MAP = { str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' };
+
+function getNatureModifier(stat) {
+  const nature = currentPokemon[32];
+  if (!nature) return 0;
+  const natures = JSON.parse(sessionStorage.getItem('natures') || '[]');
+  const natureData = natures.find(n => n.name === nature);
+  if (!natureData) return 0;
+  const fullName = STAT_NAME_MAP[stat];
+  let modifier = 0;
+  if (natureData.boostStat?.toLowerCase() === fullName) modifier += parseInt(natureData.boostAmount) || 0;
+  if (natureData.nerfStat?.toLowerCase() === fullName) modifier -= parseInt(natureData.nerfAmount) || 0;
+  return modifier;
+}
+
+function getBaseStatWithoutNature(stat) {
+  return currentPokemon[STAT_INDEX_MAP[stat]] - getNatureModifier(stat);
+}
 
 function canAllocateMore(stat, currentAllocated) {
   const evolvedBaseStat = selectedPokemon[EVOLVED_STAT_INDEX_MAP[stat]];
-  const currentBaseStat = currentPokemon[STAT_INDEX_MAP[stat]];
+  const currentBaseStat = getBaseStatWithoutNature(stat);
   const newStatValue = currentBaseStat + currentAllocated + 1;
   const pointsAboveBase = Math.max(0, newStatValue - evolvedBaseStat);
   const costAboveBase = getStatCost(evolvedBaseStat, pointsAboveBase);
@@ -826,7 +844,7 @@ function handleStatButton(e) {
   const action = e.currentTarget.dataset.action;
   const input = document.getElementById(`${stat}Points`);
   let currentValue = parseInt(input.value) || 0;
-  const baseStat = currentPokemon[STAT_INDEX_MAP[stat]];
+  const baseStat = getBaseStatWithoutNature(stat);
 
   if (action === 'increase') {
     const cost = getNextPointCost(baseStat, currentValue);
@@ -854,10 +872,11 @@ function updateAllocatedPoints() {
   const cha = parseInt(document.getElementById('chaPoints').value) || 0;
 
   // Calculate actual cost considering the 20+ threshold (2 points per stat above 20)
+  // Uses nature-free base stats so nature doesn't affect allocation costs
   const stats = { str, dex, con, int, wis, cha };
   allocatedSkillPoints = 0;
   Object.keys(stats).forEach(stat => {
-    const baseStat = currentPokemon[STAT_INDEX_MAP[stat]];
+    const baseStat = getBaseStatWithoutNature(stat);
     allocatedSkillPoints += getStatCost(baseStat, stats[stat]);
   });
 
@@ -866,7 +885,7 @@ function updateAllocatedPoints() {
 
   // Enable/disable buttons based on remaining points and current values
   Object.keys(stats).forEach(stat => {
-    const baseStat = currentPokemon[STAT_INDEX_MAP[stat]];
+    const baseStat = getBaseStatWithoutNature(stat);
     const increaseBtn = document.querySelector(`.stat-button[data-stat="${stat}"][data-action="increase"]`);
     const decreaseBtn = document.querySelector(`.stat-button[data-stat="${stat}"][data-action="decrease"]`);
 
@@ -893,12 +912,13 @@ function updateNewStats() {
   const wis = parseInt(document.getElementById('wisPoints').value) || 0;
   const cha = parseInt(document.getElementById('chaPoints').value) || 0;
 
-  document.getElementById('newStr').textContent = currentPokemon[15] + str;
-  document.getElementById('newDex').textContent = currentPokemon[16] + dex;
-  document.getElementById('newCon').textContent = currentPokemon[17] + con;
-  document.getElementById('newInt').textContent = currentPokemon[18] + int;
-  document.getElementById('newWis').textContent = currentPokemon[19] + wis;
-  document.getElementById('newCha').textContent = currentPokemon[20] + cha;
+  // Show new stats without nature (nature is reapplied after evolution)
+  document.getElementById('newStr').textContent = getBaseStatWithoutNature('str') + str;
+  document.getElementById('newDex').textContent = getBaseStatWithoutNature('dex') + dex;
+  document.getElementById('newCon').textContent = getBaseStatWithoutNature('con') + con;
+  document.getElementById('newInt').textContent = getBaseStatWithoutNature('int') + int;
+  document.getElementById('newWis').textContent = getBaseStatWithoutNature('wis') + wis;
+  document.getElementById('newCha').textContent = getBaseStatWithoutNature('cha') + cha;
 }
 
 async function confirmEvolution() {

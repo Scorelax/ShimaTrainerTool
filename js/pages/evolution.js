@@ -793,6 +793,14 @@ function evolvePokemon() {
 }
 
 const STAT_INDEX_MAP = { str: 15, dex: 16, con: 17, int: 18, wis: 19, cha: 20 };
+const EVOLVED_STAT_INDEX_MAP = { str: 16, dex: 17, con: 18, int: 19, wis: 20, cha: 21 };
+const MAX_POINTS_ABOVE_EVOLVED_BASE = 4;
+
+function getMaxAllocation(stat) {
+  const evolvedBaseStat = selectedPokemon[EVOLVED_STAT_INDEX_MAP[stat]];
+  const currentBaseStat = currentPokemon[STAT_INDEX_MAP[stat]];
+  return (evolvedBaseStat + MAX_POINTS_ABOVE_EVOLVED_BASE) - currentBaseStat;
+}
 
 function getStatCost(baseStat, allocatedPoints) {
   let cost = 0;
@@ -820,7 +828,8 @@ function handleStatButton(e) {
   if (action === 'increase') {
     const cost = getNextPointCost(baseStat, currentValue);
     const remainingPoints = availableSkillPoints - allocatedSkillPoints;
-    if (remainingPoints >= cost) {
+    const maxAlloc = getMaxAllocation(stat);
+    if (remainingPoints >= cost && currentValue < maxAlloc) {
       currentValue++;
       input.value = currentValue;
       updateAllocatedPoints();
@@ -859,10 +868,11 @@ function updateAllocatedPoints() {
     const increaseBtn = document.querySelector(`.stat-button[data-stat="${stat}"][data-action="increase"]`);
     const decreaseBtn = document.querySelector(`.stat-button[data-stat="${stat}"][data-action="decrease"]`);
 
-    // Disable increase button if not enough points for next increase
+    // Disable increase button if not enough points or at cap (evolved base + 4)
     if (increaseBtn) {
       const nextCost = getNextPointCost(baseStat, stats[stat]);
-      increaseBtn.disabled = remainingPoints < nextCost;
+      const maxAlloc = getMaxAllocation(stat);
+      increaseBtn.disabled = remainingPoints < nextCost || stats[stat] >= maxAlloc;
     }
 
     // Disable decrease button if current value is 0

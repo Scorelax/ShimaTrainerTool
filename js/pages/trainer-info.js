@@ -1,6 +1,7 @@
 // Trainer Info Page - Detailed Trainer Information Display
 
 import { showError, showSuccess } from '../utils/notifications.js';
+import { audioManager } from '../utils/audio.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -2628,6 +2629,18 @@ export function attachTrainerInfoListeners() {
     // Update sessionStorage immediately
     trainerData[20] = inventoryItems.join(', ');
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+    // Play item sound based on type
+    const allItems = JSON.parse(sessionStorage.getItem('items') || '[]');
+    const itemData = allItems.find(i => i[0] && i[0].toLowerCase() === selectedItemName.toLowerCase());
+    const itemType = itemData ? itemData[1] : '';
+    if (itemType === 'Berries') {
+      audioManager.playSfx('Berry');
+    } else if (itemType === 'Badges, Seals & Sigils') {
+      audioManager.playSfx('GymBadge');
+    } else {
+      audioManager.playSfx('NewItem');
+    }
 
     // Close modal immediately
     document.getElementById('addItemModal').style.display = 'none';

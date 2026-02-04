@@ -1,6 +1,7 @@
 // Edit Trainer Page - Form for editing trainer stats
 
 import { TrainerAPI } from '../api.js';
+import { audioManager } from '../utils/audio.js';
 import { showToast, showSuccess, showError } from '../utils/notifications.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
@@ -727,6 +728,8 @@ async function handleFormSubmit() {
   const trainerDataStr = sessionStorage.getItem('trainerData');
   const trainerData = JSON.parse(trainerDataStr);
 
+  const originalLevel = parseInt(trainerData[2], 10);
+
   try {
     // Gather form data
     const level = parseInt(form.level.value);
@@ -810,7 +813,12 @@ async function handleFormSubmit() {
     // Hide loading screen
     hideLoading();
 
-    // Navigate back to trainer info IMMEDIATELY
+    // Play level up sound if level changed
+    if (level !== originalLevel) {
+      await audioManager.playSfxAndWait('LevelUp');
+    }
+
+    // Navigate back to trainer info
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'trainer-info' }
     }));

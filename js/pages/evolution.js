@@ -2,6 +2,7 @@
 
 import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
+import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility, getPokemonVisibility } from '../utils/visibility.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
@@ -1213,6 +1214,10 @@ async function confirmEvolution() {
 
       // Hide loading screen
       hideLoading();
+
+      // Play evolution finish sound, then navigate
+      audioManager.stopBg();
+      await audioManager.playSfxAndWait('EvolutionFinish');
 
       // Navigate to pokemon card
       window.dispatchEvent(new CustomEvent('navigate', {

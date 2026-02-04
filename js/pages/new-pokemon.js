@@ -455,19 +455,13 @@ async function selectPokemon(pokemon, listItem) {
   const typeContainer = document.getElementById('pokemonType');
   typeContainer.innerHTML = '';
 
-  // Check if types are visible
-  const typesVisible = visibility.types === true;
-
-  if (typesVisible) {
-    // Show actual types as buttons
-    if (primaryType) {
-      typeContainer.appendChild(createTypeButton(primaryType));
-    }
+  // Show actual types if visible or if type data exists in the pokedex
+  if (primaryType) {
+    typeContainer.appendChild(createTypeButton(primaryType));
     if (secondaryType) {
       typeContainer.appendChild(createTypeButton(secondaryType));
     }
   } else {
-    // Show ??? button if types are unknown
     typeContainer.appendChild(createUnknownTypeButton());
   }
 

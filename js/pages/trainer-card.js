@@ -1,6 +1,7 @@
 // Trainer Card Page - Hub with Trainer Image, Party Slots, and Utility Slot
 
 import { showError } from '../utils/notifications.js';
+import { audioManager } from '../utils/audio.js';
 
 // Helper function to get max charges for a buff based on trainer level
 function getMaxCharges(buffName, trainerLevel) {
@@ -1137,7 +1138,7 @@ export function attachTrainerCardListeners() {
     document.getElementById('pokemonCenterModal').classList.remove('active');
   });
 
-  document.getElementById('pokemonCenterConfirm')?.addEventListener('click', () => {
+  document.getElementById('pokemonCenterConfirm')?.addEventListener('click', async () => {
     document.getElementById('pokemonCenterModal').classList.remove('active');
 
     const trainerDataRaw = sessionStorage.getItem('trainerData');
@@ -1200,7 +1201,8 @@ export function attachTrainerCardListeners() {
       });
     });
 
-    // Reload to reflect changes
+    // Play PokeCenter sound, then reload to reflect changes
+    await audioManager.playSfxAndWait('PokeCenter');
     window.location.reload();
   });
 

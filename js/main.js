@@ -13,6 +13,7 @@ import { renderNewPokemon, attachNewPokemonListeners } from './pages/new-pokemon
 import { renderPokemonForm, attachPokemonFormListeners } from './pages/pokemon-form.js';
 import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js';
 import { showToast, showError } from './utils/notifications.js';
+import { audioManager } from './utils/audio.js';
 
 // ============================================================================
 // APPLICATION STATE
@@ -98,6 +99,7 @@ class Router {
   }
 
   async render(route, params) {
+    audioManager.stopBg();
     const content = document.getElementById('content');
 
     // Scroll to top on navigation
@@ -128,6 +130,7 @@ class Router {
     const content = document.getElementById('content');
     content.innerHTML = renderIndex();
     attachIndexListeners();
+    audioManager.playBg('Index');
   }
 
   async renderContinueJourney() {
@@ -135,6 +138,7 @@ class Router {
     const html = await renderContinueJourney();
     content.innerHTML = html;
     attachContinueJourneyListeners();
+    audioManager.playBg('ContinueJourney');
   }
 
   async renderTrainerCard(params) {
@@ -207,6 +211,7 @@ class Router {
     const html = renderNewJourney();
     content.innerHTML = html;
     attachNewJourneyListeners();
+    audioManager.playBg('NewJourney');
   }
 
   async renderNewPokemon(params) {
@@ -214,6 +219,7 @@ class Router {
     const html = renderNewPokemon();
     content.innerHTML = html;
     attachNewPokemonListeners();
+    audioManager.playBg('FindPokemon');
   }
 
   async renderPokemonForm(params) {
@@ -221,6 +227,7 @@ class Router {
     const html = renderPokemonForm();
     content.innerHTML = html;
     attachPokemonFormListeners();
+    audioManager.playBg('FindPokemon');
   }
 
   async renderEvolution(params) {
@@ -228,6 +235,7 @@ class Router {
     const html = renderEvolution();
     content.innerHTML = html;
     attachEvolutionListeners();
+    audioManager.playEvolutionSequence();
   }
 }
 

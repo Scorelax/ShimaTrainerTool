@@ -2,6 +2,7 @@
 
 import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
+import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
@@ -701,13 +702,13 @@ async function handleFormSubmit() {
       // Show success message (keep loading screen visible)
       showSuccess(`${trainerData[1]} caught a ${selectedPokemonData[1]}!`);
 
-      // Navigate to my pokemon page and hide loading after navigation
-      setTimeout(() => {
-        hideLoading();
-        window.dispatchEvent(new CustomEvent('navigate', {
-          detail: { route: 'my-pokemon' }
-        }));
-      }, 2000);
+      // Play new pokemon sound, then navigate
+      audioManager.stopBg();
+      hideLoading();
+      await audioManager.playSfxAndWait('NewPokemon');
+      window.dispatchEvent(new CustomEvent('navigate', {
+        detail: { route: 'my-pokemon' }
+      }));
     } else {
       hideLoading();
       showError(response.message || 'Failed to register Pokemon');

@@ -1041,7 +1041,7 @@ export function renderTrainerCard() {
           <span class="rest-btn-label">Short Rest</span>
         </button>
         <button class="my-pokemon-btn" id="myPokemonButton">
-          <span class="rest-btn-icon">📦</span>
+          <span class="rest-btn-icon">🖥️</span>
           <span>My Pokemon</span>
         </button>
         <button class="rest-btn long-rest-btn" id="longRestBtn">

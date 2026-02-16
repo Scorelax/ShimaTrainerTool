@@ -2,6 +2,10 @@
 
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
+import { audioManager } from '../utils/audio.js';
+
+// Module-level variable to track selected inventory item
+let selectedItemData = null;
 
 export function renderPokemonCard(pokemonName) {
   // Load Pokemon data from session storage
@@ -1302,6 +1306,48 @@ export function renderPokemonCard(pokemonName) {
           transform: scale(1.08);
         }
 
+        /* Bag button - mirrors back button on right side */
+        .bag-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          right: clamp(15px, 3vw, 20px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          font-weight: bold;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+          overflow: hidden;
+        }
+
+        .bag-button img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 50%;
+        }
+
+        .bag-button:hover {
+          transform: scale(1.15);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        .bag-button:active {
+          transform: scale(1.08);
+        }
+
         /* Navigation Arrows - Hidden */
         .arrow-button {
           display: none;
@@ -1478,12 +1524,548 @@ export function renderPokemonCard(pokemonName) {
           opacity: 0.5;
           cursor: not-allowed;
         }
+
+        /* Inventory Popup Styles */
+        #inventoryPopup .popup-content {
+          max-width: min(90vw, 900px);
+          max-height: 85vh;
+          padding: 0;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .inventory-popup-content {
+          display: flex;
+          height: 100%;
+          flex: 1;
+          overflow: hidden;
+        }
+
+        .inventory-sidebar {
+          width: clamp(280px, 35%, 400px);
+          background: linear-gradient(135deg, #2c2c2c 0%, #252525 100%);
+          color: white;
+          display: flex;
+          flex-direction: column;
+          border-right: clamp(2px, 0.4vw, 3px) solid #333;
+          overflow: hidden;
+        }
+
+        .inventory-title {
+          padding: clamp(1rem, 2vh, 1.5rem);
+          margin: 0;
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+          font-size: clamp(1.4rem, 3vw, 1.8rem);
+          font-weight: 900;
+          text-align: center;
+          border-bottom: clamp(2px, 0.4vw, 3px) solid #333;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .inventory-categories {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          overflow-y: auto;
+          flex: 1;
+        }
+
+        .category-header {
+          padding: clamp(0.9rem, 2vh, 1.2rem) clamp(1.2rem, 2.5vw, 1.6rem);
+          background-color: #3a3a3a;
+          cursor: pointer;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid #444;
+          transition: all 0.2s ease;
+          font-size: clamp(0.85rem, 1.9vw, 1.1rem);
+          font-weight: 700;
+        }
+
+        .category-header:hover {
+          background-color: #4a4a4a;
+          padding-left: clamp(1.4rem, 3vw, 1.8rem);
+        }
+
+        .category-header.active {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        .arrow {
+          transition: transform 0.2s ease;
+          font-size: clamp(0.8rem, 1.8vw, 1rem);
+        }
+
+        .category-header.active .arrow {
+          transform: rotate(90deg);
+        }
+
+        .item-list {
+          background-color: #2c2c2c;
+          padding: 0;
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s ease;
+        }
+
+        .item-list.expanded {
+          max-height: 500px;
+          overflow-y: auto;
+        }
+
+        .inventory-list-item {
+          padding: clamp(0.7rem, 1.5vh, 0.9rem) clamp(1.7rem, 3.5vw, 2.2rem);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border-left: clamp(3px, 0.6vw, 4px) solid transparent;
+          color: #ddd;
+          font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+        }
+
+        .inventory-list-item:hover {
+          background-color: #3a3a3a;
+          border-left-color: #EE1515;
+          color: white;
+        }
+
+        .inventory-list-item.selected {
+          background-color: #EE1515;
+          color: white;
+          border-left-color: white;
+          font-weight: 700;
+        }
+
+        .inventory-main {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          padding: clamp(1.5rem, 3vw, 2rem);
+          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+          overflow: hidden;
+        }
+
+        .item-info-card {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          background: linear-gradient(135deg, #353535 0%, #2d2d2d 100%);
+          border-radius: clamp(10px, 2vw, 15px);
+          padding: clamp(1.2rem, 2.5vw, 2rem);
+          box-shadow: 0 clamp(4px, 1vh, 8px) clamp(15px, 3vw, 25px) rgba(0,0,0,0.5);
+          margin-bottom: clamp(1rem, 2vh, 1.5rem);
+          overflow-y: auto;
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+        }
+
+        .item-name {
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          color: #FFDE00;
+          margin: 0;
+          padding-bottom: clamp(0.6rem, 1.2vh, 1rem);
+          border-bottom: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.3vw, 1px);
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .item-details {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(1rem, 2vh, 1.5rem);
+          flex: 1;
+        }
+
+        .detail-section {
+          flex: 1;
+        }
+
+        .detail-section h4 {
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          color: #FFDE00;
+          margin: 0 0 clamp(0.5rem, 1vh, 0.75rem) 0;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+        }
+
+        .detail-section p {
+          font-size: clamp(0.95rem, 2.1vw, 1.1rem);
+          color: #c0c0c0;
+          line-height: 1.6;
+          margin: 0;
+        }
+
+        .detail-divider {
+          height: clamp(2px, 0.4vw, 3px);
+          background: linear-gradient(90deg, transparent 0%, rgba(255,222,0,0.3) 50%, transparent 100%);
+        }
+
+        .inventory-close {
+          position: absolute;
+          top: clamp(15px, 3vh, 20px);
+          right: clamp(15px, 3vw, 20px);
+          width: clamp(35px, 7vw, 45px);
+          height: clamp(35px, 7vw, 45px);
+          background: linear-gradient(135deg, #757575 0%, #616161 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.5rem, 3.5vw, 2rem);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s ease;
+          z-index: 10;
+        }
+
+        .inventory-close:hover {
+          transform: scale(1.1) rotate(90deg);
+          background: linear-gradient(135deg, #616161 0%, #505050 100%);
+          box-shadow: 0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.6);
+        }
+
+        .inventory-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+        }
+
+        .inventory-actions-row {
+          display: flex;
+          gap: clamp(0.5rem, 1vw, 0.75rem);
+          justify-content: center;
+        }
+
+        .inventory-actions .action-btn {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(0.3rem, 0.6vw, 0.5rem);
+          padding: clamp(0.5rem, 1.1vh, 0.75rem) clamp(0.75rem, 1.5vw, 1rem);
+          border: clamp(2px, 0.3vw, 2.5px) solid #333;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-size: clamp(0.8rem, 1.7vw, 0.95rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: clamp(0.2px, 0.15vw, 0.4px);
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          color: white;
+        }
+
+        .inventory-actions .action-btn.full-width {
+          width: 100%;
+        }
+
+        .inventory-actions .action-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 clamp(4px, 1vh, 6px) clamp(12px, 2.5vw, 18px) rgba(0,0,0,0.4),
+                      0 0 clamp(10px, 2vw, 15px) rgba(59,76,202,0.5);
+        }
+
+        .inventory-actions .action-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .btn-icon {
+          font-size: clamp(0.9rem, 1.9vw, 1.1rem);
+        }
+
+        .btn-text {
+          font-size: clamp(0.75rem, 1.6vw, 0.9rem);
+        }
+
+        /* Inventory Action Modals */
+        .inventory-modal {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.6);
+          z-index: 2100;
+          backdrop-filter: blur(5px);
+          animation: fadeIn 0.2s ease;
+        }
+
+        .inventory-modal-content {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 90%;
+          max-width: clamp(400px, 80vw, 700px);
+          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          border-radius: clamp(15px, 3vw, 25px);
+          box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+          overflow: hidden;
+          animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -45%);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+          }
+        }
+
+        .modal-header {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          padding: clamp(1rem, 2.5vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+          border-bottom: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+        }
+
+        .modal-header h2 {
+          color: white;
+          margin: 0;
+          font-size: clamp(1.3rem, 2.8vw, 1.8rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          text-align: center;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+        }
+
+        .modal-body {
+          padding: clamp(1.5rem, 3vh, 2.5rem) clamp(1.5rem, 3vw, 2rem);
+          max-height: 60vh;
+          overflow-y: auto;
+        }
+
+        .form-group {
+          margin-bottom: clamp(1.2rem, 2.5vh, 1.8rem);
+          position: relative;
+        }
+
+        .form-group label {
+          display: block;
+          color: #FFDE00;
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          font-weight: 900;
+          margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
+          text-transform: uppercase;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="number"] {
+          width: 100%;
+          padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #555;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          font-weight: 700;
+          box-sizing: border-box;
+          transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+          outline: none;
+          border-color: #FFDE00;
+          box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
+        }
+
+        /* Autocomplete Dropdown */
+        .autocomplete-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #555;
+          border-top: none;
+          border-radius: 0 0 clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px);
+          max-height: clamp(200px, 40vh, 300px);
+          overflow-y: auto;
+          display: none;
+          z-index: 9999;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+        }
+
+        .autocomplete-item {
+          padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+          cursor: pointer;
+          transition: all 0.2s ease;
+          border-bottom: 1px solid #444;
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
+          color: #e0e0e0;
+          font-weight: 700;
+        }
+
+        .autocomplete-item:last-child {
+          border-bottom: none;
+        }
+
+        .autocomplete-item:hover {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        /* Item Preview (for edit/remove modals) */
+        .item-preview {
+          padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: #FFDE00;
+          font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+          font-weight: 900;
+          text-align: center;
+          text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        /* Quantity Control */
+        .quantity-control {
+          display: flex;
+          align-items: center;
+          gap: clamp(0.5rem, 1vw, 1rem);
+          justify-content: center;
+        }
+
+        .quantity-btn {
+          width: clamp(40px, 8vw, 55px);
+          height: clamp(40px, 8vw, 55px);
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(1.5rem, 3vw, 2rem);
+          font-weight: 900;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .quantity-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 15px rgba(59,76,202,0.6);
+        }
+
+        .quantity-btn:active {
+          transform: translateY(0);
+        }
+
+        .quantity-input {
+          width: clamp(80px, 15vw, 120px);
+          text-align: center;
+        }
+
+        /* Modal Actions */
+        .modal-actions {
+          display: flex;
+          gap: clamp(0.75rem, 1.5vw, 1rem);
+          padding: clamp(1rem, 2vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+          background: linear-gradient(135deg, #252525 0%, #1a1a1a 100%);
+          border-top: clamp(2px, 0.4vw, 3px) solid #333;
+        }
+
+        .modal-actions .action-btn {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(0.3rem, 0.8vh, 0.5rem);
+          padding: clamp(0.8rem, 1.8vh, 1.2rem);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(10px, 2vw, 15px);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+
+        .modal-actions .action-btn.primary {
+          background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
+          color: white;
+        }
+
+        .modal-actions .action-btn.primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 15px rgba(59,76,202,0.6);
+        }
+
+        .modal-actions .action-btn.secondary {
+          background: linear-gradient(135deg, #666 0%, #555 100%);
+          color: white;
+        }
+
+        .modal-actions .action-btn.secondary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+
+        .modal-actions .action-btn.danger {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          color: white;
+        }
+
+        .modal-actions .action-btn.danger:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4),
+                      0 0 15px rgba(238,21,21,0.6);
+        }
+
+        /* Confirmation Text */
+        .confirmation-text {
+          font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+          color: #e0e0e0;
+          margin-bottom: clamp(1.5rem, 3vh, 2rem);
+          text-align: center;
+          line-height: 1.6;
+        }
+
+        .confirmation-text strong {
+          color: #FFDE00;
+          font-weight: 900;
+        }
+
+        @media (max-width: 768px) {
+          .inventory-sidebar {
+            width: clamp(200px, 40%, 280px);
+          }
+
+          .inventory-actions {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
       </style>
 
       <h1>${displayName} #${dexEntry}</h1>
 
       <!-- Back Button -->
       <button class="back-button" id="backToTrainerCard">←</button>
+
+      <!-- Bag Button -->
+      <button class="bag-button" id="bagButton"><img src="assets/Bag.png" alt="Bag"></button>
 
       <!-- Info Page -->
       <div id="infoPage" class="info-page-grid active-page">
@@ -1848,6 +2430,140 @@ export function renderPokemonCard(pokemonName) {
           </div>
         </div>
       </div>
+
+      <!-- Inventory Popup -->
+      <div class="popup-overlay" id="inventoryPopup">
+        <div class="popup-content">
+          <button class="popup-close inventory-close" id="closeInventory">&times;</button>
+          <div class="inventory-popup-content">
+            <div class="inventory-sidebar">
+              <h2 class="inventory-title">Inventory</h2>
+              <ul id="inventoryCategories" class="inventory-categories">
+                <!-- Categories will be dynamically populated -->
+              </ul>
+            </div>
+            <div class="inventory-main">
+              <div class="item-info-card">
+                <h3 class="item-name" id="selectedItemName">Select an item</h3>
+                <div class="item-details">
+                  <div class="detail-section">
+                    <h4>Description</h4>
+                    <p id="descriptionText">Choose an item from your inventory to view its details.</p>
+                  </div>
+                  <div class="detail-divider"></div>
+                  <div class="detail-section">
+                    <h4>Effect</h4>
+                    <p id="effectText">Item effects will appear here.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="inventory-actions">
+                <div class="inventory-actions-row">
+                  <button class="action-btn" id="addItemButton">
+                    <span class="btn-icon">➕</span>
+                    <span class="btn-text">Add</span>
+                  </button>
+                  <button class="action-btn" id="editItemButton" disabled>
+                    <span class="btn-icon">✏️</span>
+                    <span class="btn-text">Edit</span>
+                  </button>
+                </div>
+                <button class="action-btn full-width" id="removeItemButton" disabled>
+                  <span class="btn-icon">🗑️</span>
+                  <span class="btn-text">Remove</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Item Modal -->
+      <div id="addItemModal" class="inventory-modal">
+        <div class="inventory-modal-content">
+          <div class="modal-header">
+            <h2>Add Item to Inventory</h2>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="itemSearch">Search for Item</label>
+              <input type="text" id="itemSearch" placeholder="Start typing to search..." autocomplete="off">
+              <div id="autocompleteResults" class="autocomplete-dropdown"></div>
+            </div>
+            <div class="form-group">
+              <label for="itemQuantity">Quantity</label>
+              <input type="number" id="itemQuantity" value="1" min="1">
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn primary" id="confirmAddItem">
+              <span class="btn-icon">➕</span>
+              <span class="btn-text">Add</span>
+            </button>
+            <button class="action-btn secondary" id="cancelAddItem">
+              <span class="btn-icon">↩️</span>
+              <span class="btn-text">Back</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Item Modal -->
+      <div id="editItemModal" class="inventory-modal">
+        <div class="inventory-modal-content">
+          <div class="modal-header">
+            <h2>Edit Item Quantity</h2>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Item</label>
+              <div class="item-preview" id="editingItemName">Item Name</div>
+            </div>
+            <div class="form-group">
+              <label>Quantity</label>
+              <div class="quantity-control">
+                <button type="button" class="quantity-btn" id="decrementQty">−</button>
+                <input type="number" id="editItemQuantity" class="quantity-input" value="1" min="0">
+                <button type="button" class="quantity-btn" id="incrementQty">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn primary" id="confirmEditItem">
+              <span class="btn-icon">💾</span>
+              <span class="btn-text">Save</span>
+            </button>
+            <button class="action-btn secondary" id="cancelEditItem">
+              <span class="btn-icon">↩️</span>
+              <span class="btn-text">Back</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Remove Item Modal -->
+      <div id="removeItemModal" class="inventory-modal">
+        <div class="inventory-modal-content">
+          <div class="modal-header">
+            <h2>Remove Item</h2>
+          </div>
+          <div class="modal-body">
+            <div class="confirmation-text">
+              Are you sure you want to remove <strong id="itemToRemove">this item</strong> from your inventory?
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn danger" id="confirmRemoveItem">
+              <span class="btn-icon">✔️</span>
+              <span class="btn-text">Yes</span>
+            </button>
+            <button class="action-btn secondary" id="cancelRemoveItem">
+              <span class="btn-icon">✖️</span>
+              <span class="btn-text">No</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -1875,6 +2591,515 @@ export function attachPokemonCardListeners() {
       detail: { route: previousRoute }
     }));
   });
+
+  // ============================================================================
+  // BAG / INVENTORY
+  // ============================================================================
+
+  // Bag button - open inventory popup
+  document.getElementById('bagButton')?.addEventListener('click', () => {
+    refreshInventoryDisplay();
+  });
+
+  // Close inventory popup
+  document.getElementById('closeInventory')?.addEventListener('click', () => {
+    document.getElementById('inventoryPopup')?.classList.remove('active');
+  });
+
+  // Close inventory when clicking overlay
+  document.getElementById('inventoryPopup')?.addEventListener('click', (e) => {
+    if (e.target.id === 'inventoryPopup') {
+      document.getElementById('inventoryPopup').classList.remove('active');
+    }
+  });
+
+  // Refresh inventory display function
+  function refreshInventoryDisplay() {
+    const freshTrainerDataStr = sessionStorage.getItem('trainerData');
+    if (!freshTrainerDataStr) return;
+
+    const freshTrainerData = JSON.parse(freshTrainerDataStr);
+    const inventory = freshTrainerData[20] || 'None';
+    const itemsStr = sessionStorage.getItem('items');
+    const categoriesContainer = document.getElementById('inventoryCategories');
+
+    if (inventory === 'None' || !inventory || !itemsStr) {
+      categoriesContainer.innerHTML = '<li style="padding: 2rem; text-align: center; color: #999;">No items in inventory</li>';
+      document.getElementById('inventoryPopup')?.classList.add('active');
+      return;
+    }
+
+    // Parse items data and group by type
+    const itemsData = JSON.parse(itemsStr);
+    const inventoryItems = inventory.split(',').map(item => item.trim()).filter(item => item);
+
+    // Extract item name and quantity
+    const groupedItems = {};
+    inventoryItems.forEach(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
+      const quantity = match ? parseInt(match[2], 10) : 1;
+
+      const itemData = itemsData.find(i => i.name === itemName);
+      if (itemData) {
+        const type = itemData.type || 'Misc';
+        if (!groupedItems[type]) {
+          groupedItems[type] = [];
+        }
+        groupedItems[type].push({
+          name: itemData.name,
+          description: itemData.description || 'No description available',
+          effect: itemData.effect || 'No effect description',
+          quantity: quantity,
+          fullData: itemData
+        });
+      }
+    });
+
+    // Generate category list HTML
+    let html = '';
+    Object.keys(groupedItems).sort().forEach(type => {
+      html += `
+        <li>
+          <div class="category-header" data-category="${type}">
+            <span>${type}</span>
+            <span class="arrow">▶</span>
+          </div>
+          <div class="item-list">
+            ${groupedItems[type].map(item => `
+              <div class="inventory-list-item" data-item='${JSON.stringify(item)}'>
+                ${item.name} (x${item.quantity})
+              </div>
+            `).join('')}
+          </div>
+        </li>
+      `;
+    });
+
+    categoriesContainer.innerHTML = html;
+
+    // Add category toggle listeners
+    document.querySelectorAll('.category-header').forEach(header => {
+      header.addEventListener('click', function() {
+        const itemList = this.nextElementSibling;
+        const isExpanded = itemList.classList.contains('expanded');
+
+        // Close all categories
+        document.querySelectorAll('.item-list').forEach(list => list.classList.remove('expanded'));
+        document.querySelectorAll('.category-header').forEach(h => h.classList.remove('active'));
+
+        // Open clicked category
+        if (!isExpanded) {
+          itemList.classList.add('expanded');
+          this.classList.add('active');
+        }
+      });
+    });
+
+    // Add item selection listeners
+    document.querySelectorAll('.inventory-list-item').forEach(itemElement => {
+      itemElement.addEventListener('click', function() {
+        // Remove previous selection
+        document.querySelectorAll('.inventory-list-item').forEach(el => el.classList.remove('selected'));
+
+        // Select current item
+        this.classList.add('selected');
+        selectedItemData = JSON.parse(this.dataset.item);
+
+        // Update info panel
+        document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+        document.getElementById('descriptionText').textContent = selectedItemData.description;
+        document.getElementById('effectText').textContent = selectedItemData.effect;
+
+        // Enable edit/remove buttons
+        document.getElementById('editItemButton').disabled = false;
+        document.getElementById('removeItemButton').disabled = false;
+      });
+    });
+
+    // Re-select previously selected item if it still exists
+    if (selectedItemData) {
+      const previousName = selectedItemData.name;
+      let matchingItem = null;
+
+      document.querySelectorAll('.inventory-list-item').forEach(el => {
+        try {
+          const itemData = JSON.parse(el.dataset.item);
+          if (itemData.name === previousName) {
+            matchingItem = el;
+          }
+        } catch (e) {}
+      });
+
+      if (matchingItem) {
+        // Expand the parent category
+        const parentList = matchingItem.closest('.item-list');
+        const parentHeader = parentList?.previousElementSibling;
+        if (parentList) parentList.classList.add('expanded');
+        if (parentHeader) parentHeader.classList.add('active');
+
+        // Select the item
+        matchingItem.classList.add('selected');
+        selectedItemData = JSON.parse(matchingItem.dataset.item);
+
+        // Update info panel with fresh data
+        document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+        document.getElementById('descriptionText').textContent = selectedItemData.description;
+        document.getElementById('effectText').textContent = selectedItemData.effect;
+
+        // Keep buttons enabled
+        document.getElementById('editItemButton').disabled = false;
+        document.getElementById('removeItemButton').disabled = false;
+      } else {
+        // Item was removed, reset info panel
+        selectedItemData = null;
+        document.getElementById('selectedItemName').textContent = 'Select an item';
+        document.getElementById('descriptionText').textContent = 'Choose an item from your inventory to view its details.';
+        document.getElementById('effectText').textContent = 'Item effects will appear here.';
+        document.getElementById('editItemButton').disabled = true;
+        document.getElementById('removeItemButton').disabled = true;
+      }
+    }
+
+    document.getElementById('inventoryPopup')?.classList.add('active');
+  }
+
+  // Add Item button - Opens add modal
+  document.getElementById('addItemButton')?.addEventListener('click', function() {
+    document.getElementById('addItemModal').style.display = 'block';
+    document.getElementById('itemSearch').value = '';
+    document.getElementById('itemQuantity').value = '1';
+    document.getElementById('autocompleteResults').style.display = 'none';
+    setupItemAutocomplete();
+  });
+
+  // Edit Item button - Opens edit modal
+  document.getElementById('editItemButton')?.addEventListener('click', function() {
+    if (!selectedItemData) return;
+
+    document.getElementById('editingItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+    document.getElementById('editItemQuantity').value = selectedItemData.quantity;
+    document.getElementById('editItemModal').style.display = 'block';
+  });
+
+  // Remove Item button - Opens remove confirmation modal
+  document.getElementById('removeItemButton')?.addEventListener('click', function() {
+    if (!selectedItemData) return;
+
+    document.getElementById('itemToRemove').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+    document.getElementById('removeItemModal').style.display = 'block';
+  });
+
+  // Add Item Modal - Confirm button
+  document.getElementById('confirmAddItem')?.addEventListener('click', function() {
+    const selectedItemName = document.getElementById('itemSearch').value.trim();
+    const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
+
+    if (!selectedItemName || quantity < 1) {
+      alert('Please select a valid item and quantity.');
+      return;
+    }
+
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) {
+      alert('Trainer data not found.');
+      return;
+    }
+
+    const td = JSON.parse(trainerDataRaw);
+    const inventoryStr = td[20] || '';
+    let invItems = inventoryStr && inventoryStr !== 'None'
+      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+      : [];
+
+    // Check if item already exists
+    let found = false;
+    invItems = invItems.map(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
+      const currentQty = match ? parseInt(match[2], 10) : 1;
+
+      if (itemName.toLowerCase() === selectedItemName.toLowerCase()) {
+        found = true;
+        const newQty = currentQty + quantity;
+        return `${itemName} (x${newQty})`;
+      }
+      return itemStr;
+    });
+
+    // If not found, add as new item
+    if (!found) {
+      invItems.push(`${selectedItemName} (x${quantity})`);
+    }
+
+    // Update sessionStorage immediately
+    td[20] = invItems.join(', ');
+    sessionStorage.setItem('trainerData', JSON.stringify(td));
+
+    // Play item sound based on type
+    const allItems = JSON.parse(sessionStorage.getItem('items') || '[]');
+    const itemData = allItems.find(i => i[0] && i[0].toLowerCase() === selectedItemName.toLowerCase());
+    const itemType = itemData ? itemData[1] : '';
+    if (itemType === 'Berries') {
+      audioManager.playSfx('Berry');
+    } else if (itemType === 'Badges, Seals & Sigils') {
+      audioManager.playSfx('GymBadge');
+    } else {
+      audioManager.playSfx('NewItem');
+    }
+
+    // Close modal immediately
+    document.getElementById('addItemModal').style.display = 'none';
+
+    // Clear the search input for next time
+    document.getElementById('itemSearch').value = '';
+    document.getElementById('itemQuantity').value = '1';
+
+    // Refresh inventory display immediately with updated data
+    refreshInventoryDisplay();
+
+    // Update database in background
+    TrainerAPI.update(td).then(() => {
+      console.log('Inventory updated in database');
+    }).catch(error => {
+      console.error('Failed to update inventory in database:', error);
+    });
+  });
+
+  // Add Item Modal - Cancel button
+  document.getElementById('cancelAddItem')?.addEventListener('click', function() {
+    document.getElementById('addItemModal').style.display = 'none';
+  });
+
+  // Edit Item Modal - Increment button
+  document.getElementById('incrementQty')?.addEventListener('click', function() {
+    const input = document.getElementById('editItemQuantity');
+    const currentValue = parseInt(input.value) || 0;
+    input.value = currentValue + 1;
+  });
+
+  // Edit Item Modal - Decrement button
+  document.getElementById('decrementQty')?.addEventListener('click', function() {
+    const input = document.getElementById('editItemQuantity');
+    const currentValue = parseInt(input.value) || 0;
+    if (currentValue > 0) {
+      input.value = currentValue - 1;
+    }
+  });
+
+  // Edit Item Modal - Confirm button
+  document.getElementById('confirmEditItem')?.addEventListener('click', function() {
+    const newQuantity = parseInt(document.getElementById('editItemQuantity').value, 10);
+
+    if (isNaN(newQuantity) || newQuantity < 0) {
+      alert('Please enter a valid quantity (0 or greater).');
+      return;
+    }
+
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) {
+      alert('Trainer data not found.');
+      return;
+    }
+
+    const td = JSON.parse(trainerDataRaw);
+    const inventoryStr = td[20] || '';
+    let invItems = inventoryStr && inventoryStr !== 'None'
+      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+      : [];
+
+    // Find the item by parsing each string
+    let found = false;
+    invItems = invItems.filter(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
+
+      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+        found = true;
+        if (newQuantity === 0) {
+          return false;
+        } else {
+          return true;
+        }
+      }
+      return true;
+    }).map(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
+
+      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+        return `${itemName} (x${newQuantity})`;
+      }
+      return itemStr;
+    });
+
+    if (found) {
+      // Update sessionStorage immediately
+      td[20] = invItems.length > 0 ? invItems.join(', ') : 'None';
+      sessionStorage.setItem('trainerData', JSON.stringify(td));
+
+      // Close modal immediately
+      document.getElementById('editItemModal').style.display = 'none';
+
+      // Refresh inventory display immediately with updated data
+      refreshInventoryDisplay();
+
+      // Update database in background
+      TrainerAPI.update(td).then(() => {
+        console.log('Inventory updated in database');
+      }).catch(error => {
+        console.error('Failed to update inventory in database:', error);
+      });
+    }
+  });
+
+  // Edit Item Modal - Cancel button
+  document.getElementById('cancelEditItem')?.addEventListener('click', function() {
+    document.getElementById('editItemModal').style.display = 'none';
+  });
+
+  // Remove Item Modal - Confirm button
+  document.getElementById('confirmRemoveItem')?.addEventListener('click', function() {
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (!trainerDataRaw) {
+      alert('Trainer data not found.');
+      return;
+    }
+
+    const td = JSON.parse(trainerDataRaw);
+    const inventoryStr = td[20] || '';
+    let invItems = inventoryStr && inventoryStr !== 'None'
+      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+      : [];
+
+    // Find and remove item by parsing each string
+    let found = false;
+    invItems = invItems.filter(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const itemName = match ? match[1].trim() : itemStr;
+
+      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+        found = true;
+        return false;
+      }
+      return true;
+    });
+
+    if (found) {
+      // Update sessionStorage
+      td[20] = invItems.length > 0 ? invItems.join(', ') : 'None';
+      sessionStorage.setItem('trainerData', JSON.stringify(td));
+
+      // Close modal immediately
+      document.getElementById('removeItemModal').style.display = 'none';
+
+      // Refresh inventory display immediately
+      refreshInventoryDisplay();
+
+      // Update database in background
+      TrainerAPI.update(td).then(() => {
+        console.log('Inventory updated in database');
+      }).catch(error => {
+        console.error('Failed to update inventory in database:', error);
+      });
+    }
+  });
+
+  // Remove Item Modal - Cancel button
+  document.getElementById('cancelRemoveItem')?.addEventListener('click', function() {
+    document.getElementById('removeItemModal').style.display = 'none';
+  });
+
+  // Autocomplete Setup Function
+  function setupItemAutocomplete() {
+    const searchInput = document.getElementById('itemSearch');
+    const resultsDiv = document.getElementById('autocompleteResults');
+
+    if (!searchInput || !resultsDiv) return;
+
+    // Remove existing listeners by cloning
+    const newSearchInput = searchInput.cloneNode(true);
+    searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+
+    // Get new reference
+    const itemSearch = document.getElementById('itemSearch');
+    const autocompleteResults = document.getElementById('autocompleteResults');
+
+    // Add input listener
+    itemSearch.addEventListener('input', function() {
+      const searchValue = this.value.toLowerCase().trim();
+
+      if (searchValue.length < 2) {
+        autocompleteResults.style.display = 'none';
+        autocompleteResults.innerHTML = '';
+        return;
+      }
+
+      // Get items from sessionStorage
+      const itemsDataRaw = sessionStorage.getItem('items');
+
+      try {
+        const itemsData = JSON.parse(itemsDataRaw);
+
+        // Handle different data structures
+        let itemsArray;
+        if (Array.isArray(itemsData)) {
+          itemsArray = itemsData;
+        } else if (itemsData && itemsData.items && Array.isArray(itemsData.items)) {
+          itemsArray = itemsData.items;
+        } else if (itemsData && itemsData.status === 'success' && itemsData.items) {
+          itemsArray = itemsData.items;
+        } else {
+          console.error('Items data is not in expected format:', itemsData);
+          return;
+        }
+
+        // Filter matches with normalization
+        const matches = itemsArray.filter(item => {
+          if (item && item.name) {
+            const normalizedItemName = item.name.toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+            const normalizedSearchValue = searchValue
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+
+            return normalizedItemName.includes(normalizedSearchValue);
+          }
+          return false;
+        }).slice(0, 10);
+
+        // Clear previous results
+        autocompleteResults.innerHTML = '';
+
+        if (matches.length > 0) {
+          matches.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'autocomplete-item';
+            div.textContent = item.name;
+            div.addEventListener('click', function() {
+              itemSearch.value = item.name;
+              autocompleteResults.style.display = 'none';
+              autocompleteResults.innerHTML = '';
+            });
+            autocompleteResults.appendChild(div);
+          });
+          autocompleteResults.style.display = 'block';
+        } else {
+          autocompleteResults.style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Error parsing items data:', error);
+      }
+    });
+
+    // Hide autocomplete when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!itemSearch.contains(e.target) && !autocompleteResults.contains(e.target)) {
+        autocompleteResults.style.display = 'none';
+      }
+    });
+  }
 
   // Page toggle function
   function togglePage() {

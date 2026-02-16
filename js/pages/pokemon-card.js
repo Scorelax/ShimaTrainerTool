@@ -2879,8 +2879,12 @@ function showMoveDetails(moveName) {
     const attackRollBonus = proficiencyBonus + highestMod + aceTrainerBonus + typeMasterAttackBonus;
 
     // Calculate Damage Roll bonus
+    // Only include stat modifier if move description contains "+ MOVE" or "+MOVE"
+    const moveDescription = move[7] || '';
+    const includeStatModInDamage = /\+\s*MOVE/i.test(moveDescription);
+    const damageStatMod = includeStatModInDamage ? highestMod : 0;
     const stabBonus = hasSTAB ? stabBonusValue : 0;
-    const damageRollBonus = stabBonus + highestMod + aceTrainerBonus + typeMasterDamageBonus;
+    const damageRollBonus = stabBonus + damageStatMod + aceTrainerBonus + typeMasterDamageBonus;
 
     // Create breakdown text
     const attackBreakdownParts = [];
@@ -2902,7 +2906,7 @@ function showMoveDetails(moveName) {
     if (stabBonus > 0) {
       damageBreakdownParts.push(`STAB +${stabBonus}`);
     }
-    if (highestMod !== 0) {
+    if (includeStatModInDamage && highestMod !== 0) {
       damageBreakdownParts.push(`${usedStat} ${highestMod >= 0 ? '+' : ''}${highestMod}`);
     }
     if (aceTrainerBonus > 0) {

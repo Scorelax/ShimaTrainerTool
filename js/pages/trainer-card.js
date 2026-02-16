@@ -98,6 +98,23 @@ export function renderTrainerCard() {
   const unlockedSlot = sessionStorage.getItem('unlockedPokeSlotImage') || 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokeball.png';
   const lockedSlot = sessionStorage.getItem('lockedPokeSlotImage') || 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Grey%20Pokeball.png';
 
+  // Extract badges from inventory
+  const earnedBadges = [];
+  const inventoryStr = trainerData[20] || '';
+  const itemsDbStr = sessionStorage.getItem('items');
+  if (inventoryStr && itemsDbStr) {
+    const itemsDb = JSON.parse(itemsDbStr);
+    const inventoryItems = inventoryStr.split(',').map(s => s.trim()).filter(Boolean);
+    for (const itemEntry of inventoryItems) {
+      // Inventory format: "ItemName xQuantity" or just "ItemName"
+      const itemName = itemEntry.replace(/\s*x\d+$/i, '').trim();
+      const dbItem = itemsDb.find(it => it.name === itemName);
+      if (dbItem && dbItem.type === 'Badges, Seals & Sigils' && itemName.includes('Badge')) {
+        earnedBadges.push({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' });
+      }
+    }
+  }
+
   const html = `
     <div class="trainer-card-page">
       <style>
@@ -344,44 +361,41 @@ export function renderTrainerCard() {
           text-shadow: 0 2px 4px rgba(0,0,0,0.6);
         }
 
-        /* My Pokemon Button */
-        .my-pokemon-button {
-          background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
-          color: white;
-          padding: clamp(1rem, 2vh, 1.5rem) clamp(2rem, 4vw, 3rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          border-radius: clamp(15px, 3vw, 25px);
-          font-size: clamp(1.2rem, 2.5vw, 1.8rem);
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.3vw, 1px);
-          cursor: pointer;
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .my-pokemon-button:hover {
-          transform: translateY(clamp(-3px, -0.8vh, -5px));
-          box-shadow: 0 clamp(12px, 2.5vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
-                      0 0 clamp(20px, 4vw, 30px) rgba(59, 76, 202, 0.5);
-        }
-
-        .my-pokemon-button:active {
-          transform: translateY(0);
-          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2vh, 18px) rgba(0,0,0,0.4);
-        }
-
-        /* Bottom Buttons Container */
+        /* Bottom Buttons Container - Single Row */
         .bottom-buttons-container {
           display: flex;
-          flex-direction: column;
           align-items: center;
-          gap: clamp(0.8rem, 1.5vh, 1.2rem);
+          justify-content: center;
+          gap: clamp(0.6rem, 1.2vw, 1rem);
+          flex-wrap: wrap;
         }
 
-        .rest-buttons-row {
+        .my-pokemon-btn {
           display: flex;
-          gap: clamp(1rem, 2vw, 1.5rem);
+          align-items: center;
+          gap: clamp(0.3rem, 0.6vw, 0.5rem);
+          padding: clamp(0.5rem, 1vh, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.6);
+          border-radius: clamp(10px, 2vw, 15px);
+          color: white;
+          font-weight: 800;
+          font-size: clamp(0.8rem, 1.6vw, 1rem);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 clamp(4px, 0.8vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.3);
+          background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
+        }
+
+        .my-pokemon-btn:hover {
+          transform: translateY(clamp(-2px, -0.5vh, -3px));
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4),
+                      0 0 clamp(15px, 3vw, 20px) rgba(255,222,0,0.4);
+        }
+
+        .my-pokemon-btn:active {
+          transform: translateY(0);
         }
 
         .rest-btn {
@@ -682,6 +696,74 @@ export function renderTrainerCard() {
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(238,21,21,0.5);
         }
 
+        /* Badge Collection */
+        .badge-section {
+          width: 100%;
+          max-width: 900px;
+          margin-top: clamp(1.5rem, 3vh, 2rem);
+        }
+
+        .badge-section-title {
+          font-size: clamp(1.3rem, 3vw, 2rem);
+          font-weight: 900;
+          color: #FFDE00;
+          text-align: center;
+          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
+          text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+          text-transform: uppercase;
+        }
+
+        .badge-collection {
+          display: grid;
+          grid-template-columns: repeat(8, 1fr);
+          gap: clamp(0.5rem, 1vw, 1rem);
+          justify-items: center;
+        }
+
+        .badge-slot {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          cursor: default;
+          transition: transform 0.3s, filter 0.3s;
+        }
+
+        .badge-slot.earned {
+          cursor: pointer;
+        }
+
+        .badge-slot.earned:hover {
+          transform: translateY(clamp(-3px, -0.8vh, -5px));
+          filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
+        }
+
+        .badge-slot img {
+          width: 85%;
+          height: auto;
+          aspect-ratio: 1;
+          border-radius: clamp(12px, 2.5vw, 18px);
+          object-fit: cover;
+          margin-bottom: clamp(0.3rem, 0.6vh, 0.5rem);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          background-color: #fff;
+        }
+
+        .badge-slot.empty img {
+          opacity: 0.3;
+          border-color: rgba(255,222,0,0.3);
+          box-shadow: none;
+        }
+
+        .badge-slot .badge-name {
+          font-size: clamp(0.6rem, 1.3vw, 0.85rem);
+          font-weight: 700;
+          color: #FFDE00;
+          text-align: center;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+          word-break: break-word;
+        }
+
         /* Tablet - keep layout, adjust sizes */
         @media (max-width: 768px) {
           .trainer-image-container {
@@ -707,6 +789,18 @@ export function renderTrainerCard() {
 
           .trainer-utility-wrapper {
             min-height: clamp(220px, 30vw, 300px);
+          }
+
+          .badge-collection {
+            gap: clamp(0.4rem, 0.8vw, 0.75rem);
+          }
+
+          .badge-slot img {
+            border-width: clamp(2px, 0.4vw, 3px);
+          }
+
+          .badge-slot .badge-name {
+            font-size: clamp(0.55rem, 1.2vw, 0.75rem);
           }
         }
 
@@ -784,10 +878,17 @@ export function renderTrainerCard() {
             font-size: clamp(0.6rem, 1.5vw, 0.85rem);
           }
 
-          .my-pokemon-button {
-            padding: clamp(0.6rem, 1.5vh, 1rem) clamp(1.2rem, 3vw, 2rem);
-            font-size: clamp(0.9rem, 2.2vw, 1.3rem);
-            border-width: clamp(2px, 0.4vw, 3px);
+          .my-pokemon-btn {
+            font-size: clamp(0.7rem, 1.4vw, 0.9rem);
+          }
+
+          .badge-collection {
+            grid-template-columns: repeat(4, 1fr);
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+          }
+
+          .badge-slot .badge-name {
+            font-size: clamp(0.55rem, 1.5vw, 0.75rem);
           }
         }
 
@@ -863,15 +964,32 @@ export function renderTrainerCard() {
             font-size: clamp(0.5rem, 1.3vw, 0.7rem);
           }
 
-          .my-pokemon-button {
-            padding: clamp(0.5rem, 1.2vh, 0.8rem) clamp(1rem, 2.5vw, 1.5rem);
-            font-size: clamp(0.8rem, 2vw, 1.1rem);
+          .my-pokemon-btn {
+            font-size: clamp(0.6rem, 1.3vw, 0.8rem);
           }
 
           .back-button {
             width: clamp(35px, 10vw, 45px);
             height: clamp(35px, 10vw, 45px);
             font-size: clamp(1.2rem, 3vw, 1.6rem);
+          }
+
+          .badge-collection {
+            grid-template-columns: repeat(4, 1fr);
+            gap: clamp(0.3rem, 0.8vw, 0.5rem);
+          }
+
+          .badge-slot img {
+            border-width: 2px;
+            border-radius: clamp(8px, 2vw, 12px);
+          }
+
+          .badge-slot .badge-name {
+            font-size: clamp(0.5rem, 1.3vw, 0.65rem);
+          }
+
+          .badge-section-title {
+            font-size: clamp(0.9rem, 2.5vw, 1.2rem);
           }
         }
       </style>
@@ -949,18 +1067,57 @@ export function renderTrainerCard() {
         </div>
       </div>
 
-      <!-- My Pokemon Button with Rest Buttons -->
+      <!-- Buttons Row: Short Rest | My Pokemon | Long Rest -->
       <div class="bottom-buttons-container">
-        <button class="my-pokemon-button" id="myPokemonButton">My Pokemon</button>
-        <div class="rest-buttons-row">
-          <button class="rest-btn short-rest-btn" id="shortRestBtn">
-            <span class="rest-btn-icon">☀️</span>
-            <span class="rest-btn-label">Short Rest</span>
-          </button>
-          <button class="rest-btn long-rest-btn" id="longRestBtn">
-            <span class="rest-btn-icon">🌙</span>
-            <span class="rest-btn-label">Long Rest</span>
-          </button>
+        <button class="rest-btn short-rest-btn" id="shortRestBtn">
+          <span class="rest-btn-icon">☀️</span>
+          <span class="rest-btn-label">Short Rest</span>
+        </button>
+        <button class="my-pokemon-btn" id="myPokemonButton">
+          <span class="rest-btn-icon">📦</span>
+          <span>My Pokemon</span>
+        </button>
+        <button class="rest-btn long-rest-btn" id="longRestBtn">
+          <span class="rest-btn-icon">🌙</span>
+          <span class="rest-btn-label">Long Rest</span>
+        </button>
+      </div>
+
+      <!-- Badge Collection -->
+      <div class="badge-section">
+        <div class="badge-section-title">Badges</div>
+        <div class="badge-collection">
+          ${Array.from({ length: 8 }, (_, i) => {
+            const badge = earnedBadges[i];
+            if (badge) {
+              const kebabName = badge.name.toLowerCase().replace(/\s+/g, '-');
+              const imgUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/badges/' + kebabName + '.png';
+              return `
+                <div class="badge-slot earned" data-badge-index="${i}">
+                  <img src="${imgUrl}" alt="${badge.name}" onerror="this.src='${lockedSlot}'">
+                  <div class="badge-name">${badge.name}</div>
+                </div>
+              `;
+            } else {
+              return `
+                <div class="badge-slot empty">
+                  <img src="${lockedSlot}" alt="Empty Badge Slot">
+                </div>
+              `;
+            }
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Badge Detail Popup -->
+      <div class="popup-overlay" id="badgeDetailPopup">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title" id="badgeDetailTitle">Badge</div>
+            <button class="popup-close" id="closeBadgeDetail">×</button>
+          </div>
+          <div class="popup-body" id="badgeDetailBody">
+          </div>
         </div>
       </div>
 
@@ -1118,6 +1275,47 @@ export function attachTrainerCardListeners() {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'my-pokemon' }
     }));
+  });
+
+  // Badge tap interaction
+  const badgeSlots = document.querySelectorAll('.badge-slot.earned');
+  if (badgeSlots.length > 0) {
+    // Rebuild earned badges list for popups
+    const trainerDataForBadges = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    const inventoryStrForBadges = trainerDataForBadges[20] || '';
+    const itemsDbForBadges = JSON.parse(sessionStorage.getItem('items') || '[]');
+    const badgeList = [];
+    if (inventoryStrForBadges && itemsDbForBadges.length) {
+      const items = inventoryStrForBadges.split(',').map(s => s.trim()).filter(Boolean);
+      for (const entry of items) {
+        const name = entry.replace(/\s*x\d+$/i, '').trim();
+        const dbItem = itemsDbForBadges.find(it => it.name === name);
+        if (dbItem && dbItem.type === 'Badges, Seals & Sigils' && name.includes('Badge')) {
+          badgeList.push({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' });
+        }
+      }
+    }
+
+    badgeSlots.forEach(slot => {
+      slot.addEventListener('click', () => {
+        const idx = parseInt(slot.dataset.badgeIndex, 10);
+        const badge = badgeList[idx];
+        if (!badge) return;
+        document.getElementById('badgeDetailTitle').textContent = badge.name;
+        document.getElementById('badgeDetailBody').textContent = badge.description || 'No description available.';
+        document.getElementById('badgeDetailPopup').classList.add('active');
+      });
+    });
+  }
+
+  document.getElementById('closeBadgeDetail')?.addEventListener('click', () => {
+    document.getElementById('badgeDetailPopup').classList.remove('active');
+  });
+
+  document.getElementById('badgeDetailPopup')?.addEventListener('click', (e) => {
+    if (e.target.id === 'badgeDetailPopup') {
+      document.getElementById('badgeDetailPopup').classList.remove('active');
+    }
   });
 
   // Rest buttons - open rest popups directly

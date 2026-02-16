@@ -703,16 +703,6 @@ export function renderTrainerCard() {
           margin-top: clamp(1.5rem, 3vh, 2rem);
         }
 
-        .badge-section-title {
-          font-size: clamp(1.3rem, 3vw, 2rem);
-          font-weight: 900;
-          color: #FFDE00;
-          text-align: center;
-          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
-          text-shadow: 0 2px 8px rgba(0,0,0,0.8);
-          text-transform: uppercase;
-        }
-
         .badge-collection {
           display: grid;
           grid-template-columns: repeat(8, 1fr);
@@ -738,12 +728,11 @@ export function renderTrainerCard() {
         }
 
         .badge-slot img {
-          width: 85%;
+          width: 100%;
           height: auto;
           aspect-ratio: 1;
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
-          margin-bottom: clamp(0.3rem, 0.6vh, 0.5rem);
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
           background-color: #fff;
@@ -753,15 +742,6 @@ export function renderTrainerCard() {
           opacity: 0.3;
           border-color: rgba(255,222,0,0.3);
           box-shadow: none;
-        }
-
-        .badge-slot .badge-name {
-          font-size: clamp(0.6rem, 1.3vw, 0.85rem);
-          font-weight: 700;
-          color: #FFDE00;
-          text-align: center;
-          text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-          word-break: break-word;
         }
 
         /* Tablet - keep layout, adjust sizes */
@@ -799,9 +779,6 @@ export function renderTrainerCard() {
             border-width: clamp(2px, 0.4vw, 3px);
           }
 
-          .badge-slot .badge-name {
-            font-size: clamp(0.55rem, 1.2vw, 0.75rem);
-          }
         }
 
         /* Mobile phones - keep side-by-side layout */
@@ -887,9 +864,6 @@ export function renderTrainerCard() {
             gap: clamp(0.5rem, 1.5vw, 1rem);
           }
 
-          .badge-slot .badge-name {
-            font-size: clamp(0.55rem, 1.5vw, 0.75rem);
-          }
         }
 
         /* Very small screens - even more compact but keep layout */
@@ -984,13 +958,6 @@ export function renderTrainerCard() {
             border-radius: clamp(8px, 2vw, 12px);
           }
 
-          .badge-slot .badge-name {
-            font-size: clamp(0.5rem, 1.3vw, 0.65rem);
-          }
-
-          .badge-section-title {
-            font-size: clamp(0.9rem, 2.5vw, 1.2rem);
-          }
         }
       </style>
 
@@ -1085,7 +1052,6 @@ export function renderTrainerCard() {
 
       <!-- Badge Collection -->
       <div class="badge-section">
-        <div class="badge-section-title">Badges</div>
         <div class="badge-collection">
           ${Array.from({ length: 8 }, (_, i) => {
             const badge = earnedBadges[i];
@@ -1094,14 +1060,13 @@ export function renderTrainerCard() {
               const imgUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/badges/' + kebabName + '.png';
               return `
                 <div class="badge-slot earned" data-badge-index="${i}">
-                  <img src="${imgUrl}" alt="${badge.name}" onerror="this.src='${lockedSlot}'">
-                  <div class="badge-name">${badge.name}</div>
+                  <img src="${imgUrl}" alt="${badge.name}" onerror="this.src='assets/Locked_Badge.png'">
                 </div>
               `;
             } else {
               return `
                 <div class="badge-slot empty">
-                  <img src="${lockedSlot}" alt="Empty Badge Slot">
+                  <img src="assets/Locked_Badge.png" alt="Empty Badge Slot">
                 </div>
               `;
             }

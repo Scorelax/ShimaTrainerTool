@@ -20,8 +20,11 @@ class AudioManager {
     return new Promise((resolve) => {
       const audio = new Audio(`${AUDIO_PATH}${track}.mp3`);
       audio.preload = 'auto';
-      audio.addEventListener('canplaythrough', () => resolve(), { once: true });
-      audio.addEventListener('error', () => resolve(), { once: true });
+      const done = () => { clearTimeout(timer); resolve(); };
+      audio.addEventListener('canplaythrough', done, { once: true });
+      audio.addEventListener('error', done, { once: true });
+      // Timeout fallback — don't block the app if audio stalls
+      const timer = setTimeout(done, 3000);
       this.cache[track] = audio;
     });
   }

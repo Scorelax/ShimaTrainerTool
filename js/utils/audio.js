@@ -2,8 +2,8 @@
 
 const AUDIO_PATH = 'assets/';
 
-const ALL_TRACKS = [
-  'Index', 'ContinueJourney', 'NewJourney', 'FindPokemon',
+const REMAINING_TRACKS = [
+  'NewJourney', 'FindPokemon',
   'NewPokemon', 'EvolutionStart', 'Evolution', 'EvolutionFinish',
   'LevelUp', 'NewItem', 'Berry', 'GymBadge', 'PokeCenter'
 ];
@@ -16,16 +16,23 @@ class AudioManager {
     this.cache = {};
   }
 
-  preloadAll() {
-    return Promise.all(ALL_TRACKS.map(track => {
-      return new Promise((resolve) => {
-        const audio = new Audio(`${AUDIO_PATH}${track}.mp3`);
-        audio.preload = 'auto';
-        audio.addEventListener('canplaythrough', () => resolve(), { once: true });
-        audio.addEventListener('error', () => resolve(), { once: true });
-        this.cache[track] = audio;
-      });
-    }));
+  _preloadTrack(track) {
+    return new Promise((resolve) => {
+      const audio = new Audio(`${AUDIO_PATH}${track}.mp3`);
+      audio.preload = 'auto';
+      audio.addEventListener('canplaythrough', () => resolve(), { once: true });
+      audio.addEventListener('error', () => resolve(), { once: true });
+      this.cache[track] = audio;
+    });
+  }
+
+  async preloadPriority() {
+    // Load Index first so landing page music is ready before display
+    await this._preloadTrack('Index');
+    // Then load ContinueJourney next, followed by the rest in parallel (non-blocking)
+    this._preloadTrack('ContinueJourney').then(() => {
+      Promise.all(REMAINING_TRACKS.map(track => this._preloadTrack(track)));
+    });
   }
 
   _getAudio(trackName) {

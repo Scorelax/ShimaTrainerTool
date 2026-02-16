@@ -183,7 +183,7 @@ export function renderPokemonCard(pokemonName) {
   const movementDisplay = movementValues
     .map((value, index) => value && value !== '-' && value !== '0' ? `${movementTypes[index]}: ${value}` : null)
     .filter(m => m !== null)
-    .join('\n') || `Walking: ${speed} ft`;
+    .join('\n') || 'Error loading movement';
 
   // Parse learned moves from indices 23-28, 37 based on level
   const moveIndices = [23, 24, 25, 26, 27, 28, 37];

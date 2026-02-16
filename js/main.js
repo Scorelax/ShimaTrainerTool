@@ -250,6 +250,9 @@ async function initApp() {
     // Show loading screen
     document.getElementById('loading-screen').classList.add('active');
 
+    // Preload all audio files so they play instantly
+    await audioManager.preloadAll();
+
     // Hide navigation bar (not needed - each page has its own back button)
     const nav = document.querySelector('.main-nav');
     if (nav) nav.style.display = 'none';

@@ -1584,19 +1584,20 @@ export function renderPokemonCard(pokemonName) {
           width: clamp(14px, 2vw, 18px);
           height: clamp(14px, 2vw, 18px);
           border-radius: 50%;
-          border: clamp(2px, 0.3vw, 3px) solid rgba(76, 175, 80, 0.8);
+          border: clamp(2px, 0.3vw, 3px) solid #fff;
           transition: all 0.3s ease;
           display: inline-block;
         }
 
         .tp-dot.filled {
           background: linear-gradient(135deg, #4CAF50 0%, #43A047 100%);
+          border-color: #fff;
           box-shadow: 0 0 clamp(5px, 1vw, 8px) rgba(76, 175, 80, 0.5);
         }
 
         .tp-dot.empty {
           background: rgba(0, 0, 0, 0.2);
-          border-color: rgba(76, 175, 80, 0.3);
+          border-color: rgba(255, 255, 255, 0.6);
         }
 
         /* Inventory Popup Styles */

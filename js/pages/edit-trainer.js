@@ -807,6 +807,15 @@ async function handleFormSubmit() {
       console.log(`Battle Dice updated: ${oldMax} - ${oldCurrent} -> ${newMax} - ${newCurrent}`);
     }
 
+    // Update Tactician Points if level changed
+    if (trainerPath === 'Tactician' && level !== originalLevel) {
+      const oldTP = parseInt(trainerData[49], 10) || 0;
+      const levelDiff = level - originalLevel;
+      const newTP = Math.max(0, oldTP + levelDiff);
+      trainerData[49] = newTP;
+      console.log(`Tactician TP updated: ${oldTP} -> ${newTP} (level ${originalLevel} -> ${level})`);
+    }
+
     // Update session storage IMMEDIATELY
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 

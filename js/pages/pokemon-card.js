@@ -3955,6 +3955,45 @@ function loadMoveColorsAndListeners() {
   }
 }
 
+// Parse damage dice from move description, applying Higher Levels scaling
+function parseDamageDice(description, higherLevels, pokemonLevel) {
+  // Check if the move deals damage
+  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|damage on a hit/i;
+  if (!damagePatterns.test(description)) {
+    return null; // Non-damaging move
+  }
+
+  // Extract base damage dice from description (e.g., "1d4", "2d8")
+  const diceMatch = description.match(/(\d+d\d+)/i);
+  if (!diceMatch) {
+    return null;
+  }
+  let baseDice = diceMatch[1];
+
+  // Check Higher Levels for scaling
+  if (higherLevels && pokemonLevel > 1) {
+    // Match patterns like "2d8 at level 5", "4d6 at level 10"
+    const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
+    let match;
+    let bestDice = null;
+    let bestLevel = 0;
+
+    while ((match = tierRegex.exec(higherLevels)) !== null) {
+      const tierLevel = parseInt(match[2]);
+      if (pokemonLevel >= tierLevel && tierLevel > bestLevel) {
+        bestLevel = tierLevel;
+        bestDice = match[1];
+      }
+    }
+
+    if (bestDice) {
+      baseDice = bestDice;
+    }
+  }
+
+  return baseDice;
+}
+
 // Show move details popup
 function showMoveDetails(moveName) {
   const move = window.allMoves.find(m => m[0] === moveName);
@@ -4126,6 +4165,10 @@ function showMoveDetails(moveName) {
       attackBreakdownParts.push(`Type Master +${typeMasterAttackBonus}`);
     }
     const attackBreakdown = attackBreakdownParts.length > 0 ? `(${attackBreakdownParts.join(', ')})` : '';
+
+    // Parse damage dice for display
+    const pokemonLevel = parseInt(pokemonData[4]) || 1;
+    const damageDice = parseDamageDice(moveDescription, move[8] || '', pokemonLevel);
 
     const damageBreakdownParts = [];
     if (stabBonus > 0) {
@@ -4363,9 +4406,17 @@ function showMoveDetails(moveName) {
     document.getElementById('moveDescriptionPopup').textContent = move[7];
     document.getElementById('moveHigherLevelsPopup').textContent = move[8];
     document.getElementById('attackRollBonus').textContent = `+${attackRollBonus}`;
-    document.getElementById('damageRollBonus').textContent = `+${damageRollBonus}`;
+    if (damageDice) {
+      if (damageRollBonus > 0) {
+        document.getElementById('damageRollBonus').textContent = `${damageDice} + ${damageRollBonus}`;
+      } else {
+        document.getElementById('damageRollBonus').textContent = damageDice;
+      }
+    } else {
+      document.getElementById('damageRollBonus').textContent = '-';
+    }
     document.getElementById('attackRollBreakdown').textContent = attackBreakdown;
-    document.getElementById('damageRollBreakdown').textContent = damageBreakdown;
+    document.getElementById('damageRollBreakdown').textContent = damageDice ? damageBreakdown : '';
     document.getElementById('heldItemsInfo').innerHTML = heldItemsInfo;
 
     // Populate battle dice tracker for Ace Trainer

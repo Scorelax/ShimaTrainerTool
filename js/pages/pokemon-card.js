@@ -1889,6 +1889,26 @@ export function renderPokemonCard(pokemonName) {
           box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
         }
 
+        .form-group select {
+          width: 100%;
+          padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #555;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(1rem, 2.2vw, 1.3rem);
+          font-weight: 700;
+          box-sizing: border-box;
+          transition: all 0.3s ease;
+          cursor: pointer;
+        }
+
+        .form-group select:focus {
+          outline: none;
+          border-color: #FFDE00;
+          box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
+        }
+
         /* Autocomplete Dropdown */
         .autocomplete-dropdown {
           position: absolute;
@@ -2463,15 +2483,21 @@ export function renderPokemonCard(pokemonName) {
                     <span class="btn-icon">➕</span>
                     <span class="btn-text">Add</span>
                   </button>
+                  <button class="action-btn" id="useItemButton" disabled>
+                    <span class="btn-icon">🧪</span>
+                    <span class="btn-text">Use</span>
+                  </button>
+                </div>
+                <div class="inventory-actions-row">
                   <button class="action-btn" id="editItemButton" disabled>
                     <span class="btn-icon">✏️</span>
                     <span class="btn-text">Edit</span>
                   </button>
+                  <button class="action-btn" id="removeItemButton" disabled>
+                    <span class="btn-icon">🗑️</span>
+                    <span class="btn-text">Remove</span>
+                  </button>
                 </div>
-                <button class="action-btn full-width" id="removeItemButton" disabled>
-                  <span class="btn-icon">🗑️</span>
-                  <span class="btn-text">Remove</span>
-                </button>
               </div>
             </div>
           </div>
@@ -2560,6 +2586,47 @@ export function renderPokemonCard(pokemonName) {
             <button class="action-btn secondary" id="cancelRemoveItem">
               <span class="btn-icon">✖️</span>
               <span class="btn-text">No</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Use Item Modal -->
+      <div id="useItemModal" class="inventory-modal">
+        <div class="inventory-modal-content">
+          <div class="modal-header">
+            <h2>Use Item</h2>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Item</label>
+              <div class="item-preview" id="useItemName">Item Name</div>
+            </div>
+            <div class="form-group">
+              <label>Effect</label>
+              <div class="item-preview" id="useItemEffect">Effect text</div>
+            </div>
+            <div class="form-group">
+              <label for="useItemTarget">Target</label>
+              <select id="useItemTarget" class="form-select"></select>
+            </div>
+            <div class="form-group">
+              <label id="useItemDiceLabel">Roll:</label>
+              <input type="number" id="useItemDiceResult" min="1" placeholder="Enter dice roll result">
+            </div>
+            <div class="form-group">
+              <label>Total Healing</label>
+              <div class="item-preview" id="useItemTotalHealing">—</div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn primary" id="confirmUseItem">
+              <span class="btn-icon">✔️</span>
+              <span class="btn-text">Use</span>
+            </button>
+            <button class="action-btn secondary" id="cancelUseItem">
+              <span class="btn-icon">↩️</span>
+              <span class="btn-text">Back</span>
             </button>
           </div>
         </div>
@@ -2711,9 +2778,10 @@ export function attachPokemonCardListeners() {
         document.getElementById('descriptionText').textContent = selectedItemData.description;
         document.getElementById('effectText').textContent = selectedItemData.effect;
 
-        // Enable edit/remove buttons
+        // Enable edit/remove/use buttons
         document.getElementById('editItemButton').disabled = false;
         document.getElementById('removeItemButton').disabled = false;
+        document.getElementById('useItemButton').disabled = false;
       });
     });
 
@@ -2750,6 +2818,7 @@ export function attachPokemonCardListeners() {
         // Keep buttons enabled
         document.getElementById('editItemButton').disabled = false;
         document.getElementById('removeItemButton').disabled = false;
+        document.getElementById('useItemButton').disabled = false;
       } else {
         // Item was removed, reset info panel
         selectedItemData = null;
@@ -2758,6 +2827,7 @@ export function attachPokemonCardListeners() {
         document.getElementById('effectText').textContent = 'Item effects will appear here.';
         document.getElementById('editItemButton').disabled = true;
         document.getElementById('removeItemButton').disabled = true;
+        document.getElementById('useItemButton').disabled = true;
       }
     }
 
@@ -2789,6 +2859,226 @@ export function attachPokemonCardListeners() {
     document.getElementById('itemToRemove').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
     document.getElementById('removeItemModal').style.display = 'block';
   });
+
+  // Parse healing effect text from item
+  function parseHealingEffect(effectText) {
+    if (!effectText) return null;
+    const match = effectText.match(/[Rr]estores?\s+(\d+d\d+)\s*(?:\+\s*(\d+))?\s*(HP|VP)/);
+    if (!match) return null;
+    return {
+      dice: match[1],
+      flatBonus: match[2] ? parseInt(match[2], 10) : 0,
+      stat: match[3]
+    };
+  }
+
+  // Use Item button - Opens use modal
+  document.getElementById('useItemButton')?.addEventListener('click', function() {
+    if (!selectedItemData) return;
+
+    const healing = parseHealingEffect(selectedItemData.effect);
+    if (!healing) {
+      alert('This item cannot be used (no healing effect detected).');
+      return;
+    }
+
+    // Populate modal
+    document.getElementById('useItemName').textContent = selectedItemData.name;
+    document.getElementById('useItemEffect').textContent = selectedItemData.effect;
+    document.getElementById('useItemDiceLabel').textContent = `Roll ${healing.dice}:`;
+    document.getElementById('useItemDiceResult').value = '';
+    document.getElementById('useItemTotalHealing').textContent = '—';
+
+    // Build target list
+    const targetSelect = document.getElementById('useItemTarget');
+    targetSelect.innerHTML = '';
+
+    const trainerDataRaw = sessionStorage.getItem('trainerData');
+    if (trainerDataRaw) {
+      const td = JSON.parse(trainerDataRaw);
+      const trainerCurrentHP = td[34] !== '' && td[34] !== undefined ? parseInt(td[34]) : parseInt(td[11]);
+      const trainerCurrentVP = td[35] !== '' && td[35] !== undefined ? parseInt(td[35]) : parseInt(td[12]);
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({
+        type: 'trainer',
+        key: 'trainerData',
+        currentHP: trainerCurrentHP,
+        maxHP: parseInt(td[11]),
+        currentVP: trainerCurrentVP,
+        maxVP: parseInt(td[12]),
+        name: td[1]
+      });
+      const statLabel = healing.stat === 'HP'
+        ? `${trainerCurrentHP}/${td[11]} HP`
+        : `${trainerCurrentVP}/${td[12]} VP`;
+      opt.textContent = `${td[1]} (Trainer) — ${statLabel}`;
+      targetSelect.appendChild(opt);
+    }
+
+    // Add active party Pokemon
+    Object.keys(sessionStorage).filter(k => k.startsWith('pokemon_')).forEach(key => {
+      const pd = JSON.parse(sessionStorage.getItem(key));
+      if (pd[38]) {
+        const currentHP = pd[45] !== '' && pd[45] !== undefined ? parseInt(pd[45]) : parseInt(pd[10]);
+        const currentVP = pd[46] !== '' && pd[46] !== undefined ? parseInt(pd[46]) : parseInt(pd[12]);
+        const displayName = pd[36] || pd[2];
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({
+          type: 'pokemon',
+          key: key,
+          speciesName: pd[2],
+          currentHP: currentHP,
+          maxHP: parseInt(pd[10]),
+          currentVP: currentVP,
+          maxVP: parseInt(pd[12]),
+          name: displayName
+        });
+        const statLabel = healing.stat === 'HP'
+          ? `${currentHP}/${pd[10]} HP`
+          : `${currentVP}/${pd[12]} VP`;
+        opt.textContent = `${displayName} — ${statLabel}`;
+        targetSelect.appendChild(opt);
+      }
+    });
+
+    // Update total healing display when dice result changes
+    const diceInput = document.getElementById('useItemDiceResult');
+    diceInput.oninput = function() {
+      const val = parseInt(this.value);
+      if (val > 0) {
+        document.getElementById('useItemTotalHealing').textContent = `${val + healing.flatBonus} ${healing.stat}`;
+      } else {
+        document.getElementById('useItemTotalHealing').textContent = '—';
+      }
+    };
+
+    document.getElementById('useItemModal').style.display = 'block';
+  });
+
+  // Use Item Modal - Cancel button
+  document.getElementById('cancelUseItem')?.addEventListener('click', function() {
+    document.getElementById('useItemModal').style.display = 'none';
+  });
+
+  // Use Item Modal - Confirm button
+  document.getElementById('confirmUseItem')?.addEventListener('click', function() {
+    if (!selectedItemData) return;
+
+    const healing = parseHealingEffect(selectedItemData.effect);
+    if (!healing) return;
+
+    const diceResult = parseInt(document.getElementById('useItemDiceResult').value);
+    if (!diceResult || diceResult < 1) {
+      alert('Please enter a valid dice roll result.');
+      return;
+    }
+
+    const totalHealing = diceResult + healing.flatBonus;
+    const targetData = JSON.parse(document.getElementById('useItemTarget').value);
+
+    // Apply healing to target
+    if (targetData.type === 'trainer') {
+      const td = JSON.parse(sessionStorage.getItem('trainerData'));
+      if (healing.stat === 'HP') {
+        const newHP = Math.min(targetData.currentHP + totalHealing, targetData.maxHP);
+        td[34] = newHP;
+        // Update combat tracker if visible
+        const hpEl = document.getElementById('trainerHpValue');
+        if (hpEl) hpEl.textContent = newHP;
+      } else {
+        const newVP = Math.min(targetData.currentVP + totalHealing, targetData.maxVP);
+        td[35] = newVP;
+        const vpEl = document.getElementById('trainerVpValue');
+        if (vpEl) vpEl.textContent = newVP;
+      }
+
+      // Decrement item quantity
+      decrementItemQuantity(td, selectedItemData.name);
+      sessionStorage.setItem('trainerData', JSON.stringify(td));
+
+      // Update database in background
+      TrainerAPI.update(td).catch(error => {
+        console.error('Failed to update trainer data:', error);
+      });
+      if (healing.stat === 'HP') {
+        TrainerAPI.updateLiveStats(td[1], 'HP', td[34]).catch(error => {
+          console.error('Failed to update trainer HP:', error);
+        });
+      } else {
+        TrainerAPI.updateLiveStats(td[1], 'VP', td[35]).catch(error => {
+          console.error('Failed to update trainer VP:', error);
+        });
+      }
+    } else {
+      // Pokemon target
+      const pd = JSON.parse(sessionStorage.getItem(targetData.key));
+      const td = JSON.parse(sessionStorage.getItem('trainerData'));
+      if (healing.stat === 'HP') {
+        const newHP = Math.min(targetData.currentHP + totalHealing, targetData.maxHP);
+        pd[45] = newHP;
+        // Update combat tracker if this is the currently displayed Pokemon
+        const currentPokemonName = sessionStorage.getItem('selectedPokemonName');
+        if (currentPokemonName && targetData.key === `pokemon_${currentPokemonName.toLowerCase()}`) {
+          const hpEl = document.getElementById('hpValue');
+          if (hpEl) hpEl.textContent = newHP;
+        }
+      } else {
+        const newVP = Math.min(targetData.currentVP + totalHealing, targetData.maxVP);
+        pd[46] = newVP;
+        const currentPokemonName = sessionStorage.getItem('selectedPokemonName');
+        if (currentPokemonName && targetData.key === `pokemon_${currentPokemonName.toLowerCase()}`) {
+          const vpEl = document.getElementById('vpValue');
+          if (vpEl) vpEl.textContent = newVP;
+        }
+      }
+      sessionStorage.setItem(targetData.key, JSON.stringify(pd));
+
+      // Decrement item quantity from trainer inventory
+      decrementItemQuantity(td, selectedItemData.name);
+      sessionStorage.setItem('trainerData', JSON.stringify(td));
+
+      // Update database in background
+      TrainerAPI.update(td).catch(error => {
+        console.error('Failed to update inventory:', error);
+      });
+      if (healing.stat === 'HP') {
+        PokemonAPI.updateLiveStats(td[1], targetData.speciesName, 'HP', pd[45]).catch(error => {
+          console.error('Failed to update Pokemon HP:', error);
+        });
+      } else {
+        PokemonAPI.updateLiveStats(td[1], targetData.speciesName, 'VP', pd[46]).catch(error => {
+          console.error('Failed to update Pokemon VP:', error);
+        });
+      }
+    }
+
+    // Close modal and refresh
+    document.getElementById('useItemModal').style.display = 'none';
+    refreshInventoryDisplay();
+  });
+
+  // Helper to decrement item quantity in trainer data inventory string
+  function decrementItemQuantity(td, itemName) {
+    const inventoryStr = td[20] || '';
+    let invItems = inventoryStr && inventoryStr !== 'None'
+      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+      : [];
+
+    invItems = invItems.map(itemStr => {
+      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+      const name = match ? match[1].trim() : itemStr;
+      const qty = match ? parseInt(match[2], 10) : 1;
+
+      if (name.toLowerCase() === itemName.toLowerCase()) {
+        const newQty = qty - 1;
+        if (newQty <= 0) return null;
+        return `${name} (x${newQty})`;
+      }
+      return itemStr;
+    }).filter(item => item !== null);
+
+    td[20] = invItems.length > 0 ? invItems.join(', ') : 'None';
+  }
 
   // Add Item Modal - Confirm button
   document.getElementById('confirmAddItem')?.addEventListener('click', function() {

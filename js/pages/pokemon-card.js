@@ -1525,6 +1525,80 @@ export function renderPokemonCard(pokemonName) {
           cursor: not-allowed;
         }
 
+        /* Tactician Dice Styles */
+        .tactician-container {
+          margin-bottom: 1rem;
+          padding: 0.8rem;
+          background: rgba(76, 175, 80, 0.15);
+          border-radius: 8px;
+          border-left: 4px solid #4CAF50;
+        }
+
+        .tactician-ability {
+          margin-bottom: 0.6rem;
+          padding-bottom: 0.6rem;
+          border-bottom: 1px solid rgba(76, 175, 80, 0.2);
+        }
+
+        .tactician-ability:last-child {
+          margin-bottom: 0;
+          padding-bottom: 0;
+          border-bottom: none;
+        }
+
+        .use-tactician-button {
+          padding: 0.4rem 0.8rem;
+          background: linear-gradient(135deg, #4CAF50 0%, #43A047 100%);
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: clamp(0.8rem, 1.4vh, 0.9rem);
+          font-weight: bold;
+          transition: all 0.3s;
+          box-shadow: 0 3px 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .use-tactician-button:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .use-tactician-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .tactician-input {
+          width: 50px;
+          padding: 0.3rem 0.4rem;
+          border: 2px solid #4CAF50;
+          border-radius: 4px;
+          font-size: 0.9rem;
+          text-align: center;
+          background: rgba(255, 255, 255, 0.9);
+          color: #333;
+        }
+
+        .tp-dot {
+          width: clamp(14px, 2vw, 18px);
+          height: clamp(14px, 2vw, 18px);
+          border-radius: 50%;
+          border: clamp(2px, 0.3vw, 3px) solid rgba(76, 175, 80, 0.8);
+          transition: all 0.3s ease;
+          display: inline-block;
+        }
+
+        .tp-dot.filled {
+          background: linear-gradient(135deg, #4CAF50 0%, #43A047 100%);
+          box-shadow: 0 0 clamp(5px, 1vw, 8px) rgba(76, 175, 80, 0.5);
+        }
+
+        .tp-dot.empty {
+          background: rgba(0, 0, 0, 0.2);
+          border-color: rgba(76, 175, 80, 0.3);
+        }
+
         /* Inventory Popup Styles */
         #inventoryPopup .popup-content {
           max-width: min(90vw, 900px);
@@ -4719,6 +4793,7 @@ function showMoveDetails(moveName) {
               <div id="heldItemsInfo"></div>
             </div>
             <div id="battleDiceContainer"></div>
+            <div id="tacticianDiceContainer"></div>
           </div>
           <button id="useMoveButton" style="width: 100%; padding: clamp(0.8rem, 1.5vh, 1rem); background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: clamp(1rem, 1.8vh, 1.1rem); font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 12px rgba(76,175,80,0.3);">Use Move</button>
         </div>
@@ -4979,6 +5054,161 @@ function showMoveDetails(moveName) {
       }
     } else {
       battleDiceContainer.innerHTML = '';
+    }
+
+    // Populate Tactician abilities
+    const tacticianContainer = document.getElementById('tacticianDiceContainer');
+
+    if (trainerPath === 'Tactician' && trainerLevel >= 5) {
+      let currentTP = parseInt(trainerData[49], 10) || 0;
+      const maxTP = parseInt(trainerData[2], 10) || 1;
+
+      function buildTPDots(tp, max) {
+        let html = '<div class="charge-dots" style="display: inline-flex; gap: clamp(0.3rem, 0.6vw, 0.5rem);">';
+        for (let i = 0; i < max; i++) {
+          html += `<span class="tp-dot ${i < tp ? 'filled' : 'empty'}"></span>`;
+        }
+        html += '</div>';
+        return html;
+      }
+
+      function updateTacticianUI() {
+        // Update TP dots
+        const dots = tacticianContainer.querySelectorAll('.tp-dot');
+        dots.forEach((dot, i) => {
+          if (i < currentTP) {
+            dot.classList.add('filled');
+            dot.classList.remove('empty');
+          } else {
+            dot.classList.remove('filled');
+            dot.classList.add('empty');
+          }
+        });
+
+        // Update button disabled states
+        const empoweredBtn = document.getElementById('useEmpoweredStrike');
+        if (empoweredBtn) empoweredBtn.disabled = currentTP < 2;
+
+        const shieldBtn = document.getElementById('useTacticalShield');
+        if (shieldBtn) shieldBtn.disabled = currentTP < 1;
+        const shieldInput = document.getElementById('tacticalShieldInput');
+        if (shieldInput) shieldInput.max = Math.min(3, currentTP);
+
+        const pressureBtn = document.getElementById('useTacticalPressure');
+        if (pressureBtn) pressureBtn.disabled = currentTP < 1;
+        const pressureInput = document.getElementById('tacticalPressureInput');
+        if (pressureInput) pressureInput.max = Math.min(5, currentTP);
+      }
+
+      function spendTP(amount) {
+        currentTP = Math.max(0, currentTP - amount);
+        trainerData[49] = currentTP;
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+        updateTacticianUI();
+        TrainerAPI.update(trainerData)
+          .catch(error => console.error('Error updating Tactician TP:', error));
+      }
+
+      // Build ability sections
+      let abilitiesHTML = '';
+
+      // Level 5+: Empowered Strike
+      abilitiesHTML += `
+        <div class="tactician-ability">
+          <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: space-between;">
+            <div>
+              <strong>Empowered Strike</strong> <span style="opacity: 0.7; font-size: 0.85rem;">(2 TP)</span>
+              <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">Roll damage dice twice, take the highest</div>
+            </div>
+            <button class="use-tactician-button" id="useEmpoweredStrike" ${currentTP < 2 ? 'disabled' : ''} style="flex-shrink: 0;">Use</button>
+          </div>
+        </div>
+      `;
+
+      // Level 9+: Tactical Shield
+      if (trainerLevel >= 9) {
+        const shieldMax = Math.min(3, currentTP);
+        abilitiesHTML += `
+          <div class="tactician-ability">
+            <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: space-between;">
+              <div>
+                <strong>Tactical Shield</strong> <span style="opacity: 0.7; font-size: 0.85rem;">(1-3 TP)</span>
+                <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">Reaction: Add to your Pokemon's AC</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <input type="number" class="tactician-input" id="tacticalShieldInput" min="1" max="${shieldMax}" value="1" ${currentTP < 1 ? 'disabled' : ''}>
+                <button class="use-tactician-button" id="useTacticalShield" ${currentTP < 1 ? 'disabled' : ''}>Use</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // Level 15+: Tactical Pressure
+      if (trainerLevel >= 15) {
+        const pressureMax = Math.min(5, currentTP);
+        abilitiesHTML += `
+          <div class="tactician-ability">
+            <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: space-between;">
+              <div>
+                <strong>Tactical Pressure</strong> <span style="opacity: 0.7; font-size: 0.85rem;">(1-5 TP)</span>
+                <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">Increase move DC after opponent's save</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <input type="number" class="tactician-input" id="tacticalPressureInput" min="1" max="${pressureMax}" value="1" ${currentTP < 1 ? 'disabled' : ''}>
+                <button class="use-tactician-button" id="useTacticalPressure" ${currentTP < 1 ? 'disabled' : ''}>Use</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      tacticianContainer.innerHTML = `
+        <div class="tactician-container">
+          <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem;">
+            <strong>Tactician Points:</strong>
+            ${buildTPDots(currentTP, maxTP)}
+          </div>
+          ${abilitiesHTML}
+        </div>
+      `;
+
+      // Event listeners
+      const empoweredBtn = document.getElementById('useEmpoweredStrike');
+      if (empoweredBtn) {
+        empoweredBtn.addEventListener('click', () => {
+          if (currentTP >= 2) {
+            spendTP(2);
+            showSuccess('Empowered Strike used! (2 TP) Roll damage dice twice and take the highest.');
+          }
+        });
+      }
+
+      const shieldBtn = document.getElementById('useTacticalShield');
+      if (shieldBtn) {
+        shieldBtn.addEventListener('click', () => {
+          const input = document.getElementById('tacticalShieldInput');
+          const amount = Math.max(1, Math.min(parseInt(input.value, 10) || 1, 3, currentTP));
+          if (currentTP >= amount) {
+            spendTP(amount);
+            showSuccess(`Tactical Shield used! (${amount} TP) Add ${amount} to your Pokemon's AC for this attack.`);
+          }
+        });
+      }
+
+      const pressureBtn = document.getElementById('useTacticalPressure');
+      if (pressureBtn) {
+        pressureBtn.addEventListener('click', () => {
+          const input = document.getElementById('tacticalPressureInput');
+          const amount = Math.max(1, Math.min(parseInt(input.value, 10) || 1, 5, currentTP));
+          if (currentTP >= amount) {
+            spendTP(amount);
+            showSuccess(`Tactical Pressure used! (${amount} TP) Increase the move's DC by ${amount}.`);
+          }
+        });
+      }
+    } else {
+      tacticianContainer.innerHTML = '';
     }
 
     // Set dataset attributes for Use Move button

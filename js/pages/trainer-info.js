@@ -1190,8 +1190,12 @@ export function renderTrainerInfo() {
           box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
         }
 
-        .form-group select {
+        .custom-select {
+          position: relative;
           width: 100%;
+        }
+
+        .custom-select-trigger {
           padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
           background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
           border: clamp(2px, 0.4vw, 3px) solid #555;
@@ -1199,15 +1203,60 @@ export function renderTrainerInfo() {
           color: white;
           font-size: clamp(1rem, 2.2vw, 1.3rem);
           font-weight: 700;
-          box-sizing: border-box;
-          transition: all 0.3s ease;
           cursor: pointer;
+          transition: all 0.3s ease;
+          user-select: none;
         }
 
-        .form-group select:focus {
-          outline: none;
+        .custom-select-trigger::after {
+          content: '▼';
+          float: right;
+          font-size: 0.7em;
+          margin-top: 0.2em;
+          color: #FFDE00;
+        }
+
+        .custom-select.open .custom-select-trigger {
           border-color: #FFDE00;
           box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
+          border-radius: clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px) 0 0;
+        }
+
+        .custom-select-options {
+          display: none;
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-top: none;
+          border-radius: 0 0 clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px);
+          max-height: clamp(150px, 30vh, 250px);
+          overflow-y: auto;
+          z-index: 10;
+        }
+
+        .custom-select.open .custom-select-options {
+          display: block;
+        }
+
+        .custom-select-option {
+          padding: clamp(0.6rem, 1.4vh, 1rem) clamp(1rem, 2vw, 1.5rem);
+          color: white;
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s ease;
+        }
+
+        .custom-select-option:hover {
+          background: rgba(255, 222, 0, 0.15);
+        }
+
+        .custom-select-option.selected {
+          background: rgba(255, 222, 0, 0.25);
+          color: #FFDE00;
         }
 
         /* Autocomplete Dropdown */
@@ -1989,8 +2038,12 @@ export function renderTrainerInfo() {
               <div class="item-preview" id="useItemEffect">Effect text</div>
             </div>
             <div class="form-group">
-              <label for="useItemTarget">Target</label>
-              <select id="useItemTarget" class="form-select"></select>
+              <label>Target</label>
+              <div class="custom-select" id="useItemTargetWrapper">
+                <div class="custom-select-trigger" id="useItemTargetTrigger">Select target...</div>
+                <div class="custom-select-options" id="useItemTargetOptions"></div>
+                <input type="hidden" id="useItemTarget">
+              </div>
             </div>
             <div class="form-group">
               <label id="useItemDiceLabel">Roll:</label>
@@ -2363,7 +2416,7 @@ export function attachTrainerInfoListeners() {
         // Enable edit/remove/use buttons
         document.getElementById('editItemButton').disabled = false;
         document.getElementById('removeItemButton').disabled = false;
-        document.getElementById('useItemButton').disabled = false;
+        document.getElementById('useItemButton').disabled = !parseHealingEffect(selectedItemData.effect);
       });
     });
 
@@ -2400,7 +2453,7 @@ export function attachTrainerInfoListeners() {
         // Keep buttons enabled
         document.getElementById('editItemButton').disabled = false;
         document.getElementById('removeItemButton').disabled = false;
-        document.getElementById('useItemButton').disabled = false;
+        document.getElementById('useItemButton').disabled = !parseHealingEffect(selectedItemData.effect);
       } else {
         // Item was removed, reset info panel
         selectedItemData = null;
@@ -2673,16 +2726,42 @@ export function attachTrainerInfoListeners() {
     document.getElementById('useItemTotalHealing').textContent = '—';
 
     // Build target list
-    const targetSelect = document.getElementById('useItemTarget');
-    targetSelect.innerHTML = '';
+    const targetHidden = document.getElementById('useItemTarget');
+    const targetOptions = document.getElementById('useItemTargetOptions');
+    const targetTrigger = document.getElementById('useItemTargetTrigger');
+    const targetWrapper = document.getElementById('useItemTargetWrapper');
+    targetOptions.innerHTML = '';
+    targetHidden.value = '';
+    targetTrigger.textContent = 'Select target...';
+    targetWrapper.classList.remove('open');
+
+    function addTargetOption(value, label) {
+      const div = document.createElement('div');
+      div.className = 'custom-select-option';
+      div.dataset.value = value;
+      div.textContent = label;
+      div.addEventListener('click', function() {
+        targetOptions.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('selected'));
+        this.classList.add('selected');
+        targetHidden.value = value;
+        targetTrigger.textContent = label;
+        targetWrapper.classList.remove('open');
+      });
+      targetOptions.appendChild(div);
+      // Auto-select first option
+      if (targetOptions.children.length === 1) {
+        div.classList.add('selected');
+        targetHidden.value = value;
+        targetTrigger.textContent = label;
+      }
+    }
 
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (trainerDataRaw) {
       const td = JSON.parse(trainerDataRaw);
       const trainerCurrentHP = td[34] !== '' && td[34] !== undefined ? parseInt(td[34]) : parseInt(td[11]);
       const trainerCurrentVP = td[35] !== '' && td[35] !== undefined ? parseInt(td[35]) : parseInt(td[12]);
-      const opt = document.createElement('option');
-      opt.value = JSON.stringify({
+      const value = JSON.stringify({
         type: 'trainer',
         key: 'trainerData',
         currentHP: trainerCurrentHP,
@@ -2694,8 +2773,7 @@ export function attachTrainerInfoListeners() {
       const statLabel = healing.stat === 'HP'
         ? `${trainerCurrentHP}/${td[11]} HP`
         : `${trainerCurrentVP}/${td[12]} VP`;
-      opt.textContent = `${td[1]} (Trainer) — ${statLabel}`;
-      targetSelect.appendChild(opt);
+      addTargetOption(value, `${td[1]} (Trainer) — ${statLabel}`);
     }
 
     // Add active party Pokemon
@@ -2705,8 +2783,7 @@ export function attachTrainerInfoListeners() {
         const currentHP = pd[45] !== '' && pd[45] !== undefined ? parseInt(pd[45]) : parseInt(pd[10]);
         const currentVP = pd[46] !== '' && pd[46] !== undefined ? parseInt(pd[46]) : parseInt(pd[12]);
         const displayName = pd[36] || pd[2];
-        const opt = document.createElement('option');
-        opt.value = JSON.stringify({
+        const value = JSON.stringify({
           type: 'pokemon',
           key: key,
           speciesName: pd[2],
@@ -2719,10 +2796,14 @@ export function attachTrainerInfoListeners() {
         const statLabel = healing.stat === 'HP'
           ? `${currentHP}/${pd[10]} HP`
           : `${currentVP}/${pd[12]} VP`;
-        opt.textContent = `${displayName} — ${statLabel}`;
-        targetSelect.appendChild(opt);
+        addTargetOption(value, `${displayName} — ${statLabel}`);
       }
     });
+
+    // Toggle dropdown on trigger click
+    targetTrigger.onclick = function() {
+      targetWrapper.classList.toggle('open');
+    };
 
     // Update total healing display when dice result changes
     const diceInput = document.getElementById('useItemDiceResult');

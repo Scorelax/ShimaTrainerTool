@@ -779,6 +779,7 @@ async function handleFormSubmit() {
 
     // Calculate modifiers (D&D 5e rules)
     const oldWisModifier = trainerData[31] || 0;
+    const oldChaModifier = trainerData[32] || 0;
     trainerData[27] = Math.floor((str - 10) / 2);  // STR modifier
     trainerData[28] = Math.floor((dex - 10) / 2);  // DEX modifier
     trainerData[29] = Math.floor((con - 10) / 2);  // CON modifier
@@ -814,6 +815,29 @@ async function handleFormSubmit() {
       trainerData[45] = `${newMax} - ${newCurrent}`;
 
       console.log(`Battle Dice updated: ${oldMax} - ${oldCurrent} -> ${newMax} - ${newCurrent}`);
+    }
+
+    // Recalculate Rally Cry max if CHA changed for Commander
+    const newChaModifier = trainerData[32];
+    if (trainerPath === 'Commander' && level >= 15 && oldChaModifier !== newChaModifier) {
+      const rallyData = trainerData[51] || '';
+      let oldRallyMax = Math.max(1, 1 + oldChaModifier);
+      let oldRallyCurrent = oldRallyMax;
+
+      if (rallyData) {
+        const parts = rallyData.split('-').map(p => p.trim());
+        if (parts.length === 2) {
+          oldRallyMax = parseInt(parts[0], 10) || oldRallyMax;
+          oldRallyCurrent = parseInt(parts[1], 10) || oldRallyCurrent;
+        }
+      }
+
+      const used = oldRallyMax - oldRallyCurrent;
+      const newRallyMax = Math.max(1, 1 + newChaModifier);
+      const newRallyCurrent = Math.max(0, newRallyMax - used);
+
+      trainerData[51] = `${newRallyMax} - ${newRallyCurrent}`;
+      console.log(`Rally Cry updated: ${oldRallyMax} - ${oldRallyCurrent} -> ${newRallyMax} - ${newRallyCurrent}`);
     }
 
     // Update Tactician Points if level changed

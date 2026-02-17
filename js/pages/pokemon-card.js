@@ -1600,6 +1600,70 @@ export function renderPokemonCard(pokemonName) {
           border-color: rgba(255, 255, 255, 0.6);
         }
 
+        /* Commander Styles */
+        .commander-container {
+          margin-bottom: 1rem;
+          padding: 0.8rem;
+          background: rgba(33, 150, 243, 0.15);
+          border-radius: 8px;
+          border-left: 4px solid #2196F3;
+        }
+
+        .commander-ability {
+          margin-bottom: 0.6rem;
+          padding-bottom: 0.6rem;
+          border-bottom: 1px solid rgba(33, 150, 243, 0.2);
+        }
+
+        .commander-ability:last-child {
+          margin-bottom: 0;
+          padding-bottom: 0;
+          border-bottom: none;
+        }
+
+        .use-commander-button {
+          padding: 0.4rem 0.8rem;
+          background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 0.85rem;
+          font-weight: bold;
+          transition: all 0.3s;
+          box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        .use-commander-button:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+        }
+
+        .use-commander-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .commander-dot {
+          width: clamp(14px, 2vw, 18px);
+          height: clamp(14px, 2vw, 18px);
+          border-radius: 50%;
+          border: clamp(2px, 0.3vw, 3px) solid #fff;
+          transition: all 0.3s ease;
+          display: inline-block;
+        }
+
+        .commander-dot.filled {
+          background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+          border-color: #fff;
+          box-shadow: 0 0 clamp(5px, 1vw, 8px) rgba(33, 150, 243, 0.5);
+        }
+
+        .commander-dot.empty {
+          background: rgba(0, 0, 0, 0.2);
+          border-color: rgba(255, 255, 255, 0.6);
+        }
+
         /* Inventory Popup Styles */
         #inventoryPopup .popup-content {
           max-width: min(90vw, 900px);
@@ -4795,6 +4859,7 @@ function showMoveDetails(moveName) {
             </div>
             <div id="battleDiceContainer"></div>
             <div id="tacticianDiceContainer"></div>
+            <div id="commanderContainer"></div>
           </div>
           <button id="useMoveButton" style="width: 100%; padding: clamp(0.8rem, 1.5vh, 1rem); background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: clamp(1rem, 1.8vh, 1.1rem); font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 12px rgba(76,175,80,0.3);">Use Move</button>
         </div>
@@ -5210,6 +5275,147 @@ function showMoveDetails(moveName) {
       }
     } else {
       tacticianContainer.innerHTML = '';
+    }
+
+    // Populate Commander abilities
+    const commanderContainer = document.getElementById('commanderContainer');
+
+    if (trainerPath === 'Commander' && trainerLevel >= 9) {
+      // Parse Surge Command charges (index 50): "max - current"
+      const surgeData = trainerData[50] || '1 - 1';
+      const surgeParts = surgeData.split('-').map(p => p.trim());
+      let surgeMax = parseInt(surgeParts[0], 10) || 1;
+      let surgeCurrent = parseInt(surgeParts[1], 10) || 0;
+
+      // Parse Rally Cry charges (index 51): "max - current"
+      const chaModifier = parseInt(trainerData[32], 10) || 0;
+      const rallyMaxCalc = Math.max(1, 1 + chaModifier);
+      const rallyData = trainerData[51] || `${rallyMaxCalc} - ${rallyMaxCalc}`;
+      const rallyParts = rallyData.split('-').map(p => p.trim());
+      let rallyMax = parseInt(rallyParts[0], 10) || rallyMaxCalc;
+      let rallyCurrent = parseInt(rallyParts[1], 10) || 0;
+
+      function buildCommanderDots(current, max) {
+        let html = '<div class="charge-dots" style="display: inline-flex; gap: clamp(0.3rem, 0.6vw, 0.5rem);">';
+        for (let i = 0; i < max; i++) {
+          html += `<span class="commander-dot ${i < current ? 'filled' : 'empty'}"></span>`;
+        }
+        html += '</div>';
+        return html;
+      }
+
+      function updateCommanderUI() {
+        // Update Surge Command dots
+        const surgeDots = commanderContainer.querySelectorAll('.surge-dots .commander-dot');
+        surgeDots.forEach((dot, i) => {
+          if (i < surgeCurrent) {
+            dot.classList.add('filled');
+            dot.classList.remove('empty');
+          } else {
+            dot.classList.remove('filled');
+            dot.classList.add('empty');
+          }
+        });
+
+        const surgeBtn = document.getElementById('useSurgeCommand');
+        if (surgeBtn) surgeBtn.disabled = surgeCurrent <= 0;
+
+        // Update Rally Cry dots if present
+        const rallyDots = commanderContainer.querySelectorAll('.rally-dots .commander-dot');
+        rallyDots.forEach((dot, i) => {
+          if (i < rallyCurrent) {
+            dot.classList.add('filled');
+            dot.classList.remove('empty');
+          } else {
+            dot.classList.remove('filled');
+            dot.classList.add('empty');
+          }
+        });
+
+        const rallyBtn = document.getElementById('useRallyCry');
+        if (rallyBtn) rallyBtn.disabled = rallyCurrent <= 0;
+      }
+
+      // Build ability sections
+      let commanderHTML = '';
+
+      // Level 9+: Surge Command
+      commanderHTML += `
+        <div class="commander-ability">
+          <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: space-between;">
+            <div>
+              <strong>Surge Command</strong>
+              <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">Activate a move from one damage tier above</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+              <div class="surge-dots" style="display: inline-flex; gap: clamp(0.3rem, 0.6vw, 0.5rem);">
+                ${buildCommanderDots(surgeCurrent, surgeMax).replace('<div class="charge-dots" style="display: inline-flex; gap: clamp(0.3rem, 0.6vw, 0.5rem);">', '').replace('</div>', '')}
+              </div>
+              <button class="use-commander-button" id="useSurgeCommand" ${surgeCurrent <= 0 ? 'disabled' : ''}>Use</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Level 15+: Rally Cry
+      if (trainerLevel >= 15) {
+        commanderHTML += `
+          <div class="commander-ability">
+            <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: space-between;">
+              <div>
+                <strong>Rally Cry</strong>
+                <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">Your Pokemon and allies gain advantage on attacks until end of next turn</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+                <div class="rally-dots" style="display: inline-flex; gap: clamp(0.3rem, 0.6vw, 0.5rem);">
+                  ${buildCommanderDots(rallyCurrent, rallyMax).replace('<div class="charge-dots" style="display: inline-flex; gap: clamp(0.3rem, 0.6vw, 0.5rem);">', '').replace('</div>', '')}
+                </div>
+                <button class="use-commander-button" id="useRallyCry" ${rallyCurrent <= 0 ? 'disabled' : ''}>Use</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      commanderContainer.innerHTML = `
+        <div class="commander-container">
+          <strong style="display: block; margin-bottom: 0.6rem;">Commander Abilities</strong>
+          ${commanderHTML}
+        </div>
+      `;
+
+      // Event listeners
+      const surgeBtn = document.getElementById('useSurgeCommand');
+      if (surgeBtn) {
+        surgeBtn.addEventListener('click', () => {
+          if (surgeCurrent > 0) {
+            surgeCurrent--;
+            trainerData[50] = `${surgeMax} - ${surgeCurrent}`;
+            sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+            updateCommanderUI();
+            TrainerAPI.update(trainerData)
+              .catch(error => console.error('Error updating Surge Command:', error));
+            showSuccess('Surge Command used! Activate a move from one damage tier above.');
+          }
+        });
+      }
+
+      const rallyBtn = document.getElementById('useRallyCry');
+      if (rallyBtn) {
+        rallyBtn.addEventListener('click', () => {
+          if (rallyCurrent > 0) {
+            rallyCurrent--;
+            trainerData[51] = `${rallyMax} - ${rallyCurrent}`;
+            sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+            updateCommanderUI();
+            TrainerAPI.update(trainerData)
+              .catch(error => console.error('Error updating Rally Cry:', error));
+            showSuccess('Rally Cry used! Your Pokemon and allies gain advantage on attacks until end of next turn.');
+          }
+        });
+      }
+    } else {
+      commanderContainer.innerHTML = '';
     }
 
     // Set dataset attributes for Use Move button

@@ -1336,6 +1336,16 @@ export function attachTrainerCardListeners() {
       trainerData[49] = trainerLevel;
     }
 
+    // Refill Commander charges
+    if (trainerPath === 'Commander') {
+      if (trainerLevel >= 9) trainerData[50] = '1 - 1';
+      if (trainerLevel >= 15) {
+        const chaModifier = parseInt(trainerData[32], 10) || 0;
+        const rallyMax = Math.max(1, 1 + chaModifier);
+        trainerData[51] = `${rallyMax} - ${rallyMax}`;
+      }
+    }
+
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
     // Restore ALL Pokemon (active party and stored)
@@ -1830,6 +1840,16 @@ async function completeLongRest(selectedPokemon) {
   // Refill Tactician Points
   if (trainerPath === 'Tactician') {
     trainerData[49] = trainerLevel;
+  }
+
+  // Refill Commander charges
+  if (trainerPath === 'Commander') {
+    if (trainerLevel >= 9) trainerData[50] = '1 - 1';
+    if (trainerLevel >= 15) {
+      const chaModifier = parseInt(trainerData[32], 10) || 0;
+      const rallyMax = Math.max(1, 1 + chaModifier);
+      trainerData[51] = `${rallyMax} - ${rallyMax}`;
+    }
   }
 
   // Restore half of HD dice and VD dice

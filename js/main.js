@@ -139,6 +139,11 @@ class Router {
     content.innerHTML = html;
     attachContinueJourneyListeners();
     audioManager.playBg('ContinueJourney');
+    // Hide the TitleScreen loading screen now that the page is ready
+    const loadingScreen = document.getElementById('loading-screen');
+    loadingScreen.classList.remove('active');
+    const progressContainer = loadingScreen.querySelector('.loading-progress-container');
+    if (progressContainer) progressContainer.style.display = '';
   }
 
   async renderTrainerCard(params) {

@@ -4227,6 +4227,32 @@ async function saveTrainerPath(trainerPath) {
     trainerData[49] = parseInt(trainerData[2], 10) || 1;
   }
 
+  // Initialize Commander charges and loyalty bonus
+  if (trainerPath.name === 'Commander') {
+    trainerData[50] = '1 - 1';  // Surge Command: max 1, current 1
+    const chaModifier = parseInt(trainerData[32]) || 0;
+    const rallyMax = Math.max(1, 1 + chaModifier);
+    trainerData[51] = `${rallyMax} - ${rallyMax}`;  // Rally Cry
+
+    // +1 loyalty to starter (first pokemon in session)
+    const pokemonKeys = Object.keys(sessionStorage).filter(k => k.startsWith('pokemon_'));
+    if (pokemonKeys.length > 0) {
+      const starterKey = pokemonKeys[0];
+      const starterData = JSON.parse(sessionStorage.getItem(starterKey));
+      if (starterData) {
+        const currentLoyalty = parseInt(starterData[33], 10) || 0;
+        starterData[33] = Math.min(currentLoyalty + 1, 10);
+        sessionStorage.setItem(starterKey, JSON.stringify(starterData));
+        // Persist starter loyalty in background
+        import('../api.js').then(({ PokemonAPI }) => {
+          PokemonAPI.update(starterData).catch(err =>
+            console.error('Commander: starter loyalty save error:', err)
+          );
+        });
+      }
+    }
+  }
+
   // Update session storage immediately
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 

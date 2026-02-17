@@ -237,6 +237,20 @@ export function renderIndex() {
 }
 
 export function attachIndexListeners() {
+  // Show TitleScreen loading screen immediately when Continue Journey is clicked
+  const continueBtn = document.querySelector('[data-route="continue-journey"]');
+  if (continueBtn) {
+    continueBtn.addEventListener('click', () => {
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.style.backgroundImage = "url('assets/TitleScreen.png')";
+        const progressContainer = loadingScreen.querySelector('.loading-progress-container');
+        if (progressContainer) progressContainer.style.display = 'none';
+        loadingScreen.classList.add('active');
+      }
+    }, { capture: true });
+  }
+
   // Cache Reset Button
   document.getElementById('cacheResetButton')?.addEventListener('click', () => {
     if (confirm('Are you sure you want to reset the cache? This will clear all session data and reload the page.')) {

@@ -482,7 +482,7 @@ async function handleFormSubmit() {
     // Gather basic form data
     const level = parseInt(form.level.value);
     const nature = form.nature.value;
-    const loyalty = parseInt(form.loyalty.value);
+    let loyalty = parseInt(form.loyalty.value);
     const heldItem = form.heldItem.value;
     const nickname = form.nickname.value;
 
@@ -548,6 +548,12 @@ async function handleFormSubmit() {
         modifiedPokemonData[18] = (modifiedPokemonData[18] || 10) + 1;
       }
       // Speed bonus will be applied to movement data below
+    }
+
+    // Apply Commander loyalty bonus (Level 5+)
+    const trainerLevel = parseInt(trainerData[2], 10) || 1;
+    if (trainerPath === 'Commander' && trainerLevel >= 5) {
+      loyalty = Math.min(loyalty + 1, 10);
     }
 
     // Format movement and senses data

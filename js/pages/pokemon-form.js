@@ -4,7 +4,7 @@ import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
-import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
+import { showLoadingWithSplash, hideLoading, selectAndPreloadSplashImage } from '../utils/splash.js';
 
 export function renderPokemonForm() {
   // Load selected Pokemon data from session storage
@@ -356,14 +356,6 @@ export function renderPokemonForm() {
 export async function attachPokemonFormListeners() {
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
 
-  // Set splash image on loading screen immediately (before it's shown)
-  const loadingScreen = document.getElementById('loading-screen');
-  const splashUrl = sessionStorage.getItem('preloadedSplashImage');
-  if (loadingScreen && splashUrl) {
-    loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
-    console.log('[Pokemon Form] Set splash image on loading screen:', splashUrl);
-  }
-
   // Initialize visibility system
   await initializeVisibility();
 
@@ -388,8 +380,8 @@ export async function attachPokemonFormListeners() {
   document.getElementById('pokemonForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // Show loading screen IMMEDIATELY before any processing
-    const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+    // Show loading screen with a fresh random splash
+    const splashUrl = await selectAndPreloadSplashImage();
     showLoadingWithSplash(splashUrl);
 
     await handleFormSubmit();

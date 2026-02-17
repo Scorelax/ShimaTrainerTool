@@ -678,7 +678,16 @@ export function attachEditTrainerListeners() {
   document.getElementById('editTrainerForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // Show loading screen IMMEDIATELY before any processing
+    // Disable save button and show saving state immediately
+    const saveBtn = e.target.querySelector('button[type="submit"]');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.dataset.originalText = saveBtn.textContent;
+      saveBtn.textContent = 'Saving...';
+      saveBtn.style.opacity = '0.7';
+    }
+
+    // Show loading screen
     const splashUrl = sessionStorage.getItem('preloadedSplashImage');
     showLoadingWithSplash(splashUrl);
 
@@ -842,6 +851,14 @@ async function handleFormSubmit() {
     console.error('Error updating trainer:', error);
     hideLoading();
     showError('Failed to update trainer data');
+
+    // Restore save button
+    const saveBtn = document.querySelector('#editTrainerForm button[type="submit"]');
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = saveBtn.dataset.originalText || 'Save Changes';
+      saveBtn.style.opacity = '';
+    }
 
     // Reload the form
     setTimeout(() => {

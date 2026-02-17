@@ -3,29 +3,84 @@ import { TrainerAPI } from '../api.js';
 
 // Splash image configuration
 const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/splashes/';
-const MAX_SPLASH_IMAGES = 20; // Maximum number of splash images (splash-1.png through splash-20.png)
+const SPLASH_API_URL = 'https://api.github.com/repos/Benjakronk/shima-pokedex/contents/images/splashes';
+const FALLBACK_SPLASH_COUNT = 50; // Fallback if API call fails
 
-// Select and preload a random splash image (no fallback to default background)
-async function selectAndPreloadSplashImage() {
-  // Randomly pick splash-1.png through splash-20.png (assume they all exist)
-  const randomNumber = Math.floor(Math.random() * MAX_SPLASH_IMAGES) + 1;
-  const splashUrl = `${SPLASH_BASE_URL}splash-${randomNumber}.png`;
+// Fetch the list of available splash images from GitHub (cached per session)
+async function getSplashList() {
+  // Check sessionStorage cache first
+  const cached = sessionStorage.getItem('splashImageList');
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) { /* ignore bad cache */ }
+  }
 
-  console.log('[Splash] Selected splash image:', splashUrl);
+  try {
+    const response = await fetch(SPLASH_API_URL);
+    if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
+    const files = await response.json();
 
-  // Preload the image so it's cached by the browser for instant display
+    // Filter for splash-*.png files and check for session.png
+    const splashFiles = [];
+    let hasSession = false;
+
+    for (const file of files) {
+      if (file.name === 'session.png') {
+        hasSession = true;
+      } else if (file.name.match(/^splash-\d+\.png$/)) {
+        splashFiles.push(file.name);
+      }
+    }
+
+    const result = { splashFiles, hasSession };
+    sessionStorage.setItem('splashImageList', JSON.stringify(result));
+    console.log(`[Splash] Found ${splashFiles.length} splash images, session.png: ${hasSession}`);
+    return result;
+  } catch (error) {
+    console.warn('[Splash] Failed to fetch splash list from GitHub API:', error);
+    // Fallback: generate splash-1 through splash-N
+    const splashFiles = [];
+    for (let i = 1; i <= FALLBACK_SPLASH_COUNT; i++) {
+      splashFiles.push(`splash-${i}.png`);
+    }
+    return { splashFiles, hasSession: false };
+  }
+}
+
+// Preload a single image URL
+function preloadImage(url) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       console.log('[Splash] Image preloaded successfully');
-      resolve(splashUrl);
+      resolve(url);
     };
     img.onerror = () => {
       console.log('[Splash] Image failed to load, using splash anyway');
-      resolve(splashUrl); // Still resolve with URL - browser will try again when displaying
+      resolve(url);
     };
-    img.src = splashUrl;
+    img.src = url;
   });
+}
+
+// Select and preload a random splash image (prioritizes session.png if it exists)
+async function selectAndPreloadSplashImage() {
+  const { splashFiles, hasSession } = await getSplashList();
+
+  // Prioritize session.png if it exists
+  if (hasSession) {
+    const sessionUrl = `${SPLASH_BASE_URL}session.png`;
+    console.log('[Splash] Using session splash:', sessionUrl);
+    return preloadImage(sessionUrl);
+  }
+
+  // Pick a random splash from the full list
+  const randomFile = splashFiles[Math.floor(Math.random() * splashFiles.length)];
+  const splashUrl = `${SPLASH_BASE_URL}${randomFile}`;
+
+  console.log('[Splash] Selected splash image:', splashUrl);
+  return preloadImage(splashUrl);
 }
 
 // Progress tracking utility

@@ -2049,6 +2049,19 @@ export function renderTrainerInfo() {
               <label id="useItemDiceLabel">Roll:</label>
               <input type="number" id="useItemDiceResult" min="1" placeholder="Enter dice roll result">
             </div>
+            <div id="tpSection" style="display: none;">
+              <div class="form-group">
+                <label id="tpHeader" style="color: #2E7D32; font-weight: bold;">Tactician Points (0/0)</label>
+              </div>
+              <div class="form-group">
+                <label>Spend TP:</label>
+                <input type="number" id="tpSpendInput" min="0" max="0" value="0" placeholder="0">
+              </div>
+              <div class="form-group" id="tpBonusGroup" style="display: none;">
+                <label id="tpBonusLabel">Roll 0d4:</label>
+                <input type="number" id="tpBonusRollInput" min="1" placeholder="Enter TP bonus roll">
+              </div>
+            </div>
             <div class="form-group">
               <label>Total Healing</label>
               <div class="item-preview" id="useItemTotalHealing">—</div>
@@ -2735,6 +2748,43 @@ export function attachTrainerInfoListeners() {
     targetTrigger.textContent = 'Select target...';
     targetWrapper.classList.remove('open');
 
+    // TP section setup
+    const tpSection = document.getElementById('tpSection');
+    const tpHeader = document.getElementById('tpHeader');
+    const tpSpendInput = document.getElementById('tpSpendInput');
+    const tpBonusGroup = document.getElementById('tpBonusGroup');
+    const tpBonusLabel = document.getElementById('tpBonusLabel');
+    const tpBonusRollInput = document.getElementById('tpBonusRollInput');
+    tpSection.style.display = 'none';
+    tpSpendInput.value = '0';
+    tpBonusRollInput.value = '';
+    tpBonusGroup.style.display = 'none';
+
+    const trainerDataForTP = JSON.parse(sessionStorage.getItem('trainerData'));
+    const isTactician = trainerDataForTP && trainerDataForTP[25] === 'Tactician';
+    const tacticianLevel = trainerDataForTP ? parseInt(trainerDataForTP[2], 10) || 1 : 1;
+    const currentTP = trainerDataForTP ? parseInt(trainerDataForTP[49], 10) || 0 : 0;
+    const maxTP = tacticianLevel;
+
+    function updateTpSectionVisibility() {
+      if (!isTactician || tacticianLevel < 3 || healing.stat !== 'HP') {
+        tpSection.style.display = 'none';
+        return;
+      }
+      const targetVal = targetHidden.value;
+      if (!targetVal) { tpSection.style.display = 'none'; return; }
+      try {
+        const target = JSON.parse(targetVal);
+        if (target.type !== 'pokemon') { tpSection.style.display = 'none'; return; }
+      } catch(e) { tpSection.style.display = 'none'; return; }
+      tpSection.style.display = 'block';
+      tpHeader.textContent = `Tactician Points (${currentTP}/${maxTP})`;
+      tpSpendInput.max = currentTP;
+      tpSpendInput.value = '0';
+      tpBonusGroup.style.display = 'none';
+      tpBonusRollInput.value = '';
+    }
+
     function addTargetOption(value, label) {
       const div = document.createElement('div');
       div.className = 'custom-select-option';
@@ -2746,6 +2796,7 @@ export function attachTrainerInfoListeners() {
         targetHidden.value = value;
         targetTrigger.textContent = label;
         targetWrapper.classList.remove('open');
+        updateTpSectionVisibility();
       });
       targetOptions.appendChild(div);
       // Auto-select first option
@@ -2805,16 +2856,43 @@ export function attachTrainerInfoListeners() {
       targetWrapper.classList.toggle('open');
     };
 
-    // Update total healing display when dice result changes
-    const diceInput = document.getElementById('useItemDiceResult');
-    diceInput.oninput = function() {
-      const val = parseInt(this.value);
-      if (val > 0) {
-        document.getElementById('useItemTotalHealing').textContent = `${val + healing.flatBonus} ${healing.stat}`;
+    // Shared function to update total healing display
+    function updateTotalHealing() {
+      const diceVal = parseInt(document.getElementById('useItemDiceResult').value);
+      const tpBonus = parseInt(tpBonusRollInput.value) || 0;
+      const tpSpent = parseInt(tpSpendInput.value) || 0;
+      const effectiveTpBonus = (tpSpent > 0 && tpSection.style.display !== 'none') ? tpBonus : 0;
+      if (diceVal > 0) {
+        const total = diceVal + healing.flatBonus + effectiveTpBonus;
+        document.getElementById('useItemTotalHealing').textContent = `${total} ${healing.stat}`;
       } else {
         document.getElementById('useItemTotalHealing').textContent = '—';
       }
+    }
+
+    // Update total healing display when dice result changes
+    const diceInput = document.getElementById('useItemDiceResult');
+    diceInput.oninput = updateTotalHealing;
+
+    // TP spend input handler
+    tpSpendInput.oninput = function() {
+      const spent = parseInt(this.value) || 0;
+      if (spent > 0) {
+        tpBonusGroup.style.display = 'block';
+        tpBonusLabel.textContent = `Roll ${spent}d4:`;
+        tpBonusRollInput.value = '';
+      } else {
+        tpBonusGroup.style.display = 'none';
+        tpBonusRollInput.value = '';
+      }
+      updateTotalHealing();
     };
+
+    // TP bonus roll input handler
+    tpBonusRollInput.oninput = updateTotalHealing;
+
+    // Show TP section after targets are built
+    updateTpSectionVisibility();
 
     document.getElementById('useItemModal').style.display = 'block';
   });
@@ -2837,7 +2915,24 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const totalHealing = diceResult + healing.flatBonus;
+    // Calculate TP bonus if applicable
+    const tpSectionEl = document.getElementById('tpSection');
+    const tpSpend = document.getElementById('tpSpendInput');
+    const tpBonusRoll = document.getElementById('tpBonusRollInput');
+    let tpSpent = 0;
+    let tpBonusValue = 0;
+    if (tpSectionEl && tpSectionEl.style.display !== 'none') {
+      tpSpent = parseInt(tpSpend.value) || 0;
+      if (tpSpent > 0) {
+        tpBonusValue = parseInt(tpBonusRoll.value) || 0;
+        if (tpBonusValue < 1) {
+          alert('Please enter a valid TP bonus roll result.');
+          return;
+        }
+      }
+    }
+
+    const totalHealing = diceResult + healing.flatBonus + tpBonusValue;
     const targetData = JSON.parse(document.getElementById('useItemTarget').value);
 
     const { TrainerAPI, PokemonAPI } = await import('../api.js');
@@ -2885,6 +2980,13 @@ export function attachTrainerInfoListeners() {
 
       // Decrement item quantity from trainer inventory
       decrementItemQuantity(td, selectedItemData.name);
+
+      // Decrement Tactician Points if spent
+      if (tpSpent > 0) {
+        const prevTP = parseInt(td[49], 10) || 0;
+        td[49] = Math.max(prevTP - tpSpent, 0);
+      }
+
       sessionStorage.setItem('trainerData', JSON.stringify(td));
 
       // Update database in background
@@ -3390,6 +3492,24 @@ export function attachTrainerInfoListeners() {
                            </button>
                          </div>`
                     }
+                  </div>
+                `;
+              } else if (trainerPathName === 'Tactician' && stage.level === 3) {
+                // Special handling for Tactician Level 3 - show TP tracker
+                const currentTP = parseInt(freshTrainerData[49], 10) || 0;
+                const maxTP = parseInt(freshTrainerData[2], 10) || 1;
+                let tpDotsHtml = '';
+                for (let i = 0; i < maxTP; i++) {
+                  tpDotsHtml += `<span style="display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin: 0 3px; border: 2px solid #3d8b37; background: ${i < currentTP ? '#4CAF50' : 'transparent'};"></span>`;
+                }
+                html += `
+                  <div class="popup-item">
+                    <div class="popup-item-title">${stage.data.name}</div>
+                    <div class="popup-item-effect">${stage.data.effect || 'No effect found.'}</div>
+                    <div style="margin-top: 1rem; padding: 0.8rem; background: rgba(76, 175, 80, 0.15); border-radius: 8px; border-left: 4px solid #4CAF50; text-align: center;">
+                      <strong style="color: #2E7D32; font-size: 1.1em;">Tactician Points: ${currentTP} / ${maxTP}</strong>
+                      <div style="margin-top: 0.5rem;">${tpDotsHtml}</div>
+                    </div>
                   </div>
                 `;
               } else {
@@ -4102,6 +4222,11 @@ async function saveTrainerPath(trainerPath) {
 
   trainerData[25] = trainerPath.name;
 
+  // Initialize Tactician Points to trainer level
+  if (trainerPath.name === 'Tactician') {
+    trainerData[49] = parseInt(trainerData[2], 10) || 1;
+  }
+
   // Update session storage immediately
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
@@ -4117,7 +4242,9 @@ async function saveTrainerPath(trainerPath) {
   (async () => {
     try {
       const { TrainerAPI } = await import('../api.js');
-      const response = await TrainerAPI.updateTrainerPath(trainerName, trainerPath.name);
+      // Use full update to persist all trainer data including TP
+      console.log('Saving trainer data, length:', trainerData.length, 'index 49:', trainerData[49]);
+      const response = await TrainerAPI.update(trainerData);
       if (response.status === 'success') {
         console.log('Trainer path saved to backend successfully');
       } else {

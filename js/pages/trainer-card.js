@@ -1331,6 +1331,11 @@ export function attachTrainerCardListeners() {
       trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
     }
 
+    // Refill Tactician Points
+    if (trainerPath === 'Tactician') {
+      trainerData[49] = trainerLevel;
+    }
+
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
     // Restore ALL Pokemon (active party and stored)
@@ -1820,6 +1825,11 @@ async function completeLongRest(selectedPokemon) {
     const wisModifier = Math.floor((parseInt(trainerData[9], 10) - 10) / 2);
     const maxBattleDice = 1 + wisModifier;
     trainerData[45] = `${maxBattleDice} - ${maxBattleDice}`;
+  }
+
+  // Refill Tactician Points
+  if (trainerPath === 'Tactician') {
+    trainerData[49] = trainerLevel;
   }
 
   // Restore half of HD dice and VD dice

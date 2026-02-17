@@ -67,7 +67,10 @@ const TRAINER_COLUMN_INDICES = {
   battleDice: 45,
   maxPotential: 46,
   currentHD: 47,
-  currentVD: 48
+  currentVD: 48,
+  tacticianPoints: 49,
+  commander9: 50,
+  commander15: 51
 };
 const POKEMON_COLUMN_INDICES = {
   trainername: 0,
@@ -127,7 +130,8 @@ const POKEMON_COLUMN_INDICES = {
   currentHD: 54,
   currentVD: 55,
   utilityslot: 56,
-  size: 57
+  size: 57,
+  cry: 58
 };
 const REGISTERED_POKEMON_COLUMN_INDICES = {
   trainername: 0,
@@ -187,7 +191,8 @@ const REGISTERED_POKEMON_COLUMN_INDICES = {
   currentHD: 54,
   currentVD: 55,
   utilityslot: 56,
-  size: 57
+  size: 57,
+  cry: 58
 };
 
 // ------------------------------------------------------------------Import Pokémon information Start--------------------------------------------------
@@ -707,7 +712,12 @@ function createTrainer(trainer) {
             '', // Placeholder for Elemental Synergy Charges (43)
             '', // Placeholder for Master Trainer Charges (44)
             '', // Placeholder for Battle Dice (45)
-            ''  // Placeholder for Max Potential (46)
+            '', // Placeholder for Max Potential (46)
+            '', // Placeholder for currentHD (47)
+            '', // Placeholder for currentVD (48)
+            '', // Placeholder for Tactician Points (49)
+            '', // Placeholder for Commander9 (50)
+            ''  // Placeholder for Commander15 (51)
         ];
 
         TRAINER_DATA_SHEET.appendRow(rowData);

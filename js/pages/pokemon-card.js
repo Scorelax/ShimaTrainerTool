@@ -4510,7 +4510,7 @@ function loadMoveColorsAndListeners() {
 // Parse damage dice from move description, applying Higher Levels scaling
 function parseDamageDice(description, higherLevels, pokemonLevel) {
   // Check if the move deals damage
-  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|damage on a hit/i;
+  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit/i;
   if (!damagePatterns.test(description)) {
     return null; // Non-damaging move
   }

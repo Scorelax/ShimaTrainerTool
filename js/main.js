@@ -131,11 +131,11 @@ class Router {
   }
 
   async renderContinueJourney() {
+    audioManager.playBg('ContinueJourney');
     const content = document.getElementById('content');
     const html = await renderContinueJourney();
     content.innerHTML = html;
     attachContinueJourneyListeners();
-    audioManager.playBg('ContinueJourney');
     // Hide the TitleScreen loading screen now that the page is ready
     const loadingScreen = document.getElementById('loading-screen');
     loadingScreen.classList.remove('active');

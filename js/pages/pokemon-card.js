@@ -5339,12 +5339,12 @@ function showMoveDetails(moveName) {
       // Build ability sections
       let commanderHTML = '';
 
-      // Level 9+: Surge Command
+      // Level 9+: Show Me What You've Got
       commanderHTML += `
         <div class="commander-ability">
           <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: space-between;">
             <div>
-              <strong>Surge Command</strong>
+              <strong>Show Me What You've Got</strong>
               <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">Activate a move from one damage tier above</div>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
@@ -5357,13 +5357,13 @@ function showMoveDetails(moveName) {
         </div>
       `;
 
-      // Level 15+: Rally Cry
+      // Level 15+: We're a Team
       if (trainerLevel >= 15) {
         commanderHTML += `
           <div class="commander-ability">
             <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: space-between;">
               <div>
-                <strong>Rally Cry</strong>
+                <strong>We're a Team</strong>
                 <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 0.2rem;">Your Pokemon and allies gain advantage on attacks until end of next turn</div>
               </div>
               <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
@@ -5395,7 +5395,7 @@ function showMoveDetails(moveName) {
             updateCommanderUI();
             TrainerAPI.update(trainerData)
               .catch(error => console.error('Error updating Surge Command:', error));
-            showSuccess('Surge Command used! Activate a move from one damage tier above.');
+            showSuccess('Show Me What You\'ve Got used! Activate a move from one damage tier above.');
           }
         });
       }
@@ -5410,7 +5410,7 @@ function showMoveDetails(moveName) {
             updateCommanderUI();
             TrainerAPI.update(trainerData)
               .catch(error => console.error('Error updating Rally Cry:', error));
-            showSuccess('Rally Cry used! Your Pokemon and allies gain advantage on attacks until end of next turn.');
+            showSuccess('We\'re a Team used! Your Pokemon and allies gain advantage on attacks until end of next turn.');
           }
         });
       }

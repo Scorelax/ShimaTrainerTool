@@ -700,10 +700,10 @@ async function handleFormSubmit() {
       // Show success message (keep loading screen visible)
       showSuccess(`${trainerData[1]} caught a ${selectedPokemonData[1]}!`);
 
-      // Play new pokemon sound, then navigate
+      // Play new pokemon sound, then navigate (keep splash visible until sound finishes)
       audioManager.stopBg();
-      hideLoading();
       await audioManager.playSfxAndWait('NewPokemon');
+      hideLoading();
       window.dispatchEvent(new CustomEvent('navigate', {
         detail: { route: 'my-pokemon' }
       }));

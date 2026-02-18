@@ -621,6 +621,15 @@ async function handleFormSubmit() {
 
       showSuccess('Trainer created successfully!');
 
+      // Show TitleScreen loading screen while navigating
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.style.backgroundImage = "url('assets/TitleScreen.png')";
+        const progressContainer = loadingScreen.querySelector('.loading-progress-container');
+        if (progressContainer) progressContainer.style.display = 'none';
+        loadingScreen.classList.add('active');
+      }
+
       // Navigate to continue journey
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('navigate', {

@@ -105,10 +105,3 @@ export function isFieldVisible(pokemonName, field) {
   return visibility[field] === true;
 }
 
-/**
- * Get the Pokedex config (for direct access if needed)
- * @returns {Object|null} Full Pokedex config or null if not loaded
- */
-export function getPokedexConfig() {
-  return pokedexConfig;
-}

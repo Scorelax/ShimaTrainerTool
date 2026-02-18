@@ -671,7 +671,7 @@ async function getTrainerImage(trainerName) {
     }
   }
 
-  return 'https://via.placeholder.com/100';
+  return 'assets/Pokeball.png';
 }
 
 function imageExists(url) {

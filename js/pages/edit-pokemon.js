@@ -2,7 +2,6 @@
 
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
-import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 

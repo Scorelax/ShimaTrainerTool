@@ -1,5 +1,5 @@
 // Main Application Entry Point
-import { PokemonAPI, TrainerAPI, GameDataAPI, OfflineManager } from './api.js';
+import { PokemonAPI, TrainerAPI } from './api.js';
 import { renderIndex, attachIndexListeners } from './pages/index.js';
 import { renderContinueJourney, attachContinueJourneyListeners } from './pages/continue-journey.js';
 import { renderTrainerCard, attachTrainerCardListeners } from './pages/trainer-card.js';
@@ -20,10 +20,7 @@ import { audioManager } from './utils/audio.js';
 // ============================================================================
 
 const AppState = {
-  currentRoute: 'index',
-  currentTrainer: null,
-  gameData: null,
-  isLoading: false
+  currentRoute: 'index'
 };
 
 // ============================================================================

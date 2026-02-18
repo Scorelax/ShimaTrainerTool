@@ -1,7 +1,6 @@
 // Edit Trainer Page - Form for editing trainer stats
 
 import { TrainerAPI } from '../api.js';
-import { audioManager } from '../utils/audio.js';
 import { showToast, showSuccess, showError } from '../utils/notifications.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 
@@ -709,7 +708,7 @@ function addGearChip(gearName) {
     .find(chip => chip.textContent.replace('×', '').trim() === gearName);
 
   if (existingGear) {
-    alert('This item is already in your gear list.');
+    showError('This item is already in your gear list.');
     return;
   }
 

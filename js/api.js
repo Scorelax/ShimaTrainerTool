@@ -8,8 +8,7 @@
 // Replace with your actual Google Apps Script deployment URL
 const API_CONFIG = {
   baseUrl: 'https://script.google.com/macros/s/AKfycbwXsojbcIhuqpYeWFVgsMzf74HvwvV7thts7K6VBV49CWHCNFQ5aKBGeMlWpJaG2YzC/exec',
-  timeout: 30000, // 30 seconds
-  retries: 2
+  timeout: 30000 // 30 seconds
 };
 
 // ============================================================================
@@ -576,4 +575,3 @@ OfflineManager.init();
 // EXPORTS
 // ============================================================================
 
-export { cache, CacheManager };

@@ -1,7 +1,5 @@
 // My Pokemon Page - Display trainer's Pokemon grid with pagination
 
-import { showError } from '../utils/notifications.js';
-
 // Module state
 let currentPage = 1;
 const pokemonsPerPage = 9;

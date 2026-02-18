@@ -1,4 +1,6 @@
 // Landing Page (Index) - Continue Journey or Start New Adventure
+import { audioManager } from '../utils/audio.js';
+
 export function renderIndex() {
   return `
     <div class="landing-page">
@@ -248,6 +250,7 @@ export function attachIndexListeners() {
         if (progressContainer) progressContainer.style.display = 'none';
         loadingScreen.classList.add('active');
       }
+      audioManager.playBg('ContinueJourney');
     }, { capture: true });
   }
 

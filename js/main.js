@@ -12,6 +12,7 @@ import { renderNewJourney, attachNewJourneyListeners } from './pages/new-journey
 import { renderNewPokemon, attachNewPokemonListeners } from './pages/new-pokemon.js';
 import { renderPokemonForm, attachPokemonFormListeners } from './pages/pokemon-form.js';
 import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js';
+import { renderCombat, attachCombatListeners } from './pages/combat.js';
 import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
 
@@ -42,7 +43,8 @@ class Router {
       'new-journey': this.renderNewJourney.bind(this),
       'new-pokemon': this.renderNewPokemon.bind(this),
       'pokemon-form': this.renderPokemonForm.bind(this),
-      'evolution': this.renderEvolution.bind(this)
+      'evolution': this.renderEvolution.bind(this),
+      'combat': this.renderCombat.bind(this)
     };
 
     this.init();
@@ -238,6 +240,12 @@ class Router {
     content.innerHTML = html;
     attachEvolutionListeners();
     audioManager.playEvolutionSequence();
+  }
+
+  async renderCombat() {
+    const content = document.getElementById('content');
+    content.innerHTML = renderCombat();
+    attachCombatListeners();
   }
 }
 

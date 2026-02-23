@@ -423,6 +423,40 @@ export function renderTrainerCard() {
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
         }
 
+        /* Combat Corner Button — mirrors back button, top-right */
+        .combat-corner-btn {
+          position: fixed;
+          top: clamp(15px, 3vh, 25px);
+          right: clamp(15px, 3vw, 25px);
+          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
+          color: #333;
+          width: clamp(45px, 9vw, 60px);
+          height: clamp(45px, 9vw, 60px);
+          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border-radius: 50%;
+          font-size: clamp(1.3rem, 2.8vw, 1.8rem);
+          font-weight: 900;
+          cursor: pointer;
+          box-shadow: 0 clamp(8px, 2vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+        }
+
+        .combat-corner-btn:hover {
+          transform: scale(1.15);
+          box-shadow: 0 clamp(12px, 3vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
+                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        .combat-corner-btn:active {
+          transform: scale(1.05);
+        }
+
         .rest-btn:hover {
           transform: translateY(clamp(-2px, -0.5vh, -3px));
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4),
@@ -964,6 +998,9 @@ export function renderTrainerCard() {
       <!-- Back Button -->
       <button class="back-button" id="backButton">←</button>
 
+      <!-- Combat Button -->
+      <button class="combat-corner-btn" id="combatBtn">⚔️</button>
+
       <!-- Trainer and Utility Container -->
       <div class="trainer-utility-wrapper">
         <!-- Trainer Section -->
@@ -1240,6 +1277,24 @@ export function attachTrainerCardListeners() {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'my-pokemon' }
     }));
+  });
+
+  // Combat button
+  document.getElementById('combatBtn')?.addEventListener('click', () => {
+    const existing = sessionStorage.getItem('combatState');
+    if (existing) {
+      const existingState = JSON.parse(existing);
+      if (existingState.phase === 'battle' || existingState.phase === 'initiative') {
+        // Ask: resume or new?
+        const resume = confirm('An active combat session exists.\n\nOK = Resume\nCancel = Start New');
+        if (!resume) {
+          sessionStorage.removeItem('combatState');
+        }
+      } else {
+        sessionStorage.removeItem('combatState');
+      }
+    }
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat' } }));
   });
 
   // Badge tap interaction

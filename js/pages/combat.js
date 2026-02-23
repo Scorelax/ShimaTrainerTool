@@ -437,24 +437,50 @@ function renderBattlePhase(state) {
       </div>
 
       <!-- Inventory Popup -->
-      <div class="combat-popup-overlay" id="combatInventoryPopup" style="display:none;">
-        <div class="combat-popup-content" style="max-width:480px;">
-          <div class="combat-inner-popup-header">
-            <h3 style="margin:0;color:#FFD700;">📦 Inventory</h3>
-            <button id="closeCombatInventoryPopup" class="combat-popup-close" style="position:static;color:#e0e0e0;">×</button>
+      <div class="popup-overlay" id="combatInventoryPopup" style="display:none;">
+        <div class="popup-content combat-inv-popup-content">
+          <button class="inventory-close" id="closeCombatInventoryPopup">×</button>
+          <div class="inventory-popup-content">
+            <div class="inventory-sidebar">
+              <h2 class="inventory-title">Inventory</h2>
+              <ul id="combatInventoryCategories" class="inventory-categories"></ul>
+            </div>
+            <div class="inventory-main">
+              <div class="item-info-card">
+                <h3 class="item-name" id="combatSelectedItemName">Select an item</h3>
+                <div class="item-details">
+                  <div class="detail-section">
+                    <h4>Description</h4>
+                    <p id="combatDescriptionText">Choose an item from your inventory to view its details.</p>
+                  </div>
+                  <div class="detail-divider"></div>
+                  <div class="detail-section">
+                    <h4>Effect</h4>
+                    <p id="combatEffectText">Item effects will appear here.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="inventory-actions">
+                <div class="inventory-actions-row">
+                  <button class="action-btn" id="combatUseItemBtn" disabled>
+                    <span class="btn-icon">🧪</span>
+                    <span class="btn-text">Use</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <div id="combatInventoryList" style="padding:0.8rem 1rem;max-height:60vh;overflow-y:auto;"></div>
         </div>
       </div>
 
       <!-- Trainer Buffs Popup -->
-      <div class="combat-popup-overlay" id="combatBuffsPopup" style="display:none;">
-        <div class="combat-popup-content" style="max-width:520px;">
-          <div class="combat-inner-popup-header">
-            <h3 style="margin:0;color:#FFD700;">✨ Trainer Buffs</h3>
-            <button id="closeCombatBuffsPopup" class="combat-popup-close" style="position:static;color:#e0e0e0;">×</button>
+      <div class="popup-overlay" id="combatBuffsPopup" style="display:none;">
+        <div class="popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Trainer Buffs</div>
+            <button class="popup-close" id="closeCombatBuffsPopup">×</button>
           </div>
-          <div id="combatBuffsContent" style="padding:0.8rem 1rem;max-height:65vh;overflow-y:auto;"></div>
+          <div class="popup-body" id="combatBuffsContent"></div>
         </div>
       </div>
     </div>`;
@@ -551,7 +577,7 @@ function renderExpandedSection(c, statusBadges) {
   // --- Trainer action buttons (trainer only) ---
   const trainerActionsSection = c.type === 'trainer' ? `
     <div class="expanded-trainer-actions">
-      <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}">📦 Inventory</button>
+      <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}"><img src="assets/Bag.png" alt="Bag" class="combat-inv-icon"> Inventory</button>
       <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">✨ Trainer Buffs</button>
     </div>` : '';
 
@@ -855,32 +881,64 @@ function getCombatCSS() {
     .combat-trainer-action-btn { padding: 0.38rem 0.85rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #e0e0e0; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 600; transition: background 0.15s; }
     .combat-trainer-action-btn:hover { background: rgba(255,255,255,0.14); }
 
-    /* INNER POPUP HEADER */
-    .combat-inner-popup-header { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    /* BAG ICON */
+    .combat-inv-icon { width: 18px; height: 18px; object-fit: contain; vertical-align: middle; margin-right: 2px; }
+
+    /* TRAINER-INFO STYLE POPUPS */
+    .popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+    .popup-content { background: linear-gradient(135deg,#2a2a2a,#1f1f1f); border: 3px solid #FFDE00; border-radius: 20px; padding: clamp(1.5rem,3vw,2.5rem); max-width: min(90vw,600px); max-height: 80vh; overflow-y: auto; position: relative; box-shadow: 0 15px 40px rgba(0,0,0,0.8); width: 92%; }
+    .popup-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: clamp(1rem,2vh,1.5rem); padding-bottom: clamp(0.75rem,1.5vh,1rem); border-bottom: 2px solid #FFDE00; }
+    .popup-title { font-size: clamp(1.3rem,3vw,1.8rem); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #FFDE00; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+    .popup-close { background: linear-gradient(135deg,#EE1515,#C91010); color: #fff; border: 2px solid #333; border-radius: 50%; width: clamp(35px,7vw,45px); height: clamp(35px,7vw,45px); font-size: clamp(1.2rem,2.5vw,1.6rem); font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; flex-shrink: 0; }
+    .popup-close:hover { transform: scale(1.1) rotate(90deg); box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
+    .popup-body { color: #e0e0e0; font-size: clamp(0.95rem,2vw,1.1rem); line-height: 1.6; }
 
     /* INVENTORY POPUP */
-    .cinv-item { border-bottom: 1px solid rgba(255,255,255,0.07); padding: 0.55rem 0; }
-    .cinv-item:last-child { border-bottom: none; }
-    .cinv-item-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.18rem; }
-    .cinv-item-name { font-weight: 600; color: #e0e0e0; font-size: 0.9rem; }
-    .cinv-item-qty { color: #aaa; font-size: 0.8rem; }
-    .cinv-use-btn { margin-left: auto; padding: 0.2rem 0.65rem; background: linear-gradient(135deg, #4CAF50, #45A049); border: none; border-radius: 5px; color: #fff; font-size: 0.78rem; font-weight: 600; cursor: pointer; flex-shrink: 0; }
-    .cinv-use-btn:disabled { background: rgba(255,255,255,0.1); color: #666; cursor: not-allowed; }
-    .cinv-item-desc { font-size: 0.78rem; color: #aaa; line-height: 1.35; }
-    .cinv-item-effect { font-size: 0.78rem; color: #9abfff; line-height: 1.35; margin-top: 0.1rem; }
+    .combat-inv-popup-content { max-width: min(90vw,900px); max-height: 85vh; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+    .inventory-popup-content { display: flex; height: 100%; flex: 1; overflow: hidden; min-height: 400px; }
+    .inventory-sidebar { width: clamp(200px,35%,400px); background: linear-gradient(135deg,#2c2c2c,#252525); color: #fff; display: flex; flex-direction: column; border-right: 2px solid #333; overflow: hidden; }
+    .inventory-title { padding: clamp(1rem,2vh,1.5rem); margin: 0; background: linear-gradient(135deg,#EE1515,#C91010); color: #fff; font-size: clamp(1.2rem,3vw,1.8rem); font-weight: 900; text-align: center; border-bottom: 2px solid #333; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+    .inventory-categories { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+    .category-header { padding: clamp(0.75rem,2vh,1rem) clamp(1rem,2.5vw,1.4rem); background: #3a3a3a; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; transition: all 0.2s; font-size: clamp(0.8rem,1.9vw,1rem); font-weight: 700; }
+    .category-header:hover { background: #4a4a4a; }
+    .category-header.active { background: linear-gradient(135deg,#EE1515,#C91010); color: #fff; }
+    .arrow { transition: transform 0.2s; font-size: 0.85rem; }
+    .category-header.active .arrow { transform: rotate(90deg); }
+    .item-list { background: #2c2c2c; padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .item-list.expanded { max-height: 500px; overflow-y: auto; }
+    .inventory-list-item { padding: clamp(0.5rem,1.5vh,0.75rem) clamp(1.2rem,3vw,1.8rem); cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; color: #ddd; font-size: clamp(0.78rem,1.8vw,0.9rem); }
+    .inventory-list-item:hover { background: #3a3a3a; border-left-color: #EE1515; color: #fff; }
+    .inventory-list-item.selected { background: #EE1515; color: #fff; border-left-color: #fff; font-weight: 700; }
+    .inventory-main { flex: 1; display: flex; flex-direction: column; padding: clamp(1rem,2.5vw,1.5rem); background: linear-gradient(135deg,#2a2a2a,#1f1f1f); overflow: hidden; }
+    .item-info-card { flex: 1; display: flex; flex-direction: column; background: linear-gradient(135deg,#353535,#2d2d2d); border-radius: 12px; padding: clamp(1rem,2vw,1.5rem); box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-bottom: 1rem; overflow-y: auto; border: 2px solid rgba(255,222,0,0.3); }
+    .item-name { font-size: clamp(1.2rem,3vw,1.8rem); color: #FFDE00; margin: 0 0 0.75rem 0; padding-bottom: 0.75rem; border-bottom: 2px solid rgba(255,222,0,0.3); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+    .item-details { display: flex; flex-direction: column; gap: 1rem; flex: 1; }
+    .detail-section { flex: 1; }
+    .detail-section h4 { font-size: clamp(0.9rem,2vw,1.1rem); color: #FFDE00; margin: 0 0 0.5rem 0; font-weight: 900; text-transform: uppercase; }
+    .detail-section p { font-size: clamp(0.85rem,1.9vw,1rem); color: #c0c0c0; line-height: 1.6; margin: 0; }
+    .detail-divider { height: 2px; background: linear-gradient(90deg,transparent,rgba(255,222,0,0.3),transparent); }
+    .inventory-close { position: absolute; top: clamp(12px,2.5vh,18px); right: clamp(12px,2.5vw,18px); width: clamp(32px,7vw,42px); height: clamp(32px,7vw,42px); background: linear-gradient(135deg,#757575,#616161); color: #fff; border: 2px solid #FFDE00; border-radius: 50%; font-size: clamp(1.3rem,3vw,1.8rem); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; z-index: 10; }
+    .inventory-close:hover { transform: scale(1.1) rotate(90deg); box-shadow: 0 0 20px rgba(255,222,0,0.6); }
+    .inventory-actions { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .inventory-actions-row { display: flex; gap: 0.5rem; justify-content: center; }
+    .inventory-actions .action-btn { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.6rem 1.2rem; border: 2px solid #333; border-radius: 10px; cursor: pointer; transition: all 0.3s; font-size: clamp(0.8rem,1.7vw,0.95rem); font-weight: 900; text-transform: uppercase; background: linear-gradient(135deg,#3B4CCA,#2E3FA0); color: #fff; }
+    .inventory-actions .action-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+    .inventory-actions .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-icon { font-size: clamp(0.9rem,1.9vw,1.1rem); }
+    .btn-text { font-size: clamp(0.75rem,1.6vw,0.9rem); }
 
-    /* BUFFS POPUP */
-    .cbuff-item { border-bottom: 1px solid rgba(255,255,255,0.07); padding: 0.7rem 0; }
-    .cbuff-item:last-child { border-bottom: none; }
-    .cbuff-header-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; }
-    .cbuff-name { font-weight: 700; color: #FFD700; font-size: 0.92rem; }
-    .cbuff-dots { display: flex; gap: 4px; align-items: center; }
-    .cbuff-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-    .cbuff-dot-filled { background: #FFD700; }
-    .cbuff-dot-empty { background: transparent; border: 1px solid rgba(255,215,0,0.5); }
-    .cbuff-desc { font-size: 0.81rem; color: #c0c0c0; line-height: 1.45; margin-bottom: 0.35rem; }
-    .cbuff-use-btn { padding: 0.28rem 0.75rem; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 5px; color: #fff; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
-    .cbuff-use-btn:disabled { background: rgba(255,255,255,0.1); color: #666; cursor: not-allowed; }
+    /* BUFFS POPUP (skill items) */
+    .skill-item-container { border: 2px solid rgba(255,222,0,0.4); border-radius: 10px; margin: 0.75rem; padding: 0.85rem; background: linear-gradient(135deg,rgba(255,222,0,0.1),rgba(255,222,0,0.05)); }
+    .skill-name-header { text-align: center; font-weight: 900; font-size: clamp(1rem,2.2vw,1.15rem); margin: 0 0 0.6rem 0; color: #FFDE00; text-transform: uppercase; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+    .skill-effect-box { border: 1px solid rgba(255,222,0,0.3); border-radius: 7px; padding: 0.65rem; text-align: left; background: rgba(0,0,0,0.2); color: #e0e0e0; font-size: clamp(0.85rem,1.9vw,0.95rem); line-height: 1.5; }
+    .skill-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
+    .charge-dots { display: flex; gap: 5px; align-items: center; }
+    .charge-dot { width: clamp(10px,2vw,14px); height: clamp(10px,2vw,14px); border-radius: 50%; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    .charge-dot.filled { background: linear-gradient(135deg,#4CAF50,#45A049); border: 2px solid #FFDE00; box-shadow: 0 0 8px rgba(76,175,80,0.6); }
+    .charge-dot.empty { background: rgba(100,100,100,0.4); border: 2px solid rgba(150,150,150,0.5); }
+    .use-buff-button { margin-top: 0.6rem; padding: 0.55rem 1.2rem; background: linear-gradient(135deg,#4CAF50,#45A049); color: #fff; border: 2px solid #FFDE00; border-radius: 10px; font-size: clamp(0.9rem,2vw,1rem); font-weight: 900; text-transform: uppercase; cursor: pointer; width: 100%; transition: all 0.3s; }
+    .use-buff-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(76,175,80,0.5); }
+    .use-buff-button:disabled { background: linear-gradient(135deg,#666,#555); border-color: #888; cursor: not-allowed; opacity: 0.6; }
 
     /* TYPE BADGES */
     .type-badge { padding: 1px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
@@ -1317,42 +1375,91 @@ function showCombatMoveDetails(moveName, combatantId, state) {
 // INVENTORY POPUP
 // ============================================================================
 
+let _combatSelectedItem = null;
+
 function showCombatInventoryPopup() {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const inventory = trainerData[20] || '';
   const itemsStr = sessionStorage.getItem('items');
-  const container = document.getElementById('combatInventoryList');
-  if (!container) return;
+  const categoriesEl = document.getElementById('combatInventoryCategories');
+  if (!categoriesEl) return;
+
+  // Reset detail panel
+  _combatSelectedItem = null;
+  const nameEl = document.getElementById('combatSelectedItemName');
+  const descEl = document.getElementById('combatDescriptionText');
+  const effEl  = document.getElementById('combatEffectText');
+  const useBtn = document.getElementById('combatUseItemBtn');
+  if (nameEl) nameEl.textContent = 'Select an item';
+  if (descEl) descEl.textContent = 'Choose an item from your inventory to view its details.';
+  if (effEl)  effEl.textContent  = 'Item effects will appear here.';
+  if (useBtn) useBtn.disabled = true;
 
   if (!inventory || !itemsStr) {
-    container.innerHTML = '<p style="color:#aaa;padding:1rem;">No items in inventory.</p>';
+    categoriesEl.innerHTML = '<li style="padding:1rem;color:#999;text-align:center;">No items in inventory</li>';
     document.getElementById('combatInventoryPopup').style.display = 'flex';
     return;
   }
 
   const itemsData = JSON.parse(itemsStr);
-  const parsed = inventory.split(',').map(s => s.trim()).filter(Boolean).map(s => {
+  const groupedItems = {};
+  inventory.split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
     const m = s.match(/^(.+?)\s*\(x(\d+)\)$/);
     const name = m ? m[1].trim() : s;
-    const qty = m ? parseInt(m[2]) : 1;
+    const qty  = m ? parseInt(m[2]) : 1;
     const dbItem = itemsData.find(i => i.name === name);
-    return { name, qty, desc: dbItem ? (dbItem.description || '') : '', effect: dbItem ? (dbItem.effect || '') : '' };
+    if (dbItem) {
+      const type = dbItem.type || 'Misc';
+      if (!groupedItems[type]) groupedItems[type] = [];
+      groupedItems[type].push({ name, qty, description: dbItem.description || '', effect: dbItem.effect || '' });
+    }
   });
 
-  container.innerHTML = parsed.map(item => `
-    <div class="cinv-item">
-      <div class="cinv-item-header">
-        <span class="cinv-item-name">${item.name}</span>
-        <span class="cinv-item-qty">(x${item.qty})</span>
-        <button class="cinv-use-btn" data-item-name="${item.name}" ${item.qty <= 0 ? 'disabled' : ''}>Use</button>
+  let html = '';
+  Object.keys(groupedItems).sort().forEach(type => {
+    html += `<li>
+      <div class="category-header" data-category="${type}">
+        <span>${type}</span><span class="arrow">▶</span>
       </div>
-      ${item.desc ? `<div class="cinv-item-desc">${item.desc}</div>` : ''}
-      ${item.effect ? `<div class="cinv-item-effect">${item.effect}</div>` : ''}
-    </div>`).join('');
+      <div class="item-list">
+        ${groupedItems[type].map(item =>
+          `<div class="inventory-list-item" data-item-name="${item.name}">${item.name} (x${item.qty})</div>`
+        ).join('')}
+      </div>
+    </li>`;
+  });
+  categoriesEl.innerHTML = html;
 
-  container.querySelectorAll('.cinv-use-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const itemName = btn.dataset.itemName;
+  const allItems = Object.values(groupedItems).flat();
+
+  categoriesEl.querySelectorAll('.category-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const list = header.nextElementSibling;
+      const expanded = list.classList.contains('expanded');
+      categoriesEl.querySelectorAll('.item-list').forEach(l => l.classList.remove('expanded'));
+      categoriesEl.querySelectorAll('.category-header').forEach(h => h.classList.remove('active'));
+      if (!expanded) { list.classList.add('expanded'); header.classList.add('active'); }
+    });
+  });
+
+  categoriesEl.querySelectorAll('.inventory-list-item').forEach(el => {
+    el.addEventListener('click', () => {
+      categoriesEl.querySelectorAll('.inventory-list-item').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+      _combatSelectedItem = allItems.find(i => i.name === el.dataset.itemName) || null;
+      if (_combatSelectedItem && nameEl && descEl && effEl && useBtn) {
+        nameEl.textContent = `${_combatSelectedItem.name} (x${_combatSelectedItem.qty})`;
+        descEl.textContent = _combatSelectedItem.description || 'No description available.';
+        effEl.textContent  = _combatSelectedItem.effect || 'No effect description.';
+        useBtn.disabled = false;
+      }
+    });
+  });
+
+  if (useBtn) {
+    useBtn.onclick = () => {
+      if (!_combatSelectedItem) return;
+      const itemName = _combatSelectedItem.name;
       const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
       const items = (td[20] || '').split(',').map(s => s.trim()).filter(Boolean);
       const idx = items.findIndex(s => {
@@ -1368,8 +1475,8 @@ function showCombatInventoryPopup() {
       sessionStorage.setItem('trainerData', JSON.stringify(td));
       TrainerAPI.update(td).catch(e => console.error('Inventory sync:', e));
       showCombatInventoryPopup();
-    });
-  });
+    };
+  }
 
   document.getElementById('combatInventoryPopup').style.display = 'flex';
 }
@@ -1400,14 +1507,13 @@ function showCombatBuffsPopup() {
 
   let content = '';
 
-  // Nationality region buff
   if (nationalitiesDataRaw) {
     const nationalitiesData = JSON.parse(nationalitiesDataRaw);
     const nationality = nationalitiesData.find(n => n.nationality === trainerData[38]);
     if (nationality) {
-      content += `<div class="cbuff-item">
-        <div class="cbuff-header-row"><div class="cbuff-name">${nationality.regionBuff}</div></div>
-        <div class="cbuff-desc">${nationality.effect}</div>
+      content += `<div class="skill-item-container">
+        <h3 class="skill-name-header">${nationality.regionBuff}</h3>
+        <div class="skill-effect-box">${nationality.effect}</div>
       </div>`;
     }
   }
@@ -1423,7 +1529,6 @@ function showCombatBuffsPopup() {
   if (skillsDataRaw) {
     const skillsData = JSON.parse(skillsDataRaw);
     const skillsByName = new Map();
-
     skillsData.forEach(skill => {
       const isUnlocked = trainerLevel >= skill.level;
       const effect = isUnlocked ? skill.fullEffect : `Unlocks at level ${skill.level}`;
@@ -1440,22 +1545,22 @@ function showCombatBuffsPopup() {
         const maxCharges = getCombatMaxCharges(buffDef.name, trainerLevel);
         const dots = maxCharges > 0
           ? Array.from({ length: maxCharges }, (_, i) =>
-              `<span class="cbuff-dot ${i < currentCharges ? 'cbuff-dot-filled' : 'cbuff-dot-empty'}"></span>`
+              `<span class="charge-dot ${i < currentCharges ? 'filled' : 'empty'}"></span>`
             ).join('')
           : '';
         const disabled = currentCharges <= 0 ? 'disabled' : '';
-        content += `<div class="cbuff-item">
-          <div class="cbuff-header-row">
-            <div class="cbuff-name">${skillName}</div>
-            ${dots ? `<div class="cbuff-dots">${dots}</div>` : ''}
+        content += `<div class="skill-item-container">
+          <div class="skill-header-row">
+            <h3 class="skill-name-header">${skillName}</h3>
+            ${dots ? `<div class="charge-dots">${dots}</div>` : ''}
           </div>
-          <div class="cbuff-desc">${skillData.effect}</div>
-          ${maxCharges > 0 ? `<button class="cbuff-use-btn" data-buff-index="${buffDef.index}" data-buff-name="${skillName}" ${disabled}>Use</button>` : ''}
+          <div class="skill-effect-box">${skillData.effect}</div>
+          ${maxCharges > 0 ? `<button class="use-buff-button" data-buff-index="${buffDef.index}" ${disabled}>Use</button>` : ''}
         </div>`;
       } else {
-        content += `<div class="cbuff-item">
-          <div class="cbuff-header-row"><div class="cbuff-name">${skillName}</div></div>
-          <div class="cbuff-desc">${skillData.effect}</div>
+        content += `<div class="skill-item-container">
+          <h3 class="skill-name-header">${skillName}</h3>
+          <div class="skill-effect-box">${skillData.effect}</div>
         </div>`;
       }
     });
@@ -1463,7 +1568,7 @@ function showCombatBuffsPopup() {
 
   container.innerHTML = content || '<p style="color:#aaa;padding:1rem;">No skills data available.</p>';
 
-  container.querySelectorAll('.cbuff-use-btn').forEach(btn => {
+  container.querySelectorAll('.use-buff-button').forEach(btn => {
     btn.addEventListener('click', () => {
       const buffIndex = parseInt(btn.dataset.buffIndex);
       const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');

@@ -821,6 +821,12 @@ export function renderTrainerCard() {
           filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
 
+        .badge-slot.earned {
+          isolation: isolate;
+          background-color: #fff8d0;
+          border-radius: clamp(12px, 2.5vw, 18px);
+        }
+
         .badge-slot img {
           width: 100%;
           height: auto;
@@ -829,7 +835,7 @@ export function renderTrainerCard() {
           object-fit: cover;
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
-          background-color: #fff8d0;
+          background-color: transparent;
         }
 
         .badge-slot.earned img {

@@ -168,7 +168,7 @@ export function renderTrainerCard() {
       // Inventory format: "ItemName xQuantity" or just "ItemName"
       const itemName = itemEntry.replace(/\s*x\d+$/i, '').trim();
       const dbItem = itemsDb.find(it => it.name === itemName);
-      if (dbItem && dbItem.type === 'Badges, Seals & Sigils' && itemName.includes('Badge')) {
+      if (dbItem && dbItem.type === 'Badges, Seals & Sigils') {
         earnedBadges.push({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' });
       }
     }
@@ -1369,7 +1369,7 @@ export function attachTrainerCardListeners() {
       for (const entry of items) {
         const name = entry.replace(/\s*x\d+$/i, '').trim();
         const dbItem = itemsDbForBadges.find(it => it.name === name);
-        if (dbItem && dbItem.type === 'Badges, Seals & Sigils' && name.includes('Badge')) {
+        if (dbItem && dbItem.type === 'Badges, Seals & Sigils') {
           badgeList.push({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' });
         }
       }

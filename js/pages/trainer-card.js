@@ -829,7 +829,11 @@ export function renderTrainerCard() {
           object-fit: cover;
           border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
-          background-color: #fff;
+          background-color: #fff8d0;
+        }
+
+        .badge-slot.earned img {
+          mix-blend-mode: multiply;
         }
 
         .badge-slot.empty img {

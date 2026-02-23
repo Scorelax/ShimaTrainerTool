@@ -162,12 +162,14 @@ function buildTrainerCombatant() {
     id: 'trainer', type: 'trainer', entityKey: 'trainerData',
     name: trainerData[1] || 'Trainer',
     image: trainerData[0] || 'assets/Pokeball.png',
-    level, initiativeScore: dexMod, initiativeRoll: 0, initiativeBonus: trainerAlertBonus, initiativeTotal: dexMod + trainerAlertBonus,
+    level, initiativeScore: dexMod + trainerAlertBonus, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: dexMod + trainerAlertBonus,
     ac, maxHp, currentHp, maxVp, currentVp,
     proficiency: computeProficiency(level),
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
     moves: [], types: [], rechargeStates: {},
+    feats: trainerData[33] || '',
+    inventory: trainerData[20] || '',
     statusEffects: [], isExpanded: false
   };
 }
@@ -237,7 +239,7 @@ function buildPokemonCombatant(pokemonKey) {
     id: pokemonKey, type: 'pokemon', entityKey: pokemonKey,
     name: pokemonData[36] || pokemonData[2] || 'Pokemon',
     image: pokemonData[1] || 'assets/Pokeball.png',
-    level, initiativeScore: initiative, initiativeRoll: 0, initiativeBonus: pokemonAlertBonus, initiativeTotal: initiative + pokemonAlertBonus,
+    level, initiativeScore: initiative + pokemonAlertBonus, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: initiative + pokemonAlertBonus,
     ac: parseInt(pokemonData[8]) || 10,
     maxHp, currentHp, maxVp, currentVp,
     proficiency, stabBonusValue: parseInt(pokemonData[34]) || 2,
@@ -249,6 +251,7 @@ function buildPokemonCombatant(pokemonKey) {
     size: pokemonData[57] || '',
     movement: movementDisplay,
     rechargeStates,
+    feats: pokemonData[50] || '',
     statusEffects: [], isExpanded: false
   };
 }
@@ -350,8 +353,8 @@ function renderInitiativePhase(state) {
         <div class="initiative-score-label">Initiative Score: <strong>${c.initiativeScore}</strong></div>
       </div>
       <div class="initiative-roll-group">
-        <span class="initiative-plus">Bonus:</span>
-        <input type="number" class="initiative-bonus-input" id="bonus_${c.id}" value="${c.initiativeBonus}" placeholder="0" min="-20" max="20">
+        <span class="initiative-plus">d20</span>
+        <input type="number" class="initiative-bonus-input" id="bonus_${c.id}" value="" placeholder="" min="1" max="20">
         <span class="initiative-equals">= <strong id="total_${c.id}">${c.initiativeTotal}</strong></span>
       </div>
     </div>`).join('');
@@ -365,8 +368,7 @@ function renderInitiativePhase(state) {
         <div></div>
       </div>
       <div class="initiative-container">
-        <p class="initiative-instructions">Roll your d20 manually. Each participant's base initiative is pre-filled (Alert feat adds +5 automatically). Adjust the bonus field for any extra modifiers.</p>
-        <div class="initiative-list">${rows}</div>
+<div class="initiative-list">${rows}</div>
         <button class="combat-start-btn" id="beginBattleBtn">Begin Battle →</button>
       </div>
     </div>`;
@@ -433,6 +435,28 @@ function renderBattlePhase(state) {
           </div>
         </div>
       </div>
+
+      <!-- Inventory Popup -->
+      <div class="combat-popup-overlay" id="combatInventoryPopup" style="display:none;">
+        <div class="combat-popup-content" style="max-width:480px;">
+          <div class="combat-inner-popup-header">
+            <h3 style="margin:0;color:#FFD700;">📦 Inventory</h3>
+            <button id="closeCombatInventoryPopup" class="combat-popup-close" style="position:static;color:#e0e0e0;">×</button>
+          </div>
+          <div id="combatInventoryList" style="padding:0.8rem 1rem;max-height:60vh;overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <!-- Trainer Buffs Popup -->
+      <div class="combat-popup-overlay" id="combatBuffsPopup" style="display:none;">
+        <div class="combat-popup-content" style="max-width:520px;">
+          <div class="combat-inner-popup-header">
+            <h3 style="margin:0;color:#FFD700;">✨ Trainer Buffs</h3>
+            <button id="closeCombatBuffsPopup" class="combat-popup-close" style="position:static;color:#e0e0e0;">×</button>
+          </div>
+          <div id="combatBuffsContent" style="padding:0.8rem 1rem;max-height:65vh;overflow-y:auto;"></div>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -465,16 +489,16 @@ function renderCombatCard(c, isActive) {
             ${typeBadges}
             <span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>
           </div>
-          <div class="combat-card-ac-row">
-            <span>AC: <strong>${c.ac}</strong></span>
-          </div>
-          <div class="combat-card-stats-row">
-            <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>
-              <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
-            </span>
-            <span class="stat-bar-wrap">VP: <strong>${c.currentVp}/${c.maxVp}</strong>
-              <div class="mini-bar"><div class="mini-bar-fill vp-bar" style="width:${vpPct}%"></div></div>
-            </span>
+          <div class="combat-card-stats-group">
+            <div class="combat-card-ac-line">AC <strong>${c.ac}</strong></div>
+            <div class="combat-card-stats-row">
+              <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>
+                <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
+              </span>
+              <span class="stat-bar-wrap">VP: <strong>${c.currentVp}/${c.maxVp}</strong>
+                <div class="mini-bar"><div class="mini-bar-fill vp-bar" style="width:${vpPct}%"></div></div>
+              </span>
+            </div>
           </div>
           <div class="combat-card-stats-row combat-mods-row">
             <span>STR ${c.str}<small>(${formatMod(c.strMod)})</small></span>
@@ -515,6 +539,22 @@ function renderItemForCombat(itemName) {
 }
 
 function renderExpandedSection(c, statusBadges) {
+  // --- Feats section (both) ---
+  const featsSection = c.feats ? `
+    <div class="expanded-feats-section">
+      <div class="expanded-section-label">Feats</div>
+      <div class="feats-list">
+        ${c.feats.split(',').map(f => f.trim()).filter(Boolean).map(f => `<span class="feat-badge">${f}</span>`).join('')}
+      </div>
+    </div>` : '';
+
+  // --- Trainer action buttons (trainer only) ---
+  const trainerActionsSection = c.type === 'trainer' ? `
+    <div class="expanded-trainer-actions">
+      <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}">📦 Inventory</button>
+      <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">✨ Trainer Buffs</button>
+    </div>` : '';
+
   // --- Info section (pokemon only) ---
   const abilitiesHtml = renderAbilitiesForCombat(c.abilities);
   const itemHtml = renderItemForCombat(c.item);
@@ -613,10 +653,12 @@ function renderExpandedSection(c, statusBadges) {
 
   return `
     <div class="combat-card-expanded" id="expanded_${c.id}">
+      ${featsSection}
       ${infoSection}
       ${hpvpSection}
       ${statSection}
       ${statusSection}
+      ${trainerActionsSection}
       ${movesSection}
     </div>`;
 }
@@ -714,8 +756,9 @@ function getCombatCSS() {
     .fainted-name { text-decoration: line-through; color: #888; }
     .combat-card-level { font-size: 0.78rem; color: #aaa; }
     .combat-initiative-badge { margin-left: auto; font-size: 0.72rem; color: #FFD700; font-weight: 600; }
-    .combat-card-ac-row { font-size: 0.82rem; margin-bottom: 0.15rem; }
-    .combat-card-stats-row { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.82rem; margin-bottom: 0.2rem; }
+    .combat-card-stats-group { background: rgba(255,255,255,0.04); border-radius: 6px; padding: 0.2rem 0.45rem; margin-bottom: 0.2rem; }
+    .combat-card-ac-line { font-size: 0.76rem; color: #c0c0c0; margin-bottom: 0.18rem; }
+    .combat-card-stats-row { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.82rem; }
     .combat-mods-row { font-size: 0.78rem; color: #c0c0c0; gap: 0.4rem; }
     .combat-mods-row small { color: #888; margin-left: 1px; }
     .stat-bar-wrap { display: flex; align-items: center; gap: 0.3rem; }
@@ -802,6 +845,43 @@ function getCombatCSS() {
     .combat-roll-bonus { font-size: 1.15em; font-weight: bold; }
     .combat-roll-breakdown { font-size: 0.75em; color: #aaa; margin-top: 0.2rem; }
     .combat-use-move-btn { width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+
+    /* FEATS */
+    .expanded-feats-section { padding: 0.5rem 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .feats-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .feat-badge { background: rgba(255,215,0,0.12); border: 1px solid rgba(255,215,0,0.3); color: #FFD700; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; }
+
+    /* TRAINER ACTIONS */
+    .expanded-trainer-actions { display: flex; gap: 0.5rem; padding: 0.6rem 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); flex-wrap: wrap; }
+    .combat-trainer-action-btn { padding: 0.38rem 0.85rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #e0e0e0; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 600; transition: background 0.15s; }
+    .combat-trainer-action-btn:hover { background: rgba(255,255,255,0.14); }
+
+    /* INNER POPUP HEADER */
+    .combat-inner-popup-header { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+
+    /* INVENTORY POPUP */
+    .cinv-item { border-bottom: 1px solid rgba(255,255,255,0.07); padding: 0.55rem 0; }
+    .cinv-item:last-child { border-bottom: none; }
+    .cinv-item-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.18rem; }
+    .cinv-item-name { font-weight: 600; color: #e0e0e0; font-size: 0.9rem; }
+    .cinv-item-qty { color: #aaa; font-size: 0.8rem; }
+    .cinv-use-btn { margin-left: auto; padding: 0.2rem 0.65rem; background: linear-gradient(135deg, #4CAF50, #45A049); border: none; border-radius: 5px; color: #fff; font-size: 0.78rem; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+    .cinv-use-btn:disabled { background: rgba(255,255,255,0.1); color: #666; cursor: not-allowed; }
+    .cinv-item-desc { font-size: 0.78rem; color: #aaa; line-height: 1.35; }
+    .cinv-item-effect { font-size: 0.78rem; color: #9abfff; line-height: 1.35; margin-top: 0.1rem; }
+
+    /* BUFFS POPUP */
+    .cbuff-item { border-bottom: 1px solid rgba(255,255,255,0.07); padding: 0.7rem 0; }
+    .cbuff-item:last-child { border-bottom: none; }
+    .cbuff-header-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; }
+    .cbuff-name { font-weight: 700; color: #FFD700; font-size: 0.92rem; }
+    .cbuff-dots { display: flex; gap: 4px; align-items: center; }
+    .cbuff-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .cbuff-dot-filled { background: #FFD700; }
+    .cbuff-dot-empty { background: transparent; border: 1px solid rgba(255,215,0,0.5); }
+    .cbuff-desc { font-size: 0.81rem; color: #c0c0c0; line-height: 1.45; margin-bottom: 0.35rem; }
+    .cbuff-use-btn { padding: 0.28rem 0.75rem; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 5px; color: #fff; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+    .cbuff-use-btn:disabled { background: rgba(255,255,255,0.1); color: #666; cursor: not-allowed; }
 
     /* TYPE BADGES */
     .type-badge { padding: 1px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
@@ -918,6 +998,12 @@ function attachBattleListeners(state) {
         const badge = e.target.closest('.status-badge');
         removeStatusEffect(badge.dataset.combatantId, badge.dataset.effect, state); return;
       }
+      if (e.target.closest('.combat-inv-open-btn')) {
+        showCombatInventoryPopup(); return;
+      }
+      if (e.target.closest('.combat-buffs-open-btn')) {
+        showCombatBuffsPopup(); return;
+      }
       const moveItem = e.target.closest('.combat-move-item');
       if (moveItem && !moveItem.disabled) {
         showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state); return;
@@ -948,6 +1034,22 @@ function attachBattleListeners(state) {
       }
     });
   }
+
+  // Inventory popup close
+  document.getElementById('closeCombatInventoryPopup')?.addEventListener('click', () => {
+    document.getElementById('combatInventoryPopup').style.display = 'none';
+  });
+  document.getElementById('combatInventoryPopup')?.addEventListener('click', e => {
+    if (e.target.id === 'combatInventoryPopup') e.target.style.display = 'none';
+  });
+
+  // Buffs popup close
+  document.getElementById('closeCombatBuffsPopup')?.addEventListener('click', () => {
+    document.getElementById('combatBuffsPopup').style.display = 'none';
+  });
+  document.getElementById('combatBuffsPopup')?.addEventListener('click', e => {
+    if (e.target.id === 'combatBuffsPopup') e.target.style.display = 'none';
+  });
 
   // Move popup close
   document.getElementById('closeCombatMovePopup')?.addEventListener('click', () => {
@@ -1208,6 +1310,172 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   }
 
   document.getElementById('combatMovePopup').style.display = 'flex';
+}
+
+// ============================================================================
+// INVENTORY POPUP
+// ============================================================================
+
+function showCombatInventoryPopup() {
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  const inventory = trainerData[20] || '';
+  const itemsStr = sessionStorage.getItem('items');
+  const container = document.getElementById('combatInventoryList');
+  if (!container) return;
+
+  if (!inventory || !itemsStr) {
+    container.innerHTML = '<p style="color:#aaa;padding:1rem;">No items in inventory.</p>';
+    document.getElementById('combatInventoryPopup').style.display = 'flex';
+    return;
+  }
+
+  const itemsData = JSON.parse(itemsStr);
+  const parsed = inventory.split(',').map(s => s.trim()).filter(Boolean).map(s => {
+    const m = s.match(/^(.+?)\s*\(x(\d+)\)$/);
+    const name = m ? m[1].trim() : s;
+    const qty = m ? parseInt(m[2]) : 1;
+    const dbItem = itemsData.find(i => i.name === name);
+    return { name, qty, desc: dbItem ? (dbItem.description || '') : '', effect: dbItem ? (dbItem.effect || '') : '' };
+  });
+
+  container.innerHTML = parsed.map(item => `
+    <div class="cinv-item">
+      <div class="cinv-item-header">
+        <span class="cinv-item-name">${item.name}</span>
+        <span class="cinv-item-qty">(x${item.qty})</span>
+        <button class="cinv-use-btn" data-item-name="${item.name}" ${item.qty <= 0 ? 'disabled' : ''}>Use</button>
+      </div>
+      ${item.desc ? `<div class="cinv-item-desc">${item.desc}</div>` : ''}
+      ${item.effect ? `<div class="cinv-item-effect">${item.effect}</div>` : ''}
+    </div>`).join('');
+
+  container.querySelectorAll('.cinv-use-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const itemName = btn.dataset.itemName;
+      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+      const items = (td[20] || '').split(',').map(s => s.trim()).filter(Boolean);
+      const idx = items.findIndex(s => {
+        const m = s.match(/^(.+?)\s*\(x\d+\)$/);
+        return (m ? m[1].trim() : s) === itemName;
+      });
+      if (idx === -1) return;
+      const m = items[idx].match(/^(.+?)\s*\(x(\d+)\)$/);
+      const qty = m ? parseInt(m[2]) : 1;
+      if (qty <= 1) items.splice(idx, 1);
+      else items[idx] = `${itemName} (x${qty - 1})`;
+      td[20] = items.join(', ');
+      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      TrainerAPI.update(td).catch(e => console.error('Inventory sync:', e));
+      showCombatInventoryPopup();
+    });
+  });
+
+  document.getElementById('combatInventoryPopup').style.display = 'flex';
+}
+
+// ============================================================================
+// TRAINER BUFFS POPUP
+// ============================================================================
+
+function getCombatMaxCharges(buffName, trainerLevel) {
+  switch (buffName) {
+    case 'Second Wind':      return trainerLevel >= 7 ? 5 : trainerLevel >= 3 ? 2 : 0;
+    case 'Rapid Orders':     return trainerLevel >= 6 ? 1 : 0;
+    case 'Unbreakable Bond': return trainerLevel >= 13 ? 1 : 0;
+    case 'Elemental Synergy':return trainerLevel >= 18 ? 1 : 0;
+    case 'Master Trainer':   return trainerLevel >= 20 ? 2 : 0;
+    default: return 0;
+  }
+}
+
+function showCombatBuffsPopup() {
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  const trainerLevel = parseInt(trainerData[2]) || 1;
+  const skillsDataRaw = sessionStorage.getItem('skills');
+  const nationalitiesDataRaw = sessionStorage.getItem('nationalities');
+
+  const container = document.getElementById('combatBuffsContent');
+  if (!container) return;
+
+  let content = '';
+
+  // Nationality region buff
+  if (nationalitiesDataRaw) {
+    const nationalitiesData = JSON.parse(nationalitiesDataRaw);
+    const nationality = nationalitiesData.find(n => n.nationality === trainerData[38]);
+    if (nationality) {
+      content += `<div class="cbuff-item">
+        <div class="cbuff-header-row"><div class="cbuff-name">${nationality.regionBuff}</div></div>
+        <div class="cbuff-desc">${nationality.effect}</div>
+      </div>`;
+    }
+  }
+
+  const trainerBuffDefs = [
+    { name: 'Second Wind',      index: 40 },
+    { name: 'Rapid Orders',     index: 41 },
+    { name: 'Unbreakable Bond', index: 42 },
+    { name: 'Elemental Synergy',index: 43 },
+    { name: 'Master Trainer',   index: 44 }
+  ];
+
+  if (skillsDataRaw) {
+    const skillsData = JSON.parse(skillsDataRaw);
+    const skillsByName = new Map();
+
+    skillsData.forEach(skill => {
+      const isUnlocked = trainerLevel >= skill.level;
+      const effect = isUnlocked ? skill.fullEffect : `Unlocks at level ${skill.level}`;
+      const existing = skillsByName.get(skill.name);
+      if (!existing || (isUnlocked && skill.level > existing.level)) {
+        skillsByName.set(skill.name, { level: skill.level, effect, isUnlocked });
+      }
+    });
+
+    skillsByName.forEach((skillData, skillName) => {
+      const buffDef = trainerBuffDefs.find(b => b.name === skillName);
+      if (buffDef && skillData.isUnlocked) {
+        const currentCharges = parseInt(trainerData[buffDef.index]) || 0;
+        const maxCharges = getCombatMaxCharges(buffDef.name, trainerLevel);
+        const dots = maxCharges > 0
+          ? Array.from({ length: maxCharges }, (_, i) =>
+              `<span class="cbuff-dot ${i < currentCharges ? 'cbuff-dot-filled' : 'cbuff-dot-empty'}"></span>`
+            ).join('')
+          : '';
+        const disabled = currentCharges <= 0 ? 'disabled' : '';
+        content += `<div class="cbuff-item">
+          <div class="cbuff-header-row">
+            <div class="cbuff-name">${skillName}</div>
+            ${dots ? `<div class="cbuff-dots">${dots}</div>` : ''}
+          </div>
+          <div class="cbuff-desc">${skillData.effect}</div>
+          ${maxCharges > 0 ? `<button class="cbuff-use-btn" data-buff-index="${buffDef.index}" data-buff-name="${skillName}" ${disabled}>Use</button>` : ''}
+        </div>`;
+      } else {
+        content += `<div class="cbuff-item">
+          <div class="cbuff-header-row"><div class="cbuff-name">${skillName}</div></div>
+          <div class="cbuff-desc">${skillData.effect}</div>
+        </div>`;
+      }
+    });
+  }
+
+  container.innerHTML = content || '<p style="color:#aaa;padding:1rem;">No skills data available.</p>';
+
+  container.querySelectorAll('.cbuff-use-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const buffIndex = parseInt(btn.dataset.buffIndex);
+      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+      const current = parseInt(td[buffIndex]) || 0;
+      if (current <= 0) return;
+      td[buffIndex] = current - 1;
+      sessionStorage.setItem('trainerData', JSON.stringify(td));
+      TrainerAPI.update(td).catch(e => console.error('Buff sync:', e));
+      showCombatBuffsPopup();
+    });
+  });
+
+  document.getElementById('combatBuffsPopup').style.display = 'flex';
 }
 
 // ============================================================================

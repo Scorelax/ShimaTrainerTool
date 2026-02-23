@@ -165,8 +165,9 @@ export function renderTrainerCard() {
     const itemsDb = JSON.parse(itemsDbStr);
     const inventoryItems = inventoryStr.split(',').map(s => s.trim()).filter(Boolean);
     for (const itemEntry of inventoryItems) {
-      // Inventory format: "ItemName xQuantity" or just "ItemName"
-      const itemName = itemEntry.replace(/\s*x\d+$/i, '').trim();
+      // Inventory format: "ItemName (xN)" or just "ItemName"
+      const match = itemEntry.match(/^(.+?)\s*\(x\d+\)$/);
+      const itemName = match ? match[1].trim() : itemEntry.trim();
       const dbItem = itemsDb.find(it => it.name === itemName);
       if (dbItem && dbItem.type === 'Badges, Seals & Sigils') {
         earnedBadges.push({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' });
@@ -1367,7 +1368,8 @@ export function attachTrainerCardListeners() {
     if (inventoryStrForBadges && itemsDbForBadges.length) {
       const items = inventoryStrForBadges.split(',').map(s => s.trim()).filter(Boolean);
       for (const entry of items) {
-        const name = entry.replace(/\s*x\d+$/i, '').trim();
+        const entryMatch = entry.match(/^(.+?)\s*\(x\d+\)$/);
+        const name = entryMatch ? entryMatch[1].trim() : entry.trim();
         const dbItem = itemsDbForBadges.find(it => it.name === name);
         if (dbItem && dbItem.type === 'Badges, Seals & Sigils') {
           badgeList.push({ name: dbItem.name, description: dbItem.effect || dbItem.description || '' });

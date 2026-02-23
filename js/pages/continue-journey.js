@@ -2,6 +2,93 @@
 import { TrainerAPI } from '../api.js';
 import { selectAndPreloadSplashImage } from '../utils/splash.js';
 
+// ============================================================================
+// KNOWN MOVES SYNC
+// Run once after moves are loaded into sessionStorage on login.
+// Ensures pokemonData[59] (KnownMoves) is up-to-date: new recharge moves are
+// added at full charges, stale moves are pruned, existing charge counts are kept.
+// ============================================================================
+
+function _parseRechargeForSync(actionType) {
+  if (!actionType) return null;
+  const lower = actionType.toLowerCase();
+  if (!lower.includes('recharge')) return null;
+  const m = lower.match(/recharge\s*\(([^)]+)\)/);
+  if (!m) return null;
+  const type = m[1].includes('long') ? 'LR' : 'SR';
+  const chargeMatch = actionType.match(/(\d+)\s+charges?/i);
+  return { maxCharges: chargeMatch ? parseInt(chargeMatch[1]) : 1, type };
+}
+
+function _parseKnownMovesForSync(str) {
+  const result = {};
+  if (!str) return result;
+  str.split(',').map(s => s.trim()).filter(Boolean).forEach(part => {
+    const match = part.match(/^(.+?)\((\d+)\)\((\w+)\)$/);
+    if (match) result[match[1]] = { chargesLeft: parseInt(match[2]), type: match[3] };
+  });
+  return result;
+}
+
+function syncKnownMovesForAllPokemon() {
+  const allMoves = JSON.parse(sessionStorage.getItem('moves') || '[]');
+  if (allMoves.length === 0) return;
+
+  const trainerName = JSON.parse(sessionStorage.getItem('trainerData') || '[]')[1] || '';
+  const pokemonKeys = Object.keys(sessionStorage).filter(k => k.startsWith('pokemon_'));
+
+  pokemonKeys.forEach(key => {
+    const pokemonData = JSON.parse(sessionStorage.getItem(key));
+    if (!pokemonData) return;
+
+    const level = parseInt(pokemonData[4]) || 1;
+
+    // Collect all moves this Pokemon currently knows (same logic as buildPokemonCombatant)
+    const moveIndices =   [23, 24, 25, 26, 27, 28, 37];
+    const requiredLevels = [ 1,  2,  6, 10, 14, 18,  0];
+    const currentMoves = [];
+    moveIndices.forEach((idx, i) => {
+      if (level >= requiredLevels[i] || (idx === 37 && pokemonData[idx])) {
+        const raw = pokemonData[idx] || '';
+        if (raw) raw.split(',').map(m => m.trim()).filter(Boolean).forEach(m => currentMoves.push(m));
+      }
+    });
+
+    // Build new KnownMoves map: preserve existing charges, add new recharge moves at full
+    const existing = _parseKnownMovesForSync(pokemonData[59] || '');
+    const updated = {};
+    currentMoves.forEach(moveName => {
+      const moveData = allMoves.find(m => m[0] === moveName);
+      if (!moveData) return;
+      const recharge = _parseRechargeForSync(moveData[3] || '');
+      if (!recharge) return;
+      // If we already track this move keep its current charge count; otherwise start at max
+      updated[moveName] = existing[moveName] !== undefined
+        ? existing[moveName]
+        : { chargesLeft: recharge.maxCharges, type: recharge.type };
+    });
+
+    const oldStr = pokemonData[59] || '';
+    const newStr = Object.entries(updated)
+      .map(([n, s]) => `${n}(${s.chargesLeft})(${s.type})`).join(',');
+
+    if (oldStr !== newStr) {
+      pokemonData[59] = newStr;
+      sessionStorage.setItem(key, JSON.stringify(pokemonData));
+
+      // Persist to database in background (only if there is a value to write)
+      if (trainerName && pokemonData[2]) {
+        import('../api.js').then(({ PokemonAPI }) => {
+          PokemonAPI.updateLiveStats(trainerName, pokemonData[2], 'KnownMoves', newStr)
+            .catch(e => console.error(`KnownMoves sync failed for ${pokemonData[2]}:`, e));
+        });
+      }
+
+      console.log(`[KnownMoves] Synced ${pokemonData[2]}: "${oldStr || '(empty)'}" → "${newStr || '(none)'}"`);
+    }
+  });
+}
+
 // Progress tracking utility
 function updateLoadingProgress(percent, text) {
   const fill = document.getElementById('loading-progress-fill');
@@ -529,6 +616,7 @@ export function attachContinueJourneyListeners() {
           sessionStorage.setItem('specializations', JSON.stringify(actualData.specializations));
           sessionStorage.setItem('affinities', JSON.stringify(actualData.affinities));
           sessionStorage.setItem('moves', JSON.stringify(actualData.moves));
+          syncKnownMovesForAllPokemon();
           sessionStorage.setItem('natures', JSON.stringify(actualData.natures));
           sessionStorage.setItem('trainerFeats', JSON.stringify(actualData.trainerFeatsData.trainerFeats));
           sessionStorage.setItem('skills', JSON.stringify(actualData.skillsData.skills));
@@ -564,6 +652,7 @@ export function attachContinueJourneyListeners() {
           sessionStorage.setItem('battleStyles', JSON.stringify(actualData.battleStyles));
           sessionStorage.setItem('typeAwakenings', JSON.stringify(actualData.typeAwakening));
           sessionStorage.setItem('moves', JSON.stringify(actualData.moves));
+          syncKnownMovesForAllPokemon();
           sessionStorage.setItem('natures', JSON.stringify(actualData.natures));
           sessionStorage.setItem('pokemonFeats', JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
           sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));

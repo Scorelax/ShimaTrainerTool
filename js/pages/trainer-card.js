@@ -23,6 +23,65 @@ function getMaxCharges(buffName, trainerLevel) {
   }
 }
 
+// ============================================================================
+// RECHARGE HELPERS — for restoring move charges on short/long rest
+// ============================================================================
+
+function _parseRechargeTC(actionType) {
+  if (!actionType) return null;
+  const lower = actionType.toLowerCase();
+  if (!lower.includes('recharge')) return null;
+  const m = lower.match(/recharge\s*\(([^)]+)\)/);
+  if (!m) return null;
+  const type = m[1].includes('long') ? 'LR' : 'SR';
+  const chargeMatch = actionType.match(/(\d+)\s+charges?/i);
+  return { maxCharges: chargeMatch ? parseInt(chargeMatch[1]) : 1, type };
+}
+
+function _parseKnownMovesTC(str) {
+  const result = {};
+  if (!str) return result;
+  str.split(',').map(s => s.trim()).filter(Boolean).forEach(part => {
+    const match = part.match(/^(.+?)\((\d+)\)\((\w+)\)$/);
+    if (match) result[match[1]] = { chargesLeft: parseInt(match[2]), type: match[3] };
+  });
+  return result;
+}
+
+function _buildKnownMovesStringTC(map) {
+  return Object.entries(map).map(([n, s]) => `${n}(${s.chargesLeft})(${s.type})`).join(',');
+}
+
+/**
+ * Restore move charges in pokemonData[59] on rest.
+ * restType 'SR' restores SR moves only; 'LR' restores both SR and LR moves.
+ * Mutates pokemonData in-place; returns true if anything changed.
+ */
+function restoreRechargesForRest(pokemonData, restType) {
+  const knownMovesStr = pokemonData[59] || '';
+  if (!knownMovesStr) return false;
+  const knownMoves = _parseKnownMovesTC(knownMovesStr);
+  if (Object.keys(knownMoves).length === 0) return false;
+
+  const allMoves = JSON.parse(sessionStorage.getItem('moves') || '[]');
+  let changed = false;
+
+  Object.entries(knownMoves).forEach(([moveName, state]) => {
+    if (restType === 'SR' && state.type !== 'SR') return;
+    const moveData = allMoves.find(m => m[0] === moveName);
+    const maxCharges = moveData
+      ? (_parseRechargeTC(moveData[3] || '')?.maxCharges ?? state.chargesLeft)
+      : state.chargesLeft;
+    if (state.chargesLeft < maxCharges) {
+      knownMoves[moveName] = { ...state, chargesLeft: maxCharges };
+      changed = true;
+    }
+  });
+
+  if (changed) pokemonData[59] = _buildKnownMovesStringTC(knownMoves);
+  return changed;
+}
+
 // Short rest state management
 let shortRestQueue = [];
 let shortRestCurrentIndex = 0;
@@ -1417,6 +1476,10 @@ export function attachTrainerCardListeners() {
       pokemonData[54] = parseInt(pokemonData[9], 10);  // currentHD = maxHD
       pokemonData[55] = parseInt(pokemonData[11], 10); // currentVD = maxVD
 
+      // Restore all recharge moves (SR and LR) and clear status conditions
+      restoreRechargesForRest(pokemonData, 'LR');
+      pokemonData[60] = '';
+
       sessionStorage.setItem(key, JSON.stringify(pokemonData));
       pokemonToUpdate.push(pokemonData);
     });
@@ -1786,6 +1849,9 @@ async function processShortRestHealing() {
     pokemon[45] = newHP;
     pokemon[46] = newVP;
 
+    // Restore SR recharge moves
+    restoreRechargesForRest(pokemon, 'SR');
+
     sessionStorage.setItem(entity.storageKey, JSON.stringify(pokemon));
 
     // Update database in background
@@ -1946,6 +2012,10 @@ async function completeLongRest(selectedPokemon) {
       pokemonData[45] = parseInt(pokemonData[10], 10);
       pokemonData[46] = parseInt(pokemonData[12], 10);
     }
+
+    // Restore all recharge moves (SR and LR) and clear status conditions
+    restoreRechargesForRest(pokemonData, 'LR');
+    pokemonData[60] = '';
 
     sessionStorage.setItem(key, JSON.stringify(pokemonData));
     pokemonToUpdate.push(pokemonData);

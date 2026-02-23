@@ -574,6 +574,13 @@ function renderExpandedSection(c, statusBadges) {
     <div class="expanded-hpvp-section">
       <div class="expanded-section-label">Adjust HP / VP</div>
       <div class="hpvp-adjust-row">
+        <span class="hpvp-stat-label">AC</span>
+        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="-1">−</button>
+        <input type="number" class="hpvp-input" value="${c.ac}" data-combatant-id="${c.id}" data-stat="ac">
+        <span class="hpvp-max"></span>
+        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="1">+</button>
+      </div>
+      <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
         <span class="hpvp-stat-label">HP</span>
         <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="-1">−</button>
         <input type="number" class="hpvp-input" value="${c.currentHp}" min="0" max="${c.maxHp}" data-combatant-id="${c.id}" data-stat="hp">
@@ -608,14 +615,6 @@ function renderExpandedSection(c, statusBadges) {
       <div class="expanded-section-label">Modify Stats</div>
       <div class="stat-adjust-grid">
         ${statItems}
-        <div class="stat-adjust-item">
-          <div class="stat-adjust-name">AC <small>&nbsp;</small></div>
-          <div class="stat-adjust-controls">
-            <button class="stat-delta-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="-1">−</button>
-            <input type="number" class="stat-adjust-val" value="${c.ac}" data-combatant-id="${c.id}" data-stat="ac">
-            <button class="stat-delta-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="1">+</button>
-          </div>
-        </div>
       </div>
     </div>`;
 
@@ -1025,6 +1024,7 @@ function attachBattleListeners(state) {
         const val = Math.max(0, parseInt(hpvp.value) || 0);
         if (hpvp.dataset.stat === 'hp') c.currentHp = Math.min(val, c.maxHp);
         if (hpvp.dataset.stat === 'vp') c.currentVp = Math.min(val, c.maxVp);
+        if (hpvp.dataset.stat === 'ac') c.ac = val;
         saveCombatState(state); rerenderBattle(state); return;
       }
       // Direct number input for stats
@@ -1122,6 +1122,7 @@ function handleHpVpDelta(btn, state) {
   const delta = parseInt(btn.dataset.delta);
   if (btn.dataset.stat === 'hp') c.currentHp = Math.max(0, Math.min(c.currentHp + delta, c.maxHp));
   if (btn.dataset.stat === 'vp') c.currentVp = Math.max(0, Math.min(c.currentVp + delta, c.maxVp));
+  if (btn.dataset.stat === 'ac') c.ac = Math.max(0, c.ac + delta);
   saveCombatState(state);
   rerenderBattle(state);
 }

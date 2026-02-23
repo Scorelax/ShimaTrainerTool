@@ -156,11 +156,13 @@ function buildTrainerCombatant() {
   const currentVp = parseInt(trainerData[35]) || maxVp;
   const ac = parseInt(trainerData[36]) || parseInt(trainerData[13]) || 10;
 
+  const trainerAlertBonus = (trainerData[33] || '').split(',').some(f => f.trim() === 'Alert') ? 5 : 0;
+
   return {
     id: 'trainer', type: 'trainer', entityKey: 'trainerData',
     name: trainerData[1] || 'Trainer',
     image: trainerData[0] || 'assets/Pokeball.png',
-    level, initiativeScore: dexMod, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: 0,
+    level, initiativeScore: dexMod, initiativeRoll: 0, initiativeBonus: trainerAlertBonus, initiativeTotal: dexMod + trainerAlertBonus,
     ac, maxHp, currentHp, maxVp, currentVp,
     proficiency: computeProficiency(level),
     str, dex, con, int: int_, wis, cha,
@@ -229,11 +231,13 @@ function buildPokemonCombatant(pokemonKey) {
     });
   }
 
+  const pokemonAlertBonus = (pokemonData[50] || '').split(',').some(f => f.trim() === 'Alert') ? 5 : 0;
+
   return {
     id: pokemonKey, type: 'pokemon', entityKey: pokemonKey,
     name: pokemonData[36] || pokemonData[2] || 'Pokemon',
     image: pokemonData[1] || 'assets/Pokeball.png',
-    level, initiativeScore: initiative, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: 0,
+    level, initiativeScore: initiative, initiativeRoll: 0, initiativeBonus: pokemonAlertBonus, initiativeTotal: initiative + pokemonAlertBonus,
     ac: parseInt(pokemonData[8]) || 10,
     maxHp, currentHp, maxVp, currentVp,
     proficiency, stabBonusValue: parseInt(pokemonData[34]) || 2,
@@ -346,10 +350,8 @@ function renderInitiativePhase(state) {
         <div class="initiative-score-label">Initiative Score: <strong>${c.initiativeScore}</strong></div>
       </div>
       <div class="initiative-roll-group">
-        <button class="initiative-roll-btn" data-combatant-id="${c.id}">Roll</button>
-        <input type="number" class="initiative-roll-input" id="roll_${c.id}" value="${c.initiativeRoll}" placeholder="d20" readonly>
-        <span class="initiative-plus">+</span>
-        <input type="number" class="initiative-bonus-input" id="bonus_${c.id}" value="${c.initiativeBonus}" placeholder="Bonus" min="-20" max="20">
+        <span class="initiative-plus">Bonus:</span>
+        <input type="number" class="initiative-bonus-input" id="bonus_${c.id}" value="${c.initiativeBonus}" placeholder="0" min="-20" max="20">
         <span class="initiative-equals">= <strong id="total_${c.id}">${c.initiativeTotal}</strong></span>
       </div>
     </div>`).join('');
@@ -363,7 +365,7 @@ function renderInitiativePhase(state) {
         <div></div>
       </div>
       <div class="initiative-container">
-        <p class="initiative-instructions">Click <strong>Roll</strong> to auto-roll d20 for each participant, then adjust the bonus if needed.</p>
+        <p class="initiative-instructions">Roll your d20 manually. Each participant's base initiative is pre-filled (Alert feat adds +5 automatically). Adjust the bonus field for any extra modifiers.</p>
         <div class="initiative-list">${rows}</div>
         <button class="combat-start-btn" id="beginBattleBtn">Begin Battle →</button>
       </div>
@@ -463,8 +465,10 @@ function renderCombatCard(c, isActive) {
             ${typeBadges}
             <span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>
           </div>
-          <div class="combat-card-stats-row">
+          <div class="combat-card-ac-row">
             <span>AC: <strong>${c.ac}</strong></span>
+          </div>
+          <div class="combat-card-stats-row">
             <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>
               <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
             </span>
@@ -490,16 +494,38 @@ function renderCombatCard(c, isActive) {
     </div>`;
 }
 
+function renderAbilitiesForCombat(raw) {
+  if (!raw) return '';
+  return raw.split('|').map(a => a.trim()).filter(Boolean).map(a => {
+    const colonIdx = a.indexOf(':');
+    const body = colonIdx !== -1 ? a.substring(colonIdx + 1) : a;
+    const parts = body.split(';');
+    const name = parts[0].trim();
+    const desc = parts.slice(1).join(';').trim();
+    return name ? `<div class="ability-entry"><strong>${name}</strong>${desc ? `<span class="ability-desc">: ${desc}</span>` : ''}</div>` : '';
+  }).join('');
+}
+
+function renderItemForCombat(itemName) {
+  if (!itemName) return '';
+  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+  const dbItem = items.find(it => it.name === itemName);
+  const desc = dbItem ? (dbItem.effect || dbItem.description || '') : '';
+  return `<strong>${itemName}</strong>${desc ? `<span class="item-desc">: ${desc}</span>` : ''}`;
+}
+
 function renderExpandedSection(c, statusBadges) {
   // --- Info section (pokemon only) ---
+  const abilitiesHtml = renderAbilitiesForCombat(c.abilities);
+  const itemHtml = renderItemForCombat(c.item);
   const infoSection = c.type === 'pokemon' ? `
     <div class="expanded-info-section">
       <div class="expanded-section-label">Pokémon Info</div>
       <div class="info-grid">
-        ${c.abilities ? `<div class="info-row"><span class="info-label">Abilities</span><span>${c.abilities}</span></div>` : ''}
-        ${c.item     ? `<div class="info-row"><span class="info-label">Item</span><span>${c.item}</span></div>` : ''}
-        ${c.size     ? `<div class="info-row"><span class="info-label">Size</span><span>${c.size}</span></div>` : ''}
-        ${c.movement ? `<div class="info-row"><span class="info-label">Movement</span><span>${c.movement}</span></div>` : ''}
+        ${abilitiesHtml ? `<div class="info-row"><span class="info-label">Abilities</span><div class="info-ability-list">${abilitiesHtml}</div></div>` : ''}
+        ${itemHtml     ? `<div class="info-row"><span class="info-label">Item</span><div>${itemHtml}</div></div>` : ''}
+        ${c.size       ? `<div class="info-row"><span class="info-label">Size</span><span>${c.size}</span></div>` : ''}
+        ${c.movement   ? `<div class="info-row"><span class="info-label">Movement</span><span>${c.movement}</span></div>` : ''}
       </div>
     </div>` : '';
 
@@ -688,6 +714,7 @@ function getCombatCSS() {
     .fainted-name { text-decoration: line-through; color: #888; }
     .combat-card-level { font-size: 0.78rem; color: #aaa; }
     .combat-initiative-badge { margin-left: auto; font-size: 0.72rem; color: #FFD700; font-weight: 600; }
+    .combat-card-ac-row { font-size: 0.82rem; margin-bottom: 0.15rem; }
     .combat-card-stats-row { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.82rem; margin-bottom: 0.2rem; }
     .combat-mods-row { font-size: 0.78rem; color: #c0c0c0; gap: 0.4rem; }
     .combat-mods-row small { color: #888; margin-left: 1px; }
@@ -727,6 +754,10 @@ function getCombatCSS() {
     .info-grid { display: flex; flex-direction: column; gap: 0.2rem; }
     .info-row { display: flex; gap: 0.5rem; font-size: 0.82rem; }
     .info-label { color: #aaa; min-width: 68px; flex-shrink: 0; font-weight: 600; }
+    .info-ability-list { display: flex; flex-direction: column; gap: 0.15rem; }
+    .ability-entry { line-height: 1.35; }
+    .ability-desc { color: #b0b0b0; font-weight: 400; }
+    .item-desc { color: #b0b0b0; font-weight: 400; }
 
     /* HP/VP adjusters */
     .hpvp-adjust-row { display: flex; align-items: center; gap: 0.4rem; }
@@ -832,25 +863,14 @@ function attachInitiativeListeners(state) {
     attachCombatListeners();
   });
 
-  document.querySelectorAll('.initiative-roll-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.combatantId;
-      const roll = Math.floor(Math.random() * 20) + 1;
-      const rollInput = document.getElementById(`roll_${id}`);
-      if (rollInput) rollInput.value = roll;
-      recalcInitiativeTotal(id, state);
-    });
-  });
-
   document.querySelectorAll('.initiative-bonus-input').forEach(input => {
     input.addEventListener('input', () => recalcInitiativeTotal(input.id.replace('bonus_', ''), state));
   });
 
   document.getElementById('beginBattleBtn')?.addEventListener('click', () => {
     state.combatants.forEach(c => {
-      c.initiativeRoll = parseInt(document.getElementById(`roll_${c.id}`)?.value) || 0;
       c.initiativeBonus = parseInt(document.getElementById(`bonus_${c.id}`)?.value) || 0;
-      c.initiativeTotal = c.initiativeScore + c.initiativeRoll + c.initiativeBonus;
+      c.initiativeTotal = c.initiativeScore + c.initiativeBonus;
     });
     state.combatants.sort((a, b) => b.initiativeTotal - a.initiativeTotal);
     state.phase = 'battle';
@@ -864,10 +884,9 @@ function attachInitiativeListeners(state) {
 function recalcInitiativeTotal(id, state) {
   const c = state.combatants.find(x => x.id === id);
   if (!c) return;
-  const roll = parseInt(document.getElementById(`roll_${id}`)?.value) || 0;
   const bonus = parseInt(document.getElementById(`bonus_${id}`)?.value) || 0;
   const totalEl = document.getElementById(`total_${id}`);
-  if (totalEl) totalEl.textContent = c.initiativeScore + roll + bonus;
+  if (totalEl) totalEl.textContent = c.initiativeScore + bonus;
 }
 
 // -------------------------------- BATTLE -----------------------------------
@@ -1231,6 +1250,5 @@ async function endCombat(state) {
   }
 
   sessionStorage.removeItem('combatState');
-  showToast('Combat ended. Stats saved.', 'success');
   window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
 }

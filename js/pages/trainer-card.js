@@ -1152,7 +1152,7 @@ export function renderTrainerCard() {
           ${Array.from({ length: 8 }, (_, i) => {
             const badge = earnedBadges[i];
             if (badge) {
-              const kebabName = badge.name.toLowerCase().replace(/\s+/g, '-');
+              const kebabName = badge.name.replace(/\s*badge$/i, '').trim().toLowerCase().replace(/\s+/g, '-');
               const imgUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/badges/' + kebabName + '.png';
               return `
                 <div class="badge-slot earned" data-badge-index="${i}">

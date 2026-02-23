@@ -823,7 +823,7 @@ export function renderTrainerCard() {
 
         .badge-slot.earned {
           isolation: isolate;
-          background: linear-gradient(135deg, #fff8d0, #d6f0ff);
+          background: linear-gradient(135deg, #fff8d0 20%, #a8d8f0);
           border-radius: clamp(12px, 2.5vw, 18px);
         }
 

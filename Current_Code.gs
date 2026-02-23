@@ -131,7 +131,9 @@ const POKEMON_COLUMN_INDICES = {
   currentVD: 55,
   utilityslot: 56,
   size: 57,
-  cry: 58
+  cry: 58,
+  knownmoves: 59,
+  statuscondition: 60
 };
 const REGISTERED_POKEMON_COLUMN_INDICES = {
   trainername: 0,
@@ -958,7 +960,7 @@ function handlePokemonRoute(action, params) {
         params.trainer,
         params.pokemon,
         params.stat,
-        parseInt(params.value)
+        params.value
       );
 
     case 'abilities':
@@ -2530,16 +2532,24 @@ function writePokemonLiveStats(trainerName, pokemonName, stat, newValue) {
             return { status: 'error', message: 'Trainer not found' };
         }
 
-        if(stat === 'HP') { //HP
-          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 46).setValue(newValue);
+        if(stat === 'HP') {
+          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 46).setValue(parseInt(newValue));
           return { status: 'success' };
 
-        } else if(stat === 'VP'){ //VP
-          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 47).setValue(newValue); 
+        } else if(stat === 'VP') {
+          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 47).setValue(parseInt(newValue));
           return { status: 'success' };
 
-        } else { //AC 
-          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 48).setValue(newValue); 
+        } else if(stat === 'KnownMoves') {
+          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 60).setValue(newValue);
+          return { status: 'success' };
+
+        } else if(stat === 'StatusCondition') {
+          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 61).setValue(newValue);
+          return { status: 'success' };
+
+        } else { //AC
+          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 48).setValue(parseInt(newValue));
           return { status: 'success' };
 
         }

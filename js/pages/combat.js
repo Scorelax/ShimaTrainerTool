@@ -536,6 +536,23 @@ function renderBattlePhase(state) {
               <div class="type-buttons-row" id="typeCalcImmune"></div>
             </div>
             <div id="typeCalcResult" class="type-calc-result"></div>
+            <hr class="type-calc-divider">
+            <div class="combat-stats-row">
+              <div class="combat-stat-column">
+                <div class="combat-stat-label">HP</div>
+                <div class="combat-stat-value" id="typeCalcHpVal">—</div>
+                <input type="number" id="typeCalcHpInput" class="combat-input" placeholder="Amount" min="0">
+              </div>
+              <div class="combat-stat-column">
+                <div class="combat-stat-label">VP</div>
+                <div class="combat-stat-value" id="typeCalcVpVal">—</div>
+                <input type="number" id="typeCalcVpInput" class="combat-input" placeholder="Amount" min="0">
+              </div>
+            </div>
+            <div class="combat-buttons">
+              <button id="typeCalcAddBtn" class="combat-btn combat-btn-add">➕ Add</button>
+              <button id="typeCalcRemoveBtn" class="combat-btn combat-btn-remove">➖ Remove</button>
+            </div>
           </div>
         </div>
       </div>
@@ -653,14 +670,11 @@ function renderExpandedSection(c, statusBadges) {
 
   // --- HP / VP adjusters ---
   const typeCalcBtn = c.type === 'pokemon'
-    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮 Damage Calculator</button>`
+    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮<br>Damage<br>Calculator</button>`
     : '';
   const hpvpSection = `
     <div class="expanded-hpvp-section">
-      <div class="hpvp-section-header">
-        <div class="expanded-section-label" style="margin-bottom:0">Adjust HP / VP</div>
-        ${typeCalcBtn}
-      </div>
+      <div class="expanded-section-label">Adjust HP / VP</div>
       <div class="hpvp-adjust-row">
         <span class="hpvp-stat-label">AC</span>
         <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="-1">−</button>
@@ -668,19 +682,24 @@ function renderExpandedSection(c, statusBadges) {
         <span class="hpvp-max"></span>
         <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="1">+</button>
       </div>
-      <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
-        <span class="hpvp-stat-label">HP</span>
-        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="-1">−</button>
-        <input type="number" class="hpvp-input" value="${c.currentHp}" min="0" max="${c.maxHp}" data-combatant-id="${c.id}" data-stat="hp">
-        <span class="hpvp-max">/ ${c.maxHp}</span>
-        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="1">+</button>
-      </div>
-      <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
-        <span class="hpvp-stat-label">VP</span>
-        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="-1">−</button>
-        <input type="number" class="hpvp-input" value="${c.currentVp}" min="0" max="${c.maxVp}" data-combatant-id="${c.id}" data-stat="vp">
-        <span class="hpvp-max">/ ${c.maxVp}</span>
-        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="1">+</button>
+      <div class="hpvp-hpvp-wrapper">
+        <div class="hpvp-hpvp-left">
+          <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
+            <span class="hpvp-stat-label">HP</span>
+            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="-1">−</button>
+            <input type="number" class="hpvp-input" value="${c.currentHp}" min="0" max="${c.maxHp}" data-combatant-id="${c.id}" data-stat="hp">
+            <span class="hpvp-max">/ ${c.maxHp}</span>
+            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="1">+</button>
+          </div>
+          <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
+            <span class="hpvp-stat-label">VP</span>
+            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="-1">−</button>
+            <input type="number" class="hpvp-input" value="${c.currentVp}" min="0" max="${c.maxVp}" data-combatant-id="${c.id}" data-stat="vp">
+            <span class="hpvp-max">/ ${c.maxVp}</span>
+            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="1">+</button>
+          </div>
+        </div>
+        ${typeCalcBtn}
       </div>
     </div>`;
 
@@ -1027,9 +1046,22 @@ function getCombatCSS() {
     .type-cosmic{background:#120077;color:#fff}
 
     /* TYPE CALCULATOR */
-    .hpvp-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; }
-    .combat-type-calc-btn { background: rgba(255,165,0,0.12); border: 1px solid rgba(255,165,0,0.5); border-radius: 8px; color: #FFA500; font-size: 0.76rem; font-weight: 700; padding: 0.22rem 0.6rem; cursor: pointer; }
+    .hpvp-hpvp-wrapper { display: flex; align-items: stretch; gap: 0.5rem; }
+    .hpvp-hpvp-left { flex: 1; min-width: 0; }
+    .combat-type-calc-btn { background: rgba(255,165,0,0.12); border: 1px solid rgba(255,165,0,0.5); border-radius: 8px; color: #FFA500; font-size: 0.74rem; font-weight: 700; padding: 0.3rem 0.6rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.4; min-width: 72px; }
     .combat-type-calc-btn:hover { background: rgba(255,165,0,0.28); }
+    /* COMBAT TRACKER (inside type calc popup) */
+    .type-calc-divider { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 0.8rem 0 0.6rem; }
+    .combat-stats-row { display: flex; gap: 1rem; margin-bottom: 0.6rem; }
+    .combat-stat-column { flex: 1; display: flex; flex-direction: column; gap: 0.3rem; }
+    .combat-stat-label { font-size: 0.78rem; font-weight: 700; color: #FFDE00; text-transform: uppercase; }
+    .combat-stat-value { font-size: 1.05rem; font-weight: 700; color: #e0e0e0; }
+    .combat-input { width: 100%; padding: 0.45rem 0.5rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; box-sizing: border-box; }
+    .combat-buttons { display: flex; gap: 0.5rem; }
+    .combat-btn { flex: 1; padding: 0.55rem; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: transform 0.1s; }
+    .combat-btn:active { transform: scale(0.97); }
+    .combat-btn-add { background: linear-gradient(135deg,#4CAF50,#45A049); color: #fff; }
+    .combat-btn-remove { background: linear-gradient(135deg,#EE1515,#C91010); color: #fff; }
     .type-calc-type-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
     .type-calc-badge { padding: 0.2rem 0.75rem; border-radius: 12px; font-size: 0.88rem; font-weight: 700; }
     .type-eff-section { margin-bottom: 0.55rem; }
@@ -1732,7 +1764,7 @@ function showTypeCalcPopup(combatantId, state) {
     document.getElementById(containerId).innerHTML = buildBtns(types);
   });
 
-  // Result display + click handlers
+  // Result display + type button click handlers
   const resultEl = document.getElementById('typeCalcResult');
   resultEl.className = 'type-calc-result';
   resultEl.textContent = '';
@@ -1749,6 +1781,53 @@ function showTypeCalcPopup(combatantId, state) {
       else { resultEl.textContent = '1× — Normal damage'; resultEl.className = 'type-calc-result type-calc-neutral show'; }
     });
   });
+
+  // HP / VP display and adjustment
+  const hpValEl = document.getElementById('typeCalcHpVal');
+  const vpValEl = document.getElementById('typeCalcVpVal');
+  const hpInput = document.getElementById('typeCalcHpInput');
+  const vpInput = document.getElementById('typeCalcVpInput');
+
+  const refreshHpVp = () => {
+    hpValEl.textContent = `${c.currentHp} / ${c.maxHp}`;
+    vpValEl.textContent = `${c.currentVp} / ${c.maxVp}`;
+  };
+  refreshHpVp();
+  hpInput.value = '';
+  vpInput.value = '';
+
+  const syncPokemon = () => {
+    const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || '[]');
+    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    pd[45] = c.currentHp; pd[46] = c.currentVp;
+    sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
+    PokemonAPI.updateLiveStats(td[1], pd[2], 'HP', c.currentHp).catch(() => {});
+    PokemonAPI.updateLiveStats(td[1], pd[2], 'VP', c.currentVp).catch(() => {});
+  };
+
+  document.getElementById('typeCalcAddBtn').onclick = () => {
+    const hpAmt = parseInt(hpInput.value) || 0;
+    const vpAmt = parseInt(vpInput.value) || 0;
+    if (hpAmt > 0) c.currentHp = Math.min(c.currentHp + hpAmt, c.maxHp);
+    if (vpAmt > 0) c.currentVp = Math.min(c.currentVp + vpAmt, c.maxVp);
+    saveCombatState(state);
+    rerenderBattle(state);
+    syncPokemon();
+    refreshHpVp();
+    hpInput.value = ''; vpInput.value = '';
+  };
+
+  document.getElementById('typeCalcRemoveBtn').onclick = () => {
+    const hpAmt = parseInt(hpInput.value) || 0;
+    const vpAmt = parseInt(vpInput.value) || 0;
+    if (hpAmt > 0) c.currentHp = Math.max(0, c.currentHp - hpAmt);
+    if (vpAmt > 0) c.currentVp = Math.max(0, c.currentVp - vpAmt);
+    saveCombatState(state);
+    rerenderBattle(state);
+    syncPokemon();
+    refreshHpVp();
+    hpInput.value = ''; vpInput.value = '';
+  };
 
   popup.style.display = 'flex';
 }

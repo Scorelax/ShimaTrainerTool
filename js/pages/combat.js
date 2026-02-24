@@ -66,6 +66,7 @@ function loadCombatMoves() {
  * e.g. "1 action, recharge (short rest)" → { maxCharges: 1, type: 'SR' }
  *      "1 action, 2 charges, recharge (short rest)" → { maxCharges: 2, type: 'SR' }
  *      "1 action, recharge (long rest)" → { maxCharges: 1, type: 'LR' }
+ *      "1 action, recharge (5-6)" → { maxCharges: 1, type: 'DICE', range: '5-6' }
  * Returns null if no recharge.
  */
 function parseRecharge(actionType) {
@@ -76,7 +77,13 @@ function parseRecharge(actionType) {
   const rechargeMatch = lower.match(/recharge\s*\(([^)]+)\)/);
   if (!rechargeMatch) return null;
 
-  const rechargeText = rechargeMatch[1];
+  const rechargeText = rechargeMatch[1].trim();
+
+  // Dice-roll recharge: "5-6", "4-6", "3-6", etc.
+  if (/^\d+-\d+$/.test(rechargeText)) {
+    return { maxCharges: 1, type: 'DICE', range: rechargeText };
+  }
+
   const type = rechargeText.includes('long') ? 'LR' : 'SR';
 
   // Look for explicit charge count anywhere in the action type string
@@ -102,10 +109,11 @@ function parseKnownMoves(str) {
 
 /**
  * Build the KnownMoves string to save back to the database.
- * Only includes moves that actually have recharge mechanics.
+ * Only includes SR/LR moves — DICE-type recharge moves are combat-only and not persisted.
  */
 function buildKnownMovesString(rechargeStates) {
   return Object.entries(rechargeStates)
+    .filter(([, s]) => s.type !== 'DICE')
     .map(([name, s]) => `${name}(${s.chargesLeft})(${s.type})`)
     .join(',');
 }
@@ -125,7 +133,11 @@ function initializeRechargeStates(state) {
       if (!moveData) return;
       const recharge = parseRecharge(moveData[3] || '');
       if (!recharge) return;
-      c.rechargeStates[moveName] = { chargesLeft: recharge.maxCharges, maxCharges: recharge.maxCharges, type: recharge.type };
+      if (recharge.type === 'DICE') {
+        c.rechargeStates[moveName] = { chargesLeft: 1, maxCharges: 1, type: 'DICE', range: recharge.range };
+      } else {
+        c.rechargeStates[moveName] = { chargesLeft: recharge.maxCharges, maxCharges: recharge.maxCharges, type: recharge.type };
+      }
     });
   });
   saveCombatState(state);
@@ -225,7 +237,10 @@ function buildPokemonCombatant(pokemonKey) {
       if (!moveData) return;
       const recharge = parseRecharge(moveData[3] || '');
       if (!recharge) return;
-      if (existingRecharges[moveName] !== undefined) {
+      if (recharge.type === 'DICE') {
+        // Dice-recharge moves always start fresh each combat — not persisted
+        rechargeStates[moveName] = { chargesLeft: 1, maxCharges: 1, type: 'DICE', range: recharge.range };
+      } else if (existingRecharges[moveName] !== undefined) {
         rechargeStates[moveName] = { chargesLeft: existingRecharges[moveName].chargesLeft, maxCharges: recharge.maxCharges, type: recharge.type };
       } else {
         rechargeStates[moveName] = { chargesLeft: recharge.maxCharges, maxCharges: recharge.maxCharges, type: recharge.type };
@@ -659,12 +674,24 @@ function renderExpandedSection(c, statusBadges) {
         ${c.moves.map(moveName => {
           const rs = c.rechargeStates && c.rechargeStates[moveName];
           const isLocked = rs && rs.chargesLeft <= 0;
-          const chargeText = rs ? ` (${rs.chargesLeft}/${rs.maxCharges} ${rs.type})` : '';
-          return `<button class="combat-move-item ${isLocked ? 'move-locked' : ''}"
-            data-move="${moveName}" data-combatant-id="${c.id}"
-            ${isLocked ? 'disabled' : ''}
-            title="${isLocked ? `Recharges after ${rs.type === 'SR' ? 'Short' : 'Long'} Rest` : moveName}"
-          >${moveName}${chargeText}</button>`;
+          const isDice = rs && rs.type === 'DICE';
+          let chargeText = '';
+          if (rs) {
+            if (isDice) chargeText = isLocked ? ' (spent)' : ` (${rs.range})`;
+            else chargeText = ` (${rs.chargesLeft}/${rs.maxCharges} ${rs.type})`;
+          }
+          const lockTitle = isLocked
+            ? (isDice ? `Roll d6 — recharges on ${rs.range}` : `Recharges after ${rs.type === 'SR' ? 'Short' : 'Long'} Rest`)
+            : moveName;
+          const rollBtn = isDice && isLocked
+            ? `<button class="combat-dice-recharge-btn" data-move="${moveName}" data-combatant-id="${c.id}" title="Roll d6 to recharge">🎲 Roll</button>`
+            : '';
+          return `<div class="combat-move-row">
+            <button class="combat-move-item ${isLocked ? 'move-locked' : ''}"
+              data-move="${moveName}" data-combatant-id="${c.id}"
+              ${isLocked ? 'disabled' : ''}
+              title="${lockTitle}"
+            >${moveName}${chargeText}</button>${rollBtn}</div>`;
         }).join('')}
       </div>
     </div>` : '';
@@ -844,9 +871,12 @@ function getCombatCSS() {
 
     /* Moves */
     .expanded-moves-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .combat-move-row { display: flex; align-items: center; gap: 0.3rem; }
     .combat-move-item { padding: 0.3rem 0.7rem; border-radius: 14px; border: none; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: transform 0.1s; background: #888; color: #fff; }
     .combat-move-item:active { transform: scale(0.95); }
     .combat-move-item.move-locked { opacity: 0.4; cursor: not-allowed; background: #555 !important; color: #999 !important; }
+    .combat-dice-recharge-btn { padding: 0.25rem 0.5rem; border-radius: 10px; border: 1px solid rgba(255,165,0,0.6); background: rgba(255,165,0,0.15); color: #FFA500; font-size: 0.74rem; font-weight: 700; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
+    .combat-dice-recharge-btn:hover { background: rgba(255,165,0,0.35); }
 
     /* MOVE POPUP */
     .combat-popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
@@ -1062,6 +1092,10 @@ function attachBattleListeners(state) {
       if (e.target.closest('.combat-buffs-open-btn')) {
         showCombatBuffsPopup(); return;
       }
+      const diceRechargeBtn = e.target.closest('.combat-dice-recharge-btn');
+      if (diceRechargeBtn) {
+        rollDiceRecharge(diceRechargeBtn.dataset.move, diceRechargeBtn.dataset.combatantId, state); return;
+      }
       const moveItem = e.target.closest('.combat-move-item');
       if (moveItem && !moveItem.disabled) {
         showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state); return;
@@ -1161,6 +1195,22 @@ function rerenderBattle(state) {
   if (!battleList) return;
   battleList.innerHTML = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex)).join('');
   applyMoveColors();
+}
+
+function rollDiceRecharge(moveName, combatantId, state) {
+  const c = state.combatants.find(x => x.id === combatantId);
+  if (!c || !c.rechargeStates || !c.rechargeStates[moveName]) return;
+  const rs = c.rechargeStates[moveName];
+  const roll = Math.floor(Math.random() * 6) + 1;
+  const [low, high] = rs.range.split('-').map(Number);
+  if (roll >= low && roll <= high) {
+    rs.chargesLeft = 1;
+    saveCombatState(state);
+    rerenderBattle(state);
+    showToast(`Rolled ${roll} — ${moveName} recharged!`, 'success');
+  } else {
+    showToast(`Rolled ${roll} — ${moveName} did not recharge (needs ${rs.range}).`, 'warning');
+  }
 }
 
 function applyMoveColors() {

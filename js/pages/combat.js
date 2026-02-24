@@ -535,10 +535,6 @@ function renderBattlePhase(state) {
               <div class="type-eff-label immune-label">Immune to (0×)</div>
               <div class="type-buttons-row" id="typeCalcImmune"></div>
             </div>
-            <div id="typeCalcNeutralSection" class="type-eff-section">
-              <div class="type-eff-label neutral-label">Neutral (1×)</div>
-              <div class="type-buttons-row" id="typeCalcNeutral"></div>
-            </div>
             <div id="typeCalcResult" class="type-calc-result"></div>
           </div>
         </div>
@@ -657,7 +653,7 @@ function renderExpandedSection(c, statusBadges) {
 
   // --- HP / VP adjusters ---
   const typeCalcBtn = c.type === 'pokemon'
-    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🔍 Types</button>`
+    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮 Damage Calculator</button>`
     : '';
   const hpvpSection = `
     <div class="expanded-hpvp-section">
@@ -1705,7 +1701,6 @@ function showTypeCalcPopup(combatantId, state) {
   const weaknesses  = ALL_TYPES.filter(t => (multMap[t] ?? 1) > 1);
   const resistances = ALL_TYPES.filter(t => { const v = multMap[t] ?? 1; return v > 0 && v < 1; });
   const immunities  = ALL_TYPES.filter(t => (multMap[t] ?? 1) === 0);
-  const neutrals    = ALL_TYPES.filter(t => (multMap[t] ?? 1) === 1);
 
   document.getElementById('typeCalcTitle').textContent = c.name;
 
@@ -1727,10 +1722,9 @@ function showTypeCalcPopup(combatantId, state) {
   }
 
   const sections = [
-    { sectionId: 'typeCalcWeakSection',    containerId: 'typeCalcWeak',    types: weaknesses },
-    { sectionId: 'typeCalcResistSection',  containerId: 'typeCalcResist',  types: resistances },
-    { sectionId: 'typeCalcImmuneSection',  containerId: 'typeCalcImmune',  types: immunities },
-    { sectionId: 'typeCalcNeutralSection', containerId: 'typeCalcNeutral', types: neutrals },
+    { sectionId: 'typeCalcWeakSection',   containerId: 'typeCalcWeak',   types: weaknesses },
+    { sectionId: 'typeCalcResistSection', containerId: 'typeCalcResist', types: resistances },
+    { sectionId: 'typeCalcImmuneSection', containerId: 'typeCalcImmune', types: immunities },
   ];
   sections.forEach(({ sectionId, containerId, types }) => {
     const sec = document.getElementById(sectionId);

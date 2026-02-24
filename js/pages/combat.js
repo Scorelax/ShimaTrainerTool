@@ -590,7 +590,7 @@ function renderCombatCard(c, isActive) {
             <span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>
           </div>
           <div class="combat-card-stats-group">
-            <div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong>${c.type === 'pokemon' ? `  ·  Crit <strong>+${c.critMod || 0}</strong>` : ''}</div>
+            <div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong></div>
             <div class="combat-card-stats-row">
               <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>
                 <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
@@ -677,7 +677,7 @@ function renderExpandedSection(c, statusBadges) {
       <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
         <span class="hpvp-stat-label">Crit</span>
         <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="crit" data-delta="-1">−</button>
-        <input type="number" class="hpvp-input" value="${c.critMod || 0}" min="0" max="5" data-combatant-id="${c.id}" data-stat="crit">
+        <input type="number" class="hpvp-input" value="${c.critMod || 0}" data-combatant-id="${c.id}" data-stat="crit">
         <span class="hpvp-max"></span>
         <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="crit" data-delta="1">+</button>
       </div>` : '';
@@ -1244,7 +1244,7 @@ function attachBattleListeners(state) {
         if (hpvp.dataset.stat === 'hp') c.currentHp = Math.min(val, c.maxHp);
         if (hpvp.dataset.stat === 'vp') c.currentVp = Math.min(val, c.maxVp);
         if (hpvp.dataset.stat === 'ac') c.ac = val;
-        if (hpvp.dataset.stat === 'crit') c.critMod = Math.max(0, Math.min(5, val));
+        if (hpvp.dataset.stat === 'crit') c.critMod = Math.max(-5, Math.min(5, val));
         saveCombatState(state); rerenderBattle(state); return;
       }
       // Direct number input for stats
@@ -1365,7 +1365,7 @@ function handleHpVpDelta(btn, state) {
   if (btn.dataset.stat === 'hp') c.currentHp = Math.max(0, Math.min(c.currentHp + delta, c.maxHp));
   if (btn.dataset.stat === 'vp') c.currentVp = Math.max(0, Math.min(c.currentVp + delta, c.maxVp));
   if (btn.dataset.stat === 'ac') c.ac = Math.max(0, c.ac + delta);
-  if (btn.dataset.stat === 'crit') c.critMod = Math.max(0, Math.min(5, (c.critMod || 0) + delta));
+  if (btn.dataset.stat === 'crit') c.critMod = Math.max(-5, Math.min(5, (c.critMod || 0) + delta));
   saveCombatState(state);
   rerenderBattle(state);
 }

@@ -408,6 +408,8 @@ function renderBattlePhase(state) {
               <div><strong>VP Cost:</strong> <span id="cMoveVP"></span></div>
               <div><strong>Duration:</strong> <span id="cMoveDuration"></span></div>
               <div><strong>Range:</strong> <span id="cMoveRange"></span></div>
+              <div><strong>Size:</strong> <span id="cMoveSize"></span></div>
+              <div><strong>Crit Mod:</strong> <span id="cMoveCritMod"></span></div>
             </div>
             <div class="combat-move-description" id="cMoveDescription"></div>
             <div class="combat-move-higher" id="cMoveHigher"></div>
@@ -488,21 +490,23 @@ function renderBattlePhase(state) {
       <div class="popup-overlay" id="combatTypeCalcPopup" style="display:none;">
         <div class="popup-content" style="max-width:min(92vw,460px)">
           <div class="popup-header">
-            <div class="popup-title" id="typeCalcTitle" style="flex:1;text-align:center;padding-left:2rem;"></div>
+            <div style="flex:1;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;padding-left:2rem;min-width:0;">
+              <div class="popup-title" id="typeCalcTitle"></div>
+              <div id="typeCalcPokemonTypes" class="type-calc-type-row" style="margin:0;"></div>
+            </div>
             <button class="popup-close" id="closeTypeCalcPopup">×</button>
           </div>
           <div class="popup-body">
-            <div id="typeCalcPokemonTypes" class="type-calc-type-row"></div>
             <div id="typeCalcWeakSection" class="type-eff-section">
-              <div class="type-eff-label weak-label">Weak to (2×)</div>
+              <div class="type-eff-label weak-label">Weakness</div>
               <div class="type-buttons-row" id="typeCalcWeak"></div>
             </div>
             <div id="typeCalcResistSection" class="type-eff-section">
-              <div class="type-eff-label resist-label">Resists (½×)</div>
+              <div class="type-eff-label resist-label">Resistance</div>
               <div class="type-buttons-row" id="typeCalcResist"></div>
             </div>
             <div id="typeCalcImmuneSection" class="type-eff-section">
-              <div class="type-eff-label immune-label">Immune to (0×)</div>
+              <div class="type-eff-label immune-label">Immunity</div>
               <div class="type-buttons-row" id="typeCalcImmune"></div>
             </div>
             <div id="typeCalcResult" class="type-calc-result"></div>
@@ -917,7 +921,7 @@ function getCombatCSS() {
     /* HP/VP adjusters */
     .hpvp-adjust-row { display: flex; align-items: center; gap: 0.4rem; }
     .hpvp-stat-label { font-size: 0.78rem; font-weight: 700; color: #aaa; min-width: 20px; }
-    .hpvp-btn { width: 26px; height: 26px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; }
+    .hpvp-btn { width: 26px; height: 26px; flex-shrink: 0; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; }
     .hpvp-input { width: 52px; padding: 0.22rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #e0e0e0; text-align: center; font-size: 0.9rem; }
     .hpvp-max { font-size: 0.82rem; color: #aaa; }
 
@@ -1074,12 +1078,12 @@ function getCombatCSS() {
     .type-calc-type-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem; justify-content: center; }
     .type-calc-badge { padding: 0.2rem 0.75rem; border-radius: 12px; font-size: 0.88rem; font-weight: 700; }
     .type-eff-section { margin-bottom: 0.55rem; }
-    .type-eff-label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; }
+    .type-eff-label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; text-align: center; }
     .weak-label { color: #ff7777; }
     .resist-label { color: #88aaff; }
     .immune-label { color: #aaaaaa; }
     .neutral-label { color: #cccccc; }
-    .type-buttons-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .type-buttons-row { display: flex; flex-wrap: wrap; gap: 0.3rem; justify-content: center; }
     .combat-type-button { padding: 0.22rem 0.6rem; border-radius: 10px; border: 2px solid transparent; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: transform 0.1s, border-color 0.15s, box-shadow 0.15s; }
     .combat-type-button:hover { transform: scale(1.06); }
     .combat-type-button.selected { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.55); transform: scale(1.1); }
@@ -1525,6 +1529,9 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   document.getElementById('cMoveVP').textContent = move[4] || '0';
   document.getElementById('cMoveDuration').textContent = move[5] || '—';
   document.getElementById('cMoveRange').textContent = move[6] || '—';
+  document.getElementById('cMoveSize').textContent = c.size || '—';
+  const critModEl = document.getElementById('cMoveCritMod');
+  if (critModEl) critModEl.textContent = c.critMod > 0 ? `+${c.critMod}` : c.critMod < 0 ? `${c.critMod}` : '0';
   document.getElementById('cMoveDescription').textContent = move[7] || '';
   const higherEl = document.getElementById('cMoveHigher');
   if (higherEl) higherEl.textContent = move[8] ? `Higher Levels: ${move[8]}` : '';

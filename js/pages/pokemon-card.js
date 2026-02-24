@@ -3,9 +3,23 @@
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
+import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData, SPECIALIZATION_TO_TYPE } from '../utils/pokemon-types.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
+
+// Module-level move cache — parsed once, avoids repeated sessionStorage parses and enables Map lookups
+let _moves = null;
+let _moveMap = null; // Map<name, moveData> for O(1) lookups
+
+// Module-level parsed data — set in renderPokemonCard, read in attachPokemonCardListeners / showMoveDetails
+let _pokemonAbilities = null;
+let _pokemonFeats = null;
+let _heldItems = null;
+let _typeEffectiveness = null;
+let _pokemonData = null;
+let _trainerData = null;
+
 
 export function renderPokemonCard(pokemonName) {
   // Load Pokemon data from session storage
@@ -92,28 +106,6 @@ export function renderPokemonCard(pokemonName) {
     "Steel", "Fire", "Water", "Grass", "Electric", "Psychic", "Ice", "Dragon", "Dark", "Fairy"
   ];
 
-  // Mapping from specialization names to Pokemon types
-  const specializationToType = {
-    'Bird Keeper': 'Flying',
-    'Bug Maniac': 'Bug',
-    'Camper': 'Ground',
-    'Dragon Tamer': 'Dragon',
-    'Engineer': 'Electric',
-    'Pyromaniac': 'Fire',
-    'Gardener': 'Grass',
-    'Martial Artist': 'Fighting',
-    'Mountaineer': 'Rock',
-    'Mystic': 'Ghost',
-    'Steel Worker': 'Steel',
-    'Psychic': 'Psychic',
-    'Swimmer': 'Water',
-    'Charmer': 'Fairy',
-    'Shadow': 'Dark',
-    'Alchemist': 'Poison',
-    'Team Player': 'Normal',
-    'Ice Skater': 'Ice'
-  };
-
   // Type Master Level 9: Resistance shift for first specialization type
   const trainerPath = trainerData[25] || '';
   const trainerLevel = parseInt(trainerData[2]) || 1;
@@ -123,7 +115,7 @@ export function renderPokemonCard(pokemonName) {
     const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
     if (specializations.length > 0) {
       const firstSpecialization = specializations[0];
-      const firstSpecType = specializationToType[firstSpecialization];
+      const firstSpecType = SPECIALIZATION_TO_TYPE[firstSpecialization];
 
       if (firstSpecType) {
         const typeIndex = typeNames.indexOf(firstSpecType);
@@ -2839,11 +2831,11 @@ export function renderPokemonCard(pokemonName) {
     </div>
   `;
 
-  // Store parsed abilities, feats, held items, and type effectiveness data for event listener use
-  window.pokemonAbilities = parsedAbilities;
-  window.pokemonFeats = parsedFeats;
-  window.heldItems = heldItems;
-  window.typeEffectiveness = { weaknesses, resistances, immunities };
+  // Store parsed data in module-level variables for event listener use (avoids window globals)
+  _pokemonAbilities = parsedAbilities;
+  _pokemonFeats = parsedFeats;
+  _heldItems = heldItems;
+  _typeEffectiveness = { weaknesses, resistances, immunities };
 
   return html;
 }
@@ -2852,6 +2844,9 @@ export function attachPokemonCardListeners() {
   const pokemonName = sessionStorage.getItem('selectedPokemonName');
   const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+  // Cache for showMoveDetails to use without re-parsing sessionStorage
+  _pokemonData = pokemonData;
+  _trainerData = trainerData;
 
   // Global damage multiplier for type effectiveness
   let damageMultiplier = 1;
@@ -3966,8 +3961,8 @@ export function attachPokemonCardListeners() {
   document.querySelectorAll('.ability-button').forEach(button => {
     button.addEventListener('click', (e) => {
       const index = parseInt(e.target.dataset.abilityIndex);
-      if (window.pokemonAbilities && window.pokemonAbilities[index]) {
-        const ability = window.pokemonAbilities[index];
+      if (_pokemonAbilities && _pokemonAbilities[index]) {
+        const ability = _pokemonAbilities[index];
         document.getElementById('abilityPopupTitle').textContent = ability.name;
         document.getElementById('abilityPopupContent').textContent = ability.description;
         const abilityPopup = document.getElementById('abilityPopup');
@@ -3992,8 +3987,8 @@ export function attachPokemonCardListeners() {
   document.querySelectorAll('.feat-button').forEach(button => {
     button.addEventListener('click', (e) => {
       const index = parseInt(e.target.dataset.featIndex);
-      if (window.pokemonFeats && window.pokemonFeats[index]) {
-        const feat = window.pokemonFeats[index];
+      if (_pokemonFeats && _pokemonFeats[index]) {
+        const feat = _pokemonFeats[index];
         document.getElementById('featPopupTitle').textContent = feat.name;
         document.getElementById('featPopupContent').textContent = feat.description;
         const featPopup = document.getElementById('featPopup');
@@ -4021,8 +4016,8 @@ export function attachPokemonCardListeners() {
       const heldItemPopup = document.getElementById('heldItemPopup');
       const heldItemContent = document.getElementById('heldItemContent');
 
-      // Get the specific item from the window.heldItems array
-      const itemName = window.heldItems && window.heldItems[itemIndex];
+      // Get the specific item from the _heldItems array
+      const itemName = _heldItems && _heldItems[itemIndex];
 
       if (itemName) {
         // Look up item details from sessionStorage
@@ -4163,8 +4158,8 @@ export function attachPokemonCardListeners() {
   });
 
   // Initialize type effectiveness buttons
-  if (window.typeEffectiveness) {
-    const { weaknesses, resistances, immunities } = window.typeEffectiveness;
+  if (_typeEffectiveness) {
+    const { weaknesses, resistances, immunities } = _typeEffectiveness;
 
     // Create weakness buttons
     if (weaknesses.length > 0) {
@@ -4497,128 +4492,43 @@ export function attachPokemonCardListeners() {
   loadMoveColorsAndListeners();
 }
 
-// Helper function to get Pokemon type color
-function getMoveTypeColor(moveType) {
-  const colors = {
-    "Normal": "#A8A878",
-    "Fighting": "#e68c2e",
-    "Flying": "#A890F0",
-    "Poison": "#A040A0",
-    "Ground": "#A67C52",
-    "Rock": "#a85d16",
-    "Bug": "#A8B820",
-    "Ghost": "#705898",
-    "Steel": "#bdbdbd",
-    "Fire": "#f02e07",
-    "Water": "#1E90FF",
-    "Grass": "#32CD32",
-    "Electric": "#FFD700",
-    "Psychic": "#F85888",
-    "Ice": "#58c8ed",
-    "Dragon": "#280dd4",
-    "Dark": "#282729",
-    "Fairy": "#ed919f",
-    "Cosmic": "#120077"
-  };
 
-  return colors[moveType] || "#ffffff";
-}
-
-// Helper function to determine text color based on background
-function getTextColorForBackground(bgColor) {
-  // Convert hex to RGB
-  const hex = bgColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-
-  // Calculate luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-  // Return black for light backgrounds, white for dark
-  return luminance > 0.5 ? '#000000' : '#ffffff';
-}
-
-// Load moves data and apply colors and click listeners
+// Load moves data (once) and apply colors and click listeners
 function loadMoveColorsAndListeners() {
-  const rawMovesData = sessionStorage.getItem('moves');
-  if (!rawMovesData) return;
-
-  try {
-    const cleanMovesData = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
-    window.allMoves = cleanMovesData.map(move => {
-      return move.map(item => item.trim());
-    });
-
-    // Apply colors to move items
-    const moveItems = document.querySelectorAll('.move-item');
-    moveItems.forEach(moveItem => {
-      const moveName = moveItem.dataset.move;
-      const move = window.allMoves.find(m => m[0] === moveName);
-
-      if (move) {
-        const bgColor = getMoveTypeColor(move[1]);
-        const textColor = getTextColorForBackground(bgColor);
-        moveItem.style.backgroundColor = bgColor;
-        moveItem.style.color = textColor;
-
-        // Add click listener
-        moveItem.addEventListener('click', () => showMoveDetails(moveName));
-      }
-    });
-  } catch (e) {
-    console.error('Failed to parse moves data:', e);
-  }
-}
-
-// Parse damage dice from move description, applying Higher Levels scaling
-function parseDamageDice(description, higherLevels, pokemonLevel) {
-  // Check if the move deals damage
-  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit/i;
-  if (!damagePatterns.test(description)) {
-    return null; // Non-damaging move
-  }
-
-  // Extract base damage dice from description (e.g., "1d4", "2d8")
-  const diceMatch = description.match(/(\d+d\d+)/i);
-  if (!diceMatch) {
-    return null;
-  }
-  let baseDice = diceMatch[1];
-
-  // Check Higher Levels for scaling
-  if (higherLevels && pokemonLevel > 1) {
-    // Match patterns like "2d8 at level 5", "4d6 at level 10"
-    const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
-    let match;
-    let bestDice = null;
-    let bestLevel = 0;
-
-    while ((match = tierRegex.exec(higherLevels)) !== null) {
-      const tierLevel = parseInt(match[2]);
-      if (pokemonLevel >= tierLevel && tierLevel > bestLevel) {
-        bestLevel = tierLevel;
-        bestDice = match[1];
-      }
-    }
-
-    if (bestDice) {
-      baseDice = bestDice;
+  if (!_moves) {
+    const rawMovesData = sessionStorage.getItem('moves');
+    if (!rawMovesData) return;
+    try {
+      const clean = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
+      _moves = clean.map(move => move.map(item => (typeof item === 'string' ? item.trim() : item)));
+      _moveMap = new Map(_moves.map(m => [m[0], m]));
+    } catch (e) {
+      console.error('Failed to parse moves data:', e);
+      return;
     }
   }
 
-  return baseDice;
+  // Apply colors to move items (must run every render since DOM elements are new)
+  document.querySelectorAll('.move-item').forEach(moveItem => {
+    const moveName = moveItem.dataset.move;
+    const move = _moveMap.get(moveName);
+    if (move) {
+      const bgColor = getMoveTypeColor(move[1]);
+      moveItem.style.backgroundColor = bgColor;
+      moveItem.style.color = getTextColorForBackground(bgColor);
+      moveItem.addEventListener('click', () => showMoveDetails(moveName));
+    }
+  });
 }
 
 // Show move details popup
 function showMoveDetails(moveName) {
-  const move = window.allMoves.find(m => m[0] === moveName);
+  const move = _moveMap?.get(moveName);
 
   if (move) {
-    // Get Pokemon and trainer data from sessionStorage
-    const pokemonName = sessionStorage.getItem('selectedPokemonName');
-    const pokemonData = JSON.parse(sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`));
-    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    // Use module-level cached data set in attachPokemonCardListeners — avoids re-parsing sessionStorage per click
+    const pokemonData = _pokemonData;
+    const trainerData = _trainerData;
 
     // Extract needed data (convert to numbers to avoid string concatenation)
     const type1 = pokemonData[5] || '';
@@ -4634,77 +4544,14 @@ function showMoveDetails(moveName) {
     const heldItemsStr = pokemonData[35] || '';
     const heldItems = heldItemsStr ? heldItemsStr.split(',').map(item => item.trim()).filter(item => item) : [];
 
-    // Get Pokemon types for STAB calculation
+    // Get Pokemon types and trainer info for move computation
     const pokemonTypes = [type1, type2].filter(t => t);
-    const moveType = move[1];
-    let hasSTAB = pokemonTypes.includes(moveType);
-
-    // Type Master setup
+    const pokemonLevel = parseInt(pokemonData[4]) || 1;
     const trainerPath = trainerData[25] || '';
     const trainerLevel = parseInt(trainerData[2]) || 1;
     const specializationsStr = trainerData[24] || '';
 
-    // Mapping from specialization names to Pokemon types
-    const specializationToType = {
-      'Bird Keeper': 'Flying',
-      'Bug Maniac': 'Bug',
-      'Camper': 'Ground',
-      'Dragon Tamer': 'Dragon',
-      'Engineer': 'Electric',
-      'Pyromaniac': 'Fire',
-      'Gardener': 'Grass',
-      'Martial Artist': 'Fighting',
-      'Mountaineer': 'Rock',
-      'Mystic': 'Ghost',
-      'Steel Worker': 'Steel',
-      'Psychic': 'Psychic',
-      'Swimmer': 'Water',
-      'Charmer': 'Fairy',
-      'Shadow': 'Dark',
-      'Alchemist': 'Poison',
-      'Team Player': 'Normal',
-      'Ice Skater': 'Ice'
-    };
-
-    // Type Master Level 15: Universal STAB for Pokemon matching specialization types
-    if (!hasSTAB && trainerPath === 'Type Master' && trainerLevel >= 15 && specializationsStr) {
-      const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
-      const specializationTypes = specializations.map(spec => specializationToType[spec]).filter(t => t);
-
-      // Check if Pokemon has any type matching a specialization
-      const pokemonMatchesSpecialization = pokemonTypes.some(pokemonType =>
-        specializationTypes.includes(pokemonType)
-      );
-
-      // Grant STAB on all moves if Pokemon type matches specialization
-      if (pokemonMatchesSpecialization) {
-        hasSTAB = true;
-      }
-    }
-
-    // Type Master Level 3: +1 damage per Pokemon type matching specialization (only if move type also matches)
-    let typeMasterDamageBonus = 0;
-    if (trainerPath === 'Type Master' && trainerLevel >= 3 && specializationsStr) {
-      const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
-
-      // Convert specialization names to Pokemon types
-      const specializationTypes = specializations.map(spec => specializationToType[spec]).filter(t => t);
-
-      // Check if move type matches a specialization
-      const moveMatchesSpecialization = specializationTypes.includes(moveType);
-
-      // Only apply bonus if the move type matches specialization
-      if (moveMatchesSpecialization) {
-        // Count how many Pokemon types match specializations
-        pokemonTypes.forEach(pokemonType => {
-          if (specializationTypes.includes(pokemonType)) {
-            typeMasterDamageBonus++;
-          }
-        });
-      }
-    }
-
-    // Get stat modifiers
+    // Stat mods (also used by trainer path sections below)
     const strMod = Math.floor((str - 10) / 2);
     const dexMod = Math.floor((dex - 10) / 2);
     const conMod = Math.floor((con - 10) / 2);
@@ -4712,94 +4559,15 @@ function showMoveDetails(moveName) {
     const wisMod = Math.floor((wis - 10) / 2);
     const chaMod = Math.floor((cha - 10) / 2);
 
-    // Parse move modifiers (e.g., "STR/DEX")
-    const moveModifiers = move[2].split('/').map(m => m.trim().toUpperCase());
-    const modifierValues = {
-      'STR': strMod,
-      'DEX': dexMod,
-      'CON': conMod,
-      'INT': intMod,
-      'WIS': wisMod,
-      'CHA': chaMod
-    };
-
-    // Get highest stat modifier from move's allowed modifiers
-    const allowedModifiers = moveModifiers
-      .map(mod => modifierValues[mod])
-      .filter(val => val !== undefined);
-    const highestMod = allowedModifiers.length > 0 ? Math.max(...allowedModifiers) : 0;
-
-    // Find which stat is being used (for display purposes)
-    const usedStat = moveModifiers.find(mod => modifierValues[mod] === highestMod) || '';
-
-    // Check for Ace Trainer bonus (Level 3+: +1 to attack and damage)
-    const aceTrainerBonus = (trainerPath === 'Ace Trainer' && trainerLevel >= 3) ? 1 : 0;
-
-    // Type Master Level 5: +2 to all attack rolls if Pokemon type matches specialization
-    let typeMasterAttackBonus = 0;
-    if (trainerPath === 'Type Master' && trainerLevel >= 5 && specializationsStr) {
-      const specializations = specializationsStr.split(',').map(s => s.trim()).filter(s => s);
-
-      // Convert specialization names to Pokemon types
-      const specializationTypes = specializations.map(spec => specializationToType[spec]).filter(t => t);
-
-      // Check if Pokemon has a type matching a specialization
-      const pokemonHasSpecializationType = pokemonTypes.some(pokemonType =>
-        specializationTypes.includes(pokemonType)
-      );
-
-      // Apply bonus if Pokemon type matches specialization
-      if (pokemonHasSpecializationType) {
-        typeMasterAttackBonus = 2;
-      }
-    }
-
-    // Calculate Attack Roll bonus
-    const proficiencyBonus = hasSTAB ? proficiency : 0;
-    const attackRollBonus = proficiencyBonus + highestMod + aceTrainerBonus + typeMasterAttackBonus;
-
-    // Calculate Damage Roll bonus
-    // Only include stat modifier if move description contains "+ MOVE" or "+MOVE"
-    const moveDescription = move[7] || '';
-    const includeStatModInDamage = /\+\s*MOVE/i.test(moveDescription);
-    const damageStatMod = includeStatModInDamage ? highestMod : 0;
-    const stabBonus = hasSTAB ? stabBonusValue : 0;
-    const damageRollBonus = stabBonus + damageStatMod + aceTrainerBonus + typeMasterDamageBonus;
-
-    // Create breakdown text
-    const attackBreakdownParts = [];
-    if (proficiencyBonus > 0) {
-      attackBreakdownParts.push(`Proficiency +${proficiencyBonus}`);
-    }
-    if (highestMod !== 0) {
-      attackBreakdownParts.push(`${usedStat} ${highestMod >= 0 ? '+' : ''}${highestMod}`);
-    }
-    if (aceTrainerBonus > 0) {
-      attackBreakdownParts.push(`Ace Trainer +${aceTrainerBonus}`);
-    }
-    if (typeMasterAttackBonus > 0) {
-      attackBreakdownParts.push(`Type Master +${typeMasterAttackBonus}`);
-    }
-    const attackBreakdown = attackBreakdownParts.length > 0 ? `(${attackBreakdownParts.join(', ')})` : '';
-
-    // Parse damage dice for display
-    const pokemonLevel = parseInt(pokemonData[4]) || 1;
-    const damageDice = parseDamageDice(moveDescription, move[8] || '', pokemonLevel);
-
-    const damageBreakdownParts = [];
-    if (stabBonus > 0) {
-      damageBreakdownParts.push(`STAB +${stabBonus}`);
-    }
-    if (includeStatModInDamage && highestMod !== 0) {
-      damageBreakdownParts.push(`${usedStat} ${highestMod >= 0 ? '+' : ''}${highestMod}`);
-    }
-    if (aceTrainerBonus > 0) {
-      damageBreakdownParts.push(`Ace Trainer +${aceTrainerBonus}`);
-    }
-    if (typeMasterDamageBonus > 0) {
-      damageBreakdownParts.push(`Type Master +${typeMasterDamageBonus}`);
-    }
-    const damageBreakdown = damageBreakdownParts.length > 0 ? `(${damageBreakdownParts.join(', ')})` : '';
+    // Compute attack/damage bonuses via shared utility
+    const {
+      attackBonus: attackRollBonus, damageBonus: damageRollBonus,
+      attackBreakdown, damageBreakdown, damageDice,
+    } = computeMoveData(
+      move,
+      { types: pokemonTypes, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level: pokemonLevel },
+      { path: trainerPath, level: trainerLevel, specializationsStr }
+    );
 
     // Get held items info
     const heldItemsInfo = heldItems.length > 0

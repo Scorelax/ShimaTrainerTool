@@ -2,52 +2,20 @@
 
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showToast } from '../utils/notifications.js';
+import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData } from '../utils/pokemon-types.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
 
-// ============================================================================
-// MOVE TYPE HELPERS
-// ============================================================================
+// Module-level move cache — parsed once, reused everywhere
+let _moves = null;
+let _moveMap = null; // Map<name, moveData> for O(1) lookups
 
-function getMoveTypeColor(moveType) {
-  const colors = {
-    "Normal": "#A8A878", "Fighting": "#e68c2e", "Flying": "#A890F0",
-    "Poison": "#A040A0", "Ground": "#A67C52", "Rock": "#a85d16",
-    "Bug": "#A8B820", "Ghost": "#705898", "Steel": "#bdbdbd",
-    "Fire": "#f02e07", "Water": "#1E90FF", "Grass": "#32CD32",
-    "Electric": "#FFD700", "Psychic": "#F85888", "Ice": "#58c8ed",
-    "Dragon": "#280dd4", "Dark": "#282729", "Fairy": "#ed919f",
-    "Cosmic": "#120077"
-  };
-  return colors[moveType] || "#ffffff";
-}
-
-function getTextColorForBackground(bgColor) {
-  const hex = bgColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#000000' : '#ffffff';
-}
-
-function parseDamageDice(description, higherLevels, pokemonLevel) {
-  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit/i;
-  if (!damagePatterns.test(description)) return null;
-  const diceMatch = description.match(/(\d+d\d+)/i);
-  if (!diceMatch) return null;
-  let baseDice = diceMatch[1];
-  if (higherLevels && pokemonLevel > 1) {
-    const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
-    let match, bestDice = null, bestLevel = 0;
-    while ((match = tierRegex.exec(higherLevels)) !== null) {
-      const tierLevel = parseInt(match[2]);
-      if (pokemonLevel >= tierLevel && tierLevel > bestLevel) { bestLevel = tierLevel; bestDice = match[1]; }
-    }
-    if (bestDice) baseDice = bestDice;
-  }
-  return baseDice;
+// Module-level items DB cache — held items don't change during combat, so parse once
+let _itemsCache = null;
+function getCachedItems() {
+  if (!_itemsCache) _itemsCache = JSON.parse(sessionStorage.getItem('items') || '[]');
+  return _itemsCache;
 }
 
 // ============================================================================
@@ -71,12 +39,13 @@ function formatMod(val) {
 // ============================================================================
 
 function loadCombatMoves() {
-  if (window.allMoves) return;
+  if (_moves) return;
   const rawMovesData = sessionStorage.getItem('moves');
   if (!rawMovesData) return;
   try {
     const clean = JSON.parse(rawMovesData.replace(/\\"/g, '"').replace(/\\r/g, '').replace(/\\n/g, ''));
-    window.allMoves = clean.map(move => move.map(item => (typeof item === 'string' ? item.trim() : item)));
+    _moves = clean.map(move => move.map(item => (typeof item === 'string' ? item.trim() : item)));
+    _moveMap = new Map(_moves.map(m => [m[0], m]));
   } catch (e) {
     console.error('Failed to parse moves data:', e);
   }
@@ -144,13 +113,13 @@ function buildKnownMovesString(rechargeStates) {
  * Called at the start of the battle phase.
  */
 function initializeRechargeStates(state) {
-  if (!window.allMoves) return;
+  if (!_moves) return;
   state.combatants.forEach(c => {
     if (c.type !== 'pokemon') return;
     if (!c.rechargeStates) c.rechargeStates = {};
     c.moves.forEach(moveName => {
       if (c.rechargeStates[moveName] !== undefined) return;
-      const moveData = window.allMoves.find(m => m[0] === moveName);
+      const moveData = _moveMap.get(moveName);
       if (!moveData) return;
       const recharge = parseRecharge(moveData[3] || '');
       if (!recharge) return;
@@ -190,13 +159,11 @@ function buildTrainerCombatant() {
   const ac = parseInt(trainerData[36]) || parseInt(trainerData[13]) || 10;
   const baseAc = parseInt(trainerData[13]) || 10;
 
-  const trainerAlertBonus = (trainerData[33] || '').split(',').some(f => f.trim() === 'Alert') ? 5 : 0;
-
   return {
     id: 'trainer', type: 'trainer', entityKey: 'trainerData',
     name: trainerData[1] || 'Trainer',
     image: trainerData[0] || 'assets/Pokeball.png',
-    level, initiativeScore: dexMod + trainerAlertBonus, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: dexMod + trainerAlertBonus,
+    level, initiativeScore: dexMod, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: dexMod,
     ac, baseAc, critMod: 0, maxHp, currentHp, maxVp, currentVp,
     proficiency: computeProficiency(level),
     str, dex, con, int: int_, wis, cha,
@@ -253,9 +220,9 @@ function buildPokemonCombatant(pokemonKey) {
   // Initialize recharge states (using existing KnownMoves from pokemonData[59] if present)
   const existingRecharges = parseKnownMoves(pokemonData[59] || '');
   const rechargeStates = {};
-  if (window.allMoves) {
+  if (_moves) {
     moves.forEach(moveName => {
-      const moveData = window.allMoves.find(m => m[0] === moveName);
+      const moveData = _moveMap.get(moveName);
       if (!moveData) return;
       const recharge = parseRecharge(moveData[3] || '');
       if (!recharge) return;
@@ -270,13 +237,11 @@ function buildPokemonCombatant(pokemonKey) {
     });
   }
 
-  const pokemonAlertBonus = (pokemonData[50] || '').split(',').some(f => f.trim() === 'Alert') ? 5 : 0;
-
   return {
     id: pokemonKey, type: 'pokemon', entityKey: pokemonKey,
     name: pokemonData[36] || pokemonData[2] || 'Pokemon',
     image: pokemonData[1] || 'assets/Pokeball.png',
-    level, initiativeScore: initiative + pokemonAlertBonus, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: initiative + pokemonAlertBonus,
+    level, initiativeScore: initiative, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: initiative,
     ac: parseInt(pokemonData[8]) || 10, baseAc: parseInt(pokemonData[8]) || 10, critMod: 0,
     maxHp, currentHp, maxVp, currentVp,
     proficiency, stabBonusValue: parseInt(pokemonData[34]) || 2,
@@ -354,7 +319,7 @@ function renderSetupPhase() {
 
   return `
     <div class="combat-page">
-      <style>${getCombatCSS()}</style>
+      <style>${COMBAT_CSS}</style>
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Back</button>
         <div class="combat-header-title">⚔️ Combat Setup</div>
@@ -399,7 +364,7 @@ function renderInitiativePhase(state) {
 
   return `
     <div class="combat-page">
-      <style>${getCombatCSS()}</style>
+      <style>${COMBAT_CSS}</style>
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Setup</button>
         <div class="combat-header-title">⚔️ Initiative</div>
@@ -420,7 +385,7 @@ function renderBattlePhase(state) {
   const cards = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex)).join('');
   return `
     <div class="combat-page">
-      <style>${getCombatCSS()}</style>
+      <style>${COMBAT_CSS}</style>
       <div class="combat-header-bar">
         <div class="combat-round-label">Round ${state.round}</div>
         <div class="combat-header-title">⚔️ Battle</div>
@@ -458,6 +423,10 @@ function renderBattlePhase(state) {
                 <div id="cDamageBreakdown" class="combat-roll-breakdown"></div>
               </div>
             </div>
+            <div class="combat-move-held-items" id="cHeldItems" style="display:none;"></div>
+            <div id="cBattleDiceContainer"></div>
+            <div id="cTacticianContainer"></div>
+            <div id="cCommanderContainer"></div>
             <button id="useCombatMoveBtn" class="combat-use-move-btn">Use Move</button>
           </div>
         </div>
@@ -571,9 +540,12 @@ function renderCombatCard(c, isActive) {
 
   const typeBadges = c.types.map(t => `<span class="type-badge type-${t.toLowerCase()}">${t}</span>`).join('');
 
+  const KNOWN_STATUSES = ['Poison','Burn','Confusion','Paralysis','Sleep','Freeze'];
   const statusBadges = c.statusEffects.map(se => {
     const dur = se.duration === -1 ? '' : ` (${se.duration})`;
-    return `<span class="status-badge status-${se.name.toLowerCase()}" data-combatant-id="${c.id}" data-effect="${se.name}">${se.name}${dur}</span>`;
+    const cls = KNOWN_STATUSES.includes(se.name) ? `status-${se.name.toLowerCase()}` : 'status-custom';
+    const titleAttr = se.description ? ` title="${se.description.replace(/"/g, '&quot;')}"` : '';
+    return `<span class="status-badge ${cls}"${titleAttr} data-combatant-id="${c.id}" data-effect="${se.name}">${se.name}${dur}</span>`;
   }).join('');
 
   const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges) : '';
@@ -632,8 +604,7 @@ function renderAbilitiesForCombat(raw) {
 
 function renderItemForCombat(itemName) {
   if (!itemName) return '';
-  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
-  const dbItem = items.find(it => it.name === itemName);
+  const dbItem = getCachedItems().find(it => it.name === itemName);
   const desc = dbItem ? (dbItem.effect || dbItem.description || '') : '';
   return `<strong>${itemName}</strong>${desc ? `<span class="item-desc">: ${desc}</span>` : ''}`;
 }
@@ -686,22 +657,24 @@ function renderExpandedSection(c, statusBadges) {
       <div class="expanded-section-label">Adjust Stats</div>
       <div class="hpvp-hpvp-wrapper">
         <div class="hpvp-hpvp-left">
-          <div class="hpvp-adjust-row">
-            <span class="hpvp-stat-label">HP</span>
-            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="-1">−</button>
-            <input type="number" class="hpvp-input" value="${c.currentHp}" min="0" max="${c.maxHp}" data-combatant-id="${c.id}" data-stat="hp">
-            <span class="hpvp-max">/ ${c.maxHp}</span>
-            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="1">+</button>
+          <div class="hpvp-hpvp-rows">
+            <div class="hpvp-adjust-row">
+              <span class="hpvp-stat-label">HP</span>
+              <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="-1">−</button>
+              <input type="number" class="hpvp-input" value="${c.currentHp}" min="0" max="${c.maxHp}" data-combatant-id="${c.id}" data-stat="hp">
+              <span class="hpvp-max">/ ${c.maxHp}</span>
+              <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="1">+</button>
+            </div>
+            <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
+              <span class="hpvp-stat-label">VP</span>
+              <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="-1">−</button>
+              <input type="number" class="hpvp-input" value="${c.currentVp}" min="0" max="${c.maxVp}" data-combatant-id="${c.id}" data-stat="vp">
+              <span class="hpvp-max">/ ${c.maxVp}</span>
+              <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="1">+</button>
+            </div>
           </div>
-          <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
-            <span class="hpvp-stat-label">VP</span>
-            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="-1">−</button>
-            <input type="number" class="hpvp-input" value="${c.currentVp}" min="0" max="${c.maxVp}" data-combatant-id="${c.id}" data-stat="vp">
-            <span class="hpvp-max">/ ${c.maxVp}</span>
-            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="1">+</button>
-          </div>
+          ${typeCalcBtn}
         </div>
-        ${typeCalcBtn}
         <div class="hpvp-hpvp-right">
           <div class="hpvp-adjust-row">
             <span class="hpvp-stat-label">AC</span>
@@ -747,7 +720,16 @@ function renderExpandedSection(c, statusBadges) {
   const statusSection = `
     <div class="expanded-status-section">
       <div class="expanded-section-label">Status Effects</div>
-      <div class="add-status-btns">${addStatusBtns}</div>
+      <div class="add-status-btns">
+        ${addStatusBtns}
+        <button class="add-status-btn combat-custom-status-btn" data-combatant-id="${c.id}">+ Custom…</button>
+      </div>
+      <div class="custom-status-form" id="customStatusForm_${c.id}" style="display:none;">
+        <input type="text" class="custom-status-name-input" placeholder="Condition name…" maxlength="40">
+        <input type="text" class="custom-status-effect-input" placeholder="Effect description (optional)…" maxlength="140">
+        <button class="add-status-btn" data-combatant-id="${c.id}" data-action="addCustomStatus">Add</button>
+        <button class="add-status-btn" data-combatant-id="${c.id}" data-action="cancelCustomStatus">Cancel</button>
+      </div>
       ${statusBadges ? `<div class="status-remove-hint">Tap a badge to remove it</div>` : ''}
     </div>`;
 
@@ -951,6 +933,10 @@ function getCombatCSS() {
     /* Status */
     .add-status-btns { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.3rem; }
     .add-status-btn { padding: 0.22rem 0.55rem; font-size: 0.75rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e0e0e0; border-radius: 12px; cursor: pointer; }
+    .custom-status-form { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-bottom: 0.4rem; }
+    .custom-status-name-input { width: 110px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; padding: 0.22rem 0.5rem; font-size: 0.75rem; }
+    .custom-status-effect-input { flex: 1; min-width: 130px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; padding: 0.22rem 0.5rem; font-size: 0.75rem; }
+    .status-custom { background: rgba(150,100,220,0.3); color: #d4aaff; border: 1px solid rgba(180,130,255,0.5); }
     .status-remove-hint { font-size: 0.68rem; color: #888; }
 
     /* Moves */
@@ -977,6 +963,15 @@ function getCombatCSS() {
     .combat-roll-bonus { font-size: 1.15em; font-weight: bold; }
     .combat-roll-breakdown { font-size: 0.75em; opacity: 0.8; margin-top: 0.2rem; }
     .combat-use-move-btn { width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    .combat-move-held-items { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 0.7rem; font-size: 0.88rem; line-height: 1.5; margin-bottom: 0.6rem; }
+    .battle-dice-container, .tactician-container, .commander-container { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 0.7rem; margin-bottom: 0.6rem; font-size: 0.88rem; }
+    .tactician-ability, .commander-ability { padding: 0.35rem 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 0.3rem; }
+    .use-battle-dice-button, .use-tactician-button, .use-commander-button { padding: 0.3rem 0.7rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 700; }
+    .use-battle-dice-button:disabled, .use-tactician-button:disabled, .use-commander-button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .tactician-input { width: 50px; padding: 0.2rem 0.4rem; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; color: inherit; font-size: 0.88rem; text-align: center; }
+    .tp-dot, .commander-dot { width: clamp(10px,2vw,14px); height: clamp(10px,2vw,14px); border-radius: 50%; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+    .tp-dot.filled, .commander-dot.filled { background: linear-gradient(135deg,#4CAF50,#45A049); border: 2px solid #FFDE00; box-shadow: 0 0 8px rgba(76,175,80,0.6); }
+    .tp-dot.empty, .commander-dot.empty { background: rgba(100,100,100,0.4); border: 2px solid rgba(150,150,150,0.5); }
 
     /* FEATS */
     .expanded-feats-section { padding: 0.5rem 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -1058,10 +1053,11 @@ function getCombatCSS() {
     .type-cosmic{background:#120077;color:#fff}
 
     /* TYPE CALCULATOR */
-    .hpvp-hpvp-wrapper { display: flex; align-items: stretch; gap: 0.2rem; }
-    .hpvp-hpvp-left { flex: 1; min-width: 0; }
+    .hpvp-hpvp-wrapper { display: flex; align-items: stretch; gap: 0.4rem; }
+    .hpvp-hpvp-left { flex: 1; min-width: 0; display: flex; flex-direction: row; align-items: stretch; gap: 0.2rem; }
+    .hpvp-hpvp-rows { flex: 1; min-width: 0; display: flex; flex-direction: column; }
     .hpvp-hpvp-right { flex: 1; min-width: 0; }
-    .combat-type-calc-btn { background: rgba(255,165,0,0.12); border: 1px solid rgba(255,165,0,0.5); border-radius: 8px; color: #FFA500; font-size: 0.74rem; font-weight: 700; padding: 0.3rem 0.6rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.4; min-width: 72px; }
+    .combat-type-calc-btn { background: rgba(255,165,0,0.12); border: 1px solid rgba(255,165,0,0.5); border-radius: 8px; color: #FFA500; font-size: 0.74rem; font-weight: 700; padding: 0.3rem 0.6rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.4; min-width: 72px; align-self: stretch; }
     .combat-type-calc-btn:hover { background: rgba(255,165,0,0.28); }
     /* COMBAT TRACKER (inside type calc popup) */
     .type-calc-divider { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 0.8rem 0 0.6rem; }
@@ -1103,6 +1099,9 @@ function getCombatCSS() {
     .combat-item-heal-preview { font-size: 0.82rem; color: #4CAF50; margin-bottom: 0.5rem; min-height: 1.2em; }
   `;
 }
+
+// Evaluated once at module load — avoids re-building and re-parsing the stylesheet on every phase transition
+const COMBAT_CSS = getCombatCSS();
 
 // ============================================================================
 // LISTENERS
@@ -1199,6 +1198,25 @@ function attachBattleListeners(state) {
       }
       if (e.target.closest('.stat-delta-btn')) {
         handleStatDelta(e.target.closest('.stat-delta-btn'), state); return;
+      }
+      if (e.target.closest('.combat-custom-status-btn')) {
+        const btn = e.target.closest('.combat-custom-status-btn');
+        const form = document.getElementById(`customStatusForm_${btn.dataset.combatantId}`);
+        if (form) form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+        return;
+      }
+      if (e.target.closest('[data-action="addCustomStatus"]')) {
+        const btn = e.target.closest('[data-action="addCustomStatus"]');
+        const form = document.getElementById(`customStatusForm_${btn.dataset.combatantId}`);
+        const name = form?.querySelector('.custom-status-name-input')?.value.trim();
+        if (!name) { showToast('Enter a condition name.', 'warning'); return; }
+        const desc = form?.querySelector('.custom-status-effect-input')?.value.trim() || '';
+        addStatusEffect(btn.dataset.combatantId, name, state, desc); return;
+      }
+      if (e.target.closest('[data-action="cancelCustomStatus"]')) {
+        const btn = e.target.closest('[data-action="cancelCustomStatus"]');
+        const form = document.getElementById(`customStatusForm_${btn.dataset.combatantId}`);
+        if (form) form.style.display = 'none'; return;
       }
       if (e.target.closest('.add-status-btn')) {
         const btn = e.target.closest('.add-status-btn');
@@ -1347,9 +1365,9 @@ function rollDiceRecharge(moveName, combatantId, state) {
 }
 
 function applyMoveColors() {
-  if (!window.allMoves) return;
+  if (!_moveMap) return;
   document.querySelectorAll('.combat-move-item:not(.move-locked)').forEach(item => {
-    const move = window.allMoves.find(m => m[0] === item.dataset.move);
+    const move = _moveMap.get(item.dataset.move);
     if (move) {
       const bg = getMoveTypeColor(move[1]);
       item.style.backgroundColor = bg;
@@ -1411,6 +1429,10 @@ function endTurnForCombatant(combatantId, state) {
       showToast(`${c.name}: Asleep! Roll to wake up.`, 'info');
     } else if (se.name === 'Freeze') {
       showToast(`${c.name}: Frozen! Roll to thaw.`, 'info');
+    } else {
+      // Custom condition — show name and effect (if any) as a reminder
+      const reminder = se.description ? ` — ${se.description}` : '';
+      showToast(`${c.name}: ${se.name}${reminder}`, 'info');
     }
     if (se.duration === -1) remaining.push(se);
     else if (se.duration - 1 > 0) remaining.push({ ...se, duration: se.duration - 1 });
@@ -1438,10 +1460,12 @@ function endTurnForCombatant(combatantId, state) {
   rerenderBattle(state);
 }
 
-function addStatusEffect(combatantId, effectName, state) {
+function addStatusEffect(combatantId, effectName, state, description = '') {
   const c = state.combatants.find(x => x.id === combatantId);
   if (!c || c.statusEffects.find(s => s.name === effectName)) return;
-  c.statusEffects.push({ name: effectName, duration: -1 });
+  const entry = { name: effectName, duration: -1 };
+  if (description) entry.description = description;
+  c.statusEffects.push(entry);
   saveCombatState(state);
   rerenderBattle(state);
 }
@@ -1459,8 +1483,8 @@ function removeStatusEffect(combatantId, effectName, state) {
 // ============================================================================
 
 function showCombatMoveDetails(moveName, combatantId, state) {
-  if (!window.allMoves) { showToast('Move data not loaded.', 'warning'); return; }
-  const move = window.allMoves.find(m => m[0] === moveName);
+  if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
+  const move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
 
   const c = state.combatants.find(x => x.id === combatantId);
@@ -1471,56 +1495,20 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   const trainerLevel = parseInt(trainerData[2]) || 1;
   const specializationsStr = trainerData[24] || '';
 
-  const moveType = move[1];
-  const pokemonTypes = c.types || [];
-  let hasSTAB = pokemonTypes.includes(moveType);
+  const { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice } = computeMoveData(
+    move,
+    {
+      types: c.types || [],
+      strMod: c.strMod, dexMod: c.dexMod, conMod: c.conMod,
+      intMod: c.intMod, wisMod: c.wisMod, chaMod: c.chaMod,
+      proficiency: c.proficiency,
+      stabBonusValue: c.stabBonusValue || 2,
+      level: c.level,
+    },
+    { path: trainerPath, level: trainerLevel, specializationsStr }
+  );
 
-  const specializationToType = {
-    'Bird Keeper':'Flying','Bug Maniac':'Bug','Camper':'Ground','Dragon Tamer':'Dragon','Engineer':'Electric',
-    'Pyromaniac':'Fire','Gardener':'Grass','Martial Artist':'Fighting','Mountaineer':'Rock','Mystic':'Ghost',
-    'Steel Worker':'Steel','Psychic':'Psychic','Swimmer':'Water','Charmer':'Fairy','Shadow':'Dark',
-    'Alchemist':'Poison','Team Player':'Normal','Ice Skater':'Ice'
-  };
-
-  if (!hasSTAB && trainerPath === 'Type Master' && trainerLevel >= 15 && specializationsStr) {
-    const specTypes = specializationsStr.split(',').map(s => specializationToType[s.trim()]).filter(Boolean);
-    if (pokemonTypes.some(pt => specTypes.includes(pt))) hasSTAB = true;
-  }
-
-  let typeMasterDamageBonus = 0, typeMasterAttackBonus = 0;
-  if (trainerPath === 'Type Master' && trainerLevel >= 3 && specializationsStr) {
-    const specTypes = specializationsStr.split(',').map(s => specializationToType[s.trim()]).filter(Boolean);
-    if (specTypes.includes(moveType)) pokemonTypes.forEach(pt => { if (specTypes.includes(pt)) typeMasterDamageBonus++; });
-    if (trainerLevel >= 5 && pokemonTypes.some(pt => specTypes.includes(pt))) typeMasterAttackBonus = 2;
-  }
-
-  const aceBonus = (trainerPath === 'Ace Trainer' && trainerLevel >= 3) ? 1 : 0;
-  const modMap = { STR: c.strMod, DEX: c.dexMod, CON: c.conMod, INT: c.intMod, WIS: c.wisMod, CHA: c.chaMod };
-  const moveModifiers = (move[2] || '').split('/').map(m => m.trim().toUpperCase());
-  const allowedMods = moveModifiers.map(m => modMap[m]).filter(v => v !== undefined);
-  const highestMod = allowedMods.length > 0 ? Math.max(...allowedMods) : 0;
-  const usedStat = moveModifiers.find(m => modMap[m] === highestMod) || '';
-
-  const profBonus = hasSTAB ? c.proficiency : 0;
-  const attackBonus = profBonus + highestMod + aceBonus + typeMasterAttackBonus;
-  const desc = move[7] || '';
-  const includeStatInDmg = /\+\s*MOVE/i.test(desc);
-  const stabBonus = hasSTAB ? (c.stabBonusValue || 2) : 0;
-  const damageBonus = stabBonus + (includeStatInDmg ? highestMod : 0) + aceBonus + typeMasterDamageBonus;
-
-  const atkParts = [];
-  if (profBonus > 0) atkParts.push(`Proficiency +${profBonus}`);
-  if (highestMod !== 0) atkParts.push(`${usedStat} ${formatMod(highestMod)}`);
-  if (aceBonus > 0) atkParts.push(`Ace Trainer +${aceBonus}`);
-  if (typeMasterAttackBonus > 0) atkParts.push(`Type Master +${typeMasterAttackBonus}`);
-
-  const dmgParts = [];
-  if (stabBonus > 0) dmgParts.push(`STAB +${stabBonus}`);
-  if (includeStatInDmg && highestMod !== 0) dmgParts.push(`${usedStat} ${formatMod(highestMod)}`);
-  if (aceBonus > 0) dmgParts.push(`Ace Trainer +${aceBonus}`);
-  if (typeMasterDamageBonus > 0) dmgParts.push(`Type Master +${typeMasterDamageBonus}`);
-
-  const bgColor = getMoveTypeColor(moveType);
+  const bgColor = getMoveTypeColor(move[1]);
   const textColor = getTextColorForBackground(bgColor);
 
   const header = document.getElementById('combatMovePopupHeader');
@@ -1537,18 +1525,40 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   document.getElementById('cMoveVP').textContent = move[4] || '0';
   document.getElementById('cMoveDuration').textContent = move[5] || '—';
   document.getElementById('cMoveRange').textContent = move[6] || '—';
-  document.getElementById('cMoveDescription').textContent = desc;
+  document.getElementById('cMoveDescription').textContent = move[7] || '';
   const higherEl = document.getElementById('cMoveHigher');
   if (higherEl) higherEl.textContent = move[8] ? `Higher Levels: ${move[8]}` : '';
-  const damageDice = parseDamageDice(desc, move[8] || '', c.level);
   document.getElementById('cAttackBonus').textContent = formatMod(attackBonus);
-  document.getElementById('cAttackBreakdown').textContent = atkParts.length ? `(${atkParts.join(', ')})` : '';
+  document.getElementById('cAttackBreakdown').textContent = attackBreakdown;
   if (damageDice) {
     document.getElementById('cDamageBonus').textContent = damageBonus > 0 ? `${damageDice} + ${damageBonus}` : damageDice;
   } else {
     document.getElementById('cDamageBonus').textContent = damageBonus > 0 ? formatMod(damageBonus) : '—';
   }
-  document.getElementById('cDamageBreakdown').textContent = dmgParts.length ? `(${dmgParts.join(', ')})` : '';
+  document.getElementById('cDamageBreakdown').textContent = damageBreakdown;
+
+  // Held items
+  const heldItemsEl = document.getElementById('cHeldItems');
+  if (heldItemsEl) {
+    const heldItemNames = (c.item || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (heldItemNames.length > 0) {
+      const items = getCachedItems();
+      heldItemsEl.innerHTML = '<strong>Held Items:</strong>' + heldItemNames.map(name => {
+        const dbItem = items.find(i => i.name === name);
+        return dbItem
+          ? `<div style="margin-top:0.3rem;"><strong>${dbItem.name}:</strong> ${dbItem.effect || dbItem.description || 'No description'}</div>`
+          : `<div style="margin-top:0.3rem;"><strong>${name}:</strong> No description available</div>`;
+      }).join('');
+      heldItemsEl.style.display = '';
+    } else {
+      heldItemsEl.style.display = 'none';
+    }
+  }
+
+  // Trainer path sections
+  _renderCombatBattleDice(trainerData, trainerPath);
+  _renderCombatTactician(trainerData, trainerPath, trainerLevel);
+  _renderCombatCommander(trainerData, trainerPath, trainerLevel);
 
   const vpCost = parseInt(move[4]) || 0;
   const useBtn = document.getElementById('useCombatMoveBtn');
@@ -1563,6 +1573,247 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   }
 
   document.getElementById('combatMovePopup').style.display = 'flex';
+}
+
+function _renderCombatBattleDice(trainerData, trainerPath) {
+  const container = document.getElementById('cBattleDiceContainer');
+  if (!container) return;
+  if (trainerPath !== 'Ace Trainer') { container.innerHTML = ''; return; }
+
+  const battleDiceData = trainerData[45] || '';
+  let maxCharges = 0, currentCharges = 0;
+  if (battleDiceData) {
+    const parts = battleDiceData.split('-').map(p => p.trim());
+    if (parts.length === 2) { maxCharges = parseInt(parts[0]) || 0; currentCharges = parseInt(parts[1]) || 0; }
+  }
+
+  let dotsHTML = '<div class="charge-dots">';
+  for (let i = 0; i < maxCharges; i++) dotsHTML += `<span class="charge-dot ${i < currentCharges ? 'filled' : 'empty'}"></span>`;
+  dotsHTML += '</div>';
+
+  container.innerHTML = `
+    <div class="battle-dice-container">
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;">
+        <strong>Battle Dice (d6):</strong> ${dotsHTML}
+      </div>
+      <div style="display:flex;align-items:center;gap:0.8rem;justify-content:space-between;">
+        <div style="font-size:0.85rem;opacity:0.9;">Add 1d6 to your next attack or damage roll</div>
+        <button class="use-battle-dice-button" id="cUseBattleDiceBtn" ${currentCharges <= 0 ? 'disabled' : ''} style="flex-shrink:0;">Use Battle Dice</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('cUseBattleDiceBtn')?.addEventListener('click', () => {
+    if (currentCharges <= 0) return;
+    currentCharges--;
+    trainerData[45] = `${maxCharges} - ${currentCharges}`;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    TrainerAPI.update(trainerData).catch(e => console.error('Battle dice sync:', e));
+    const dots = container.querySelectorAll('.charge-dot');
+    dots.forEach((dot, i) => { dot.classList.toggle('filled', i < currentCharges); dot.classList.toggle('empty', i >= currentCharges); });
+    if (currentCharges <= 0) document.getElementById('cUseBattleDiceBtn').disabled = true;
+    showToast('Battle Dice used! Roll 1d6 and add to attack or damage.', 'success');
+  });
+}
+
+function _renderCombatTactician(trainerData, trainerPath, trainerLevel) {
+  const container = document.getElementById('cTacticianContainer');
+  if (!container) return;
+  if (trainerPath !== 'Tactician' || trainerLevel < 5) { container.innerHTML = ''; return; }
+
+  let currentTP = parseInt(trainerData[49], 10) || 0;
+  const maxTP = parseInt(trainerData[2], 10) || 1;
+
+  function buildTPDots(tp, max) {
+    let html = '<div class="charge-dots" style="display:inline-flex;gap:clamp(0.3rem,0.6vw,0.5rem);">';
+    for (let i = 0; i < max; i++) html += `<span class="tp-dot ${i < tp ? 'filled' : 'empty'}"></span>`;
+    return html + '</div>';
+  }
+
+  function updateTP() {
+    container.querySelectorAll('.tp-dot').forEach((dot, i) => {
+      dot.classList.toggle('filled', i < currentTP); dot.classList.toggle('empty', i >= currentTP);
+    });
+    const empBtn = document.getElementById('cUseEmpoweredStrike');
+    if (empBtn) empBtn.disabled = currentTP < 2;
+    const shieldBtn = document.getElementById('cUseTacticalShield');
+    if (shieldBtn) shieldBtn.disabled = currentTP < 1;
+    const shieldInput = document.getElementById('cTacticalShieldInput');
+    if (shieldInput) shieldInput.max = Math.min(3, currentTP);
+    const pressBtn = document.getElementById('cUseTacticalPressure');
+    if (pressBtn) pressBtn.disabled = currentTP < 1;
+    const pressInput = document.getElementById('cTacticalPressureInput');
+    if (pressInput) pressInput.max = Math.min(5, currentTP);
+  }
+
+  function spendTP(amount) {
+    currentTP = Math.max(0, currentTP - amount);
+    trainerData[49] = currentTP;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    updateTP();
+    TrainerAPI.update(trainerData).catch(e => console.error('Tactician TP sync:', e));
+  }
+
+  let abilitiesHTML = `
+    <div class="tactician-ability">
+      <div style="display:flex;align-items:center;gap:0.8rem;justify-content:space-between;">
+        <div>
+          <strong>Empowered Strike</strong> <span style="opacity:0.7;font-size:0.85rem;">(2 TP)</span>
+          <div style="font-size:0.85rem;opacity:0.9;margin-top:0.2rem;">Roll damage dice twice, take the highest</div>
+        </div>
+        <button class="use-tactician-button" id="cUseEmpoweredStrike" ${currentTP < 2 ? 'disabled' : ''} style="flex-shrink:0;">Use</button>
+      </div>
+    </div>
+  `;
+
+  if (trainerLevel >= 9) {
+    const shieldMax = Math.min(3, currentTP);
+    abilitiesHTML += `
+      <div class="tactician-ability">
+        <div style="display:flex;align-items:center;gap:0.8rem;justify-content:space-between;">
+          <div>
+            <strong>Tactical Shield</strong> <span style="opacity:0.7;font-size:0.85rem;">(1-3 TP)</span>
+            <div style="font-size:0.85rem;opacity:0.9;margin-top:0.2rem;">Reaction: Add to your Pokemon's AC</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+            <input type="number" class="tactician-input" id="cTacticalShieldInput" min="1" max="${shieldMax}" value="1" ${currentTP < 1 ? 'disabled' : ''}>
+            <button class="use-tactician-button" id="cUseTacticalShield" ${currentTP < 1 ? 'disabled' : ''}>Use</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (trainerLevel >= 15) {
+    const pressureMax = Math.min(5, currentTP);
+    abilitiesHTML += `
+      <div class="tactician-ability">
+        <div style="display:flex;align-items:center;gap:0.8rem;justify-content:space-between;">
+          <div>
+            <strong>Tactical Pressure</strong> <span style="opacity:0.7;font-size:0.85rem;">(1-5 TP)</span>
+            <div style="font-size:0.85rem;opacity:0.9;margin-top:0.2rem;">Increase move DC after opponent's save</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+            <input type="number" class="tactician-input" id="cTacticalPressureInput" min="1" max="${pressureMax}" value="1" ${currentTP < 1 ? 'disabled' : ''}>
+            <button class="use-tactician-button" id="cUseTacticalPressure" ${currentTP < 1 ? 'disabled' : ''}>Use</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="tactician-container">
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.6rem;">
+        <strong>Tactician Points:</strong> ${buildTPDots(currentTP, maxTP)}
+      </div>
+      ${abilitiesHTML}
+    </div>
+  `;
+
+  document.getElementById('cUseEmpoweredStrike')?.addEventListener('click', () => {
+    if (currentTP >= 2) { spendTP(2); showToast('Empowered Strike! (2 TP) Roll damage dice twice and take the highest.', 'success'); }
+  });
+  document.getElementById('cUseTacticalShield')?.addEventListener('click', () => {
+    const input = document.getElementById('cTacticalShieldInput');
+    const amount = Math.max(1, Math.min(parseInt(input?.value, 10) || 1, 3, currentTP));
+    if (currentTP >= amount) { spendTP(amount); showToast(`Tactical Shield! (${amount} TP) Add ${amount} to your Pokemon's AC for this attack.`, 'success'); }
+  });
+  document.getElementById('cUseTacticalPressure')?.addEventListener('click', () => {
+    const input = document.getElementById('cTacticalPressureInput');
+    const amount = Math.max(1, Math.min(parseInt(input?.value, 10) || 1, 5, currentTP));
+    if (currentTP >= amount) { spendTP(amount); showToast(`Tactical Pressure! (${amount} TP) Increase the move's DC by ${amount}.`, 'success'); }
+  });
+}
+
+function _renderCombatCommander(trainerData, trainerPath, trainerLevel) {
+  const container = document.getElementById('cCommanderContainer');
+  if (!container) return;
+  if (trainerPath !== 'Commander' || trainerLevel < 9) { container.innerHTML = ''; return; }
+
+  const surgeData = trainerData[50] || '1 - 1';
+  const surgeParts = surgeData.split('-').map(p => p.trim());
+  let surgeMax = parseInt(surgeParts[0], 10) || 1;
+  let surgeCurrent = parseInt(surgeParts[1], 10) || 0;
+
+  const chaModifier = parseInt(trainerData[32], 10) || 0;
+  const rallyMaxCalc = Math.max(1, 1 + chaModifier);
+  const rallyData = trainerData[51] || `${rallyMaxCalc} - ${rallyMaxCalc}`;
+  const rallyParts = rallyData.split('-').map(p => p.trim());
+  let rallyMax = parseInt(rallyParts[0], 10) || rallyMaxCalc;
+  let rallyCurrent = parseInt(rallyParts[1], 10) || 0;
+
+  function buildDots(current, max, cls) {
+    let html = `<div class="${cls} charge-dots" style="display:inline-flex;gap:clamp(0.3rem,0.6vw,0.5rem);">`;
+    for (let i = 0; i < max; i++) html += `<span class="commander-dot ${i < current ? 'filled' : 'empty'}"></span>`;
+    return html + '</div>';
+  }
+
+  function updateCommanderUI() {
+    container.querySelectorAll('.surge-dots .commander-dot').forEach((dot, i) => {
+      dot.classList.toggle('filled', i < surgeCurrent); dot.classList.toggle('empty', i >= surgeCurrent);
+    });
+    const surgeBtn = document.getElementById('cUseSurgeCommand');
+    if (surgeBtn) surgeBtn.disabled = surgeCurrent <= 0;
+    container.querySelectorAll('.rally-dots .commander-dot').forEach((dot, i) => {
+      dot.classList.toggle('filled', i < rallyCurrent); dot.classList.toggle('empty', i >= rallyCurrent);
+    });
+    const rallyBtn = document.getElementById('cUseRallyCry');
+    if (rallyBtn) rallyBtn.disabled = rallyCurrent <= 0;
+  }
+
+  let commanderHTML = `
+    <div class="commander-ability">
+      <div style="display:flex;align-items:center;gap:0.8rem;justify-content:space-between;">
+        <div>
+          <strong>Show Me What You've Got</strong>
+          <div style="font-size:0.85rem;opacity:0.9;margin-top:0.2rem;">Activate a move from one damage tier above</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+          ${buildDots(surgeCurrent, surgeMax, 'surge-dots')}
+          <button class="use-commander-button" id="cUseSurgeCommand" ${surgeCurrent <= 0 ? 'disabled' : ''}>Use</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (trainerLevel >= 15) {
+    commanderHTML += `
+      <div class="commander-ability">
+        <div style="display:flex;align-items:center;gap:0.8rem;justify-content:space-between;">
+          <div>
+            <strong>We're a Team</strong>
+            <div style="font-size:0.85rem;opacity:0.9;margin-top:0.2rem;">Your Pokemon and allies gain advantage on attacks until end of next turn</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+            ${buildDots(rallyCurrent, rallyMax, 'rally-dots')}
+            <button class="use-commander-button" id="cUseRallyCry" ${rallyCurrent <= 0 ? 'disabled' : ''}>Use</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `<div class="commander-container">${commanderHTML}</div>`;
+
+  document.getElementById('cUseSurgeCommand')?.addEventListener('click', () => {
+    if (surgeCurrent <= 0) return;
+    surgeCurrent--;
+    trainerData[50] = `${surgeMax} - ${surgeCurrent}`;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    TrainerAPI.update(trainerData).catch(e => console.error('Surge sync:', e));
+    updateCommanderUI();
+    showToast("Show Me What You've Got! Activate a move from one damage tier above.", 'success');
+  });
+  document.getElementById('cUseRallyCry')?.addEventListener('click', () => {
+    if (rallyCurrent <= 0) return;
+    rallyCurrent--;
+    trainerData[51] = `${rallyMax} - ${rallyCurrent}`;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    TrainerAPI.update(trainerData).catch(e => console.error('Rally sync:', e));
+    updateCommanderUI();
+    showToast("We're a Team! Allies gain advantage on attacks until end of next turn.", 'success');
+  });
 }
 
 // ============================================================================
@@ -1617,7 +1868,6 @@ function useCombatHealingItem(itemName, targetId, healAmount, stat) {
   rerenderBattle(state);
   decrementCombatInventoryItem(itemName);
 
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   if (target.type === 'trainer') {
     const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
     td[34] = target.currentHp; td[35] = target.currentVp;
@@ -1627,9 +1877,10 @@ function useCombatHealingItem(itemName, targetId, healAmount, stat) {
     const pd = JSON.parse(sessionStorage.getItem(target.entityKey) || '[]');
     pd[45] = target.currentHp; pd[46] = target.currentVp;
     sessionStorage.setItem(target.entityKey, JSON.stringify(pd));
+    const trainerName = _battleState?.combatants.find(c => c.type === 'trainer')?.name || '';
     const apiStat = stat === 'HP' ? 'HP' : 'VP';
     const apiVal  = stat === 'HP' ? target.currentHp : target.currentVp;
-    PokemonAPI.updateLiveStats(trainerData[1], pd[2], apiStat, apiVal).catch(e => console.error('Pokemon sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pd[2], apiStat, apiVal).catch(e => console.error('Pokemon sync:', e));
   }
 }
 
@@ -1648,10 +1899,10 @@ function useCombatStatusCureItem(itemName, targetId, statusesToCure) {
 
   if (target.type === 'pokemon') {
     const pd = JSON.parse(sessionStorage.getItem(target.entityKey) || '[]');
-    const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    const trainerName = _battleState?.combatants.find(c => c.type === 'trainer')?.name || '';
     pd[60] = target.statusEffects.map(s => s.name).join(',');
     sessionStorage.setItem(target.entityKey, JSON.stringify(pd));
-    PokemonAPI.updateLiveStats(trainerData[1], pd[2], 'StatusCondition', pd[60]).catch(e => console.error('Status sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pd[2], 'StatusCondition', pd[60]).catch(e => console.error('Status sync:', e));
   }
 }
 
@@ -1811,13 +2062,13 @@ function showTypeCalcPopup(combatantId, state) {
   hpInput.value = '';
   vpInput.value = '';
 
+  const trainerName = _battleState?.combatants.find(x => x.type === 'trainer')?.name || '';
   const syncPokemon = () => {
     const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || '[]');
-    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
     pd[45] = c.currentHp; pd[46] = c.currentVp;
     sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
-    PokemonAPI.updateLiveStats(td[1], pd[2], 'HP', c.currentHp).catch(() => {});
-    PokemonAPI.updateLiveStats(td[1], pd[2], 'VP', c.currentVp).catch(() => {});
+    PokemonAPI.updateLiveStats(trainerName, pd[2], 'HP', c.currentHp).catch(() => {});
+    PokemonAPI.updateLiveStats(trainerName, pd[2], 'VP', c.currentVp).catch(() => {});
   };
 
   document.getElementById('typeCalcAddBtn').onclick = () => {

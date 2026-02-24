@@ -3,6 +3,7 @@
 import { PokemonAPI } from '../api.js';
 import { showError } from '../utils/notifications.js';
 import { initializeVisibility, getPokemonVisibility } from '../utils/visibility.js';
+import { getMoveTypeColor, getTextColorForBackground } from '../utils/pokemon-types.js';
 
 // Module state
 let selectedPokemon = null;
@@ -541,48 +542,6 @@ function registerPokemon() {
   window.dispatchEvent(new CustomEvent('navigate', {
     detail: { route: 'pokemon-form' }
   }));
-}
-
-// Helper function to get Pokemon type color
-function getMoveTypeColor(moveType) {
-  const colors = {
-    "Normal": "#A8A878",
-    "Fighting": "#e68c2e",
-    "Flying": "#A890F0",
-    "Poison": "#A040A0",
-    "Ground": "#A67C52",
-    "Rock": "#a85d16",
-    "Bug": "#A8B820",
-    "Ghost": "#705898",
-    "Steel": "#bdbdbd",
-    "Fire": "#f02e07",
-    "Water": "#1E90FF",
-    "Grass": "#32CD32",
-    "Electric": "#FFD700",
-    "Psychic": "#F85888",
-    "Ice": "#58c8ed",
-    "Dragon": "#280dd4",
-    "Dark": "#282729",
-    "Fairy": "#ed919f",
-    "Cosmic": "#120077"
-  };
-
-  return colors[moveType] || "#ffffff";
-}
-
-// Helper function to determine text color based on background
-function getTextColorForBackground(bgColor) {
-  // Convert hex to RGB
-  const hex = bgColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-
-  // Calculate luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-  // Return black for light backgrounds, white for dark
-  return luminance > 0.5 ? '#000000' : '#ffffff';
 }
 
 // Helper function to create a type button

@@ -194,7 +194,9 @@ const REGISTERED_POKEMON_COLUMN_INDICES = {
   currentVD: 55,
   utilityslot: 56,
   size: 57,
-  cry: 58
+  cry: 58,
+  knownmoves: 59,
+  statuscondition: 60
 };
 
 // ------------------------------------------------------------------Import Pokémon information Start--------------------------------------------------

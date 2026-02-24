@@ -409,7 +409,7 @@ function renderBattlePhase(state) {
               <div><strong>Duration:</strong> <span id="cMoveDuration"></span></div>
               <div><strong>Range:</strong> <span id="cMoveRange"></span></div>
               <div><strong>Size:</strong> <span id="cMoveSize"></span></div>
-              <div><strong>Crit Mod:</strong> <span id="cMoveCritMod"></span></div>
+              <div><strong>Critical Hit:</strong> <span id="cMoveCritMod"></span></div>
             </div>
             <div class="combat-move-description" id="cMoveDescription"></div>
             <div class="combat-move-higher" id="cMoveHigher"></div>
@@ -547,9 +547,12 @@ function renderCombatCard(c, isActive) {
   const KNOWN_STATUSES = ['Poison','Burn','Confusion','Paralysis','Sleep','Freeze'];
   const statusBadges = c.statusEffects.map(se => {
     const dur = se.duration === -1 ? '' : ` (${se.duration})`;
-    const cls = KNOWN_STATUSES.includes(se.name) ? `status-${se.name.toLowerCase()}` : 'status-custom';
-    const titleAttr = se.description ? ` title="${se.description.replace(/"/g, '&quot;')}"` : '';
-    return `<span class="status-badge ${cls}"${titleAttr} data-combatant-id="${c.id}" data-effect="${se.name}">${se.name}${dur}</span>`;
+    const isCustom = !KNOWN_STATUSES.includes(se.name);
+    const cls = isCustom ? 'status-custom' : `status-${se.name.toLowerCase()}`;
+    if (isCustom && se.description) {
+      return `<span class="status-badge status-custom status-custom-expanded" data-combatant-id="${c.id}" data-effect="${se.name}"><span class="status-custom-name">${se.name}${dur}</span><span class="status-custom-desc">${se.description}</span></span>`;
+    }
+    return `<span class="status-badge ${cls}" data-combatant-id="${c.id}" data-effect="${se.name}">${se.name}${dur}</span>`;
   }).join('');
 
   const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges) : '';
@@ -677,9 +680,9 @@ function renderExpandedSection(c, statusBadges) {
               <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="vp" data-delta="1">+</button>
             </div>
           </div>
-          ${typeCalcBtn}
         </div>
-        <div class="hpvp-hpvp-right">
+        ${typeCalcBtn}
+        <div class="hpvp-hpvp-right" style="margin-left:0.8rem;">
           <div class="hpvp-adjust-row">
             <span class="hpvp-stat-label">AC</span>
             <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="-1">−</button>
@@ -941,6 +944,9 @@ function getCombatCSS() {
     .custom-status-name-input { width: 110px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; padding: 0.22rem 0.5rem; font-size: 0.75rem; }
     .custom-status-effect-input { flex: 1; min-width: 130px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; padding: 0.22rem 0.5rem; font-size: 0.75rem; }
     .status-custom { background: rgba(150,100,220,0.3); color: #d4aaff; border: 1px solid rgba(180,130,255,0.5); }
+    .status-custom-expanded { display: inline-flex; flex-direction: column; padding: 3px 8px; line-height: 1.3; }
+    .status-custom-name { font-size: 0.72rem; font-weight: 700; }
+    .status-custom-desc { font-size: 0.63rem; font-weight: 400; opacity: 0.9; }
     .status-remove-hint { font-size: 0.68rem; color: #888; }
 
     /* Moves */

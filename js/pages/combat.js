@@ -3,6 +3,9 @@
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showToast } from '../utils/notifications.js';
 
+// Holds a reference to the live battle state so inventory/heal functions stay in sync
+let _battleState = null;
+
 // ============================================================================
 // MOVE TYPE HELPERS
 // ============================================================================
@@ -27,6 +30,24 @@ function getTextColorForBackground(bgColor) {
   const b = parseInt(hex.substr(4, 2), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+function parseDamageDice(description, higherLevels, pokemonLevel) {
+  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit/i;
+  if (!damagePatterns.test(description)) return null;
+  const diceMatch = description.match(/(\d+d\d+)/i);
+  if (!diceMatch) return null;
+  let baseDice = diceMatch[1];
+  if (higherLevels && pokemonLevel > 1) {
+    const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
+    let match, bestDice = null, bestLevel = 0;
+    while ((match = tierRegex.exec(higherLevels)) !== null) {
+      const tierLevel = parseInt(match[2]);
+      if (pokemonLevel >= tierLevel && tierLevel > bestLevel) { bestLevel = tierLevel; bestDice = match[1]; }
+    }
+    if (bestDice) baseDice = bestDice;
+  }
+  return baseDice;
 }
 
 // ============================================================================
@@ -804,7 +825,7 @@ function getCombatCSS() {
     .combat-card-stats-group { background: rgba(255,255,255,0.04); border-radius: 6px; padding: 0.2rem 0.45rem; margin-bottom: 0.2rem; }
     .combat-card-ac-line { font-size: 0.76rem; color: #c0c0c0; margin-bottom: 0.18rem; }
     .combat-card-stats-row { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.82rem; }
-    .combat-mods-row { font-size: 0.78rem; color: #c0c0c0; gap: 0.4rem; }
+    .combat-mods-row { display: grid; grid-template-columns: repeat(3, 1fr); font-size: 0.78rem; color: #c0c0c0; gap: 0.25rem 0.3rem; }
     .combat-mods-row small { color: #888; margin-left: 1px; }
     .stat-bar-wrap { display: flex; align-items: center; gap: 0.3rem; }
     .mini-bar { width: 48px; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
@@ -855,8 +876,7 @@ function getCombatCSS() {
     .hpvp-max { font-size: 0.82rem; color: #aaa; }
 
     /* Stat adjusters */
-    .stat-adjust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }
-    @media (max-width: 480px) { .stat-adjust-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-adjust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
     .stat-adjust-item { background: rgba(255,255,255,0.04); border-radius: 6px; padding: 0.35rem 0.4rem; }
     .stat-adjust-name { font-size: 0.72rem; font-weight: 700; color: #ccc; margin-bottom: 0.2rem; }
     .stat-adjust-name small { color: #888; font-weight: 400; }
@@ -888,10 +908,10 @@ function getCombatCSS() {
     .combat-move-popup-body { padding: 1rem 1.2rem; }
     .combat-move-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin-bottom: 0.8rem; font-size: 0.88rem; }
     .combat-move-description { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 0.7rem; font-size: 0.88rem; line-height: 1.5; margin-bottom: 0.6rem; }
-    .combat-move-higher { font-size: 0.82rem; color: #aaa; margin-bottom: 0.8rem; }
+    .combat-move-higher { font-size: 0.82rem; margin-bottom: 0.8rem; opacity: 0.85; }
     .combat-move-rolls-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 0.7rem; margin-bottom: 1rem; font-size: 0.88rem; }
     .combat-roll-bonus { font-size: 1.15em; font-weight: bold; }
-    .combat-roll-breakdown { font-size: 0.75em; color: #aaa; margin-top: 0.2rem; }
+    .combat-roll-breakdown { font-size: 0.75em; opacity: 0.8; margin-top: 0.2rem; }
     .combat-use-move-btn { width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
 
     /* FEATS */
@@ -1060,6 +1080,7 @@ function recalcInitiativeTotal(id, state) {
 // -------------------------------- BATTLE -----------------------------------
 
 function attachBattleListeners(state) {
+  _battleState = state;
   loadCombatMoves();
   initializeRechargeStates(state);
 
@@ -1292,7 +1313,11 @@ function endTurnForCombatant(combatantId, state) {
     if (candidate < state.activeTurnIndex || candidate === 0) wrapped = true;
     if (state.combatants[candidate].currentHp > 0) { next = candidate; break; }
   }
-  if (wrapped) { state.round++; showToast(`Round ${state.round} begins!`, 'info'); }
+  if (wrapped) {
+    state.round++;
+    const roundLabel = document.querySelector('.combat-round-label');
+    if (roundLabel) roundLabel.textContent = `Round ${state.round}`;
+  }
   state.activeTurnIndex = next;
 
   state.combatants.forEach((cc, idx) => { if (idx !== next) cc.isExpanded = false; });
@@ -1402,9 +1427,14 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   document.getElementById('cMoveDescription').textContent = desc;
   const higherEl = document.getElementById('cMoveHigher');
   if (higherEl) higherEl.textContent = move[8] ? `Higher Levels: ${move[8]}` : '';
+  const damageDice = parseDamageDice(desc, move[8] || '', c.level);
   document.getElementById('cAttackBonus').textContent = formatMod(attackBonus);
   document.getElementById('cAttackBreakdown').textContent = atkParts.length ? `(${atkParts.join(', ')})` : '';
-  document.getElementById('cDamageBonus').textContent = formatMod(damageBonus);
+  if (damageDice) {
+    document.getElementById('cDamageBonus').textContent = damageBonus > 0 ? `${damageDice} + ${damageBonus}` : damageDice;
+  } else {
+    document.getElementById('cDamageBonus').textContent = damageBonus > 0 ? formatMod(damageBonus) : '—';
+  }
   document.getElementById('cDamageBreakdown').textContent = dmgParts.length ? `(${dmgParts.join(', ')})` : '';
 
   const vpCost = parseInt(move[4]) || 0;
@@ -1462,7 +1492,7 @@ function decrementCombatInventoryItem(itemName) {
 }
 
 function useCombatHealingItem(itemName, targetId, healAmount, stat) {
-  const state = getCombatState();
+  const state = _battleState || getCombatState();
   if (!state) return;
   const target = state.combatants.find(c => c.id === targetId);
   if (!target) return;
@@ -1491,7 +1521,7 @@ function useCombatHealingItem(itemName, targetId, healAmount, stat) {
 }
 
 function useCombatStatusCureItem(itemName, targetId, statusesToCure) {
-  const state = getCombatState();
+  const state = _battleState || getCombatState();
   if (!state) return;
   const target = state.combatants.find(c => c.id === targetId);
   if (!target) return;

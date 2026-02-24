@@ -1067,7 +1067,7 @@ function getCombatCSS() {
     .hpvp-hpvp-wrapper { display: flex; align-items: stretch; gap: 1.4rem; }
     .hpvp-hpvp-left { flex: 1; min-width: 0; display: flex; flex-direction: row; align-items: stretch; gap: 0.4rem; }
     .hpvp-hpvp-rows { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-    .hpvp-hpvp-right { flex: 1; min-width: 0; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 0.9rem; }
+    .hpvp-hpvp-right { flex: 0 0 auto; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 0.3rem; }
     .combat-type-calc-btn { background: rgba(255,165,0,0.12); border: 1px solid rgba(255,165,0,0.5); border-radius: 8px; color: #FFA500; font-size: 0.74rem; font-weight: 700; padding: 0.3rem 0.6rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.4; min-width: 72px; align-self: stretch; }
     .combat-type-calc-btn:hover { background: rgba(255,165,0,0.28); }
     /* COMBAT TRACKER (inside type calc popup) */

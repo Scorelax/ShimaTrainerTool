@@ -31,7 +31,7 @@ export function getTextColorForBackground(bgColor) {
 }
 
 export function parseDamageDice(description, higherLevels, pokemonLevel) {
-  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit/i;
+  const damagePatterns = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit|hit\s+for\s+\d+d\d+/i;
   if (!damagePatterns.test(description)) return null;
   const diceMatch = description.match(/(\d+d\d+)/i);
   if (!diceMatch) return null;

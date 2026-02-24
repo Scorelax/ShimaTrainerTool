@@ -197,7 +197,7 @@ function buildTrainerCombatant() {
     name: trainerData[1] || 'Trainer',
     image: trainerData[0] || 'assets/Pokeball.png',
     level, initiativeScore: dexMod + trainerAlertBonus, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: dexMod + trainerAlertBonus,
-    ac, baseAc, maxHp, currentHp, maxVp, currentVp,
+    ac, baseAc, critMod: 0, maxHp, currentHp, maxVp, currentVp,
     proficiency: computeProficiency(level),
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
@@ -277,7 +277,7 @@ function buildPokemonCombatant(pokemonKey) {
     name: pokemonData[36] || pokemonData[2] || 'Pokemon',
     image: pokemonData[1] || 'assets/Pokeball.png',
     level, initiativeScore: initiative + pokemonAlertBonus, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: initiative + pokemonAlertBonus,
-    ac: parseInt(pokemonData[8]) || 10, baseAc: parseInt(pokemonData[8]) || 10,
+    ac: parseInt(pokemonData[8]) || 10, baseAc: parseInt(pokemonData[8]) || 10, critMod: 0,
     maxHp, currentHp, maxVp, currentVp,
     proficiency, stabBonusValue: parseInt(pokemonData[34]) || 2,
     str, dex, con, int: int_, wis, cha,
@@ -590,7 +590,7 @@ function renderCombatCard(c, isActive) {
             <span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>
           </div>
           <div class="combat-card-stats-group">
-            <div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong></div>
+            <div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong>${c.type === 'pokemon' ? `  ·  Crit <strong>+${c.critMod || 0}</strong>` : ''}</div>
             <div class="combat-card-stats-row">
               <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>
                 <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
@@ -673,19 +673,20 @@ function renderExpandedSection(c, statusBadges) {
   const typeCalcBtn = c.type === 'pokemon'
     ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮<br>Damage<br>Calculator</button>`
     : '';
+  const critRow = c.type === 'pokemon' ? `
+      <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
+        <span class="hpvp-stat-label">Crit</span>
+        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="crit" data-delta="-1">−</button>
+        <input type="number" class="hpvp-input" value="${c.critMod || 0}" min="0" max="5" data-combatant-id="${c.id}" data-stat="crit">
+        <span class="hpvp-max"></span>
+        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="crit" data-delta="1">+</button>
+      </div>` : '';
   const hpvpSection = `
     <div class="expanded-hpvp-section">
-      <div class="expanded-section-label">Adjust HP / VP</div>
-      <div class="hpvp-adjust-row">
-        <span class="hpvp-stat-label">AC</span>
-        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="-1">−</button>
-        <input type="number" class="hpvp-input" value="${c.ac}" data-combatant-id="${c.id}" data-stat="ac">
-        <span class="hpvp-max">/ ${c.baseAc}</span>
-        <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="1">+</button>
-      </div>
+      <div class="expanded-section-label">Adjust Stats</div>
       <div class="hpvp-hpvp-wrapper">
         <div class="hpvp-hpvp-left">
-          <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
+          <div class="hpvp-adjust-row">
             <span class="hpvp-stat-label">HP</span>
             <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="hp" data-delta="-1">−</button>
             <input type="number" class="hpvp-input" value="${c.currentHp}" min="0" max="${c.maxHp}" data-combatant-id="${c.id}" data-stat="hp">
@@ -701,6 +702,16 @@ function renderExpandedSection(c, statusBadges) {
           </div>
         </div>
         ${typeCalcBtn}
+        <div class="hpvp-hpvp-right">
+          <div class="hpvp-adjust-row">
+            <span class="hpvp-stat-label">AC</span>
+            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="-1">−</button>
+            <input type="number" class="hpvp-input" value="${c.ac}" data-combatant-id="${c.id}" data-stat="ac">
+            <span class="hpvp-max">/ ${c.baseAc}</span>
+            <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="1">+</button>
+          </div>
+          ${critRow}
+        </div>
       </div>
     </div>`;
 
@@ -1049,6 +1060,7 @@ function getCombatCSS() {
     /* TYPE CALCULATOR */
     .hpvp-hpvp-wrapper { display: flex; align-items: stretch; gap: 0.2rem; }
     .hpvp-hpvp-left { flex: 1; min-width: 0; }
+    .hpvp-hpvp-right { flex: 1; min-width: 0; }
     .combat-type-calc-btn { background: rgba(255,165,0,0.12); border: 1px solid rgba(255,165,0,0.5); border-radius: 8px; color: #FFA500; font-size: 0.74rem; font-weight: 700; padding: 0.3rem 0.6rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.4; min-width: 72px; }
     .combat-type-calc-btn:hover { background: rgba(255,165,0,0.28); }
     /* COMBAT TRACKER (inside type calc popup) */
@@ -1232,6 +1244,7 @@ function attachBattleListeners(state) {
         if (hpvp.dataset.stat === 'hp') c.currentHp = Math.min(val, c.maxHp);
         if (hpvp.dataset.stat === 'vp') c.currentVp = Math.min(val, c.maxVp);
         if (hpvp.dataset.stat === 'ac') c.ac = val;
+        if (hpvp.dataset.stat === 'crit') c.critMod = Math.max(0, Math.min(5, val));
         saveCombatState(state); rerenderBattle(state); return;
       }
       // Direct number input for stats
@@ -1352,6 +1365,7 @@ function handleHpVpDelta(btn, state) {
   if (btn.dataset.stat === 'hp') c.currentHp = Math.max(0, Math.min(c.currentHp + delta, c.maxHp));
   if (btn.dataset.stat === 'vp') c.currentVp = Math.max(0, Math.min(c.currentVp + delta, c.maxVp));
   if (btn.dataset.stat === 'ac') c.ac = Math.max(0, c.ac + delta);
+  if (btn.dataset.stat === 'crit') c.critMod = Math.max(0, Math.min(5, (c.critMod || 0) + delta));
   saveCombatState(state);
   rerenderBattle(state);
 }

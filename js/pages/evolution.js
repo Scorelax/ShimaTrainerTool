@@ -1142,7 +1142,10 @@ async function confirmEvolution() {
       currentPokemon[54] || '',    // 54: Current HD
       currentPokemon[55] || '',    // 55: Current VD
       currentPokemon[56] || '',    // 56: Utility Slot
-      evolvedSize                  // 57: Size (NEW - read from index 34 of completePokemonData)
+      evolvedSize,                 // 57: Size
+      currentPokemon[58] || '',    // 58: Cry (carry over if set)
+      '',                          // 59: KnownMoves (reset on evolution)
+      '',                          // 60: StatusCondition (reset on evolution)
     ];
 
     // Log what we're sending to the server

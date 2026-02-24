@@ -669,7 +669,10 @@ async function handleFormSubmit() {
       '',                          // 54: Current HD
       '',                          // 55: Current VD
       '',                          // 56: Utility Slot
-      pokemonSize                  // 57: Size (NEW - read from index 34 of completePokemonData)
+      pokemonSize,                 // 57: Size
+      '',                          // 58: Cry
+      '',                          // 59: KnownMoves
+      '',                          // 60: StatusCondition
     ];
 
     console.log('[Pokemon Form] newPokemonData array:');

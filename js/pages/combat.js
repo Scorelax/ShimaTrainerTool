@@ -288,6 +288,7 @@ function buildPokemonCombatant(pokemonKey) {
     movement: movementDisplay,
     rechargeStates,
     feats: pokemonData[50] || '',
+    typeChart: pokemonData[53] || '',
     statusEffects: [], isExpanded: false
   };
 }
@@ -512,6 +513,36 @@ function renderBattlePhase(state) {
           <div class="popup-body" id="combatBuffsContent"></div>
         </div>
       </div>
+
+      <!-- Type Calculator Popup -->
+      <div class="popup-overlay" id="combatTypeCalcPopup" style="display:none;">
+        <div class="popup-content" style="max-width:min(92vw,460px)">
+          <div class="popup-header">
+            <div class="popup-title" id="typeCalcTitle"></div>
+            <button class="popup-close" id="closeTypeCalcPopup">×</button>
+          </div>
+          <div class="popup-body">
+            <div id="typeCalcPokemonTypes" class="type-calc-type-row"></div>
+            <div id="typeCalcWeakSection" class="type-eff-section">
+              <div class="type-eff-label weak-label">Weak to (2×)</div>
+              <div class="type-buttons-row" id="typeCalcWeak"></div>
+            </div>
+            <div id="typeCalcResistSection" class="type-eff-section">
+              <div class="type-eff-label resist-label">Resists (½×)</div>
+              <div class="type-buttons-row" id="typeCalcResist"></div>
+            </div>
+            <div id="typeCalcImmuneSection" class="type-eff-section">
+              <div class="type-eff-label immune-label">Immune to (0×)</div>
+              <div class="type-buttons-row" id="typeCalcImmune"></div>
+            </div>
+            <div id="typeCalcNeutralSection" class="type-eff-section">
+              <div class="type-eff-label neutral-label">Neutral (1×)</div>
+              <div class="type-buttons-row" id="typeCalcNeutral"></div>
+            </div>
+            <div id="typeCalcResult" class="type-calc-result"></div>
+          </div>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -625,9 +656,15 @@ function renderExpandedSection(c, statusBadges) {
     </div>` : '';
 
   // --- HP / VP adjusters ---
+  const typeCalcBtn = c.type === 'pokemon'
+    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🔍 Types</button>`
+    : '';
   const hpvpSection = `
     <div class="expanded-hpvp-section">
-      <div class="expanded-section-label">Adjust HP / VP</div>
+      <div class="hpvp-section-header">
+        <div class="expanded-section-label" style="margin-bottom:0">Adjust HP / VP</div>
+        ${typeCalcBtn}
+      </div>
       <div class="hpvp-adjust-row">
         <span class="hpvp-stat-label">AC</span>
         <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="ac" data-delta="-1">−</button>
@@ -993,6 +1030,29 @@ function getCombatCSS() {
     .type-dragon{background:#280dd4;color:#fff}.type-dark{background:#282729;color:#fff}.type-fairy{background:#ed919f;color:#000}
     .type-cosmic{background:#120077;color:#fff}
 
+    /* TYPE CALCULATOR */
+    .hpvp-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; }
+    .combat-type-calc-btn { background: rgba(255,165,0,0.12); border: 1px solid rgba(255,165,0,0.5); border-radius: 8px; color: #FFA500; font-size: 0.76rem; font-weight: 700; padding: 0.22rem 0.6rem; cursor: pointer; }
+    .combat-type-calc-btn:hover { background: rgba(255,165,0,0.28); }
+    .type-calc-type-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+    .type-calc-badge { padding: 0.2rem 0.75rem; border-radius: 12px; font-size: 0.88rem; font-weight: 700; }
+    .type-eff-section { margin-bottom: 0.55rem; }
+    .type-eff-label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; }
+    .weak-label { color: #ff7777; }
+    .resist-label { color: #88aaff; }
+    .immune-label { color: #aaaaaa; }
+    .neutral-label { color: #cccccc; }
+    .type-buttons-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .combat-type-button { padding: 0.22rem 0.6rem; border-radius: 10px; border: 2px solid transparent; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: transform 0.1s, border-color 0.15s, box-shadow 0.15s; }
+    .combat-type-button:hover { transform: scale(1.06); }
+    .combat-type-button.selected { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.55); transform: scale(1.1); }
+    .type-calc-result { margin-top: 0.75rem; padding: 0.65rem 1rem; border-radius: 10px; font-size: 1rem; font-weight: 900; text-align: center; text-transform: uppercase; letter-spacing: 0.05em; display: none; }
+    .type-calc-result.show { display: block; }
+    .type-calc-weak { background: rgba(255,80,80,0.2); border: 2px solid rgba(255,100,100,0.7); color: #ff8888; }
+    .type-calc-resist { background: rgba(100,150,255,0.18); border: 2px solid rgba(100,150,255,0.6); color: #88aaff; }
+    .type-calc-immune { background: rgba(150,150,150,0.18); border: 2px solid rgba(150,150,150,0.5); color: #aaa; }
+    .type-calc-neutral { background: rgba(255,255,255,0.07); border: 2px solid rgba(255,255,255,0.2); color: #ccc; }
+
     /* ITEM ACTION AREA */
     .combat-item-action-area { margin-top: 0.75rem; }
     .combat-item-target-select { width: 100%; padding: 0.6rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,222,0,0.3); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; margin-bottom: 0.5rem; }
@@ -1107,6 +1167,10 @@ function attachBattleListeners(state) {
         const badge = e.target.closest('.status-badge');
         removeStatusEffect(badge.dataset.combatantId, badge.dataset.effect, state); return;
       }
+      if (e.target.closest('.combat-type-calc-btn')) {
+        const btn = e.target.closest('.combat-type-calc-btn');
+        showTypeCalcPopup(btn.dataset.combatantId, state); return;
+      }
       if (e.target.closest('.combat-inv-open-btn')) {
         showCombatInventoryPopup(); return;
       }
@@ -1163,6 +1227,12 @@ function attachBattleListeners(state) {
   });
   document.getElementById('combatBuffsPopup')?.addEventListener('click', e => {
     if (e.target.id === 'combatBuffsPopup') e.target.style.display = 'none';
+  });
+  document.getElementById('closeTypeCalcPopup')?.addEventListener('click', () => {
+    document.getElementById('combatTypeCalcPopup').style.display = 'none';
+  });
+  document.getElementById('combatTypeCalcPopup')?.addEventListener('click', e => {
+    if (e.target.id === 'combatTypeCalcPopup') e.target.style.display = 'none';
   });
 
   // Move popup close
@@ -1618,6 +1688,75 @@ function populateCombatItemActionArea(item) {
       document.getElementById('combatInventoryPopup').style.display = 'none';
     });
   }
+}
+
+function showTypeCalcPopup(combatantId, state) {
+  const c = state.combatants.find(x => x.id === combatantId);
+  if (!c || c.type !== 'pokemon') return;
+
+  const TYPE_NAMES = ["Normal","Fighting","Flying","Poison","Ground","Rock","Bug","Ghost","Steel","Fire","Water","Grass","Electric","Psychic","Ice","Dragon","Dark","Fairy"];
+  const ALL_TYPES = [...TYPE_NAMES, "Cosmic"];
+
+  const chartVals = (c.typeChart || '').split(',').map(Number);
+  const multMap = {};
+  TYPE_NAMES.forEach((name, i) => { multMap[name] = isNaN(chartVals[i]) ? 1 : chartVals[i]; });
+  multMap["Cosmic"] = 1;
+
+  const weaknesses  = ALL_TYPES.filter(t => (multMap[t] ?? 1) > 1);
+  const resistances = ALL_TYPES.filter(t => { const v = multMap[t] ?? 1; return v > 0 && v < 1; });
+  const immunities  = ALL_TYPES.filter(t => (multMap[t] ?? 1) === 0);
+  const neutrals    = ALL_TYPES.filter(t => (multMap[t] ?? 1) === 1);
+
+  document.getElementById('typeCalcTitle').textContent = c.name;
+
+  // Pokemon types row
+  const typesEl = document.getElementById('typeCalcPokemonTypes');
+  typesEl.innerHTML = c.types.map(t => {
+    const bg = getMoveTypeColor(t);
+    const col = getTextColorForBackground(bg);
+    return `<span class="type-calc-badge" style="background:${bg};color:${col}">${t}</span>`;
+  }).join('');
+
+  // Build clickable type buttons
+  function buildBtns(types) {
+    return types.map(t => {
+      const bg = getMoveTypeColor(t);
+      const col = getTextColorForBackground(bg);
+      return `<button class="combat-type-button" data-type="${t}" style="background:${bg};color:${col}">${t}</button>`;
+    }).join('');
+  }
+
+  const sections = [
+    { sectionId: 'typeCalcWeakSection',    containerId: 'typeCalcWeak',    types: weaknesses },
+    { sectionId: 'typeCalcResistSection',  containerId: 'typeCalcResist',  types: resistances },
+    { sectionId: 'typeCalcImmuneSection',  containerId: 'typeCalcImmune',  types: immunities },
+    { sectionId: 'typeCalcNeutralSection', containerId: 'typeCalcNeutral', types: neutrals },
+  ];
+  sections.forEach(({ sectionId, containerId, types }) => {
+    const sec = document.getElementById(sectionId);
+    sec.style.display = types.length ? '' : 'none';
+    document.getElementById(containerId).innerHTML = buildBtns(types);
+  });
+
+  // Result display + click handlers
+  const resultEl = document.getElementById('typeCalcResult');
+  resultEl.className = 'type-calc-result';
+  resultEl.textContent = '';
+
+  const popup = document.getElementById('combatTypeCalcPopup');
+  popup.querySelectorAll('.combat-type-button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      popup.querySelectorAll('.combat-type-button').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      const v = multMap[btn.dataset.type] ?? 1;
+      if (v === 0) { resultEl.textContent = '0× — Immune!'; resultEl.className = 'type-calc-result type-calc-immune show'; }
+      else if (v < 1) { resultEl.textContent = `${v}× — Not very effective`; resultEl.className = 'type-calc-result type-calc-resist show'; }
+      else if (v > 1) { resultEl.textContent = `${v}× — Super effective!`; resultEl.className = 'type-calc-result type-calc-weak show'; }
+      else { resultEl.textContent = '1× — Normal damage'; resultEl.className = 'type-calc-result type-calc-neutral show'; }
+    });
+  });
+
+  popup.style.display = 'flex';
 }
 
 function showCombatInventoryPopup() {

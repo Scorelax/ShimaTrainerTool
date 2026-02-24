@@ -163,7 +163,11 @@ const REGISTERED_POKEMON_COLUMN_INDICES = {
   typematchups: 53,
   currentHD: 54,
   currentVD: 55,
-  utilityslot: 56
+  utilityslot: 56,
+  size: 57,
+  cry: 58,
+  knownmoves: 59,
+  statuscondition: 60
 };
 
 // ------------------------------------------------------------------Import Pokémon information Start--------------------------------------------------
@@ -1701,13 +1705,24 @@ function writePokemonLiveStats(trainerName, pokemonName, stat, newValue) {
           POKEMON_DATA_SHEET.getRange(pokemonRow + 1, REGISTERED_POKEMON_COLUMN_INDICES.currentHP + 1).setValue(newValue);
           return { status: 'success' };
 
-        } else if(stat === 'VP'){
+        } else if(stat === 'VP') {
           POKEMON_DATA_SHEET.getRange(pokemonRow + 1, REGISTERED_POKEMON_COLUMN_INDICES.currentVP + 1).setValue(newValue);
           return { status: 'success' };
 
-        } else { // AC
+        } else if(stat === 'AC') {
           POKEMON_DATA_SHEET.getRange(pokemonRow + 1, REGISTERED_POKEMON_COLUMN_INDICES.currentAC + 1).setValue(newValue);
           return { status: 'success' };
+
+        } else if(stat === 'KnownMoves') {
+          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, REGISTERED_POKEMON_COLUMN_INDICES.knownmoves + 1).setValue(newValue);
+          return { status: 'success' };
+
+        } else if(stat === 'StatusCondition') {
+          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, REGISTERED_POKEMON_COLUMN_INDICES.statuscondition + 1).setValue(newValue);
+          return { status: 'success' };
+
+        } else {
+          return { status: 'error', message: 'Unknown stat: ' + stat };
         }
     } catch (error) {
         Logger.log('Error writing Pokemon Live Stats: ' + error);

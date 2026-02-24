@@ -460,14 +460,7 @@ function renderBattlePhase(state) {
                   </div>
                 </div>
               </div>
-              <div class="inventory-actions">
-                <div class="inventory-actions-row">
-                  <button class="action-btn" id="combatUseItemBtn" disabled>
-                    <span class="btn-icon">🧪</span>
-                    <span class="btn-text">Use</span>
-                  </button>
-                </div>
-              </div>
+              <div id="combatItemActionArea" class="combat-item-action-area"></div>
             </div>
           </div>
         </div>
@@ -949,6 +942,14 @@ function getCombatCSS() {
     .type-electric{background:#FFD700;color:#000}.type-psychic{background:#F85888;color:#fff}.type-ice{background:#58c8ed;color:#000}
     .type-dragon{background:#280dd4;color:#fff}.type-dark{background:#282729;color:#fff}.type-fairy{background:#ed919f;color:#000}
     .type-cosmic{background:#120077;color:#fff}
+
+    /* ITEM ACTION AREA */
+    .combat-item-action-area { margin-top: 0.75rem; }
+    .combat-item-target-select { width: 100%; padding: 0.6rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,222,0,0.3); border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .combat-item-roll-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .combat-item-roll-label { color: #FFDE00; font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
+    .combat-item-roll-input { width: 80px; padding: 0.4rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0; text-align: center; font-size: 0.9rem; }
+    .combat-item-heal-preview { font-size: 0.82rem; color: #4CAF50; margin-bottom: 0.5rem; min-height: 1.2em; }
   `;
 }
 
@@ -1377,6 +1378,168 @@ function showCombatMoveDetails(moveName, combatantId, state) {
 
 let _combatSelectedItem = null;
 
+function parseHealingEffect(effectText) {
+  if (!effectText) return null;
+  const match = effectText.match(/[Rr]estores?\s+(\d+d\d+)\s*(?:\+\s*(\d+))?\s*(HP|VP)/);
+  if (!match) return null;
+  return { dice: match[1], flatBonus: match[2] ? parseInt(match[2]) : 0, stat: match[3] };
+}
+
+function parseStatusCure(effectText) {
+  if (!effectText) return null;
+  const lower = effectText.toLowerCase();
+  if (lower.includes('all status') || lower.includes('any status') || lower.includes('all conditions')) return ['all'];
+  const statuses = ['Poison', 'Burn', 'Confusion', 'Paralysis', 'Sleep', 'Freeze'];
+  const cured = statuses.filter(s => lower.includes(s.toLowerCase()));
+  return cured.length > 0 ? cured : null;
+}
+
+function decrementCombatInventoryItem(itemName) {
+  const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  const items = (td[20] || '').split(',').map(s => s.trim()).filter(Boolean);
+  const idx = items.findIndex(s => {
+    const m = s.match(/^(.+?)\s*\(x\d+\)$/);
+    return (m ? m[1].trim() : s) === itemName;
+  });
+  if (idx === -1) return;
+  const m = items[idx].match(/^(.+?)\s*\(x(\d+)\)$/);
+  const qty = m ? parseInt(m[2]) : 1;
+  if (qty <= 1) items.splice(idx, 1);
+  else items[idx] = `${itemName} (x${qty - 1})`;
+  td[20] = items.join(', ');
+  sessionStorage.setItem('trainerData', JSON.stringify(td));
+  TrainerAPI.update(td).catch(e => console.error('Inventory sync:', e));
+}
+
+function useCombatHealingItem(itemName, targetId, healAmount, stat) {
+  const state = getCombatState();
+  if (!state) return;
+  const target = state.combatants.find(c => c.id === targetId);
+  if (!target) return;
+
+  if (stat === 'HP') target.currentHp = Math.min(target.currentHp + healAmount, target.maxHp);
+  else               target.currentVp = Math.min(target.currentVp + healAmount, target.maxVp);
+
+  saveCombatState(state);
+  rerenderBattle(state);
+  decrementCombatInventoryItem(itemName);
+
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  if (target.type === 'trainer') {
+    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    td[34] = target.currentHp; td[35] = target.currentVp;
+    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    TrainerAPI.update(td).catch(e => console.error('Trainer sync:', e));
+  } else {
+    const pd = JSON.parse(sessionStorage.getItem(target.entityKey) || '[]');
+    pd[45] = target.currentHp; pd[46] = target.currentVp;
+    sessionStorage.setItem(target.entityKey, JSON.stringify(pd));
+    const apiStat = stat === 'HP' ? 'HP' : 'VP';
+    const apiVal  = stat === 'HP' ? target.currentHp : target.currentVp;
+    PokemonAPI.updateLiveStats(trainerData[1], pd[2], apiStat, apiVal).catch(e => console.error('Pokemon sync:', e));
+  }
+}
+
+function useCombatStatusCureItem(itemName, targetId, statusesToCure) {
+  const state = getCombatState();
+  if (!state) return;
+  const target = state.combatants.find(c => c.id === targetId);
+  if (!target) return;
+
+  if (statusesToCure[0] === 'all') target.statusEffects = [];
+  else target.statusEffects = target.statusEffects.filter(s => !statusesToCure.includes(s.name));
+
+  saveCombatState(state);
+  rerenderBattle(state);
+  decrementCombatInventoryItem(itemName);
+
+  if (target.type === 'pokemon') {
+    const pd = JSON.parse(sessionStorage.getItem(target.entityKey) || '[]');
+    const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    pd[60] = target.statusEffects.map(s => s.name).join(',');
+    sessionStorage.setItem(target.entityKey, JSON.stringify(pd));
+    PokemonAPI.updateLiveStats(trainerData[1], pd[2], 'StatusCondition', pd[60]).catch(e => console.error('Status sync:', e));
+  }
+}
+
+function populateCombatItemActionArea(item) {
+  const area = document.getElementById('combatItemActionArea');
+  if (!area) return;
+
+  const healing    = parseHealingEffect(item.effect);
+  const statusCure = !healing ? parseStatusCure(item.effect) : null;
+
+  const state      = getCombatState();
+  const combatants = state ? state.combatants : [];
+  const targetOptions = combatants
+    .map(c => `<option value="${c.id}">${c.name} — ${healing?.stat === 'VP' ? `VP: ${c.currentVp}/${c.maxVp}` : `HP: ${c.currentHp}/${c.maxHp}`}</option>`)
+    .join('');
+
+  if (healing) {
+    const bonusLabel = healing.flatBonus > 0 ? ` + ${healing.flatBonus}` : '';
+    area.innerHTML = `
+      <div class="combat-item-roll-row">
+        <span class="combat-item-roll-label">Roll <strong>${healing.dice}</strong>${bonusLabel}:</span>
+        <input type="number" id="combatHealRoll" class="combat-item-roll-input" min="1" placeholder="Result">
+      </div>
+      <select id="combatItemTarget" class="combat-item-target-select">
+        <option value="">Select target...</option>${targetOptions}
+      </select>
+      <div id="combatHealPreview" class="combat-item-heal-preview"></div>
+      <button class="use-buff-button" id="combatApplyItemBtn">Use</button>`;
+
+    const updatePreview = () => {
+      const roll = parseInt(document.getElementById('combatHealRoll')?.value) || 0;
+      const total = roll + healing.flatBonus;
+      const targetId = document.getElementById('combatItemTarget')?.value;
+      const target = combatants.find(c => c.id === targetId);
+      const preview = document.getElementById('combatHealPreview');
+      if (preview && target && total > 0) {
+        const cur = healing.stat === 'HP' ? target.currentHp : target.currentVp;
+        const max = healing.stat === 'HP' ? target.maxHp : target.maxVp;
+        const after = Math.min(cur + total, max);
+        preview.textContent = `${healing.stat}: ${cur} → ${after} (+${after - cur})`;
+      } else if (preview) {
+        preview.textContent = '';
+      }
+    };
+    area.querySelector('#combatHealRoll').addEventListener('input', updatePreview);
+    area.querySelector('#combatItemTarget').addEventListener('change', updatePreview);
+
+    area.querySelector('#combatApplyItemBtn').addEventListener('click', () => {
+      const roll = parseInt(document.getElementById('combatHealRoll')?.value) || 0;
+      if (roll <= 0) { showToast('Enter your dice roll result first.', 'warning'); return; }
+      const targetId = document.getElementById('combatItemTarget')?.value;
+      if (!targetId) { showToast('Select a target first.', 'warning'); return; }
+      useCombatHealingItem(item.name, targetId, roll + healing.flatBonus, healing.stat);
+      document.getElementById('combatInventoryPopup').style.display = 'none';
+    });
+
+  } else if (statusCure) {
+    const cureLabel = statusCure[0] === 'all' ? 'all status conditions' : statusCure.join(', ');
+    area.innerHTML = `
+      <div style="color:#FFDE00;font-size:0.82rem;margin-bottom:0.4rem;">Cures: <strong>${cureLabel}</strong></div>
+      <select id="combatItemTarget" class="combat-item-target-select">
+        <option value="">Select target...</option>${targetOptions}
+      </select>
+      <button class="use-buff-button" id="combatApplyItemBtn">Use</button>`;
+
+    area.querySelector('#combatApplyItemBtn').addEventListener('click', () => {
+      const targetId = document.getElementById('combatItemTarget')?.value;
+      if (!targetId) { showToast('Select a target first.', 'warning'); return; }
+      useCombatStatusCureItem(item.name, targetId, statusCure);
+      document.getElementById('combatInventoryPopup').style.display = 'none';
+    });
+
+  } else {
+    area.innerHTML = `<button class="use-buff-button" id="combatApplyItemBtn">Use</button>`;
+    area.querySelector('#combatApplyItemBtn').addEventListener('click', () => {
+      decrementCombatInventoryItem(item.name);
+      document.getElementById('combatInventoryPopup').style.display = 'none';
+    });
+  }
+}
+
 function showCombatInventoryPopup() {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const inventory = trainerData[20] || '';
@@ -1386,14 +1549,14 @@ function showCombatInventoryPopup() {
 
   // Reset detail panel
   _combatSelectedItem = null;
-  const nameEl = document.getElementById('combatSelectedItemName');
-  const descEl = document.getElementById('combatDescriptionText');
-  const effEl  = document.getElementById('combatEffectText');
-  const useBtn = document.getElementById('combatUseItemBtn');
-  if (nameEl) nameEl.textContent = 'Select an item';
-  if (descEl) descEl.textContent = 'Choose an item from your inventory to view its details.';
-  if (effEl)  effEl.textContent  = 'Item effects will appear here.';
-  if (useBtn) useBtn.disabled = true;
+  const nameEl    = document.getElementById('combatSelectedItemName');
+  const descEl    = document.getElementById('combatDescriptionText');
+  const effEl     = document.getElementById('combatEffectText');
+  const actionArea = document.getElementById('combatItemActionArea');
+  if (nameEl)    nameEl.textContent = 'Select an item';
+  if (descEl)    descEl.textContent = 'Choose an item from your inventory to view its details.';
+  if (effEl)     effEl.textContent  = 'Item effects will appear here.';
+  if (actionArea) actionArea.innerHTML = '';
 
   if (!inventory || !itemsStr) {
     categoriesEl.innerHTML = '<li style="padding:1rem;color:#999;text-align:center;">No items in inventory</li>';
@@ -1447,36 +1610,14 @@ function showCombatInventoryPopup() {
       categoriesEl.querySelectorAll('.inventory-list-item').forEach(x => x.classList.remove('selected'));
       el.classList.add('selected');
       _combatSelectedItem = allItems.find(i => i.name === el.dataset.itemName) || null;
-      if (_combatSelectedItem && nameEl && descEl && effEl && useBtn) {
+      if (_combatSelectedItem && nameEl && descEl && effEl) {
         nameEl.textContent = `${_combatSelectedItem.name} (x${_combatSelectedItem.qty})`;
         descEl.textContent = _combatSelectedItem.description || 'No description available.';
         effEl.textContent  = _combatSelectedItem.effect || 'No effect description.';
-        useBtn.disabled = false;
+        populateCombatItemActionArea(_combatSelectedItem);
       }
     });
   });
-
-  if (useBtn) {
-    useBtn.onclick = () => {
-      if (!_combatSelectedItem) return;
-      const itemName = _combatSelectedItem.name;
-      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-      const items = (td[20] || '').split(',').map(s => s.trim()).filter(Boolean);
-      const idx = items.findIndex(s => {
-        const m = s.match(/^(.+?)\s*\(x\d+\)$/);
-        return (m ? m[1].trim() : s) === itemName;
-      });
-      if (idx === -1) return;
-      const m = items[idx].match(/^(.+?)\s*\(x(\d+)\)$/);
-      const qty = m ? parseInt(m[2]) : 1;
-      if (qty <= 1) items.splice(idx, 1);
-      else items[idx] = `${itemName} (x${qty - 1})`;
-      td[20] = items.join(', ');
-      sessionStorage.setItem('trainerData', JSON.stringify(td));
-      TrainerAPI.update(td).catch(e => console.error('Inventory sync:', e));
-      showCombatInventoryPopup();
-    };
-  }
 
   document.getElementById('combatInventoryPopup').style.display = 'flex';
 }

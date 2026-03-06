@@ -13,6 +13,9 @@ let _moveMap = null; // Map<name, moveData> for O(1) lookups
 
 // Module-level items DB cache — held items don't change during combat, so parse once
 let _itemsCache = null;
+
+// Holds the bench pokemon selected for a switch-in initiative roll
+let _switchTargetPokemon = null;
 function getCachedItems() {
   if (!_itemsCache) _itemsCache = JSON.parse(sessionStorage.getItem('items') || '[]');
   return _itemsCache;
@@ -335,7 +338,7 @@ function renderSetupPhase() {
             <div class="setup-trainer-level">Level ${trainerLevel}</div>
           </div>
         </div>
-        <div class="setup-section-label">SELECT PARTY POKÉMON</div>
+        <div class="setup-section-label">SELECT LEAD POKÉMON (1)</div>
         <div class="setup-pokemon-list" id="setupPokemonList">
           ${pokemonCards || '<div class="setup-empty">No active party Pokémon found.</div>'}
         </div>
@@ -487,6 +490,38 @@ function renderBattlePhase(state) {
         </div>
       </div>
 
+      <!-- Switch Pokemon Popup -->
+      <div class="popup-overlay" id="combatSwitchPopup" style="display:none;">
+        <div class="popup-content combat-switch-popup-content">
+          <div class="popup-header">
+            <div class="popup-title">Switch Pokémon</div>
+            <button class="popup-close" id="closeCombatSwitchPopup">×</button>
+          </div>
+          <div id="combatSwitchPopupBody" class="combat-switch-body popup-body"></div>
+        </div>
+      </div>
+
+      <!-- Switch Initiative Popup -->
+      <div class="popup-overlay" id="combatSwitchInitPopup" style="display:none;">
+        <div class="popup-content" style="max-width:360px;">
+          <div class="popup-header">
+            <div class="popup-title" id="switchInitTitle">Initiative Roll</div>
+            <button class="popup-close" id="closeCombatSwitchInitPopup">×</button>
+          </div>
+          <div class="popup-body">
+            <p id="switchInitDesc" style="margin-bottom:1rem;color:#aaa;font-size:0.9rem;line-height:1.5;"></p>
+            <div class="initiative-row" style="background:none;border:none;padding:0;margin-bottom:0.8rem;">
+              <div class="initiative-roll-group" style="justify-content:center;width:100%;">
+                <span class="initiative-plus">d20</span>
+                <input type="number" class="initiative-bonus-input" id="switchInitInput" min="1" max="20" placeholder="Roll">
+                <span class="initiative-equals">= <strong id="switchInitTotal">—</strong></span>
+              </div>
+            </div>
+            <button id="confirmSwitchBtn" class="combat-start-btn" style="margin-top:0.5rem;" disabled>Switch In →</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Type Calculator Popup -->
       <div class="popup-overlay" id="combatTypeCalcPopup" style="display:none;">
         <div class="popup-content" style="max-width:min(92vw,460px)">
@@ -628,10 +663,12 @@ function renderExpandedSection(c, statusBadges) {
     </div>` : '';
 
   // --- Trainer action buttons (trainer only) ---
+  const hasBenchPokemon = (_battleState?.bench ?? []).length > 0;
   const trainerActionsSection = c.type === 'trainer' ? `
     <div class="expanded-trainer-actions">
       <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}"><img src="assets/Bag.png" alt="Bag" class="combat-inv-icon"> Inventory</button>
       <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">✨ Trainer Buffs</button>
+      ${hasBenchPokemon ? `<button class="combat-trainer-action-btn combat-switch-open-btn">⇄ Switch Pokémon</button>` : ''}
     </div>` : '';
 
   // --- Info section (pokemon only) ---
@@ -1108,6 +1145,24 @@ function getCombatCSS() {
     .combat-item-roll-label { color: #FFDE00; font-weight: 700; font-size: 0.9rem; flex-shrink: 0; }
     .combat-item-roll-input { width: 80px; padding: 0.4rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e0e0e0; text-align: center; font-size: 0.9rem; }
     .combat-item-heal-preview { font-size: 0.82rem; color: #4CAF50; margin-bottom: 0.5rem; min-height: 1.2em; }
+
+    /* SWITCH POKEMON POPUP */
+    .combat-switch-popup-content { max-width: min(92vw,500px); }
+    .combat-switch-body { display: flex; flex-direction: column; gap: 0.5rem; }
+    .switch-pokemon-card {
+      display: flex; align-items: center; gap: 0.8rem;
+      background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 0.6rem 0.8rem; cursor: pointer; transition: all 0.18s;
+    }
+    .switch-pokemon-card:hover:not(.fainted-bench) { border-color: rgba(102,126,234,0.7); background: rgba(102,126,234,0.12); }
+    .switch-pokemon-card.fainted-bench { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+    .switch-poke-img { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; border-radius: 6px; background: rgba(255,255,255,0.04); }
+    .switch-poke-info { flex: 1; min-width: 0; }
+    .switch-poke-name { font-weight: 700; font-size: 0.92rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.25rem; }
+    .switch-poke-stats { font-size: 0.82rem; color: #b0b0b0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .switch-init-label { background: rgba(255,215,0,0.15); border: 1px solid rgba(255,215,0,0.4); color: #FFD700; padding: 1px 7px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
+    .switch-init-new { background: rgba(76,175,80,0.15); border-color: rgba(76,175,80,0.4) !important; color: #4CAF50 !important; }
+    .switch-no-bench { color: #888; font-style: italic; padding: 1rem; text-align: center; }
   `;
 }
 
@@ -1137,7 +1192,10 @@ function attachSetupListeners() {
 
   document.querySelectorAll('.setup-pokemon-card').forEach(card => {
     card.addEventListener('click', () => {
-      card.classList.toggle('selected');
+      const wasSelected = card.classList.contains('selected');
+      // Deselect all, then select this one (unless it was already selected — toggle off)
+      document.querySelectorAll('.setup-pokemon-card').forEach(c => c.classList.remove('selected'));
+      if (!wasSelected) card.classList.add('selected');
       startBtn.disabled = document.querySelectorAll('.setup-pokemon-card.selected').length === 0;
     });
   });
@@ -1145,8 +1203,20 @@ function attachSetupListeners() {
   startBtn?.addEventListener('click', () => {
     loadCombatMoves();
     const selectedKeys = [...document.querySelectorAll('.setup-pokemon-card.selected')].map(el => el.dataset.pokemonKey);
-    const combatants = [buildTrainerCombatant(), ...selectedKeys.map(k => buildPokemonCombatant(k))];
-    saveCombatState({ phase: 'initiative', round: 1, activeTurnIndex: 0, combatants });
+    const allPartyKeys = [...document.querySelectorAll('.setup-pokemon-card')].map(el => el.dataset.pokemonKey);
+    const benchKeys = allPartyKeys.filter(k => !selectedKeys.includes(k));
+
+    const activePokemon = buildPokemonCombatant(selectedKeys[0]);
+    activePokemon.hasRolledInitiative = false;
+    const combatants = [buildTrainerCombatant(), activePokemon];
+
+    const bench = benchKeys.map(k => {
+      const bc = buildPokemonCombatant(k);
+      bc.hasRolledInitiative = false;
+      return bc;
+    });
+
+    saveCombatState({ phase: 'initiative', round: 1, activeTurnIndex: 0, combatants, bench, partyKeys: allPartyKeys });
     const content = document.getElementById('content');
     content.innerHTML = renderCombat();
     attachCombatListeners();
@@ -1170,6 +1240,7 @@ function attachInitiativeListeners(state) {
     state.combatants.forEach(c => {
       c.initiativeBonus = parseInt(document.getElementById(`bonus_${c.id}`)?.value) || 0;
       c.initiativeTotal = c.initiativeScore + c.initiativeBonus;
+      c.hasRolledInitiative = true;
     });
     state.combatants.sort((a, b) => b.initiativeTotal - a.initiativeTotal);
     state.phase = 'battle';
@@ -1247,6 +1318,9 @@ function attachBattleListeners(state) {
       if (e.target.closest('.combat-buffs-open-btn')) {
         showCombatBuffsPopup(); return;
       }
+      if (e.target.closest('.combat-switch-open-btn')) {
+        showSwitchPopup(state); return;
+      }
       const diceRechargeBtn = e.target.closest('.combat-dice-recharge-btn');
       if (diceRechargeBtn) {
         rollDiceRecharge(diceRechargeBtn.dataset.move, diceRechargeBtn.dataset.combatantId, state); return;
@@ -1304,6 +1378,43 @@ function attachBattleListeners(state) {
   });
   document.getElementById('combatTypeCalcPopup')?.addEventListener('click', e => {
     if (e.target.id === 'combatTypeCalcPopup') e.target.style.display = 'none';
+  });
+
+  // Switch popup close
+  document.getElementById('closeCombatSwitchPopup')?.addEventListener('click', () => {
+    document.getElementById('combatSwitchPopup').style.display = 'none';
+  });
+  document.getElementById('combatSwitchPopup')?.addEventListener('click', e => {
+    if (e.target.id === 'combatSwitchPopup') e.target.style.display = 'none';
+  });
+
+  // Switch initiative popup close
+  document.getElementById('closeCombatSwitchInitPopup')?.addEventListener('click', () => {
+    document.getElementById('combatSwitchInitPopup').style.display = 'none';
+    _switchTargetPokemon = null;
+  });
+  document.getElementById('combatSwitchInitPopup')?.addEventListener('click', e => {
+    if (e.target.id === 'combatSwitchInitPopup') { e.target.style.display = 'none'; _switchTargetPokemon = null; }
+  });
+
+  // Switch initiative input — live total update
+  document.getElementById('switchInitInput')?.addEventListener('input', () => {
+    if (!_switchTargetPokemon) return;
+    const roll = parseInt(document.getElementById('switchInitInput').value) || 0;
+    const totalEl = document.getElementById('switchInitTotal');
+    if (totalEl) totalEl.textContent = _switchTargetPokemon.initiativeScore + roll;
+    const confirmBtn = document.getElementById('confirmSwitchBtn');
+    if (confirmBtn) confirmBtn.disabled = !document.getElementById('switchInitInput').value.trim();
+  });
+
+  // Confirm switch after initiative roll
+  document.getElementById('confirmSwitchBtn')?.addEventListener('click', () => {
+    if (!_switchTargetPokemon || !_battleState) return;
+    const roll = parseInt(document.getElementById('switchInitInput')?.value) || 0;
+    _switchTargetPokemon.initiativeBonus = roll;
+    _switchTargetPokemon.initiativeTotal = _switchTargetPokemon.initiativeScore + roll;
+    executePokemonSwitch(_switchTargetPokemon, _battleState);
+    _switchTargetPokemon = null;
   });
 
   // Move popup close
@@ -1373,6 +1484,113 @@ function rollDiceRecharge(moveName, combatantId, state) {
   } else {
     showToast(`Rolled ${roll} — ${moveName} did not recharge (needs ${rs.range}).`, 'warning');
   }
+}
+
+// ============================================================================
+// SWITCH POKEMON
+// ============================================================================
+
+function showSwitchPopup(state) {
+  const bench = state.bench || [];
+  const popup = document.getElementById('combatSwitchPopup');
+  const body = document.getElementById('combatSwitchPopupBody');
+  if (!popup || !body) return;
+
+  if (bench.length === 0) {
+    body.innerHTML = '<p class="switch-no-bench">No other Pokémon available to switch in.</p>';
+    popup.style.display = 'flex';
+    return;
+  }
+
+  body.innerHTML = bench.map(p => {
+    const hpPct = p.maxHp > 0 ? Math.round((p.currentHp / p.maxHp) * 100) : 0;
+    const typeBadges = p.types.map(t => `<span class="type-badge type-${t.toLowerCase()}">${t}</span>`).join('');
+    const fainted = p.currentHp <= 0;
+    const initLabel = p.hasRolledInitiative
+      ? `<span class="switch-init-label">Init: ${p.initiativeTotal}</span>`
+      : `<span class="switch-init-label switch-init-new">Roll Init</span>`;
+    return `
+      <div class="switch-pokemon-card ${fainted ? 'fainted-bench' : ''}" data-pokemon-id="${p.id}">
+        <img src="${p.image}" alt="${p.name}" onerror="this.src='assets/Pokeball.png'" class="switch-poke-img">
+        <div class="switch-poke-info">
+          <div class="switch-poke-name">${p.name} <span class="combat-card-level">Lv ${p.level}</span> ${typeBadges}</div>
+          <div class="switch-poke-stats">
+            HP: <strong>${p.currentHp}/${p.maxHp}</strong>
+            <div class="mini-bar" style="display:inline-block;vertical-align:middle;margin:0 0.3rem;"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
+            ${initLabel}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Attach click listeners to switchable cards
+  body.querySelectorAll('.switch-pokemon-card:not(.fainted-bench)').forEach(card => {
+    card.addEventListener('click', () => {
+      const pokemon = bench.find(p => p.id === card.dataset.pokemonId);
+      if (!pokemon) return;
+      if (pokemon.hasRolledInitiative) {
+        // Already has a saved initiative — switch immediately
+        executePokemonSwitch(pokemon, state);
+      } else {
+        // First time in battle — need to roll initiative
+        popup.style.display = 'none';
+        showSwitchInitiativePopup(pokemon);
+      }
+    });
+  });
+
+  popup.style.display = 'flex';
+}
+
+function showSwitchInitiativePopup(benchPokemon) {
+  _switchTargetPokemon = benchPokemon;
+  const titleEl = document.getElementById('switchInitTitle');
+  const descEl  = document.getElementById('switchInitDesc');
+  const input   = document.getElementById('switchInitInput');
+  const totalEl = document.getElementById('switchInitTotal');
+  const confirmBtn = document.getElementById('confirmSwitchBtn');
+
+  if (titleEl) titleEl.textContent = `${benchPokemon.name}'s Initiative`;
+  if (descEl)  descEl.textContent  = `Initiative Score: ${benchPokemon.initiativeScore}. Enter your d20 roll:`;
+  if (input)   { input.value = ''; }
+  if (totalEl) totalEl.textContent = benchPokemon.initiativeScore;
+  if (confirmBtn) confirmBtn.disabled = true;
+
+  document.getElementById('combatSwitchInitPopup').style.display = 'flex';
+}
+
+function executePokemonSwitch(benchPokemon, state) {
+  // Find the currently active pokemon (first non-trainer)
+  const activePokIdx = state.combatants.findIndex(c => c.type === 'pokemon');
+  if (activePokIdx === -1) return;
+
+  const activePokemon = state.combatants[activePokIdx];
+  // Remember who owns the current active turn so we can restore activeTurnIndex
+  const activeTurnCombatant = state.combatants[state.activeTurnIndex];
+
+  // Move active pokemon to bench
+  activePokemon.hasRolledInitiative = true;
+  state.bench = (state.bench || []).filter(b => b.id !== benchPokemon.id);
+  state.bench.push(activePokemon);
+
+  // Bring bench pokemon into active combatants
+  benchPokemon.hasRolledInitiative = true;
+  state.combatants.splice(activePokIdx, 1);
+  state.combatants.push(benchPokemon);
+
+  // Re-sort by initiative total
+  state.combatants.sort((a, b) => b.initiativeTotal - a.initiativeTotal);
+
+  // Restore activeTurnIndex to point to the same combatant that had the turn
+  const newIdx = state.combatants.findIndex(c => c.id === activeTurnCombatant.id);
+  state.activeTurnIndex = newIdx !== -1 ? newIdx : 0;
+
+  saveCombatState(state);
+  rerenderBattle(state);
+  showToast(`${activePokemon.name} withdrawn — ${benchPokemon.name} switched in!`, 'success');
+
+  document.getElementById('combatSwitchPopup').style.display = 'none';
+  document.getElementById('combatSwitchInitPopup').style.display = 'none';
 }
 
 function applyMoveColors() {
@@ -2305,35 +2523,39 @@ async function endCombat(state) {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const trainerName = trainerData[1] || '';
 
-  for (const c of state.combatants) {
-    if (c.type === 'trainer') {
-      trainerData[34] = c.currentHp;
-      trainerData[35] = c.currentVp;
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-      TrainerAPI.update(trainerData).catch(e => console.error('Trainer sync:', e));
+  // Persist trainer
+  const trainer = state.combatants.find(c => c.type === 'trainer');
+  if (trainer) {
+    trainerData[34] = trainer.currentHp;
+    trainerData[35] = trainer.currentVp;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    TrainerAPI.update(trainerData).catch(e => console.error('Trainer sync:', e));
+  }
 
-    } else if (c.type === 'pokemon') {
-      const pokemonData = JSON.parse(sessionStorage.getItem(c.entityKey) || '[]');
-      const pokemonName = pokemonData[2];
-      pokemonData[45] = c.currentHp;
-      pokemonData[46] = c.currentVp;
+  // Persist all pokemon — active and benched
+  const allPokemon = [
+    ...state.combatants.filter(c => c.type === 'pokemon'),
+    ...(state.bench || [])
+  ];
 
-      // Save KnownMoves (recharge tracking)
-      const knownMovesStr = buildKnownMovesString(c.rechargeStates || {});
-      pokemonData[59] = knownMovesStr;
+  for (const c of allPokemon) {
+    const pokemonData = JSON.parse(sessionStorage.getItem(c.entityKey) || '[]');
+    const pokemonName = pokemonData[2];
+    pokemonData[45] = c.currentHp;
+    pokemonData[46] = c.currentVp;
 
-      // Save StatusCondition (active status effects)
-      const statusCondStr = c.statusEffects.map(s => s.name).join(',');
-      pokemonData[60] = statusCondStr;
+    const knownMovesStr = buildKnownMovesString(c.rechargeStates || {});
+    pokemonData[59] = knownMovesStr;
 
-      sessionStorage.setItem(c.entityKey, JSON.stringify(pokemonData));
+    const statusCondStr = c.statusEffects.map(s => s.name).join(',');
+    pokemonData[60] = statusCondStr;
 
-      // Sync to API
-      PokemonAPI.updateLiveStats(trainerName, pokemonName, 'HP', c.currentHp).catch(e => console.error('HP sync:', e));
-      PokemonAPI.updateLiveStats(trainerName, pokemonName, 'VP', c.currentVp).catch(e => console.error('VP sync:', e));
-      if (knownMovesStr) PokemonAPI.updateLiveStats(trainerName, pokemonName, 'KnownMoves', knownMovesStr).catch(e => console.error('KnownMoves sync:', e));
-      if (statusCondStr) PokemonAPI.updateLiveStats(trainerName, pokemonName, 'StatusCondition', statusCondStr).catch(e => console.error('StatusCondition sync:', e));
-    }
+    sessionStorage.setItem(c.entityKey, JSON.stringify(pokemonData));
+
+    PokemonAPI.updateLiveStats(trainerName, pokemonName, 'HP', c.currentHp).catch(e => console.error('HP sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pokemonName, 'VP', c.currentVp).catch(e => console.error('VP sync:', e));
+    if (knownMovesStr) PokemonAPI.updateLiveStats(trainerName, pokemonName, 'KnownMoves', knownMovesStr).catch(e => console.error('KnownMoves sync:', e));
+    if (statusCondStr) PokemonAPI.updateLiveStats(trainerName, pokemonName, 'StatusCondition', statusCondStr).catch(e => console.error('StatusCondition sync:', e));
   }
 
   sessionStorage.removeItem('combatState');

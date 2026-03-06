@@ -2341,10 +2341,14 @@ export function renderPokemonCard(pokemonName) {
                 const skillClass = proficiencyLevel >= 1 ? 'unlocked' : '';
                 const doubleProfClass = hasDoubleProficiency ? 'double-proficiency' : '';
 
+                const profBonus = parseInt(proficiencyBonus) || 2;
+                const totalMod = skill.mod + (hasDoubleProficiency ? 2 * profBonus : proficiencyLevel >= 1 ? profBonus : 0);
+                const totalModStr = totalMod >= 0 ? `+${totalMod}` : `${totalMod}`;
+
                 return `
                   <div class="skill-item ${skillClass} ${doubleProfClass}">
                     <div class="skill-name">${skill.name}</div>
-                    <div class="skill-modifier">(${skill.stat})</div>
+                    <div class="skill-modifier">(${skill.stat} ${totalModStr})</div>
                   </div>
                 `;
               }).join('')}

@@ -56,12 +56,31 @@ export function renderTrainerInfo() {
   // Parse skills (comma-separated string)
   const skillsArray = trainerSkills ? trainerSkills.split(',').map(s => s.trim()).filter(s => s) : [];
 
-  // All skills list
+  // All skills list with associated stat modifier
+  const _strMod = parseInt(strModifier) || 0;
+  const _dexMod = parseInt(dexModifier) || 0;
+  const _intMod = parseInt(intModifier) || 0;
+  const _wisMod = parseInt(wisModifier) || 0;
+  const _chaMod = parseInt(chaModifier) || 0;
   const allSkills = [
-    "Athletics (STR)", "Acrobatics (DEX)", "Sleight of Hand (DEX)", "Stealth (DEX)",
-    "Arcana (INT)", "History (INT)", "Investigation (INT)", "Nature (INT)", "Religion (INT)",
-    "Animal Handling (WIS)", "Insight (WIS)", "Medicine (WIS)", "Perception (WIS)",
-    "Survival (WIS)", "Deception (CHA)", "Intimidation (CHA)", "Performance (CHA)", "Persuasion (CHA)"
+    { name: "Athletics",       stat: "STR", mod: _strMod },
+    { name: "Acrobatics",      stat: "DEX", mod: _dexMod },
+    { name: "Sleight of Hand", stat: "DEX", mod: _dexMod },
+    { name: "Stealth",         stat: "DEX", mod: _dexMod },
+    { name: "Arcana",          stat: "INT", mod: _intMod },
+    { name: "History",         stat: "INT", mod: _intMod },
+    { name: "Investigation",   stat: "INT", mod: _intMod },
+    { name: "Nature",          stat: "INT", mod: _intMod },
+    { name: "Religion",        stat: "INT", mod: _intMod },
+    { name: "Animal Handling", stat: "WIS", mod: _wisMod },
+    { name: "Insight",         stat: "WIS", mod: _wisMod },
+    { name: "Medicine",        stat: "WIS", mod: _wisMod },
+    { name: "Perception",      stat: "WIS", mod: _wisMod },
+    { name: "Survival",        stat: "WIS", mod: _wisMod },
+    { name: "Deception",       stat: "CHA", mod: _chaMod },
+    { name: "Intimidation",    stat: "CHA", mod: _chaMod },
+    { name: "Performance",     stat: "CHA", mod: _chaMod },
+    { name: "Persuasion",      stat: "CHA", mod: _chaMod }
   ];
 
   const html = `
@@ -1867,14 +1886,21 @@ export function renderTrainerInfo() {
           <h3>Skills</h3>
           <div class="skills-grid">
             ${allSkills.map(skill => {
-              const skillName = skill.split(' (')[0].trim();
-              const skillModifier = skill.split(' (')[1].replace(')', '');
-              const isUnlocked = skillsArray.some(s => s.toLowerCase().includes(skillName.toLowerCase()));
+              const skillKey = skill.name.toLowerCase();
+              const profBonus = parseInt(trainerProficiency) || 2;
+              const isDouble = skillsArray.some(s =>
+                s.toLowerCase() === skillKey + '+' || s === skill.name + '+'
+              );
+              const isProficient = isDouble || skillsArray.some(s => s.toLowerCase().includes(skillKey));
+              const totalMod = skill.mod + (isDouble ? 2 * profBonus : isProficient ? profBonus : 0);
+              const totalModStr = totalMod >= 0 ? `+${totalMod}` : `${totalMod}`;
+              const skillClass = isProficient ? 'unlocked' : '';
+              const doubleProfClass = isDouble ? 'double-proficiency' : '';
 
               return `
-                <div class="skill-item ${isUnlocked ? 'unlocked' : ''}">
-                  <div class="skill-name">${skillName}</div>
-                  <div class="skill-modifier">(${skillModifier})</div>
+                <div class="skill-item ${skillClass} ${doubleProfClass}">
+                  <div class="skill-name">${skill.name}</div>
+                  <div class="skill-modifier">(${skill.stat} ${totalModStr})</div>
                 </div>
               `;
             }).join('')}

@@ -25,6 +25,19 @@ function getCachedItems() {
 // GAME HELPERS
 // ============================================================================
 
+/**
+ * Returns true if the combatant has the named ability (case-insensitive).
+ * Abilities are stored as "slot:name;desc|slot:name;desc" or "name;desc|name;desc".
+ */
+function hasAbility(combatant, abilityName) {
+  if (!combatant?.abilities) return false;
+  const target = abilityName.toLowerCase();
+  return combatant.abilities.split('|').some(a => {
+    const body = a.includes(':') ? a.substring(a.indexOf(':') + 1) : a;
+    return body.split(';')[0].trim().toLowerCase() === target;
+  });
+}
+
 function computeProficiency(level) {
   if (level >= 17) return 6;
   if (level >= 13) return 5;
@@ -1684,6 +1697,16 @@ function endTurnForCombatant(combatantId, state) {
   }
   state.activeTurnIndex = next;
 
+  // Start-of-turn ability effects (skip round 1)
+  if (state.round > 1) {
+    const nextC = state.combatants[next];
+    if (nextC && nextC.type === 'pokemon' && hasAbility(nextC, 'Energy Intensive')) {
+      const drain = nextC.proficiency || 2;
+      nextC.currentVp = Math.max(0, nextC.currentVp - drain);
+      showToast(`${nextC.name}: Energy Intensive — −${drain} VP at start of turn`, 'warning');
+    }
+  }
+
   state.combatants.forEach((cc, idx) => { if (idx !== next) cc.isExpanded = false; });
   saveCombatState(state);
   rerenderBattle(state);
@@ -2228,6 +2251,12 @@ function showTypeCalcPopup(combatantId, state) {
   TYPE_NAMES.forEach((name, i) => { multMap[name] = isNaN(chartVals[i]) ? 1 : chartVals[i]; });
   multMap["Cosmic"] = 1;
 
+  // Energy Intensive: Psychic resistance → neutral (immunities and weaknesses unchanged)
+  if (hasAbility(c, 'Energy Intensive')) {
+    const psyMult = multMap['Psychic'] ?? 1;
+    if (psyMult > 0 && psyMult < 1) multMap['Psychic'] = 1;
+  }
+
   const weaknesses  = ALL_TYPES.filter(t => (multMap[t] ?? 1) > 1);
   const resistances = ALL_TYPES.filter(t => { const v = multMap[t] ?? 1; return v > 0 && v < 1; });
   const immunities  = ALL_TYPES.filter(t => (multMap[t] ?? 1) === 0);
@@ -2327,6 +2356,14 @@ function showTypeCalcPopup(combatantId, state) {
     const vpAmt = parseInt(vpInput.value) || 0;
     if (hpAmt > 0) c.currentHp = Math.max(0, c.currentHp - hpAmt);
     if (vpAmt > 0) c.currentVp = Math.max(0, c.currentVp - vpAmt);
+    // Energy Intensive: Psychic damage also drains VP equal to HP taken
+    if (hpAmt > 0 && hasAbility(c, 'Energy Intensive')) {
+      const selectedType = popup.querySelector('.combat-type-button.selected')?.dataset.type;
+      if (selectedType === 'Psychic') {
+        c.currentVp = Math.max(0, c.currentVp - hpAmt);
+        showToast(`${c.name}: Energy Intensive — Psychic hit drains an extra ${hpAmt} VP!`, 'warning');
+      }
+    }
     saveCombatState(state);
     rerenderBattle(state);
     syncPokemon();

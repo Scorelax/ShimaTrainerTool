@@ -558,6 +558,10 @@ function renderBattlePhase(state) {
               <div class="type-eff-label immune-label">Immunity</div>
               <div class="type-buttons-row" id="typeCalcImmune"></div>
             </div>
+            <div id="typeCalcAbilitySection" class="type-eff-section" style="display:none;">
+              <div class="type-eff-label ability-effect-label" id="typeCalcAbilityLabel"></div>
+              <div class="type-buttons-row" id="typeCalcAbility"></div>
+            </div>
             <div id="typeCalcResult" class="type-calc-result"></div>
             <hr class="type-calc-divider">
             <div class="combat-stats-row">
@@ -1139,6 +1143,7 @@ function getCombatCSS() {
     .weak-label { color: #ff7777; }
     .resist-label { color: #88aaff; }
     .immune-label { color: #aaaaaa; }
+    .ability-effect-label { color: #c792ea; }
     .neutral-label { color: #cccccc; }
     .type-buttons-row { display: flex; flex-wrap: wrap; gap: 0.3rem; justify-content: center; }
     .combat-type-button { padding: 0.22rem 0.6rem; border-radius: 10px; border: 2px solid transparent; font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: transform 0.1s, border-color 0.15s, box-shadow 0.15s; }
@@ -2252,7 +2257,8 @@ function showTypeCalcPopup(combatantId, state) {
   multMap["Cosmic"] = 1;
 
   // Energy Intensive: Psychic resistance → neutral (immunities and weaknesses unchanged)
-  if (hasAbility(c, 'Energy Intensive')) {
+  const energyIntensive = hasAbility(c, 'Energy Intensive');
+  if (energyIntensive) {
     const psyMult = multMap['Psychic'] ?? 1;
     if (psyMult > 0 && psyMult < 1) multMap['Psychic'] = 1;
   }
@@ -2290,6 +2296,23 @@ function showTypeCalcPopup(combatantId, state) {
     sec.style.display = types.length ? '' : 'none';
     document.getElementById(containerId).innerHTML = buildBtns(types);
   });
+
+  // Ability-effect section: always show Psychic for Energy Intensive
+  const abilitySection = document.getElementById('typeCalcAbilitySection');
+  const abilityContainer = document.getElementById('typeCalcAbility');
+  const abilityLabel = document.getElementById('typeCalcAbilityLabel');
+  if (energyIntensive) {
+    // Only add Psychic here if it's not already in the weakness row (e.g. naturally weak)
+    if (!weaknesses.includes('Psychic')) {
+      abilityLabel.textContent = 'Energy Intensive (neutral, drains VP)';
+      abilityContainer.innerHTML = buildBtns(['Psychic']);
+      abilitySection.style.display = '';
+    } else {
+      abilitySection.style.display = 'none';
+    }
+  } else {
+    abilitySection.style.display = 'none';
+  }
 
   // Result display + type button click handlers
   const resultEl = document.getElementById('typeCalcResult');

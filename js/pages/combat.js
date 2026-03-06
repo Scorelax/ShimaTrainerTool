@@ -2270,13 +2270,20 @@ function showTypeCalcPopup(combatantId, state) {
   const popup = document.getElementById('combatTypeCalcPopup');
   popup.querySelectorAll('.combat-type-button').forEach(btn => {
     btn.addEventListener('click', () => {
+      const wasSelected = btn.classList.contains('selected');
       popup.querySelectorAll('.combat-type-button').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      const v = multMap[btn.dataset.type] ?? 1;
-      if (v === 0) { resultEl.textContent = '0× — Immune!'; resultEl.className = 'type-calc-result type-calc-immune show'; }
-      else if (v < 1) { resultEl.textContent = `${v}× — Not very effective`; resultEl.className = 'type-calc-result type-calc-resist show'; }
-      else if (v > 1) { resultEl.textContent = `${v}× — Super effective!`; resultEl.className = 'type-calc-result type-calc-weak show'; }
-      else { resultEl.textContent = '1× — Normal damage'; resultEl.className = 'type-calc-result type-calc-neutral show'; }
+      if (wasSelected) {
+        // Deselect — clear result
+        resultEl.className = 'type-calc-result';
+        resultEl.textContent = '';
+      } else {
+        btn.classList.add('selected');
+        const v = multMap[btn.dataset.type] ?? 1;
+        if (v === 0) { resultEl.textContent = '0× — Immune!'; resultEl.className = 'type-calc-result type-calc-immune show'; }
+        else if (v < 1) { resultEl.textContent = `${v}× — Not very effective`; resultEl.className = 'type-calc-result type-calc-resist show'; }
+        else if (v > 1) { resultEl.textContent = `${v}× — Super effective!`; resultEl.className = 'type-calc-result type-calc-weak show'; }
+        else { resultEl.textContent = '1× — Normal damage'; resultEl.className = 'type-calc-result type-calc-neutral show'; }
+      }
     });
   });
 

@@ -234,6 +234,14 @@ export function renderPokemonCard(pokemonName) {
     skillCounts[skillName] = (skillCounts[skillName] || 0) + 1;
   });
 
+  // Specialization skill bonus: +1 per trainer specialization whose type matches this pokemon's type(s)
+  const pokemonTypes = [type1, type2].filter(Boolean);
+  const trainerSpecs = specializationsStr ? specializationsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const specSkillBonus = trainerSpecs.reduce((sum, spec) => {
+    const specType = SPECIALIZATION_TO_TYPE[spec];
+    return sum + (specType && pokemonTypes.includes(specType) ? 1 : 0);
+  }, 0);
+
   const displayName = name; // Just use the Pokemon name, not nickname
   const typingText = type2 ? `${type1} - ${type2}` : type1;
 
@@ -2342,7 +2350,7 @@ export function renderPokemonCard(pokemonName) {
                 const doubleProfClass = hasDoubleProficiency ? 'double-proficiency' : '';
 
                 const profBonus = parseInt(proficiencyBonus) || 2;
-                const totalMod = skill.mod + (hasDoubleProficiency ? 2 * profBonus : proficiencyLevel >= 1 ? profBonus : 0);
+                const totalMod = skill.mod + specSkillBonus + (hasDoubleProficiency ? 2 * profBonus : proficiencyLevel >= 1 ? profBonus : 0);
                 const totalModStr = totalMod >= 0 ? `+${totalMod}` : `${totalMod}`;
 
                 return `

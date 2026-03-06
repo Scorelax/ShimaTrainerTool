@@ -2256,11 +2256,14 @@ function showTypeCalcPopup(combatantId, state) {
   TYPE_NAMES.forEach((name, i) => { multMap[name] = isNaN(chartVals[i]) ? 1 : chartVals[i]; });
   multMap["Cosmic"] = 1;
 
-  // Energy Intensive: Psychic resistance → neutral (immunities and weaknesses unchanged)
+  // Energy Intensive: shift Psychic up one damage tier
   const energyIntensive = hasAbility(c, 'Energy Intensive');
   if (energyIntensive) {
     const psyMult = multMap['Psychic'] ?? 1;
-    if (psyMult > 0 && psyMult < 1) multMap['Psychic'] = 1;
+    if (psyMult === 0)    multMap['Psychic'] = 0.5; // immune → resistant
+    else if (psyMult < 1) multMap['Psychic'] = 1;   // resistant → neutral
+    else if (psyMult === 1) multMap['Psychic'] = 2; // neutral → weak
+    // already weak (≥2): no change
   }
 
   const weaknesses  = ALL_TYPES.filter(t => (multMap[t] ?? 1) > 1);
@@ -2301,15 +2304,12 @@ function showTypeCalcPopup(combatantId, state) {
   const abilitySection = document.getElementById('typeCalcAbilitySection');
   const abilityContainer = document.getElementById('typeCalcAbility');
   const abilityLabel = document.getElementById('typeCalcAbilityLabel');
-  if (energyIntensive) {
-    // Only add Psychic here if it's not already in the weakness row (e.g. naturally weak)
-    if (!weaknesses.includes('Psychic')) {
-      abilityLabel.textContent = 'Energy Intensive (neutral, drains VP)';
-      abilityContainer.innerHTML = buildBtns(['Psychic']);
-      abilitySection.style.display = '';
-    } else {
-      abilitySection.style.display = 'none';
-    }
+  // Show ability section only when Psychic landed at neutral (1×) — not visible in any standard section
+  const psychicInStandardSection = [...weaknesses, ...resistances, ...immunities].includes('Psychic');
+  if (energyIntensive && !psychicInStandardSection) {
+    abilityLabel.textContent = 'Energy Intensive (neutral, drains VP)';
+    abilityContainer.innerHTML = buildBtns(['Psychic']);
+    abilitySection.style.display = '';
   } else {
     abilitySection.style.display = 'none';
   }

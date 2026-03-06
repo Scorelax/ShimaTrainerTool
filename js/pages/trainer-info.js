@@ -83,6 +83,31 @@ export function renderTrainerInfo() {
     { name: "Persuasion",      stat: "CHA", mod: _chaMod }
   ];
 
+  // Parse badge effects for skill bonuses
+  // Regex matches: "+N to <skill> skill check(s)" or "+N to all skill checks"
+  const badgeSkillBonuses = {};
+  const allItems = JSON.parse(sessionStorage.getItem('items') || '[]');
+  const inventoryNames = (trainerData[20] || '').split(',')
+    .map(s => s.replace(/\(x\d+\)/i, '').trim()).filter(Boolean);
+  const earnedBadges = allItems.filter(item =>
+    item.type === 'Badges, Seals & Sigils' && inventoryNames.includes(item.name)
+  );
+  const skillBonusRegex = /\+(\d+)\s+to\s+([\w\s]+?)\s+skill\s+checks?/gi;
+  earnedBadges.forEach(badge => {
+    const effectText = badge.effect || badge.description || '';
+    let match;
+    skillBonusRegex.lastIndex = 0;
+    while ((match = skillBonusRegex.exec(effectText)) !== null) {
+      const amount = parseInt(match[1]);
+      const targets = match[2].trim().toLowerCase();
+      // Support "all" or "skill1 and skill2" style
+      targets.split(/\s+and\s+/).forEach(t => {
+        const key = t.trim();
+        if (key) badgeSkillBonuses[key] = (badgeSkillBonuses[key] || 0) + amount;
+      });
+    }
+  });
+
   const html = `
     <div class="trainer-info-page">
       <style>
@@ -1892,7 +1917,8 @@ export function renderTrainerInfo() {
                 s.toLowerCase() === skillKey + '+' || s === skill.name + '+'
               );
               const isProficient = isDouble || skillsArray.some(s => s.toLowerCase().includes(skillKey));
-              const totalMod = skill.mod + (isDouble ? 2 * profBonus : isProficient ? profBonus : 0);
+              const badgeBonus = (badgeSkillBonuses['all'] || 0) + (badgeSkillBonuses[skillKey] || 0);
+              const totalMod = skill.mod + badgeBonus + (isDouble ? 2 * profBonus : isProficient ? profBonus : 0);
               const totalModStr = totalMod >= 0 ? `+${totalMod}` : `${totalMod}`;
               const skillClass = isProficient ? 'unlocked' : '';
               const doubleProfClass = isDouble ? 'double-proficiency' : '';

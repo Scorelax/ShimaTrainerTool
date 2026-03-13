@@ -1199,6 +1199,54 @@ export function renderTrainerInfo() {
           overflow-y: auto;
         }
 
+        .modal-tabs {
+          display: flex;
+          border-bottom: 2px solid #444;
+          margin-bottom: 1.2rem;
+        }
+
+        .modal-tab {
+          flex: 1;
+          padding: 0.55rem 1rem;
+          background: none;
+          border: none;
+          border-bottom: 3px solid transparent;
+          color: #aaa;
+          font-size: clamp(0.85rem, 1.9vw, 1rem);
+          font-weight: 700;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.2s;
+          margin-bottom: -2px;
+        }
+
+        .modal-tab.active {
+          color: #FFDE00;
+          border-bottom-color: #FFDE00;
+        }
+
+        .form-group textarea {
+          width: 100%;
+          padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
+          background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
+          border: clamp(2px, 0.4vw, 3px) solid #555;
+          border-radius: clamp(8px, 1.5vw, 12px);
+          color: white;
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-weight: 600;
+          box-sizing: border-box;
+          resize: vertical;
+          min-height: 80px;
+          transition: all 0.3s ease;
+          font-family: inherit;
+        }
+
+        .form-group textarea:focus {
+          outline: none;
+          border-color: #FFDE00;
+          box-shadow: 0 0 0 clamp(2px, 0.4vw, 3px) rgba(255,222,0,0.3);
+        }
+
         .form-group {
           margin-bottom: clamp(1.2rem, 2.5vh, 1.8rem);
           position: relative;
@@ -1994,14 +2042,34 @@ export function renderTrainerInfo() {
             <h2>Add Item to Inventory</h2>
           </div>
           <div class="modal-body">
-            <div class="form-group">
-              <label for="itemSearch">Search for Item</label>
-              <input type="text" id="itemSearch" placeholder="Start typing to search..." autocomplete="off">
-              <div id="autocompleteResults" class="autocomplete-dropdown"></div>
+            <div class="modal-tabs">
+              <button class="modal-tab active" id="tabFromList">From List</button>
+              <button class="modal-tab" id="tabCustomItem">Custom Item</button>
             </div>
-            <div class="form-group">
-              <label for="itemQuantity">Quantity</label>
-              <input type="number" id="itemQuantity" value="1" min="1">
+            <div id="fromListSection">
+              <div class="form-group">
+                <label for="itemSearch">Search for Item</label>
+                <input type="text" id="itemSearch" placeholder="Start typing to search..." autocomplete="off">
+                <div id="autocompleteResults" class="autocomplete-dropdown"></div>
+              </div>
+              <div class="form-group">
+                <label for="itemQuantity">Quantity</label>
+                <input type="number" id="itemQuantity" value="1" min="1">
+              </div>
+            </div>
+            <div id="customItemSection" style="display:none;">
+              <div class="form-group">
+                <label for="customItemName">Item Name</label>
+                <input type="text" id="customItemName" placeholder="Enter item name...">
+              </div>
+              <div class="form-group">
+                <label for="customItemDescription">Description</label>
+                <textarea id="customItemDescription" placeholder="Enter item description..."></textarea>
+              </div>
+              <div class="form-group">
+                <label for="customItemQuantity">Quantity</label>
+                <input type="number" id="customItemQuantity" value="1" min="1">
+              </div>
             </div>
           </div>
           <div class="modal-actions">
@@ -2379,6 +2447,22 @@ export function attachTrainerInfoListeners() {
     }));
   });
 
+  // Helper functions for custom item storage (stored as JSON after '##CUSTOM##' in trainerData[20])
+  function parseCustomItems(inventoryStr) {
+    if (!inventoryStr || !inventoryStr.includes('##CUSTOM##')) return [];
+    try { return JSON.parse(inventoryStr.split('##CUSTOM##')[1]) || []; } catch(e) { return []; }
+  }
+
+  function getRegularStr(inventoryStr) {
+    if (!inventoryStr) return '';
+    return inventoryStr.split('##CUSTOM##')[0];
+  }
+
+  function buildInventoryString(regularStr, customItems) {
+    if (!customItems || customItems.length === 0) return regularStr || '';
+    return `${regularStr || ''}##CUSTOM##${JSON.stringify(customItems)}`;
+  }
+
   // Helper function to refresh inventory display
   function refreshInventoryDisplay() {
     // Reload fresh trainer data from sessionStorage
@@ -2390,15 +2474,20 @@ export function attachTrainerInfoListeners() {
     const itemsStr = sessionStorage.getItem('items');
     const categoriesContainer = document.getElementById('inventoryCategories');
 
-    if (inventory === 'None' || !inventory || !itemsStr) {
+    const customItemsList = parseCustomItems(inventory);
+    const regularInv = getRegularStr(inventory);
+
+    if ((regularInv === 'None' || !regularInv || !itemsStr) && customItemsList.length === 0) {
       categoriesContainer.innerHTML = '<li style="padding: 2rem; text-align: center; color: #999;">No items in inventory</li>';
       openPopup('inventoryPopup');
       return;
     }
 
     // Parse items data and group by type
-    const itemsData = JSON.parse(itemsStr);
-    const inventoryItems = inventory.split(',').map(item => item.trim()).filter(item => item);
+    const itemsData = itemsStr ? JSON.parse(itemsStr) : [];
+    const inventoryItems = (regularInv && regularInv !== 'None' && itemsStr)
+      ? regularInv.split(',').map(item => item.trim()).filter(item => item)
+      : [];
 
     // Extract item name and quantity
     const groupedItems = {};
@@ -2422,6 +2511,17 @@ export function attachTrainerInfoListeners() {
         });
       }
     });
+
+    // Add custom items to their own section
+    if (customItemsList.length > 0) {
+      groupedItems['Custom Items'] = customItemsList.map(ci => ({
+        name: ci.name,
+        description: ci.description || 'No description available',
+        effect: '',
+        quantity: ci.quantity,
+        fullData: { isCustom: true }
+      }));
+    }
 
     // Generate category list HTML
     let html = '';
@@ -2472,11 +2572,14 @@ export function attachTrainerInfoListeners() {
         // Select current item
         this.classList.add('selected');
         selectedItemData = JSON.parse(this.dataset.item);
+        if (selectedItemData.fullData && selectedItemData.fullData.isCustom) {
+          selectedItemData.isCustom = true;
+        }
 
         // Update info panel
         document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
         document.getElementById('descriptionText').textContent = selectedItemData.description;
-        document.getElementById('effectText').textContent = selectedItemData.effect;
+        document.getElementById('effectText').textContent = selectedItemData.effect || 'Custom item — no effect.';
 
         // Enable edit/remove/use buttons
         document.getElementById('editItemButton').disabled = false;
@@ -2509,11 +2612,14 @@ export function attachTrainerInfoListeners() {
         // Select the item
         matchingItem.classList.add('selected');
         selectedItemData = JSON.parse(matchingItem.dataset.item);
+        if (selectedItemData.fullData && selectedItemData.fullData.isCustom) {
+          selectedItemData.isCustom = true;
+        }
 
         // Update info panel with fresh data
         document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
         document.getElementById('descriptionText').textContent = selectedItemData.description;
-        document.getElementById('effectText').textContent = selectedItemData.effect;
+        document.getElementById('effectText').textContent = selectedItemData.effect || 'Custom item — no effect.';
 
         // Keep buttons enabled
         document.getElementById('editItemButton').disabled = false;
@@ -2738,10 +2844,33 @@ export function attachTrainerInfoListeners() {
   // Add Item button - Opens add modal
   document.getElementById('addItemButton')?.addEventListener('click', function() {
     document.getElementById('addItemModal').style.display = 'block';
+    // Reset to "From List" tab
+    document.getElementById('fromListSection').style.display = 'block';
+    document.getElementById('customItemSection').style.display = 'none';
+    document.getElementById('tabFromList').classList.add('active');
+    document.getElementById('tabCustomItem').classList.remove('active');
     document.getElementById('itemSearch').value = '';
     document.getElementById('itemQuantity').value = '1';
     document.getElementById('autocompleteResults').style.display = 'none';
+    document.getElementById('customItemName').value = '';
+    document.getElementById('customItemDescription').value = '';
+    document.getElementById('customItemQuantity').value = '1';
     setupItemAutocomplete();
+  });
+
+  // Add Item modal tab switching
+  document.getElementById('tabFromList')?.addEventListener('click', function() {
+    this.classList.add('active');
+    document.getElementById('tabCustomItem').classList.remove('active');
+    document.getElementById('fromListSection').style.display = 'block';
+    document.getElementById('customItemSection').style.display = 'none';
+  });
+
+  document.getElementById('tabCustomItem')?.addEventListener('click', function() {
+    this.classList.add('active');
+    document.getElementById('tabFromList').classList.remove('active');
+    document.getElementById('fromListSection').style.display = 'none';
+    document.getElementById('customItemSection').style.display = 'block';
   });
 
   // Edit Item button - Opens edit modal
@@ -3063,17 +3192,22 @@ export function attachTrainerInfoListeners() {
 
   // Helper to decrement item quantity in trainer data inventory string
   function decrementItemQuantity(td, itemName) {
-    const inventoryStr = td[20] || '';
-    let invItems = inventoryStr && inventoryStr !== 'None'
-      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+    const fullStr = td[20] || '';
+    const regularStr = getRegularStr(fullStr);
+    const customItems = parseCustomItems(fullStr);
+
+    let invItems = regularStr && regularStr !== 'None'
+      ? regularStr.split(',').map(item => item.trim()).filter(item => item)
       : [];
 
+    let found = false;
     invItems = invItems.map(itemStr => {
       const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
       const name = match ? match[1].trim() : itemStr;
       const qty = match ? parseInt(match[2], 10) : 1;
 
       if (name.toLowerCase() === itemName.toLowerCase()) {
+        found = true;
         const newQty = qty - 1;
         if (newQty <= 0) return null;
         return `${name} (x${newQty})`;
@@ -3081,7 +3215,16 @@ export function attachTrainerInfoListeners() {
       return itemStr;
     }).filter(item => item !== null);
 
-    td[20] = invItems.length > 0 ? invItems.join(', ') : 'None';
+    if (!found) {
+      const ci = customItems.findIndex(i => i.name.toLowerCase() === itemName.toLowerCase());
+      if (ci >= 0) {
+        customItems[ci].quantity -= 1;
+        if (customItems[ci].quantity <= 0) customItems.splice(ci, 1);
+      }
+    }
+
+    const newRegular = invItems.length > 0 ? invItems.join(', ') : 'None';
+    td[20] = buildInventoryString(newRegular, customItems);
   }
 
   // Trainer Buffs button
@@ -3097,14 +3240,6 @@ export function attachTrainerInfoListeners() {
 
   // Add Item Modal - Confirm button
   document.getElementById('confirmAddItem')?.addEventListener('click', function() {
-    const selectedItemName = document.getElementById('itemSearch').value.trim();
-    const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
-
-    if (!selectedItemName || quantity < 1) {
-      alert('Please select a valid item and quantity.');
-      return;
-    }
-
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
       alert('Trainer data not found.');
@@ -3112,62 +3247,91 @@ export function attachTrainerInfoListeners() {
     }
 
     const trainerData = JSON.parse(trainerDataRaw);
-    const inventoryStr = trainerData[20] || '';
-    let inventoryItems = inventoryStr && inventoryStr !== 'None'
-      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
-      : [];
+    const isCustomTab = document.getElementById('tabCustomItem').classList.contains('active');
 
-    // Check if item already exists
-    let found = false;
-    inventoryItems = inventoryItems.map(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-      const currentQty = match ? parseInt(match[2], 10) : 1;
+    if (isCustomTab) {
+      // --- Custom item path ---
+      const customName = document.getElementById('customItemName').value.trim();
+      const customDesc = document.getElementById('customItemDescription').value.trim();
+      const customQty = parseInt(document.getElementById('customItemQuantity').value, 10);
 
-      if (itemName.toLowerCase() === selectedItemName.toLowerCase()) {
-        found = true;
-        const newQty = currentQty + quantity;
-        return `${itemName} (x${newQty})`;
+      if (!customName || customQty < 1) {
+        alert('Please enter a valid item name and quantity.');
+        return;
       }
-      return itemStr;
-    });
 
-    // If not found, add as new item
-    if (!found) {
-      inventoryItems.push(`${selectedItemName} (x${quantity})`);
+      const existingCustom = parseCustomItems(trainerData[20] || '');
+      const regularStr = getRegularStr(trainerData[20] || '');
+      const existingIdx = existingCustom.findIndex(i => i.name.toLowerCase() === customName.toLowerCase());
+      if (existingIdx >= 0) {
+        existingCustom[existingIdx].quantity += customQty;
+        if (customDesc) existingCustom[existingIdx].description = customDesc;
+      } else {
+        existingCustom.push({ name: customName, description: customDesc, quantity: customQty });
+      }
+      trainerData[20] = buildInventoryString(regularStr, existingCustom);
+      audioManager.playSfx('NewItem');
+    } else {
+      // --- Regular item path ---
+      const selectedItemName = document.getElementById('itemSearch').value.trim();
+      const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
+
+      if (!selectedItemName || quantity < 1) {
+        alert('Please select a valid item and quantity.');
+        return;
+      }
+
+      const fullInvStr = trainerData[20] || '';
+      const regularStr = getRegularStr(fullInvStr);
+      const customItems = parseCustomItems(fullInvStr);
+
+      let inventoryItems = regularStr && regularStr !== 'None'
+        ? regularStr.split(',').map(item => item.trim()).filter(item => item)
+        : [];
+
+      let found = false;
+      inventoryItems = inventoryItems.map(itemStr => {
+        const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+        const itemName = match ? match[1].trim() : itemStr;
+        const currentQty = match ? parseInt(match[2], 10) : 1;
+        if (itemName.toLowerCase() === selectedItemName.toLowerCase()) {
+          found = true;
+          return `${itemName} (x${currentQty + quantity})`;
+        }
+        return itemStr;
+      });
+      if (!found) {
+        inventoryItems.push(`${selectedItemName} (x${quantity})`);
+      }
+
+      trainerData[20] = buildInventoryString(inventoryItems.join(', '), customItems);
+
+      const allItems = JSON.parse(sessionStorage.getItem('items') || '[]');
+      const itemData = allItems.find(i => i[0] && i[0].toLowerCase() === selectedItemName.toLowerCase());
+      const itemType = itemData ? itemData[1] : '';
+      if (itemType === 'Berries') {
+        audioManager.playSfx('Berry');
+      } else if (itemType === 'Badges, Seals & Sigils') {
+        audioManager.playSfx('GymBadge');
+      } else {
+        audioManager.playSfx('NewItem');
+      }
     }
 
-    // Update sessionStorage immediately
-    trainerData[20] = inventoryItems.join(', ');
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-    // Play item sound based on type
-    const allItems = JSON.parse(sessionStorage.getItem('items') || '[]');
-    const itemData = allItems.find(i => i[0] && i[0].toLowerCase() === selectedItemName.toLowerCase());
-    const itemType = itemData ? itemData[1] : '';
-    if (itemType === 'Berries') {
-      audioManager.playSfx('Berry');
-    } else if (itemType === 'Badges, Seals & Sigils') {
-      audioManager.playSfx('GymBadge');
-    } else {
-      audioManager.playSfx('NewItem');
-    }
-
-    // Close modal immediately
+    // Close modal and reset
     document.getElementById('addItemModal').style.display = 'none';
-
-    // Clear the search input for next time
     document.getElementById('itemSearch').value = '';
     document.getElementById('itemQuantity').value = '1';
+    document.getElementById('customItemName').value = '';
+    document.getElementById('customItemDescription').value = '';
+    document.getElementById('customItemQuantity').value = '1';
 
-    // Refresh inventory display immediately with updated data
     refreshInventoryDisplay();
 
-    // Update database in background
     import('../api.js').then(({ TrainerAPI }) => {
-      TrainerAPI.update(trainerData).then(() => {
-        console.log('Inventory updated in database');
-      }).catch(error => {
+      TrainerAPI.update(trainerData).catch(error => {
         console.error('Failed to update inventory in database:', error);
       });
     });
@@ -3210,32 +3374,51 @@ export function attachTrainerInfoListeners() {
     }
 
     const trainerData = JSON.parse(trainerDataRaw);
-    const inventoryStr = trainerData[20] || '';
-    let inventoryItems = inventoryStr && inventoryStr !== 'None'
-      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+    const fullStr = trainerData[20] || '';
+    const regularStr = getRegularStr(fullStr);
+    const customItems = parseCustomItems(fullStr);
+
+    let found = false;
+
+    if (selectedItemData.isCustom) {
+      const ci = customItems.findIndex(i => i.name.toLowerCase() === selectedItemData.name.toLowerCase());
+      if (ci >= 0) {
+        found = true;
+        if (newQuantity === 0) {
+          customItems.splice(ci, 1);
+        } else {
+          customItems[ci].quantity = newQuantity;
+        }
+      }
+      if (found) {
+        trainerData[20] = buildInventoryString(regularStr || 'None', customItems);
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+        document.getElementById('editItemModal').style.display = 'none';
+        refreshInventoryDisplay();
+        import('../api.js').then(({ TrainerAPI }) => {
+          TrainerAPI.update(trainerData).catch(error => console.error('Failed to update inventory:', error));
+        });
+      }
+      return;
+    }
+
+    // Regular item path
+    let inventoryItems = regularStr && regularStr !== 'None'
+      ? regularStr.split(',').map(item => item.trim()).filter(item => item)
       : [];
 
-    // Find the item by parsing each string
-    let found = false;
     inventoryItems = inventoryItems.filter(itemStr => {
       const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
       const itemName = match ? match[1].trim() : itemStr;
 
       if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
         found = true;
-        if (newQuantity === 0) {
-          // Remove item if quantity is 0
-          return false; // Filter out this item
-        } else {
-          // Update quantity - will be handled in map below
-          return true;
-        }
+        return newQuantity !== 0;
       }
       return true;
     }).map(itemStr => {
       const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
       const itemName = match ? match[1].trim() : itemStr;
-
       if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
         return `${itemName} (x${newQuantity})`;
       }
@@ -3243,21 +3426,14 @@ export function attachTrainerInfoListeners() {
     });
 
     if (found) {
-      // Update sessionStorage immediately
-      trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
+      trainerData[20] = buildInventoryString(inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None', customItems);
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-      // Close modal immediately
       document.getElementById('editItemModal').style.display = 'none';
-
-      // Refresh inventory display immediately with updated data
       refreshInventoryDisplay();
 
-      // Update database in background
       import('../api.js').then(({ TrainerAPI }) => {
-        TrainerAPI.update(trainerData).then(() => {
-          console.log('Inventory updated in database');
-        }).catch(error => {
+        TrainerAPI.update(trainerData).catch(error => {
           console.error('Failed to update inventory in database:', error);
         });
       });
@@ -3278,40 +3454,55 @@ export function attachTrainerInfoListeners() {
     }
 
     const trainerData = JSON.parse(trainerDataRaw);
-    const inventoryStr = trainerData[20] || '';
-    let inventoryItems = inventoryStr && inventoryStr !== 'None'
-      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+    const fullStr = trainerData[20] || '';
+    const regularStr = getRegularStr(fullStr);
+    const customItems = parseCustomItems(fullStr);
+
+    let found = false;
+
+    if (selectedItemData.isCustom) {
+      const ci = customItems.findIndex(i => i.name.toLowerCase() === selectedItemData.name.toLowerCase());
+      if (ci >= 0) {
+        found = true;
+        customItems.splice(ci, 1);
+      }
+      if (found) {
+        trainerData[20] = buildInventoryString(regularStr || 'None', customItems);
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+        document.getElementById('removeItemModal').style.display = 'none';
+        refreshInventoryDisplay();
+        import('../api.js').then(({ TrainerAPI }) => {
+          TrainerAPI.update(trainerData).catch(error => console.error('Failed to update inventory:', error));
+        });
+      }
+      return;
+    }
+
+    // Regular item path
+    let inventoryItems = regularStr && regularStr !== 'None'
+      ? regularStr.split(',').map(item => item.trim()).filter(item => item)
       : [];
 
-    // Find and remove item by parsing each string
-    let found = false;
     inventoryItems = inventoryItems.filter(itemStr => {
       const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
       const itemName = match ? match[1].trim() : itemStr;
 
       if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
         found = true;
-        return false; // Filter out this item
+        return false;
       }
       return true;
     });
 
     if (found) {
-      // Update sessionStorage
-      trainerData[20] = inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None';
+      trainerData[20] = buildInventoryString(inventoryItems.length > 0 ? inventoryItems.join(', ') : 'None', customItems);
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-      // Close modal immediately
       document.getElementById('removeItemModal').style.display = 'none';
-
-      // Refresh inventory display immediately
       refreshInventoryDisplay();
 
-      // Update database in background
       import('../api.js').then(({ TrainerAPI }) => {
-        TrainerAPI.update(trainerData).then(() => {
-          console.log('Inventory updated in database');
-        }).catch(error => {
+        TrainerAPI.update(trainerData).catch(error => {
           console.error('Failed to update inventory in database:', error);
         });
       });

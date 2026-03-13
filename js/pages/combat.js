@@ -1761,6 +1761,7 @@ function showCombatMoveDetails(moveName, combatantId, state) {
       proficiency: c.proficiency,
       stabBonusValue: c.stabBonusValue || 2,
       level: c.level,
+      hasToughClaws: hasAbility(c, 'Tough Claws'),
     },
     { path: trainerPath, level: trainerLevel, specializationsStr }
   );
@@ -2100,17 +2101,37 @@ function parseStatusCure(effectText) {
 
 function decrementCombatInventoryItem(itemName) {
   const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-  const items = (td[20] || '').split(',').map(s => s.trim()).filter(Boolean);
+  const fullStr = td[20] || '';
+  const sepIdx = fullStr.indexOf('##CUSTOM##');
+  const regularStr = sepIdx >= 0 ? fullStr.slice(0, sepIdx) : fullStr;
+  const customStr  = sepIdx >= 0 ? fullStr.slice(sepIdx + 10) : null;
+
+  const items = regularStr.split(',').map(s => s.trim()).filter(Boolean);
   const idx = items.findIndex(s => {
     const m = s.match(/^(.+?)\s*\(x\d+\)$/);
     return (m ? m[1].trim() : s) === itemName;
   });
-  if (idx === -1) return;
-  const m = items[idx].match(/^(.+?)\s*\(x(\d+)\)$/);
-  const qty = m ? parseInt(m[2]) : 1;
-  if (qty <= 1) items.splice(idx, 1);
-  else items[idx] = `${itemName} (x${qty - 1})`;
-  td[20] = items.join(', ');
+
+  if (idx !== -1) {
+    const m = items[idx].match(/^(.+?)\s*\(x(\d+)\)$/);
+    const qty = m ? parseInt(m[2]) : 1;
+    if (qty <= 1) items.splice(idx, 1);
+    else items[idx] = `${itemName} (x${qty - 1})`;
+    const newRegular = items.join(', ');
+    td[20] = customStr ? `${newRegular}##CUSTOM##${customStr}` : newRegular;
+  } else if (customStr) {
+    let customItems = [];
+    try { customItems = JSON.parse(customStr) || []; } catch(e) {}
+    const ci = customItems.findIndex(i => i.name === itemName);
+    if (ci !== -1) {
+      if (customItems[ci].quantity <= 1) customItems.splice(ci, 1);
+      else customItems[ci].quantity--;
+      const newRegular = items.join(', ');
+      td[20] = customItems.length > 0
+        ? `${newRegular}##CUSTOM##${JSON.stringify(customItems)}`
+        : newRegular || 'None';
+    }
+  }
   sessionStorage.setItem('trainerData', JSON.stringify(td));
   TrainerAPI.update(td).catch(e => console.error('Inventory sync:', e));
 }
@@ -2415,15 +2436,18 @@ function showCombatInventoryPopup() {
   if (effEl)     effEl.textContent  = 'Item effects will appear here.';
   if (actionArea) actionArea.innerHTML = '';
 
-  if (!inventory || !itemsStr) {
+  const hasCombatCustom = inventory.includes('##CUSTOM##');
+  if ((!inventory || !itemsStr) && !hasCombatCustom) {
     categoriesEl.innerHTML = '<li style="padding:1rem;color:#999;text-align:center;">No items in inventory</li>';
     document.getElementById('combatInventoryPopup').style.display = 'flex';
     return;
   }
 
-  const itemsData = JSON.parse(itemsStr);
+  const itemsData = itemsStr ? JSON.parse(itemsStr) : [];
   const groupedItems = {};
-  inventory.split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
+  const combatSepIdx = inventory.indexOf('##CUSTOM##');
+  const combatRegularInv = combatSepIdx >= 0 ? inventory.slice(0, combatSepIdx) : inventory;
+  combatRegularInv.split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
     const m = s.match(/^(.+?)\s*\(x(\d+)\)$/);
     const name = m ? m[1].trim() : s;
     const qty  = m ? parseInt(m[2]) : 1;
@@ -2434,6 +2458,16 @@ function showCombatInventoryPopup() {
       groupedItems[type].push({ name, qty, description: dbItem.description || '', effect: dbItem.effect || '' });
     }
   });
+  if (combatSepIdx >= 0) {
+    try {
+      const combatCustom = JSON.parse(inventory.slice(combatSepIdx + 10)) || [];
+      if (combatCustom.length > 0) {
+        groupedItems['Custom Items'] = combatCustom.map(ci => ({
+          name: ci.name, qty: ci.quantity, description: ci.description || '', effect: ''
+        }));
+      }
+    } catch(e) {}
+  }
 
   let html = '';
   Object.keys(groupedItems).sort().forEach(type => {

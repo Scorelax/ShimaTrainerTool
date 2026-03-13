@@ -1519,9 +1519,28 @@ function attachBattleListeners(state) {
     // Ingrain: register 3-turn end-of-turn healing
     if (moveName && moveName.toLowerCase() === 'ingrain') {
       const move = _moveMap?.get(moveName);
-      const descText = (move?.[7] || '') + ' ' + (move?.[8] || '');
-      const diceMatch = descText.match(/(\d+d\d+)/i);
-      const healDice = diceMatch ? diceMatch[1] : '1d10';
+      const desc = move?.[7] || '';
+      const higherLevels = move?.[8] || '';
+      const pokemonLevel = c.level || 1;
+
+      // Base dice from description
+      const baseDiceMatch = desc.match(/(\d+d\d+)/i);
+      let healDice = baseDiceMatch ? baseDiceMatch[1] : '1d10';
+
+      // Apply higher-level tier scaling (same pattern as parseDamageDice)
+      if (higherLevels && pokemonLevel > 1) {
+        const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
+        let match, bestDice = null, bestLevel = 0;
+        while ((match = tierRegex.exec(higherLevels)) !== null) {
+          const tierLevel = parseInt(match[2]);
+          if (pokemonLevel >= tierLevel && tierLevel > bestLevel) {
+            bestLevel = tierLevel;
+            bestDice = match[1];
+          }
+        }
+        if (bestDice) healDice = bestDice;
+      }
+
       const moveMod = (move?.[2] || '').trim();
       c.statusEffects = c.statusEffects.filter(se => se.name !== 'Ingrain');
       c.statusEffects.push({ name: 'Ingrain', duration: 3, healDice, moveMod });

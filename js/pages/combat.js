@@ -483,6 +483,26 @@ function renderBattlePhase(state) {
         </div>
       </div>
 
+      <!-- Drain Heal Popup -->
+      <div class="combat-popup-overlay" id="drainHealPopup" style="display:none;">
+        <div class="combat-popup-content" style="max-width:420px;padding:2rem;">
+          <h3 id="drainHealTitle" style="margin:0 0 0.4rem 0;color:#4CAF50;text-align:center;font-size:1.2rem;">🌿 Drain — Heal</h3>
+          <p id="drainHealTarget" style="text-align:center;color:#aaa;margin:0 0 1.4rem 0;font-size:0.9rem;"></p>
+          <div style="margin-bottom:1rem;">
+            <label style="display:block;color:#FFDE00;font-weight:700;text-transform:uppercase;margin-bottom:0.5rem;font-size:0.88rem;">Damage Dealt:</label>
+            <input type="number" id="drainDamageInput" min="0" placeholder="Enter damage dealt..." style="width:100%;padding:0.7rem 1rem;background:#3a3a3a;border:2px solid #555;border-radius:8px;color:white;font-size:1rem;box-sizing:border-box;">
+          </div>
+          <div style="text-align:center;margin-bottom:1.5rem;">
+            <span style="color:#FFDE00;font-weight:700;text-transform:uppercase;font-size:0.88rem;">Healing (½ rounded down): </span>
+            <span id="drainHealTotal" style="color:#4CAF50;font-weight:900;font-size:1.1rem;">—</span>
+          </div>
+          <div style="display:flex;gap:1rem;">
+            <button id="drainHealConfirm" class="combat-use-move-btn" disabled style="flex:1;background:linear-gradient(135deg,#2E7D32,#1B5E20);">Apply Heal</button>
+            <button id="drainHealSkip" class="combat-use-move-btn" style="flex:1;background:linear-gradient(135deg,#555,#333);">Miss / Skip</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Inventory Popup -->
       <div class="popup-overlay" id="combatInventoryPopup" style="display:none;">
         <div class="popup-content combat-inv-popup-content">
@@ -1550,6 +1570,13 @@ function attachBattleListeners(state) {
     document.getElementById('combatMoveConfirmPopup').style.display = 'none';
     document.getElementById('combatMovePopup').style.display = 'none';
     rerenderBattle(state);
+
+    // Drain heal: if move restores half the damage dealt, prompt for damage
+    const usedMove = _moveMap?.get(moveName);
+    const fullMoveDesc = (usedMove?.[7] || '') + ' ' + (usedMove?.[8] || '');
+    if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullMoveDesc)) {
+      showDrainHealPopup(c, moveName, state);
+    }
   });
 
   applyMoveColors();
@@ -1808,6 +1835,73 @@ function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
 
     popup.style.display = 'none';
     onConfirm();
+  });
+
+  popup.style.display = 'flex';
+}
+
+function showDrainHealPopup(combatant, moveName, state) {
+  const popup = document.getElementById('drainHealPopup');
+  document.getElementById('drainHealTitle').textContent = `🌿 ${moveName} — Drain Heal`;
+  document.getElementById('drainHealTarget').textContent =
+    `${combatant.name} — ${combatant.currentHp}/${combatant.maxHp} HP`;
+  document.getElementById('drainHealTotal').textContent = '—';
+
+  // Clone elements to remove stale listeners
+  const oldInput = document.getElementById('drainDamageInput');
+  const newInput = oldInput.cloneNode(true);
+  newInput.value = '';
+  oldInput.parentNode.replaceChild(newInput, oldInput);
+
+  const oldBtn = document.getElementById('drainHealConfirm');
+  const newBtn = oldBtn.cloneNode(true);
+  newBtn.disabled = true;
+  oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+
+  const oldSkip = document.getElementById('drainHealSkip');
+  const newSkip = oldSkip.cloneNode(true);
+  oldSkip.parentNode.replaceChild(newSkip, oldSkip);
+
+  document.getElementById('drainDamageInput').addEventListener('input', function () {
+    const dmg = parseInt(this.value);
+    const totalEl = document.getElementById('drainHealTotal');
+    const confirmBtn = document.getElementById('drainHealConfirm');
+    if (!isNaN(dmg) && dmg >= 0) {
+      const heal = Math.floor(dmg / 2);
+      totalEl.textContent = `${heal} HP`;
+      confirmBtn.disabled = heal <= 0;
+    } else {
+      totalEl.textContent = '—';
+      confirmBtn.disabled = true;
+    }
+  });
+
+  document.getElementById('drainHealConfirm').addEventListener('click', function () {
+    const dmg = parseInt(document.getElementById('drainDamageInput').value);
+    if (isNaN(dmg) || dmg < 0) return;
+    const heal = Math.floor(dmg / 2);
+    if (heal <= 0) return;
+
+    combatant.currentHp = Math.min(combatant.currentHp + heal, combatant.maxHp);
+    showToast(`${combatant.name}: ${moveName} drained ${heal} HP!`, 'success');
+
+    // Sync to sessionStorage and API
+    const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
+    if (pd) {
+      pd[45] = combatant.currentHp;
+      sessionStorage.setItem(combatant.entityKey, JSON.stringify(pd));
+      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+      PokemonAPI.updateLiveStats(td[1], pd[2], 'HP', combatant.currentHp)
+        .catch(e => console.error('Drain HP sync:', e));
+    }
+
+    saveCombatState(state);
+    rerenderBattle(state);
+    popup.style.display = 'none';
+  });
+
+  document.getElementById('drainHealSkip').addEventListener('click', function () {
+    popup.style.display = 'none';
   });
 
   popup.style.display = 'flex';

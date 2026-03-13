@@ -462,6 +462,27 @@ function renderBattlePhase(state) {
         </div>
       </div>
 
+      <!-- Ingrain Heal Popup -->
+      <div class="combat-popup-overlay" id="ingrainHealPopup" style="display:none;">
+        <div class="combat-popup-content" style="max-width:420px;padding:2rem;">
+          <h3 style="margin:0 0 0.4rem 0;color:#4CAF50;text-align:center;font-size:1.2rem;">🌿 Ingrain — End-of-Turn Heal</h3>
+          <p id="ingrainHealTarget" style="text-align:center;color:#aaa;margin:0 0 1.4rem 0;font-size:0.9rem;"></p>
+          <div style="margin-bottom:1rem;">
+            <label id="ingrainDiceLabel" style="display:block;color:#FFDE00;font-weight:700;text-transform:uppercase;margin-bottom:0.5rem;font-size:0.88rem;">Roll 1d10:</label>
+            <input type="number" id="ingrainDiceInput" min="1" placeholder="Enter roll result..." style="width:100%;padding:0.7rem 1rem;background:#3a3a3a;border:2px solid #555;border-radius:8px;color:white;font-size:1rem;box-sizing:border-box;">
+          </div>
+          <div id="ingrainModRow" style="display:none;margin-bottom:0.8rem;color:#aaa;font-size:0.88rem;text-align:center;"></div>
+          <div style="text-align:center;margin-bottom:1.2rem;">
+            <span style="color:#FFDE00;font-weight:700;text-transform:uppercase;font-size:0.88rem;">Total Healing: </span>
+            <span id="ingrainTotal" style="color:#4CAF50;font-weight:900;font-size:1.1rem;">—</span>
+          </div>
+          <div style="margin-bottom:1.2rem;text-align:center;color:#aaa;font-size:0.83rem;">
+            Heals remaining after this: <strong id="ingrainTurnsLeft" style="color:#FFDE00;"></strong>
+          </div>
+          <button id="ingrainHealConfirm" class="combat-use-move-btn" style="width:100%;background:linear-gradient(135deg,#2E7D32,#1B5E20);" disabled>Apply Heal</button>
+        </div>
+      </div>
+
       <!-- Inventory Popup -->
       <div class="popup-overlay" id="combatInventoryPopup" style="display:none;">
         <div class="popup-content combat-inv-popup-content">
@@ -681,11 +702,19 @@ function renderExpandedSection(c, statusBadges) {
 
   // --- Trainer action buttons (trainer only) ---
   const hasBenchPokemon = (_battleState?.bench ?? []).length > 0;
+  const ingrainLocked = (_battleState?.combatants ?? []).some(x =>
+    x.type === 'pokemon' && x.currentHp > 0 &&
+    x.statusEffects.some(se => se.name === 'Ingrain' && se.duration > 0)
+  );
+  const switchBtn = !hasBenchPokemon ? '' :
+    ingrainLocked
+      ? `<button class="combat-trainer-action-btn combat-switch-open-btn" disabled title="Cannot switch: a Pokémon is rooted by Ingrain" style="opacity:0.4;cursor:not-allowed;">⇄ Switch Pokémon</button>`
+      : `<button class="combat-trainer-action-btn combat-switch-open-btn">⇄ Switch Pokémon</button>`;
   const trainerActionsSection = c.type === 'trainer' ? `
     <div class="expanded-trainer-actions">
       <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}"><img src="assets/Bag.png" alt="Bag" class="combat-inv-icon"> Inventory</button>
       <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">✨ Trainer Buffs</button>
-      ${hasBenchPokemon ? `<button class="combat-trainer-action-btn combat-switch-open-btn">⇄ Switch Pokémon</button>` : ''}
+      ${switchBtn}
     </div>` : '';
 
   // --- Info section (pokemon only) ---
@@ -1290,7 +1319,22 @@ function attachBattleListeners(state) {
   if (battleList) {
     battleList.addEventListener('click', e => {
       if (e.target.closest('.end-turn-btn')) {
-        endTurnForCombatant(e.target.closest('.end-turn-btn').dataset.combatantId, state);
+        const combatantId = e.target.closest('.end-turn-btn').dataset.combatantId;
+        const combatant = state.combatants.find(x => x.id === combatantId);
+        const ingrainIdx = combatant
+          ? combatant.statusEffects.findIndex(se => se.name === 'Ingrain' && se.duration > 0)
+          : -1;
+        if (ingrainIdx >= 0 && combatant.currentHp > 0) {
+          showIngrainHealPopup(combatant, combatant.statusEffects[ingrainIdx], state, () => {
+            combatant.statusEffects[ingrainIdx].duration--;
+            if (combatant.statusEffects[ingrainIdx].duration <= 0) {
+              combatant.statusEffects.splice(ingrainIdx, 1);
+            }
+            endTurnForCombatant(combatantId, state);
+          });
+        } else {
+          endTurnForCombatant(combatantId, state);
+        }
         return;
       }
       if (e.target.closest('.hpvp-btn')) {
@@ -1470,6 +1514,17 @@ function attachBattleListeners(state) {
     // Decrement recharge charges
     if (c.rechargeStates && c.rechargeStates[moveName]) {
       c.rechargeStates[moveName].chargesLeft = Math.max(0, c.rechargeStates[moveName].chargesLeft - 1);
+    }
+
+    // Ingrain: register 3-turn end-of-turn healing
+    if (moveName && moveName.toLowerCase() === 'ingrain') {
+      const move = _moveMap?.get(moveName);
+      const descText = (move?.[7] || '') + ' ' + (move?.[8] || '');
+      const diceMatch = descText.match(/(\d+d\d+)/i);
+      const healDice = diceMatch ? diceMatch[1] : '1d10';
+      const moveMod = (move?.[2] || '').trim();
+      c.statusEffects = c.statusEffects.filter(se => se.name !== 'Ingrain');
+      c.statusEffects.push({ name: 'Ingrain', duration: 3, healDice, moveMod });
     }
 
     saveCombatState(state);
@@ -1658,12 +1713,98 @@ function updateCombatantStat(id, stat, delta, state, absValue) {
 // BATTLE LOGIC
 // ============================================================================
 
+function getStatMod(combatant, statName) {
+  switch ((statName || '').toUpperCase()) {
+    case 'STR': return combatant.strMod || 0;
+    case 'DEX': return combatant.dexMod || 0;
+    case 'CON': return combatant.conMod || 0;
+    case 'INT': return combatant.intMod || 0;
+    case 'WIS': return combatant.wisMod || 0;
+    case 'CHA': return combatant.chaMod || 0;
+    default: return 0;
+  }
+}
+
+function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
+  const modBonus = getStatMod(combatant, ingrainEffect.moveMod);
+  const popup      = document.getElementById('ingrainHealPopup');
+  const modRow     = document.getElementById('ingrainModRow');
+  const turnsLeftEl = document.getElementById('ingrainTurnsLeft');
+
+  document.getElementById('ingrainDiceLabel').textContent = `Roll ${ingrainEffect.healDice}:`;
+  document.getElementById('ingrainHealTarget').textContent =
+    `${combatant.name} — ${combatant.currentHp}/${combatant.maxHp} HP`;
+  turnsLeftEl.textContent = ingrainEffect.duration - 1;
+
+  if (ingrainEffect.moveMod && modBonus !== 0) {
+    modRow.style.display = 'block';
+    modRow.textContent = `${ingrainEffect.moveMod} modifier bonus: ${modBonus >= 0 ? '+' : ''}${modBonus}`;
+  } else {
+    modRow.style.display = 'none';
+  }
+
+  // Clone to remove any old listeners
+  const oldInput = document.getElementById('ingrainDiceInput');
+  const newInput = oldInput.cloneNode(true);
+  newInput.value = '';
+  oldInput.parentNode.replaceChild(newInput, oldInput);
+
+  const oldBtn = document.getElementById('ingrainHealConfirm');
+  const newBtn = oldBtn.cloneNode(true);
+  newBtn.disabled = true;
+  oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+
+  document.getElementById('ingrainTotal').textContent = '—';
+
+  document.getElementById('ingrainDiceInput').addEventListener('input', function () {
+    const val = parseInt(this.value);
+    const totalEl = document.getElementById('ingrainTotal');
+    const confirmBtn = document.getElementById('ingrainHealConfirm');
+    if (val > 0) {
+      const total = val + modBonus;
+      totalEl.textContent = `${total} HP`;
+      confirmBtn.disabled = false;
+    } else {
+      totalEl.textContent = '—';
+      confirmBtn.disabled = true;
+    }
+  });
+
+  document.getElementById('ingrainHealConfirm').addEventListener('click', function () {
+    const diceVal = parseInt(document.getElementById('ingrainDiceInput').value);
+    if (!diceVal || diceVal < 1) return;
+    const total = diceVal + modBonus;
+    combatant.currentHp = Math.min(combatant.currentHp + total, combatant.maxHp);
+    showToast(`${combatant.name}: Ingrain healed ${total} HP!`, 'success');
+
+    // Sync HP to sessionStorage and API
+    const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
+    if (pd) {
+      pd[45] = combatant.currentHp;
+      sessionStorage.setItem(combatant.entityKey, JSON.stringify(pd));
+      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+      PokemonAPI.updateLiveStats(td[1], pd[2], 'HP', combatant.currentHp)
+        .catch(e => console.error('Ingrain HP sync:', e));
+    }
+
+    popup.style.display = 'none';
+    onConfirm();
+  });
+
+  popup.style.display = 'flex';
+}
+
 function endTurnForCombatant(combatantId, state) {
   const c = state.combatants.find(x => x.id === combatantId);
   if (!c) return;
 
   const remaining = [];
   for (const se of c.statusEffects) {
+    if (se.name === 'Ingrain') {
+      // Duration managed by the end-turn intercept; preserve as-is (already decremented or removed there)
+      remaining.push(se);
+      continue;
+    }
     if (se.name === 'Poison' || se.name === 'Burn') {
       const dmg = c.proficiency;
       c.currentHp = Math.max(0, c.currentHp - dmg);

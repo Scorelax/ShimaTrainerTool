@@ -2946,7 +2946,7 @@ export function attachPokemonCardListeners() {
           </div>
           <div class="item-list">
             ${groupedItems[type].map(item => `
-              <div class="inventory-list-item" data-item='${JSON.stringify(item)}'>
+              <div class="inventory-list-item" data-item='${JSON.stringify(item).replace(/'/g, "&#39;")}'>
                 ${item.name} (x${item.quantity})
               </div>
             `).join('')}
@@ -3833,6 +3833,7 @@ export function attachPokemonCardListeners() {
     // Update sessionStorage immediately for instant UI feedback
     sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
     sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
     // Now make the API call
     try {
@@ -3859,6 +3860,7 @@ export function attachPokemonCardListeners() {
           pokemonData[38] = response.slot;
           sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
           sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+          sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
         }
       } else {
         // Rollback on failure
@@ -3868,6 +3870,7 @@ export function attachPokemonCardListeners() {
         }
         sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
         sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
         e.target.checked = !isChecked;
         showError(response.message || 'Failed to update active party status');
       }
@@ -3880,6 +3883,7 @@ export function attachPokemonCardListeners() {
       }
       sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
       sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
       e.target.checked = !isChecked;
       showError('Failed to update active party status');
     }
@@ -3922,6 +3926,7 @@ export function attachPokemonCardListeners() {
 
     // Update trainer data timestamp to trigger refresh
     sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
     // Now make the API call
     try {
@@ -3947,6 +3952,7 @@ export function attachPokemonCardListeners() {
         });
 
         sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
         e.target.checked = !isChecked;
         showError(response.message || 'Failed to update utility slot status');
       }
@@ -3964,6 +3970,7 @@ export function attachPokemonCardListeners() {
       });
 
       sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
+      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
       e.target.checked = !isChecked;
       showError('Failed to update utility slot status');
     }
@@ -4572,12 +4579,17 @@ function showMoveDetails(moveName) {
     const chaMod = Math.floor((cha - 10) / 2);
 
     // Compute attack/damage bonuses via shared utility
+    const abilitiesStr = pokemonData[7] || '';
+    const hasToughClaws = abilitiesStr.split('|').some(a => {
+      const body = a.includes(':') ? a.substring(a.indexOf(':') + 1) : a;
+      return body.split(';')[0].trim().toLowerCase() === 'tough claws';
+    });
     const {
       attackBonus: attackRollBonus, damageBonus: damageRollBonus,
       attackBreakdown, damageBreakdown, damageDice,
     } = computeMoveData(
       move,
-      { types: pokemonTypes, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level: pokemonLevel },
+      { types: pokemonTypes, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level: pokemonLevel, hasToughClaws },
       { path: trainerPath, level: trainerLevel, specializationsStr }
     );
 

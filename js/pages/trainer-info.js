@@ -2534,7 +2534,7 @@ export function attachTrainerInfoListeners() {
           </div>
           <div class="item-list">
             ${groupedItems[type].map(item => `
-              <div class="inventory-list-item" data-item='${JSON.stringify(item)}'>
+              <div class="inventory-list-item" data-item='${JSON.stringify(item).replace(/'/g, "&#39;")}'>
                 ${item.name} (x${item.quantity})
               </div>
             `).join('')}

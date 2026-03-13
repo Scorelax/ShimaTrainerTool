@@ -57,12 +57,13 @@ export function parseDamageDice(description, higherLevels, pokemonLevel) {
  * @param {{ path: string, level: number, specializationsStr: string }} trainerAttrs
  * @returns {{ hasSTAB: boolean, attackBonus: number, damageBonus: number, attackBreakdown: string, damageBreakdown: string, damageDice: string|null }}
  */
-export function computeMoveData(move, pokemonAttrs, trainerAttrs) {
-  const { types, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level } = pokemonAttrs;
+export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffects = []) {
+  const { types, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level, hasToughClaws } = pokemonAttrs;
   const { path, level: trainerLevel, specializationsStr } = trainerAttrs;
 
   const moveType = move[1];
   let hasSTAB = types.includes(moveType);
+  const isMelee = /melee\s+attack/i.test(move[7] || '');
 
   // Type Master Level 15: Universal STAB for Pokemon matching specialization types
   if (!hasSTAB && path === 'Type Master' && trainerLevel >= 15 && specializationsStr) {
@@ -89,6 +90,13 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs) {
   // Ace Trainer Level 3+: +1 to attack and damage
   const aceBonus = (path === 'Ace Trainer' && trainerLevel >= 3) ? 1 : 0;
 
+  // Tough Claws: melee attacks always get STAB; if already STAB, double it
+  let toughClawsDoubled = false;
+  if (hasToughClaws && isMelee) {
+    if (hasSTAB) { toughClawsDoubled = true; }
+    else { hasSTAB = true; }
+  }
+
   // Stat mods — pick highest allowed modifier for the move
   const modMap = { STR: strMod, DEX: dexMod, CON: conMod, INT: intMod, WIS: wisMod, CHA: chaMod };
   const moveModifiers = (move[2] || '').split('/').map(m => m.trim().toUpperCase());
@@ -103,8 +111,24 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs) {
   // Damage roll bonus
   const desc = move[7] || '';
   const includeStatInDmg = /\+\s*MOVE/i.test(desc);
-  const stabBonus = hasSTAB ? stabBonusValue : 0;
-  const damageBonus = stabBonus + (includeStatInDmg ? highestMod : 0) + aceBonus + typeMasterDamageBonus;
+  const stabBonus = hasSTAB ? (toughClawsDoubled ? stabBonusValue * 2 : stabBonusValue) : 0;
+
+  // Held item: "Holder adds prof. bonus to damage from <TYPE> type moves"
+  const heldItemProfPattern = /holder adds prof(?:iciency|\.)? bonus to damage from (\w+) type moves?/i;
+  let heldItemDamageBonus = 0;
+  const heldItemDmgSources = [];
+  for (const effect of heldItemEffects) {
+    const match = heldItemProfPattern.exec(effect);
+    if (match) {
+      const itemType = match[1];
+      if (itemType.toLowerCase() === moveType.toLowerCase()) {
+        heldItemDamageBonus += proficiency;
+        heldItemDmgSources.push(`Item +${proficiency} (Prof.)`);
+      }
+    }
+  }
+
+  const damageBonus = stabBonus + (includeStatInDmg ? highestMod : 0) + aceBonus + typeMasterDamageBonus + heldItemDamageBonus;
 
   // Format modifier helper
   const fmt = v => v >= 0 ? `+${v}` : `${v}`;
@@ -116,11 +140,19 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs) {
   if (aceBonus > 0) atkParts.push(`Ace Trainer +${aceBonus}`);
   if (typeMasterAttackBonus > 0) atkParts.push(`Type Master +${typeMasterAttackBonus}`);
 
+  const toughClawsGranted = hasToughClaws && isMelee && !toughClawsDoubled && stabBonus > 0 && !types.includes(moveType);
   const dmgParts = [];
-  if (stabBonus > 0) dmgParts.push(`STAB +${stabBonus}`);
+  if (stabBonus > 0) {
+    let stabLabel;
+    if (toughClawsDoubled) stabLabel = `STAB ×2 +${stabBonus}`;
+    else if (toughClawsGranted) stabLabel = `STAB +${stabBonus} (Tough Claws)`;
+    else stabLabel = `STAB +${stabBonus}`;
+    dmgParts.push(stabLabel);
+  }
   if (includeStatInDmg && highestMod !== 0) dmgParts.push(`${usedStat} ${fmt(highestMod)}`);
   if (aceBonus > 0) dmgParts.push(`Ace Trainer +${aceBonus}`);
   if (typeMasterDamageBonus > 0) dmgParts.push(`Type Master +${typeMasterDamageBonus}`);
+  heldItemDmgSources.forEach(s => dmgParts.push(s));
 
   const damageDice = parseDamageDice(desc, move[8] || '', level);
 

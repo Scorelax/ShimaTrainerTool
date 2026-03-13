@@ -2006,6 +2006,14 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   const trainerLevel = parseInt(trainerData[2]) || 1;
   const specializationsStr = trainerData[24] || '';
 
+  // Resolve held item effects for bonus calculation
+  const heldItemNames = (c.item || '').split(',').map(s => s.trim()).filter(Boolean);
+  const cachedItems = getCachedItems();
+  const heldItemEffects = heldItemNames.map(name => {
+    const dbItem = cachedItems.find(i => i.name === name);
+    return dbItem ? (dbItem.effect || dbItem.description || '') : '';
+  });
+
   const { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice } = computeMoveData(
     move,
     {
@@ -2017,7 +2025,8 @@ function showCombatMoveDetails(moveName, combatantId, state) {
       level: c.level,
       hasToughClaws: hasAbility(c, 'Tough Claws'),
     },
-    { path: trainerPath, level: trainerLevel, specializationsStr }
+    { path: trainerPath, level: trainerLevel, specializationsStr },
+    heldItemEffects
   );
 
   const bgColor = getMoveTypeColor(move[1]);
@@ -2055,11 +2064,9 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   // Held items
   const heldItemsEl = document.getElementById('cHeldItems');
   if (heldItemsEl) {
-    const heldItemNames = (c.item || '').split(',').map(s => s.trim()).filter(Boolean);
     if (heldItemNames.length > 0) {
-      const items = getCachedItems();
       heldItemsEl.innerHTML = '<strong>Held Items:</strong>' + heldItemNames.map(name => {
-        const dbItem = items.find(i => i.name === name);
+        const dbItem = cachedItems.find(i => i.name === name);
         return dbItem
           ? `<div style="margin-top:0.3rem;"><strong>${dbItem.name}:</strong> ${dbItem.effect || dbItem.description || 'No description'}</div>`
           : `<div style="margin-top:0.3rem;"><strong>${name}:</strong> No description available</div>`;

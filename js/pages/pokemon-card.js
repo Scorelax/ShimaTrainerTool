@@ -4584,22 +4584,32 @@ function showMoveDetails(moveName) {
       const body = a.includes(':') ? a.substring(a.indexOf(':') + 1) : a;
       return body.split(';')[0].trim().toLowerCase() === 'tough claws';
     });
+
+    // Resolve held item DB entries once — used for both bonus calc and display
+    const itemsData = JSON.parse(sessionStorage.getItem('items')) || [];
+    const resolvedHeldItems = heldItems.map(itemName => {
+      const item = itemsData.find(i => i.name === itemName);
+      return { name: itemName, effect: item ? (item.effect || item.description || '') : '', found: !!item };
+    });
+    const heldItemEffects = resolvedHeldItems.map(r => r.effect);
+
     const {
       attackBonus: attackRollBonus, damageBonus: damageRollBonus,
       attackBreakdown, damageBreakdown, damageDice,
     } = computeMoveData(
       move,
       { types: pokemonTypes, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level: pokemonLevel, hasToughClaws },
-      { path: trainerPath, level: trainerLevel, specializationsStr }
+      { path: trainerPath, level: trainerLevel, specializationsStr },
+      heldItemEffects
     );
 
-    // Get held items info
-    const heldItemsInfo = heldItems.length > 0
-      ? heldItems.map(itemName => {
-          const itemsData = JSON.parse(sessionStorage.getItem('items')) || [];
-          const item = itemsData.find(i => i.name === itemName);
-          return item ? `<div style="margin-bottom: 0.8rem;"><strong>${item.name}:</strong> ${item.effect || item.description || 'No description'}</div>` : `<div style="margin-bottom: 0.8rem;"><strong>${itemName}:</strong> No description available</div>`;
-        }).join('')
+    // Build held items display from already-resolved data
+    const heldItemsInfo = resolvedHeldItems.length > 0
+      ? resolvedHeldItems.map(r =>
+          r.found
+            ? `<div style="margin-bottom: 0.8rem;"><strong>${r.name}:</strong> ${r.effect || 'No description'}</div>`
+            : `<div style="margin-bottom: 0.8rem;"><strong>${r.name}:</strong> No description available</div>`
+        ).join('')
       : '<div style="color: #999;">No held items</div>';
 
     // Create popup if it doesn't exist

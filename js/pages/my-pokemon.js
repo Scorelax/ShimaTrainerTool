@@ -1,9 +1,12 @@
 // My Pokemon Page - Display trainer's Pokemon grid with pagination
+import { PokemonAPI } from '../api.js';
+import { showError, showSuccess } from '../utils/notifications.js';
 
 // Module state
 let currentPage = 1;
 const pokemonsPerPage = 9;
 let allPokemons = [];
+let searchQuery = '';
 
 export function renderMyPokemon() {
   const html = `
@@ -244,6 +247,213 @@ export function renderMyPokemon() {
           padding: clamp(1.5rem, 4vh, 4rem);
         }
 
+        .pokemon-search-wrapper {
+          width: 90%;
+          max-width: min(100vw, 1200px);
+          margin-bottom: clamp(1rem, 2.5vh, 1.5rem);
+        }
+
+        .pokemon-search-input {
+          width: 100%;
+          box-sizing: border-box;
+          padding: clamp(0.6rem, 1.3vh, 0.85rem) clamp(1rem, 2.5vw, 1.4rem);
+          background: rgba(255,255,255,0.92);
+          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-radius: clamp(20px, 5vw, 40px);
+          color: #333;
+          font-size: clamp(0.9rem, 2vw, 1.1rem);
+          font-weight: 600;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .pokemon-search-input::placeholder {
+          color: #888;
+          font-weight: 400;
+        }
+
+        .pokemon-search-input:focus {
+          border-color: #FFC700;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 12px rgba(255,222,0,0.4);
+        }
+
+        .action-buttons-row {
+          display: flex;
+          gap: clamp(0.75rem, 2vw, 1.5rem);
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .party-button {
+          background: linear-gradient(135deg, #3B4CCA 0%, #2A3BAA 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border-radius: clamp(30px, 8vw, 60px);
+          padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 5vw, 3.5rem);
+          font-size: clamp(1rem, 2.5vw, 1.5rem);
+          font-weight: 900;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3.5vw, 25px) rgba(59,76,202,0.4),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.2);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.15vw, 1.5px);
+        }
+
+        .party-button:hover {
+          transform: translateY(clamp(-3px, -1vh, -7px)) scale(1.02);
+          box-shadow: 0 clamp(8px, 2vh, 16px) clamp(22px, 5vw, 40px) rgba(59,76,202,0.5),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.2),
+                      0 0 clamp(20px, 4vw, 35px) rgba(255,222,0,0.5);
+          border-color: #FFC700;
+        }
+
+        /* Party Modal */
+        .party-modal-overlay {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.7);
+          z-index: 2000;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .party-modal-overlay.open {
+          display: flex;
+        }
+
+        .party-modal-content {
+          background: linear-gradient(135deg, #2c2c2c 0%, #252525 100%);
+          border-radius: clamp(12px, 2vw, 18px);
+          border: clamp(2px, 0.4vw, 3px) solid #444;
+          width: min(92vw, 480px);
+          max-height: 85vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+
+        .party-modal-header {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          padding: clamp(0.9rem, 2vh, 1.3rem) clamp(1.2rem, 3vw, 1.8rem);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          border-bottom: clamp(2px, 0.4vw, 3px) solid #333;
+        }
+
+        .party-modal-header h2 {
+          margin: 0;
+          color: white;
+          font-size: clamp(1.2rem, 3vw, 1.6rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
+        .party-count-badge {
+          background: rgba(0,0,0,0.3);
+          color: white;
+          font-size: clamp(0.85rem, 2vw, 1rem);
+          font-weight: 700;
+          padding: 0.3rem 0.8rem;
+          border-radius: 20px;
+          border: 1px solid rgba(255,255,255,0.3);
+          white-space: nowrap;
+        }
+
+        .party-modal-close {
+          background: none;
+          border: none;
+          color: white;
+          font-size: clamp(1.6rem, 3.5vw, 2rem);
+          cursor: pointer;
+          line-height: 1;
+          padding: 0;
+          opacity: 0.8;
+          transition: opacity 0.2s;
+        }
+
+        .party-modal-close:hover {
+          opacity: 1;
+        }
+
+        .party-modal-list {
+          overflow-y: auto;
+          flex: 1;
+          padding: clamp(0.5rem, 1.5vh, 1rem) 0;
+        }
+
+        .party-pokemon-row {
+          display: flex;
+          align-items: center;
+          gap: clamp(0.8rem, 2vw, 1.2rem);
+          padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(1.2rem, 3vw, 1.8rem);
+          border-bottom: 1px solid #383838;
+          transition: background 0.15s;
+        }
+
+        .party-pokemon-row:last-child {
+          border-bottom: none;
+        }
+
+        .party-pokemon-row:hover {
+          background: rgba(255,255,255,0.04);
+        }
+
+        .party-pokemon-avatar {
+          width: clamp(42px, 9vw, 56px);
+          height: clamp(42px, 9vw, 56px);
+          border-radius: 8px;
+          object-fit: cover;
+          border: 2px solid #FFDE00;
+          background: #fff;
+          flex-shrink: 0;
+        }
+
+        .party-pokemon-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .party-pokemon-label {
+          font-weight: 700;
+          color: #FFDE00;
+          font-size: clamp(0.9rem, 2vw, 1.05rem);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .party-pokemon-sublabel {
+          color: #aaa;
+          font-size: clamp(0.75rem, 1.6vw, 0.88rem);
+          margin-top: 2px;
+        }
+
+        .party-pokemon-utility-note {
+          color: #f90;
+          font-size: clamp(0.7rem, 1.5vw, 0.82rem);
+          margin-top: 2px;
+        }
+
+        .party-checkbox {
+          width: clamp(20px, 4vw, 26px);
+          height: clamp(20px, 4vw, 26px);
+          accent-color: #EE1515;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+
+        .party-checkbox:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
         @media (max-width: 480px) {
           .pokemon-grid {
             grid-template-columns: 1fr;
@@ -252,6 +462,9 @@ export function renderMyPokemon() {
       </style>
 
       <h1>My Pokemon</h1>
+      <div class="pokemon-search-wrapper">
+        <input type="text" id="pokemonSearch" class="pokemon-search-input" placeholder="Search by name or nickname..." autocomplete="off">
+      </div>
       <div class="pokemon-list-container">
         <div class="pokemon-grid" id="pokemonGrid">
           <!-- Pokemon slots will be dynamically generated -->
@@ -264,7 +477,22 @@ export function renderMyPokemon() {
           <span id="pageIndicator">1/1</span>
           <button class="nav-button" id="nextBtn">Next &gt;</button>
         </div>
-        <button class="register-button" id="registerNewBtn">Register New Pokemon</button>
+        <div class="action-buttons-row">
+          <button class="register-button" id="registerNewBtn">New Pokemon</button>
+          <button class="party-button" id="partyBtn">Party</button>
+        </div>
+      </div>
+
+      <!-- Party Modal -->
+      <div class="party-modal-overlay" id="partyModal">
+        <div class="party-modal-content">
+          <div class="party-modal-header">
+            <h2>Manage Party</h2>
+            <span class="party-count-badge" id="partyCountBadge">Party: 0/6</span>
+            <button class="party-modal-close" id="closePartyModal">×</button>
+          </div>
+          <div class="party-modal-list" id="partyModalList"></div>
+        </div>
       </div>
 
       <button class="back-button" id="backButton">←</button>
@@ -278,9 +506,17 @@ export function attachMyPokemonListeners() {
   // Reset state
   currentPage = 1;
   allPokemons = [];
+  searchQuery = '';
 
   // Load Pokemon from session storage
   loadPokemonList();
+
+  // Search input
+  document.getElementById('pokemonSearch')?.addEventListener('input', e => {
+    searchQuery = e.target.value;
+    currentPage = 1;
+    renderPokemonList();
+  });
 
   // Navigation buttons
   document.getElementById('prevBtn')?.addEventListener('click', prevPage);
@@ -291,6 +527,12 @@ export function attachMyPokemonListeners() {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'new-pokemon' }
     }));
+  });
+
+  // Party button
+  document.getElementById('partyBtn')?.addEventListener('click', openPartyModal);
+  document.getElementById('closePartyModal')?.addEventListener('click', () => {
+    document.getElementById('partyModal').classList.remove('open');
   });
 
   // Back button
@@ -329,11 +571,21 @@ function loadPokemonList() {
   renderPokemonList();
 }
 
+function getFilteredPokemons() {
+  if (!searchQuery) return allPokemons;
+  const q = searchQuery.toLowerCase();
+  return allPokemons.filter(p =>
+    p.name.toLowerCase().includes(q) || (p.nickname && p.nickname.toLowerCase().includes(q))
+  );
+}
+
 function renderPokemonList() {
   const pokemonGrid = document.getElementById('pokemonGrid');
   if (!pokemonGrid) return;
 
   pokemonGrid.innerHTML = '';
+
+  const displayPokemons = getFilteredPokemons();
 
   if (allPokemons.length === 0) {
     pokemonGrid.innerHTML = `
@@ -345,9 +597,19 @@ function renderPokemonList() {
     return;
   }
 
+  if (displayPokemons.length === 0) {
+    pokemonGrid.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        No Pokemon match your search.
+      </div>
+    `;
+    updatePageIndicator();
+    return;
+  }
+
   const startIndex = (currentPage - 1) * pokemonsPerPage;
   const endIndex = startIndex + pokemonsPerPage;
-  const currentPokemons = allPokemons.slice(startIndex, endIndex);
+  const currentPokemons = displayPokemons.slice(startIndex, endIndex);
 
   currentPokemons.forEach(pokemon => {
     const slot = document.createElement('div');
@@ -387,7 +649,7 @@ function renderPokemonList() {
 }
 
 function updatePageIndicator() {
-  const totalPages = Math.max(1, Math.ceil(allPokemons.length / pokemonsPerPage));
+  const totalPages = Math.max(1, Math.ceil(getFilteredPokemons().length / pokemonsPerPage));
   const indicator = document.getElementById('pageIndicator');
   if (indicator) {
     indicator.textContent = `${currentPage}/${totalPages}`;
@@ -408,9 +670,192 @@ function prevPage() {
 }
 
 function nextPage() {
-  const totalPages = Math.ceil(allPokemons.length / pokemonsPerPage);
+  const totalPages = Math.ceil(getFilteredPokemons().length / pokemonsPerPage);
   if (currentPage < totalPages) {
     currentPage++;
     renderPokemonList();
+  }
+}
+
+// ── Party Modal ──────────────────────────────────────────────────────────────
+
+function openPartyModal() {
+  const modal = document.getElementById('partyModal');
+  if (!modal) return;
+
+  // Load full pokemon data for all pokemon
+  const pokemonFullData = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key.startsWith('pokemon_')) {
+      try {
+        const data = JSON.parse(sessionStorage.getItem(key));
+        pokemonFullData.push(data);
+      } catch (e) {}
+    }
+  }
+  pokemonFullData.sort((a, b) => (a[3] || 0) - (b[3] || 0)); // sort by dex entry
+
+  renderPartyModalList(pokemonFullData);
+  modal.classList.add('open');
+}
+
+function renderPartyModalList(pokemonFullData) {
+  const list = document.getElementById('partyModalList');
+  const badge = document.getElementById('partyCountBadge');
+  if (!list) return;
+
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  const partySlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+  const partyCount = partySlots.filter(s => s && s !== '').length;
+  if (badge) badge.textContent = `Party: ${partyCount}/6`;
+
+  if (pokemonFullData.length === 0) {
+    list.innerHTML = '<div style="padding:2rem;text-align:center;color:#888;">No Pokemon registered.</div>';
+    return;
+  }
+
+  list.innerHTML = pokemonFullData.map(data => {
+    const name = data[2] || '';
+    const nickname = data[36] || '';
+    const image = data[1] || 'assets/Pokeball.png';
+    const inParty = !!(data[38]);
+    const inUtility = data[56] === 1 || data[56] === '1';
+    const displayName = nickname || name;
+    const subLabel = nickname ? name : `Lv. ${data[4] || '?'}`;
+
+    return `
+      <div class="party-pokemon-row">
+        <img class="party-pokemon-avatar" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+        <div class="party-pokemon-info">
+          <div class="party-pokemon-label">${displayName}</div>
+          <div class="party-pokemon-sublabel">${subLabel}</div>
+          ${inUtility ? '<div class="party-pokemon-utility-note">In utility slot</div>' : ''}
+        </div>
+        <input
+          type="checkbox"
+          class="party-checkbox"
+          data-pokemon-name="${name}"
+          ${inParty ? 'checked' : ''}
+          ${inUtility ? 'disabled' : ''}
+        >
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.party-checkbox').forEach(cb => {
+    cb.addEventListener('change', e => handlePartyToggle(e, pokemonFullData));
+  });
+}
+
+async function handlePartyToggle(e, pokemonFullData) {
+  const checkbox = e.target;
+  const isChecked = checkbox.checked;
+  const pokemonName = checkbox.dataset.pokemonName;
+
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  const pokemonKey = `pokemon_${pokemonName.toLowerCase()}`;
+  const pokemonData = JSON.parse(sessionStorage.getItem(pokemonKey) || '[]');
+
+  if (!trainerData.length || !pokemonData.length) {
+    checkbox.checked = !isChecked;
+    showError('Could not load trainer or Pokemon data.');
+    return;
+  }
+
+  if (isChecked) {
+    // Check party full
+    const partySlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+    const full = partySlots.every(s => s && s !== '');
+    if (full) {
+      checkbox.checked = false;
+      showError('Party is full! (6/6)');
+      return;
+    }
+  }
+
+  // Store originals for rollback
+  const originalSlot = pokemonData[38];
+  const originalTrainerSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+
+  // Optimistic update
+  if (isChecked) {
+    for (let i = 26; i <= 31; i++) {
+      if (!trainerData[i] || trainerData[i] === '') {
+        trainerData[i] = pokemonData[2];
+        pokemonData[38] = (i - 25).toString();
+        break;
+      }
+    }
+  } else {
+    pokemonData[38] = '';
+    for (let i = 26; i <= 31; i++) {
+      if (trainerData[i] === pokemonData[2]) {
+        trainerData[i] = '';
+        break;
+      }
+    }
+  }
+
+  sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+
+  // Update party count badge
+  const partySlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+  const partyCount = partySlots.filter(s => s && s !== '').length;
+  const badge = document.getElementById('partyCountBadge');
+  if (badge) badge.textContent = `Party: ${partyCount}/6`;
+
+  // Also update the in-memory pokemonFullData entry so re-renders stay consistent
+  const entry = pokemonFullData.find(d => d[2] === pokemonName);
+  if (entry) entry[38] = pokemonData[38];
+
+  try {
+    const action = isChecked ? 'add' : 'remove';
+    const response = await PokemonAPI.updatePartyStatus(
+      trainerData[1],
+      pokemonData[2],
+      trainerData[26],
+      action
+    );
+
+    if (response.status === 'success') {
+      if (isChecked && response.slot) {
+        const slotIndex = 26 + parseInt(response.slot) - 1;
+        for (let i = 26; i <= 31; i++) {
+          if (trainerData[i] === pokemonData[2]) trainerData[i] = '';
+        }
+        trainerData[slotIndex] = pokemonData[2];
+        pokemonData[38] = response.slot;
+        if (entry) entry[38] = response.slot;
+        sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
+        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+        // Refresh badge with confirmed data
+        const confirmedSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+        if (badge) badge.textContent = `Party: ${confirmedSlots.filter(s => s && s !== '').length}/6`;
+      }
+    } else {
+      // Rollback
+      pokemonData[38] = originalSlot;
+      for (let i = 0; i < 6; i++) trainerData[26 + i] = originalTrainerSlots[i];
+      if (entry) entry[38] = originalSlot;
+      sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
+      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+      checkbox.checked = !isChecked;
+      const rolledSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+      if (badge) badge.textContent = `Party: ${rolledSlots.filter(s => s && s !== '').length}/6`;
+      showError(response.message || 'Failed to update party status.');
+    }
+  } catch (err) {
+    // Rollback
+    pokemonData[38] = originalSlot;
+    for (let i = 0; i < 6; i++) trainerData[26 + i] = originalTrainerSlots[i];
+    if (entry) entry[38] = originalSlot;
+    sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    checkbox.checked = !isChecked;
+    const rolledSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+    if (badge) badge.textContent = `Party: ${rolledSlots.filter(s => s && s !== '').length}/6`;
+    showError('Failed to update party status.');
   }
 }

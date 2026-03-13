@@ -911,6 +911,58 @@ export function renderTrainerInfo() {
           text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
+        .inventory-search-wrapper {
+          padding: clamp(0.6rem, 1.2vh, 0.9rem) clamp(0.8rem, 1.5vw, 1.2rem);
+          background: #2c2c2c;
+          border-bottom: 1px solid #444;
+        }
+
+        .inventory-search-input {
+          width: 100%;
+          box-sizing: border-box;
+          padding: clamp(0.45rem, 1vh, 0.65rem) clamp(0.7rem, 1.4vw, 1rem);
+          background: #1e1e1e;
+          border: 1px solid #555;
+          border-radius: 6px;
+          color: #eee;
+          font-size: clamp(0.8rem, 1.7vw, 0.95rem);
+          outline: none;
+          transition: border-color 0.2s;
+        }
+
+        .inventory-search-input::placeholder {
+          color: #777;
+        }
+
+        .inventory-search-input:focus {
+          border-color: #EE1515;
+        }
+
+        .inventory-search-results {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          overflow-y: auto;
+          flex: 1;
+          display: none;
+        }
+
+        .inventory-search-results.active {
+          display: block;
+        }
+
+        .inventory-search-results .inventory-list-item {
+          padding-left: clamp(1.2rem, 2.5vw, 1.6rem);
+          border-bottom: 1px solid #333;
+        }
+
+        .inventory-search-no-results {
+          padding: 2rem;
+          text-align: center;
+          color: #777;
+          font-size: 0.9rem;
+        }
+
         .inventory-categories {
           list-style: none;
           padding: 0;
@@ -1989,6 +2041,10 @@ export function renderTrainerInfo() {
           <div class="inventory-popup-content">
             <div class="inventory-sidebar">
               <h2 class="inventory-title">Inventory</h2>
+              <div class="inventory-search-wrapper">
+                <input type="text" id="inventorySearch" class="inventory-search-input" placeholder="Search items..." autocomplete="off">
+              </div>
+              <ul id="inventorySearchResults" class="inventory-search-results"></ul>
               <ul id="inventoryCategories" class="inventory-categories">
                 <!-- Categories will be dynamically populated -->
               </ul>
@@ -2636,6 +2692,57 @@ export function attachTrainerInfoListeners() {
         document.getElementById('useItemButton').disabled = true;
       }
     }
+
+    // Build flat item list for search (all items across all categories)
+    const allInventoryItems = Object.values(groupedItems).flat();
+
+    function applyInventorySearch(query) {
+      const searchResults = document.getElementById('inventorySearchResults');
+      const categoriesContainer = document.getElementById('inventoryCategories');
+      const q = query.trim().toLowerCase();
+
+      if (!q) {
+        searchResults.classList.remove('active');
+        categoriesContainer.style.display = '';
+        return;
+      }
+
+      categoriesContainer.style.display = 'none';
+      searchResults.classList.add('active');
+
+      const matches = allInventoryItems.filter(item => item.name.toLowerCase().includes(q));
+
+      if (matches.length === 0) {
+        searchResults.innerHTML = '<li class="inventory-search-no-results">No items found</li>';
+        return;
+      }
+
+      searchResults.innerHTML = matches.map(item =>
+        `<li class="inventory-list-item" data-item='${JSON.stringify(item).replace(/'/g, "&#39;")}'>${item.name} (x${item.quantity})</li>`
+      ).join('');
+
+      searchResults.querySelectorAll('.inventory-list-item').forEach(itemElement => {
+        itemElement.addEventListener('click', function() {
+          document.querySelectorAll('.inventory-list-item').forEach(el => el.classList.remove('selected'));
+          this.classList.add('selected');
+          selectedItemData = JSON.parse(this.dataset.item);
+          if (selectedItemData.fullData && selectedItemData.fullData.isCustom) selectedItemData.isCustom = true;
+          document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+          document.getElementById('descriptionText').textContent = selectedItemData.description;
+          document.getElementById('effectText').textContent = selectedItemData.effect || 'Custom item — no effect.';
+          document.getElementById('editItemButton').disabled = false;
+          document.getElementById('removeItemButton').disabled = false;
+          document.getElementById('useItemButton').disabled = !parseHealingEffect(selectedItemData.effect);
+        });
+      });
+    }
+
+    // Wire up search input (replace listener to avoid duplicates)
+    const searchInput = document.getElementById('inventorySearch');
+    const freshSearchInput = searchInput.cloneNode(true);
+    searchInput.parentNode.replaceChild(freshSearchInput, searchInput);
+    freshSearchInput.value = '';
+    freshSearchInput.addEventListener('input', e => applyInventorySearch(e.target.value));
 
     openPopup('inventoryPopup');
   }

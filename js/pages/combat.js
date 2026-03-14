@@ -2778,8 +2778,11 @@ async function endCombat(state) {
 
     sessionStorage.setItem(c.entityKey, JSON.stringify(pokemonData));
 
-    // Full update ensures empty StatusCondition (and all other fields) is written to the DB
+    // Full update for HP, VP, KnownMoves
     PokemonAPI.update(pokemonData).catch(e => console.error('Pokemon sync:', e));
+    // Explicit StatusCondition update — uses clearContent() in GAS when empty, which reliably clears the cell
+    PokemonAPI.updateLiveStats(trainerName, pokemonName, 'StatusCondition', statusCondStr)
+      .catch(e => console.error('StatusCondition sync:', e));
   }
 
   sessionStorage.removeItem('combatState');

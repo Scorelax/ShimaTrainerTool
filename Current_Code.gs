@@ -2547,7 +2547,12 @@ function writePokemonLiveStats(trainerName, pokemonName, stat, newValue) {
           return { status: 'success' };
 
         } else if(stat === 'StatusCondition') {
-          POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 61).setValue(newValue);
+          const statusCell = POKEMON_DATA_SHEET.getRange(pokemonRow + 1, 61);
+          if (newValue === '' || newValue === null || newValue === undefined) {
+            statusCell.clearContent();
+          } else {
+            statusCell.setValue(newValue);
+          }
           return { status: 'success' };
 
         } else { //AC

@@ -4665,8 +4665,9 @@ function showMoveDetails(moveName) {
         }
       },
     });
-    return; // popup is now handled by showMovePopup
-
+  }
+  // END showMoveDetails — remainder removed (dead code replaced by showMovePopup above)
+  if (false) {
     // Create popup if it doesn't exist
     let popup = document.getElementById('moveDetailsPopup');
     if (!popup) {

@@ -1953,12 +1953,10 @@ function showCombatMoveDetails(moveName, combatantId, state) {
 
       saveCombatState(state);
       rerenderBattle(state);
-
-      const usedMoveData = _moveMap?.get(usedMoveName);
-      const fullMoveDesc = (usedMoveData?.[7] || '') + ' ' + (usedMoveData?.[8] || '');
-      if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullMoveDesc)) {
-        showDrainHealPopup(target, usedMoveName, state);
-      }
+    },
+    onDrainHeal: () => {
+      const target = state.combatants.find(x => x.id === combatantId);
+      if (target) showDrainHealPopup(target, moveName, state);
     },
   });
 }

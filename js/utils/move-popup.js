@@ -135,6 +135,16 @@ function _createPopupDOM() {
     if (overlay._onUseMove) overlay._onUseMove(moveName, vpCost);
     confirmOverlay.style.display = 'none';
     overlay.style.display = 'none';
+
+    // ── Shared post-use checks (add new move-effect rules here) ──
+    const move = overlay._currentMove;
+    if (move) {
+      const fullDesc = (move[7] || '') + ' ' + (move[8] || '');
+      // Drain: restore half of damage dealt to user
+      if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullDesc)) {
+        if (overlay._onDrainHeal) overlay._onDrainHeal();
+      }
+    }
   });
 }
 
@@ -405,9 +415,10 @@ function _renderCommander(trainerData) {
  * @param {string} [params.size]        - Pokemon size string
  * @param {number} [params.critMod]     - Critical hit modifier
  * @param {Array}  params.trainerData   - Full trainer data array
- * @param {function} [params.onUseMove] - Callback(moveName, vpCost) invoked after user confirms
+ * @param {function} [params.onUseMove]    - Callback(moveName, vpCost) for platform-specific VP deduction
+ * @param {function} [params.onDrainHeal] - Callback() invoked when move matches the drain heal pattern
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -416,8 +427,10 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
     popup = document.getElementById('combatMovePopup');
   }
 
-  // Store callback — accessed by the static confirmCombatMoveYes listener
+  // Store callbacks — accessed by the static confirmCombatMoveYes listener
   popup._onUseMove = onUseMove || null;
+  popup._onDrainHeal = onDrainHeal || null;
+  popup._currentMove = move;
 
   const { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice } = computedData;
   const fmtMod = v => v >= 0 ? `+${v}` : `${v}`;

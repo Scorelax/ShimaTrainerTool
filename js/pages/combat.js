@@ -2781,7 +2781,7 @@ async function endCombat(state) {
     PokemonAPI.updateLiveStats(trainerName, pokemonName, 'HP', c.currentHp).catch(e => console.error('HP sync:', e));
     PokemonAPI.updateLiveStats(trainerName, pokemonName, 'VP', c.currentVp).catch(e => console.error('VP sync:', e));
     if (knownMovesStr) PokemonAPI.updateLiveStats(trainerName, pokemonName, 'KnownMoves', knownMovesStr).catch(e => console.error('KnownMoves sync:', e));
-    if (statusCondStr) PokemonAPI.updateLiveStats(trainerName, pokemonName, 'StatusCondition', statusCondStr).catch(e => console.error('StatusCondition sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pokemonName, 'StatusCondition', statusCondStr).catch(e => console.error('StatusCondition sync:', e));
   }
 
   sessionStorage.removeItem('combatState');

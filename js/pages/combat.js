@@ -2778,10 +2778,8 @@ async function endCombat(state) {
 
     sessionStorage.setItem(c.entityKey, JSON.stringify(pokemonData));
 
-    PokemonAPI.updateLiveStats(trainerName, pokemonName, 'HP', c.currentHp).catch(e => console.error('HP sync:', e));
-    PokemonAPI.updateLiveStats(trainerName, pokemonName, 'VP', c.currentVp).catch(e => console.error('VP sync:', e));
-    if (knownMovesStr) PokemonAPI.updateLiveStats(trainerName, pokemonName, 'KnownMoves', knownMovesStr).catch(e => console.error('KnownMoves sync:', e));
-    PokemonAPI.updateLiveStats(trainerName, pokemonName, 'StatusCondition', statusCondStr).catch(e => console.error('StatusCondition sync:', e));
+    // Full update ensures empty StatusCondition (and all other fields) is written to the DB
+    PokemonAPI.update(pokemonData).catch(e => console.error('Pokemon sync:', e));
   }
 
   sessionStorage.removeItem('combatState');

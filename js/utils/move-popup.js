@@ -541,9 +541,11 @@ export function showDrainHealPopupForCard(pokemonData, moveName, trainerData) {
     document.body.appendChild(popup);
   }
 
-  // Populate header info
-  const currentHp = parseInt(pokemonData[45]) || 0;
-  const maxHp = parseInt(pokemonData[44]) || 0;
+  // Read HP from UI (same source onUseMove uses — pokemonData indices not reliable for max HP)
+  const hpText = document.getElementById('combatCurrentHP')?.textContent || '';
+  const hpParts = hpText.split('/').map(v => parseInt(v.trim()));
+  const currentHp = Number.isFinite(hpParts[0]) ? hpParts[0] : (parseInt(pokemonData[45]) || 0);
+  const maxHp = Number.isFinite(hpParts[1]) ? hpParts[1] : currentHp;
   document.getElementById('cardDrainHealTitle').textContent = `🌿 ${moveName} — Drain Heal`;
   document.getElementById('cardDrainHealTarget').textContent =
     `${pokemonData[2]} — ${currentHp}/${maxHp} HP`;
@@ -584,14 +586,13 @@ export function showDrainHealPopupForCard(pokemonData, moveName, trainerData) {
     const heal = Math.floor(dmg / 2);
     if (heal <= 0) return;
 
-    const newHp = Math.min((parseInt(pokemonData[45]) || 0) + heal, parseInt(pokemonData[44]) || 0);
+    const newHp = Math.min(currentHp + heal, maxHp);
     pokemonData[45] = newHp;
     sessionStorage.setItem(`pokemon_${pokemonData[2].toLowerCase()}`, JSON.stringify(pokemonData));
 
     // Update UI elements on the pokemon-card battle page
-    const maxHpVal = parseInt(pokemonData[44]) || 0;
     const hpDisplay = document.getElementById('combatCurrentHP');
-    if (hpDisplay) hpDisplay.textContent = `${newHp} / ${maxHpVal}`;
+    if (hpDisplay) hpDisplay.textContent = `${newHp} / ${maxHp}`;
     const hpVal = document.getElementById('currentHpValue');
     if (hpVal) hpVal.textContent = newHp;
 

@@ -873,7 +873,7 @@ export function renderTrainerInfo() {
         /* Special Inventory Popup Styles */
         #inventoryPopup .popup-content {
           max-width: min(90vw, 900px);
-          min-height: 75vh;
+          height: 75vh;
           max-height: 85vh;
           padding: 0;
           overflow: hidden;
@@ -883,8 +883,8 @@ export function renderTrainerInfo() {
 
         .inventory-popup-content {
           display: flex;
-          height: 100%;
           flex: 1;
+          min-height: 0;
           overflow: hidden;
         }
 

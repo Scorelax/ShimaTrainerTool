@@ -508,11 +508,13 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
  * Show the drain heal popup when a drain move is used outside combat.
  * Prompts for damage dealt, applies floor(damage/2) as HP healing.
  *
- * @param {Array}  pokemonData  - Pokemon data array (index 2=name, 44=maxHp, 45=currentHp)
+ * @param {Array}  pokemonData  - Pokemon data array (index 2=name, 45=currentHp)
  * @param {string} moveName
  * @param {Array}  trainerData  - Trainer data array (index 1=trainerName)
+ * @param {number} currentHp    - Current HP (post VP-deduction), passed by caller
+ * @param {number} maxHp        - Max HP (pokemonData[10]), passed by caller
  */
-export function showDrainHealPopupForCard(pokemonData, moveName, trainerData) {
+export function showDrainHealPopupForCard(pokemonData, moveName, trainerData, currentHp, maxHp) {
   let popup = document.getElementById('cardDrainHealPopup');
   if (!popup) {
     popup = document.createElement('div');
@@ -541,11 +543,7 @@ export function showDrainHealPopupForCard(pokemonData, moveName, trainerData) {
     document.body.appendChild(popup);
   }
 
-  // Read HP from UI (same source onUseMove uses — pokemonData indices not reliable for max HP)
-  const hpText = document.getElementById('combatCurrentHP')?.textContent || '';
-  const hpParts = hpText.split('/').map(v => parseInt(v.trim()));
-  const currentHp = Number.isFinite(hpParts[0]) ? hpParts[0] : (parseInt(pokemonData[45]) || 0);
-  const maxHp = Number.isFinite(hpParts[1]) ? hpParts[1] : currentHp;
+  // currentHp and maxHp are passed in by the caller (pokemon-card: pokemonData[45] / pokemonData[10])
   document.getElementById('cardDrainHealTitle').textContent = `🌿 ${moveName} — Drain Heal`;
   document.getElementById('cardDrainHealTarget').textContent =
     `${pokemonData[2]} — ${currentHp}/${maxHp} HP`;

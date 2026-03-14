@@ -4665,7 +4665,8 @@ function showMoveDetails(moveName) {
         }
       },
       onDrainHeal: () => {
-        showDrainHealPopupForCard(pokemonData, move[0], trainerData);
+        // pokemonData[45] was just updated by onUseMove; pokemonData[10] is max HP
+        showDrainHealPopupForCard(pokemonData, move[0], trainerData, pokemonData[45], pokemonData[10]);
       },
     });
   }

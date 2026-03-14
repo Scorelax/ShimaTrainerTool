@@ -2,7 +2,7 @@
 // Creates the popup DOM once (appended to document.body) and populates it on each call.
 
 import { getMoveTypeColor, getTextColorForBackground } from './pokemon-types.js';
-import { TrainerAPI } from '../api.js';
+import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showToast } from './notifications.js';
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
@@ -485,6 +485,113 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
     useBtn.dataset.moveName = move[0];
     useBtn.dataset.vpCost = move[4] || 0;
   }
+
+  popup.style.display = 'flex';
+}
+
+// ── Drain heal popup for pokemon-card page ────────────────────────────────────
+
+/**
+ * Show the drain heal popup when a drain move is used outside combat.
+ * Prompts for damage dealt, applies floor(damage/2) as HP healing.
+ *
+ * @param {Array}  pokemonData  - Pokemon data array (index 2=name, 44=maxHp, 45=currentHp)
+ * @param {string} moveName
+ * @param {Array}  trainerData  - Trainer data array (index 1=trainerName)
+ */
+export function showDrainHealPopupForCard(pokemonData, moveName, trainerData) {
+  let popup = document.getElementById('cardDrainHealPopup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'cardDrainHealPopup';
+    popup.className = 'combat-popup-overlay';
+    popup.style.display = 'none';
+    popup.innerHTML = `
+      <div class="combat-popup-content" style="max-width:420px;padding:2rem;">
+        <h3 id="cardDrainHealTitle" style="margin:0 0 0.4rem 0;color:#4CAF50;text-align:center;font-size:1.2rem;"></h3>
+        <p id="cardDrainHealTarget" style="text-align:center;color:#aaa;margin:0 0 1.4rem 0;font-size:0.9rem;"></p>
+        <div style="margin-bottom:1rem;">
+          <label style="display:block;color:#FFDE00;font-weight:700;text-transform:uppercase;margin-bottom:0.5rem;font-size:0.88rem;">Damage dealt to opponent:</label>
+          <input type="number" id="cardDrainDamageInput" min="0" placeholder="Enter damage dealt..."
+            style="width:100%;padding:0.7rem 1rem;background:#3a3a3a;border:2px solid #555;border-radius:8px;color:white;font-size:1rem;box-sizing:border-box;">
+        </div>
+        <div style="text-align:center;margin-bottom:1.2rem;">
+          <span style="color:#FFDE00;font-weight:700;text-transform:uppercase;font-size:0.88rem;">HP Restored: </span>
+          <span id="cardDrainHealTotal" style="color:#4CAF50;font-weight:900;font-size:1.1rem;">—</span>
+        </div>
+        <div style="display:flex;gap:0.8rem;">
+          <button id="cardDrainHealConfirm" class="combat-use-move-btn" style="flex:1;background:linear-gradient(135deg,#2E7D32,#1B5E20);" disabled>Apply Heal</button>
+          <button id="cardDrainHealSkip" class="combat-use-move-btn" style="flex:1;background:linear-gradient(135deg,#555,#333);">Skip</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(popup);
+  }
+
+  // Populate header info
+  const currentHp = parseInt(pokemonData[45]) || 0;
+  const maxHp = parseInt(pokemonData[44]) || 0;
+  document.getElementById('cardDrainHealTitle').textContent = `🌿 ${moveName} — Drain Heal`;
+  document.getElementById('cardDrainHealTarget').textContent =
+    `${pokemonData[2]} — ${currentHp}/${maxHp} HP`;
+  document.getElementById('cardDrainHealTotal').textContent = '—';
+
+  // Clone input + buttons to remove stale listeners
+  const oldInput = document.getElementById('cardDrainDamageInput');
+  const newInput = oldInput.cloneNode(true);
+  newInput.value = '';
+  oldInput.parentNode.replaceChild(newInput, oldInput);
+
+  const oldConfirm = document.getElementById('cardDrainHealConfirm');
+  const newConfirm = oldConfirm.cloneNode(true);
+  newConfirm.disabled = true;
+  oldConfirm.parentNode.replaceChild(newConfirm, oldConfirm);
+
+  const oldSkip = document.getElementById('cardDrainHealSkip');
+  const newSkip = oldSkip.cloneNode(true);
+  oldSkip.parentNode.replaceChild(newSkip, oldSkip);
+
+  document.getElementById('cardDrainDamageInput').addEventListener('input', function () {
+    const dmg = parseInt(this.value);
+    const totalEl = document.getElementById('cardDrainHealTotal');
+    const confirmBtn = document.getElementById('cardDrainHealConfirm');
+    if (!isNaN(dmg) && dmg >= 0) {
+      const heal = Math.floor(dmg / 2);
+      totalEl.textContent = `${heal} HP`;
+      confirmBtn.disabled = heal <= 0;
+    } else {
+      totalEl.textContent = '—';
+      confirmBtn.disabled = true;
+    }
+  });
+
+  document.getElementById('cardDrainHealConfirm').addEventListener('click', function () {
+    const dmg = parseInt(document.getElementById('cardDrainDamageInput').value);
+    if (isNaN(dmg) || dmg < 0) return;
+    const heal = Math.floor(dmg / 2);
+    if (heal <= 0) return;
+
+    const newHp = Math.min((parseInt(pokemonData[45]) || 0) + heal, parseInt(pokemonData[44]) || 0);
+    pokemonData[45] = newHp;
+    sessionStorage.setItem(`pokemon_${pokemonData[2].toLowerCase()}`, JSON.stringify(pokemonData));
+
+    // Update UI elements on the pokemon-card battle page
+    const maxHpVal = parseInt(pokemonData[44]) || 0;
+    const hpDisplay = document.getElementById('combatCurrentHP');
+    if (hpDisplay) hpDisplay.textContent = `${newHp} / ${maxHpVal}`;
+    const hpVal = document.getElementById('currentHpValue');
+    if (hpVal) hpVal.textContent = newHp;
+
+    PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp)
+      .catch(e => console.error('Drain HP sync:', e));
+
+    showToast(`${pokemonData[2]}: ${moveName} drained ${heal} HP!`, 'success');
+    popup.style.display = 'none';
+  });
+
+  document.getElementById('cardDrainHealSkip').addEventListener('click', function () {
+    popup.style.display = 'none';
+  });
 
   popup.style.display = 'flex';
 }

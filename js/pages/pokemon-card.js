@@ -4,7 +4,7 @@ import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData, SPECIALIZATION_TO_TYPE } from '../utils/pokemon-types.js';
-import { showMovePopup } from '../utils/move-popup.js';
+import { showMovePopup, showDrainHealPopupForCard } from '../utils/move-popup.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -4662,6 +4662,12 @@ function showMoveDetails(moveName) {
         if (vpOverflow) {
           PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp)
             .catch(error => console.error('Error updating HP:', error));
+        }
+
+        // Drain heal: prompt for damage dealt so we can restore half
+        const fullMoveDesc = (move[7] || '') + ' ' + (move[8] || '');
+        if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullMoveDesc)) {
+          showDrainHealPopupForCard(pokemonData, usedMoveName, trainerData);
         }
       },
     });

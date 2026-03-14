@@ -752,8 +752,8 @@ function renderPartyModalList(pokemonFullData) {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const trainerLevel = parseInt(trainerData[2]) || 1;
   const numPokeSlots = getNumPokeSlots(trainerLevel);
-  const partySlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-  const partyCount = partySlots.filter(s => s && s !== '').length;
+  // trainerData[26] is the pokeslots count field; party membership is per-pokemon in pokemonData[38]
+  const partyCount = pokemonFullData.filter(d => d[38]).length;
   const partyFull = partyCount >= numPokeSlots;
 
   const badge = document.getElementById('partyCountBadge');
@@ -812,16 +812,14 @@ function renderPartyModalList(pokemonFullData) {
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
-function _updatePartyBadge(trainerData, numPokeSlots) {
+function _updatePartyBadge(pokemonFullData, numPokeSlots) {
   const badge = document.getElementById('partyCountBadge');
   if (!badge) return;
-  const slots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-  badge.textContent = `Party: ${slots.filter(s => s && s !== '').length}/${numPokeSlots}`;
+  badge.textContent = `Party: ${pokemonFullData.filter(d => d[38]).length}/${numPokeSlots}`;
 }
 
-function _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots) {
-  const slots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-  const partyFull = slots.filter(s => s && s !== '').length >= numPokeSlots;
+function _refreshPartyDisabled(pokemonFullData, numPokeSlots) {
+  const partyFull = pokemonFullData.filter(d => d[38]).length >= numPokeSlots;
   document.querySelectorAll('input[data-slot-type="party"]').forEach(cb => {
     const entry = pokemonFullData.find(d => d[2] === cb.dataset.pokemonName);
     cb.disabled = partyFull && !(entry && entry[38]);
@@ -863,9 +861,8 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
       showError('Remove from utility slot first.');
       return;
     }
-    // Block if party is at trainer's slot cap
-    const slots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-    if (slots.filter(s => s && s !== '').length >= numPokeSlots) {
+    // Block if party is at cap — count from pokemon data, not trainerData
+    if (pokemonFullData.filter(d => d[38]).length >= numPokeSlots) {
       checkbox.checked = false;
       showError(`Party is full! (${numPokeSlots}/${numPokeSlots})`);
       return;
@@ -873,69 +870,46 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
   }
 
   const originalSlot = pokemonData[38];
-  const originalTrainerSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-
-  if (isChecked) {
-    for (let i = 26; i <= 31; i++) {
-      if (!trainerData[i] || trainerData[i] === '') {
-        trainerData[i] = pokemonData[2];
-        pokemonData[38] = (i - 25).toString();
-        break;
-      }
-    }
-  } else {
-    pokemonData[38] = '';
-    for (let i = 26; i <= 31; i++) {
-      if (trainerData[i] === pokemonData[2]) { trainerData[i] = ''; break; }
-    }
-  }
-
+  // Only update pokemonData[38] — party slot names live in pokemon data, not trainerData
+  pokemonData[38] = isChecked ? '1' : ''; // server will correct the slot number on success
   sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
-  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
   const entry = pokemonFullData.find(d => d[2] === pokemonName);
   if (entry) entry[38] = pokemonData[38];
 
-  _updatePartyBadge(trainerData, numPokeSlots);
-  _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots);
+  _updatePartyBadge(pokemonFullData, numPokeSlots);
+  _refreshPartyDisabled(pokemonFullData, numPokeSlots);
 
   try {
+    // trainerData[26] is the pokeslots count — passed to API as capacity info
     const response = await PokemonAPI.updatePartyStatus(
       trainerData[1], pokemonData[2], trainerData[26], isChecked ? 'add' : 'remove'
     );
 
     if (response.status === 'success') {
       if (isChecked && response.slot) {
-        const slotIndex = 26 + parseInt(response.slot) - 1;
-        for (let i = 26; i <= 31; i++) { if (trainerData[i] === pokemonData[2]) trainerData[i] = ''; }
-        trainerData[slotIndex] = pokemonData[2];
         pokemonData[38] = response.slot;
         if (entry) entry[38] = response.slot;
         sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
-        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-        _updatePartyBadge(trainerData, numPokeSlots);
-        _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots);
+        _updatePartyBadge(pokemonFullData, numPokeSlots);
+        _refreshPartyDisabled(pokemonFullData, numPokeSlots);
       }
     } else {
       pokemonData[38] = originalSlot;
-      for (let i = 0; i < 6; i++) trainerData[26 + i] = originalTrainerSlots[i];
       if (entry) entry[38] = originalSlot;
       sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
       checkbox.checked = !isChecked;
-      _updatePartyBadge(trainerData, numPokeSlots);
-      _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots);
+      _updatePartyBadge(pokemonFullData, numPokeSlots);
+      _refreshPartyDisabled(pokemonFullData, numPokeSlots);
       showError(response.message || 'Failed to update party status.');
     }
   } catch (err) {
     pokemonData[38] = originalSlot;
-    for (let i = 0; i < 6; i++) trainerData[26 + i] = originalTrainerSlots[i];
     if (entry) entry[38] = originalSlot;
     sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
     checkbox.checked = !isChecked;
-    _updatePartyBadge(trainerData, numPokeSlots);
-    _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots);
+    _updatePartyBadge(pokemonFullData, numPokeSlots);
+    _refreshPartyDisabled(pokemonFullData, numPokeSlots);
     showError('Failed to update party status.');
   }
 }

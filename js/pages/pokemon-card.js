@@ -4761,7 +4761,7 @@ function showMoveDetails(moveName) {
         // Save to sessionStorage
         pokemonData[46] = newVp;
         pokemonData[45] = newHp;
-        sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
+        sessionStorage.setItem(`pokemon_${pokemonData[2].toLowerCase()}`, JSON.stringify(pokemonData));
 
         // Close both popups immediately
         document.getElementById('useMoveConfirmPopup').style.display = 'none';

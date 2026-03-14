@@ -873,6 +873,7 @@ export function renderTrainerInfo() {
         /* Special Inventory Popup Styles */
         #inventoryPopup .popup-content {
           max-width: min(90vw, 900px);
+          height: clamp(400px, 75vh, 600px);
           max-height: 85vh;
           padding: 0;
           overflow: hidden;
@@ -2699,7 +2700,8 @@ export function attachTrainerInfoListeners() {
     function applyInventorySearch(query) {
       const searchResults = document.getElementById('inventorySearchResults');
       const categoriesContainer = document.getElementById('inventoryCategories');
-      const q = query.trim().toLowerCase();
+      const normalize = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const q = normalize(query.trim());
 
       if (!q) {
         searchResults.classList.remove('active');
@@ -2710,7 +2712,7 @@ export function attachTrainerInfoListeners() {
       categoriesContainer.style.display = 'none';
       searchResults.classList.add('active');
 
-      const matches = allInventoryItems.filter(item => item.name.toLowerCase().includes(q));
+      const matches = allInventoryItems.filter(item => normalize(item.name).includes(q));
 
       if (matches.length === 0) {
         searchResults.innerHTML = '<li class="inventory-search-no-results">No items found</li>';

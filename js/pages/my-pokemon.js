@@ -435,22 +435,64 @@ export function renderMyPokemon() {
           margin-top: 2px;
         }
 
-        .party-pokemon-utility-note {
-          color: #f90;
-          font-size: clamp(0.7rem, 1.5vw, 0.82rem);
-          margin-top: 2px;
+        .party-col-header {
+          display: flex;
+          align-items: center;
+          padding: 0.35rem clamp(1.2rem, 3vw, 1.8rem);
+          background: #1e1e1e;
+          border-bottom: 1px solid #555;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #999;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          position: sticky;
+          top: 0;
+          z-index: 1;
         }
 
-        .party-checkbox {
-          width: clamp(20px, 4vw, 26px);
-          height: clamp(20px, 4vw, 26px);
-          accent-color: #EE1515;
-          cursor: pointer;
+        .party-col-header-spacer { flex: 1; }
+
+        .party-col-header-label {
+          width: clamp(50px, 10vw, 62px);
+          text-align: center;
+        }
+
+        .party-slot-checks {
+          display: flex;
+          gap: clamp(0.3rem, 1vw, 0.6rem);
+          align-items: center;
           flex-shrink: 0;
         }
 
-        .party-checkbox:disabled {
-          opacity: 0.4;
+        .slot-check-label {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 3px;
+          width: clamp(50px, 10vw, 62px);
+          cursor: pointer;
+        }
+
+        .slot-check-label span {
+          font-size: clamp(0.62rem, 1.3vw, 0.72rem);
+          color: #aaa;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+          user-select: none;
+        }
+
+        .slot-check-label input[type="checkbox"] {
+          width: clamp(18px, 3.5vw, 22px);
+          height: clamp(18px, 3.5vw, 22px);
+          accent-color: #EE1515;
+          cursor: pointer;
+          margin: 0;
+        }
+
+        .slot-check-label input:disabled {
+          opacity: 0.35;
           cursor: not-allowed;
         }
 
@@ -679,22 +721,25 @@ function nextPage() {
 
 // ── Party Modal ──────────────────────────────────────────────────────────────
 
+function getNumPokeSlots(trainerLevel) {
+  if (trainerLevel >= 16) return 6;
+  if (trainerLevel >= 10) return 5;
+  if (trainerLevel >= 5)  return 4;
+  return 3;
+}
+
 function openPartyModal() {
   const modal = document.getElementById('partyModal');
   if (!modal) return;
 
-  // Load full pokemon data for all pokemon
   const pokemonFullData = [];
   for (let i = 0; i < sessionStorage.length; i++) {
     const key = sessionStorage.key(i);
     if (key.startsWith('pokemon_')) {
-      try {
-        const data = JSON.parse(sessionStorage.getItem(key));
-        pokemonFullData.push(data);
-      } catch (e) {}
+      try { pokemonFullData.push(JSON.parse(sessionStorage.getItem(key))); } catch (e) {}
     }
   }
-  pokemonFullData.sort((a, b) => (a[3] || 0) - (b[3] || 0)); // sort by dex entry
+  pokemonFullData.sort((a, b) => (a[3] || 0) - (b[3] || 0));
 
   renderPartyModalList(pokemonFullData);
   modal.classList.add('open');
@@ -702,20 +747,31 @@ function openPartyModal() {
 
 function renderPartyModalList(pokemonFullData) {
   const list = document.getElementById('partyModalList');
-  const badge = document.getElementById('partyCountBadge');
   if (!list) return;
 
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  const trainerLevel = parseInt(trainerData[2]) || 1;
+  const numPokeSlots = getNumPokeSlots(trainerLevel);
   const partySlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
   const partyCount = partySlots.filter(s => s && s !== '').length;
-  if (badge) badge.textContent = `Party: ${partyCount}/6`;
+  const partyFull = partyCount >= numPokeSlots;
+
+  const badge = document.getElementById('partyCountBadge');
+  if (badge) badge.textContent = `Party: ${partyCount}/${numPokeSlots}`;
 
   if (pokemonFullData.length === 0) {
     list.innerHTML = '<div style="padding:2rem;text-align:center;color:#888;">No Pokemon registered.</div>';
     return;
   }
 
-  list.innerHTML = pokemonFullData.map(data => {
+  const colHeader = `
+    <div class="party-col-header">
+      <span class="party-col-header-spacer"></span>
+      <span class="party-col-header-label">Party</span>
+      <span class="party-col-header-label">Utility</span>
+    </div>`;
+
+  const rows = pokemonFullData.map(data => {
     const name = data[2] || '';
     const nickname = data[36] || '';
     const image = data[1] || 'assets/Pokeball.png';
@@ -723,6 +779,7 @@ function renderPartyModalList(pokemonFullData) {
     const inUtility = data[56] === 1 || data[56] === '1';
     const displayName = nickname || name;
     const subLabel = nickname ? name : `Lv. ${data[4] || '?'}`;
+    const partyDisabled = partyFull && !inParty;
 
     return `
       <div class="party-pokemon-row">
@@ -730,28 +787,54 @@ function renderPartyModalList(pokemonFullData) {
         <div class="party-pokemon-info">
           <div class="party-pokemon-label">${displayName}</div>
           <div class="party-pokemon-sublabel">${subLabel}</div>
-          ${inUtility ? '<div class="party-pokemon-utility-note">In utility slot</div>' : ''}
         </div>
-        <input
-          type="checkbox"
-          class="party-checkbox"
-          data-pokemon-name="${name}"
-          ${inParty ? 'checked' : ''}
-          ${inUtility ? 'disabled' : ''}
-        >
-      </div>
-    `;
+        <div class="party-slot-checks">
+          <label class="slot-check-label">
+            <span>Party</span>
+            <input type="checkbox" data-pokemon-name="${name}" data-slot-type="party"
+              ${inParty ? 'checked' : ''} ${partyDisabled ? 'disabled' : ''}>
+          </label>
+          <label class="slot-check-label">
+            <span>Utility</span>
+            <input type="checkbox" data-pokemon-name="${name}" data-slot-type="utility"
+              ${inUtility ? 'checked' : ''}>
+          </label>
+        </div>
+      </div>`;
   }).join('');
 
-  list.querySelectorAll('.party-checkbox').forEach(cb => {
-    cb.addEventListener('change', e => handlePartyToggle(e, pokemonFullData));
+  list.innerHTML = colHeader + rows;
+
+  list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', e => handleSlotToggle(e, pokemonFullData, numPokeSlots));
   });
 }
 
-async function handlePartyToggle(e, pokemonFullData) {
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+function _updatePartyBadge(trainerData, numPokeSlots) {
+  const badge = document.getElementById('partyCountBadge');
+  if (!badge) return;
+  const slots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+  badge.textContent = `Party: ${slots.filter(s => s && s !== '').length}/${numPokeSlots}`;
+}
+
+function _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots) {
+  const slots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+  const partyFull = slots.filter(s => s && s !== '').length >= numPokeSlots;
+  document.querySelectorAll('input[data-slot-type="party"]').forEach(cb => {
+    const entry = pokemonFullData.find(d => d[2] === cb.dataset.pokemonName);
+    cb.disabled = partyFull && !(entry && entry[38]);
+  });
+}
+
+// ── Toggle dispatcher ────────────────────────────────────────────────────────
+
+async function handleSlotToggle(e, pokemonFullData, numPokeSlots) {
   const checkbox = e.target;
   const isChecked = checkbox.checked;
   const pokemonName = checkbox.dataset.pokemonName;
+  const slotType = checkbox.dataset.slotType;
 
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const pokemonKey = `pokemon_${pokemonName.toLowerCase()}`;
@@ -763,22 +846,35 @@ async function handlePartyToggle(e, pokemonFullData) {
     return;
   }
 
+  if (slotType === 'party') {
+    await _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, pokemonData, trainerData, pokemonFullData, numPokeSlots);
+  } else {
+    await _toggleUtilitySlot(checkbox, isChecked, pokemonName, pokemonKey, pokemonData, trainerData, pokemonFullData, numPokeSlots);
+  }
+}
+
+// ── Party slot toggle ────────────────────────────────────────────────────────
+
+async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, pokemonData, trainerData, pokemonFullData, numPokeSlots) {
   if (isChecked) {
-    // Check party full
-    const partySlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-    const full = partySlots.every(s => s && s !== '');
-    if (full) {
+    // Block if already in utility slot
+    if (pokemonData[56] === 1 || pokemonData[56] === '1') {
       checkbox.checked = false;
-      showError('Party is full! (6/6)');
+      showError('Remove from utility slot first.');
+      return;
+    }
+    // Block if party is at trainer's slot cap
+    const slots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
+    if (slots.filter(s => s && s !== '').length >= numPokeSlots) {
+      checkbox.checked = false;
+      showError(`Party is full! (${numPokeSlots}/${numPokeSlots})`);
       return;
     }
   }
 
-  // Store originals for rollback
   const originalSlot = pokemonData[38];
   const originalTrainerSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
 
-  // Optimistic update
   if (isChecked) {
     for (let i = 26; i <= 31; i++) {
       if (!trainerData[i] || trainerData[i] === '') {
@@ -790,72 +886,126 @@ async function handlePartyToggle(e, pokemonFullData) {
   } else {
     pokemonData[38] = '';
     for (let i = 26; i <= 31; i++) {
-      if (trainerData[i] === pokemonData[2]) {
-        trainerData[i] = '';
-        break;
-      }
+      if (trainerData[i] === pokemonData[2]) { trainerData[i] = ''; break; }
     }
   }
 
   sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-  // Update party count badge
-  const partySlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-  const partyCount = partySlots.filter(s => s && s !== '').length;
-  const badge = document.getElementById('partyCountBadge');
-  if (badge) badge.textContent = `Party: ${partyCount}/6`;
-
-  // Also update the in-memory pokemonFullData entry so re-renders stay consistent
   const entry = pokemonFullData.find(d => d[2] === pokemonName);
   if (entry) entry[38] = pokemonData[38];
 
+  _updatePartyBadge(trainerData, numPokeSlots);
+  _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots);
+
   try {
-    const action = isChecked ? 'add' : 'remove';
     const response = await PokemonAPI.updatePartyStatus(
-      trainerData[1],
-      pokemonData[2],
-      trainerData[26],
-      action
+      trainerData[1], pokemonData[2], trainerData[26], isChecked ? 'add' : 'remove'
     );
 
     if (response.status === 'success') {
       if (isChecked && response.slot) {
         const slotIndex = 26 + parseInt(response.slot) - 1;
-        for (let i = 26; i <= 31; i++) {
-          if (trainerData[i] === pokemonData[2]) trainerData[i] = '';
-        }
+        for (let i = 26; i <= 31; i++) { if (trainerData[i] === pokemonData[2]) trainerData[i] = ''; }
         trainerData[slotIndex] = pokemonData[2];
         pokemonData[38] = response.slot;
         if (entry) entry[38] = response.slot;
         sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
         sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-        // Refresh badge with confirmed data
-        const confirmedSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-        if (badge) badge.textContent = `Party: ${confirmedSlots.filter(s => s && s !== '').length}/6`;
+        _updatePartyBadge(trainerData, numPokeSlots);
+        _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots);
       }
     } else {
-      // Rollback
       pokemonData[38] = originalSlot;
       for (let i = 0; i < 6; i++) trainerData[26 + i] = originalTrainerSlots[i];
       if (entry) entry[38] = originalSlot;
       sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
       sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
       checkbox.checked = !isChecked;
-      const rolledSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-      if (badge) badge.textContent = `Party: ${rolledSlots.filter(s => s && s !== '').length}/6`;
+      _updatePartyBadge(trainerData, numPokeSlots);
+      _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots);
       showError(response.message || 'Failed to update party status.');
     }
   } catch (err) {
-    // Rollback
     pokemonData[38] = originalSlot;
     for (let i = 0; i < 6; i++) trainerData[26 + i] = originalTrainerSlots[i];
     if (entry) entry[38] = originalSlot;
     sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
     checkbox.checked = !isChecked;
-    const rolledSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
-    if (badge) badge.textContent = `Party: ${rolledSlots.filter(s => s && s !== '').length}/6`;
+    _updatePartyBadge(trainerData, numPokeSlots);
+    _refreshPartyDisabled(pokemonFullData, trainerData, numPokeSlots);
     showError('Failed to update party status.');
+  }
+}
+
+// ── Utility slot toggle ──────────────────────────────────────────────────────
+
+async function _toggleUtilitySlot(checkbox, isChecked, pokemonName, pokemonKey, pokemonData, trainerData, pokemonFullData, numPokeSlots) {
+  if (isChecked) {
+    // Block if already in active party
+    if (pokemonData[38]) {
+      checkbox.checked = false;
+      showError('Remove from active party first.');
+      return;
+    }
+  }
+
+  const originalUtility = pokemonData[56];
+  const clearedEntries = []; // for rollback
+
+  pokemonData[56] = isChecked ? 1 : '';
+  sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
+
+  // Auto-clear any other Pokemon currently in utility slot
+  if (isChecked) {
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key.startsWith('pokemon_') && key !== pokemonKey) {
+        const other = JSON.parse(sessionStorage.getItem(key));
+        if (other[56] === 1 || other[56] === '1') {
+          clearedEntries.push({ key, originalValue: other[56], name: other[2] });
+          other[56] = '';
+          sessionStorage.setItem(key, JSON.stringify(other));
+          const otherEntry = pokemonFullData.find(d => d[2] === other[2]);
+          if (otherEntry) otherEntry[56] = '';
+          const otherCb = document.querySelector(`input[data-slot-type="utility"][data-pokemon-name="${other[2]}"]`);
+          if (otherCb) otherCb.checked = false;
+        }
+      }
+    }
+  }
+
+  sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+  const entry = pokemonFullData.find(d => d[2] === pokemonName);
+  if (entry) entry[56] = pokemonData[56];
+
+  const rollback = () => {
+    pokemonData[56] = originalUtility;
+    sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
+    clearedEntries.forEach(({ key, originalValue, name }) => {
+      const other = JSON.parse(sessionStorage.getItem(key));
+      other[56] = originalValue;
+      sessionStorage.setItem(key, JSON.stringify(other));
+      const otherEntry = pokemonFullData.find(d => d[2] === name);
+      if (otherEntry) otherEntry[56] = originalValue;
+      const otherCb = document.querySelector(`input[data-slot-type="utility"][data-pokemon-name="${name}"]`);
+      if (otherCb) otherCb.checked = !!originalValue;
+    });
+    if (entry) entry[56] = originalUtility;
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
+    checkbox.checked = !isChecked;
+  };
+
+  try {
+    const response = await PokemonAPI.updateUtilitySlot(trainerData[1], pokemonData[2], isChecked ? 'add' : 'remove');
+    if (response.status !== 'success') {
+      rollback();
+      showError(response.message || 'Failed to update utility slot.');
+    }
+  } catch (err) {
+    rollback();
+    showError('Failed to update utility slot.');
   }
 }

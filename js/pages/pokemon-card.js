@@ -4,6 +4,7 @@ import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData, SPECIALIZATION_TO_TYPE } from '../utils/pokemon-types.js';
+import { showMovePopup } from '../utils/move-popup.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -4543,13 +4544,12 @@ function loadMoveColorsAndListeners() {
 // Show move details popup
 function showMoveDetails(moveName) {
   const move = _moveMap?.get(moveName);
+  if (!move) return;
 
-  if (move) {
-    // Use module-level cached data set in attachPokemonCardListeners — avoids re-parsing sessionStorage per click
-    const pokemonData = _pokemonData;
-    const trainerData = _trainerData;
+  const pokemonData = _pokemonData;
+  const trainerData = _trainerData;
 
-    // Extract needed data (convert to numbers to avoid string concatenation)
+  {
     const type1 = pokemonData[5] || '';
     const type2 = pokemonData[6] || '';
     const str = parseInt(pokemonData[15]) || 10;
@@ -4603,14 +4603,69 @@ function showMoveDetails(moveName) {
       heldItemEffects
     );
 
-    // Build held items display from already-resolved data
-    const heldItemsInfo = resolvedHeldItems.length > 0
-      ? resolvedHeldItems.map(r =>
+    // Build held items HTML for shared popup
+    const heldItemsHTML = resolvedHeldItems.length > 0
+      ? '<strong>Held Items:</strong>' + resolvedHeldItems.map(r =>
           r.found
-            ? `<div style="margin-bottom: 0.8rem;"><strong>${r.name}:</strong> ${r.effect || 'No description'}</div>`
-            : `<div style="margin-bottom: 0.8rem;"><strong>${r.name}:</strong> No description available</div>`
+            ? `<div style="margin-top:0.3rem;"><strong>${r.name}:</strong> ${r.effect || 'No description'}</div>`
+            : `<div style="margin-top:0.3rem;"><strong>${r.name}:</strong> No description available</div>`
         ).join('')
-      : '<div style="color: #999;">No held items</div>';
+      : '';
+
+    const hasBrawny = (pokemonData[50] || '').split(',').map(f => f.trim()).some(f => f === 'Brawny');
+    const sizeText = (pokemonData[57] || 'Unknown') + (hasBrawny ? ' ✦' : '');
+
+    showMovePopup({
+      move,
+      computedData: {
+        attackBonus: attackRollBonus,
+        damageBonus: damageRollBonus,
+        attackBreakdown,
+        damageBreakdown,
+        damageDice,
+      },
+      heldItemsHTML,
+      size: sizeText,
+      critMod: 0,
+      trainerData,
+      onUseMove: (usedMoveName, vpCost) => {
+        const currentVpText = document.getElementById('combatCurrentVP')?.textContent || '0 / 0';
+        const currentHpText = document.getElementById('combatCurrentHP')?.textContent || '0 / 0';
+        const [currentVp, maxVp] = currentVpText.split(' / ').map(v => parseInt(v));
+        const [currentHp, maxHp] = currentHpText.split(' / ').map(v => parseInt(v));
+
+        let newVp = currentVp - vpCost;
+        let newHp = currentHp;
+        let vpOverflow = false;
+
+        if (newVp < 0) {
+          const excessVpCost = Math.abs(newVp);
+          newVp = 0;
+          newHp = Math.max(currentHp - excessVpCost, 0);
+          vpOverflow = true;
+        }
+
+        document.getElementById('combatCurrentVP').textContent = `${newVp} / ${maxVp}`;
+        document.getElementById('combatCurrentHP').textContent = `${newHp} / ${maxHp}`;
+        const currentVpEl = document.getElementById('currentVpValue');
+        const currentHpEl = document.getElementById('currentHpValue');
+        if (currentVpEl) currentVpEl.textContent = newVp;
+        if (currentHpEl) currentHpEl.textContent = newHp;
+
+        pokemonData[46] = newVp;
+        pokemonData[45] = newHp;
+        sessionStorage.setItem(`pokemon_${pokemonData[2].toLowerCase()}`, JSON.stringify(pokemonData));
+
+        PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp)
+          .catch(error => console.error('Error updating VP:', error));
+
+        if (vpOverflow) {
+          PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'HP', newHp)
+            .catch(error => console.error('Error updating HP:', error));
+        }
+      },
+    });
+    return; // popup is now handled by showMovePopup
 
     // Create popup if it doesn't exist
     let popup = document.getElementById('moveDetailsPopup');

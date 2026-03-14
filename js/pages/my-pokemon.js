@@ -385,7 +385,7 @@ export function renderMyPokemon() {
         .party-modal-list {
           overflow-y: auto;
           flex: 1;
-          padding: clamp(0.5rem, 1.5vh, 1rem) 0;
+          padding: 0 0 clamp(0.5rem, 1.5vh, 1rem) 0;
         }
 
         .party-pokemon-row {
@@ -780,6 +780,8 @@ function renderPartyModalList(pokemonFullData) {
     const displayName = nickname || name;
     const subLabel = nickname ? name : `Lv. ${data[4] || '?'}`;
     const partyDisabled = partyFull && !inParty;
+    const utilityOccupied = pokemonFullData.some(d => d[56] === 1 || d[56] === '1');
+    const utilityDisabled = inParty || (utilityOccupied && !inUtility);
 
     return `
       <div class="party-pokemon-row">
@@ -797,7 +799,7 @@ function renderPartyModalList(pokemonFullData) {
           <label class="slot-check-label">
             <span>Utility</span>
             <input type="checkbox" data-pokemon-name="${name}" data-slot-type="utility"
-              ${inUtility ? 'checked' : ''}>
+              ${inUtility ? 'checked' : ''} ${utilityDisabled ? 'disabled' : ''}>
           </label>
         </div>
       </div>`;
@@ -823,6 +825,16 @@ function _refreshPartyDisabled(pokemonFullData, numPokeSlots) {
   document.querySelectorAll('input[data-slot-type="party"]').forEach(cb => {
     const entry = pokemonFullData.find(d => d[2] === cb.dataset.pokemonName);
     cb.disabled = partyFull && !(entry && entry[38]);
+  });
+}
+
+function _refreshUtilityDisabled(pokemonFullData) {
+  const utilityOccupied = pokemonFullData.some(d => d[56] === 1 || d[56] === '1');
+  document.querySelectorAll('input[data-slot-type="utility"]').forEach(cb => {
+    const entry = pokemonFullData.find(d => d[2] === cb.dataset.pokemonName);
+    const hasUtility = entry && (entry[56] === 1 || entry[56] === '1');
+    const inParty = entry && !!entry[38];
+    cb.disabled = inParty || (utilityOccupied && !hasUtility);
   });
 }
 
@@ -879,6 +891,7 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
 
   _updatePartyBadge(pokemonFullData, numPokeSlots);
   _refreshPartyDisabled(pokemonFullData, numPokeSlots);
+  _refreshUtilityDisabled(pokemonFullData);
 
   try {
     // trainerData[26] is the pokeslots count — passed to API as capacity info
@@ -893,6 +906,7 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
         sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
         _updatePartyBadge(pokemonFullData, numPokeSlots);
         _refreshPartyDisabled(pokemonFullData, numPokeSlots);
+        _refreshUtilityDisabled(pokemonFullData);
       }
     } else {
       pokemonData[38] = originalSlot;
@@ -901,6 +915,7 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
       checkbox.checked = !isChecked;
       _updatePartyBadge(pokemonFullData, numPokeSlots);
       _refreshPartyDisabled(pokemonFullData, numPokeSlots);
+      _refreshUtilityDisabled(pokemonFullData);
       showError(response.message || 'Failed to update party status.');
     }
   } catch (err) {
@@ -910,6 +925,7 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
     checkbox.checked = !isChecked;
     _updatePartyBadge(pokemonFullData, numPokeSlots);
     _refreshPartyDisabled(pokemonFullData, numPokeSlots);
+    _refreshUtilityDisabled(pokemonFullData);
     showError('Failed to update party status.');
   }
 }
@@ -954,6 +970,7 @@ async function _toggleUtilitySlot(checkbox, isChecked, pokemonName, pokemonKey, 
   sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
   const entry = pokemonFullData.find(d => d[2] === pokemonName);
   if (entry) entry[56] = pokemonData[56];
+  _refreshUtilityDisabled(pokemonFullData);
 
   const rollback = () => {
     pokemonData[56] = originalUtility;
@@ -970,6 +987,7 @@ async function _toggleUtilitySlot(checkbox, isChecked, pokemonName, pokemonKey, 
     if (entry) entry[56] = originalUtility;
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
     checkbox.checked = !isChecked;
+    _refreshUtilityDisabled(pokemonFullData);
   };
 
   try {

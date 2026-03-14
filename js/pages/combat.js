@@ -3,6 +3,7 @@
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showToast } from '../utils/notifications.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData } from '../utils/pokemon-types.js';
+import { showMovePopup } from '../utils/move-popup.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -409,58 +410,6 @@ function renderBattlePhase(state) {
         <button class="combat-end-btn" id="endCombatBtn">End Combat</button>
       </div>
       <div class="battle-list" id="battleList">${cards}</div>
-
-      <!-- Move Details Popup -->
-      <div class="combat-popup-overlay" id="combatMovePopup" style="display:none;">
-        <div class="combat-popup-content" id="combatMovePopupContent">
-          <div id="combatMovePopupHeader" class="combat-move-popup-header">
-            <button id="closeCombatMovePopup" class="combat-popup-close">×</button>
-            <h2 id="combatMoveNamePopup"></h2>
-            <div id="combatMoveTypePopup" class="combat-move-type-badge"></div>
-          </div>
-          <div id="combatMovePopupBody" class="combat-move-popup-body">
-            <div class="combat-move-grid">
-              <div><strong>Modifier:</strong> <span id="cMoveModifier"></span></div>
-              <div><strong>Action:</strong> <span id="cMoveAction"></span></div>
-              <div><strong>VP Cost:</strong> <span id="cMoveVP"></span></div>
-              <div><strong>Duration:</strong> <span id="cMoveDuration"></span></div>
-              <div><strong>Range:</strong> <span id="cMoveRange"></span></div>
-              <div><strong>Size:</strong> <span id="cMoveSize"></span></div>
-              <div><strong>Critical Hit:</strong> <span id="cMoveCritMod"></span></div>
-            </div>
-            <div class="combat-move-description" id="cMoveDescription"></div>
-            <div class="combat-move-higher" id="cMoveHigher"></div>
-            <div class="combat-move-rolls-grid">
-              <div>
-                <strong>Attack Roll:</strong>
-                <span id="cAttackBonus" class="combat-roll-bonus"></span>
-                <div id="cAttackBreakdown" class="combat-roll-breakdown"></div>
-              </div>
-              <div>
-                <strong>Damage Roll:</strong>
-                <span id="cDamageBonus" class="combat-roll-bonus"></span>
-                <div id="cDamageBreakdown" class="combat-roll-breakdown"></div>
-              </div>
-            </div>
-            <div class="combat-move-held-items" id="cHeldItems" style="display:none;"></div>
-            <div id="cBattleDiceContainer"></div>
-            <div id="cTacticianContainer"></div>
-            <div id="cCommanderContainer"></div>
-            <button id="useCombatMoveBtn" class="combat-use-move-btn">Use Move</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Use Move Confirm -->
-      <div class="combat-popup-overlay" id="combatMoveConfirmPopup" style="display:none;">
-        <div class="combat-popup-content" style="max-width:360px;text-align:center;padding:2rem;">
-          <h3 id="combatConfirmText" style="margin:0 0 1.5rem 0;color:#e0e0e0;"></h3>
-          <div style="display:flex;gap:1rem;">
-            <button id="confirmCombatMoveYes" class="combat-use-move-btn" style="flex:1;">Yes</button>
-            <button id="confirmCombatMoveNo" class="combat-use-move-btn" style="flex:1;background:linear-gradient(135deg,#EE1515,#C91010);">No</button>
-          </div>
-        </div>
-      </div>
 
       <!-- Ingrain Heal Popup -->
       <div class="combat-popup-overlay" id="ingrainHealPopup" style="display:none;">
@@ -1499,85 +1448,7 @@ function attachBattleListeners(state) {
     _switchTargetPokemon = null;
   });
 
-  // Move popup close
-  document.getElementById('closeCombatMovePopup')?.addEventListener('click', () => {
-    document.getElementById('combatMovePopup').style.display = 'none';
-  });
-  document.getElementById('combatMovePopup')?.addEventListener('click', e => {
-    if (e.target.id === 'combatMovePopup') e.target.style.display = 'none';
-  });
-
-  // Confirm popup
-  document.getElementById('confirmCombatMoveNo')?.addEventListener('click', () => {
-    document.getElementById('combatMoveConfirmPopup').style.display = 'none';
-  });
-  document.getElementById('combatMoveConfirmPopup')?.addEventListener('click', e => {
-    if (e.target.id === 'combatMoveConfirmPopup') e.target.style.display = 'none';
-  });
-  document.getElementById('confirmCombatMoveYes')?.addEventListener('click', () => {
-    const btn = document.getElementById('useCombatMoveBtn');
-    const vpCost = parseInt(btn?.dataset.vpCost) || 0;
-    const combatantId = btn?.dataset.combatantId;
-    const moveName = btn?.dataset.moveName;
-    if (!combatantId) return;
-
-    const c = state.combatants.find(x => x.id === combatantId);
-    if (!c) return;
-
-    // Deduct VP (overflow to HP)
-    let newVp = c.currentVp - vpCost;
-    let newHp = c.currentHp;
-    if (newVp < 0) { newHp = Math.max(0, newHp + newVp); newVp = 0; }
-    c.currentHp = newHp;
-    c.currentVp = newVp;
-
-    // Decrement recharge charges
-    if (c.rechargeStates && c.rechargeStates[moveName]) {
-      c.rechargeStates[moveName].chargesLeft = Math.max(0, c.rechargeStates[moveName].chargesLeft - 1);
-    }
-
-    // Ingrain: register 3-turn end-of-turn healing
-    if (moveName && moveName.toLowerCase() === 'ingrain') {
-      const move = _moveMap?.get(moveName);
-      const desc = move?.[7] || '';
-      const higherLevels = move?.[8] || '';
-      const pokemonLevel = c.level || 1;
-
-      // Base dice from description
-      const baseDiceMatch = desc.match(/(\d+d\d+)/i);
-      let healDice = baseDiceMatch ? baseDiceMatch[1] : '1d10';
-
-      // Apply higher-level tier scaling (same pattern as parseDamageDice)
-      if (higherLevels && pokemonLevel > 1) {
-        const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
-        let match, bestDice = null, bestLevel = 0;
-        while ((match = tierRegex.exec(higherLevels)) !== null) {
-          const tierLevel = parseInt(match[2]);
-          if (pokemonLevel >= tierLevel && tierLevel > bestLevel) {
-            bestLevel = tierLevel;
-            bestDice = match[1];
-          }
-        }
-        if (bestDice) healDice = bestDice;
-      }
-
-      const moveMod = (move?.[2] || '').trim();
-      c.statusEffects = c.statusEffects.filter(se => se.name !== 'Ingrain');
-      c.statusEffects.push({ name: 'Ingrain', duration: 3, healDice, moveMod });
-    }
-
-    saveCombatState(state);
-    document.getElementById('combatMoveConfirmPopup').style.display = 'none';
-    document.getElementById('combatMovePopup').style.display = 'none';
-    rerenderBattle(state);
-
-    // Drain heal: if move restores half the damage dealt, prompt for damage
-    const usedMove = _moveMap?.get(moveName);
-    const fullMoveDesc = (usedMove?.[7] || '') + ' ' + (usedMove?.[8] || '');
-    if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullMoveDesc)) {
-      showDrainHealPopup(c, moveName, state);
-    }
-  });
+  // Note: move popup close/confirm listeners are handled by the shared showMovePopup utility.
 
   applyMoveColors();
 }
@@ -2006,7 +1877,6 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   const trainerLevel = parseInt(trainerData[2]) || 1;
   const specializationsStr = trainerData[24] || '';
 
-  // Resolve held item effects for bonus calculation
   const heldItemNames = (c.item || '').split(',').map(s => s.trim()).filter(Boolean);
   const cachedItems = getCachedItems();
   const heldItemEffects = heldItemNames.map(name => {
@@ -2014,7 +1884,7 @@ function showCombatMoveDetails(moveName, combatantId, state) {
     return dbItem ? (dbItem.effect || dbItem.description || '') : '';
   });
 
-  const { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice } = computeMoveData(
+  const computedData = computeMoveData(
     move,
     {
       types: c.types || [],
@@ -2029,72 +1899,68 @@ function showCombatMoveDetails(moveName, combatantId, state) {
     heldItemEffects
   );
 
-  const bgColor = getMoveTypeColor(move[1]);
-  const textColor = getTextColorForBackground(bgColor);
-
-  const header = document.getElementById('combatMovePopupHeader');
-  const body = document.getElementById('combatMovePopupBody');
-  if (header) { header.style.backgroundColor = bgColor; header.style.color = textColor; }
-  if (body) { body.style.backgroundColor = bgColor; body.style.color = textColor; }
-  const closeBtn = header?.querySelector('.combat-popup-close');
-  if (closeBtn) { closeBtn.style.color = textColor; }
-
-  document.getElementById('combatMoveNamePopup').textContent = move[0];
-  document.getElementById('combatMoveTypePopup').textContent = move[1];
-  document.getElementById('cMoveModifier').textContent = move[2] || '—';
-  document.getElementById('cMoveAction').textContent = move[3] || '—';
-  document.getElementById('cMoveVP').textContent = move[4] || '0';
-  document.getElementById('cMoveDuration').textContent = move[5] || '—';
-  document.getElementById('cMoveRange').textContent = move[6] || '—';
-  document.getElementById('cMoveSize').textContent = c.size || '—';
-  const critModEl = document.getElementById('cMoveCritMod');
-  if (critModEl) critModEl.textContent = c.critMod > 0 ? `+${c.critMod}` : c.critMod < 0 ? `${c.critMod}` : '0';
-  document.getElementById('cMoveDescription').textContent = move[7] || '';
-  const higherEl = document.getElementById('cMoveHigher');
-  if (higherEl) higherEl.textContent = move[8] ? `Higher Levels: ${move[8]}` : '';
-  document.getElementById('cAttackBonus').textContent = formatMod(attackBonus);
-  document.getElementById('cAttackBreakdown').textContent = attackBreakdown;
-  if (damageDice) {
-    document.getElementById('cDamageBonus').textContent = damageBonus > 0 ? `${damageDice} + ${damageBonus}` : damageDice;
-  } else {
-    document.getElementById('cDamageBonus').textContent = damageBonus > 0 ? formatMod(damageBonus) : '—';
-  }
-  document.getElementById('cDamageBreakdown').textContent = damageBreakdown;
-
-  // Held items
-  const heldItemsEl = document.getElementById('cHeldItems');
-  if (heldItemsEl) {
-    if (heldItemNames.length > 0) {
-      heldItemsEl.innerHTML = '<strong>Held Items:</strong>' + heldItemNames.map(name => {
+  const heldItemsHTML = heldItemNames.length > 0
+    ? '<strong>Held Items:</strong>' + heldItemNames.map(name => {
         const dbItem = cachedItems.find(i => i.name === name);
         return dbItem
           ? `<div style="margin-top:0.3rem;"><strong>${dbItem.name}:</strong> ${dbItem.effect || dbItem.description || 'No description'}</div>`
           : `<div style="margin-top:0.3rem;"><strong>${name}:</strong> No description available</div>`;
-      }).join('');
-      heldItemsEl.style.display = '';
-    } else {
-      heldItemsEl.style.display = 'none';
-    }
-  }
+      }).join('')
+    : '';
 
-  // Trainer path sections
-  _renderCombatBattleDice(trainerData, trainerPath);
-  _renderCombatTactician(trainerData, trainerPath, trainerLevel);
-  _renderCombatCommander(trainerData, trainerPath, trainerLevel);
+  showMovePopup({
+    move,
+    computedData,
+    heldItemsHTML,
+    size: c.size,
+    critMod: c.critMod,
+    trainerData,
+    onUseMove: (usedMoveName, vpCost) => {
+      const target = state.combatants.find(x => x.id === combatantId);
+      if (!target) return;
 
-  const vpCost = parseInt(move[4]) || 0;
-  const useBtn = document.getElementById('useCombatMoveBtn');
-  if (useBtn) {
-    useBtn.dataset.vpCost = vpCost;
-    useBtn.dataset.combatantId = combatantId;
-    useBtn.dataset.moveName = moveName;
-    useBtn.onclick = () => {
-      document.getElementById('combatConfirmText').textContent = `Use ${moveName} (${vpCost} VP)?`;
-      document.getElementById('combatMoveConfirmPopup').style.display = 'flex';
-    };
-  }
+      let newVp = target.currentVp - vpCost;
+      let newHp = target.currentHp;
+      if (newVp < 0) { newHp = Math.max(0, newHp + newVp); newVp = 0; }
+      target.currentHp = newHp;
+      target.currentVp = newVp;
 
-  document.getElementById('combatMovePopup').style.display = 'flex';
+      if (target.rechargeStates && target.rechargeStates[usedMoveName]) {
+        target.rechargeStates[usedMoveName].chargesLeft =
+          Math.max(0, target.rechargeStates[usedMoveName].chargesLeft - 1);
+      }
+
+      if (usedMoveName && usedMoveName.toLowerCase() === 'ingrain') {
+        const ingrainMove = _moveMap?.get(usedMoveName);
+        const desc = ingrainMove?.[7] || '';
+        const higherLevels = ingrainMove?.[8] || '';
+        const pokemonLevel = target.level || 1;
+        const baseDiceMatch = desc.match(/(\d+d\d+)/i);
+        let healDice = baseDiceMatch ? baseDiceMatch[1] : '1d10';
+        if (higherLevels && pokemonLevel > 1) {
+          const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
+          let match, bestDice = null, bestLevel = 0;
+          while ((match = tierRegex.exec(higherLevels)) !== null) {
+            const tierLevel = parseInt(match[2]);
+            if (pokemonLevel >= tierLevel && tierLevel > bestLevel) { bestLevel = tierLevel; bestDice = match[1]; }
+          }
+          if (bestDice) healDice = bestDice;
+        }
+        const moveMod = (ingrainMove?.[2] || '').trim();
+        target.statusEffects = target.statusEffects.filter(se => se.name !== 'Ingrain');
+        target.statusEffects.push({ name: 'Ingrain', duration: 3, healDice, moveMod });
+      }
+
+      saveCombatState(state);
+      rerenderBattle(state);
+
+      const usedMoveData = _moveMap?.get(usedMoveName);
+      const fullMoveDesc = (usedMoveData?.[7] || '') + ' ' + (usedMoveData?.[8] || '');
+      if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullMoveDesc)) {
+        showDrainHealPopup(target, usedMoveName, state);
+      }
+    },
+  });
 }
 
 function _renderCombatBattleDice(trainerData, trainerPath) {

@@ -905,6 +905,8 @@ function openTypingsModal() {
 
 const MOVE_INDICES = [23, 24, 25, 26, 27, 28, 37];
 const DMG_PATTERN = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit|hit\s+for\s+\d+d\d+/i;
+const DICE_PATTERN = /\d+d\d+/i;
+const _isDamaging = desc => DMG_PATTERN.test(desc) && DICE_PATTERN.test(desc);
 
 function _buildMoveMap() {
   const movesData = JSON.parse(sessionStorage.getItem('moves') || '[]');
@@ -942,7 +944,7 @@ function _renderTypingsGrid() {
         const move = moveMap.get(moveName);
         if (!move) return;
         const type = move[1] || '';
-        if (type && ALL_TYPES.includes(type) && !coveredTypes.has(type) && DMG_PATTERN.test(move[7] || '')) {
+        if (type && ALL_TYPES.includes(type) && !coveredTypes.has(type) && _isDamaging(move[7] || '')) {
           coveredTypes.add(type);
           moveCounts[type]++;
         }
@@ -995,7 +997,7 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
       MOVE_INDICES.some(idx =>
         (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).some(moveName => {
           const move = moveMap.get(moveName);
-          return move && move[1] === type && DMG_PATTERN.test(move[7] || '');
+          return move && move[1] === type && _isDamaging(move[7] || '');
         })
       )
     );
@@ -1010,24 +1012,12 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
       const image = data[1] || 'assets/Pokeball.png';
       const displayName = nickname || name;
       const t2 = data[6] ? ` / ${data[6]}` : '';
-      let movesList = '';
-      if (section === 'move') {
-        const dmgMoves = [];
-        MOVE_INDICES.forEach(idx => {
-          (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(moveName => {
-            const move = moveMap.get(moveName);
-            if (move && move[1] === type && DMG_PATTERN.test(move[7] || '')) dmgMoves.push(moveName);
-          });
-        });
-        if (dmgMoves.length) movesList = `<div style="color:#bbb;font-size:0.78rem;margin-top:2px;">${dmgMoves.join(', ')}</div>`;
-      }
       return `
         <div class="party-pokemon-row">
           <img class="party-pokemon-avatar" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
           <div class="party-pokemon-info">
             <div class="party-pokemon-label">${displayName}</div>
             <div class="party-pokemon-sublabel">Lv. ${data[4] || '?'} &nbsp;·&nbsp; ${data[5] || ''}${t2}</div>
-            ${movesList}
           </div>
         </div>`;
     }).join('')}`;

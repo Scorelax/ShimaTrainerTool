@@ -409,6 +409,23 @@ export function renderMyPokemon() {
           text-shadow: 0 1px 3px rgba(0,0,0,0.4);
         }
 
+        .typings-back-btn {
+          display: block;
+          width: 100%;
+          border: none;
+          padding: clamp(0.5rem, 1.5vh, 0.75rem) clamp(1.2rem, 3vw, 1.8rem);
+          font-size: clamp(0.9rem, 2vw, 1rem);
+          font-weight: 700;
+          cursor: pointer;
+          text-align: left;
+          border-bottom: 1px solid rgba(255,255,255,0.15);
+          margin-bottom: 0.25rem;
+          opacity: 0.9;
+          transition: opacity 0.15s;
+        }
+
+        .typings-back-btn:hover { opacity: 1; }
+
         .type-coverage-count {
           font-size: clamp(0.85rem, 2vw, 1rem);
           font-weight: 900;
@@ -653,7 +670,7 @@ export function renderMyPokemon() {
       <div class="typings-modal-overlay" id="typingsModal">
         <div class="typings-modal-content">
           <div class="typings-modal-header">
-            <h2>Type Coverage</h2>
+            <h2 id="typingsModalTitle">Type Coverage</h2>
             <button class="party-modal-close" id="closeTypingsModal">×</button>
           </div>
           <div class="typings-modal-body" id="typingsModalList"></div>
@@ -852,45 +869,94 @@ function nextPage() {
 
 const ALL_TYPES = ['Normal','Fighting','Flying','Poison','Ground','Rock','Bug','Ghost','Steel','Fire','Water','Grass','Electric','Psychic','Ice','Dragon','Dark','Fairy','Cosmic'];
 
-function openTypingsModal() {
-  const modal = document.getElementById('typingsModal');
-  const list = document.getElementById('typingsModalList');
-  if (!modal || !list) return;
-
-  // Count each type from all Pokemon in sessionStorage
-  const typeCounts = {};
-  ALL_TYPES.forEach(t => { typeCounts[t] = 0; });
-
+function _getAllPokemonData() {
+  const result = [];
   for (let i = 0; i < sessionStorage.length; i++) {
     const key = sessionStorage.key(i);
     if (!key.startsWith('pokemon_')) continue;
-    try {
-      const data = JSON.parse(sessionStorage.getItem(key));
-      const t1 = data[5] || '';
-      const t2 = data[6] || '';
-      if (t1 && typeCounts.hasOwnProperty(t1)) typeCounts[t1]++;
-      if (t2 && typeCounts.hasOwnProperty(t2)) typeCounts[t2]++;
-    } catch (e) {}
+    try { result.push(JSON.parse(sessionStorage.getItem(key))); } catch (e) {}
   }
+  result.sort((a, b) => (a[3] || 0) - (b[3] || 0));
+  return result;
+}
 
-  // Sort: highest count first, then alphabetical; zeros at the bottom
+function openTypingsModal() {
+  const modal = document.getElementById('typingsModal');
+  if (!modal) return;
+  _renderTypingsGrid();
+  modal.classList.add('open');
+}
+
+function _renderTypingsGrid() {
+  const list = document.getElementById('typingsModalList');
+  const title = document.getElementById('typingsModalTitle');
+  if (!list) return;
+
+  if (title) title.textContent = 'Type Coverage';
+
+  const allPokemon = _getAllPokemonData();
+  const typeCounts = {};
+  ALL_TYPES.forEach(t => { typeCounts[t] = 0; });
+  allPokemon.forEach(data => {
+    const t1 = data[5] || '';
+    const t2 = data[6] || '';
+    if (t1 && typeCounts.hasOwnProperty(t1)) typeCounts[t1]++;
+    if (t2 && typeCounts.hasOwnProperty(t2)) typeCounts[t2]++;
+  });
+
   const sorted = ALL_TYPES.slice().sort((a, b) => {
     if (typeCounts[b] !== typeCounts[a]) return typeCounts[b] - typeCounts[a];
     return a.localeCompare(b);
   });
 
+  list.style.display = 'grid';
   list.innerHTML = sorted.map(type => {
     const count = typeCounts[type];
     const bg = getMoveTypeColor(type);
     const textColor = getTextColorForBackground(bg);
     return `
-      <div class="type-coverage-card ${count === 0 ? 'type-zero' : ''}" style="background:${bg}; color:${textColor};">
+      <div class="type-coverage-card ${count === 0 ? 'type-zero' : ''}" style="background:${bg}; color:${textColor}; cursor:${count > 0 ? 'pointer' : 'default'};" data-type="${type}">
         <span class="type-coverage-name">${type}</span>
         <span class="type-coverage-count">${count}</span>
       </div>`;
   }).join('');
 
-  modal.classList.add('open');
+  list.querySelectorAll('.type-coverage-card:not(.type-zero)').forEach(card => {
+    card.addEventListener('click', () => _renderTypingDetail(card.dataset.type, allPokemon));
+  });
+}
+
+function _renderTypingDetail(type, allPokemon) {
+  const list = document.getElementById('typingsModalList');
+  const title = document.getElementById('typingsModalTitle');
+  if (!list) return;
+
+  if (title) title.textContent = type;
+
+  const bg = getMoveTypeColor(type);
+  const textColor = getTextColorForBackground(bg);
+  const matching = allPokemon.filter(d => d[5] === type || d[6] === type);
+
+  list.style.display = 'block';
+  list.innerHTML = `
+    <button class="typings-back-btn" style="background:${bg}; color:${textColor};">← All Types</button>
+    ${matching.map(data => {
+      const name = data[2] || '';
+      const nickname = data[36] || '';
+      const image = data[1] || 'assets/Pokeball.png';
+      const displayName = nickname || name;
+      const t2 = data[6] ? ` / ${data[6]}` : '';
+      return `
+        <div class="party-pokemon-row">
+          <img class="party-pokemon-avatar" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+          <div class="party-pokemon-info">
+            <div class="party-pokemon-label">${displayName}</div>
+            <div class="party-pokemon-sublabel">Lv. ${data[4] || '?'} &nbsp;·&nbsp; ${data[5] || ''}${t2}</div>
+          </div>
+        </div>`;
+    }).join('')}`;
+
+  list.querySelector('.typings-back-btn').addEventListener('click', _renderTypingsGrid);
 }
 
 // ── Party Modal ──────────────────────────────────────────────────────────────
@@ -952,7 +1018,7 @@ function renderPartyModalList(pokemonFullData) {
     const inParty = !!(data[38]);
     const inUtility = data[56] === 1 || data[56] === '1';
     const displayName = nickname || name;
-    const subLabel = nickname ? name : `Lv. ${data[4] || '?'}`;
+    const subLabel = `Lv. ${data[4] || '?'}`;
     const partyDisabled = partyFull && !inParty;
     const utilityOccupied = pokemonFullData.some(d => d[56] === 1 || d[56] === '1');
     const utilityDisabled = inParty || (utilityOccupied && !inUtility);

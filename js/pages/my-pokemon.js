@@ -919,7 +919,20 @@ function openTypingsModal() {
   modal.classList.add('open');
 }
 
-const MOVE_INDICES = [23, 24, 25, 26, 27, 28, 37];
+const MOVE_INDICES      = [23, 24, 25, 26, 27, 28, 37];
+const MOVE_REQ_LEVELS   = [ 1,  2,  6, 10, 14, 18,  0]; // 0 = custom moves, always available
+
+function _knownMoveNames(data) {
+  const level = parseInt(data[4]) || 1;
+  const names = [];
+  MOVE_INDICES.forEach((idx, i) => {
+    const req = MOVE_REQ_LEVELS[i];
+    if (req === 0 || level >= req) {
+      (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(n => names.push(n));
+    }
+  });
+  return names;
+}
 const DMG_PATTERN = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit|hit\s+for\s+\d+d\d+/i;
 const DICE_PATTERN = /\d+d\d+/i;
 const _isDamaging = desc => DMG_PATTERN.test(desc) && DICE_PATTERN.test(desc);
@@ -955,16 +968,14 @@ function _renderTypingsGrid() {
   ALL_TYPES.forEach(t => { moveCounts[t] = 0; });
   allPokemon.forEach(data => {
     const coveredTypes = new Set();
-    MOVE_INDICES.forEach(idx => {
-      (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(moveName => {
-        const move = moveMap.get(moveName);
-        if (!move) return;
-        const type = move[1] || '';
-        if (type && ALL_TYPES.includes(type) && !coveredTypes.has(type) && _isDamaging(move[7] || '')) {
-          coveredTypes.add(type);
-          moveCounts[type]++;
-        }
-      });
+    _knownMoveNames(data).forEach(moveName => {
+      const move = moveMap.get(moveName);
+      if (!move) return;
+      const type = move[1] || '';
+      if (type && ALL_TYPES.includes(type) && !coveredTypes.has(type) && _isDamaging(move[7] || '')) {
+        coveredTypes.add(type);
+        moveCounts[type]++;
+      }
     });
   });
   const sortedMoves = ALL_TYPES.slice().sort((a, b) => moveCounts[b] - moveCounts[a] || a.localeCompare(b));
@@ -1010,12 +1021,10 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
     matching = allPokemon.filter(d => d[5] === type || d[6] === type);
   } else {
     matching = allPokemon.filter(data =>
-      MOVE_INDICES.some(idx =>
-        (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).some(moveName => {
-          const move = moveMap.get(moveName);
-          return move && move[1] === type && _isDamaging(move[7] || '');
-        })
-      )
+      _knownMoveNames(data).some(moveName => {
+        const move = moveMap.get(moveName);
+        return move && move[1] === type && _isDamaging(move[7] || '');
+      })
     );
   }
 

@@ -6,6 +6,15 @@ import { audioManager } from '../utils/audio.js';
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
 
+function parseFeatsFromString(featsStr) {
+  if (!featsStr || featsStr === 'None') return [];
+  return featsStr.split(',').map(entry => {
+    const colonIdx = entry.trim().indexOf(':');
+    if (colonIdx === -1) return { name: entry.trim(), data: '' };
+    return { name: entry.trim().slice(0, colonIdx), data: entry.trim().slice(colonIdx + 1) };
+  }).filter(f => f.name);
+}
+
 export function renderTrainerInfo() {
   // Load trainer data from session storage
   const trainerDataStr = sessionStorage.getItem('trainerData');
@@ -541,6 +550,27 @@ export function renderTrainerInfo() {
           border-color: #333;
           box-shadow: 0 5px 12px rgba(0,0,0,0.4),
                       0 0 9px rgba(255,222,0,0.5);
+        }
+
+        /* Expertise: left 50% yellow (proficient), right 50% purple */
+        .skill-item.double-proficiency {
+          background: linear-gradient(to right, #FFDE00 0%, #FFC700 50%, #7B2FBE 50%, #5E1FA0 100%);
+          color: black;
+          border-color: #333;
+          box-shadow: 0 5px 12px rgba(0,0,0,0.4), 0 0 9px rgba(123,47,190,0.4);
+        }
+
+        /* Observant passive: right 1/3 dark green */
+        .skill-item.passive-bonus.unlocked {
+          background: linear-gradient(to right, #FFDE00 0%, #FFC700 66.66%, #1a6b2e 66.66%, #145422 100%);
+          color: black;
+          border-color: #333;
+          box-shadow: 0 5px 12px rgba(0,0,0,0.4), 0 0 9px rgba(26,107,46,0.4);
+        }
+        .skill-item.passive-bonus:not(.unlocked) {
+          background: linear-gradient(to right, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 66.66%, #1a6b2e 66.66%, #145422 100%);
+          color: rgba(255,255,255,0.85);
+          border-color: #1a6b2e;
         }
 
         .skill-name {
@@ -2011,26 +2041,31 @@ export function renderTrainerInfo() {
         <div class="skills-container">
           <h3>Skills</h3>
           <div class="skills-grid">
-            ${allSkills.map(skill => {
-              const skillKey = skill.name.toLowerCase();
-              const profBonus = parseInt(trainerProficiency) || 2;
-              const isDouble = skillsArray.some(s =>
-                s.toLowerCase() === skillKey + '+' || s === skill.name + '+'
-              );
-              const isProficient = isDouble || skillsArray.some(s => s.toLowerCase().includes(skillKey));
-              const badgeBonus = (badgeSkillBonuses['all'] || 0) + (badgeSkillBonuses[skillKey] || 0);
-              const totalMod = skill.mod + badgeBonus + (isDouble ? 2 * profBonus : isProficient ? profBonus : 0);
-              const totalModStr = totalMod >= 0 ? `+${totalMod}` : `${totalMod}`;
-              const skillClass = isProficient ? 'unlocked' : '';
-              const doubleProfClass = isDouble ? 'double-proficiency' : '';
+            ${(() => {
+              const hasObservant = parseFeatsFromString(trainerFeats).some(f => f.name === 'Observant');
+              return allSkills.map(skill => {
+                const skillKey = skill.name.toLowerCase();
+                const profBonus = parseInt(trainerProficiency) || 2;
+                const isDouble = skillsArray.some(s =>
+                  s.toLowerCase() === skillKey + '+' || s === skill.name + '+'
+                );
+                const isProficient = isDouble || skillsArray.some(s => s.toLowerCase().includes(skillKey));
+                const badgeBonus = (badgeSkillBonuses['all'] || 0) + (badgeSkillBonuses[skillKey] || 0);
+                const totalMod = skill.mod + badgeBonus + (isDouble ? 2 * profBonus : isProficient ? profBonus : 0);
+                const totalModStr = totalMod >= 0 ? `+${totalMod}` : `${totalMod}`;
+                const skillClass = isProficient ? 'unlocked' : '';
+                const doubleProfClass = isDouble ? 'double-proficiency' : '';
+                const isPassive = hasObservant && (skill.name === 'Perception' || skill.name === 'Investigation');
+                const passiveClass = isPassive ? 'passive-bonus' : '';
 
-              return `
-                <div class="skill-item ${skillClass} ${doubleProfClass}">
-                  <div class="skill-name">${skill.name}</div>
-                  <div class="skill-modifier">(${skill.stat} ${totalModStr})</div>
-                </div>
-              `;
-            }).join('')}
+                return `
+                  <div class="skill-item ${skillClass} ${doubleProfClass} ${passiveClass}">
+                    <div class="skill-name">${skill.name}</div>
+                    <div class="skill-modifier">(${skill.stat} ${totalModStr})</div>
+                  </div>
+                `;
+              }).join('');
+            })()}
           </div>
         </div>
       </div>
@@ -4069,38 +4104,30 @@ export function attachTrainerInfoListeners() {
       return;
     }
 
-    const featsList = feats.split(',').map(f => f.trim()).filter(f => f);
+    const featsList = parseFeatsFromString(feats);
     const featsDataStr = sessionStorage.getItem('trainerFeats');
+    const featsData = featsDataStr ? JSON.parse(featsDataStr) : [];
     let html = '';
 
-    if (featsDataStr) {
-      const featsData = JSON.parse(featsDataStr);
-      featsList.forEach(featName => {
-        const featData = featsData.find(f => f.name === featName);
-        if (featData) {
-          html += `
-            <div class="popup-item">
-              <div class="popup-item-title">${featData.name}</div>
-              <div class="popup-item-effect">${featData.effect || 'No effect description'}</div>
-            </div>
-          `;
-        } else {
-          html += `
-            <div class="popup-item">
-              <div class="popup-item-title">${featName}</div>
-            </div>
-          `;
-        }
-      });
-    } else {
-      featsList.forEach(featName => {
-        html += `
-          <div class="popup-item">
-            <div class="popup-item-title">${featName}</div>
-          </div>
-        `;
-      });
-    }
+    featsList.forEach(({ name, data }) => {
+      const featData = featsData.find(f => f.name === name);
+      const effect = featData ? (featData.effect || 'No effect description') : '';
+      let extraHtml = '';
+
+      // Show stored data for feats that have it (e.g. Linguist languages)
+      if (name === 'Linguist' && data) {
+        const languages = data.split('|').filter(l => l).join(', ');
+        extraHtml = `<div class="popup-item-effect" style="margin-top:0.4rem; color: #888; font-style: italic;">Languages: ${languages}</div>`;
+      }
+
+      html += `
+        <div class="popup-item">
+          <div class="popup-item-title">${name}</div>
+          ${effect ? `<div class="popup-item-effect">${effect}</div>` : ''}
+          ${extraHtml}
+        </div>
+      `;
+    });
 
     content.innerHTML = html;
     openPopup('featsPopup');

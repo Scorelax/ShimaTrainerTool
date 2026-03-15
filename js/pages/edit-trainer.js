@@ -39,7 +39,8 @@ export function renderEditTrainer() {
   ];
 
   const selectedSkills = trainerSkills ? trainerSkills.split(',').map(s => s.trim()) : [];
-  const selectedFeats = trainerFeats ? trainerFeats.split(',').map(s => s.trim()) : [];
+  // Strip :data suffix (e.g. "Linguist:French|Spanish|German" → "Linguist") for checkbox matching
+  const selectedFeats = trainerFeats ? trainerFeats.split(',').map(s => s.trim().split(':')[0]) : [];
   const gearArray = gear ? gear.split(',').map(g => g.trim()).filter(g => g && g !== 'None') : [];
 
   const html = `
@@ -736,6 +737,7 @@ async function handleFormSubmit() {
   const trainerDataStr = sessionStorage.getItem('trainerData');
   const trainerData = JSON.parse(trainerDataStr);
 
+  const originalFeatsStr = trainerData[33] || '';
   const originalLevel = parseInt(trainerData[2], 10);
 
   try {
@@ -754,9 +756,14 @@ async function handleFormSubmit() {
     const selectedSkills = Array.from(form.querySelectorAll('input[name="skills"]:checked'))
       .map(cb => cb.value);
 
-    // Get selected feats
-    const selectedFeats = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
+    // Get selected feats — preserve existing feat data (e.g. Linguist languages)
+    const selectedFeatNames = Array.from(form.querySelectorAll('input[name="feats"]:checked'))
       .map(cb => cb.value);
+    const existingFeatDataMap = {};
+    parseFeatsFromString(originalFeatsStr).forEach(f => { if (f.data) existingFeatDataMap[f.name] = f.data; });
+    const selectedFeatEntries = selectedFeatNames.map(name =>
+      existingFeatDataMap[name] ? `${name}:${existingFeatDataMap[name]}` : name
+    );
 
     // Get gear items
     const gearItems = Array.from(document.querySelectorAll('.gear-chip'))
@@ -773,7 +780,10 @@ async function handleFormSubmit() {
     trainerData[13] = ac;
     trainerData[21] = leaguePoints;
     trainerData[18] = selectedSkills.length > 0 ? selectedSkills.join(', ') : '';
-    trainerData[33] = selectedFeats.length > 0 ? selectedFeats.join(', ') : '';
+    trainerData[33] = selectedFeatEntries.length > 0 ? selectedFeatEntries.join(', ') : '';
+    const newFeatNames = selectedFeatNames.filter(
+      name => !parseFeatsFromString(originalFeatsStr).map(f => f.name).includes(name)
+    );
     trainerData[37] = gearItems.length > 0 ? gearItems.join(', ') : 'None';
 
     // Calculate modifiers (D&D 5e rules)
@@ -848,11 +858,16 @@ async function handleFormSubmit() {
       console.log(`Tactician TP updated: ${oldTP} -> ${newTP} (level ${originalLevel} -> ${level})`);
     }
 
-    // Update session storage IMMEDIATELY
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
-
-    // Hide loading screen
+    // Hide loading before feat choice popups
     hideLoading();
+
+    // Process feat choices for newly added feats (modifies trainerData in place)
+    if (newFeatNames.length > 0) {
+      await processFeatChoices(newFeatNames, trainerData);
+    }
+
+    // Save to session storage (including any feat choice results)
+    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
     // Play level up sound if level changed
     if (level !== originalLevel) {
@@ -889,5 +904,317 @@ async function handleFormSubmit() {
         detail: { route: 'edit-trainer' }
       }));
     }, 2000);
+  }
+}
+
+// ============================================================================
+// FEAT AUTOMATION
+// ============================================================================
+
+const STAT_MAP = {
+  STR: { index: 5, modIndex: 27 },
+  DEX: { index: 6, modIndex: 28 },
+  CON: { index: 7, modIndex: 29 },
+  INT: { index: 8, modIndex: 30 },
+  WIS: { index: 9, modIndex: 31 },
+  CHA: { index: 10, modIndex: 32 },
+};
+
+const ALL_SKILL_NAMES = [
+  'Athletics', 'Acrobatics', 'Sleight of Hand', 'Stealth',
+  'Arcana', 'History', 'Investigation', 'Nature', 'Religion',
+  'Animal Handling', 'Insight', 'Medicine', 'Perception', 'Survival',
+  'Deception', 'Intimidation', 'Performance', 'Persuasion',
+];
+
+function parseFeatsFromString(featsStr) {
+  if (!featsStr || featsStr === 'None') return [];
+  return featsStr.split(',').map(entry => {
+    const colonIdx = entry.trim().indexOf(':');
+    if (colonIdx === -1) return { name: entry.trim(), data: '' };
+    return { name: entry.trim().slice(0, colonIdx), data: entry.trim().slice(colonIdx + 1) };
+  }).filter(f => f.name);
+}
+
+function applyStatIncrease(trainerData, stat) {
+  const info = STAT_MAP[stat];
+  if (!info) return;
+  const newVal = Math.min(20, (parseInt(trainerData[info.index]) || 10) + 1);
+  trainerData[info.index] = newVal;
+  trainerData[info.modIndex] = Math.floor((newVal - 10) / 2);
+}
+
+function getUnproficientSkills(trainerData) {
+  const current = (trainerData[18] || '').split(',')
+    .map(s => s.trim().replace('+', '').toLowerCase()).filter(s => s);
+  return ALL_SKILL_NAMES.filter(s => !current.includes(s.toLowerCase()));
+}
+
+function addSkillProficiency(trainerData, skillName) {
+  const skills = (trainerData[18] || '').split(',').map(s => s.trim()).filter(s => s);
+  const already = skills.some(s => s.replace('+', '').trim().toLowerCase() === skillName.toLowerCase());
+  if (!already) {
+    skills.push(skillName);
+    trainerData[18] = skills.join(', ');
+  }
+}
+
+function addSkillExpertise(trainerData, skillName) {
+  const skills = (trainerData[18] || '').split(',').map(s => s.trim()).filter(s => s);
+  const idx = skills.findIndex(s => s.replace('+', '').trim().toLowerCase() === skillName.toLowerCase());
+  if (idx !== -1 && !skills[idx].endsWith('+')) {
+    skills[idx] = skills[idx].trim() + '+';
+  } else if (idx === -1) {
+    skills.push(skillName + '+');
+  }
+  trainerData[18] = skills.join(', ');
+}
+
+function injectFeatModalStyles() {
+  if (document.getElementById('feat-modal-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'feat-modal-styles';
+  style.textContent = `
+    .feat-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.78);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; padding: 1rem; box-sizing: border-box;
+    }
+    .feat-modal {
+      background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+      border: 4px solid #FFDE00; border-radius: 24px;
+      padding: 2rem; max-width: min(90vw, 480px); width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      max-height: 80vh; overflow-y: auto; box-sizing: border-box;
+    }
+    .feat-modal-title {
+      font-size: 1.4rem; font-weight: 900; text-transform: uppercase;
+      color: #F44336; margin-bottom: 0.4rem; letter-spacing: 1px;
+    }
+    .feat-modal-desc {
+      font-size: 0.95rem; color: #555; margin-bottom: 1.5rem; line-height: 1.5;
+    }
+    .feat-modal-options { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .feat-modal-option {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.75rem 1rem; background: white; border: 2px solid #DDD;
+      border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 500;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .feat-modal-option:hover { border-color: #F44336; background: #FFF8F8; }
+    .feat-modal-option input { accent-color: #F44336; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
+    .feat-modal-fields { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .feat-modal-field-label {
+      display: block; font-weight: 700; font-size: 0.85rem;
+      text-transform: uppercase; color: #333; margin-bottom: 0.35rem; letter-spacing: 0.5px;
+    }
+    .feat-text-input {
+      width: 100%; padding: 0.65rem 1rem; border: 3px solid #DDD;
+      border-radius: 10px; font-size: 1rem; box-sizing: border-box;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .feat-text-input:focus { border-color: #FFDE00; outline: none; box-shadow: 0 0 10px rgba(255,222,0,0.4); }
+    .feat-modal-hint { font-size: 0.85rem; color: #888; margin-bottom: 1rem; text-align: center; font-style: italic; }
+    .feat-modal-confirm {
+      width: 100%; padding: 0.9rem;
+      background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+      color: white; border: 3px solid #000; border-radius: 14px;
+      font-size: 1.1rem; font-weight: 900; text-transform: uppercase;
+      letter-spacing: 1px; cursor: pointer;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.3); transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .feat-modal-confirm:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+  `;
+  document.head.appendChild(style);
+}
+
+function showFeatChoiceModal({ title, description, type, options = [], maxSelect, fields = [] }) {
+  injectFeatModalStyles();
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'feat-modal-overlay';
+
+    let bodyHtml = '';
+    if (type === 'radio') {
+      bodyHtml = `<div class="feat-modal-options">${options.map((opt, i) => `
+        <label class="feat-modal-option">
+          <input type="radio" name="featChoice" value="${opt.value}" ${i === 0 ? 'checked' : ''}/>
+          ${opt.label}
+        </label>`).join('')}</div>`;
+    } else if (type === 'checkbox') {
+      bodyHtml = `
+        ${maxSelect ? `<div class="feat-modal-hint">Select ${maxSelect === 1 ? 'one' : `up to ${maxSelect}`}</div>` : ''}
+        <div class="feat-modal-options">${options.map(opt => `
+          <label class="feat-modal-option">
+            <input type="checkbox" name="featChoice" value="${opt.value}"/>
+            ${opt.label}
+          </label>`).join('')}</div>`;
+    } else if (type === 'text') {
+      bodyHtml = `<div class="feat-modal-fields">${fields.map((f, i) => `
+        <div>
+          <label class="feat-modal-field-label">${f.label}</label>
+          <input type="text" class="feat-text-input" data-field="${i}" placeholder="${f.placeholder || ''}"/>
+        </div>`).join('')}</div>`;
+    }
+
+    overlay.innerHTML = `
+      <div class="feat-modal">
+        <div class="feat-modal-title">${title}</div>
+        <div class="feat-modal-desc">${description}</div>
+        ${bodyHtml}
+        <button class="feat-modal-confirm" id="featModalConfirm">Confirm</button>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    if (type === 'checkbox' && maxSelect) {
+      const checkboxes = overlay.querySelectorAll('input[type="checkbox"]');
+      const updateDisabled = () => {
+        const checked = overlay.querySelectorAll('input[type="checkbox"]:checked');
+        checkboxes.forEach(cb => { cb.disabled = !cb.checked && checked.length >= maxSelect; });
+      };
+      checkboxes.forEach(cb => cb.addEventListener('change', updateDisabled));
+    }
+
+    overlay.querySelector('#featModalConfirm').addEventListener('click', () => {
+      let result;
+      if (type === 'radio') {
+        const sel = overlay.querySelector('input[name="featChoice"]:checked');
+        if (!sel) return;
+        result = sel.value;
+      } else if (type === 'checkbox') {
+        result = Array.from(overlay.querySelectorAll('input[name="featChoice"]:checked')).map(c => c.value);
+        if (result.length === 0) return;
+      } else if (type === 'text') {
+        result = Array.from(overlay.querySelectorAll('.feat-text-input')).map(i => i.value.trim());
+      }
+      overlay.remove();
+      resolve(result);
+    });
+  });
+}
+
+async function processChef(trainerData) {
+  const options = ['CON', 'WIS']
+    .filter(s => (parseInt(trainerData[STAT_MAP[s].index]) || 10) < 20)
+    .map(s => ({ value: s, label: s === 'CON' ? 'Constitution (CON)' : 'Wisdom (WIS)' }));
+  if (options.length === 0) return;
+  if (options.length === 1) { applyStatIncrease(trainerData, options[0].value); return; }
+  const choice = await showFeatChoiceModal({
+    title: 'Chef', description: 'Choose one ability score to increase by 1 (max 20):', type: 'radio', options,
+  });
+  if (choice) applyStatIncrease(trainerData, choice);
+}
+
+async function processLinguist(trainerData) {
+  applyStatIncrease(trainerData, 'INT'); // INT +1 applied automatically
+  const result = await showFeatChoiceModal({
+    title: 'Linguist',
+    description: 'You learn three new languages. Enter them below (INT has been increased by 1):',
+    type: 'text',
+    fields: [
+      { label: 'Language 1', placeholder: 'e.g. Elvish' },
+      { label: 'Language 2', placeholder: 'e.g. Draconic' },
+      { label: 'Language 3', placeholder: 'e.g. Dwarvish' },
+    ],
+  });
+  if (result && result.some(l => l)) {
+    const languages = result.filter(l => l).join('|');
+    const entries = (trainerData[33] || '').split(',').map(e => e.trim());
+    const idx = entries.findIndex(e => e === 'Linguist' || e.startsWith('Linguist:'));
+    if (idx !== -1) {
+      entries[idx] = `Linguist:${languages}`;
+      trainerData[33] = entries.join(', ');
+    }
+  }
+}
+
+async function processObservant(trainerData) {
+  const options = ['INT', 'WIS']
+    .filter(s => (parseInt(trainerData[STAT_MAP[s].index]) || 10) < 20)
+    .map(s => ({ value: s, label: s === 'INT' ? 'Intelligence (INT)' : 'Wisdom (WIS)' }));
+  if (options.length === 0) return;
+  if (options.length === 1) { applyStatIncrease(trainerData, options[0].value); return; }
+  const choice = await showFeatChoiceModal({
+    title: 'Observant',
+    description: 'Choose one ability score to increase by 1 (max 20). You also gain +5 passive Perception and Investigation:',
+    type: 'radio', options,
+  });
+  if (choice) applyStatIncrease(trainerData, choice);
+}
+
+async function processSkilled(trainerData) {
+  const unproficient = getUnproficientSkills(trainerData);
+  if (unproficient.length === 0) return;
+  const choices = await showFeatChoiceModal({
+    title: 'Skilled',
+    description: 'Choose 3 skills to gain proficiency in:',
+    type: 'checkbox',
+    options: unproficient.map(s => ({ value: s, label: s })),
+    maxSelect: 3,
+  });
+  if (choices) choices.slice(0, 3).forEach(s => addSkillProficiency(trainerData, s));
+}
+
+async function processSkillExpert(trainerData) {
+  // Step 1: Stat +1
+  const statOptions = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
+    .filter(s => (parseInt(trainerData[STAT_MAP[s].index]) || 10) < 20)
+    .map(s => ({ value: s, label: s }));
+  if (statOptions.length > 0) {
+    const statChoice = await showFeatChoiceModal({
+      title: 'Skill Expert (1/3)', description: 'Increase one ability score by 1 (max 20):',
+      type: 'radio', options: statOptions,
+    });
+    if (statChoice) applyStatIncrease(trainerData, statChoice);
+  }
+
+  // Step 2: New proficiency
+  const unproficient = getUnproficientSkills(trainerData);
+  if (unproficient.length > 0) {
+    const profChoices = await showFeatChoiceModal({
+      title: 'Skill Expert (2/3)', description: 'Choose one skill to gain proficiency in:',
+      type: 'checkbox', options: unproficient.map(s => ({ value: s, label: s })), maxSelect: 1,
+    });
+    if (profChoices && profChoices.length > 0) addSkillProficiency(trainerData, profChoices[0]);
+  }
+
+  // Step 3: Expertise (from all current proficiencies, excluding those already with expertise)
+  const expertiseCandidates = (trainerData[18] || '').split(',')
+    .map(s => s.trim()).filter(s => s && !s.endsWith('+'))
+    .map(s => s.trim());
+  if (expertiseCandidates.length > 0) {
+    const expChoices = await showFeatChoiceModal({
+      title: 'Skill Expert (3/3)',
+      description: 'Choose one skill to gain expertise in (proficiency bonus doubled):',
+      type: 'checkbox', options: expertiseCandidates.map(s => ({ value: s, label: s })), maxSelect: 1,
+    });
+    if (expChoices && expChoices.length > 0) addSkillExpertise(trainerData, expChoices[0]);
+  }
+}
+
+async function processTelerpathic(trainerData) {
+  const options = ['INT', 'WIS', 'CHA']
+    .filter(s => (parseInt(trainerData[STAT_MAP[s].index]) || 10) < 20)
+    .map(s => ({ value: s, label: s === 'INT' ? 'Intelligence (INT)' : s === 'WIS' ? 'Wisdom (WIS)' : 'Charisma (CHA)' }));
+  if (options.length === 0) return;
+  if (options.length === 1) { applyStatIncrease(trainerData, options[0].value); return; }
+  const choice = await showFeatChoiceModal({
+    title: 'Telepathic', description: 'Choose one ability score to increase by 1 (max 20):',
+    type: 'radio', options,
+  });
+  if (choice) applyStatIncrease(trainerData, choice);
+}
+
+async function processFeatChoices(newFeatNames, trainerData) {
+  for (const name of newFeatNames) {
+    switch (name) {
+      case 'Chef':         await processChef(trainerData);        break;
+      case 'Linguist':     await processLinguist(trainerData);    break;
+      case 'Observant':    await processObservant(trainerData);   break;
+      case 'Skilled':      await processSkilled(trainerData);     break;
+      case 'Skill Expert': await processSkillExpert(trainerData); break;
+      case 'Telepathic':   await processTelerpathic(trainerData); break;
+    }
   }
 }

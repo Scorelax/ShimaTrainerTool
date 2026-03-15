@@ -1,6 +1,7 @@
 // My Pokemon Page - Display trainer's Pokemon grid with pagination
 import { PokemonAPI } from '../api.js';
 import { showError, showSuccess } from '../utils/notifications.js';
+import { getMoveTypeColor, getTextColorForBackground } from '../utils/pokemon-types.js';
 
 // Module state
 let currentPage = 1;
@@ -309,6 +310,116 @@ export function renderMyPokemon() {
           border-color: #FFC700;
         }
 
+        .typings-button {
+          background: linear-gradient(135deg, #7B2FBE 0%, #5E1FA0 100%);
+          color: white;
+          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border-radius: clamp(30px, 8vw, 60px);
+          padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 5vw, 3.5rem);
+          font-size: clamp(1rem, 2.5vw, 1.5rem);
+          font-weight: 900;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 clamp(5px, 1.5vh, 12px) clamp(15px, 3.5vw, 25px) rgba(123,47,190,0.4),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.2);
+          text-transform: uppercase;
+          letter-spacing: clamp(0.5px, 0.15vw, 1.5px);
+        }
+
+        .typings-button:hover {
+          transform: translateY(clamp(-3px, -1vh, -7px)) scale(1.02);
+          box-shadow: 0 clamp(8px, 2vh, 16px) clamp(22px, 5vw, 40px) rgba(123,47,190,0.5),
+                      inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.2),
+                      0 0 clamp(20px, 4vw, 35px) rgba(255,222,0,0.5);
+          border-color: #FFC700;
+        }
+
+        /* Typings Modal */
+        .typings-modal-overlay {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.7);
+          z-index: 2000;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .typings-modal-overlay.open {
+          display: flex;
+        }
+
+        .typings-modal-content {
+          background: linear-gradient(135deg, #2c2c2c 0%, #252525 100%);
+          border-radius: clamp(12px, 2vw, 18px);
+          border: clamp(2px, 0.4vw, 3px) solid #444;
+          width: min(92vw, 500px);
+          max-height: 85vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+
+        .typings-modal-header {
+          background: linear-gradient(135deg, #7B2FBE 0%, #5E1FA0 100%);
+          padding: clamp(0.9rem, 2vh, 1.3rem) clamp(1.2rem, 3vw, 1.8rem);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: clamp(2px, 0.4vw, 3px) solid #333;
+        }
+
+        .typings-modal-header h2 {
+          margin: 0;
+          color: white;
+          font-size: clamp(1.2rem, 3vw, 1.6rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
+        .typings-modal-body {
+          overflow-y: auto;
+          flex: 1;
+          padding: clamp(0.75rem, 2vh, 1rem);
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: clamp(0.4rem, 1.2vw, 0.65rem);
+          align-content: start;
+        }
+
+        .type-coverage-card {
+          border-radius: 8px;
+          padding: clamp(0.4rem, 1.2vh, 0.6rem) clamp(0.5rem, 1.5vw, 0.8rem);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-weight: 700;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+          transition: opacity 0.2s;
+        }
+
+        .type-coverage-card.type-zero {
+          opacity: 0.35;
+        }
+
+        .type-coverage-name {
+          font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+          text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        .type-coverage-count {
+          font-size: clamp(0.85rem, 2vw, 1rem);
+          font-weight: 900;
+          background: rgba(0,0,0,0.25);
+          border-radius: 12px;
+          min-width: clamp(22px, 4.5vw, 28px);
+          text-align: center;
+          padding: 1px clamp(4px, 1vw, 7px);
+          text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
         /* Party Modal */
         .party-modal-overlay {
           display: none;
@@ -520,6 +631,7 @@ export function renderMyPokemon() {
           <button class="nav-button" id="nextBtn">Next &gt;</button>
         </div>
         <div class="action-buttons-row">
+          <button class="typings-button" id="typingsBtn">Typings</button>
           <button class="register-button" id="registerNewBtn">New Pokemon</button>
           <button class="party-button" id="partyBtn">Party</button>
         </div>
@@ -534,6 +646,17 @@ export function renderMyPokemon() {
             <button class="party-modal-close" id="closePartyModal">×</button>
           </div>
           <div class="party-modal-list" id="partyModalList"></div>
+        </div>
+      </div>
+
+      <!-- Typings Modal -->
+      <div class="typings-modal-overlay" id="typingsModal">
+        <div class="typings-modal-content">
+          <div class="typings-modal-header">
+            <h2>Type Coverage</h2>
+            <button class="party-modal-close" id="closeTypingsModal">×</button>
+          </div>
+          <div class="typings-modal-body" id="typingsModalList"></div>
         </div>
       </div>
 
@@ -569,6 +692,12 @@ export function attachMyPokemonListeners() {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'new-pokemon' }
     }));
+  });
+
+  // Typings button
+  document.getElementById('typingsBtn')?.addEventListener('click', openTypingsModal);
+  document.getElementById('closeTypingsModal')?.addEventListener('click', () => {
+    document.getElementById('typingsModal').classList.remove('open');
   });
 
   // Party button
@@ -717,6 +846,51 @@ function nextPage() {
     currentPage++;
     renderPokemonList();
   }
+}
+
+// ── Typings Modal ────────────────────────────────────────────────────────────
+
+const ALL_TYPES = ['Normal','Fighting','Flying','Poison','Ground','Rock','Bug','Ghost','Steel','Fire','Water','Grass','Electric','Psychic','Ice','Dragon','Dark','Fairy','Cosmic'];
+
+function openTypingsModal() {
+  const modal = document.getElementById('typingsModal');
+  const list = document.getElementById('typingsModalList');
+  if (!modal || !list) return;
+
+  // Count each type from all Pokemon in sessionStorage
+  const typeCounts = {};
+  ALL_TYPES.forEach(t => { typeCounts[t] = 0; });
+
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (!key.startsWith('pokemon_')) continue;
+    try {
+      const data = JSON.parse(sessionStorage.getItem(key));
+      const t1 = data[5] || '';
+      const t2 = data[6] || '';
+      if (t1 && typeCounts.hasOwnProperty(t1)) typeCounts[t1]++;
+      if (t2 && typeCounts.hasOwnProperty(t2)) typeCounts[t2]++;
+    } catch (e) {}
+  }
+
+  // Sort: highest count first, then alphabetical; zeros at the bottom
+  const sorted = ALL_TYPES.slice().sort((a, b) => {
+    if (typeCounts[b] !== typeCounts[a]) return typeCounts[b] - typeCounts[a];
+    return a.localeCompare(b);
+  });
+
+  list.innerHTML = sorted.map(type => {
+    const count = typeCounts[type];
+    const bg = getMoveTypeColor(type);
+    const textColor = getTextColorForBackground(bg);
+    return `
+      <div class="type-coverage-card ${count === 0 ? 'type-zero' : ''}" style="background:${bg}; color:${textColor};">
+        <span class="type-coverage-name">${type}</span>
+        <span class="type-coverage-count">${count}</span>
+      </div>`;
+  }).join('');
+
+  modal.classList.add('open');
 }
 
 // ── Party Modal ──────────────────────────────────────────────────────────────

@@ -114,7 +114,7 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
   const stabBonus = hasSTAB ? (toughClawsDoubled ? stabBonusValue * 2 : stabBonusValue) : 0;
 
   // Held item: "Holder adds prof. bonus to damage from <TYPE> type moves"
-  const heldItemProfPattern = /holder adds prof(?:iciency|\.)? bonus to damage from (\w+)[- ]type moves?/i;
+  const heldItemProfPattern = /holder adds prof(?:iciency|\.)? bonus to damage from (\w+)(?:-| )type moves?/i;
   let heldItemDamageBonus = 0;
   const heldItemDmgSources = [];
   for (const effect of heldItemEffects) {

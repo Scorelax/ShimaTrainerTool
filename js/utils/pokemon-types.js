@@ -123,7 +123,7 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
       const itemType = match[1];
       if (itemType.toLowerCase() === moveType.toLowerCase()) {
         heldItemDamageBonus += proficiency;
-        heldItemDmgSources.push(`Item +${proficiency} (Prof.)`);
+        heldItemDmgSources.push(`Item +${proficiency}`);
       }
     }
   }

@@ -383,10 +383,26 @@ export function renderMyPokemon() {
           overflow-y: auto;
           flex: 1;
           padding: clamp(0.75rem, 2vh, 1rem);
+        }
+
+        .coverage-section-label {
+          font-size: clamp(0.7rem, 1.5vw, 0.8rem);
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          color: #aaa;
+          margin-bottom: 0.5rem;
+        }
+
+        .type-coverage-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: clamp(0.4rem, 1.2vw, 0.65rem);
-          align-content: start;
+        }
+
+        .coverage-section-divider {
+          border-top: 1px solid #444;
+          margin: clamp(0.75rem, 2vh, 1rem) 0;
         }
 
         .type-coverage-card {
@@ -887,6 +903,14 @@ function openTypingsModal() {
   modal.classList.add('open');
 }
 
+const MOVE_INDICES = [23, 24, 25, 26, 27, 28, 37];
+const DMG_PATTERN = /melee attack|ranged attack|dealing\s+\d+d\d+|doing\s+\d+d\d+|tak(?:e|ing)\s+\d+d\d+|damage on a hit|hit\s+for\s+\d+d\d+/i;
+
+function _buildMoveMap() {
+  const movesData = JSON.parse(sessionStorage.getItem('moves') || '[]');
+  return new Map(movesData.map(m => [m[0], m]));
+}
+
 function _renderTypingsGrid() {
   const list = document.getElementById('typingsModalList');
   const title = document.getElementById('typingsModalTitle');
@@ -895,6 +919,9 @@ function _renderTypingsGrid() {
   if (title) title.textContent = 'Type Coverage';
 
   const allPokemon = _getAllPokemonData();
+  const moveMap = _buildMoveMap();
+
+  // --- Pokemon type counts ---
   const typeCounts = {};
   ALL_TYPES.forEach(t => { typeCounts[t] = 0; });
   allPokemon.forEach(data => {
@@ -903,30 +930,54 @@ function _renderTypingsGrid() {
     if (t1 && typeCounts.hasOwnProperty(t1)) typeCounts[t1]++;
     if (t2 && typeCounts.hasOwnProperty(t2)) typeCounts[t2]++;
   });
+  const sortedTypes = ALL_TYPES.slice().sort((a, b) => typeCounts[b] - typeCounts[a] || a.localeCompare(b));
 
-  const sorted = ALL_TYPES.slice().sort((a, b) => {
-    if (typeCounts[b] !== typeCounts[a]) return typeCounts[b] - typeCounts[a];
-    return a.localeCompare(b);
+  // --- Move type counts (damaging moves, one count per Pokemon per type) ---
+  const moveCounts = {};
+  ALL_TYPES.forEach(t => { moveCounts[t] = 0; });
+  allPokemon.forEach(data => {
+    const coveredTypes = new Set();
+    MOVE_INDICES.forEach(idx => {
+      (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(moveName => {
+        const move = moveMap.get(moveName);
+        if (!move) return;
+        const type = move[1] || '';
+        if (type && ALL_TYPES.includes(type) && !coveredTypes.has(type) && DMG_PATTERN.test(move[7] || '')) {
+          coveredTypes.add(type);
+          moveCounts[type]++;
+        }
+      });
+    });
   });
+  const sortedMoves = ALL_TYPES.slice().sort((a, b) => moveCounts[b] - moveCounts[a] || a.localeCompare(b));
 
-  list.style.display = 'grid';
-  list.innerHTML = sorted.map(type => {
-    const count = typeCounts[type];
+  const renderGrid = (sorted, counts, section) => sorted.map(type => {
+    const count = counts[type];
     const bg = getMoveTypeColor(type);
     const textColor = getTextColorForBackground(bg);
     return `
-      <div class="type-coverage-card ${count === 0 ? 'type-zero' : ''}" style="background:${bg}; color:${textColor}; cursor:${count > 0 ? 'pointer' : 'default'};" data-type="${type}">
+      <div class="type-coverage-card ${count === 0 ? 'type-zero' : ''}"
+           style="background:${bg}; color:${textColor}; cursor:${count > 0 ? 'pointer' : 'default'};"
+           data-type="${type}" data-section="${section}">
         <span class="type-coverage-name">${type}</span>
         <span class="type-coverage-count">${count}</span>
       </div>`;
   }).join('');
 
+  list.innerHTML = `
+    <div class="coverage-section-label">Pokémon Types</div>
+    <div class="type-coverage-grid">${renderGrid(sortedTypes, typeCounts, 'type')}</div>
+    <div class="coverage-section-divider"></div>
+    <div class="coverage-section-label">Damaging Move Types</div>
+    <div class="type-coverage-grid">${renderGrid(sortedMoves, moveCounts, 'move')}</div>
+  `;
+
   list.querySelectorAll('.type-coverage-card:not(.type-zero)').forEach(card => {
-    card.addEventListener('click', () => _renderTypingDetail(card.dataset.type, allPokemon));
+    card.addEventListener('click', () => _renderTypingDetail(card.dataset.type, allPokemon, card.dataset.section, moveMap));
   });
 }
 
-function _renderTypingDetail(type, allPokemon) {
+function _renderTypingDetail(type, allPokemon, section, moveMap) {
   const list = document.getElementById('typingsModalList');
   const title = document.getElementById('typingsModalTitle');
   if (!list) return;
@@ -935,23 +986,48 @@ function _renderTypingDetail(type, allPokemon) {
 
   const bg = getMoveTypeColor(type);
   const textColor = getTextColorForBackground(bg);
-  const matching = allPokemon.filter(d => d[5] === type || d[6] === type);
 
-  list.style.display = 'block';
+  let matching;
+  if (section === 'type') {
+    matching = allPokemon.filter(d => d[5] === type || d[6] === type);
+  } else {
+    matching = allPokemon.filter(data =>
+      MOVE_INDICES.some(idx =>
+        (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).some(moveName => {
+          const move = moveMap.get(moveName);
+          return move && move[1] === type && DMG_PATTERN.test(move[7] || '');
+        })
+      )
+    );
+  }
+
   list.innerHTML = `
     <button class="typings-back-btn" style="background:${bg}; color:${textColor};">← All Types</button>
+    ${matching.length === 0 ? '<div style="padding:1rem 1.5rem;color:#888;">No Pokémon found.</div>' : ''}
     ${matching.map(data => {
       const name = data[2] || '';
       const nickname = data[36] || '';
       const image = data[1] || 'assets/Pokeball.png';
       const displayName = nickname || name;
       const t2 = data[6] ? ` / ${data[6]}` : '';
+      let movesList = '';
+      if (section === 'move') {
+        const dmgMoves = [];
+        MOVE_INDICES.forEach(idx => {
+          (data[idx] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(moveName => {
+            const move = moveMap.get(moveName);
+            if (move && move[1] === type && DMG_PATTERN.test(move[7] || '')) dmgMoves.push(moveName);
+          });
+        });
+        if (dmgMoves.length) movesList = `<div style="color:#bbb;font-size:0.78rem;margin-top:2px;">${dmgMoves.join(', ')}</div>`;
+      }
       return `
         <div class="party-pokemon-row">
           <img class="party-pokemon-avatar" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
           <div class="party-pokemon-info">
             <div class="party-pokemon-label">${displayName}</div>
             <div class="party-pokemon-sublabel">Lv. ${data[4] || '?'} &nbsp;·&nbsp; ${data[5] || ''}${t2}</div>
+            ${movesList}
           </div>
         </div>`;
     }).join('')}`;

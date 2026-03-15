@@ -952,149 +952,126 @@ function recalculateStatsForNatureChange(oldNatureName, newNatureName, pokemonDa
   }
 }
 
-// Helper function to show feat choice popup
-function showFeatChoicePopup(featName, choices) {
-  return new Promise((resolve) => {
-    const popup = document.createElement('div');
-    popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; justify-content: center; align-items: center;';
-
-    const content = document.createElement('div');
-    content.style.cssText = 'background: white; padding: 2rem; border-radius: 15px; max-width: 400px; width: 90%;';
-
-    content.innerHTML = `
-      <h2 style="margin: 0 0 1rem 0;">${featName} - Choose Stat</h2>
-      <p style="margin: 0 0 1rem 0;">Which ability score would you like to increase?</p>
-      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-        ${choices.map(choice => `
-          <button class="choice-btn" data-choice="${choice}" style="padding: 0.75rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">
-            ${choice}
-          </button>
-        `).join('')}
-      </div>
-    `;
-
-    popup.appendChild(content);
-    document.body.appendChild(popup);
-
-    popup.querySelectorAll('.choice-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const choice = btn.dataset.choice;
-        document.body.removeChild(popup);
-        resolve(choice);
-      });
-    });
-  });
+function injectFeatModalStyles() {
+  if (document.getElementById('feat-modal-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'feat-modal-styles';
+  style.textContent = `
+    .feat-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.78);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; padding: 1rem; box-sizing: border-box;
+    }
+    .feat-modal {
+      background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
+      border: 4px solid #FFDE00; border-radius: 24px;
+      padding: 2rem; max-width: min(90vw, 480px); width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      max-height: 80vh; overflow-y: auto; box-sizing: border-box;
+    }
+    .feat-modal-title {
+      font-size: 1.4rem; font-weight: 900; text-transform: uppercase;
+      color: #F44336; margin-bottom: 0.4rem; letter-spacing: 1px;
+    }
+    .feat-modal-desc {
+      font-size: 0.95rem; color: #555; margin-bottom: 1.5rem; line-height: 1.5;
+    }
+    .feat-modal-options { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; }
+    .feat-modal-option {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.75rem 1rem; background: white; border: 2px solid #DDD;
+      border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 500;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .feat-modal-option:hover { border-color: #F44336; background: #FFF8F8; }
+    .feat-modal-option input { accent-color: #F44336; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
+    .feat-modal-fields { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .feat-modal-field-label {
+      display: block; font-weight: 700; font-size: 0.85rem;
+      text-transform: uppercase; color: #333; margin-bottom: 0.35rem; letter-spacing: 0.5px;
+    }
+    .feat-text-input {
+      width: 100%; padding: 0.65rem 1rem; border: 3px solid #DDD;
+      border-radius: 10px; font-size: 1rem; box-sizing: border-box;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .feat-text-input:focus { border-color: #FFDE00; outline: none; box-shadow: 0 0 10px rgba(255,222,0,0.4); }
+    .feat-modal-hint { font-size: 0.85rem; color: #888; margin-bottom: 1rem; text-align: center; font-style: italic; }
+    .feat-modal-confirm {
+      width: 100%; padding: 0.9rem;
+      background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+      color: white; border: 3px solid #000; border-radius: 14px;
+      font-size: 1.1rem; font-weight: 900; text-transform: uppercase;
+      letter-spacing: 1px; cursor: pointer;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.3); transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .feat-modal-confirm:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+  `;
+  document.head.appendChild(style);
 }
 
-// Helper function for Skilled feat
-function showSkilledFeatPopup() {
-  return new Promise((resolve) => {
-    const skillsData = JSON.parse(sessionStorage.getItem('skills') || '[]');
+function showFeatChoiceModal({ title, description, type, options = [], maxSelect, fields = [] }) {
+  injectFeatModalStyles();
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'feat-modal-overlay';
 
-    const popup = document.createElement('div');
-    popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; justify-content: center; align-items: center;';
+    let bodyHtml = '';
+    if (type === 'radio') {
+      bodyHtml = `<div class="feat-modal-options">${options.map((opt, i) => `
+        <label class="feat-modal-option">
+          <input type="radio" name="featChoice" value="${opt.value}" ${i === 0 ? 'checked' : ''}/>
+          ${opt.label}
+        </label>`).join('')}</div>`;
+    } else if (type === 'checkbox') {
+      bodyHtml = `
+        ${maxSelect ? `<div class="feat-modal-hint">Select ${maxSelect === 1 ? 'one' : `up to ${maxSelect}`}</div>` : ''}
+        <div class="feat-modal-options">${options.map(opt => `
+          <label class="feat-modal-option">
+            <input type="checkbox" name="featChoice" value="${opt.value}"/>
+            ${opt.label}
+          </label>`).join('')}</div>`;
+    } else if (type === 'text') {
+      bodyHtml = `<div class="feat-modal-fields">${fields.map((f, i) => `
+        <div>
+          <label class="feat-modal-field-label">${f.label}</label>
+          <input type="text" class="feat-text-input" data-field="${i}" placeholder="${f.placeholder || ''}"/>
+        </div>`).join('')}</div>`;
+    }
 
-    const content = document.createElement('div');
-    content.style.cssText = 'background: white; padding: 2rem; border-radius: 15px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;';
+    overlay.innerHTML = `
+      <div class="feat-modal">
+        <div class="feat-modal-title">${title}</div>
+        <div class="feat-modal-desc">${description}</div>
+        ${bodyHtml}
+        <button class="feat-modal-confirm" id="featModalConfirm">Confirm</button>
+      </div>`;
+    document.body.appendChild(overlay);
 
-    content.innerHTML = `
-      <h2 style="margin: 0 0 1rem 0;">Skilled Feat - Choose Proficiency</h2>
-      <p style="margin: 0 0 1rem 0;">Choose a skill or enter a custom tool:</p>
-      <select id="skillChoice" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; font-size: 1rem;">
-        <option value="">-- Select a Skill --</option>
-        ${skillsData.map(skill => `<option value="${skill.name}">${skill.name}</option>`).join('')}
-      </select>
-      <p style="margin: 0.5rem 0;">OR enter a custom tool:</p>
-      <input type="text" id="customTool" placeholder="e.g., Cook's Utensils" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; font-size: 1rem;">
-      <button id="confirmChoice" style="width: 100%; padding: 0.75rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">Confirm</button>
-    `;
+    if (type === 'checkbox' && maxSelect) {
+      const checkboxes = overlay.querySelectorAll('input[type="checkbox"]');
+      const updateDisabled = () => {
+        const checked = overlay.querySelectorAll('input[type="checkbox"]:checked');
+        checkboxes.forEach(cb => { cb.disabled = !cb.checked && checked.length >= maxSelect; });
+      };
+      checkboxes.forEach(cb => cb.addEventListener('change', updateDisabled));
+    }
 
-    popup.appendChild(content);
-    document.body.appendChild(popup);
-
-    document.getElementById('confirmChoice').addEventListener('click', () => {
-      const skillChoice = document.getElementById('skillChoice').value;
-      const customTool = document.getElementById('customTool').value.trim();
-      const choice = customTool || skillChoice;
-
-      if (choice) {
-        document.body.removeChild(popup);
-        resolve(choice);
-      } else {
-        alert('Please select a skill or enter a custom tool');
+    overlay.querySelector('#featModalConfirm').addEventListener('click', () => {
+      let result;
+      if (type === 'radio') {
+        const sel = overlay.querySelector('input[name="featChoice"]:checked');
+        if (!sel) return;
+        result = sel.value;
+      } else if (type === 'checkbox') {
+        result = Array.from(overlay.querySelectorAll('input[name="featChoice"]:checked')).map(c => c.value);
+        if (result.length === 0) return;
+      } else if (type === 'text') {
+        result = Array.from(overlay.querySelectorAll('.feat-text-input')).map(i => i.value.trim());
       }
-    });
-  });
-}
-
-// Helper function for Type Adept
-function showTypeAdeptPopup() {
-  const types = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'];
-
-  return new Promise((resolve) => {
-    const popup = document.createElement('div');
-    popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; justify-content: center; align-items: center;';
-
-    const content = document.createElement('div');
-    content.style.cssText = 'background: white; padding: 2rem; border-radius: 15px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;';
-
-    content.innerHTML = `
-      <h2 style="margin: 0 0 1rem 0;">Type Adept - Choose Type</h2>
-      <p style="margin: 0 0 1rem 0;">Which type should this feat apply to?</p>
-      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
-        ${types.map(type => `
-          <button class="type-choice" data-type="${type}" style="padding: 0.75rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
-            ${type}
-          </button>
-        `).join('')}
-      </div>
-    `;
-
-    popup.appendChild(content);
-    document.body.appendChild(popup);
-
-    popup.querySelectorAll('.type-choice').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const type = btn.dataset.type;
-        document.body.removeChild(popup);
-        resolve(`Type Adept (${type})`);
-      });
-    });
-  });
-}
-
-// Helper function for Terrain Adept
-function showTerrainAdeptPopup() {
-  const terrains = ['Coastal', 'Swamp', 'Forest', 'Arctic', 'Desert', 'Grassland', 'Hill', 'Mountain', 'Underwater'];
-
-  return new Promise((resolve) => {
-    const popup = document.createElement('div');
-    popup.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; justify-content: center; align-items: center;';
-
-    const content = document.createElement('div');
-    content.style.cssText = 'background: white; padding: 2rem; border-radius: 15px; max-width: 400px; width: 90%;';
-
-    content.innerHTML = `
-      <h2 style="margin: 0 0 1rem 0;">Terrain Adept - Choose Terrain</h2>
-      <p style="margin: 0 0 1rem 0;">Which terrain should this feat apply to?</p>
-      <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-        ${terrains.map(terrain => `
-          <button class="terrain-choice" data-terrain="${terrain}" style="padding: 0.75rem; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">
-            ${terrain}
-          </button>
-        `).join('')}
-      </div>
-    `;
-
-    popup.appendChild(content);
-    document.body.appendChild(popup);
-
-    popup.querySelectorAll('.terrain-choice').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const terrain = btn.dataset.terrain;
-        document.body.removeChild(popup);
-        resolve(`Terrain Adept (${terrain})`);
-      });
+      overlay.remove();
+      resolve(result);
     });
   });
 }
@@ -1139,43 +1116,59 @@ async function handleFormSubmit(pokemonName, originalNature) {
       const baseFeatName = f.split('(')[0].trim(); // Remove any parenthetical suffix for comparison
       return !originalFeatsNormalized.includes(baseFeatName.toLowerCase()) && !f.includes('(');
     });
-    const featChoices = {};
-
     // Process feats that need choices or special handling
     for (const feat of newFeats) {
-      // Handle feats with stat choices - append choice to feat name
       if (feat === 'Athlete') {
-        const choice = await showFeatChoicePopup('Athlete', ['STR', 'DEX']);
-        selectedFeats = selectedFeats.map(f => f === 'Athlete' ? `Athlete (${choice})` : f);
+        const choice = await showFeatChoiceModal({
+          title: 'Athlete', description: 'Choose one ability score to increase by 1:',
+          type: 'radio', options: [{ value: 'STR', label: 'Strength (STR)' }, { value: 'DEX', label: 'Dexterity (DEX)' }],
+        });
+        if (choice) selectedFeats = selectedFeats.map(f => f === 'Athlete' ? `Athlete (${choice})` : f);
       } else if (feat === 'Observant') {
-        const choice = await showFeatChoicePopup('Observant', ['INT', 'WIS']);
-        selectedFeats = selectedFeats.map(f => f === 'Observant' ? `Observant (${choice})` : f);
+        const choice = await showFeatChoiceModal({
+          title: 'Observant', description: 'Choose one ability score to increase by 1:',
+          type: 'radio', options: [{ value: 'INT', label: 'Intelligence (INT)' }, { value: 'WIS', label: 'Wisdom (WIS)' }],
+        });
+        if (choice) selectedFeats = selectedFeats.map(f => f === 'Observant' ? `Observant (${choice})` : f);
       } else if (feat === 'Resilient') {
-        const choice = await showFeatChoicePopup('Resilient', ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']);
-        selectedFeats = selectedFeats.map(f => f === 'Resilient' ? `Resilient (${choice})` : f);
-      }
-      // Handle Skilled feat
-      else if (feat === 'Skilled') {
-        const choice = await showSkilledFeatPopup();
-        // Add the chosen skill/tool to the skills list
-        if (choice && !selectedSkills.includes(choice) && !selectedSkills.includes(choice + '+')) {
-          selectedSkills.push(choice);
-        } else if (choice && selectedSkills.includes(choice)) {
-          // Upgrade to double proficiency
-          selectedSkills = selectedSkills.map(s => s === choice ? choice + '+' : s);
+        const choice = await showFeatChoiceModal({
+          title: 'Resilient', description: 'Choose one ability score to increase by 1 and add to saving throws:',
+          type: 'radio', options: [
+            { value: 'STR', label: 'Strength (STR)' }, { value: 'DEX', label: 'Dexterity (DEX)' },
+            { value: 'CON', label: 'Constitution (CON)' }, { value: 'INT', label: 'Intelligence (INT)' },
+            { value: 'WIS', label: 'Wisdom (WIS)' }, { value: 'CHA', label: 'Charisma (CHA)' },
+          ],
+        });
+        if (choice) selectedFeats = selectedFeats.map(f => f === 'Resilient' ? `Resilient (${choice})` : f);
+      } else if (feat === 'Skilled') {
+        const skillsData = JSON.parse(sessionStorage.getItem('skills') || '[]');
+        const skillOptions = skillsData.map(s => ({ value: s.name || s, label: s.name || s }));
+        const choices = await showFeatChoiceModal({
+          title: 'Skilled', description: 'Choose a skill to gain proficiency in:',
+          type: 'checkbox', options: skillOptions, maxSelect: 1,
+        });
+        const choice = choices && choices[0];
+        if (choice) {
+          if (!selectedSkills.includes(choice) && !selectedSkills.includes(choice + '+')) {
+            selectedSkills.push(choice);
+          } else if (selectedSkills.includes(choice)) {
+            selectedSkills = selectedSkills.map(s => s === choice ? choice + '+' : s);
+          }
         }
-      }
-      // Handle Type Adept
-      else if (feat === 'Type Adept') {
-        const fullFeatName = await showTypeAdeptPopup();
-        // Replace the feat in the list with the full name
-        selectedFeats = selectedFeats.map(f => f === 'Type Adept' ? fullFeatName : f);
-      }
-      // Handle Terrain Adept
-      else if (feat === 'Terrain Adept') {
-        const fullFeatName = await showTerrainAdeptPopup();
-        // Replace the feat in the list with the full name
-        selectedFeats = selectedFeats.map(f => f === 'Terrain Adept' ? fullFeatName : f);
+      } else if (feat === 'Type Adept') {
+        const types = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'];
+        const choice = await showFeatChoiceModal({
+          title: 'Type Adept', description: 'Choose which type this feat applies to:',
+          type: 'radio', options: types.map(t => ({ value: t, label: t })),
+        });
+        if (choice) selectedFeats = selectedFeats.map(f => f === 'Type Adept' ? `Type Adept (${choice})` : f);
+      } else if (feat === 'Terrain Adept') {
+        const terrains = ['Coastal', 'Swamp', 'Forest', 'Arctic', 'Desert', 'Grassland', 'Hill', 'Mountain', 'Underwater'];
+        const choice = await showFeatChoiceModal({
+          title: 'Terrain Adept', description: 'Choose which terrain this feat applies to:',
+          type: 'radio', options: terrains.map(t => ({ value: t, label: t })),
+        });
+        if (choice) selectedFeats = selectedFeats.map(f => f === 'Terrain Adept' ? `Terrain Adept (${choice})` : f);
       }
       // Handle Quick-Fingered feat - add Sleight of Hand proficiency
       else if (feat === 'Quick-Fingered') {

@@ -77,7 +77,7 @@ export function renderMyPokemon() {
           grid-template-columns: repeat(3, 1fr);
           gap: clamp(1rem, 3vw, 2.5rem);
           width: 100%;
-          margin-bottom: clamp(1.5rem, 5vh, 3rem);
+          margin-bottom: clamp(0.25rem, 1vh, 0.5rem);
         }
 
         .pokemon-slot {
@@ -131,7 +131,7 @@ export function renderMyPokemon() {
           flex-direction: column;
           align-items: center;
           gap: clamp(0.75rem, 2vh, 1.5rem);
-          margin-top: clamp(0.75rem, 2vh, 1.5rem);
+          margin-top: 0;
         }
 
         .navigation-buttons {

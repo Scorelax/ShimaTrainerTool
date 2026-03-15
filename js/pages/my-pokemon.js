@@ -575,8 +575,10 @@ export function renderMyPokemon() {
 
         .party-type-badges {
           display: flex;
+          flex-direction: column;
           gap: 4px;
-          margin-top: 4px;
+          align-self: center;
+          flex-shrink: 0;
         }
 
         .party-type-badge {
@@ -1116,8 +1118,8 @@ function renderPartyModalList(pokemonFullData) {
         <div class="party-pokemon-info">
           <div class="party-pokemon-label">${displayName}</div>
           <div class="party-pokemon-sublabel">${subLabel}</div>
-          ${typeBadges ? `<div class="party-type-badges">${typeBadges}</div>` : ''}
         </div>
+        ${typeBadges ? `<div class="party-type-badges">${typeBadges}</div>` : ''}
         <div class="party-slot-checks">
           <label class="slot-check-label">
             <span>Party</span>

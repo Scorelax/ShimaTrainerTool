@@ -573,6 +573,20 @@ export function renderMyPokemon() {
           text-overflow: ellipsis;
         }
 
+        .party-type-badges {
+          display: flex;
+          gap: 4px;
+          margin-top: 4px;
+        }
+
+        .party-type-badge {
+          font-size: 0.68rem;
+          font-weight: 700;
+          padding: 1px 7px;
+          border-radius: 10px;
+          letter-spacing: 0.3px;
+        }
+
         .party-pokemon-sublabel {
           color: #aaa;
           font-size: clamp(0.75rem, 1.6vw, 0.88rem);
@@ -1085,6 +1099,13 @@ function renderPartyModalList(pokemonFullData) {
     const inUtility = data[56] === 1 || data[56] === '1';
     const displayName = nickname || name;
     const subLabel = `Lv. ${data[4] || '?'}`;
+    const t1 = data[5] || '';
+    const t2 = data[6] || '';
+    const typeBadges = [t1, t2].filter(Boolean).map(t => {
+      const bg = getMoveTypeColor(t);
+      const col = getTextColorForBackground(bg);
+      return `<span class="party-type-badge" style="background:${bg};color:${col};">${t}</span>`;
+    }).join('');
     const partyDisabled = partyFull && !inParty;
     const utilityOccupied = pokemonFullData.some(d => d[56] === 1 || d[56] === '1');
     const utilityDisabled = inParty || (utilityOccupied && !inUtility);
@@ -1095,6 +1116,7 @@ function renderPartyModalList(pokemonFullData) {
         <div class="party-pokemon-info">
           <div class="party-pokemon-label">${displayName}</div>
           <div class="party-pokemon-sublabel">${subLabel}</div>
+          ${typeBadges ? `<div class="party-type-badges">${typeBadges}</div>` : ''}
         </div>
         <div class="party-slot-checks">
           <label class="slot-check-label">

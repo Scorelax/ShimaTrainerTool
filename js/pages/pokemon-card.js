@@ -2266,6 +2266,28 @@ export function renderPokemonCard(pokemonName) {
             grid-template-columns: repeat(3, 1fr);
           }
         }
+
+        @media (max-width: 480px) {
+          .inventory-sidebar {
+            width: clamp(120px, 38%, 160px);
+          }
+          .inventory-title {
+            font-size: 0.85rem;
+            padding: 0.6rem 0.5rem;
+            letter-spacing: 0;
+          }
+          .category-header {
+            font-size: 0.72rem;
+            padding: 0.6rem 0.6rem;
+          }
+          .inventory-list-item {
+            font-size: 0.68rem;
+            padding: 0.5rem 0.75rem;
+          }
+          .item-name {
+            font-size: 0.95rem;
+          }
+        }
       </style>
 
       <h1>${displayName} #${dexEntry}</h1>

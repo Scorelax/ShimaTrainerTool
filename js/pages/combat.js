@@ -1179,6 +1179,15 @@ function getCombatCSS() {
     .switch-init-label { background: rgba(255,215,0,0.15); border: 1px solid rgba(255,215,0,0.4); color: #FFD700; padding: 1px 7px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
     .switch-init-new { background: rgba(76,175,80,0.15); border-color: rgba(76,175,80,0.4) !important; color: #4CAF50 !important; }
     .switch-no-bench { color: #888; font-style: italic; padding: 1rem; text-align: center; }
+
+    @media (max-width: 480px) {
+      .hpvp-hpvp-wrapper { flex-direction: column; gap: 0.5rem; }
+      .hpvp-hpvp-left { flex-direction: column; align-items: stretch; }
+      .hpvp-hpvp-right { border-left: none; padding-left: 0; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 0.4rem; }
+      .combat-type-calc-btn { align-self: flex-start; min-width: 0; width: auto; }
+      .stat-adjust-grid { grid-template-columns: repeat(2, 1fr); }
+      .combat-mods-row { grid-template-columns: repeat(2, 1fr); }
+    }
   `;
 }
 

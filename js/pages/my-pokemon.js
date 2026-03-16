@@ -662,8 +662,20 @@ export function renderMyPokemon() {
         }
 
         @media (max-width: 480px) {
+          .my-pokemon-page h1 {
+            font-size: 1.25rem;
+            letter-spacing: 1px;
+            white-space: nowrap;
+          }
           .pokemon-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+          }
+          .pokemon-name {
+            font-size: 0.7rem;
+          }
+          .pokemon-level {
+            font-size: 0.65rem;
           }
         }
       </style>

@@ -399,6 +399,65 @@ function renderInitiativePhase(state) {
 // PHASE 3: BATTLE
 // ============================================================================
 
+const WEATHER_SUGGESTIONS = ['Clear Skies', 'Rain', 'Harsh Sunlight', 'Sandstorm', 'Hail', 'Fog', 'Heavy Rain', 'Extremely Harsh Sunlight'];
+const TERRAIN_SUGGESTIONS = ['Electric Terrain', 'Grassy Terrain', 'Misty Terrain', 'Psychic Terrain'];
+
+function renderConditionBadge(type, cond) {
+  const icon = type === 'weather' ? '🌦' : '🌿';
+  return `
+    <div class="combat-condition-badge">
+      <span class="condition-icon">${icon}</span>
+      <div class="condition-text">
+        <span class="condition-name">${cond.name}</span>
+        ${cond.effect ? `<span class="condition-effect">${cond.effect}</span>` : ''}
+      </div>
+      <button class="condition-clear-btn" data-type="${type}" title="Clear ${type}">✕</button>
+    </div>`;
+}
+
+function renderGlobalBar(state) {
+  const w = state.weather || null;
+  const t = state.terrain || null;
+  return `
+    <div class="combat-global-bar">
+      <div class="combat-global-conditions" id="combatGlobalConditions">
+        ${w ? renderConditionBadge('weather', w) : ''}
+        ${t ? renderConditionBadge('terrain', t) : ''}
+      </div>
+      <div class="combat-global-btns">
+        <button class="combat-global-btn" id="weatherBtn">🌦 Weather</button>
+        <button class="combat-global-btn" id="terrainBtn">🌿 Terrain</button>
+      </div>
+    </div>`;
+}
+
+function renderGlobalConditionModal() {
+  return `
+    <div class="combat-popup-overlay" id="globalConditionModal" style="display:none;">
+      <div class="combat-popup-content" style="max-width:440px;padding:2rem;">
+        <h3 id="globalConditionModalTitle" style="margin:0 0 1.2rem;text-align:center;color:#FFD700;font-size:1.1rem;"></h3>
+        <div style="margin-bottom:1rem;">
+          <label class="combat-condition-form-label">Name</label>
+          <input type="text" id="globalConditionName" list="globalConditionSuggestions"
+            style="width:100%;padding:0.6rem 0.8rem;background:#3a3a3a;border:2px solid #555;border-radius:8px;color:white;font-size:0.95rem;box-sizing:border-box;"
+            placeholder="e.g. Rain" maxlength="60">
+          <datalist id="globalConditionSuggestions"></datalist>
+        </div>
+        <div style="margin-bottom:1.5rem;">
+          <label class="combat-condition-form-label">Effect <span style="font-weight:400;color:#777;text-transform:none;">(optional)</span></label>
+          <textarea id="globalConditionEffect" rows="3"
+            style="width:100%;padding:0.6rem 0.8rem;background:#3a3a3a;border:2px solid #555;border-radius:8px;color:white;font-size:0.88rem;box-sizing:border-box;resize:vertical;font-family:inherit;"
+            placeholder="Describe what this does…" maxlength="200"></textarea>
+        </div>
+        <div style="display:flex;gap:0.6rem;justify-content:flex-end;flex-wrap:wrap;">
+          <button class="combat-global-modal-btn gcm-cancel" id="globalConditionCancel">Cancel</button>
+          <button class="combat-global-modal-btn gcm-clear" id="globalConditionClearBtn" style="display:none;">Clear</button>
+          <button class="combat-global-modal-btn gcm-set" id="globalConditionSetBtn">Set</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderBattlePhase(state) {
   const cards = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex)).join('');
   return `
@@ -409,7 +468,11 @@ function renderBattlePhase(state) {
         <div class="combat-header-title">⚔️ Battle</div>
         <button class="combat-end-btn" id="endCombatBtn">End Combat</button>
       </div>
+      ${renderGlobalBar(state)}
       <div class="battle-list" id="battleList">${cards}</div>
+
+      <!-- Global Condition Modal (weather / terrain) -->
+      ${renderGlobalConditionModal()}
 
       <!-- Ingrain Heal Popup -->
       <div class="combat-popup-overlay" id="ingrainHealPopup" style="display:none;">
@@ -1192,6 +1255,55 @@ function getCombatCSS() {
       .category-header { font-size: 0.62rem; padding: 0.5rem 0.5rem; }
       .inventory-list-item { font-size: 0.58rem; padding: 0.4rem 0.6rem; }
     }
+
+    /* GLOBAL CONDITIONS BAR (weather / terrain) */
+    .combat-global-bar {
+      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+      padding: 0.45rem 1rem;
+      background: rgba(0,0,0,0.22);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      min-height: 38px;
+    }
+    .combat-global-conditions {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; align-items: center;
+    }
+    .combat-global-btns { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; margin-left: auto; }
+    .combat-global-btn {
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18);
+      color: #b0b0b0; padding: 0.22rem 0.65rem; border-radius: 6px; cursor: pointer;
+      font-size: 0.78rem; font-weight: 600; transition: all 0.18s; white-space: nowrap;
+    }
+    .combat-global-btn:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,215,0,0.4); color: #FFD700; }
+    .combat-condition-badge {
+      display: flex; align-items: center; gap: 0.35rem;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px; padding: 0.18rem 0.3rem 0.18rem 0.5rem; max-width: 260px;
+    }
+    .condition-icon { font-size: 0.95rem; flex-shrink: 0; }
+    .condition-text { flex: 1; min-width: 0; }
+    .condition-name { font-size: 0.8rem; font-weight: 700; color: #FFD700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .condition-effect { font-size: 0.7rem; color: #a0a0a0; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .condition-clear-btn {
+      background: none; border: none; color: rgba(255,255,255,0.35); cursor: pointer;
+      font-size: 0.7rem; padding: 0 0.15rem; flex-shrink: 0; line-height: 1; transition: color 0.15s;
+    }
+    .condition-clear-btn:hover { color: #ff6b6b; }
+
+    /* Global condition modal */
+    .combat-condition-form-label {
+      display: block; color: #FFD700; font-weight: 700; text-transform: uppercase;
+      font-size: 0.78rem; letter-spacing: 0.5px; margin-bottom: 0.4rem;
+    }
+    .combat-global-modal-btn {
+      padding: 0.5rem 1.2rem; border-radius: 7px; border: none; cursor: pointer;
+      font-size: 0.88rem; font-weight: 700; transition: all 0.18s;
+    }
+    .combat-global-modal-btn.gcm-cancel { background: rgba(255,255,255,0.08); color: #ccc; border: 1px solid rgba(255,255,255,0.2); }
+    .combat-global-modal-btn.gcm-cancel:hover { background: rgba(255,255,255,0.15); }
+    .combat-global-modal-btn.gcm-clear { background: rgba(255,107,107,0.12); color: #ff8080; border: 1px solid rgba(255,107,107,0.3); }
+    .combat-global-modal-btn.gcm-clear:hover { background: rgba(255,107,107,0.22); }
+    .combat-global-modal-btn.gcm-set { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; }
+    .combat-global-modal-btn.gcm-set:hover { filter: brightness(1.15); }
   `;
 }
 
@@ -1296,6 +1408,80 @@ function attachBattleListeners(state) {
   initializeRechargeStates(state);
 
   document.getElementById('endCombatBtn')?.addEventListener('click', () => endCombat(state));
+
+  // ── Global conditions (weather / terrain) ──────────────────────────────────
+  let _gcmType = null; // 'weather' | 'terrain'
+
+  const gcModal    = document.getElementById('globalConditionModal');
+  const gcName     = document.getElementById('globalConditionName');
+  const gcEffect   = document.getElementById('globalConditionEffect');
+  const gcTitle    = document.getElementById('globalConditionModalTitle');
+  const gcDatalist = document.getElementById('globalConditionSuggestions');
+  const gcClearBtn = document.getElementById('globalConditionClearBtn');
+
+  const rerenderGlobalConditions = () => {
+    const container = document.getElementById('combatGlobalConditions');
+    if (!container) return;
+    const w = state.weather || null;
+    const t = state.terrain || null;
+    container.innerHTML = [
+      w ? renderConditionBadge('weather', w) : '',
+      t ? renderConditionBadge('terrain', t) : '',
+    ].join('');
+    container.querySelectorAll('.condition-clear-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state[btn.dataset.type] = null;
+        saveCombatState(state);
+        rerenderGlobalConditions();
+      });
+    });
+  };
+
+  const openGcModal = (type) => {
+    _gcmType = type;
+    const isWeather = type === 'weather';
+    const current = isWeather ? state.weather : state.terrain;
+    gcTitle.textContent = isWeather ? '🌦 Set Weather' : '🌿 Set Terrain';
+    gcName.value   = current?.name   || '';
+    gcEffect.value = current?.effect || '';
+    gcDatalist.innerHTML = (isWeather ? WEATHER_SUGGESTIONS : TERRAIN_SUGGESTIONS)
+      .map(s => `<option value="${s}">`).join('');
+    gcClearBtn.style.display = current ? 'inline-block' : 'none';
+    gcModal.style.display = 'flex';
+    setTimeout(() => gcName.focus(), 50);
+  };
+
+  const closeGcModal = () => {
+    gcModal.style.display = 'none';
+    _gcmType = null;
+  };
+
+  document.getElementById('weatherBtn')?.addEventListener('click', () => openGcModal('weather'));
+  document.getElementById('terrainBtn')?.addEventListener('click', () => openGcModal('terrain'));
+  document.getElementById('globalConditionCancel')?.addEventListener('click', closeGcModal);
+  gcModal?.addEventListener('click', (e) => { if (e.target === gcModal) closeGcModal(); });
+
+  document.getElementById('globalConditionSetBtn')?.addEventListener('click', () => {
+    const name = gcName.value.trim();
+    if (!name || !_gcmType) return;
+    state[_gcmType] = { name, effect: gcEffect.value.trim() };
+    saveCombatState(state);
+    rerenderGlobalConditions();
+    closeGcModal();
+  });
+
+  gcClearBtn?.addEventListener('click', () => {
+    if (!_gcmType) return;
+    state[_gcmType] = null;
+    saveCombatState(state);
+    rerenderGlobalConditions();
+    closeGcModal();
+  });
+
+  // Wire up clear buttons already rendered on page load
+  rerenderGlobalConditions();
+  // ──────────────────────────────────────────────────────────────────────────
 
   const battleList = document.getElementById('battleList');
   if (battleList) {

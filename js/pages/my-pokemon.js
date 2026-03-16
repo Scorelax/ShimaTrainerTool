@@ -364,10 +364,11 @@ export function renderMyPokemon() {
         .typings-modal-header {
           background: linear-gradient(135deg, #7B2FBE 0%, #5E1FA0 100%);
           padding: clamp(0.9rem, 2vh, 1.3rem) clamp(1.2rem, 3vw, 1.8rem);
-          display: flex;
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
           align-items: center;
-          justify-content: space-between;
           border-bottom: clamp(2px, 0.4vw, 3px) solid #333;
+          transition: background 0.25s ease;
         }
 
         .typings-modal-header h2 {
@@ -377,7 +378,25 @@ export function renderMyPokemon() {
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 1px;
+          text-align: center;
         }
+
+        #typingsBackBtn {
+          background: none;
+          border: none;
+          color: white;
+          font-size: clamp(1rem, 2.5vw, 1.2rem);
+          font-weight: 700;
+          cursor: pointer;
+          opacity: 0.85;
+          padding: 0;
+          transition: opacity 0.15s;
+          justify-self: start;
+        }
+
+        #typingsBackBtn:hover { opacity: 1; }
+
+        #typingsBackBtn.hidden { visibility: hidden; pointer-events: none; }
 
         .typings-modal-body {
           overflow-y: auto;
@@ -425,24 +444,7 @@ export function renderMyPokemon() {
           text-shadow: 0 1px 3px rgba(0,0,0,0.4);
         }
 
-        .typings-back-btn {
-          display: block;
-          width: 100%;
-          border: none;
-          padding: clamp(0.5rem, 1.5vh, 0.75rem) clamp(1.2rem, 3vw, 1.8rem);
-          font-size: clamp(0.9rem, 2vw, 1rem);
-          font-weight: 700;
-          cursor: pointer;
-          text-align: left;
-          border-bottom: 1px solid rgba(255,255,255,0.15);
-          margin-bottom: 0.25rem;
-          opacity: 0.9;
-          transition: opacity 0.15s;
-        }
-
-        .typings-back-btn:hover { opacity: 1; }
-
-        .type-coverage-count {
+.type-coverage-count {
           font-size: clamp(0.85rem, 2vw, 1rem);
           font-weight: 900;
           background: rgba(0,0,0,0.25);
@@ -702,8 +704,9 @@ export function renderMyPokemon() {
       <div class="typings-modal-overlay" id="typingsModal">
         <div class="typings-modal-content">
           <div class="typings-modal-header">
+            <button id="typingsBackBtn" class="hidden">← Back</button>
             <h2 id="typingsModalTitle">Type Coverage</h2>
-            <button class="party-modal-close" id="closeTypingsModal">×</button>
+            <button class="party-modal-close" id="closeTypingsModal" style="justify-self:end;">×</button>
           </div>
           <div class="typings-modal-body" id="typingsModalList"></div>
         </div>
@@ -748,6 +751,7 @@ export function attachMyPokemonListeners() {
   document.getElementById('closeTypingsModal')?.addEventListener('click', () => {
     document.getElementById('typingsModal').classList.remove('open');
   });
+  document.getElementById('typingsBackBtn')?.addEventListener('click', _renderTypingsGrid);
 
   // Party button
   document.getElementById('partyBtn')?.addEventListener('click', openPartyModal);
@@ -950,6 +954,7 @@ function _renderTypingsGrid() {
   if (title) title.textContent = 'Type Coverage';
   const header = document.querySelector('.typings-modal-header');
   if (header) header.style.background = '';
+  document.getElementById('typingsBackBtn')?.classList.add('hidden');
 
   const allPokemon = _getAllPokemonData();
   const moveMap = _buildMoveMap();
@@ -1018,6 +1023,7 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
   const header = document.querySelector('.typings-modal-header');
   const bg = getMoveTypeColor(type);
   if (header) header.style.background = bg;
+  document.getElementById('typingsBackBtn')?.classList.remove('hidden');
   const textColor = getTextColorForBackground(bg);
 
   let matching;
@@ -1033,7 +1039,6 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
   }
 
   list.innerHTML = `
-    <button class="typings-back-btn" style="background:${bg}; color:${textColor};">← All Types</button>
     ${matching.length === 0 ? '<div style="padding:1rem 1.5rem;color:#888;">No Pokémon found.</div>' : ''}
     ${matching.map(data => {
       const name = data[2] || '';
@@ -1050,8 +1055,6 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
           </div>
         </div>`;
     }).join('')}`;
-
-  list.querySelector('.typings-back-btn').addEventListener('click', _renderTypingsGrid);
 }
 
 // ── Party Modal ──────────────────────────────────────────────────────────────

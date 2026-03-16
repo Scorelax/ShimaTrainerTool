@@ -948,6 +948,8 @@ function _renderTypingsGrid() {
   if (!list) return;
 
   if (title) title.textContent = 'Type Coverage';
+  const header = document.querySelector('.typings-modal-header');
+  if (header) header.style.background = '';
 
   const allPokemon = _getAllPokemonData();
   const moveMap = _buildMoveMap();
@@ -1013,7 +1015,9 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
 
   if (title) title.textContent = type;
 
+  const header = document.querySelector('.typings-modal-header');
   const bg = getMoveTypeColor(type);
+  if (header) header.style.background = bg;
   const textColor = getTextColorForBackground(bg);
 
   let matching;

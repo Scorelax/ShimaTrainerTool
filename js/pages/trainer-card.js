@@ -280,7 +280,7 @@ export function renderTrainerCard() {
         .utility-container {
           position: absolute;
           left: calc(50% + clamp(130px, 18vw, 180px));
-          bottom: clamp(2.5rem, 5vh, 3.5rem);
+          top: 0;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -535,7 +535,7 @@ export function renderTrainerCard() {
         .pokecenter-container {
           position: absolute;
           right: calc(50% + clamp(130px, 18vw, 180px));
-          bottom: clamp(2.5rem, 5vh, 3.5rem);
+          top: 0;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -903,7 +903,6 @@ export function renderTrainerCard() {
 
           .utility-container {
             left: calc(50% + clamp(70px, 18vw, 100px));
-            bottom: clamp(1.5rem, 4vh, 2.5rem);
           }
 
           .utility-slot {
@@ -924,7 +923,6 @@ export function renderTrainerCard() {
 
           .pokecenter-container {
             right: calc(50% + clamp(70px, 18vw, 100px));
-            bottom: clamp(1.5rem, 4vh, 2.5rem);
           }
 
           .pokecenter-slot {
@@ -987,7 +985,6 @@ export function renderTrainerCard() {
 
           .utility-container {
             left: calc(50% + clamp(55px, 15vw, 75px));
-            bottom: clamp(1rem, 3vh, 2rem);
           }
 
           .utility-slot {
@@ -1005,7 +1002,6 @@ export function renderTrainerCard() {
 
           .pokecenter-container {
             right: calc(50% + clamp(55px, 15vw, 75px));
-            bottom: clamp(1rem, 3vh, 2rem);
           }
 
           .pokecenter-slot {

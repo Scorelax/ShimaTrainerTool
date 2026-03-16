@@ -1187,6 +1187,10 @@ function getCombatCSS() {
       .combat-type-calc-btn { align-self: flex-start; min-width: 0; width: auto; }
       .stat-adjust-grid { grid-template-columns: repeat(2, 1fr); }
       .combat-mods-row { grid-template-columns: repeat(2, 1fr); }
+      .inventory-sidebar { width: clamp(100px, 36%, 140px); }
+      .inventory-title { font-size: 0.7rem; padding: 0.5rem 0.4rem; letter-spacing: 0; }
+      .category-header { font-size: 0.62rem; padding: 0.5rem 0.5rem; }
+      .inventory-list-item { font-size: 0.58rem; padding: 0.4rem 0.6rem; }
     }
   `;
 }

@@ -550,131 +550,183 @@ export function attachContinueJourneyListeners() {
       loadingScreen.classList.add('active');
       updateLoadingProgress(0, 'Connecting to server...');
 
-      try {
-        // Fetch trainer data with Pokemon
-        updateLoadingProgress(10, 'Loading trainer data...');
-        const response = await TrainerAPI.get(selectedTrainer.name);
+      // Track which step we're at so the error screen can report it precisely
+      let _step = 'connecting to server';
+      const _ts  = () => new Date().toISOString();
+      const _log  = (msg, ...a) => console.log( `[Login ${_ts()}] ${msg}`, ...a);
+      const _warn = (msg, ...a) => console.warn(`[Login ${_ts()}] ⚠ ${msg}`, ...a);
+      const _err  = (msg, ...a) => console.error(`[Login ${_ts()}] ✖ ${msg}`, ...a);
 
-        updateLoadingProgress(30, 'Processing trainer information...');
-        // Store in session storage (matching original behavior)
+      const _showError = (step, err) => {
+        _err(`FAILED at step "${step}"`, err);
+        loadingScreen.classList.remove('active');
+        document.getElementById('content').innerHTML = `
+          <div style="
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            min-height:60vh;padding:2rem;text-align:center;
+          ">
+            <div style="
+              background:rgba(30,30,40,0.95);border:2px solid #EE1515;border-radius:16px;
+              padding:2rem 2.5rem;max-width:480px;width:100%;
+              box-shadow:0 8px 32px rgba(0,0,0,0.6);
+            ">
+              <div style="font-size:2.5rem;margin-bottom:0.75rem;">⚠️</div>
+              <h2 style="color:#EE1515;margin:0 0 0.5rem;font-size:1.4rem;text-transform:uppercase;letter-spacing:1px;">
+                Failed to load
+              </h2>
+              <p style="color:#aaa;margin:0 0 0.4rem;font-size:0.9rem;">
+                Step: <strong style="color:#fff;">${step}</strong>
+              </p>
+              <p style="color:#888;font-size:0.8rem;margin:0 0 1.5rem;word-break:break-word;">
+                ${err?.message || 'Unknown error'}
+              </p>
+              <button onclick="window.location.reload()" style="
+                background:linear-gradient(135deg,#EE1515,#C91010);color:white;
+                border:none;border-radius:8px;padding:0.75rem 2rem;
+                font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:0.5px;
+                text-transform:uppercase;
+              ">↺ Retry</button>
+              <p style="color:#555;font-size:0.72rem;margin:0.75rem 0 0;">
+                Check the browser console (F12) for detailed logs.
+              </p>
+            </div>
+          </div>
+        `;
+      };
+
+      try {
+        // ── Step 1: Trainer + Pokemon data ────────────────────────────────────
+        _step = 'loading trainer data';
+        _log(`Fetching trainer "${selectedTrainer.name}"...`);
+        updateLoadingProgress(10, 'Loading trainer data...');
+        const t1 = Date.now();
+        const response = await TrainerAPI.get(selectedTrainer.name);
+        _log(`Trainer data OK in ${Date.now()-t1}ms — Pokemon: ${response.data.pokemonData?.length ?? 0}, trainerData fields: ${response.data.trainerData?.length ?? 0}`);
+
+        _step = 'storing trainer data';
         sessionStorage.setItem('trainerData', JSON.stringify(response.data.trainerData));
         response.data.pokemonData.forEach((pokemon) => {
           sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
         });
+        _log(`Stored trainerData + ${response.data.pokemonData.length} pokemon_* keys`);
 
-        // Store pokeball images
         sessionStorage.setItem('unlockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokeball.png');
         sessionStorage.setItem('lockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Grey%20Pokeball.png');
 
-        updateLoadingProgress(50, 'Loading Pokemon data...');
+        updateLoadingProgress(30, 'Processing trainer information...');
 
-        // Load complete Pokemon data (all registered Pokemon with abilities, moves, stats)
-        // This is cached in session storage to avoid slow API calls later
+        // ── Step 2 (optional): Complete Pokemon list ──────────────────────────
+        _step = 'caching complete Pokemon list';
+        updateLoadingProgress(50, 'Loading Pokemon data...');
         try {
+          _log('Fetching complete Pokemon list...');
+          const t2 = Date.now();
           const completePokemonData = await import('../api.js').then(m => m.PokemonAPI.getRegisteredList());
           if (completePokemonData.status === 'success') {
             sessionStorage.setItem('completePokemonData', JSON.stringify(completePokemonData.data));
-            console.log('[Cache] Stored complete Pokemon data for', completePokemonData.data.length, 'Pokemon');
+            _log(`Complete Pokemon list cached: ${completePokemonData.data.length} entries in ${Date.now()-t2}ms`);
+          } else {
+            _warn('Complete Pokemon list — unexpected status:', completePokemonData.status);
           }
-        } catch (error) {
-          console.error('[Cache] Failed to load complete Pokemon data:', error);
-          // Continue anyway - app will fall back to individual API calls if needed
+        } catch (e) {
+          _warn('Optional step skipped (complete Pokemon list):', e.message);
         }
 
-        // Load Pokedex config (visibility settings for Pokemon data)
-        // This is cached in session storage to avoid API calls on every page
+        // ── Step 3 (optional): Pokedex config ────────────────────────────────
+        _step = 'caching Pokedex config';
         try {
+          _log('Fetching Pokedex config...');
+          const t3 = Date.now();
           const pokedexConfig = await import('../api.js').then(m => m.GameDataAPI.getPokedexConfig());
           if (pokedexConfig.status === 'success') {
             sessionStorage.setItem('pokedexConfig', JSON.stringify(pokedexConfig.data));
-            console.log('[Cache] Stored Pokedex config');
+            _log(`Pokedex config cached in ${Date.now()-t3}ms`);
+          } else {
+            _warn('Pokedex config — unexpected status:', pokedexConfig.status);
           }
-        } catch (error) {
-          console.error('[Cache] Failed to load Pokedex config:', error);
-          // Continue anyway - app will fall back to API call if needed
+        } catch (e) {
+          _warn('Optional step skipped (Pokedex config):', e.message);
         }
 
-        // Check if Pokemon Trainer or Conduit
-        const trainerClass = response.data.trainerData[39]; // Index for trainer class
+        // ── Step 4: Game data (critical) ──────────────────────────────────────
+        const trainerClass = response.data.trainerData[39];
+        _log(`Trainer class: "${trainerClass}"`);
 
         if (trainerClass === "Pokemon Trainer") {
-          // Load game data for Pokemon Trainer
+          _step = 'loading game data';
           updateLoadingProgress(60, 'Loading game data...');
+          _log('Fetching game data (getAll)...');
+          const t4 = Date.now();
           const gameData = await import('../api.js').then(m => m.GameDataAPI.getAll());
-          console.log('Game data response:', gameData);
-          console.log('gameData keys:', Object.keys(gameData));
-          console.log('Has .data property?', 'data' in gameData);
-
-          // Check structure and use appropriate path
           const actualData = gameData.data || gameData;
-          console.log('actualData keys:', Object.keys(actualData));
+          _log(`Game data OK in ${Date.now()-t4}ms. Keys: [${Object.keys(actualData).join(', ')}]`);
 
+          const requiredKeys = ['itemsData','trainerPaths','specializations','affinities','moves','natures','trainerFeatsData','skillsData','pokemonFeatsData','nationalitiesData'];
+          const missing = requiredKeys.filter(k => !actualData[k]);
+          if (missing.length) _warn(`Game data missing keys: [${missing.join(', ')}]`);
+
+          _step = 'storing game data';
           updateLoadingProgress(75, 'Processing items and moves...');
-          // Store game data in session storage
-          sessionStorage.setItem('items', JSON.stringify(actualData.itemsData.items));
-          sessionStorage.setItem('trainerPaths', JSON.stringify(actualData.trainerPaths));
+          sessionStorage.setItem('items',           JSON.stringify(actualData.itemsData.items));
+          sessionStorage.setItem('trainerPaths',    JSON.stringify(actualData.trainerPaths));
           sessionStorage.setItem('specializations', JSON.stringify(actualData.specializations));
-          sessionStorage.setItem('affinities', JSON.stringify(actualData.affinities));
-          sessionStorage.setItem('moves', JSON.stringify(actualData.moves));
-          syncKnownMovesForAllPokemon();
-          sessionStorage.setItem('natures', JSON.stringify(actualData.natures));
-          sessionStorage.setItem('trainerFeats', JSON.stringify(actualData.trainerFeatsData.trainerFeats));
-          sessionStorage.setItem('skills', JSON.stringify(actualData.skillsData.skills));
-          sessionStorage.setItem('pokemonFeats', JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
-          sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));
+          sessionStorage.setItem('affinities',      JSON.stringify(actualData.affinities));
+          sessionStorage.setItem('moves',           JSON.stringify(actualData.moves));
+          sessionStorage.setItem('natures',         JSON.stringify(actualData.natures));
+          sessionStorage.setItem('trainerFeats',    JSON.stringify(actualData.trainerFeatsData.trainerFeats));
+          sessionStorage.setItem('skills',          JSON.stringify(actualData.skillsData.skills));
+          sessionStorage.setItem('pokemonFeats',    JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
+          sessionStorage.setItem('nationalities',   JSON.stringify(actualData.nationalitiesData.nationalities));
+          _log('Game data stored in sessionStorage');
 
+          _step = 'syncing known moves';
+          syncKnownMovesForAllPokemon();
+
+          _step = 'preloading splash image';
           updateLoadingProgress(85, 'Loading splash images...');
-          // Preload splash image for instant display on other pages
           const splashUrl = await selectAndPreloadSplashImage();
           sessionStorage.setItem('preloadedSplashImage', splashUrl);
-          console.log('[Continue Journey] Preloaded splash image:', splashUrl);
+          _log('Splash image preloaded:', splashUrl);
 
           updateLoadingProgress(95, 'Almost ready...');
-          // Navigate to trainer card
-          window.dispatchEvent(new CustomEvent('navigate', {
-            detail: { route: 'trainer-card' }
-          }));
+          _log('Navigating to trainer-card');
+          window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+
         } else {
-          // Load conduit data
+          _step = 'loading conduit data';
           updateLoadingProgress(60, 'Loading conduit data...');
+          _log('Fetching conduit data (getConduit)...');
+          const t4 = Date.now();
           const conduitData = await import('../api.js').then(m => m.GameDataAPI.getConduit());
-          console.log('Conduit data response:', conduitData);
-          console.log('conduitData keys:', Object.keys(conduitData));
-
-          // Check structure and use appropriate path
           const actualData = conduitData.data || conduitData;
-          console.log('actualData keys:', Object.keys(actualData));
+          _log(`Conduit data OK in ${Date.now()-t4}ms. Keys: [${Object.keys(actualData).join(', ')}]`);
 
+          const requiredKeys = ['itemsData','conduitFeatures','battleStyles','typeAwakening','moves','natures','pokemonFeatsData','nationalitiesData'];
+          const missing = requiredKeys.filter(k => !actualData[k]);
+          if (missing.length) _warn(`Conduit data missing keys: [${missing.join(', ')}]`);
+
+          _step = 'storing conduit data';
           updateLoadingProgress(75, 'Processing conduit abilities...');
-          // Store conduit data in session storage
-          sessionStorage.setItem('items', JSON.stringify(actualData.itemsData.items));
+          sessionStorage.setItem('items',           JSON.stringify(actualData.itemsData.items));
           sessionStorage.setItem('conduitFeatures', JSON.stringify(actualData.conduitFeatures));
-          sessionStorage.setItem('battleStyles', JSON.stringify(actualData.battleStyles));
-          sessionStorage.setItem('typeAwakenings', JSON.stringify(actualData.typeAwakening));
-          sessionStorage.setItem('moves', JSON.stringify(actualData.moves));
+          sessionStorage.setItem('battleStyles',    JSON.stringify(actualData.battleStyles));
+          sessionStorage.setItem('typeAwakenings',  JSON.stringify(actualData.typeAwakening));
+          sessionStorage.setItem('moves',           JSON.stringify(actualData.moves));
+          sessionStorage.setItem('natures',         JSON.stringify(actualData.natures));
+          sessionStorage.setItem('pokemonFeats',    JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
+          sessionStorage.setItem('nationalities',   JSON.stringify(actualData.nationalitiesData.nationalities));
+          _log('Conduit data stored in sessionStorage');
+
+          _step = 'syncing known moves';
           syncKnownMovesForAllPokemon();
-          sessionStorage.setItem('natures', JSON.stringify(actualData.natures));
-          sessionStorage.setItem('pokemonFeats', JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
-          sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));
 
           updateLoadingProgress(95, 'Almost ready...');
-          // Navigate to conduit card
-          window.dispatchEvent(new CustomEvent('navigate', {
-            detail: { route: 'conduit-card' }
-          }));
+          _log('Navigating to conduit-card');
+          window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'conduit-card' } }));
         }
 
       } catch (err) {
-        console.error('Error loading trainer:', err);
-        updateLoadingProgress(0, 'Error loading data');
-        // Show error in content area since modal is closed
-        document.getElementById('content').innerHTML = `
-          <div class="error" style="text-align: center; padding: 2rem; color: red;">
-            <h2>Failed to load trainer data</h2>
-            <p>${err.message}</p>
-            <button onclick="window.location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem;">Retry</button>
-          </div>
-        `;
+        _showError(_step, err);
       }
 
     } else {

@@ -402,6 +402,8 @@ export function renderMyPokemon() {
 
         #typingsBackBtn.hidden { visibility: hidden; pointer-events: none; }
 
+        #closeTypingsModal { justify-self: end; }
+
         .typings-modal-body {
           overflow-y: auto;
           flex: 1;
@@ -710,7 +712,7 @@ export function renderMyPokemon() {
           <div class="typings-modal-header">
             <button id="typingsBackBtn" class="hidden"><span style="font-size:1.3em;line-height:1;">←</span><span>Back</span></button>
             <h2 id="typingsModalTitle">Type Coverage</h2>
-            <button class="party-modal-close" id="closeTypingsModal" style="justify-self:end;">×</button>
+            <button class="party-modal-close" id="closeTypingsModal">×</button>
           </div>
           <div class="typings-modal-body" id="typingsModalList"></div>
         </div>

@@ -1420,6 +1420,12 @@ export function renderPokemonCard(pokemonName) {
 
         /* Small mobile phones - compact 2 columns */
         @media (max-width: 480px) {
+          .pokemon-card-page h1 {
+            font-size: 1.25rem;
+            letter-spacing: 0.5px;
+            padding: 0 clamp(30px, 8vw, 60px);
+          }
+
           .info-page-grid,
           .battle-page-grid {
             grid-template-columns: 45% 1fr;

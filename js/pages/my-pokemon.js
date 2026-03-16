@@ -459,6 +459,58 @@ export function renderMyPokemon() {
           text-shadow: 0 1px 3px rgba(0,0,0,0.4);
         }
 
+        /* Expandable pokemon rows in move-type detail */
+        .type-detail-expandable {
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .type-detail-expandable:hover {
+          background: rgba(255,255,255,0.06);
+        }
+
+        .type-detail-chevron {
+          font-size: 0.75rem;
+          color: rgba(255,255,255,0.55);
+          flex-shrink: 0;
+          transition: transform 0.2s ease;
+          margin-left: auto;
+          padding-left: 0.5rem;
+        }
+
+        .type-move-expand {
+          background: rgba(0,0,0,0.25);
+          border-left: 3px solid rgba(255,255,255,0.15);
+          margin: 0 0.75rem 0.25rem 3.5rem;
+          border-radius: 0 6px 6px 0;
+          padding: 0.4rem 0.6rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.3rem;
+        }
+
+        .type-move-chip {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          flex-wrap: wrap;
+        }
+
+        .type-move-chip-name {
+          font-size: 0.82rem;
+          font-weight: 700;
+          color: #fff;
+        }
+
+        .type-move-chip-tag {
+          font-size: 0.7rem;
+          font-weight: 600;
+          background: rgba(255,255,255,0.15);
+          border-radius: 8px;
+          padding: 1px 7px;
+          color: rgba(255,255,255,0.8);
+        }
+
         /* Party Modal */
         .party-modal-overlay {
           display: none;
@@ -1054,23 +1106,68 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
     );
   }
 
+  // Pre-compute moves per pokemon for the move section
+  const matchingWithMoves = matching.map(data => {
+    const moves = section === 'move'
+      ? _knownMoveNames(data)
+          .filter(moveName => {
+            const move = moveMap.get(moveName);
+            return move && move[1] === type && _isDamaging(move[7] || '');
+          })
+          .map(moveName => {
+            const move = moveMap.get(moveName);
+            return { name: moveName, vpCost: move[4] || '', range: move[6] || '' };
+          })
+      : [];
+    return { data, moves };
+  });
+
   list.innerHTML = `
-    ${matching.length === 0 ? '<div style="padding:1rem 1.5rem;color:#888;">No Pokémon found.</div>' : ''}
-    ${matching.map(data => {
+    ${matchingWithMoves.length === 0 ? '<div style="padding:1rem 1.5rem;color:#888;">No Pokémon found.</div>' : ''}
+    ${matchingWithMoves.map(({ data }) => {
       const name = data[2] || '';
       const nickname = data[36] || '';
       const image = data[1] || 'assets/Pokeball.png';
       const displayName = nickname || name;
       const t2 = data[6] ? ` / ${data[6]}` : '';
+      const isMove = section === 'move';
       return `
-        <div class="party-pokemon-row">
+        <div class="party-pokemon-row${isMove ? ' type-detail-expandable' : ''}">
           <img class="party-pokemon-avatar" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
           <div class="party-pokemon-info">
             <div class="party-pokemon-label">${displayName}</div>
             <div class="party-pokemon-sublabel">Lv. ${data[4] || '?'} &nbsp;·&nbsp; ${data[5] || ''}${t2}</div>
           </div>
-        </div>`;
+          ${isMove ? '<span class="type-detail-chevron">▼</span>' : ''}
+        </div>
+        ${isMove ? '<div class="type-move-expand" style="display:none;"></div>' : ''}`;
     }).join('')}`;
+
+  // Attach expand/collapse handlers
+  if (section === 'move') {
+    list.querySelectorAll('.type-detail-expandable').forEach((row, i) => {
+      const moves = matchingWithMoves[i].moves;
+      const expand = row.nextElementSibling;
+      const chevron = row.querySelector('.type-detail-chevron');
+      row.addEventListener('click', () => {
+        const isOpen = expand.style.display !== 'none';
+        if (isOpen) {
+          expand.style.display = 'none';
+          expand.innerHTML = '';
+          if (chevron) chevron.style.transform = '';
+        } else {
+          expand.innerHTML = moves.map(m => `
+            <div class="type-move-chip">
+              <span class="type-move-chip-name">${m.name}</span>
+              ${m.vpCost ? `<span class="type-move-chip-tag">${m.vpCost} VP</span>` : ''}
+              ${m.range ? `<span class="type-move-chip-tag">${m.range}</span>` : ''}
+            </div>`).join('');
+          expand.style.display = 'flex';
+          if (chevron) chevron.style.transform = 'rotate(180deg)';
+        }
+      });
+    });
+  }
 }
 
 // ── Party Modal ──────────────────────────────────────────────────────────────

@@ -419,15 +419,9 @@ function renderGlobalBar(state) {
   const w = state.weather || null;
   const t = state.terrain || null;
   return `
-    <div class="combat-global-bar">
-      <div class="combat-global-conditions" id="combatGlobalConditions">
-        ${w ? renderConditionBadge('weather', w) : ''}
-        ${t ? renderConditionBadge('terrain', t) : ''}
-      </div>
-      <div class="combat-global-btns">
-        <button class="combat-global-btn" id="weatherBtn">🌦 Weather</button>
-        <button class="combat-global-btn" id="terrainBtn">🌿 Terrain</button>
-      </div>
+    <div class="combat-global-bar" id="combatGlobalBar">
+      ${w ? renderConditionBadge('weather', w) : '<button class="combat-global-btn" id="weatherBtn">🌦 Weather</button>'}
+      ${t ? renderConditionBadge('terrain', t) : '<button class="combat-global-btn" id="terrainBtn">🌿 Terrain</button>'}
     </div>`;
 }
 
@@ -1258,16 +1252,12 @@ function getCombatCSS() {
 
     /* GLOBAL CONDITIONS BAR (weather / terrain) */
     .combat-global-bar {
-      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+      display: flex; align-items: center; justify-content: center; gap: 0.6rem; flex-wrap: wrap;
       padding: 0.45rem 1rem;
       background: rgba(0,0,0,0.22);
       border-bottom: 1px solid rgba(255,255,255,0.07);
       min-height: 38px;
     }
-    .combat-global-conditions {
-      display: flex; flex-wrap: wrap; gap: 0.4rem; flex: 1; align-items: center;
-    }
-    .combat-global-btns { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; margin-left: auto; }
     .combat-global-btn {
       background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18);
       color: #b0b0b0; padding: 0.22rem 0.65rem; border-radius: 6px; cursor: pointer;
@@ -1419,21 +1409,23 @@ function attachBattleListeners(state) {
   const gcDatalist = document.getElementById('globalConditionSuggestions');
   const gcClearBtn = document.getElementById('globalConditionClearBtn');
 
-  const rerenderGlobalConditions = () => {
-    const container = document.getElementById('combatGlobalConditions');
-    if (!container) return;
+  const rerenderGlobalBar = () => {
+    const bar = document.getElementById('combatGlobalBar');
+    if (!bar) return;
     const w = state.weather || null;
     const t = state.terrain || null;
-    container.innerHTML = [
-      w ? renderConditionBadge('weather', w) : '',
-      t ? renderConditionBadge('terrain', t) : '',
+    bar.innerHTML = [
+      w ? renderConditionBadge('weather', w) : '<button class="combat-global-btn" id="weatherBtn">🌦 Weather</button>',
+      t ? renderConditionBadge('terrain', t) : '<button class="combat-global-btn" id="terrainBtn">🌿 Terrain</button>',
     ].join('');
-    container.querySelectorAll('.condition-clear-btn').forEach(btn => {
+    document.getElementById('weatherBtn')?.addEventListener('click', () => openGcModal('weather'));
+    document.getElementById('terrainBtn')?.addEventListener('click', () => openGcModal('terrain'));
+    bar.querySelectorAll('.condition-clear-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         state[btn.dataset.type] = null;
         saveCombatState(state);
-        rerenderGlobalConditions();
+        rerenderGlobalBar();
       });
     });
   };
@@ -1457,8 +1449,6 @@ function attachBattleListeners(state) {
     _gcmType = null;
   };
 
-  document.getElementById('weatherBtn')?.addEventListener('click', () => openGcModal('weather'));
-  document.getElementById('terrainBtn')?.addEventListener('click', () => openGcModal('terrain'));
   document.getElementById('globalConditionCancel')?.addEventListener('click', closeGcModal);
   gcModal?.addEventListener('click', (e) => { if (e.target === gcModal) closeGcModal(); });
 
@@ -1467,7 +1457,7 @@ function attachBattleListeners(state) {
     if (!name || !_gcmType) return;
     state[_gcmType] = { name, effect: gcEffect.value.trim() };
     saveCombatState(state);
-    rerenderGlobalConditions();
+    rerenderGlobalBar();
     closeGcModal();
   });
 
@@ -1475,12 +1465,12 @@ function attachBattleListeners(state) {
     if (!_gcmType) return;
     state[_gcmType] = null;
     saveCombatState(state);
-    rerenderGlobalConditions();
+    rerenderGlobalBar();
     closeGcModal();
   });
 
-  // Wire up clear buttons already rendered on page load
-  rerenderGlobalConditions();
+  // Wire up buttons/badges on initial load
+  rerenderGlobalBar();
   // ──────────────────────────────────────────────────────────────────────────
 
   const battleList = document.getElementById('battleList');

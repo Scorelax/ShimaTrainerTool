@@ -364,8 +364,7 @@ export function renderMyPokemon() {
         .typings-modal-header {
           background: linear-gradient(135deg, #7B2FBE 0%, #5E1FA0 100%);
           padding: clamp(0.9rem, 2vh, 1.3rem) clamp(1.2rem, 3vw, 1.8rem);
-          display: grid;
-          grid-template-columns: 1fr auto 1fr;
+          display: flex;
           align-items: center;
           border-bottom: clamp(2px, 0.4vw, 3px) solid #333;
           transition: background 0.25s ease;
@@ -379,6 +378,7 @@ export function renderMyPokemon() {
           text-transform: uppercase;
           letter-spacing: 1px;
           text-align: center;
+          flex: 1;
         }
 
         #typingsBackBtn {
@@ -391,7 +391,6 @@ export function renderMyPokemon() {
           opacity: 0.85;
           padding: 0;
           transition: opacity 0.15s;
-          justify-self: start;
           display: flex;
           align-items: center;
           gap: 0.3em;
@@ -401,8 +400,6 @@ export function renderMyPokemon() {
         #typingsBackBtn:hover { opacity: 1; }
 
         #typingsBackBtn.hidden { visibility: hidden; pointer-events: none; }
-
-        #closeTypingsModal { justify-self: end; }
 
         .typings-modal-body {
           overflow-y: auto;

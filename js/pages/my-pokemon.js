@@ -385,13 +385,17 @@ export function renderMyPokemon() {
           background: none;
           border: none;
           color: white;
-          font-size: clamp(1rem, 2.5vw, 1.2rem);
+          font-size: clamp(1.1rem, 2.5vw, 1.35rem);
           font-weight: 700;
           cursor: pointer;
           opacity: 0.85;
           padding: 0;
           transition: opacity 0.15s;
           justify-self: start;
+          display: flex;
+          align-items: center;
+          gap: 0.3em;
+          line-height: 1;
         }
 
         #typingsBackBtn:hover { opacity: 1; }
@@ -704,7 +708,7 @@ export function renderMyPokemon() {
       <div class="typings-modal-overlay" id="typingsModal">
         <div class="typings-modal-content">
           <div class="typings-modal-header">
-            <button id="typingsBackBtn" class="hidden">← Back</button>
+            <button id="typingsBackBtn" class="hidden"><span style="font-size:1.3em;line-height:1;">←</span><span>Back</span></button>
             <h2 id="typingsModalTitle">Type Coverage</h2>
             <button class="party-modal-close" id="closeTypingsModal" style="justify-self:end;">×</button>
           </div>
@@ -1018,7 +1022,7 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
   const title = document.getElementById('typingsModalTitle');
   if (!list) return;
 
-  if (title) title.textContent = type;
+  if (title) title.textContent = section === 'move' ? `${type} Moves` : type;
 
   const header = document.querySelector('.typings-modal-header');
   const bg = getMoveTypeColor(type);

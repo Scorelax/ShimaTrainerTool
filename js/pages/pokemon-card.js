@@ -2893,6 +2893,20 @@ export function attachPokemonCardListeners() {
     }
   });
 
+  // ── Inventory string helpers ─────────────────────────────────────────────
+  function parseCustomItems(inventoryStr) {
+    if (!inventoryStr || !inventoryStr.includes('##CUSTOM##')) return [];
+    try { return JSON.parse(inventoryStr.split('##CUSTOM##')[1]) || []; } catch(e) { return []; }
+  }
+  function getRegularStr(inventoryStr) {
+    if (!inventoryStr) return '';
+    return inventoryStr.split('##CUSTOM##')[0];
+  }
+  function buildInventoryString(regularStr, customItems) {
+    if (!customItems || customItems.length === 0) return regularStr || '';
+    return `${regularStr || ''}##CUSTOM##${JSON.stringify(customItems)}`;
+  }
+
   // Refresh inventory display function
   function refreshInventoryDisplay() {
     const freshTrainerDataStr = sessionStorage.getItem('trainerData');
@@ -2902,16 +2916,20 @@ export function attachPokemonCardListeners() {
     const inventory = freshTrainerData[20] || 'None';
     const itemsStr = sessionStorage.getItem('items');
     const categoriesContainer = document.getElementById('inventoryCategories');
+    const customItemsList = parseCustomItems(inventory);
+    const regularInv = getRegularStr(inventory);
 
-    if (inventory === 'None' || !inventory || !itemsStr) {
+    if ((regularInv === 'None' || !regularInv) && customItemsList.length === 0) {
       categoriesContainer.innerHTML = '<li style="padding: 2rem; text-align: center; color: #999;">No items in inventory</li>';
       document.getElementById('inventoryPopup')?.classList.add('active');
       return;
     }
 
     // Parse items data and group by type
-    const itemsData = JSON.parse(itemsStr);
-    const inventoryItems = inventory.split(',').map(item => item.trim()).filter(item => item);
+    const itemsData = itemsStr ? JSON.parse(itemsStr) : [];
+    const inventoryItems = regularInv && regularInv !== 'None'
+      ? regularInv.split(',').map(item => item.trim()).filter(Boolean)
+      : [];
 
     // Extract item name and quantity
     const groupedItems = {};
@@ -2935,6 +2953,16 @@ export function attachPokemonCardListeners() {
         });
       }
     });
+
+    if (customItemsList.length > 0) {
+      groupedItems['Custom Items'] = customItemsList.map(ci => ({
+        name: ci.name,
+        description: ci.description || 'No description available',
+        effect: '',
+        quantity: ci.quantity,
+        fullData: { isCustom: true }
+      }));
+    }
 
     // Generate category list HTML
     let html = '';
@@ -3394,8 +3422,10 @@ export function attachPokemonCardListeners() {
   // Helper to decrement item quantity in trainer data inventory string
   function decrementItemQuantity(td, itemName) {
     const inventoryStr = td[20] || '';
-    let invItems = inventoryStr && inventoryStr !== 'None'
-      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+    const customItems = parseCustomItems(inventoryStr);
+    const regularStr = getRegularStr(inventoryStr);
+    let invItems = regularStr && regularStr !== 'None'
+      ? regularStr.split(',').map(item => item.trim()).filter(Boolean)
       : [];
 
     invItems = invItems.map(itemStr => {
@@ -3411,7 +3441,7 @@ export function attachPokemonCardListeners() {
       return itemStr;
     }).filter(item => item !== null);
 
-    td[20] = invItems.length > 0 ? invItems.join(', ') : 'None';
+    td[20] = buildInventoryString(invItems.length > 0 ? invItems.join(', ') : 'None', customItems);
   }
 
   // Add Item Modal - Confirm button
@@ -3432,8 +3462,10 @@ export function attachPokemonCardListeners() {
 
     const td = JSON.parse(trainerDataRaw);
     const inventoryStr = td[20] || '';
-    let invItems = inventoryStr && inventoryStr !== 'None'
-      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+    const customItems = parseCustomItems(inventoryStr);
+    const regularStr = getRegularStr(inventoryStr);
+    let invItems = regularStr && regularStr !== 'None'
+      ? regularStr.split(',').map(item => item.trim()).filter(Boolean)
       : [];
 
     // Check if item already exists
@@ -3457,7 +3489,7 @@ export function attachPokemonCardListeners() {
     }
 
     // Update sessionStorage immediately
-    td[20] = invItems.join(', ');
+    td[20] = buildInventoryString(invItems.join(', '), customItems);
     sessionStorage.setItem('trainerData', JSON.stringify(td));
 
     // Play item sound based on type
@@ -3528,38 +3560,44 @@ export function attachPokemonCardListeners() {
 
     const td = JSON.parse(trainerDataRaw);
     const inventoryStr = td[20] || '';
-    let invItems = inventoryStr && inventoryStr !== 'None'
-      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+    let customItems = parseCustomItems(inventoryStr);
+    const regularStr = getRegularStr(inventoryStr);
+    let invItems = regularStr && regularStr !== 'None'
+      ? regularStr.split(',').map(item => item.trim()).filter(Boolean)
       : [];
 
     // Find the item by parsing each string
     let found = false;
-    invItems = invItems.filter(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-
-      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-        found = true;
-        if (newQuantity === 0) {
-          return false;
-        } else {
-          return true;
+    if (selectedItemData.fullData?.isCustom) {
+      customItems = customItems.map(ci => {
+        if (ci.name.toLowerCase() === selectedItemData.name.toLowerCase()) {
+          found = true;
+          return newQuantity === 0 ? null : { ...ci, quantity: newQuantity };
         }
-      }
-      return true;
-    }).map(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-
-      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-        return `${itemName} (x${newQuantity})`;
-      }
-      return itemStr;
-    });
+        return ci;
+      }).filter(Boolean);
+    } else {
+      invItems = invItems.filter(itemStr => {
+        const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+        const itemName = match ? match[1].trim() : itemStr;
+        if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+          found = true;
+          return newQuantity !== 0;
+        }
+        return true;
+      }).map(itemStr => {
+        const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+        const itemName = match ? match[1].trim() : itemStr;
+        if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+          return `${itemName} (x${newQuantity})`;
+        }
+        return itemStr;
+      });
+    }
 
     if (found) {
       // Update sessionStorage immediately
-      td[20] = invItems.length > 0 ? invItems.join(', ') : 'None';
+      td[20] = buildInventoryString(invItems.length > 0 ? invItems.join(', ') : 'None', customItems);
       sessionStorage.setItem('trainerData', JSON.stringify(td));
 
       // Close modal immediately
@@ -3592,26 +3630,33 @@ export function attachPokemonCardListeners() {
 
     const td = JSON.parse(trainerDataRaw);
     const inventoryStr = td[20] || '';
-    let invItems = inventoryStr && inventoryStr !== 'None'
-      ? inventoryStr.split(',').map(item => item.trim()).filter(item => item)
+    let customItems = parseCustomItems(inventoryStr);
+    const regularStr = getRegularStr(inventoryStr);
+    let invItems = regularStr && regularStr !== 'None'
+      ? regularStr.split(',').map(item => item.trim()).filter(Boolean)
       : [];
 
     // Find and remove item by parsing each string
     let found = false;
-    invItems = invItems.filter(itemStr => {
-      const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
-      const itemName = match ? match[1].trim() : itemStr;
-
-      if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
-        found = true;
-        return false;
-      }
-      return true;
-    });
+    if (selectedItemData.fullData?.isCustom) {
+      const before = customItems.length;
+      customItems = customItems.filter(ci => ci.name.toLowerCase() !== selectedItemData.name.toLowerCase());
+      found = customItems.length < before;
+    } else {
+      invItems = invItems.filter(itemStr => {
+        const match = itemStr.match(/^(.+?)\s*\(x(\d+)\)$/);
+        const itemName = match ? match[1].trim() : itemStr;
+        if (itemName.toLowerCase() === selectedItemData.name.toLowerCase()) {
+          found = true;
+          return false;
+        }
+        return true;
+      });
+    }
 
     if (found) {
       // Update sessionStorage
-      td[20] = invItems.length > 0 ? invItems.join(', ') : 'None';
+      td[20] = buildInventoryString(invItems.length > 0 ? invItems.join(', ') : 'None', customItems);
       sessionStorage.setItem('trainerData', JSON.stringify(td));
 
       // Close modal immediately

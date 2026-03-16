@@ -2269,23 +2269,26 @@ export function renderPokemonCard(pokemonName) {
 
         @media (max-width: 480px) {
           .inventory-sidebar {
-            width: clamp(120px, 38%, 160px);
+            width: clamp(100px, 36%, 140px);
           }
           .inventory-title {
-            font-size: 0.85rem;
-            padding: 0.6rem 0.5rem;
+            font-size: 0.7rem;
+            padding: 0.5rem 0.4rem;
             letter-spacing: 0;
           }
           .category-header {
-            font-size: 0.72rem;
-            padding: 0.6rem 0.6rem;
+            font-size: 0.62rem;
+            padding: 0.5rem 0.5rem;
           }
           .inventory-list-item {
-            font-size: 0.68rem;
-            padding: 0.5rem 0.75rem;
+            font-size: 0.58rem;
+            padding: 0.4rem 0.6rem;
           }
           .item-name {
-            font-size: 0.95rem;
+            font-size: 0.85rem;
+          }
+          #selectedItemName {
+            font-size: 0.85rem;
           }
         }
       </style>

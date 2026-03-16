@@ -213,7 +213,128 @@ export function renderIndex() {
             padding: clamp(0.75rem, 2vh, 2rem);
           }
         }
+
+        /* Cache Reset Modal */
+        .cache-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.65);
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1rem;
+        }
+
+        .cache-modal {
+          background: linear-gradient(145deg, #2a0808 0%, #1a0404 100%);
+          border: 2px solid #FFDE00;
+          border-radius: clamp(12px, 2.5vw, 20px);
+          padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.5rem, 5vw, 3rem);
+          max-width: min(420px, 90vw);
+          width: 100%;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 30px rgba(255,222,0,0.15);
+          text-align: center;
+          animation: modalPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes modalPop {
+          from { transform: scale(0.85); opacity: 0; }
+          to   { transform: scale(1);    opacity: 1; }
+        }
+
+        .cache-modal-icon {
+          font-size: clamp(2rem, 6vw, 3rem);
+          margin-bottom: 0.5rem;
+        }
+
+        .cache-modal-title {
+          font-size: clamp(1.2rem, 3.5vw, 1.6rem);
+          font-weight: 900;
+          color: #FFDE00;
+          margin: 0 0 0.75rem;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+          letter-spacing: 0.5px;
+        }
+
+        .cache-modal-message {
+          font-size: clamp(0.85rem, 2.2vw, 1rem);
+          color: rgba(255,255,255,0.85);
+          margin: 0 0 1.75rem;
+          line-height: 1.5;
+        }
+
+        .cache-modal-buttons {
+          display: flex;
+          gap: 1rem;
+          justify-content: center;
+        }
+
+        .cache-modal-btn {
+          flex: 1;
+          max-width: 140px;
+          padding: clamp(0.6rem, 1.5vh, 0.85rem) 1rem;
+          font-size: clamp(0.85rem, 2vw, 1rem);
+          font-weight: 700;
+          border-radius: clamp(8px, 2vw, 12px);
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 2px solid transparent;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+
+        .cache-modal-cancel {
+          background: rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.8);
+          border-color: rgba(255,255,255,0.25);
+        }
+
+        .cache-modal-cancel:hover {
+          background: rgba(255,255,255,0.18);
+          border-color: rgba(255,255,255,0.45);
+          color: #fff;
+        }
+
+        .cache-modal-confirm {
+          background: linear-gradient(135deg, #FF6B6B 0%, #C91010 100%);
+          color: #fff;
+          border-color: #FFDE00;
+        }
+
+        .cache-modal-confirm:hover {
+          background: linear-gradient(135deg, #FF5555 0%, #A00808 100%);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.4), 0 0 14px rgba(255,222,0,0.4);
+          transform: translateY(-2px);
+        }
+
+        .cache-modal-ok {
+          background: linear-gradient(135deg, #4CAF50 0%, #2e7d32 100%);
+          color: #fff;
+          border-color: #FFDE00;
+          width: 100%;
+          max-width: 180px;
+        }
+
+        .cache-modal-ok:hover {
+          background: linear-gradient(135deg, #43A047 0%, #1b5e20 100%);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.4), 0 0 14px rgba(255,222,0,0.4);
+          transform: translateY(-2px);
+        }
       </style>
+
+      <!-- Cache Reset Confirm Modal -->
+      <div id="cacheModal" class="cache-modal-overlay" style="display:none;">
+        <div class="cache-modal">
+          <div class="cache-modal-icon" id="cacheModalIcon">🔄</div>
+          <h2 class="cache-modal-title" id="cacheModalTitle">Reset Cache?</h2>
+          <p class="cache-modal-message" id="cacheModalMessage">This will clear all session data and reload the page.</p>
+          <div class="cache-modal-buttons" id="cacheModalButtons">
+            <button class="cache-modal-btn cache-modal-cancel" id="cacheModalCancel">Cancel</button>
+            <button class="cache-modal-btn cache-modal-confirm" id="cacheModalConfirm">Reset</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Cache Reset Button -->
       <button class="cache-reset-button" id="cacheResetButton">
@@ -251,38 +372,73 @@ export function attachIndexListeners() {
     }, { capture: true });
   }
 
-  // Cache Reset Button
+  // Cache Reset Button — custom modal
+  const cacheModal   = document.getElementById('cacheModal');
+  const modalTitle   = document.getElementById('cacheModalTitle');
+  const modalIcon    = document.getElementById('cacheModalIcon');
+  const modalMessage = document.getElementById('cacheModalMessage');
+  const modalButtons = document.getElementById('cacheModalButtons');
+
+  const showCacheModal = ({ icon, title, message, buttons }) => {
+    modalIcon.textContent    = icon;
+    modalTitle.textContent   = title;
+    modalMessage.textContent = message;
+    modalButtons.innerHTML   = buttons;
+    cacheModal.style.display = 'flex';
+  };
+
+  const hideCacheModal = () => { cacheModal.style.display = 'none'; };
+
+  // Close on overlay click
+  cacheModal?.addEventListener('click', (e) => { if (e.target === cacheModal) hideCacheModal(); });
+
   document.getElementById('cacheResetButton')?.addEventListener('click', () => {
-    if (confirm('Are you sure you want to reset the cache? This will clear all session data and reload the page.')) {
-      // Clear sessionStorage
-      sessionStorage.clear();
+    showCacheModal({
+      icon: '🔄',
+      title: 'Reset Cache?',
+      message: 'This will clear all session data and reload the page.',
+      buttons: `
+        <button class="cache-modal-btn cache-modal-cancel" id="cacheModalCancel">Cancel</button>
+        <button class="cache-modal-btn cache-modal-confirm" id="cacheModalConfirm">Reset</button>
+      `,
+    });
 
-      // Clear localStorage (if used)
-      localStorage.clear();
+    // Attach buttons after injecting HTML
+    setTimeout(() => {
+      document.getElementById('cacheModalCancel')?.addEventListener('click', hideCacheModal);
+      document.getElementById('cacheModalConfirm')?.addEventListener('click', () => {
+        // Clear sessionStorage
+        sessionStorage.clear();
 
-      // Clear any service worker cache if present
-      if ('caches' in window) {
-        caches.keys().then(names => {
-          names.forEach(name => {
-            caches.delete(name);
+        // Clear localStorage (if used)
+        localStorage.clear();
+
+        // Clear any service worker cache if present
+        if ('caches' in window) {
+          caches.keys().then(names => { names.forEach(name => caches.delete(name)); });
+        }
+
+        // Unregister service workers if present
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(registrations => {
+            registrations.forEach(r => r.unregister());
           });
-        });
-      }
+        }
 
-      // Unregister service workers if present
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          registrations.forEach(registration => {
-            registration.unregister();
+        // Show success state
+        showCacheModal({
+          icon: '✅',
+          title: 'Cache Cleared!',
+          message: 'All session data has been cleared. The page will now reload.',
+          buttons: `<button class="cache-modal-btn cache-modal-ok" id="cacheModalOk">OK</button>`,
+        });
+
+        setTimeout(() => {
+          document.getElementById('cacheModalOk')?.addEventListener('click', () => {
+            window.location.reload(true);
           });
-        });
-      }
-
-      // Show confirmation message
-      alert('Cache cleared successfully! The page will now reload.');
-
-      // Force reload from server (bypass cache)
-      window.location.reload(true);
-    }
+        }, 0);
+      });
+    }, 0);
   });
 }

@@ -418,8 +418,8 @@ export function renderMyPokemon() {
 
         .type-coverage-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: clamp(0.4rem, 1.2vw, 0.65rem);
+          grid-template-columns: repeat(4, 1fr);
+          gap: clamp(0.3rem, 0.9vw, 0.5rem);
         }
 
         .coverage-section-divider {
@@ -429,10 +429,11 @@ export function renderMyPokemon() {
 
         .type-coverage-card {
           border-radius: 8px;
-          padding: clamp(0.4rem, 1.2vh, 0.6rem) clamp(0.5rem, 1.5vw, 0.8rem);
+          padding: clamp(0.35rem, 1vh, 0.5rem) clamp(0.35rem, 1vw, 0.55rem);
           display: flex;
           align-items: center;
           justify-content: space-between;
+          gap: 0.25rem;
           font-weight: 700;
           box-shadow: 0 2px 6px rgba(0,0,0,0.35);
           transition: opacity 0.2s;
@@ -443,7 +444,7 @@ export function renderMyPokemon() {
         }
 
         .type-coverage-name {
-          font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
           text-shadow: 0 1px 3px rgba(0,0,0,0.4);
         }
 

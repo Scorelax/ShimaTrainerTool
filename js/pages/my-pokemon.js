@@ -444,7 +444,7 @@ export function renderMyPokemon() {
         }
 
         .type-coverage-name {
-          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
+          font-size: clamp(0.8rem, 1.8vw, 0.95rem);
           text-shadow: 0 1px 3px rgba(0,0,0,0.4);
         }
 

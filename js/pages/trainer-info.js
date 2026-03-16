@@ -1824,7 +1824,7 @@ export function renderTrainerInfo() {
           }
 
           .ability-container {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: clamp(0.3rem, 1vw, 0.5rem);
           }
 
@@ -1859,7 +1859,7 @@ export function renderTrainerInfo() {
           }
 
           .ability-container {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
           }
 
           .skills-grid {

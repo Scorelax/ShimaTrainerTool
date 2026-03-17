@@ -2805,6 +2805,7 @@ export function attachTrainerInfoListeners() {
     searchInput.parentNode.replaceChild(freshSearchInput, searchInput);
     freshSearchInput.value = '';
     freshSearchInput.addEventListener('input', e => applyInventorySearch(e.target.value));
+    applyInventorySearch('');
 
     openPopup('inventoryPopup');
   }

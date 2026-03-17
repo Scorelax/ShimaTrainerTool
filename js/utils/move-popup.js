@@ -65,6 +65,7 @@ function _createPopupDOM() {
           <div><strong>Duration:</strong> <span id="cMoveDuration"></span></div>
           <div><strong>Range:</strong> <span id="cMoveRange"></span></div>
           <div><strong>Size:</strong> <span id="cMoveSize"></span></div>
+          <div id="cMoveDCWrapper" style="display:none;"><strong>Move DC:</strong> <span id="cMoveDC"></span></div>
           <div><strong>Critical Hit:</strong> <span id="cMoveCritMod"></span></div>
         </div>
         <div class="combat-move-description" id="cMoveDescription"></div>
@@ -454,6 +455,18 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   document.getElementById('cMoveDuration').textContent = move[5] || '—';
   document.getElementById('cMoveRange').textContent = move[6] || '—';
   document.getElementById('cMoveSize').textContent = size || '—';
+
+  const moveDCWrapper = document.getElementById('cMoveDCWrapper');
+  const moveDCEl = document.getElementById('cMoveDC');
+  if (moveDCWrapper && moveDCEl) {
+    const hasMoveDC = /save against your Move DC/i.test(move[7] || '');
+    if (hasMoveDC) {
+      moveDCEl.textContent = computedData.moveDC ?? '—';
+      moveDCWrapper.style.display = '';
+    } else {
+      moveDCWrapper.style.display = 'none';
+    }
+  }
 
   const critEl = document.getElementById('cMoveCritMod');
   if (critEl) {

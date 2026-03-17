@@ -156,6 +156,8 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
 
   const damageDice = parseDamageDice(desc, move[8] || '', level);
 
+  const moveDC = 8 + highestMod + proficiency;
+
   return {
     hasSTAB,
     attackBonus,
@@ -163,5 +165,6 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
     attackBreakdown: atkParts.length ? `(${atkParts.join(', ')})` : '',
     damageBreakdown: dmgParts.length ? `(${dmgParts.join(', ')})` : '',
     damageDice,
+    moveDC,
   };
 }

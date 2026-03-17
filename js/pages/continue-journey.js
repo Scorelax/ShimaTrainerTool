@@ -656,6 +656,7 @@ export function attachContinueJourneyListeners() {
           _step = 'loading game data';
           updateLoadingProgress(60, 'Loading game data...');
           _log('Fetching game data (getAll)...');
+          updateLoadingProgress(60, 'Loading game data (this may take up to a minute)...');
           const t4 = Date.now();
           const gameData = await import('../api.js').then(m => m.GameDataAPI.getAll());
           const actualData = gameData.data || gameData;
@@ -696,6 +697,7 @@ export function attachContinueJourneyListeners() {
           _step = 'loading conduit data';
           updateLoadingProgress(60, 'Loading conduit data...');
           _log('Fetching conduit data (getConduit)...');
+          updateLoadingProgress(60, 'Loading conduit data (this may take up to a minute)...');
           const t4 = Date.now();
           const conduitData = await import('../api.js').then(m => m.GameDataAPI.getConduit());
           const actualData = conduitData.data || conduitData;

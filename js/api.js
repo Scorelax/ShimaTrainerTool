@@ -70,7 +70,7 @@ const cache = new CacheManager();
 
 class API {
   static async request(route, action, params = {}, options = {}) {
-    const { useCache = true, cacheKey, timeout = API_CONFIG.timeout } = options;
+    const { useCache = true, cacheKey, timeout = API_CONFIG.timeout, retries = 1 } = options;
 
     // Check cache first
     if (useCache && cacheKey) {
@@ -92,46 +92,54 @@ class API {
       }
     });
 
-    // Make request with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    let lastError;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      if (attempt > 0) {
+        console.warn(`[API] Retrying ${route}/${action} (attempt ${attempt + 1}/${retries + 1})...`);
+        await new Promise(res => setTimeout(res, 2000 * attempt));
+      }
 
-    try {
-      const response = await fetch(url.toString(), {
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json'
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(url.toString(), {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-      });
 
-      clearTimeout(timeoutId);
+        const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (data.status === 'error') {
+          throw new Error(data.error || 'Unknown API error');
+        }
+
+        if (useCache && cacheKey) {
+          cache.set(cacheKey, data);
+        }
+
+        return data;
+
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          lastError = new Error('Request timeout - please try again');
+          console.warn(`[API] Timeout on ${route}/${action} (attempt ${attempt + 1})`);
+        } else {
+          throw error; // non-timeout errors are not retried
+        }
       }
-
-      const data = await response.json();
-
-      // Check for API-level errors
-      if (data.status === 'error') {
-        throw new Error(data.error || 'Unknown API error');
-      }
-
-      // Cache successful responses
-      if (useCache && cacheKey) {
-        cache.set(cacheKey, data);
-      }
-
-      return data;
-
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Request timeout - please try again');
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
     }
+
+    throw lastError;
   }
 }
 

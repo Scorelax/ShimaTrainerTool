@@ -483,11 +483,11 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   if (damageDice) {
     document.getElementById('cDamageBonus').textContent =
       damageBonus > 0 ? `${damageDice} + ${damageBonus}` : damageDice;
+    document.getElementById('cDamageBreakdown').textContent = damageBreakdown;
   } else {
-    document.getElementById('cDamageBonus').textContent =
-      damageBonus > 0 ? fmtMod(damageBonus) : '—';
+    document.getElementById('cDamageBonus').textContent = '—';
+    document.getElementById('cDamageBreakdown').textContent = '';
   }
-  document.getElementById('cDamageBreakdown').textContent = damageBreakdown;
 
   // Held items
   const heldItemsEl = document.getElementById('cHeldItems');

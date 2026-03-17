@@ -4671,7 +4671,7 @@ function showMoveDetails(moveName) {
 
     const {
       attackBonus: attackRollBonus, damageBonus: damageRollBonus,
-      attackBreakdown, damageBreakdown, damageDice,
+      attackBreakdown, damageBreakdown, damageDice, moveDC,
     } = computeMoveData(
       move,
       { types: pokemonTypes, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level: pokemonLevel, hasToughClaws },
@@ -4699,6 +4699,7 @@ function showMoveDetails(moveName) {
         attackBreakdown,
         damageBreakdown,
         damageDice,
+        moveDC,
       },
       heldItemsHTML,
       size: sizeText,

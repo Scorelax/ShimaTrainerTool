@@ -243,7 +243,7 @@ export function renderPokemonCard(pokemonName) {
     return sum + (specType && pokemonTypes.includes(specType) ? 1 : 0);
   }, 0);
 
-  const displayName = name; // Just use the Pokemon name, not nickname
+  const displayName = nickname || name;
   const typingText = type2 ? `${type1} - ${type2}` : type1;
 
   // Create typing buttons with colors
@@ -2306,7 +2306,7 @@ export function renderPokemonCard(pokemonName) {
         }
       </style>
 
-      <h1>${displayName} #${dexEntry}</h1>
+      <h1>${displayName} #${dexEntry}${nickname ? `<span style="display:block;font-size:0.55em;font-weight:500;color:#aaa;letter-spacing:1px;text-transform:uppercase;margin-top:0.1em;">${name}</span>` : ''}</h1>
 
       <!-- Back Button -->
       <button class="back-button" id="backToTrainerCard">←</button>
@@ -2598,7 +2598,7 @@ export function renderPokemonCard(pokemonName) {
 
               <!-- Pokemon Section -->
               <div>
-                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${pokemonData[2]}</div>
+                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${displayName}</div>
 
                 <!-- Type Effectiveness Buttons -->
                 ${weaknesses.length > 0 ? `

@@ -444,6 +444,7 @@ async function populateAbilityOptions(selectedPokemonData) {
     checkbox.name = 'abilities';
     checkbox.value = abilityName; // Just the name
     checkbox.dataset.slotIndex = slotIndex; // Store slot index for later
+    if (slotIndex === 0) checkbox.checked = true; // Default: primary ability pre-selected
 
     const label = document.createElement('label');
     label.htmlFor = `ability${slotIndex}`;

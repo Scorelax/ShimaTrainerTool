@@ -1406,6 +1406,13 @@ function populateAbilities(abilities, pokemonData) {
     currentAbilities = [abilityString];
   }
 
+  // If no ability saved, default to the first available checkbox
+  if (currentAbilities.length === 0) {
+    const firstCheckbox = abilitiesContent.querySelector('input[name="abilities"]');
+    if (firstCheckbox) firstCheckbox.checked = true;
+    return;
+  }
+
   currentAbilities.forEach(abilityData => {
     // Ensure abilityData is a string
     const abilityStr = typeof abilityData === 'string' ? abilityData : String(abilityData);

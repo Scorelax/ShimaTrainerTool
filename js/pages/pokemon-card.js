@@ -2306,7 +2306,7 @@ export function renderPokemonCard(pokemonName) {
         }
       </style>
 
-      <h1>${displayName} #${dexEntry}${nickname ? `<span style="display:block;font-size:0.55em;font-weight:500;color:#aaa;letter-spacing:1px;text-transform:uppercase;margin-top:0.1em;">${name}</span>` : ''}</h1>
+      <h1>${displayName} #${dexEntry}</h1>
 
       <!-- Back Button -->
       <button class="back-button" id="backToTrainerCard">←</button>

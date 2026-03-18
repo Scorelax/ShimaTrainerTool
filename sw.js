@@ -1,5 +1,5 @@
 // Service Worker for Pokemon D&D Trainer Tool
-const CACHE_NAME = 'pokemon-dnd-v44';
+const CACHE_NAME = 'pokemon-dnd-v45';
 
 // Files to cache for offline use (relative paths for subdirectory hosting)
 const STATIC_ASSETS = [

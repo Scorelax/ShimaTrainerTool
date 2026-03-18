@@ -459,7 +459,7 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   const moveDCWrapper = document.getElementById('cMoveDCWrapper');
   const moveDCEl = document.getElementById('cMoveDC');
   if (moveDCWrapper && moveDCEl) {
-    const hasMoveDC = /save against your Move DC/i.test(move[7] || '');
+    const hasMoveDC = /(?:saving throw|save) against your Move DC/i.test(move[7] || '');
     if (hasMoveDC) {
       moveDCEl.textContent = computedData.moveDC ?? '—';
       moveDCWrapper.style.display = '';

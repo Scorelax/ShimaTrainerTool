@@ -1787,6 +1787,13 @@ export function renderPokemonCard(pokemonName) {
           font-weight: 700;
         }
 
+        .inventory-search-wrapper { padding: 0.6rem 0.8rem; }
+        .inventory-search-input { width: 100%; padding: 0.45rem 0.7rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 0.88rem; box-sizing: border-box; outline: none; }
+        .inventory-search-input:focus { border-color: #EE1515; }
+        .inventory-search-results { list-style: none; padding: 0; margin: 0; overflow-y: auto; display: none; }
+        .inventory-search-results.active { display: block; }
+        .inventory-search-no-results { padding: 0.75rem 1rem; color: #999; font-size: 0.88rem; text-align: center; }
+
         .inventory-main {
           flex: 1;
           display: flex;
@@ -2682,6 +2689,10 @@ export function renderPokemonCard(pokemonName) {
           <div class="inventory-popup-content">
             <div class="inventory-sidebar">
               <h2 class="inventory-title">Inventory</h2>
+              <div class="inventory-search-wrapper">
+                <input type="text" id="cardInventorySearch" class="inventory-search-input" placeholder="Search items..." autocomplete="off">
+              </div>
+              <ul id="cardInventorySearchResults" class="inventory-search-results"></ul>
               <ul id="inventoryCategories" class="inventory-categories">
                 <!-- Categories will be dynamically populated -->
               </ul>
@@ -3016,6 +3027,52 @@ export function attachPokemonCardListeners() {
     });
 
     categoriesContainer.innerHTML = html;
+
+    const allInventoryItems = Object.values(groupedItems).flat();
+
+    // Search
+    const cardSearchInput = document.getElementById('cardInventorySearch');
+    const cardSearchResults = document.getElementById('cardInventorySearchResults');
+    if (cardSearchInput && cardSearchResults) {
+      const normalize = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const applyCardSearch = (query) => {
+        const q = normalize(query.trim());
+        if (!q) {
+          cardSearchResults.classList.remove('active');
+          cardSearchResults.innerHTML = '';
+          categoriesContainer.style.display = '';
+          return;
+        }
+        categoriesContainer.style.display = 'none';
+        const matches = allInventoryItems.filter(item => normalize(item.name).includes(q));
+        if (!matches.length) {
+          cardSearchResults.innerHTML = '<li class="inventory-search-no-results">No items found</li>';
+        } else {
+          cardSearchResults.innerHTML = matches.map(item =>
+            `<li class="inventory-list-item" data-item='${JSON.stringify(item).replace(/'/g, "&#39;")}'>${item.name} (x${item.quantity})</li>`
+          ).join('');
+          cardSearchResults.querySelectorAll('.inventory-list-item').forEach(el => {
+            el.addEventListener('click', () => {
+              cardSearchResults.querySelectorAll('.inventory-list-item').forEach(x => x.classList.remove('selected'));
+              el.classList.add('selected');
+              selectedItemData = JSON.parse(el.dataset.item);
+              document.getElementById('selectedItemName').textContent = `${selectedItemData.name} (x${selectedItemData.quantity})`;
+              document.getElementById('descriptionText').textContent = selectedItemData.description;
+              document.getElementById('effectText').textContent = selectedItemData.effect;
+              document.getElementById('editItemButton').disabled = false;
+              document.getElementById('removeItemButton').disabled = false;
+              document.getElementById('useItemButton').disabled = !parseHealingEffect(selectedItemData.effect);
+            });
+          });
+        }
+        cardSearchResults.classList.add('active');
+      };
+      const freshSearch = cardSearchInput.cloneNode(true);
+      cardSearchInput.parentNode.replaceChild(freshSearch, cardSearchInput);
+      freshSearch.value = '';
+      freshSearch.addEventListener('input', e => applyCardSearch(e.target.value));
+      applyCardSearch('');
+    }
 
     // Add category toggle listeners
     document.querySelectorAll('.category-header').forEach(header => {

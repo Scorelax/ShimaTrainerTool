@@ -2012,6 +2012,7 @@ function endTurnForCombatant(combatantId, state) {
 
   // Advance to next living combatant
   const total = state.combatants.length;
+  const currentC = state.combatants[state.activeTurnIndex];
   let next = state.activeTurnIndex;
   let wrapped = false;
   for (let i = 1; i <= total; i++) {
@@ -2026,13 +2027,12 @@ function endTurnForCombatant(combatantId, state) {
   }
   state.activeTurnIndex = next;
 
-  // Start-of-turn ability effects (skip round 1)
+  // End-of-turn ability effects (skip round 1)
   if (state.round > 1) {
-    const nextC = state.combatants[next];
-    if (nextC && nextC.type === 'pokemon' && hasAbility(nextC, 'Energy Intensive')) {
-      const drain = nextC.proficiency || 2;
-      nextC.currentVp = Math.max(0, nextC.currentVp - drain);
-      showToast(`${nextC.name}: Energy Intensive — −${drain} VP at start of turn`, 'warning');
+    if (currentC && currentC.type === 'pokemon' && hasAbility(currentC, 'Energy Intensive')) {
+      const drain = currentC.proficiency || 2;
+      currentC.currentVp = Math.max(0, currentC.currentVp - drain);
+      showToast(`${currentC.name}: Energy Intensive — −${drain} VP at end of turn`, 'warning');
     }
   }
 

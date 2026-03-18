@@ -1263,15 +1263,15 @@ async function handleFormSubmit(pokemonName, originalNature) {
     // Update session storage IMMEDIATELY
     sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
 
-    // Play level up sound if level changed
-    if (levelChanged) {
-      await audioManager.playSfxAndWait('LevelUp');
-    }
-
     // Navigate back to pokemon card
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'pokemon-card', pokemonName: pokemonName }
     }));
+
+    // Play level up sound after redirect (non-blocking)
+    if (levelChanged) {
+      audioManager.playSfxAndWait('LevelUp');
+    }
 
     // Update database in background (don't wait)
     PokemonAPI.update(pokemonData).catch(error => {

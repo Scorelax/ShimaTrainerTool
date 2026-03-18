@@ -182,7 +182,8 @@ function buildTrainerCombatant() {
     image: trainerData[0] || 'assets/Pokeball.png',
     level, initiativeScore: dexMod, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: dexMod,
     ac, baseAc, critMod: 0, maxHp, currentHp, maxVp, currentVp,
-    proficiency: computeProficiency(level),
+    proficiency: parseInt(trainerData[17]) || computeProficiency(level),
+    skills: trainerData[18] || '',
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
     moves: [], types: [], rechargeStates: {},
@@ -262,6 +263,7 @@ function buildPokemonCombatant(pokemonKey) {
     ac: parseInt(pokemonData[8]) || 10, baseAc: parseInt(pokemonData[8]) || 10, critMod: 0,
     maxHp, currentHp, maxVp, currentVp,
     proficiency, stabBonusValue: parseInt(pokemonData[34]) || 2,
+    skills: pokemonData[22] || '',
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
     moves, types: [pokemonData[5], pokemonData[6]].filter(Boolean),
@@ -750,6 +752,9 @@ function renderExpandedSection(c, statusBadges) {
   // --- Info section (pokemon only) ---
   const abilitiesHtml = renderAbilitiesForCombat(c.abilities);
   const itemHtml = renderItemForCombat(c.item);
+  const proficiencyDisplay = c.proficiency != null
+    ? `+${c.proficiency}${c.skills ? ' — ' + c.skills.split(',').map(s => s.trim()).filter(Boolean).join(', ') : ''}`
+    : null;
   const infoSection = c.type === 'pokemon' ? `
     <div class="expanded-info-section">
       <div class="expanded-section-label">Pokémon Info</div>
@@ -758,8 +763,15 @@ function renderExpandedSection(c, statusBadges) {
         ${itemHtml     ? `<div class="info-row"><span class="info-label">Item</span><div>${itemHtml}</div></div>` : ''}
         ${c.size       ? `<div class="info-row"><span class="info-label">Size</span><span>${c.size}</span></div>` : ''}
         ${c.movement   ? `<div class="info-row"><span class="info-label">Movement</span><span>${c.movement}</span></div>` : ''}
+        ${proficiencyDisplay ? `<div class="info-row"><span class="info-label">Proficiency</span><span>${proficiencyDisplay}</span></div>` : ''}
       </div>
-    </div>` : '';
+    </div>` : `
+    <div class="expanded-info-section">
+      <div class="expanded-section-label">Trainer Stats</div>
+      <div class="info-grid">
+        ${proficiencyDisplay ? `<div class="info-row"><span class="info-label">Proficiency</span><span>${proficiencyDisplay}</span></div>` : ''}
+      </div>
+    </div>`;
 
   // --- HP / VP adjusters ---
   const typeCalcBtn = c.type === 'pokemon'
@@ -2722,7 +2734,8 @@ function showTypeCalcPopup(combatantId, state) {
   document.getElementById('typeCalcRemoveBtn').onclick = () => {
     const hpAmt = parseInt(hpInput.value) || 0;
     const vpAmt = parseInt(vpInput.value) || 0;
-    const selectedType = popup.querySelector('.combat-type-button.selected')?.dataset.type;
+    const selectedBtn = popup.querySelector('.combat-type-button.selected');
+    const selectedType = selectedBtn?.dataset.type;
     const mult = selectedType ? (multMap[selectedType] ?? 1) : 1;
     const actualHp = Math.round(hpAmt * mult);
     if (actualHp > 0) c.currentHp = Math.max(0, c.currentHp - actualHp);
@@ -2733,6 +2746,12 @@ function showTypeCalcPopup(combatantId, state) {
         c.currentVp = Math.max(0, c.currentVp - actualHp);
         showToast(`${c.name}: Energy Intensive — Psychic hit drains an extra ${actualHp} VP!`, 'warning');
       }
+    }
+    // Deselect the type button after applying damage
+    if (selectedBtn) {
+      selectedBtn.classList.remove('selected');
+      resultEl.className = 'type-calc-result';
+      resultEl.textContent = '';
     }
     saveCombatState(state);
     rerenderBattle(state);

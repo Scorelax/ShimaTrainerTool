@@ -752,8 +752,19 @@ function renderExpandedSection(c, statusBadges) {
   // --- Info section (pokemon only) ---
   const abilitiesHtml = renderAbilitiesForCombat(c.abilities);
   const itemHtml = renderItemForCombat(c.item);
+  const SKILL_STAT = {
+    'Athletics': 'STR',
+    'Acrobatics': 'DEX', 'Sleight of Hand': 'DEX', 'Stealth': 'DEX',
+    'Arcana': 'INT', 'History': 'INT', 'Investigation': 'INT', 'Nature': 'INT', 'Religion': 'INT',
+    'Animal Handling': 'WIS', 'Insight': 'WIS', 'Medicine': 'WIS', 'Perception': 'WIS', 'Survival': 'WIS',
+    'Deception': 'CHA', 'Intimidation': 'CHA', 'Performance': 'CHA', 'Persuasion': 'CHA'
+  };
   const proficiencyDisplay = c.proficiency != null
-    ? `+${c.proficiency}${c.skills ? ' — ' + c.skills.split(',').map(s => s.trim()).filter(Boolean).join(', ') : ''}`
+    ? `+${c.proficiency}${c.skills ? ' — ' + c.skills.split(',').map(s => {
+        const skill = s.trim().replace(/\+$/, '');
+        const stat = SKILL_STAT[skill];
+        return stat ? `${skill} (${stat})` : skill;
+      }).filter(Boolean).join(', ') : ''}`
     : null;
   const infoSection = c.type === 'pokemon' ? `
     <div class="expanded-info-section">

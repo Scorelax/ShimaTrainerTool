@@ -516,6 +516,10 @@ function renderBattlePhase(state) {
           <div class="inventory-popup-content">
             <div class="inventory-sidebar">
               <h2 class="inventory-title">Inventory</h2>
+              <div class="inventory-search-wrapper">
+                <input type="text" id="combatInventorySearch" class="inventory-search-input" placeholder="Search items..." autocomplete="off">
+              </div>
+              <ul id="combatInventorySearchResults" class="inventory-search-results"></ul>
               <ul id="combatInventoryCategories" class="inventory-categories"></ul>
             </div>
             <div class="inventory-main">
@@ -1131,6 +1135,12 @@ function getCombatCSS() {
     .inventory-list-item { padding: clamp(0.5rem,1.5vh,0.75rem) clamp(1.2rem,3vw,1.8rem); cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; color: #ddd; font-size: clamp(0.78rem,1.8vw,0.9rem); }
     .inventory-list-item:hover { background: #3a3a3a; border-left-color: #EE1515; color: #fff; }
     .inventory-list-item.selected { background: #EE1515; color: #fff; border-left-color: #fff; font-weight: 700; }
+    .inventory-search-wrapper { padding: 0.6rem 0.8rem; }
+    .inventory-search-input { width: 100%; padding: 0.45rem 0.7rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 0.88rem; box-sizing: border-box; outline: none; }
+    .inventory-search-input:focus { border-color: #EE1515; }
+    .inventory-search-results { list-style: none; padding: 0; margin: 0; overflow-y: auto; display: none; }
+    .inventory-search-results.active { display: block; }
+    .inventory-search-no-results { padding: 0.75rem 1rem; color: #999; font-size: 0.88rem; text-align: center; }
     .inventory-main { flex: 1; display: flex; flex-direction: column; padding: clamp(1rem,2.5vw,1.5rem); background: linear-gradient(135deg,#2a2a2a,#1f1f1f); overflow: hidden; }
     .item-info-card { flex: 1; display: flex; flex-direction: column; background: linear-gradient(135deg,#353535,#2d2d2d); border-radius: 12px; padding: clamp(1rem,2vw,1.5rem); box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-bottom: 1rem; overflow-y: auto; border: 2px solid rgba(255,222,0,0.3); }
     .item-name { font-size: clamp(1.2rem,3vw,1.8rem); color: #FFDE00; margin: 0 0 0.75rem 0; padding-bottom: 0.75rem; border-bottom: 2px solid rgba(255,222,0,0.3); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
@@ -2712,14 +2722,16 @@ function showTypeCalcPopup(combatantId, state) {
   document.getElementById('typeCalcRemoveBtn').onclick = () => {
     const hpAmt = parseInt(hpInput.value) || 0;
     const vpAmt = parseInt(vpInput.value) || 0;
-    if (hpAmt > 0) c.currentHp = Math.max(0, c.currentHp - hpAmt);
+    const selectedType = popup.querySelector('.combat-type-button.selected')?.dataset.type;
+    const mult = selectedType ? (multMap[selectedType] ?? 1) : 1;
+    const actualHp = Math.round(hpAmt * mult);
+    if (actualHp > 0) c.currentHp = Math.max(0, c.currentHp - actualHp);
     if (vpAmt > 0) c.currentVp = Math.max(0, c.currentVp - vpAmt);
     // Energy Intensive: Psychic damage also drains VP equal to HP taken
-    if (hpAmt > 0 && hasAbility(c, 'Energy Intensive')) {
-      const selectedType = popup.querySelector('.combat-type-button.selected')?.dataset.type;
+    if (actualHp > 0 && hasAbility(c, 'Energy Intensive')) {
       if (selectedType === 'Psychic') {
-        c.currentVp = Math.max(0, c.currentVp - hpAmt);
-        showToast(`${c.name}: Energy Intensive — Psychic hit drains an extra ${hpAmt} VP!`, 'warning');
+        c.currentVp = Math.max(0, c.currentVp - actualHp);
+        showToast(`${c.name}: Energy Intensive — Psychic hit drains an extra ${actualHp} VP!`, 'warning');
       }
     }
     saveCombatState(state);
@@ -2799,6 +2811,50 @@ function showCombatInventoryPopup() {
   categoriesEl.innerHTML = html;
 
   const allItems = Object.values(groupedItems).flat();
+
+  // Search
+  const searchInput = document.getElementById('combatInventorySearch');
+  const searchResults = document.getElementById('combatInventorySearchResults');
+  if (searchInput && searchResults) {
+    const normalize = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const applySearch = (query) => {
+      const q = normalize(query.trim());
+      if (!q) {
+        searchResults.classList.remove('active');
+        searchResults.innerHTML = '';
+        categoriesEl.style.display = '';
+        return;
+      }
+      categoriesEl.style.display = 'none';
+      const matches = allItems.filter(item => normalize(item.name).includes(q));
+      if (!matches.length) {
+        searchResults.innerHTML = '<li class="inventory-search-no-results">No items found</li>';
+      } else {
+        searchResults.innerHTML = matches.map(item =>
+          `<li class="inventory-list-item" data-item-name="${item.name}">${item.name} (x${item.qty})</li>`
+        ).join('');
+        searchResults.querySelectorAll('.inventory-list-item').forEach(el => {
+          el.addEventListener('click', () => {
+            searchResults.querySelectorAll('.inventory-list-item').forEach(x => x.classList.remove('selected'));
+            el.classList.add('selected');
+            _combatSelectedItem = allItems.find(i => i.name === el.dataset.itemName) || null;
+            if (_combatSelectedItem && nameEl && descEl && effEl) {
+              nameEl.textContent = `${_combatSelectedItem.name} (x${_combatSelectedItem.qty})`;
+              descEl.textContent = _combatSelectedItem.description || 'No description available.';
+              effEl.textContent = _combatSelectedItem.effect || 'No effect description.';
+              populateCombatItemActionArea(_combatSelectedItem);
+            }
+          });
+        });
+      }
+      searchResults.classList.add('active');
+    };
+    const freshSearch = searchInput.cloneNode(true);
+    searchInput.parentNode.replaceChild(freshSearch, searchInput);
+    freshSearch.value = '';
+    freshSearch.addEventListener('input', e => applySearch(e.target.value));
+    applySearch('');
+  }
 
   categoriesEl.querySelectorAll('.category-header').forEach(header => {
     header.addEventListener('click', () => {

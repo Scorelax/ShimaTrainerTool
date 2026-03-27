@@ -717,7 +717,8 @@ async function selectEvolution(pokemon, listItem) {
   listItem.classList.add('selected');
 
   // Display details and resolve image URL
-  const imageUrl = pokemon[0] || await resolveImageUrl(pokemon[1], pokemon[2]);
+  const isShiny = currentPokemon ? currentPokemon[61] : '';
+  const imageUrl = pokemon[0] || await resolveImageUrl(pokemon[1], pokemon[2], isShiny);
 
   // Store resolved image URL back into selectedPokemon for later use
   if (!pokemon[0]) {
@@ -739,7 +740,7 @@ async function selectEvolution(pokemon, listItem) {
   document.getElementById('pokemonDetails').classList.add('visible');
 }
 
-async function resolveImageUrl(pokemonName, pokemonId) {
+async function resolveImageUrl(pokemonName, pokemonId, isShiny) {
   const paddedId = pokemonId.toString().padStart(3, '0');
   const sanitizedName = pokemonName.toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -748,6 +749,15 @@ async function resolveImageUrl(pokemonName, pokemonId) {
 
   const formats = ['png', 'jpg', 'jpeg', 'jfif'];
   const baseUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/';
+
+  if (isShiny === 'Y') {
+    for (const format of formats) {
+      const url = `${baseUrl}${baseFileName}-shiny.${format}`;
+      if (await imageExists(url)) {
+        return url;
+      }
+    }
+  }
 
   for (const format of formats) {
     const url = `${baseUrl}${baseFileName}.${format}`;
@@ -1146,6 +1156,7 @@ async function confirmEvolution() {
       currentPokemon[58] || '',    // 58: Cry (carry over if set)
       '',                          // 59: KnownMoves (reset on evolution)
       '',                          // 60: StatusCondition (reset on evolution)
+      currentPokemon[61] || '',    // 61: Shiny (carry over from pre-evolved)
     ];
 
     // Log what we're sending to the server

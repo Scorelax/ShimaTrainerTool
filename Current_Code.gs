@@ -133,7 +133,8 @@ const POKEMON_COLUMN_INDICES = {
   size: 57,
   cry: 58,
   knownmoves: 59,
-  statuscondition: 60
+  statuscondition: 60,
+  shiny: 61
 };
 const REGISTERED_POKEMON_COLUMN_INDICES = {
   trainername: 0,
@@ -196,7 +197,8 @@ const REGISTERED_POKEMON_COLUMN_INDICES = {
   size: 57,
   cry: 58,
   knownmoves: 59,
-  statuscondition: 60
+  statuscondition: 60,
+  shiny: 61
 };
 
 // ------------------------------------------------------------------Import Pokémon information Start--------------------------------------------------
@@ -2936,7 +2938,8 @@ function formatPokemonData(row) {
     movementData,   // Movement data
     sensesData,     // Sense data
     row[6],         // Flavor text
-    row[9]          // Size (NEW)
+    row[9],         // Size
+    row[61]         // Shiny (NEW)
   ];
 }
 
@@ -3023,7 +3026,8 @@ function getRegisteredPokemonList() {
           movementData, // 31: Movement Data
           sensesData,   // 32: Senses Data
           row[6],       // 33: Flavor text
-          row[9]        // 34: Size (NEW)
+          row[9],       // 34: Size
+          row[61]       // 35: Shiny (NEW)
         ];
       })
       .sort((a, b) => a[2] - b[2]); // Sort by dex entry

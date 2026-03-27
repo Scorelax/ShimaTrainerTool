@@ -340,6 +340,11 @@ export function renderPokemonForm() {
             <input type="text" id="nickname" name="nickname" />
           </div>
 
+          <div class="checkbox-item">
+            <input type="checkbox" id="shiny" name="shiny" />
+            <label for="shiny">Shiny</label>
+          </div>
+
           <!-- Buttons -->
           <div class="button-group">
             <button type="submit" class="button button-primary">Register Pokémon</button>
@@ -486,6 +491,7 @@ async function handleFormSubmit() {
     let loyalty = parseInt(form.loyalty.value);
     const heldItem = form.heldItem.value;
     const nickname = form.nickname.value;
+    const shiny = form.shiny.checked;
 
     // Get selected abilities and format them
     const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
@@ -674,6 +680,7 @@ async function handleFormSubmit() {
       '',                          // 58: Cry
       '',                          // 59: KnownMoves
       '',                          // 60: StatusCondition
+      shiny ? 'Y' : '',            // 61: Shiny
     ];
 
     console.log('[Pokemon Form] newPokemonData array:');
@@ -695,11 +702,6 @@ async function handleFormSubmit() {
       console.log('[Pokemon Form] - Index 7 (Abilities):', finalPokemonData[7]);
 
       sessionStorage.setItem(`pokemon_${selectedPokemonData[1].toLowerCase()}`, JSON.stringify(finalPokemonData));
-
-      // Update complete Pokemon data
-      const completePokemonData = JSON.parse(sessionStorage.getItem('completePokemonData') || '[]');
-      completePokemonData.push(finalPokemonData);
-      sessionStorage.setItem('completePokemonData', JSON.stringify(completePokemonData));
 
       // Show success message (keep loading screen visible)
       showSuccess(`${trainerData[1]} caught a ${selectedPokemonData[1]}!`);

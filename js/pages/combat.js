@@ -588,6 +588,19 @@ function renderBattlePhase(state) {
         </div>
       </div>
 
+      <!-- Dice Recharge Confirmation Popup -->
+      <div class="combat-popup-overlay" id="diceRechargePopup" style="display:none;">
+        <div class="combat-popup-content" style="max-width:360px;padding:2rem;text-align:center;">
+          <h3 id="diceRechargeMoveName" style="margin:0 0 0.6rem;color:#FFD700;font-size:1.1rem;"></h3>
+          <p id="diceRechargeCriteria" style="margin:0 0 1.6rem;color:#aaa;font-size:0.95rem;"></p>
+          <p style="margin:0 0 1.6rem;color:#e0e0e0;font-size:1rem;font-weight:600;">Move successfully recharged?</p>
+          <div style="display:flex;gap:0.8rem;justify-content:center;">
+            <button id="diceRechargeNo" class="combat-global-modal-btn gcm-cancel" style="min-width:80px;">No</button>
+            <button id="diceRechargeYes" class="combat-global-modal-btn gcm-set" style="min-width:80px;">Yes</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Type Calculator Popup -->
       <div class="popup-overlay" id="combatTypeCalcPopup" style="display:none;">
         <div class="popup-content" style="max-width:min(92vw,460px)">
@@ -891,18 +904,14 @@ function renderExpandedSection(c, statusBadges) {
             if (isDice) chargeText = isLocked ? ' (spent)' : ` (${rs.range})`;
             else chargeText = ` (${rs.chargesLeft}/${rs.maxCharges} ${rs.type})`;
           }
-          const lockTitle = isLocked
-            ? (isDice ? `Roll d6 — recharges on ${rs.range}` : `Recharges after ${rs.type === 'SR' ? 'Short' : 'Long'} Rest`)
-            : moveName;
-          const rollBtn = isDice && isLocked
-            ? `<button class="combat-dice-recharge-btn" data-move="${moveName}" data-combatant-id="${c.id}" title="Roll d6 to recharge">🎲 Roll</button>`
-            : '';
+          const isDiceLocked = isDice && isLocked;
           return `<div class="combat-move-row">
-            <button class="combat-move-item ${isLocked ? 'move-locked' : ''}"
+            <button class="combat-move-item ${isLocked ? 'move-locked' : ''} ${isDiceLocked ? 'move-dice-locked' : ''}"
               data-move="${moveName}" data-combatant-id="${c.id}"
-              ${isLocked ? 'disabled' : ''}
-              title="${lockTitle}"
-            >${moveName}${chargeText}</button>${rollBtn}</div>`;
+              data-is-dice-locked="${isDiceLocked ? 'true' : ''}"
+              data-recharge-range="${isDice ? (rs.range || '') : ''}"
+              ${isLocked && !isDice ? 'disabled' : ''}
+            >${moveName}${chargeText}</button></div>`;
         }).join('')}
       </div>
     </div>` : '';
@@ -1092,8 +1101,8 @@ function getCombatCSS() {
     .combat-move-item { padding: 0.3rem 0.7rem; border-radius: 14px; border: none; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: transform 0.1s; background: #888; color: #fff; }
     .combat-move-item:active { transform: scale(0.95); }
     .combat-move-item.move-locked { opacity: 0.4; cursor: not-allowed; background: #555 !important; color: #999 !important; }
-    .combat-dice-recharge-btn { padding: 0.25rem 0.5rem; border-radius: 10px; border: 1px solid rgba(255,165,0,0.6); background: rgba(255,165,0,0.15); color: #FFA500; font-size: 0.74rem; font-weight: 700; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
-    .combat-dice-recharge-btn:hover { background: rgba(255,165,0,0.35); }
+    .combat-move-item.move-dice-locked { opacity: 0.7; cursor: pointer; background: rgba(255,165,0,0.15) !important; color: #FFA500 !important; border: 1px solid rgba(255,165,0,0.5) !important; }
+    .combat-move-item.move-dice-locked:active { transform: scale(0.95); }
 
     /* MOVE POPUP */
     .combat-popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
@@ -1574,12 +1583,11 @@ function attachBattleListeners(state) {
       if (e.target.closest('.combat-switch-open-btn')) {
         showSwitchPopup(state); return;
       }
-      const diceRechargeBtn = e.target.closest('.combat-dice-recharge-btn');
-      if (diceRechargeBtn) {
-        rollDiceRecharge(diceRechargeBtn.dataset.move, diceRechargeBtn.dataset.combatantId, state); return;
-      }
       const moveItem = e.target.closest('.combat-move-item');
       if (moveItem && !moveItem.disabled) {
+        if (moveItem.dataset.isDiceLocked === 'true') {
+          showDiceRechargePopup(moveItem.dataset.move, moveItem.dataset.combatantId, moveItem.dataset.rechargeRange, state); return;
+        }
         showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state); return;
       }
       // Toggle expand on card click (not on controls)
@@ -1682,20 +1690,29 @@ function rerenderBattle(state) {
   applyMoveColors();
 }
 
-function rollDiceRecharge(moveName, combatantId, state) {
-  const c = state.combatants.find(x => x.id === combatantId);
-  if (!c || !c.rechargeStates || !c.rechargeStates[moveName]) return;
-  const rs = c.rechargeStates[moveName];
-  const roll = Math.floor(Math.random() * 6) + 1;
-  const [low, high] = rs.range.split('-').map(Number);
-  if (roll >= low && roll <= high) {
-    rs.chargesLeft = 1;
-    saveCombatState(state);
-    rerenderBattle(state);
-    showToast(`Rolled ${roll} — ${moveName} recharged!`, 'success');
-  } else {
-    showToast(`Rolled ${roll} — ${moveName} did not recharge (needs ${rs.range}).`, 'warning');
-  }
+function showDiceRechargePopup(moveName, combatantId, range, state) {
+  const popup = document.getElementById('diceRechargePopup');
+  if (!popup) return;
+  document.getElementById('diceRechargeMoveName').textContent = moveName;
+  document.getElementById('diceRechargeCriteria').textContent = `Recharges on ${range} (roll a d6)`;
+  popup.style.display = 'flex';
+
+  const yesBtn = document.getElementById('diceRechargeYes');
+  const noBtn = document.getElementById('diceRechargeNo');
+
+  const close = () => { popup.style.display = 'none'; };
+
+  yesBtn.onclick = () => {
+    const c = state.combatants.find(x => x.id === combatantId);
+    if (c && c.rechargeStates && c.rechargeStates[moveName]) {
+      c.rechargeStates[moveName].chargesLeft = 1;
+      saveCombatState(state);
+      rerenderBattle(state);
+      showToast(`${moveName} recharged!`, 'success');
+    }
+    close();
+  };
+  noBtn.onclick = close;
 }
 
 // ============================================================================

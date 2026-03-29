@@ -617,10 +617,16 @@ async function handleFormSubmit() {
     // Extract Size from selectedPokemonData (index 34 - at end of array from code.gs)
     const pokemonSize = selectedPokemonData[34] || '';
 
+    // Resolve shiny image URL if needed
+    const baseImageUrl = selectedPokemonData[0] || '';
+    const pokemonImageUrl = shiny && baseImageUrl && baseImageUrl !== 'assets/Pokeball.png'
+      ? baseImageUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1')
+      : baseImageUrl;
+
     // Build new Pokemon data array matching exact database schema
     const newPokemonData = [
       trainerData[1],              // 0: Trainer Name
-      selectedPokemonData[0],      // 1: Image
+      pokemonImageUrl,             // 1: Image
       selectedPokemonData[1],      // 2: Name
       selectedPokemonData[2],      // 3: Dex Entry
       level,                       // 4: Level

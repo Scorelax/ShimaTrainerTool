@@ -1,5 +1,5 @@
 // Service Worker for Pokemon D&D Trainer Tool
-const CACHE_NAME = 'pokemon-dnd-v54';
+const CACHE_NAME = 'pokemon-dnd-v55';
 
 // Files to cache for offline use (relative paths for subdirectory hosting)
 const STATIC_ASSETS = [
@@ -8,6 +8,25 @@ const STATIC_ASSETS = [
   './css/styles.css',
   './js/main.js',
   './js/api.js',
+  './js/pages/new-journey.js',
+  './js/pages/new-pokemon.js',
+  './js/pages/trainer-card.js',
+  './js/pages/index.js',
+  './js/pages/my-pokemon.js',
+  './js/pages/continue-journey.js',
+  './js/pages/trainer-info.js',
+  './js/pages/edit-pokemon.js',
+  './js/pages/pokemon-card.js',
+  './js/pages/evolution.js',
+  './js/pages/combat.js',
+  './js/pages/pokemon-form.js',
+  './js/pages/edit-trainer.js',
+  './js/utils/audio.js',
+  './js/utils/splash.js',
+  './js/utils/visibility.js',
+  './js/utils/notifications.js',
+  './js/utils/pokemon-types.js',
+  './js/utils/move-popup.js',
   './assets/Pokeball.png',
   './assets/Grey Pokeball.png',
   './assets/pokecenter.png',

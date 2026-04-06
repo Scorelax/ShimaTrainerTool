@@ -867,11 +867,7 @@ async function handleFormSubmit() {
     const newMaxHP = hd + (level * ((hd / 2) + 1 + conModifier));
     const newMaxVP = Math.floor(vd + level * ((vd / 2) + 2) + Math.floor((totalStats - 30) / 2));
 
-    console.log(`[HP/VP] hd=${hd} vd=${vd} level=${level} con=${con} conMod=${conModifier} totalStats=${totalStats}`);
-    console.log(`[HP/VP] raw[11]=${trainerData[11]} raw[12]=${trainerData[12]} raw[34]=${trainerData[34]} raw[35]=${trainerData[35]}`);
-    console.log(`[HP/VP] newMaxHP=${newMaxHP} newMaxVP=${newMaxVP}`);
-
-    const oldMaxHP = parseInt(trainerData[11]) || newMaxHP;
+const oldMaxHP = parseInt(trainerData[11]) || newMaxHP;
     const oldMaxVP = parseInt(trainerData[12]) || newMaxVP;
     const hpDiff = newMaxHP - oldMaxHP;
     const vpDiff = newMaxVP - oldMaxVP;

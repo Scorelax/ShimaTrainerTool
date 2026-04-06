@@ -859,6 +859,30 @@ async function handleFormSubmit() {
       console.log(`Tactician TP updated: ${oldTP} -> ${newTP} (level ${originalLevel} -> ${level})`);
     }
 
+    // Recalculate max HP and VP based on updated stats/level
+    const hd = parseInt(trainerData[3]) || 8;
+    const vd = parseInt(trainerData[4]) || 6;
+    const conModifier = (con - 10) < 0 ? Math.ceil((con - 10) / 2) : Math.floor((con - 10) / 2);
+    const totalStats = str + dex + con + int + wis + cha;
+    const newMaxHP = hd + (level * ((hd / 2) + 1 + conModifier));
+    const newMaxVP = Math.floor(vd + level * ((vd / 2) + 2) + Math.floor((totalStats - 30) / 2));
+
+    const oldMaxHP = parseInt(trainerData[11]) || newMaxHP;
+    const oldMaxVP = parseInt(trainerData[12]) || newMaxVP;
+    const hpDiff = newMaxHP - oldMaxHP;
+    const vpDiff = newMaxVP - oldMaxVP;
+
+    trainerData[11] = newMaxHP;
+    trainerData[12] = newMaxVP;
+
+    // Adjust current HP/VP by the same delta, capped at new max
+    const oldCurrentHP = (trainerData[34] !== '' && trainerData[34] !== undefined && trainerData[34] !== null)
+      ? parseInt(trainerData[34]) : oldMaxHP;
+    const oldCurrentVP = (trainerData[35] !== '' && trainerData[35] !== undefined && trainerData[35] !== null)
+      ? parseInt(trainerData[35]) : oldMaxVP;
+    trainerData[34] = Math.min(newMaxHP, Math.max(0, oldCurrentHP + hpDiff));
+    trainerData[35] = Math.min(newMaxVP, Math.max(0, oldCurrentVP + vpDiff));
+
     // Hide loading before feat choice popups
     hideLoading();
 

@@ -3,6 +3,7 @@
 import { TrainerAPI } from '../api.js';
 import { showToast, showSuccess, showError } from '../utils/notifications.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
+import { audioManager } from '../utils/audio.js';
 
 export function renderEditTrainer() {
   // Load trainer data from session storage

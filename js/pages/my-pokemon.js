@@ -1341,8 +1341,15 @@ async function _togglePartySlot(checkbox, isChecked, pokemonName, pokemonKey, po
   }
 
   const originalSlot = pokemonData[38];
-  // Only update pokemonData[38] — party slot names live in pokemon data, not trainerData
-  pokemonData[38] = isChecked ? '1' : ''; // server will correct the slot number on success
+  // Assign the next available slot optimistically so rapid multi-selects don't collide on slot 1
+  let optimisticSlot = '1';
+  if (isChecked) {
+    const usedSlots = new Set(pokemonFullData.filter(d => d[38]).map(d => String(d[38])));
+    for (let i = 1; i <= numPokeSlots; i++) {
+      if (!usedSlots.has(String(i))) { optimisticSlot = String(i); break; }
+    }
+  }
+  pokemonData[38] = isChecked ? optimisticSlot : '';
   sessionStorage.setItem(pokemonKey, JSON.stringify(pokemonData));
 
   const entry = pokemonFullData.find(d => d[2] === pokemonName);

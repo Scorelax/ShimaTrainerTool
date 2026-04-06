@@ -2147,6 +2147,9 @@ function showCombatMoveDetails(moveName, combatantId, state) {
       }).join('')
     : '';
 
+  const _rechargeInfo = c.rechargeStates?.[moveName];
+  const chargesLeft = _rechargeInfo !== undefined ? _rechargeInfo.chargesLeft : undefined;
+
   showMovePopup({
     move,
     computedData,
@@ -2154,6 +2157,7 @@ function showCombatMoveDetails(moveName, combatantId, state) {
     size: c.size,
     critMod: c.critMod,
     trainerData,
+    chargesLeft,
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;

@@ -26,6 +26,7 @@ function _injectStyles() {
     .combat-roll-bonus { font-size: 1.15em; font-weight: bold; }
     .combat-roll-breakdown { font-size: 0.75em; opacity: 0.8; margin-top: 0.2rem; }
     .combat-use-move-btn { width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    .combat-use-move-btn:disabled { opacity: 0.45; cursor: not-allowed; background: linear-gradient(135deg, #888, #666); }
     .combat-move-held-items { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 0.7rem; font-size: 0.88rem; line-height: 1.5; margin-bottom: 0.6rem; }
     .battle-dice-container, .tactician-container, .commander-container { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 0.7rem; margin-bottom: 0.6rem; font-size: 0.88rem; }
     .tactician-ability, .commander-ability { padding: 0.35rem 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 0.3rem; }
@@ -419,7 +420,7 @@ function _renderCommander(trainerData) {
  * @param {function} [params.onUseMove]    - Callback(moveName, vpCost) for platform-specific VP deduction
  * @param {function} [params.onDrainHeal] - Callback() invoked when move matches the drain heal pattern
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, chargesLeft }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -510,6 +511,15 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   if (useBtn) {
     useBtn.dataset.moveName = move[0];
     useBtn.dataset.vpCost = move[4] || 0;
+    const isSpent = chargesLeft !== undefined && chargesLeft === 0;
+    useBtn.disabled = isSpent;
+    if (isSpent) {
+      const actionText = (move[3] || '').toLowerCase();
+      const restType = actionText.includes('long rest') ? 'Long Rest' : 'Short Rest';
+      useBtn.textContent = `No charges remaining — recharges on ${restType}`;
+    } else {
+      useBtn.textContent = 'Use Move';
+    }
   }
 
   popup.style.display = 'flex';

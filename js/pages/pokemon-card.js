@@ -4748,6 +4748,16 @@ function showMoveDetails(moveName) {
     const hasBrawny = (pokemonData[50] || '').split(',').map(f => f.trim()).some(f => f === 'Brawny');
     const sizeText = (pokemonData[57] || 'Unknown') + (hasBrawny ? ' ✦' : '');
 
+    // Get chargesLeft for this move from KnownMoves string (pokemonData[59])
+    let chargesLeft;
+    const _knownMovesStr = pokemonData[59] || '';
+    if (_knownMovesStr) {
+      for (const _entry of _knownMovesStr.split(',').map(e => e.trim())) {
+        const _km = _entry.match(/^(.+?)\((\d+)\)\((SR|LR|DICE)\)$/);
+        if (_km && _km[1].trim() === move[0]) { chargesLeft = parseInt(_km[2]); break; }
+      }
+    }
+
     showMovePopup({
       move,
       computedData: {
@@ -4762,6 +4772,7 @@ function showMoveDetails(moveName) {
       size: sizeText,
       critMod: 0,
       trainerData,
+      chargesLeft,
       onUseMove: (usedMoveName, vpCost) => {
         const currentVpText = document.getElementById('combatCurrentVP')?.textContent || '0 / 0';
         const currentHpText = document.getElementById('combatCurrentHP')?.textContent || '0 / 0';
@@ -4788,6 +4799,24 @@ function showMoveDetails(moveName) {
 
         pokemonData[46] = newVp;
         pokemonData[45] = newHp;
+
+        // Decrement charge for recharge moves (SR/LR/DICE)
+        const _currentKnownMoves = pokemonData[59] || '';
+        if (_currentKnownMoves) {
+          let _chargeChanged = false;
+          pokemonData[59] = _currentKnownMoves.split(',').map(e => {
+            const _km = e.trim().match(/^(.+?)\((\d+)\)\((SR|LR|DICE)\)$/);
+            if (_km && _km[1].trim() === usedMoveName && parseInt(_km[2]) > 0) {
+              _chargeChanged = true;
+              return `${_km[1]}(${parseInt(_km[2]) - 1})(${_km[3]})`;
+            }
+            return e.trim();
+          }).filter(Boolean).join(',');
+          if (_chargeChanged) {
+            PokemonAPI.update(pokemonData).catch(e => console.error('Error saving move charges:', e));
+          }
+        }
+
         sessionStorage.setItem(`pokemon_${pokemonData[2].toLowerCase()}`, JSON.stringify(pokemonData));
 
         PokemonAPI.updateLiveStats(trainerData[1], pokemonData[2], 'VP', newVp)

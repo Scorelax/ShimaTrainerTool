@@ -474,7 +474,6 @@ async function handleFormSubmit() {
   const form = document.getElementById('pokemonForm');
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
   const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
-  const natures = JSON.parse(sessionStorage.getItem('natures') || '[]');
 
   if (!trainerData || !selectedPokemonData) {
     showError('Missing trainer or Pokemon data');
@@ -523,25 +522,8 @@ async function handleFormSubmit() {
     // NOW show loading (after we've captured all the data)
     document.getElementById('content').innerHTML = '<div class="loading">Registering Pokemon...</div>';
 
-    // Apply nature modifiers to stats
-    const natureData = natures.find(n => n.name === nature);
-    let modifiedPokemonData = [...selectedPokemonData];
-
-    if (natureData) {
-      const boostStat = natureData.boostStat?.toLowerCase();
-      const nerfStat = natureData.nerfStat?.toLowerCase();
-      const boostAmount = parseInt(natureData.boostAmount) || 0;
-      const nerfAmount = parseInt(natureData.nerfAmount) || 0;
-
-      if (boostStat) {
-        const statIndex = 16 + getStatIndex(boostStat);
-        modifiedPokemonData[statIndex] = (modifiedPokemonData[statIndex] || 0) + boostAmount;
-      }
-      if (nerfStat) {
-        const statIndex = 16 + getStatIndex(nerfStat);
-        modifiedPokemonData[statIndex] = (modifiedPokemonData[statIndex] || 0) - nerfAmount;
-      }
-    }
+    // Nature adjustments are applied by the backend in registerPokemonForTrainer
+    const modifiedPokemonData = [...selectedPokemonData];
 
     // Apply Ace Trainer Max Potential bonus (Level 9)
     const trainerPath = trainerData[25] || '';

@@ -513,16 +513,55 @@ function registerPokemonForTrainer(trainerName, newPokemonData) {
     const level = parseInt(newPokemonData[4], 10);   // Level
     const hd = parseInt(newPokemonData[9], 10);      // Hit Dice
     const vd = parseInt(newPokemonData[11], 10);     // Vitality Dice
-    const str = parseInt(newPokemonData[15], 10);    // Strength
-    const dex = parseInt(newPokemonData[16], 10);    // Dexterity
-    const con = parseInt(newPokemonData[17], 10);    // Constitution
-    const int = parseInt(newPokemonData[18], 10);    // Intelligence
-    const wis = parseInt(newPokemonData[19], 10);    // Wisdom
-    const cha = parseInt(newPokemonData[20], 10);    // Charisma
+    let str = parseInt(newPokemonData[15], 10);      // Strength
+    let dex = parseInt(newPokemonData[16], 10);      // Dexterity
+    let con = parseInt(newPokemonData[17], 10);      // Constitution
+    let int = parseInt(newPokemonData[18], 10);      // Intelligence
+    let wis = parseInt(newPokemonData[19], 10);      // Wisdom
+    let cha = parseInt(newPokemonData[20], 10);      // Charisma
     const loyalty = parseInt(newPokemonData[33], 10) || 0;  // Loyalty
 
     Logger.log('Parsed values — Level: ' + level + ', HD: ' + hd + ', VD: ' + vd);
-    Logger.log('Parsed stats — STR: ' + str + ', DEX: ' + dex + ', CON: ' + con + ', INT: ' + int + ', WIS: ' + wis + ', CHA: ' + cha + ', Loyalty: ' + loyalty);
+    Logger.log('Parsed stats (before nature) — STR: ' + str + ', DEX: ' + dex + ', CON: ' + con + ', INT: ' + int + ', WIS: ' + wis + ', CHA: ' + cha + ', Loyalty: ' + loyalty);
+
+    // Apply nature stat adjustments
+    const natureName = newPokemonData[32] || '';
+    if (natureName) {
+        const statMap = { strength: 'str', dexterity: 'dex', constitution: 'con', intelligence: 'int', wisdom: 'wis', charisma: 'cha' };
+        const natures = getNatureData();
+        const nature = natures.find(n => n.name.toLowerCase() === natureName.toLowerCase());
+        if (nature) {
+            const boostKey = statMap[nature.boostStat.toLowerCase()];
+            const nerfKey  = statMap[nature.nerfStat.toLowerCase()];
+            if (boostKey === 'str') str += parseInt(nature.boostAmount, 10);
+            else if (boostKey === 'dex') dex += parseInt(nature.boostAmount, 10);
+            else if (boostKey === 'con') con += parseInt(nature.boostAmount, 10);
+            else if (boostKey === 'int') int += parseInt(nature.boostAmount, 10);
+            else if (boostKey === 'wis') wis += parseInt(nature.boostAmount, 10);
+            else if (boostKey === 'cha') cha += parseInt(nature.boostAmount, 10);
+            if (nerfKey === 'str') str -= parseInt(nature.nerfAmount, 10);
+            else if (nerfKey === 'dex') dex -= parseInt(nature.nerfAmount, 10);
+            else if (nerfKey === 'con') con -= parseInt(nature.nerfAmount, 10);
+            else if (nerfKey === 'int') int -= parseInt(nature.nerfAmount, 10);
+            else if (nerfKey === 'wis') wis -= parseInt(nature.nerfAmount, 10);
+            else if (nerfKey === 'cha') cha -= parseInt(nature.nerfAmount, 10);
+            Logger.log('Nature applied: ' + natureName + ' (boost ' + nature.boostStat + ' +' + nature.boostAmount + ', nerf ' + nature.nerfStat + ' -' + nature.nerfAmount + ')');
+        } else {
+            Logger.log('Nature not found in sheet: ' + natureName);
+        }
+    } else {
+        Logger.log('No nature set.');
+    }
+
+    Logger.log('Parsed stats (after nature) — STR: ' + str + ', DEX: ' + dex + ', CON: ' + con + ', INT: ' + int + ', WIS: ' + wis + ', CHA: ' + cha);
+
+    // Write nature-adjusted stats back so modifiers and HP/VP use the correct values
+    newPokemonData[15] = str;
+    newPokemonData[16] = dex;
+    newPokemonData[17] = con;
+    newPokemonData[18] = int;
+    newPokemonData[19] = wis;
+    newPokemonData[20] = cha;
 
     // Calculate HP/VP
     const { hp, vp } = calculateHpVp(str, dex, con, int, wis, cha, level, hd, vd, loyalty);

@@ -496,8 +496,20 @@ function getPokemonListByTrainer(trainerName) {
 // ------------------------------------------------------------------Write Pokémon to Google Sheet Start-----------------------------------------------
 // Function to register the Pokémon for the trainer with additional data
 function registerPokemonForTrainer(trainerName, newPokemonData) {
-    // Calculate HP and VP before saving
-    // Use exact indices matching database schema (single ability at index 7)
+    Logger.log('=== registerPokemonForTrainer START ===');
+    Logger.log('Trainer: ' + trainerName);
+    Logger.log('Pokemon name (index 2): ' + newPokemonData[2]);
+    Logger.log('Raw index 4 (Level): ' + newPokemonData[4]);
+    Logger.log('Raw index 9 (Hit Dice): ' + newPokemonData[9]);
+    Logger.log('Raw index 11 (Vitality Dice): ' + newPokemonData[11]);
+    Logger.log('Raw index 15 (STR): ' + newPokemonData[15]);
+    Logger.log('Raw index 16 (DEX): ' + newPokemonData[16]);
+    Logger.log('Raw index 17 (CON): ' + newPokemonData[17]);
+    Logger.log('Raw index 18 (INT): ' + newPokemonData[18]);
+    Logger.log('Raw index 19 (WIS): ' + newPokemonData[19]);
+    Logger.log('Raw index 20 (CHA): ' + newPokemonData[20]);
+    Logger.log('Raw index 33 (Loyalty): ' + newPokemonData[33]);
+
     const level = parseInt(newPokemonData[4], 10);   // Level
     const hd = parseInt(newPokemonData[9], 10);      // Hit Dice
     const vd = parseInt(newPokemonData[11], 10);     // Vitality Dice
@@ -509,8 +521,12 @@ function registerPokemonForTrainer(trainerName, newPokemonData) {
     const cha = parseInt(newPokemonData[20], 10);    // Charisma
     const loyalty = parseInt(newPokemonData[33], 10) || 0;  // Loyalty
 
+    Logger.log('Parsed values — Level: ' + level + ', HD: ' + hd + ', VD: ' + vd);
+    Logger.log('Parsed stats — STR: ' + str + ', DEX: ' + dex + ', CON: ' + con + ', INT: ' + int + ', WIS: ' + wis + ', CHA: ' + cha + ', Loyalty: ' + loyalty);
+
     // Calculate HP/VP
     const { hp, vp } = calculateHpVp(str, dex, con, int, wis, cha, level, hd, vd, loyalty);
+    Logger.log('Calculated HP: ' + hp + ', VP: ' + vp);
 
     // Calculate modifiers
     const strMod = Math.floor((str - 10) / 2);

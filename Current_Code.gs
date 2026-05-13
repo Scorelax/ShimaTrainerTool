@@ -1038,6 +1038,10 @@ function handlePokemonRoute(action, params) {
       // First calculate modifiers for the evolved Pokemon
       const calculatedData = calculateModifiers(evolveData, "None", "None");
       if (calculatedData.status === 'success') {
+        // Resolve image server-side — client may have stored a Pokeball fallback if
+        // the client-side resolution failed. evolveData[2] = name, evolveData[3] = dex ID.
+        const resolvedImage = getImageUrl(calculatedData.newPokemonData[2], evolveData[3]);
+        if (resolvedImage) calculatedData.newPokemonData[1] = resolvedImage;
         // Then replace in sheet
         const replaceResult = replacePokemonInSheet(params.currentName, params.trainer, calculatedData.newPokemonData);
         if (replaceResult.status === 'success') {

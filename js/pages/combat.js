@@ -171,8 +171,8 @@ function buildTrainerCombatant() {
   const chaMod = parseInt(trainerData[32]) || Math.floor((cha - 10) / 2);
   const maxHp = parseInt(trainerData[11]) || 0;
   const maxVp = parseInt(trainerData[12]) || 0;
-  const currentHp = parseInt(trainerData[34]) || maxHp;
-  const currentVp = parseInt(trainerData[35]) || maxVp;
+  const currentHp = (trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== '') ? parseInt(trainerData[34]) : maxHp;
+  const currentVp = (trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? parseInt(trainerData[35]) : maxVp;
   const ac = parseInt(trainerData[36]) || parseInt(trainerData[13]) || 10;
   const baseAc = parseInt(trainerData[13]) || 10;
 
@@ -211,8 +211,8 @@ function buildPokemonCombatant(pokemonKey) {
   const chaMod = Math.floor((cha - 10) / 2);
   const maxHp = parseInt(pokemonData[10]) || 0;
   const maxVp = parseInt(pokemonData[12]) || 0;
-  const currentHp = parseInt(pokemonData[45]) || maxHp;
-  const currentVp = parseInt(pokemonData[46]) || maxVp;
+  const currentHp = (pokemonData[45] !== null && pokemonData[45] !== undefined && pokemonData[45] !== '') ? parseInt(pokemonData[45]) : maxHp;
+  const currentVp = (pokemonData[46] !== null && pokemonData[46] !== undefined && pokemonData[46] !== '') ? parseInt(pokemonData[46]) : maxVp;
   const proficiency = parseInt(pokemonData[31]) || computeProficiency(level);
   const initiative = parseInt(pokemonData[30]) || dexMod;
 

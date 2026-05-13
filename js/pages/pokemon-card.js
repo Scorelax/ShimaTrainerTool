@@ -2578,12 +2578,12 @@ export function renderPokemonCard(pokemonName) {
                 <div class="combat-stats-row">
                   <div class="combat-stat-column">
                     <div class="combat-stat-label">HP</div>
-                    <div class="combat-stat-value" id="trainerCombatCurrentHP">${trainerData[34] || trainerData[11]} / ${trainerData[11]}</div>
+                    <div class="combat-stat-value" id="trainerCombatCurrentHP">${(trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== '') ? trainerData[34] : trainerData[11]} / ${trainerData[11]}</div>
                     <input type="number" id="trainerHpChangeInput" class="combat-input" placeholder="HP Amount">
                   </div>
                   <div class="combat-stat-column">
                     <div class="combat-stat-label">VP</div>
-                    <div class="combat-stat-value" id="trainerCombatCurrentVP">${trainerData[35] || trainerData[12]} / ${trainerData[12]}</div>
+                    <div class="combat-stat-value" id="trainerCombatCurrentVP">${(trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? trainerData[35] : trainerData[12]} / ${trainerData[12]}</div>
                     <input type="number" id="trainerVpChangeInput" class="combat-input" placeholder="VP Amount">
                   </div>
                 </div>

@@ -1629,15 +1629,15 @@ function attachBattleListeners(state) {
         const badge = e.target.closest('.status-badge');
         removeStatusEffect(badge.dataset.combatantId, badge.dataset.effect, state); return;
       }
-      if (e.target.closest('.combat-type-calc-btn')) {
-        const btn = e.target.closest('.combat-type-calc-btn');
-        showTypeCalcPopup(btn.dataset.combatantId, state); return;
-      }
       if (e.target.closest('.combat-trainer-hpvp-btn')) {
         const btn = e.target.closest('.combat-trainer-hpvp-btn');
         const c = state.combatants.find(x => x.id === btn.dataset.combatantId);
         if (c) showTrainerHpVpPopup(c, state);
         return;
+      }
+      if (e.target.closest('.combat-type-calc-btn')) {
+        const btn = e.target.closest('.combat-type-calc-btn');
+        showTypeCalcPopup(btn.dataset.combatantId, state); return;
       }
       if (e.target.closest('.combat-inv-open-btn')) {
         showCombatInventoryPopup(); return;

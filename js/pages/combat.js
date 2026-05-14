@@ -2390,7 +2390,6 @@ function showCombatMoveDetails(moveName, combatantId, state) {
     const _healModBonus = _healMoveMod ? getStatMod(c, _healMoveMod) : 0;
     const _healStacks = _moveLower === 'swallow' ? Math.max(_stacks, 1) : 1;
     const _diceStr = _healStacks > 1 ? `${_healDice} ×${_healStacks}` : _healDice;
-    _diceLabel = 'Heal Roll:';
     _diceOverride = _healModBonus !== 0
       ? `${_diceStr} ${_healModBonus >= 0 ? '+' : ''}${_healModBonus}`
       : _diceStr;

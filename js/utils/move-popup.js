@@ -146,6 +146,10 @@ function _createPopupDOM() {
       if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullDesc)) {
         if (overlay._onDrainHeal) overlay._onDrainHeal();
       }
+      // Direct heal: "regain a base X hit points"
+      if (/regain\s+a\s+base\s+.*?\s+hit\s+points/i.test(fullDesc)) {
+        if (overlay._onDirectHeal) overlay._onDirectHeal();
+      }
     }
   });
 }
@@ -420,7 +424,7 @@ function _renderCommander(trainerData) {
  * @param {function} [params.onUseMove]    - Callback(moveName, vpCost) for platform-specific VP deduction
  * @param {function} [params.onDrainHeal] - Callback() invoked when move matches the drain heal pattern
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, chargesLeft }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -432,6 +436,7 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   // Store callbacks — accessed by the static confirmCombatMoveYes listener
   popup._onUseMove = onUseMove || null;
   popup._onDrainHeal = onDrainHeal || null;
+  popup._onDirectHeal = onDirectHeal || null;
   popup._currentMove = move;
 
   const { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice } = computedData;

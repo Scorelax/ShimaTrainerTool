@@ -511,6 +511,41 @@ function renderBattlePhase(state) {
         </div>
       </div>
 
+      <!-- Direct Heal Popup (Swallow, Recover-style heals) -->
+      <div class="combat-popup-overlay" id="directHealPopup" style="display:none;">
+        <div class="combat-popup-content" style="max-width:420px;padding:2rem;">
+          <h3 id="directHealTitle" style="margin:0 0 0.4rem 0;color:#4CAF50;text-align:center;font-size:1.2rem;">💊 Heal</h3>
+          <p id="directHealTarget" style="text-align:center;color:#aaa;margin:0 0 1.4rem 0;font-size:0.9rem;"></p>
+          <div style="margin-bottom:1rem;">
+            <label id="directHealDiceLabel" style="display:block;color:#FFDE00;font-weight:700;text-transform:uppercase;margin-bottom:0.5rem;font-size:0.88rem;">Roll:</label>
+            <input type="number" id="directHealDiceInput" min="1" placeholder="Enter roll result..." style="width:100%;padding:0.7rem 1rem;background:#3a3a3a;border:2px solid #555;border-radius:8px;color:white;font-size:1rem;box-sizing:border-box;">
+          </div>
+          <div id="directHealModRow" style="display:none;margin-bottom:0.8rem;color:#aaa;font-size:0.88rem;text-align:center;"></div>
+          <div style="text-align:center;margin-bottom:1.5rem;">
+            <span style="color:#FFDE00;font-weight:700;text-transform:uppercase;font-size:0.88rem;">Total Healing: </span>
+            <span id="directHealTotal" style="color:#4CAF50;font-weight:900;font-size:1.1rem;">—</span>
+          </div>
+          <div style="display:flex;gap:1rem;">
+            <button id="directHealConfirm" class="combat-use-move-btn" disabled style="flex:1;background:linear-gradient(135deg,#2E7D32,#1B5E20);">Apply Heal</button>
+            <button id="directHealSkip" class="combat-use-move-btn" style="flex:1;background:linear-gradient(135deg,#555,#333);">Skip</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spit Up Popup -->
+      <div class="combat-popup-overlay" id="spitUpPopup" style="display:none;">
+        <div class="combat-popup-content" style="max-width:420px;padding:2rem;">
+          <h3 style="margin:0 0 0.4rem 0;color:#FF6B35;text-align:center;font-size:1.2rem;">💥 Spit Up</h3>
+          <p id="spitUpTarget" style="text-align:center;color:#aaa;margin:0 0 1rem 0;font-size:0.9rem;"></p>
+          <div style="text-align:center;margin-bottom:1.5rem;">
+            <div style="font-size:2.4rem;font-weight:900;color:#FFDE00;" id="spitUpMultiplier"></div>
+            <div style="color:#aaa;font-size:0.9rem;margin-top:0.4rem;">Multiply your damage roll by the stacks above</div>
+          </div>
+          <p style="text-align:center;color:#888;font-size:0.83rem;margin-bottom:1.2rem;">Stockpile has been cleared.</p>
+          <button id="spitUpDismiss" class="combat-use-move-btn" style="width:100%;background:linear-gradient(135deg,#555,#333);">OK</button>
+        </div>
+      </div>
+
       <!-- Inventory Popup -->
       <div class="popup-overlay" id="combatInventoryPopup" style="display:none;">
         <div class="popup-content combat-inv-popup-content">
@@ -2017,6 +2052,96 @@ function showDrainHealPopup(combatant, moveName, state) {
   popup.style.display = 'flex';
 }
 
+function showDirectHealPopup(combatant, moveName, healDice, moveMod, stacks, state) {
+  const modBonus = getStatMod(combatant, moveMod);
+  const popup = document.getElementById('directHealPopup');
+  const modRow = document.getElementById('directHealModRow');
+
+  const stackLabel = stacks > 1 ? ` ×${stacks} (Stockpile)` : '';
+  document.getElementById('directHealTitle').textContent = `💊 ${moveName}`;
+  document.getElementById('directHealTarget').textContent =
+    `${combatant.name} — ${combatant.currentHp}/${combatant.maxHp} HP`;
+  document.getElementById('directHealDiceLabel').textContent = `Roll ${healDice}${stackLabel}:`;
+  document.getElementById('directHealTotal').textContent = '—';
+
+  if (moveMod && modBonus !== 0) {
+    modRow.style.display = 'block';
+    modRow.textContent = `${moveMod} modifier bonus: ${modBonus >= 0 ? '+' : ''}${modBonus}`;
+  } else {
+    modRow.style.display = 'none';
+  }
+
+  const oldInput = document.getElementById('directHealDiceInput');
+  const newInput = oldInput.cloneNode(true);
+  newInput.value = '';
+  oldInput.parentNode.replaceChild(newInput, oldInput);
+
+  const oldBtn = document.getElementById('directHealConfirm');
+  const newBtn = oldBtn.cloneNode(true);
+  newBtn.disabled = true;
+  oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+
+  const oldSkip = document.getElementById('directHealSkip');
+  const newSkip = oldSkip.cloneNode(true);
+  oldSkip.parentNode.replaceChild(newSkip, oldSkip);
+
+  document.getElementById('directHealDiceInput').addEventListener('input', function () {
+    const val = parseInt(this.value);
+    const totalEl = document.getElementById('directHealTotal');
+    const confirmBtn = document.getElementById('directHealConfirm');
+    if (val > 0) {
+      const total = (val * stacks) + modBonus;
+      totalEl.textContent = `${total} HP`;
+      confirmBtn.disabled = false;
+    } else {
+      totalEl.textContent = '—';
+      confirmBtn.disabled = true;
+    }
+  });
+
+  document.getElementById('directHealConfirm').addEventListener('click', function () {
+    const diceVal = parseInt(document.getElementById('directHealDiceInput').value);
+    if (!diceVal || diceVal < 1) return;
+    const total = (diceVal * stacks) + modBonus;
+    combatant.currentHp = Math.min(combatant.currentHp + total, combatant.maxHp);
+    showToast(`${combatant.name}: ${moveName} restored ${total} HP!`, 'success');
+
+    const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
+    if (pd) {
+      pd[45] = combatant.currentHp;
+      sessionStorage.setItem(combatant.entityKey, JSON.stringify(pd));
+      const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+      PokemonAPI.updateLiveStats(td[1], pd[2], 'HP', combatant.currentHp)
+        .catch(e => console.error('Direct heal HP sync:', e));
+    }
+
+    saveCombatState(state);
+    rerenderBattle(state);
+    popup.style.display = 'none';
+  });
+
+  document.getElementById('directHealSkip').addEventListener('click', function () {
+    popup.style.display = 'none';
+  });
+
+  popup.style.display = 'flex';
+}
+
+function showSpitUpPopup(combatant, stacks) {
+  const popup = document.getElementById('spitUpPopup');
+  document.getElementById('spitUpTarget').textContent = combatant.name;
+  document.getElementById('spitUpMultiplier').textContent = stacks > 0 ? `×${stacks}` : '×0 (no stacks!)';
+
+  const oldBtn = document.getElementById('spitUpDismiss');
+  const newBtn = oldBtn.cloneNode(true);
+  oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+  document.getElementById('spitUpDismiss').addEventListener('click', () => {
+    popup.style.display = 'none';
+  });
+
+  popup.style.display = 'flex';
+}
+
 function endTurnForCombatant(combatantId, state) {
   const c = state.combatants.find(x => x.id === combatantId);
   if (!c) return;
@@ -2193,12 +2318,43 @@ function showCombatMoveDetails(moveName, combatantId, state) {
         target.statusEffects.push({ name: 'Ingrain', duration: 3, healDice, moveMod });
       }
 
+      // Stockpile: increment stack counter (max 3)
+      if (usedMoveName.toLowerCase() === 'stockpile') {
+        target.stockpileStacks = Math.min((target.stockpileStacks || 0) + 1, 3);
+        const s = target.stockpileStacks;
+        showToast(`${target.name}: Stockpile ×${s}${s === 3 ? ' (max)' : ''}`, 'info');
+      }
+
+      // Spit Up: show stacks multiplier popup then reset
+      if (usedMoveName.toLowerCase() === 'spit up') {
+        const stacks = target.stockpileStacks || 0;
+        target.stockpileStacks = 0;
+        showSpitUpPopup(target, stacks);
+      }
+
       saveCombatState(state);
       rerenderBattle(state);
     },
     onDrainHeal: () => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (target) showDrainHealPopup(target, moveName, state);
+    },
+    onDirectHeal: () => {
+      const target = state.combatants.find(x => x.id === combatantId);
+      if (!target) return;
+      const healMove = _moveMap?.get(moveName);
+      const fullDesc = (healMove?.[7] || '') + ' ' + (healMove?.[8] || '');
+      const diceMatch = fullDesc.match(/regain\s+a\s+base\s+(\d+d\d+)/i);
+      const healDice = diceMatch ? diceMatch[1] : '1d6';
+      const moveMod = (healMove?.[2] || '').trim();
+      const isSwallow = moveName.toLowerCase() === 'swallow';
+      const stacks = isSwallow ? (target.stockpileStacks || 0) : 1;
+      if (isSwallow) {
+        target.stockpileStacks = 0;
+        saveCombatState(state);
+        rerenderBattle(state);
+      }
+      showDirectHealPopup(target, moveName, healDice, moveMod, stacks, state);
     },
   });
 }

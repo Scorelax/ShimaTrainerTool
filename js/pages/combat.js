@@ -2067,14 +2067,12 @@ function endTurnForCombatant(combatantId, state) {
   }
   state.activeTurnIndex = next;
 
-  // Start-of-turn ability effects (skip round 1)
-  if (state.round > 1) {
-    const nextC = state.combatants[next];
-    if (nextC && nextC.type === 'pokemon' && hasAbility(nextC, 'Energy Intensive')) {
-      const drain = nextC.proficiency || 2;
-      nextC.currentVp = Math.max(0, nextC.currentVp - drain);
-      showToast(`${nextC.name}: Energy Intensive — −${drain} VP at start of turn`, 'warning');
-    }
+  // Start-of-turn ability effects
+  const nextC = state.combatants[next];
+  if (nextC && nextC.type === 'pokemon' && hasAbility(nextC, 'Energy Intensive')) {
+    const drain = nextC.proficiency || 2;
+    nextC.currentVp = Math.max(0, nextC.currentVp - drain);
+    showToast(`${nextC.name}: Energy Intensive — −${drain} VP at start of turn`, 'warning');
   }
 
   state.combatants.forEach((cc, idx) => { if (idx !== next) cc.isExpanded = false; });

@@ -2067,12 +2067,13 @@ function endTurnForCombatant(combatantId, state) {
   }
   state.activeTurnIndex = next;
 
-  // End-of-turn ability effects (skip round 1)
+  // Start-of-turn ability effects (skip round 1)
   if (state.round > 1) {
-    if (currentC && currentC.type === 'pokemon' && hasAbility(currentC, 'Energy Intensive')) {
-      const drain = currentC.proficiency || 2;
-      currentC.currentVp = Math.max(0, currentC.currentVp - drain);
-      showToast(`${currentC.name}: Energy Intensive — −${drain} VP at end of turn`, 'warning');
+    const nextC = state.combatants[next];
+    if (nextC && nextC.type === 'pokemon' && hasAbility(nextC, 'Energy Intensive')) {
+      const drain = nextC.proficiency || 2;
+      nextC.currentVp = Math.max(0, nextC.currentVp - drain);
+      showToast(`${nextC.name}: Energy Intensive — −${drain} VP at start of turn`, 'warning');
     }
   }
 

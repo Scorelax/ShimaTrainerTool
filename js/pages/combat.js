@@ -549,7 +549,7 @@ function renderBattlePhase(state) {
       <!-- Trainer HP/VP Calculator Popup -->
       <div class="combat-popup-overlay" id="trainerHpVpPopup" style="display:none;">
         <div class="combat-popup-content" style="max-width:380px;padding:2rem;">
-          <h3 id="trainerHpVpTitle" style="margin:0 0 0.4rem 0;color:#FFDE00;text-align:center;font-size:1.2rem;">❤ HP / VP</h3>
+          <h3 id="trainerHpVpTitle" style="margin:0 0 0.4rem 0;color:#FFDE00;text-align:center;font-size:1.2rem;">HP / VP</h3>
           <p id="trainerHpVpStatus" style="text-align:center;color:#aaa;margin:0 0 1.4rem 0;font-size:0.9rem;"></p>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.2rem;">
             <div>
@@ -2193,7 +2193,7 @@ function showTrainerHpVpPopup(combatant, state) {
   const popup = document.getElementById('trainerHpVpPopup');
 
   const refreshStatus = () => {
-    document.getElementById('trainerHpVpTitle').textContent = `❤ ${combatant.name} — HP / VP`;
+    document.getElementById('trainerHpVpTitle').textContent = `${combatant.name} — HP / VP`;
     document.getElementById('trainerHpVpStatus').textContent =
       `HP: ${combatant.currentHp} / ${combatant.maxHp}   ·   VP: ${combatant.currentVp} / ${combatant.maxVp}`;
   };

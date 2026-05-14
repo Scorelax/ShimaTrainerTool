@@ -2379,6 +2379,26 @@ function showCombatMoveDetails(moveName, combatantId, state) {
         : `Stockpile: ×${_stacks} stack${_stacks > 1 ? 's' : ''}`)
     : undefined;
 
+  // Heal dice display for "regain a base X hit points" moves
+  const _fullMoveDesc = (move[7] || '') + ' ' + (move[8] || '');
+  const _isDirectHeal = /regain\s+a\s+base\s+.*?\s+hit\s+points/i.test(_fullMoveDesc);
+  let _diceLabel, _diceOverride, _diceBreakdownOverride;
+  if (_isDirectHeal) {
+    const _healDiceMatch = _fullMoveDesc.match(/regain\s+a\s+base\s+(\d+d\d+)/i);
+    const _healDice = _healDiceMatch ? _healDiceMatch[1] : '1d6';
+    const _healMoveMod = (move[2] || '').trim();
+    const _healModBonus = _healMoveMod ? getStatMod(c, _healMoveMod) : 0;
+    const _healStacks = _moveLower === 'swallow' ? Math.max(_stacks, 1) : 1;
+    const _diceStr = _healStacks > 1 ? `${_healDice} ×${_healStacks}` : _healDice;
+    _diceLabel = 'Heal Roll:';
+    _diceOverride = _healModBonus !== 0
+      ? `${_diceStr} ${_healModBonus >= 0 ? '+' : ''}${_healModBonus}`
+      : _diceStr;
+    _diceBreakdownOverride = _healMoveMod && _healModBonus !== 0
+      ? `${_healMoveMod} modifier: ${_healModBonus >= 0 ? '+' : ''}${_healModBonus}`
+      : '';
+  }
+
   showMovePopup({
     move,
     computedData,
@@ -2390,6 +2410,9 @@ function showCombatMoveDetails(moveName, combatantId, state) {
     noteText: _stackNote,
     disableUse: _isStackMove && _stacks === 0,
     disableUseMsg: 'No Stockpile stacks — use Stockpile first',
+    diceLabel: _diceLabel,
+    diceOverride: _diceOverride,
+    diceBreakdownOverride: _diceBreakdownOverride,
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;

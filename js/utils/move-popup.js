@@ -78,7 +78,7 @@ function _createPopupDOM() {
             <div id="cAttackBreakdown" class="combat-roll-breakdown"></div>
           </div>
           <div>
-            <strong>Damage Roll:</strong>
+            <strong id="cDiceLabel">Damage Roll:</strong>
             <span id="cDamageBonus" class="combat-roll-bonus"></span>
             <div id="cDamageBreakdown" class="combat-roll-breakdown"></div>
           </div>
@@ -87,7 +87,7 @@ function _createPopupDOM() {
         <div id="cBattleDiceContainer"></div>
         <div id="cTacticianContainer"></div>
         <div id="cCommanderContainer"></div>
-        <div id="cMoveNote" style="display:none;text-align:center;font-size:0.88rem;font-weight:700;color:#FFDE00;background:rgba(255,222,0,0.08);border:1px solid rgba(255,222,0,0.3);border-radius:8px;padding:0.5rem 0.8rem;margin-bottom:0.5rem;"></div>
+        <div id="cMoveNote" style="display:none;text-align:center;font-size:0.88rem;font-weight:700;color:#fff;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.25);border-radius:8px;padding:0.5rem 0.8rem;margin-bottom:0.5rem;"></div>
         <button id="useCombatMoveBtn" class="combat-use-move-btn">Use Move</button>
       </div>
     </div>
@@ -425,7 +425,7 @@ function _renderCommander(trainerData) {
  * @param {function} [params.onUseMove]    - Callback(moveName, vpCost) for platform-specific VP deduction
  * @param {function} [params.onDrainHeal] - Callback() invoked when move matches the drain heal pattern
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -485,9 +485,15 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   if (higherEl) higherEl.textContent = move[8] ? `Higher Levels: ${move[8]}` : '';
 
   // Roll bonuses
+  const diceLabelEl = document.getElementById('cDiceLabel');
+  if (diceLabelEl) diceLabelEl.textContent = diceLabel || 'Damage Roll:';
+
   document.getElementById('cAttackBonus').textContent = fmtMod(attackBonus);
   document.getElementById('cAttackBreakdown').textContent = attackBreakdown;
-  if (damageDice) {
+  if (diceOverride !== undefined) {
+    document.getElementById('cDamageBonus').textContent = diceOverride || '—';
+    document.getElementById('cDamageBreakdown').textContent = diceBreakdownOverride || '';
+  } else if (damageDice) {
     document.getElementById('cDamageBonus').textContent =
       damageBonus > 0 ? `${damageDice} + ${damageBonus}` : damageDice;
     document.getElementById('cDamageBreakdown').textContent = damageBreakdown;

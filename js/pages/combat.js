@@ -817,7 +817,6 @@ function renderExpandedSection(c, statusBadges) {
     <div class="expanded-trainer-actions">
       <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}"><img src="assets/Bag.png" alt="Bag" class="combat-inv-icon"> Inventory</button>
       <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">✨ Trainer Buffs</button>
-      <button class="combat-trainer-action-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}">❤ HP/VP</button>
       ${switchBtn}
     </div>` : '';
 
@@ -859,7 +858,7 @@ function renderExpandedSection(c, statusBadges) {
   // --- HP / VP adjusters ---
   const typeCalcBtn = c.type === 'pokemon'
     ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮<br>Damage<br>Calculator</button>`
-    : '';
+    : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}" style="background:rgba(76,175,80,0.12);border-color:rgba(76,175,80,0.5);color:#4CAF50;">❤<br>HP/VP<br>Calculator</button>`;
   const critRow = c.type === 'pokemon' ? `
       <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
         <span class="hpvp-stat-label">Crit</span>

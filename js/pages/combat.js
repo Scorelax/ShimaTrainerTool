@@ -2159,7 +2159,7 @@ function showDirectHealPopup(combatant, moveName, healDice, moveMod, stacks, sta
 function showSpitUpPopup(combatant, stacks) {
   const popup = document.getElementById('spitUpPopup');
   document.getElementById('spitUpTarget').textContent = combatant.name;
-  document.getElementById('spitUpMultiplier').textContent = stacks > 0 ? `×${stacks}` : '×0 (no stacks!)';
+  document.getElementById('spitUpMultiplier').textContent = stacks > 0 ? `×${stacks}` : '0 Stockpile stacks';
 
   const oldBtn = document.getElementById('spitUpDismiss');
   const newBtn = oldBtn.cloneNode(true);
@@ -2369,6 +2369,15 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   const _rechargeInfo = c.rechargeStates?.[moveName];
   const chargesLeft = _rechargeInfo !== undefined ? _rechargeInfo.chargesLeft : undefined;
 
+  const _moveLower = moveName.toLowerCase();
+  const _stacks = c.stockpileStacks || 0;
+  const _isStackMove = _moveLower === 'spit up' || _moveLower === 'swallow';
+  const _stackNote = _isStackMove
+    ? (_stacks === 0
+        ? 'Stockpile: 0 stacks — use Stockpile first'
+        : `Stockpile: ×${_stacks} stack${_stacks > 1 ? 's' : ''}`)
+    : undefined;
+
   showMovePopup({
     move,
     computedData,
@@ -2377,6 +2386,9 @@ function showCombatMoveDetails(moveName, combatantId, state) {
     critMod: c.critMod,
     trainerData,
     chargesLeft,
+    noteText: _stackNote,
+    disableUse: _isStackMove && _stacks === 0,
+    disableUseMsg: 'No Stockpile stacks — use Stockpile first',
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;

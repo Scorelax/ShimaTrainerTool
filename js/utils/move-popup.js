@@ -87,6 +87,7 @@ function _createPopupDOM() {
         <div id="cBattleDiceContainer"></div>
         <div id="cTacticianContainer"></div>
         <div id="cCommanderContainer"></div>
+        <div id="cMoveNote" style="display:none;text-align:center;font-size:0.88rem;font-weight:700;color:#FFDE00;background:rgba(255,222,0,0.08);border:1px solid rgba(255,222,0,0.3);border-radius:8px;padding:0.5rem 0.8rem;margin-bottom:0.5rem;"></div>
         <button id="useCombatMoveBtn" class="combat-use-move-btn">Use Move</button>
       </div>
     </div>
@@ -424,7 +425,7 @@ function _renderCommander(trainerData) {
  * @param {function} [params.onUseMove]    - Callback(moveName, vpCost) for platform-specific VP deduction
  * @param {function} [params.onDrainHeal] - Callback() invoked when move matches the drain heal pattern
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -511,17 +512,26 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   _renderTactician(trainerData);
   _renderCommander(trainerData);
 
+  // Move note banner
+  const noteEl = document.getElementById('cMoveNote');
+  if (noteEl) {
+    if (noteText) { noteEl.textContent = noteText; noteEl.style.display = ''; }
+    else { noteEl.style.display = 'none'; noteEl.textContent = ''; }
+  }
+
   // Use Move button dataset
   const useBtn = document.getElementById('useCombatMoveBtn');
   if (useBtn) {
     useBtn.dataset.moveName = move[0];
     useBtn.dataset.vpCost = move[4] || 0;
     const isSpent = chargesLeft !== undefined && chargesLeft === 0;
-    useBtn.disabled = isSpent;
+    useBtn.disabled = isSpent || !!disableUse;
     if (isSpent) {
       const actionText = (move[3] || '').toLowerCase();
       const restType = actionText.includes('long rest') ? 'Long Rest' : 'Short Rest';
       useBtn.textContent = `No charges remaining — recharges on ${restType}`;
+    } else if (disableUse) {
+      useBtn.textContent = disableUseMsg || 'Cannot use this move';
     } else {
       useBtn.textContent = 'Use Move';
     }

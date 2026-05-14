@@ -546,6 +546,29 @@ function renderBattlePhase(state) {
         </div>
       </div>
 
+      <!-- Trainer HP/VP Calculator Popup -->
+      <div class="combat-popup-overlay" id="trainerHpVpPopup" style="display:none;">
+        <div class="combat-popup-content" style="max-width:380px;padding:2rem;">
+          <h3 id="trainerHpVpTitle" style="margin:0 0 0.4rem 0;color:#FFDE00;text-align:center;font-size:1.2rem;">❤ HP / VP</h3>
+          <p id="trainerHpVpStatus" style="text-align:center;color:#aaa;margin:0 0 1.4rem 0;font-size:0.9rem;"></p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.2rem;">
+            <div>
+              <label style="display:block;color:#4CAF50;font-weight:700;text-transform:uppercase;margin-bottom:0.4rem;font-size:0.82rem;">HP Amount</label>
+              <input type="number" id="trainerHpVpHpInput" min="0" placeholder="HP..." style="width:100%;padding:0.6rem 0.8rem;background:#3a3a3a;border:2px solid #555;border-radius:8px;color:white;font-size:1rem;box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="display:block;color:#64B5F6;font-weight:700;text-transform:uppercase;margin-bottom:0.4rem;font-size:0.82rem;">VP Amount</label>
+              <input type="number" id="trainerHpVpVpInput" min="0" placeholder="VP..." style="width:100%;padding:0.6rem 0.8rem;background:#3a3a3a;border:2px solid #555;border-radius:8px;color:white;font-size:1rem;box-sizing:border-box;">
+            </div>
+          </div>
+          <div style="display:flex;gap:0.8rem;">
+            <button id="trainerHpVpAddBtn" class="combat-use-move-btn" style="flex:1;background:linear-gradient(135deg,#2E7D32,#1B5E20);">Add</button>
+            <button id="trainerHpVpRemoveBtn" class="combat-use-move-btn" style="flex:1;background:linear-gradient(135deg,#7B1FA2,#4A148C);">Remove</button>
+            <button id="trainerHpVpCloseBtn" class="combat-use-move-btn" style="flex:1;background:linear-gradient(135deg,#555,#333);">Close</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Inventory Popup -->
       <div class="popup-overlay" id="combatInventoryPopup" style="display:none;">
         <div class="popup-content combat-inv-popup-content">
@@ -794,6 +817,7 @@ function renderExpandedSection(c, statusBadges) {
     <div class="expanded-trainer-actions">
       <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}"><img src="assets/Bag.png" alt="Bag" class="combat-inv-icon"> Inventory</button>
       <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">✨ Trainer Buffs</button>
+      <button class="combat-trainer-action-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}">❤ HP/VP</button>
       ${switchBtn}
     </div>` : '';
 
@@ -1609,6 +1633,12 @@ function attachBattleListeners(state) {
         const btn = e.target.closest('.combat-type-calc-btn');
         showTypeCalcPopup(btn.dataset.combatantId, state); return;
       }
+      if (e.target.closest('.combat-trainer-hpvp-btn')) {
+        const btn = e.target.closest('.combat-trainer-hpvp-btn');
+        const c = state.combatants.find(x => x.id === btn.dataset.combatantId);
+        if (c) showTrainerHpVpPopup(c, state);
+        return;
+      }
       if (e.target.closest('.combat-inv-open-btn')) {
         showCombatInventoryPopup(); return;
       }
@@ -2136,6 +2166,72 @@ function showSpitUpPopup(combatant, stacks) {
   const newBtn = oldBtn.cloneNode(true);
   oldBtn.parentNode.replaceChild(newBtn, oldBtn);
   document.getElementById('spitUpDismiss').addEventListener('click', () => {
+    popup.style.display = 'none';
+  });
+
+  popup.style.display = 'flex';
+}
+
+function showTrainerHpVpPopup(combatant, state) {
+  const popup = document.getElementById('trainerHpVpPopup');
+
+  const refreshStatus = () => {
+    document.getElementById('trainerHpVpTitle').textContent = `❤ ${combatant.name} — HP / VP`;
+    document.getElementById('trainerHpVpStatus').textContent =
+      `HP: ${combatant.currentHp} / ${combatant.maxHp}   ·   VP: ${combatant.currentVp} / ${combatant.maxVp}`;
+  };
+  refreshStatus();
+
+  const hpInput = document.getElementById('trainerHpVpHpInput');
+  const vpInput = document.getElementById('trainerHpVpVpInput');
+  hpInput.value = '';
+  vpInput.value = '';
+
+  const syncTrainer = () => {
+    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    td[34] = combatant.currentHp;
+    td[35] = combatant.currentVp;
+    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    TrainerAPI.update(td).catch(e => console.error('Trainer HP/VP sync:', e));
+  };
+
+  const oldAdd = document.getElementById('trainerHpVpAddBtn');
+  const newAdd = oldAdd.cloneNode(true);
+  oldAdd.parentNode.replaceChild(newAdd, oldAdd);
+
+  const oldRemove = document.getElementById('trainerHpVpRemoveBtn');
+  const newRemove = oldRemove.cloneNode(true);
+  oldRemove.parentNode.replaceChild(newRemove, oldRemove);
+
+  const oldClose = document.getElementById('trainerHpVpCloseBtn');
+  const newClose = oldClose.cloneNode(true);
+  oldClose.parentNode.replaceChild(newClose, oldClose);
+
+  document.getElementById('trainerHpVpAddBtn').addEventListener('click', () => {
+    const hp = parseInt(hpInput.value) || 0;
+    const vp = parseInt(vpInput.value) || 0;
+    if (hp > 0) combatant.currentHp = Math.min(combatant.currentHp + hp, combatant.maxHp);
+    if (vp > 0) combatant.currentVp = Math.min(combatant.currentVp + vp, combatant.maxVp);
+    saveCombatState(state);
+    rerenderBattle(state);
+    syncTrainer();
+    refreshStatus();
+    hpInput.value = ''; vpInput.value = '';
+  });
+
+  document.getElementById('trainerHpVpRemoveBtn').addEventListener('click', () => {
+    const hp = parseInt(hpInput.value) || 0;
+    const vp = parseInt(vpInput.value) || 0;
+    if (hp > 0) combatant.currentHp = Math.max(0, combatant.currentHp - hp);
+    if (vp > 0) combatant.currentVp = Math.max(0, combatant.currentVp - vp);
+    saveCombatState(state);
+    rerenderBattle(state);
+    syncTrainer();
+    refreshStatus();
+    hpInput.value = ''; vpInput.value = '';
+  });
+
+  document.getElementById('trainerHpVpCloseBtn').addEventListener('click', () => {
     popup.style.display = 'none';
   });
 

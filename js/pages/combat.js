@@ -1946,6 +1946,23 @@ function getStatMod(combatant, statName) {
   }
 }
 
+function getHealDiceForLevel(move, level) {
+  const desc = move[7] || '';
+  const higherLevels = move[8] || '';
+  const baseMatch = desc.match(/regain\s+a\s+base\s+(\d+d\d+)/i);
+  let dice = baseMatch ? baseMatch[1] : '1d6';
+  if (higherLevels && level > 1) {
+    const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
+    let match, bestDice = null, bestLevel = 0;
+    while ((match = tierRegex.exec(higherLevels)) !== null) {
+      const tierLevel = parseInt(match[2]);
+      if (level >= tierLevel && tierLevel > bestLevel) { bestLevel = tierLevel; bestDice = match[1]; }
+    }
+    if (bestDice) dice = bestDice;
+  }
+  return dice;
+}
+
 function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
   const modBonus = getStatMod(combatant, ingrainEffect.moveMod);
   const popup      = document.getElementById('ingrainHealPopup');
@@ -2384,8 +2401,7 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   const _isDirectHeal = /regain\s+a\s+base\s+.*?\s+hit\s+points/i.test(_fullMoveDesc);
   let _diceLabel, _diceOverride, _diceBreakdownOverride;
   if (_isDirectHeal) {
-    const _healDiceMatch = _fullMoveDesc.match(/regain\s+a\s+base\s+(\d+d\d+)/i);
-    const _healDice = _healDiceMatch ? _healDiceMatch[1] : '1d6';
+    const _healDice = getHealDiceForLevel(move, c.level || 1);
     const _healMoveMod = (move[2] || '').trim();
     const _healModBonus = _healMoveMod ? getStatMod(c, _healMoveMod) : 0;
     const _healStacks = _moveLower === 'swallow' ? Math.max(_stacks, 1) : 1;
@@ -2473,9 +2489,7 @@ function showCombatMoveDetails(moveName, combatantId, state) {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;
       const healMove = _moveMap?.get(moveName);
-      const fullDesc = (healMove?.[7] || '') + ' ' + (healMove?.[8] || '');
-      const diceMatch = fullDesc.match(/regain\s+a\s+base\s+(\d+d\d+)/i);
-      const healDice = diceMatch ? diceMatch[1] : '1d6';
+      const healDice = getHealDiceForLevel(healMove || [], target.level || 1);
       const moveMod = (healMove?.[2] || '').trim();
       const isSwallow = moveName.toLowerCase() === 'swallow';
       const stacks = isSwallow ? (target.stockpileStacks || 0) : 1;

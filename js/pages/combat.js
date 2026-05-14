@@ -1000,13 +1000,14 @@ function getCombatCSS() {
       color: #e0e0e0;
       font-family: inherit;
       padding-bottom: 2rem;
+      padding-top: 3.5rem;
     }
     .combat-header-bar {
       display: flex; align-items: center; justify-content: space-between;
       padding: 0.8rem 1rem;
-      background: rgba(0,0,0,0.4);
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      position: sticky; top: 0; z-index: 10;
+      background: #1a1a2e;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
     }
     .combat-header-title { font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px; }
     .combat-round-label { font-size: 1rem; font-weight: 700; color: #a0a0c0; }

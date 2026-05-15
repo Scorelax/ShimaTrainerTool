@@ -183,6 +183,7 @@ function buildTrainerCombatant() {
     level, initiativeScore: dexMod, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: dexMod,
     ac, baseAc, critMod: 0, maxHp, currentHp, maxVp, currentVp,
     proficiency: parseInt(trainerData[17]) || computeProficiency(level),
+    savingThrows: trainerData[15] || '',
     skills: trainerData[18] || '',
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
@@ -263,6 +264,7 @@ function buildPokemonCombatant(pokemonKey) {
     ac: parseInt(pokemonData[8]) || 10, baseAc: parseInt(pokemonData[8]) || 10, critMod: 0,
     maxHp, currentHp, maxVp, currentVp,
     proficiency, stabBonusValue: parseInt(pokemonData[34]) || 2,
+    savingThrows: pokemonData[21] || '',
     skills: pokemonData[22] || '',
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
@@ -837,6 +839,9 @@ function renderExpandedSection(c, statusBadges) {
         return stat ? `${skill} (${stat})` : skill;
       }).filter(Boolean).join(', ') : ''}`
     : null;
+  const savingThrowDisplay = c.proficiency != null && c.savingThrows && c.savingThrows.trim() && c.savingThrows.trim().toLowerCase() !== 'none'
+    ? `+${c.proficiency} — ${c.savingThrows.split(',').map(s => s.trim()).filter(Boolean).join(', ')}`
+    : null;
   const infoSection = c.type === 'pokemon' ? `
     <div class="expanded-info-section">
       <div class="expanded-section-label">Pokémon Info</div>
@@ -846,12 +851,14 @@ function renderExpandedSection(c, statusBadges) {
         ${c.size       ? `<div class="info-row"><span class="info-label">Size</span><span>${c.size}</span></div>` : ''}
         ${c.movement   ? `<div class="info-row"><span class="info-label">Movement</span><span>${c.movement}</span></div>` : ''}
         ${proficiencyDisplay ? `<div class="info-row"><span class="info-label">Proficiency</span><span>${proficiencyDisplay}</span></div>` : ''}
+        ${savingThrowDisplay ? `<div class="info-row"><span class="info-label">Saving Throws</span><span>${savingThrowDisplay}</span></div>` : ''}
       </div>
     </div>` : `
     <div class="expanded-info-section">
       <div class="expanded-section-label">Trainer Stats</div>
       <div class="info-grid">
         ${proficiencyDisplay ? `<div class="info-row"><span class="info-label">Proficiency</span><span>${proficiencyDisplay}</span></div>` : ''}
+        ${savingThrowDisplay ? `<div class="info-row"><span class="info-label">Saving Throws</span><span>${savingThrowDisplay}</span></div>` : ''}
       </div>
     </div>`;
 

@@ -2323,6 +2323,10 @@ export function renderPokemonCard(pokemonName) {
           </div>
 
           <div class="trainer-info-list">
+            <div class="info-item">
+              <span class="info-item-label">Name:</span>
+              <span class="info-item-value">${name}</span>
+            </div>
             <div class="info-item-row">
               <div class="info-item info-item-half">
                 <span class="info-item-label">Level:</span>

@@ -40,7 +40,8 @@ export function renderTrainerInfo() {
   const trainerVP = trainerData[12] || 0;
   const trainerAC = trainerData[13] || 10;
   const trainerSpeed = trainerData[14] || 30;
-  const trainerSavingThrows = trainerData[15] || 'None';
+  const SAVE_ABBREV = { strength:'STR', dexterity:'DEX', constitution:'CON', intelligence:'INT', wisdom:'WIS', charisma:'CHA' };
+  const trainerSavingThrows = (trainerData[15] || 'None').split(',').map(s => { const k = s.trim().toLowerCase(); return SAVE_ABBREV[k] || s.trim(); }).join(', ');
   const trainerInitiative = trainerData[16] || 0;
   const trainerProficiency = trainerData[17] || 2;
   const trainerSkills = trainerData[18] || '';

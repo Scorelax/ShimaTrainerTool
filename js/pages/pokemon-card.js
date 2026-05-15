@@ -254,8 +254,8 @@ export function renderPokemonCard(pokemonName) {
   };
   const typingButtons = type2 ? `${createTypeButton(type1)}${createTypeButton(type2)}` : createTypeButton(type1);
 
-  // Format saving throws - keep as newline-separated for column layout
-  const savingThrowFormatted = savingThrow;
+  const SAVE_ABBREV = { strength:'STR', dexterity:'DEX', constitution:'CON', intelligence:'INT', wisdom:'WIS', charisma:'CHA' };
+  const savingThrowFormatted = savingThrow.split(',').map(s => { const k = s.trim().toLowerCase(); return SAVE_ABBREV[k] || s.trim(); }).join(', ');
 
   // STAB display
   const stab = `+${stabBonus}`;

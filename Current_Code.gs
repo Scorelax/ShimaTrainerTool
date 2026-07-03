@@ -204,82 +204,36 @@ const REGISTERED_POKEMON_COLUMN_INDICES = {
 // ------------------------------------------------------------------Import Pokémon information Start--------------------------------------------------
 // Import Move Data from external source
 function fetchMoveData() {
+    const cached = cacheGetChunked('upstream:moves');
+    if (cached) return cached;
     const response = UrlFetchApp.fetch(MOVE_DATA_URL);
     const jsonData = JSON.parse(response.getContentText());
+    cachePutChunked('upstream:moves', jsonData, UPSTREAM_CACHE_TTL);
     return jsonData;
 }
 
-// Importing registered pokemon data from external source
+// Registered pokemon names come from the pokedex config (single cached fetch)
 function fetchRegisteredPokemon() {
-  const now = Date.now();
-  
-  // Return cached data if available and not expired
-  if (cachedRegisteredNames && cacheTimestamp && (now - cacheTimestamp < CACHE_DURATION)) {
-    Logger.log('Using cached registered Pokemon names');
-    return cachedRegisteredNames;
-  }
-  
-  const startTime = Date.now();
-  try {
-    const response = UrlFetchApp.fetch(REGISTERED_POKEMON_URL);
-    const data = JSON.parse(response.getContentText());
-    const endTime = Date.now();
-
-    // Update cache with both registered names and full config
-    cachedRegisteredNames = data.registered;
-    cachedPokedexConfig = data; // Store full config (visibility, defaults, extraSearchableMoves, splashCount)
-    cacheTimestamp = now;
-
-    Logger.log('fetchRegisteredPokemon: ' + (endTime - startTime) + ' ms');
-    return data.registered;
-  } catch (error) {
-    Logger.log("Error fetching registered Pokémon: " + error.toString());
-
-    // Return cached data if available, even if expired
-    if (cachedRegisteredNames) {
-      Logger.log('Using expired cache due to fetch error');
-      return cachedRegisteredNames;
-    }
-
-    return [];
-  }
+  const config = getPokedexConfig();
+  return (config && config.registered) ? config.registered : [];
 }
 
-// Function to get the full Pokedex config (visibility, defaults, etc.)
-// This is for future use when implementing visibility controls
+// Full Pokedex config (registered list, visibility, defaults, splashCount)
 function getPokedexConfig() {
-  const now = Date.now();
+  const cached = cacheGetChunked('upstream:pokedexConfig');
+  if (cached) return cached;
 
-  // Return cached config if available and not expired
-  if (cachedPokedexConfig && cacheTimestamp && (now - cacheTimestamp < CACHE_DURATION)) {
-    Logger.log('Using cached Pokedex config');
-    return cachedPokedexConfig;
-  }
-
-  // If cache is expired or not available, fetch new data
   const startTime = Date.now();
   try {
     const response = UrlFetchApp.fetch(REGISTERED_POKEMON_URL);
     const data = JSON.parse(response.getContentText());
-    const endTime = Date.now();
-
-    // Update cache
-    cachedPokedexConfig = data;
-    cachedRegisteredNames = data.registered;
-    cacheTimestamp = now;
-
-    Logger.log('getPokedexConfig: ' + (endTime - startTime) + ' ms');
+    Logger.log('getPokedexConfig (cold): ' + (Date.now() - startTime) + ' ms');
+    cachePutChunked('upstream:pokedexConfig', data, UPSTREAM_CACHE_TTL);
     return data;
   } catch (error) {
     Logger.log("Error fetching Pokedex config: " + error.toString());
 
-    // Return cached data if available, even if expired
-    if (cachedPokedexConfig) {
-      Logger.log('Using expired Pokedex config cache due to fetch error');
-      return cachedPokedexConfig;
-    }
-
-    // Return minimal structure if no cache available
+    // Return minimal structure if fetch fails and no cache is available
     return {
       registered: [],
       visibility: {},
@@ -314,21 +268,91 @@ function batchResolveImageUrls(pokemonList) {
   return results;
 }
 
-// Caching mechanism for registered pokemon names and config
-let cachedRegisteredNames = null;
-let cachedPokedexConfig = null; // Full config including visibility, defaults, etc.
-let cacheTimestamp = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// ============================================================================
+// SERVER-SIDE CACHE (CacheService)
+// Apps Script does NOT persist global variables between web requests, so the
+// old in-memory cache (global let + timestamp) never produced a single hit.
+// CacheService persists across requests for up to 6 hours. Values larger than
+// the 100KB per-key limit are split into chunks.
+// ============================================================================
+const UPSTREAM_CACHE_TTL = 21600; // 6 hours (CacheService maximum)
+
+function cachePutChunked(key, obj, ttlSeconds) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const json = JSON.stringify(obj);
+    const chunkSize = 90 * 1024; // stay safely under the 100KB per-key limit
+    const payload = {};
+    let count = 0;
+    for (let i = 0; i < json.length; i += chunkSize) {
+      payload[key + ':' + count] = json.substring(i, i + chunkSize);
+      count++;
+    }
+    payload[key + ':meta'] = String(count);
+    cache.putAll(payload, ttlSeconds);
+  } catch (e) {
+    Logger.log('cachePutChunked(' + key + ') failed: ' + e);
+  }
+}
+
+function cacheGetChunked(key) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const meta = cache.get(key + ':meta');
+    if (!meta) return null;
+    const count = parseInt(meta, 10);
+    const keys = [];
+    for (let i = 0; i < count; i++) keys.push(key + ':' + i);
+    const parts = cache.getAll(keys);
+    let json = '';
+    for (let i = 0; i < count; i++) {
+      const part = parts[key + ':' + i];
+      if (part === null || part === undefined) return null; // chunk evicted
+      json += part;
+    }
+    return JSON.parse(json);
+  } catch (e) {
+    Logger.log('cacheGetChunked(' + key + ') failed: ' + e);
+    return null;
+  }
+}
+
+// Cached fetch of the full upstream Pokemon database (the slowest dependency)
+function fetchUpstreamPokemonData() {
+  const cached = cacheGetChunked('upstream:pokemonDB');
+  if (cached) return cached;
+  const startTime = Date.now();
+  const response = UrlFetchApp.fetch(POKEMON_DATA_URL);
+  const data = JSON.parse(response.getContentText());
+  Logger.log('fetchUpstreamPokemonData (cold): ' + (Date.now() - startTime) + ' ms');
+  cachePutChunked('upstream:pokemonDB', data, UPSTREAM_CACHE_TTL);
+  return data;
+}
+
+// Manual escape hatch: ?route=game-data&action=clear-cache
+// Use after editing the upstream pokedex/moves/items so changes show up
+// before the 6h TTL expires.
+function clearServerCache() {
+  const bases = ['upstream:pokemonDB', 'upstream:moves', 'upstream:items', 'upstream:pokedexConfig'];
+  const cache = CacheService.getScriptCache();
+  bases.forEach(base => {
+    const meta = cache.get(base + ':meta');
+    if (meta) {
+      const count = parseInt(meta, 10);
+      for (let i = 0; i < count; i++) cache.remove(base + ':' + i);
+      cache.remove(base + ':meta');
+    }
+  });
+  return { status: 'success', message: 'Server cache cleared' };
+}
 
 // ---------------------------------------Search in registered Pokémon for all seen Pokémon---------------------------------------------------
 function getCompletePokemonData() {
   const startTime = Date.now();
   const registeredNames = fetchRegisteredPokemon(); // Fetch registered Pokémon names
-  Logger.log('Registered Names: ' + registeredNames);
 
   try {
-    const response = UrlFetchApp.fetch(POKEMON_DATA_URL);
-    const allPokemonData = JSON.parse(response.getContentText());
+    const allPokemonData = fetchUpstreamPokemonData();
 
     // Filter the complete data to include only registered Pokémon
     const filteredData = allPokemonData.filter((pokemon) => 
@@ -365,9 +389,6 @@ function getCompletePokemonData() {
         darkvision: row[78],
         truesight: row[79]
       };
-
-      const endTime = Date.now();
-      Logger.log('getCompletePokemonData: ' + (endTime - startTime) + ' ms');
 
       return [
         imageUrl,       // 0: image
@@ -407,7 +428,7 @@ function getCompletePokemonData() {
         row[9]          // 34: Size
       ];
     });
-    Logger.log("FORMATTEDDATA: " + JSON.stringify(formattedData, null, 2));
+    Logger.log('getCompletePokemonData: ' + (Date.now() - startTime) + ' ms');
     // Return the formatted data to the client
     return formattedData;
 
@@ -1084,6 +1105,15 @@ function handleTrainerRoute(action, params) {
         data: storeTrainerAndPokemonData(params.name)
       };
 
+    case 'get-full':
+      // GET: ?route=trainer&action=get-full&name=Ash
+      // Batched login call: trainer + pokemon + game data + registered list
+      // + pokedex config in a single request.
+      if (!params.name) {
+        throw new Error('Missing trainer name');
+      }
+      return loadTrainerFullBundle(params.name);
+
     case 'create':
       // GET: ?route=trainer&action=create&data={...}
       if (!params.data) {
@@ -1193,6 +1223,12 @@ function handleGameDataRoute(action, params) {
         status: 'success',
         data: getPokedexConfig()
       };
+
+    case 'clear-cache':
+      // GET: ?route=game-data&action=clear-cache
+      // Clears the server-side upstream cache; use after editing the
+      // pokedex config, moves or items so changes show up immediately.
+      return clearServerCache();
 
     default:
       throw new Error('Unknown game-data action: ' + action);
@@ -1318,9 +1354,6 @@ function storeTrainerAndPokemonData(trainerName) {
     
     const trainerData = TRAINER_DATA_SHEET.getDataRange().getValues();
     const pokemonData = POKEMON_DATA_SHEET.getDataRange().getValues();
-    
-    Logger.log('Trainer Data from Sheet: ' + JSON.stringify(trainerData));
-    Logger.log('Pokemon Data from Sheet: ' + JSON.stringify(pokemonData));
 
     const trainerEntry = trainerData.find(row => row[TRAINER_COLUMN_INDICES.name].toLowerCase() === trainerName.toLowerCase());
     if (!trainerEntry) {
@@ -1334,10 +1367,8 @@ function storeTrainerAndPokemonData(trainerName) {
         // Only convert to empty string if value is null or undefined, NOT if it's 0
         return (value === null || value === undefined) ? "" : value;
     });
-    Logger.log('Trainer Result: ' + JSON.stringify(trainerResult));
 
     const pokemonEntries = pokemonData.filter(row => row[REGISTERED_POKEMON_COLUMN_INDICES.trainername].toLowerCase() === trainerName.toLowerCase());
-    Logger.log('Pokemon Entries: ' + JSON.stringify(pokemonEntries));
 
     // For pokemon data, preserve null/undefined but keep 0 values
     const pokemonResults = pokemonEntries.map(pokemon =>
@@ -1347,8 +1378,6 @@ function storeTrainerAndPokemonData(trainerName) {
             return (value === null || value === undefined) ? "" : value;
         })
     );
-
-    Logger.log('Pokemon Results: ' + JSON.stringify(pokemonResults));
 
     return {
         trainerData: trainerResult,
@@ -1404,6 +1433,33 @@ function loadTrainerWithAllData(trainerName) {
       message: error.toString()
     };
   }
+}
+
+/**
+ * Everything the client needs at login, in one response:
+ * trainer + pokemon + game data (loadTrainerWithAllData) plus the
+ * registered Pokemon list and the Pokedex config.
+ * Exposed as ?route=trainer&action=get-full&name=...
+ */
+function loadTrainerFullBundle(trainerName) {
+  const base = loadTrainerWithAllData(trainerName);
+  if (!base || base.status !== 'success') return base;
+
+  try {
+    base.registeredList = getRegisteredPokemonList().data;
+  } catch (e) {
+    Logger.log('get-full: registered list failed: ' + e);
+    base.registeredList = null;
+  }
+
+  try {
+    base.pokedexConfig = getPokedexConfig();
+  } catch (e) {
+    Logger.log('get-full: pokedex config failed: ' + e);
+    base.pokedexConfig = null;
+  }
+
+  return base;
 }
 
 // Function to get trainer's Pokémon from the sheet
@@ -2386,6 +2442,8 @@ function sanitizeString(str) {
 }
 
 function loadItemsData() {
+    const cached = cacheGetChunked('upstream:items');
+    if (cached) return cached;
     try {
         // Fetch data from the URL stored in the ITEMS_DATA constant
         const response = UrlFetchApp.fetch(ITEMS_DATA);
@@ -2399,7 +2457,9 @@ function loadItemsData() {
             effect: sanitizeString(row[4])          // Effect (sanitize)
         }));
 
-        return { status: 'success', items };  // Return the array of items
+        const result = { status: 'success', items };
+        cachePutChunked('upstream:items', result, UPSTREAM_CACHE_TTL);
+        return result;
     } catch (error) {
         Logger.log('Error loading items: ' + error);
         return { status: 'error', message: 'Failed to load items' };
@@ -2822,9 +2882,8 @@ function getPokemonAbilities(pokemonName) {
   const startTime = Date.now();
 
   try {
-    // Fetch all Pokemon data
-    const response = UrlFetchApp.fetch(POKEMON_DATA_URL);
-    const allPokemonData = JSON.parse(response.getContentText());
+    // Fetch all Pokemon data (served from server cache when warm)
+    const allPokemonData = fetchUpstreamPokemonData();
 
     // Find the specific Pokemon by name (index 2 is the name)
     const pokemon = allPokemonData.find(row => row[2] === pokemonName);
@@ -2896,10 +2955,9 @@ function getEvolutionOptions(currentDexEntry, limit = 20) {
   try {
     // First, get registered Pokemon names
     const registeredNames = fetchRegisteredPokemon();
-    
-    // Fetch all Pokemon data
-    const pokemonResponse = UrlFetchApp.fetch(POKEMON_DATA_URL);
-    const allPokemonData = JSON.parse(pokemonResponse.getContentText());
+
+    // Fetch all Pokemon data (served from server cache when warm)
+    const allPokemonData = fetchUpstreamPokemonData();
     
     // Filter to only registered Pokemon with higher dex entries
     const eligiblePokemon = allPokemonData
@@ -3012,10 +3070,9 @@ function getRegisteredPokemonList() {
   try {
     // Get registered Pokemon names
     const registeredNames = fetchRegisteredPokemon();
-    
-    // Fetch all Pokemon data
-    const response = UrlFetchApp.fetch(POKEMON_DATA_URL);
-    const allPokemonData = JSON.parse(response.getContentText());
+
+    // Fetch all Pokemon data (served from server cache when warm)
+    const allPokemonData = fetchUpstreamPokemonData();
     
     // Filter to registered Pokemon and extract ALL needed fields for pokemon_form
     // DO NOT resolve images server-side - this is the key optimization

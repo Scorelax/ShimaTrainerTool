@@ -89,6 +89,28 @@ function syncKnownMovesForAllPokemon() {
   });
 }
 
+// Store a game-data bundle in sessionStorage under the keys the rest of the
+// app reads. The shape differs between Pokemon Trainers and Conduits.
+function storeGameDataInSession(trainerClass, actualData) {
+  sessionStorage.setItem('items',         JSON.stringify(actualData.itemsData.items));
+  sessionStorage.setItem('moves',         JSON.stringify(actualData.moves));
+  sessionStorage.setItem('natures',       JSON.stringify(actualData.natures));
+  sessionStorage.setItem('pokemonFeats',  JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
+  sessionStorage.setItem('nationalities', JSON.stringify(actualData.nationalitiesData.nationalities));
+
+  if (trainerClass === 'Pokemon Trainer') {
+    sessionStorage.setItem('trainerPaths',    JSON.stringify(actualData.trainerPaths));
+    sessionStorage.setItem('specializations', JSON.stringify(actualData.specializations));
+    sessionStorage.setItem('affinities',      JSON.stringify(actualData.affinities));
+    sessionStorage.setItem('trainerFeats',    JSON.stringify(actualData.trainerFeatsData.trainerFeats));
+    sessionStorage.setItem('skills',          JSON.stringify(actualData.skillsData.skills));
+  } else {
+    sessionStorage.setItem('conduitFeatures', JSON.stringify(actualData.conduitFeatures));
+    sessionStorage.setItem('battleStyles',    JSON.stringify(actualData.battleStyles));
+    sessionStorage.setItem('typeAwakenings',  JSON.stringify(actualData.typeAwakening));
+  }
+}
+
 // Progress tracking utility
 function updateLoadingProgress(percent, text) {
   const fill = document.getElementById('loading-progress-fill');
@@ -595,6 +617,69 @@ export function attachContinueJourneyListeners() {
       };
 
       try {
+        // ── Fast path: single batched request (trainer + pokemon + game data
+        //    + registered list + pokedex config in one call). Falls back to
+        //    the original multi-step flow if the backend doesn't have the
+        //    get-full route deployed yet, or if the call fails.
+        _step = 'loading trainer data';
+        updateLoadingProgress(10, 'Loading your adventure...');
+        let bundle = null;
+        try {
+          const t0 = Date.now();
+          bundle = await TrainerAPI.getFull(selectedTrainer.name);
+          if (!bundle || bundle.status !== 'success' || !bundle.trainerData || !bundle.gameData) {
+            throw new Error((bundle && bundle.message) || 'incomplete response');
+          }
+          _log(`get-full OK in ${Date.now() - t0}ms — Pokemon: ${bundle.pokemonData?.length ?? 0}`);
+        } catch (e) {
+          _warn('Batched load unavailable, using multi-step fallback:', e.message);
+          bundle = null;
+        }
+
+        if (bundle) {
+          _step = 'storing trainer data';
+          updateLoadingProgress(40, 'Processing trainer information...');
+          sessionStorage.setItem('trainerData', JSON.stringify(bundle.trainerData));
+          bundle.pokemonData.forEach((pokemon) => {
+            sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
+          });
+          sessionStorage.setItem('unlockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokeball.png');
+          sessionStorage.setItem('lockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Grey%20Pokeball.png');
+          if (bundle.registeredList) {
+            sessionStorage.setItem('completePokemonData', JSON.stringify(bundle.registeredList));
+          }
+          if (bundle.pokedexConfig) {
+            sessionStorage.setItem('pokedexConfig', JSON.stringify(bundle.pokedexConfig));
+          }
+
+          _step = 'storing game data';
+          updateLoadingProgress(70, 'Processing game data...');
+          const bundleClass = bundle.trainerData[39];
+          storeGameDataInSession(bundleClass, bundle.gameData);
+          _log('Game data stored in sessionStorage');
+
+          _step = 'syncing known moves';
+          syncKnownMovesForAllPokemon();
+
+          if (bundleClass === 'Pokemon Trainer') {
+            _step = 'preloading splash image';
+            updateLoadingProgress(90, 'Loading splash images...');
+            try {
+              const splashUrl = await selectAndPreloadSplashImage();
+              sessionStorage.setItem('preloadedSplashImage', splashUrl);
+            } catch (e) {
+              _warn('Splash preload failed:', e.message);
+            }
+          }
+
+          updateLoadingProgress(95, 'Almost ready...');
+          const route = bundleClass === 'Pokemon Trainer' ? 'trainer-card' : 'conduit-card';
+          _log(`Navigating to ${route}`);
+          window.dispatchEvent(new CustomEvent('navigate', { detail: { route } }));
+          return;
+        }
+
+        // ── Fallback: original multi-step flow ────────────────────────────────
         // ── Step 1: Trainer + Pokemon data ────────────────────────────────────
         _step = 'loading trainer data';
         _log(`Fetching trainer "${selectedTrainer.name}"...`);
@@ -668,16 +753,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'storing game data';
           updateLoadingProgress(75, 'Processing items and moves...');
-          sessionStorage.setItem('items',           JSON.stringify(actualData.itemsData.items));
-          sessionStorage.setItem('trainerPaths',    JSON.stringify(actualData.trainerPaths));
-          sessionStorage.setItem('specializations', JSON.stringify(actualData.specializations));
-          sessionStorage.setItem('affinities',      JSON.stringify(actualData.affinities));
-          sessionStorage.setItem('moves',           JSON.stringify(actualData.moves));
-          sessionStorage.setItem('natures',         JSON.stringify(actualData.natures));
-          sessionStorage.setItem('trainerFeats',    JSON.stringify(actualData.trainerFeatsData.trainerFeats));
-          sessionStorage.setItem('skills',          JSON.stringify(actualData.skillsData.skills));
-          sessionStorage.setItem('pokemonFeats',    JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
-          sessionStorage.setItem('nationalities',   JSON.stringify(actualData.nationalitiesData.nationalities));
+          storeGameDataInSession('Pokemon Trainer', actualData);
           _log('Game data stored in sessionStorage');
 
           _step = 'syncing known moves';
@@ -709,14 +785,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'storing conduit data';
           updateLoadingProgress(75, 'Processing conduit abilities...');
-          sessionStorage.setItem('items',           JSON.stringify(actualData.itemsData.items));
-          sessionStorage.setItem('conduitFeatures', JSON.stringify(actualData.conduitFeatures));
-          sessionStorage.setItem('battleStyles',    JSON.stringify(actualData.battleStyles));
-          sessionStorage.setItem('typeAwakenings',  JSON.stringify(actualData.typeAwakening));
-          sessionStorage.setItem('moves',           JSON.stringify(actualData.moves));
-          sessionStorage.setItem('natures',         JSON.stringify(actualData.natures));
-          sessionStorage.setItem('pokemonFeats',    JSON.stringify(actualData.pokemonFeatsData.pokemonFeats));
-          sessionStorage.setItem('nationalities',   JSON.stringify(actualData.nationalitiesData.nationalities));
+          storeGameDataInSession(trainerClass, actualData);
           _log('Conduit data stored in sessionStorage');
 
           _step = 'syncing known moves';

@@ -25,10 +25,10 @@ class CacheManager {
       const item = localStorage.getItem(`cache:${key}`);
       if (!item) return null;
 
-      const { data, timestamp } = JSON.parse(item);
+      const { data, timestamp, ttl } = JSON.parse(item);
 
-      // Check if expired
-      if (Date.now() - timestamp > this.duration) {
+      // Check if expired (per-entry TTL wins over the default)
+      if (Date.now() - timestamp > (ttl || this.duration)) {
         this.remove(key);
         return null;
       }
@@ -40,11 +40,12 @@ class CacheManager {
     }
   }
 
-  set(key, data) {
+  set(key, data, ttl) {
     try {
       localStorage.setItem(`cache:${key}`, JSON.stringify({
         data,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ttl
       }));
     } catch (error) {
       console.error('Cache set error:', error);
@@ -64,13 +65,22 @@ class CacheManager {
 
 const cache = new CacheManager();
 
+// TTL for static game data (moves, items, feats, natures, pokedex config).
+// This data only changes when the sheets are edited between sessions;
+// the Reset Cache button on the landing page clears it manually.
+const STATIC_DATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+// Heavy endpoints (login bundle, full game data) get a longer timeout so a
+// slow Apps Script day degrades to "slow" instead of failing at 30s.
+const HEAVY_TIMEOUT = 90000;
+
 // ============================================================================
 // API CLIENT
 // ============================================================================
 
 class API {
   static async request(route, action, params = {}, options = {}) {
-    const { useCache = true, cacheKey, timeout = API_CONFIG.timeout, retries = 1 } = options;
+    const { useCache = true, cacheKey, cacheTtl, timeout = API_CONFIG.timeout, retries = 1 } = options;
 
     // Check cache first
     if (useCache && cacheKey) {
@@ -123,7 +133,7 @@ class API {
         }
 
         if (useCache && cacheKey) {
-          cache.set(cacheKey, data);
+          cache.set(cacheKey, data, cacheTtl);
         }
 
         return data;
@@ -154,7 +164,9 @@ export class PokemonAPI {
   static async getRegisteredList() {
     return API.request('pokemon', 'registered-list', {}, {
       cacheKey: 'pokemon:registered-list',
-      useCache: true
+      useCache: true,
+      cacheTtl: STATIC_DATA_TTL,
+      timeout: HEAVY_TIMEOUT
     });
   }
 
@@ -164,7 +176,9 @@ export class PokemonAPI {
   static async getCompleteList() {
     return API.request('pokemon', 'list', {}, {
       cacheKey: 'pokemon:complete-list',
-      useCache: true
+      useCache: true,
+      cacheTtl: STATIC_DATA_TTL,
+      timeout: HEAVY_TIMEOUT
     });
   }
 
@@ -293,7 +307,8 @@ export class PokemonAPI {
       name: pokemonName
     }, {
       cacheKey: `pokemon:abilities:${pokemonName}`,
-      useCache: true
+      useCache: true,
+      cacheTtl: STATIC_DATA_TTL
     });
   }
 
@@ -338,7 +353,21 @@ export class TrainerAPI {
   static async get(name) {
     return API.request('trainer', 'get', { name }, {
       cacheKey: `trainer:${name}`,
-      useCache: true
+      useCache: true,
+      timeout: HEAVY_TIMEOUT
+    });
+  }
+
+  /**
+   * Batched login call: trainer + pokemon + game data + registered list +
+   * pokedex config in one request. Requires a backend with the get-full
+   * route deployed — callers should fall back to the individual calls if
+   * this throws. Never cached: live trainer stats must be fresh.
+   */
+  static async getFull(name) {
+    return API.request('trainer', 'get-full', { name }, {
+      useCache: false,
+      timeout: HEAVY_TIMEOUT
     });
   }
 
@@ -495,7 +524,9 @@ export class GameDataAPI {
   static async getAll() {
     return API.request('game-data', 'all', {}, {
       cacheKey: 'game-data:all',
-      useCache: true
+      useCache: true,
+      cacheTtl: STATIC_DATA_TTL,
+      timeout: HEAVY_TIMEOUT
     });
   }
 
@@ -505,7 +536,9 @@ export class GameDataAPI {
   static async getConduit() {
     return API.request('game-data', 'conduit', {}, {
       cacheKey: 'game-data:conduit',
-      useCache: true
+      useCache: true,
+      cacheTtl: STATIC_DATA_TTL,
+      timeout: HEAVY_TIMEOUT
     });
   }
 
@@ -515,7 +548,8 @@ export class GameDataAPI {
   static async getMoves() {
     return API.request('game-data', 'moves', {}, {
       cacheKey: 'game-data:moves',
-      useCache: true
+      useCache: true,
+      cacheTtl: STATIC_DATA_TTL
     });
   }
 
@@ -525,7 +559,8 @@ export class GameDataAPI {
   static async getNatures() {
     return API.request('game-data', 'natures', {}, {
       cacheKey: 'game-data:natures',
-      useCache: true
+      useCache: true,
+      cacheTtl: STATIC_DATA_TTL
     });
   }
 
@@ -537,7 +572,8 @@ export class GameDataAPI {
     if (type2) params.type2 = type2;
 
     return API.request('game-data', 'type-effectiveness', params, {
-      cacheKey: `type-effectiveness:${type1}${type2 ? ':' + type2 : ''}`
+      cacheKey: `type-effectiveness:${type1}${type2 ? ':' + type2 : ''}`,
+      cacheTtl: STATIC_DATA_TTL
     });
   }
 
@@ -547,7 +583,8 @@ export class GameDataAPI {
   static async getPokedexConfig() {
     return API.request('game-data', 'pokedex-config', {}, {
       cacheKey: 'game-data:pokedex-config',
-      useCache: true
+      useCache: true,
+      cacheTtl: STATIC_DATA_TTL
     });
   }
 }

@@ -89,9 +89,39 @@ function syncKnownMovesForAllPokemon() {
   });
 }
 
+// Check a game-data bundle for missing pieces (an upstream fetch inside the
+// backend can fail and leave e.g. itemsData as {status:'error'} with no
+// items). Returns an array of missing key names, empty when complete.
+function findMissingGameData(trainerClass, gd) {
+  const missing = [];
+  if (!gd?.itemsData?.items) missing.push('items');
+  if (!gd?.moves) missing.push('moves');
+  if (!gd?.natures) missing.push('natures');
+  if (!gd?.pokemonFeatsData?.pokemonFeats) missing.push('pokemonFeats');
+  if (!gd?.nationalitiesData?.nationalities) missing.push('nationalities');
+  if (trainerClass === 'Pokemon Trainer') {
+    if (!gd?.trainerPaths) missing.push('trainerPaths');
+    if (!gd?.specializations) missing.push('specializations');
+    if (!gd?.affinities) missing.push('affinities');
+    if (!gd?.trainerFeatsData?.trainerFeats) missing.push('trainerFeats');
+    if (!gd?.skillsData?.skills) missing.push('skills');
+  } else {
+    if (!gd?.conduitFeatures) missing.push('conduitFeatures');
+    if (!gd?.battleStyles) missing.push('battleStyles');
+    if (!gd?.typeAwakening) missing.push('typeAwakenings');
+  }
+  return missing;
+}
+
 // Store a game-data bundle in sessionStorage under the keys the rest of the
 // app reads. The shape differs between Pokemon Trainers and Conduits.
+// Throws (instead of storing the string "undefined") when data is missing —
+// a later JSON.parse crash on another page is much harder to act on.
 function storeGameDataInSession(trainerClass, actualData) {
+  const missing = findMissingGameData(trainerClass, actualData);
+  if (missing.length) {
+    throw new Error('Game data incomplete (server may be having issues, try again): missing ' + missing.join(', '));
+  }
   sessionStorage.setItem('items',         JSON.stringify(actualData.itemsData.items));
   sessionStorage.setItem('moves',         JSON.stringify(actualData.moves));
   sessionStorage.setItem('natures',       JSON.stringify(actualData.natures));
@@ -629,6 +659,12 @@ export function attachContinueJourneyListeners() {
           bundle = await TrainerAPI.getFull(selectedTrainer.name);
           if (!bundle || bundle.status !== 'success' || !bundle.trainerData || !bundle.gameData) {
             throw new Error((bundle && bundle.message) || 'incomplete response');
+          }
+          // Reject partial bundles (e.g. one upstream fetch failed inside the
+          // backend) so the multi-step fallback can retry the pieces.
+          const missingData = findMissingGameData(bundle.trainerData[39], bundle.gameData);
+          if (missingData.length) {
+            throw new Error('bundle missing: ' + missingData.join(', '));
           }
           _log(`get-full OK in ${Date.now() - t0}ms — Pokemon: ${bundle.pokemonData?.length ?? 0}`);
         } catch (e) {

@@ -329,6 +329,19 @@ function fetchUpstreamPokemonData() {
   return data;
 }
 
+// Cache warmer — run this on a time-based trigger (e.g. hourly) so player
+// logins never hit the slow cold path. Set up via the Apps Script editor:
+// Triggers (clock icon) → Add Trigger → warmUpstreamCache → time-driven →
+// hour timer → every hour. Uses the saved script, no redeploy needed.
+function warmUpstreamCache() {
+  const startTime = Date.now();
+  try { fetchUpstreamPokemonData(); } catch (e) { Logger.log('warm: pokemonDB failed: ' + e); }
+  try { fetchMoveData(); } catch (e) { Logger.log('warm: moves failed: ' + e); }
+  try { loadItemsData(); } catch (e) { Logger.log('warm: items failed: ' + e); }
+  try { getPokedexConfig(); } catch (e) { Logger.log('warm: pokedexConfig failed: ' + e); }
+  Logger.log('warmUpstreamCache done in ' + (Date.now() - startTime) + ' ms');
+}
+
 // Manual escape hatch: ?route=game-data&action=clear-cache
 // Use after editing the upstream pokedex/moves/items so changes show up
 // before the 6h TTL expires.

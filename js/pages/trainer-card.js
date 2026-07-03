@@ -180,10 +180,10 @@ export function renderTrainerCard() {
       <style>
         body, .content {
           background:
-            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.06) 0%, transparent 50%),
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.10) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.12) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.10) 0%, transparent 40%),
-            linear-gradient(to bottom, #1a1a2e 0%, #14141f 100%);
+            radial-gradient(circle at 40% 40%, rgba(0, 0, 0, 0.22) 0%, transparent 40%),
+            linear-gradient(to bottom, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
           position: relative;
           overflow-x: hidden;
@@ -487,7 +487,7 @@ export function renderTrainerCard() {
           position: fixed;
           top: clamp(15px, 3vh, 25px);
           right: clamp(15px, 3vw, 25px);
-          background: rgba(20, 20, 31, 0.75);
+          background: var(--surface-glass);
           color: var(--text);
           width: clamp(45px, 9vw, 60px);
           height: clamp(45px, 9vw, 60px);

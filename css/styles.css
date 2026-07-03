@@ -11,19 +11,21 @@
   --poke-yellow: #FFDE00;
   --poke-blue: #3B4CCA;
 
-  /* Dark theme surfaces */
-  --bg: #14141f;
-  --bg-raised: #1a1a2e;
+  /* Dark theme surfaces — deep Pokeball red */
+  --bg: #6e0404;
+  --bg-raised: #8f0808;
   --surface: rgba(255, 255, 255, 0.05);
   --surface-2: rgba(255, 255, 255, 0.10);
-  --surface-solid: #23233a;
+  --surface-solid: #2e1212;
+  --surface-solid-deep: #1e0b0b;
+  --surface-glass: rgba(30, 6, 6, 0.6);
   --border-subtle: rgba(255, 255, 255, 0.16);
   --border-accent: rgba(255, 222, 0, 0.45);
 
   /* Text on dark surfaces */
-  --text: #ececf1;
-  --text-dim: #a0a0b8;
-  --text-faint: #74748c;
+  --text: #f3eded;
+  --text-dim: #d6bebe;
+  --text-faint: #a88f8f;
 
   /* Semantic */
   --success: #4CAF50;
@@ -630,7 +632,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: rgba(20, 20, 31, 0.75);
+  background: var(--surface-glass);
   color: var(--text);
   border: 1px solid var(--border-subtle);
   border-radius: 50%;
@@ -680,7 +682,7 @@ body {
 }
 
 :where(.theme-dark) .popup-content {
-  background: linear-gradient(160deg, #23233a 0%, #1b1b2c 100%);
+  background: linear-gradient(160deg, var(--surface-solid) 0%, var(--surface-solid-deep) 100%);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   padding: clamp(1.5rem, 3vw, 2.5rem);
@@ -757,7 +759,7 @@ body {
 }
 
 :where(.theme-dark) .exit-modal-content {
-  background: linear-gradient(160deg, #23233a 0%, #1b1b2c 100%);
+  background: linear-gradient(160deg, var(--surface-solid) 0%, var(--surface-solid-deep) 100%);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   padding: clamp(2rem, 4vh, 3rem);

@@ -650,6 +650,42 @@ export function renderTrainerCard() {
           box-shadow: none;
         }
 
+        /* Long Rest selection rows — same look as the Short Rest list */
+        .trainer-card-page .pokemon-selection-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+        }
+
+        .long-rest-row {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem;
+          background: #f5f5f5;
+          border-radius: 8px;
+          border: 2px solid transparent;
+          cursor: pointer;
+          color: #333;
+          text-align: left;
+          transition: border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .long-rest-row.selected {
+          border-color: var(--poke-yellow);
+          background: #fff3bf;
+        }
+
+        .long-rest-row-name {
+          font-weight: 700;
+        }
+
+        .long-rest-row-stats {
+          font-size: 0.85rem;
+          color: #666;
+        }
+
         /* Tablet - keep layout, adjust sizes */
         @media (max-width: 768px) {
           .trainer-image-container {
@@ -1691,20 +1727,26 @@ function showLongRestPokemonSelection(activePokemon) {
     completeButton.textContent = 'Complete Long Rest';
   }
 
-  // Create selection item for each active Pokemon
+  // Create selection row for each active Pokemon (same layout as short rest)
   activePokemon.forEach(pokemon => {
     const pokemonName = pokemon[2];
     const currentHP = parseInt(pokemon[45], 10) || parseInt(pokemon[10], 10);
     const maxHP = parseInt(pokemon[10], 10);
     const currentVP = parseInt(pokemon[46], 10) || parseInt(pokemon[12], 10);
     const maxVP = parseInt(pokemon[12], 10);
+    const pokemonMaxHD = parseInt(pokemon[9], 10) || 0;
+    const pokemonMaxVD = parseInt(pokemon[11], 10) || 0;
+    const currentHD = (pokemon[54] === '' || pokemon[54] === null || pokemon[54] === undefined) ? pokemonMaxHD : parseInt(pokemon[54], 10);
+    const currentVD = (pokemon[55] === '' || pokemon[55] === null || pokemon[55] === undefined) ? pokemonMaxVD : parseInt(pokemon[55], 10);
 
     const item = document.createElement('div');
-    item.className = 'trainer-path-item';
+    item.className = 'long-rest-row';
+    item.dataset.pokemonName = pokemonName;
     item.innerHTML = `
-      <div style="font-weight: 700; margin-bottom: 0.5rem;">${pokemonName}</div>
-      <div style="font-size: 0.85rem; color: #666;">HP: ${currentHP}/${maxHP}</div>
-      <div style="font-size: 0.85rem; color: #666;">VP: ${currentVP}/${maxVP}</div>
+      <div style="flex: 1;">
+        <div class="long-rest-row-name">${pokemonName}</div>
+        <div class="long-rest-row-stats">HP: ${currentHP}/${maxHP} | VP: ${currentVP}/${maxVP} | HD: ${currentHD} | VD: ${currentVD}</div>
+      </div>
     `;
     item.onclick = () => selectLongRestPokemon(pokemon);
     pokemonGrid.appendChild(item);
@@ -1717,18 +1759,14 @@ function showLongRestPokemonSelection(activePokemon) {
 function selectLongRestPokemon(pokemon) {
   const completeButton = document.getElementById('completeShortRestButton');
 
-  // Remove selected class from all items
-  document.querySelectorAll('.pokemon-selection-grid .trainer-path-item').forEach(item => {
+  // Remove selected class from all rows
+  document.querySelectorAll('.pokemon-selection-grid .long-rest-row').forEach(item => {
     item.classList.remove('selected');
   });
 
-  // Add selected class to clicked item (find by Pokemon name)
+  // Add selected class to the clicked row
   const pokemonName = pokemon[2];
-  document.querySelectorAll('.pokemon-selection-grid .trainer-path-item').forEach(item => {
-    if (item.querySelector('div').textContent === pokemonName) {
-      item.classList.add('selected');
-    }
-  });
+  document.querySelector(`.pokemon-selection-grid .long-rest-row[data-pokemon-name="${CSS.escape(pokemonName)}"]`)?.classList.add('selected');
 
   // Enable complete button
   completeButton.disabled = false;

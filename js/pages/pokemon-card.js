@@ -341,7 +341,7 @@ export function renderPokemonCard(pokemonName) {
             radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+            linear-gradient(135deg, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
           position: relative;
           overflow-x: hidden;
@@ -433,7 +433,7 @@ export function renderPokemonCard(pokemonName) {
           position: relative;
           border-radius: clamp(15px, 3vw, 20px);
           overflow: hidden;
-          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-shadow: 0 clamp(8px, 2vh, 10px) clamp(25px, 5vw, 30px) rgba(0,0,0,0.5),
                       0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.3);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -467,7 +467,7 @@ export function renderPokemonCard(pokemonName) {
           gap: clamp(0.5rem, 1vw, 0.75rem);
           padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border: 1px solid rgba(255,222,0,0.35);
           border-radius: clamp(8px, 1.5vw, 12px);
           font-size: clamp(0.75rem, 1.6vw, 0.9rem);
           font-weight: 700;
@@ -514,7 +514,7 @@ export function renderPokemonCard(pokemonName) {
           gap: clamp(0.3rem, 0.8vw, 0.5rem);
           padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.6rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border: 1px solid rgba(255,222,0,0.35);
           border-radius: clamp(8px, 1.5vw, 12px);
           font-size: clamp(0.65rem, 1.4vw, 0.8rem);
           font-weight: 700;
@@ -536,7 +536,7 @@ export function renderPokemonCard(pokemonName) {
           gap: clamp(0.25rem, 0.5vh, 0.4rem);
           padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.4rem, 1vw, 0.6rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border: 1px solid rgba(255,222,0,0.35);
           border-radius: clamp(8px, 1.5vw, 12px);
           font-weight: 700;
           color: white;
@@ -592,7 +592,7 @@ export function renderPokemonCard(pokemonName) {
         .info-button {
           padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(0.7rem, 1.5vw, 1rem);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(8px, 1.5vw, 12px);
           color: white;
           font-size: clamp(0.75rem, 1.5vw, 0.9rem);
@@ -649,7 +649,7 @@ export function renderPokemonCard(pokemonName) {
         .description-text {
           padding: clamp(0.75rem, 1.5vh, 1rem);
           background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.4);
+          border: 1px solid rgba(255,222,0,0.35);
           border-radius: clamp(8px, 1.5vw, 12px);
           color: white;
           font-size: clamp(0.85rem, 1.8vw, 1rem);
@@ -1066,8 +1066,8 @@ export function renderPokemonCard(pokemonName) {
         }
 
         .popup-content {
-          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
-          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          background: linear-gradient(160deg, var(--surface-solid) 0%, var(--surface-solid-deep) 100%);
+          border: 2px solid var(--border-accent);
           border-radius: clamp(15px, 3vw, 20px);
           padding: clamp(1.5rem, 3vw, 2.5rem);
           max-width: min(90vw, 600px);
@@ -1083,7 +1083,7 @@ export function renderPokemonCard(pokemonName) {
           align-items: center;
           margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
           padding-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          border-bottom: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border-bottom: 1px solid var(--border-accent);
         }
 
         .popup-title {
@@ -1164,7 +1164,7 @@ export function renderPokemonCard(pokemonName) {
           width: 100%;
           padding: clamp(0.5rem, 1vh, 0.75rem);
           background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+          border: 1px solid rgba(255,222,0,0.35);
           border-radius: clamp(8px, 1.5vw, 10px);
           color: white;
           font-size: clamp(0.9rem, 2vw, 1rem);
@@ -1278,11 +1278,11 @@ export function renderPokemonCard(pokemonName) {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
           left: clamp(15px, 3vw, 20px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: var(--surface-glass);
+          color: var(--text);
           width: clamp(45px, 9vw, 55px);
           height: clamp(45px, 9vw, 55px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.5rem, 3.5vw, 2rem);
           font-weight: bold;
@@ -1312,11 +1312,11 @@ export function renderPokemonCard(pokemonName) {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
           right: clamp(15px, 3vw, 20px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: var(--surface-glass);
+          color: var(--text);
           width: clamp(45px, 9vw, 55px);
           height: clamp(45px, 9vw, 55px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.5rem, 3.5vw, 2rem);
           font-weight: bold;
@@ -1799,7 +1799,7 @@ export function renderPokemonCard(pokemonName) {
           display: flex;
           flex-direction: column;
           padding: clamp(1.5rem, 3vw, 2rem);
-          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+          background: linear-gradient(160deg, var(--surface-solid) 0%, var(--surface-solid-deep) 100%);
           overflow: hidden;
         }
 
@@ -1813,7 +1813,7 @@ export function renderPokemonCard(pokemonName) {
           box-shadow: 0 clamp(4px, 1vh, 8px) clamp(15px, 3vw, 25px) rgba(0,0,0,0.5);
           margin-bottom: clamp(1rem, 2vh, 1.5rem);
           overflow-y: auto;
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.3);
+          border: 1px solid rgba(255,222,0,0.35);
         }
 
         .item-name {
@@ -1868,7 +1868,7 @@ export function renderPokemonCard(pokemonName) {
           height: clamp(35px, 7vw, 45px);
           background: linear-gradient(135deg, #757575 0%, #616161 100%);
           color: white;
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.5rem, 3.5vw, 2rem);
           cursor: pointer;
@@ -1961,8 +1961,8 @@ export function renderPokemonCard(pokemonName) {
           transform: translate(-50%, -50%);
           width: 90%;
           max-width: clamp(400px, 80vw, 700px);
-          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
-          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          background: linear-gradient(160deg, var(--surface-solid) 0%, var(--surface-solid-deep) 100%);
+          border: 2px solid var(--border-accent);
           border-radius: clamp(15px, 3vw, 25px);
           box-shadow: 0 15px 40px rgba(0,0,0,0.8);
           overflow: hidden;
@@ -1988,7 +1988,7 @@ export function renderPokemonCard(pokemonName) {
         .modal-header {
           background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
           padding: clamp(1rem, 2.5vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
-          border-bottom: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          border-bottom: 1px solid var(--border-accent);
         }
 
         .modal-header h2 {
@@ -2081,7 +2081,7 @@ export function renderPokemonCard(pokemonName) {
           left: 0;
           right: 0;
           background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-top: none;
           border-radius: 0 0 clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px);
           max-height: clamp(150px, 30vh, 250px);
@@ -2151,7 +2151,7 @@ export function renderPokemonCard(pokemonName) {
         .item-preview {
           padding: clamp(0.8rem, 1.8vh, 1.2rem) clamp(1rem, 2vw, 1.5rem);
           background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(8px, 1.5vw, 12px);
           color: #FFDE00;
           font-size: clamp(1.1rem, 2.4vw, 1.4rem);
@@ -2172,7 +2172,7 @@ export function renderPokemonCard(pokemonName) {
           width: clamp(40px, 8vw, 55px);
           height: clamp(40px, 8vw, 55px);
           background: linear-gradient(135deg, #3B4CCA 0%, #2E3FA0 100%);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(8px, 1.5vw, 12px);
           color: white;
           font-size: clamp(1.5rem, 3vw, 2rem);

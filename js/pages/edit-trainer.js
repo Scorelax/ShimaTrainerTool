@@ -52,7 +52,7 @@ export function renderEditTrainer() {
             radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
+            linear-gradient(to bottom, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
           position: relative;
           overflow-x: hidden;
@@ -105,7 +105,7 @@ export function renderEditTrainer() {
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
           padding: clamp(2rem, 4vw, 3rem);
           border-radius: clamp(20px, 3vw, 30px);
-          border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-shadow: 0 clamp(15px, 3vh, 25px) clamp(40px, 6vh, 60px) rgba(0,0,0,0.5),
                       inset 0 clamp(-4px, -0.8vh, -6px) 0 rgba(0,0,0,0.1);
           max-height: 70vh;
@@ -158,7 +158,7 @@ export function renderEditTrainer() {
           background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
           color: white;
           border-radius: clamp(12px, 2.5vw, 18px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           cursor: pointer;
           font-size: clamp(1.1rem, 2.3vw, 1.5rem);
           font-weight: 900;
@@ -186,7 +186,7 @@ export function renderEditTrainer() {
         .collapsible-content {
           display: none;
           padding: clamp(1rem, 2vh, 1.5rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-top: none;
           border-radius: 0 0 clamp(12px, 2.5vw, 18px) clamp(12px, 2.5vw, 18px);
           max-height: clamp(200px, 35vh, 300px);
@@ -368,11 +368,11 @@ export function renderEditTrainer() {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
           left: clamp(15px, 3vw, 20px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: var(--surface-glass);
+          color: var(--text);
           width: clamp(45px, 9vw, 55px);
           height: clamp(45px, 9vw, 55px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.5rem, 3.5vw, 2rem);
           font-weight: bold;
@@ -1008,7 +1008,7 @@ function injectFeatModalStyles() {
     }
     .feat-modal {
       background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-      border: 4px solid #FFDE00; border-radius: 24px;
+      border: 2px solid var(--border-accent); border-radius: 24px;
       padding: 2rem; max-width: min(90vw, 480px); width: 100%;
       box-shadow: 0 20px 60px rgba(0,0,0,0.6);
       max-height: 80vh; overflow-y: auto; box-sizing: border-box;

@@ -111,7 +111,7 @@ export async function renderContinueJourney() {
     <div class="continue-journey-page">
       <style>
         body, .content {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          background: linear-gradient(135deg, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
         }
 
@@ -171,7 +171,7 @@ export async function renderContinueJourney() {
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
           margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
           background-color: #fff;
           cursor: pointer;
@@ -214,7 +214,7 @@ export async function renderContinueJourney() {
 
         .pin-modal-content {
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(15px, 3vw, 30px);
           padding: 3vh 3vw;
           box-shadow: 0 clamp(10px, 3vh, 25px) clamp(30px, 8vw, 70px) rgba(0,0,0,0.5),
@@ -261,7 +261,7 @@ export async function renderContinueJourney() {
           font-weight: bold;
           padding: clamp(10px, 2vh, 20px);
           border-radius: clamp(10px, 2vw, 20px);
-          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-sizing: border-box;
           margin-bottom: clamp(1.5rem, 3vh, 2.5rem);
           text-align: center;
@@ -330,11 +330,11 @@ export async function renderContinueJourney() {
           position: fixed;
           top: clamp(10px, 2vh, 30px);
           left: clamp(10px, 2vw, 30px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: var(--surface-glass);
+          color: var(--text);
           width: clamp(40px, 8vw, 70px);
           height: clamp(40px, 8vw, 70px);
-          border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.2rem, 3vw, 2.5rem);
           font-weight: bold;

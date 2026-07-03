@@ -36,7 +36,7 @@ export function renderEvolution() {
             radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
+            linear-gradient(to bottom, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
           position: relative;
           overflow-x: hidden;
@@ -97,7 +97,7 @@ export function renderEvolution() {
           width: 58%;
           max-height: 65vh;
           overflow-y: auto;
-          border: clamp(3px, 0.5vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(15px, 2.5vw, 20px);
           padding: clamp(1.25rem, 2.5vw, 1.5rem);
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
@@ -179,7 +179,7 @@ export function renderEvolution() {
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
           margin-bottom: clamp(1rem, 2vh, 1.5rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
           background-color: #fff;
           transition: transform 0.3s, filter 0.3s;
@@ -206,7 +206,7 @@ export function renderEvolution() {
         .evolve-button {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(10px, 2vw, 15px);
           padding: clamp(1rem, 2vh, 1.2rem) clamp(2rem, 4vw, 2.5rem);
           font-size: clamp(1.1rem, 2.4vw, 1.3rem);
@@ -300,7 +300,7 @@ export function renderEvolution() {
           height: 30px;
           font-size: 1.3rem;
           font-weight: bold;
-          border: 2px solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 5px;
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
@@ -405,11 +405,11 @@ export function renderEvolution() {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
           left: clamp(15px, 3vw, 20px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: var(--surface-glass);
+          color: var(--text);
           width: clamp(40px, 8vw, 50px);
           height: clamp(40px, 8vw, 50px);
-          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.4rem, 3vw, 1.8rem);
           font-weight: bold;

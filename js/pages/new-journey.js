@@ -12,7 +12,7 @@ export function renderNewJourney() {
             radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
+            linear-gradient(to bottom, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
           position: relative;
           overflow-x: hidden;
@@ -65,7 +65,7 @@ export function renderNewJourney() {
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
           padding: clamp(1.5rem, 3vw, 2.5rem);
           border-radius: clamp(15px, 3vw, 25px);
-          border: clamp(2px, 0.5vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.4),
                       inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.05);
           margin-bottom: 2vh;
@@ -141,7 +141,7 @@ export function renderNewJourney() {
         .button-primary {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(10px, 2vw, 15px);
           font-size: clamp(1rem, 2vw, 1.2rem);
           font-weight: 900;
@@ -180,11 +180,11 @@ export function renderNewJourney() {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
           left: clamp(15px, 3vw, 20px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: var(--surface-glass);
+          color: var(--text);
           width: clamp(45px, 9vw, 55px);
           height: clamp(45px, 9vw, 55px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.5rem, 3.5vw, 2rem);
           font-weight: bold;
@@ -249,7 +249,7 @@ export function renderNewJourney() {
           overflow: hidden;
           transition: max-height 0.3s ease-out;
           padding: 0 clamp(0.75rem, 1.5vh, 1rem);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-top: none;
           border-radius: 0 0 clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px);
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);

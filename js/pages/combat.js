@@ -1001,7 +1001,7 @@ function getCombatCSS() {
   return `
     .combat-page {
       min-height: 100vh;
-      background: #1a1a2e;
+      background: #1e0808;
       background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0);
       background-size: 32px 32px;
       color: #e0e0e0;
@@ -1012,7 +1012,7 @@ function getCombatCSS() {
     .combat-header-bar {
       display: flex; align-items: center; justify-content: space-between;
       padding: 0.8rem 1rem;
-      background: #1a1a2e;
+      background: #1e0808;
       border-bottom: 1px solid rgba(255,255,255,0.15);
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
     }
@@ -1210,8 +1210,8 @@ function getCombatCSS() {
 
     /* TRAINER-INFO STYLE POPUPS */
     .popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
-    .popup-content { background: linear-gradient(135deg,#2a2a2a,#1f1f1f); border: 3px solid #FFDE00; border-radius: 20px; padding: clamp(1.5rem,3vw,2.5rem); max-width: min(90vw,600px); max-height: 80vh; overflow-y: auto; position: relative; box-shadow: 0 15px 40px rgba(0,0,0,0.8); width: 92%; }
-    .popup-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: clamp(1rem,2vh,1.5rem); padding-bottom: clamp(0.75rem,1.5vh,1rem); border-bottom: 2px solid #FFDE00; }
+    .popup-content { background: linear-gradient(160deg,var(--surface-solid),var(--surface-solid-deep)); border: 1px solid var(--border-accent); border-radius: 20px; padding: clamp(1.5rem,3vw,2.5rem); max-width: min(90vw,600px); max-height: 80vh; overflow-y: auto; position: relative; box-shadow: 0 15px 40px rgba(0,0,0,0.8); width: 92%; }
+    .popup-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: clamp(1rem,2vh,1.5rem); padding-bottom: clamp(0.75rem,1.5vh,1rem); border-bottom: 1px solid var(--border-accent); }
     .popup-title { font-size: clamp(1.3rem,3vw,1.8rem); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #FFDE00; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
     .popup-close { background: linear-gradient(135deg,#EE1515,#C91010); color: #fff; border: 2px solid #333; border-radius: 50%; width: clamp(35px,7vw,45px); height: clamp(35px,7vw,45px); font-size: clamp(1.2rem,2.5vw,1.6rem); font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; flex-shrink: 0; }
     .popup-close:hover { transform: scale(1.1) rotate(90deg); box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
@@ -1239,7 +1239,7 @@ function getCombatCSS() {
     .inventory-search-results { list-style: none; padding: 0; margin: 0; overflow-y: auto; display: none; }
     .inventory-search-results.active { display: block; }
     .inventory-search-no-results { padding: 0.75rem 1rem; color: #999; font-size: 0.88rem; text-align: center; }
-    .inventory-main { flex: 1; display: flex; flex-direction: column; padding: clamp(1rem,2.5vw,1.5rem); background: linear-gradient(135deg,#2a2a2a,#1f1f1f); overflow: hidden; }
+    .inventory-main { flex: 1; display: flex; flex-direction: column; padding: clamp(1rem,2.5vw,1.5rem); background: linear-gradient(160deg,var(--surface-solid),var(--surface-solid-deep)); overflow: hidden; }
     .item-info-card { flex: 1; display: flex; flex-direction: column; background: linear-gradient(135deg,#353535,#2d2d2d); border-radius: 12px; padding: clamp(1rem,2vw,1.5rem); box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-bottom: 1rem; overflow-y: auto; border: 2px solid rgba(255,222,0,0.3); }
     .item-name { font-size: clamp(1.2rem,3vw,1.8rem); color: #FFDE00; margin: 0 0 0.75rem 0; padding-bottom: 0.75rem; border-bottom: 2px solid rgba(255,222,0,0.3); font-weight: 900; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
     .item-details { display: flex; flex-direction: column; gap: 1rem; flex: 1; }

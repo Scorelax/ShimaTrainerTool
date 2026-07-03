@@ -26,7 +26,7 @@ export function renderPokemonForm() {
             radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
+            linear-gradient(to bottom, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
           position: relative;
           overflow-x: hidden;
@@ -81,7 +81,7 @@ export function renderPokemonForm() {
           background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
           padding: clamp(1.5rem, 3vw, 2.5rem);
           border-radius: clamp(15px, 3vw, 25px);
-          border: clamp(2px, 0.5vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.4),
                       inset 0 clamp(-2px, -0.5vh, -4px) 0 rgba(0,0,0,0.05);
           margin-bottom: 2vh;
@@ -120,7 +120,7 @@ export function renderPokemonForm() {
 
         .abilities-container {
           padding: clamp(0.75rem, 1.5vh, 1rem);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(10px, 2vw, 15px);
           max-height: clamp(250px, 40vh, 350px);
           overflow-y: auto;
@@ -175,7 +175,7 @@ export function renderPokemonForm() {
         .button-primary {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(10px, 2vw, 15px);
           font-size: clamp(1rem, 2vw, 1.2rem);
           font-weight: 900;
@@ -263,9 +263,9 @@ export function renderPokemonForm() {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
           left: clamp(15px, 3vw, 20px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
-          border: 3px solid rgba(255,222,0,0.8);
+          background: var(--surface-glass);
+          color: var(--text);
+          border: 1px solid var(--border-subtle);
           border-radius: 50%;
           width: clamp(45px, 10vw, 60px);
           height: clamp(45px, 10vw, 60px);

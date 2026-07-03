@@ -48,7 +48,7 @@ export function renderEditPokemon(pokemonName) {
             radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+            linear-gradient(135deg, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
           position: relative;
         }
@@ -101,7 +101,7 @@ export function renderEditPokemon(pokemonName) {
           padding: clamp(2rem, 4vw, 3rem);
           border-radius: clamp(15px, 3vw, 20px);
           box-shadow: 0 clamp(8px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.5);
-          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           max-height: 75vh;
           overflow-y: auto;
         }
@@ -137,7 +137,7 @@ export function renderEditPokemon(pokemonName) {
           width: 100%;
           padding: clamp(0.6rem, 1.5vw, 0.8rem);
           font-size: clamp(0.95rem, 2vw, 1.1rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.5);
+          border: 1px solid rgba(255,222,0,0.35);
           border-radius: clamp(8px, 1.5vw, 12px);
           box-sizing: border-box;
           background: white;
@@ -175,7 +175,7 @@ export function renderEditPokemon(pokemonName) {
           border-radius: clamp(15px, 3vw, 20px);
           font-size: clamp(0.85rem, 1.8vw, 1rem);
           font-weight: 700;
-          border: clamp(2px, 0.3vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
         }
 
         .chip-remove {
@@ -195,7 +195,7 @@ export function renderEditPokemon(pokemonName) {
           padding: clamp(0.4rem, 1vh, 0.6rem) clamp(0.8rem, 2vw, 1.2rem);
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(8px, 1.5vw, 10px);
           font-size: clamp(0.85rem, 1.8vw, 1rem);
           font-weight: 900;
@@ -221,7 +221,7 @@ export function renderEditPokemon(pokemonName) {
           max-height: clamp(150px, 25vh, 200px);
           overflow-y: auto;
           background: white;
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-top: none;
           border-radius: 0 0 clamp(8px, 1.5vw, 12px) clamp(8px, 1.5vw, 12px);
           z-index: 100;
@@ -269,7 +269,7 @@ export function renderEditPokemon(pokemonName) {
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.3vw, 1px);
           transition: all 0.3s;
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
         }
 
@@ -291,7 +291,7 @@ export function renderEditPokemon(pokemonName) {
         .collapsible-content {
           display: none;
           padding: clamp(1rem, 2.5vh, 1.5rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.5);
+          border: 1px solid rgba(255,222,0,0.35);
           border-top: none;
           border-radius: 0 0 clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px);
           max-height: clamp(200px, 35vh, 300px);
@@ -336,7 +336,7 @@ export function renderEditPokemon(pokemonName) {
           width: 100%;
           padding: clamp(0.6rem, 1.5vw, 0.8rem);
           font-size: clamp(0.95rem, 2vw, 1.1rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.5);
+          border: 1px solid rgba(255,222,0,0.35);
           border-radius: clamp(8px, 1.5vw, 12px);
           background: white;
           font-weight: 600;
@@ -359,7 +359,7 @@ export function renderEditPokemon(pokemonName) {
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: clamp(0.5px, 0.3vw, 1px);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-bottom: none;
           box-shadow: 0 clamp(3px, 0.8vh, 5px) clamp(8px, 1.5vh, 12px) rgba(0,0,0,0.3);
         }
@@ -374,7 +374,7 @@ export function renderEditPokemon(pokemonName) {
           width: 100%;
           padding: clamp(0.8rem, 2vw, 1rem);
           font-size: clamp(0.95rem, 2vw, 1.1rem);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-top: none;
           border-radius: 0 0 clamp(10px, 2vw, 15px) clamp(10px, 2vw, 15px);
           background: rgba(255,255,255,0.95);
@@ -439,11 +439,11 @@ export function renderEditPokemon(pokemonName) {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
           left: clamp(15px, 3vw, 20px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: var(--surface-glass);
+          color: var(--text);
           width: clamp(45px, 9vw, 55px);
           height: clamp(45px, 9vw, 55px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.5rem, 3.5vw, 2rem);
           font-weight: bold;
@@ -966,7 +966,7 @@ function injectFeatModalStyles() {
     }
     .feat-modal {
       background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-      border: 4px solid #FFDE00; border-radius: 24px;
+      border: 2px solid var(--border-accent); border-radius: 24px;
       padding: 2rem; max-width: min(90vw, 480px); width: 100%;
       box-shadow: 0 20px 60px rgba(0,0,0,0.6);
       max-height: 80vh; overflow-y: auto; box-sizing: border-box;

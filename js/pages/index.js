@@ -4,7 +4,7 @@ export function renderIndex() {
     <div class="landing-page">
       <style>
         body, .content {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 50%, #A00808 100%);
+          background: linear-gradient(135deg, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
         }
 
@@ -84,7 +84,7 @@ export function renderIndex() {
           font-weight: bold;
           color: #333;
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          border: clamp(3px, 0.5vw, 6px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(15px, 3vw, 30px);
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -132,7 +132,7 @@ export function renderIndex() {
           right: clamp(15px, 3vw, 20px);
           background: linear-gradient(135deg, #FF6B6B 0%, #EE5A5A 100%);
           color: white;
-          border: clamp(2px, 0.5vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(8px, 2vw, 12px);
           padding: clamp(0.6rem, 1.5vh, 0.9rem) clamp(1rem, 2.5vw, 1.5rem);
           font-size: clamp(0.85rem, 2vw, 1rem);
@@ -228,7 +228,7 @@ export function renderIndex() {
 
         .cache-modal {
           background: linear-gradient(145deg, #2a0808 0%, #1a0404 100%);
-          border: 2px solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(12px, 2.5vw, 20px);
           padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.5rem, 5vw, 3rem);
           max-width: min(420px, 90vw);

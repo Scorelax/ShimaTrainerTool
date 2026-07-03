@@ -18,7 +18,7 @@ export function renderMyPokemon() {
             radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
             radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
+            linear-gradient(to bottom, #c41111 0%, #970909 50%, #6e0404 100%);
           min-height: 100vh;
           position: relative;
         }
@@ -102,7 +102,7 @@ export function renderMyPokemon() {
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
           margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
           background-color: #fff;
           cursor: pointer;
@@ -143,7 +143,7 @@ export function renderMyPokemon() {
         .nav-button {
           background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
           color: #333;
-          border: clamp(2px, 0.3vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(10px, 2vw, 20px);
           padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 4vw, 3rem);
           font-size: clamp(0.9rem, 2vw, 1.3rem);
@@ -183,7 +183,7 @@ export function renderMyPokemon() {
         .register-button {
           background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
           color: white;
-          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(30px, 8vw, 60px);
           padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 5vw, 3.5rem);
           font-size: clamp(1rem, 2.5vw, 1.5rem);
@@ -212,11 +212,11 @@ export function renderMyPokemon() {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
           left: clamp(15px, 3vw, 20px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: var(--surface-glass);
+          color: var(--text);
           width: clamp(45px, 9vw, 55px);
           height: clamp(45px, 9vw, 55px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: 50%;
           font-size: clamp(1.5rem, 3.5vw, 2rem);
           font-weight: bold;
@@ -259,7 +259,7 @@ export function renderMyPokemon() {
           box-sizing: border-box;
           padding: clamp(0.6rem, 1.3vh, 0.85rem) clamp(1rem, 2.5vw, 1.4rem);
           background: rgba(255,255,255,0.92);
-          border: clamp(2px, 0.4vw, 3px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(20px, 5vw, 40px);
           color: #333;
           font-size: clamp(0.9rem, 2vw, 1.1rem);
@@ -289,7 +289,7 @@ export function renderMyPokemon() {
         .party-button {
           background: linear-gradient(135deg, #3B4CCA 0%, #2A3BAA 100%);
           color: white;
-          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(30px, 8vw, 60px);
           padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 5vw, 3.5rem);
           font-size: clamp(1rem, 2.5vw, 1.5rem);
@@ -313,7 +313,7 @@ export function renderMyPokemon() {
         .typings-button {
           background: linear-gradient(135deg, #7B2FBE 0%, #5E1FA0 100%);
           color: white;
-          border: clamp(2px, 0.4vw, 5px) solid #FFDE00;
+          border: 2px solid var(--border-accent);
           border-radius: clamp(30px, 8vw, 60px);
           padding: clamp(0.75rem, 1.5vh, 1.5rem) clamp(1.5rem, 5vw, 3.5rem);
           font-size: clamp(1rem, 2.5vw, 1.5rem);
@@ -612,7 +612,7 @@ export function renderMyPokemon() {
           height: clamp(42px, 9vw, 56px);
           border-radius: 8px;
           object-fit: cover;
-          border: 2px solid #FFDE00;
+          border: 2px solid var(--border-accent);
           background: #fff;
           flex-shrink: 0;
         }

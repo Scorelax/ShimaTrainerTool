@@ -1250,9 +1250,12 @@ function handleGameDataRoute(action, params) {
 
     case 'clear-cache':
       // GET: ?route=game-data&action=clear-cache
-      // Clears the server-side upstream cache; use after editing the
-      // pokedex config, moves or items so changes show up immediately.
-      return clearServerCache();
+      // Refreshes the server-side upstream cache IN PLACE (fetch fresh data,
+      // overwrite cache) rather than just clearing it — the cache never goes
+      // cold, and a failed fetch keeps the previous data. Used by the Reset
+      // Cache button after editing the pokedex config, moves or items.
+      warmUpstreamCache();
+      return { status: 'success', message: 'Server cache refreshed' };
 
     default:
       throw new Error('Unknown game-data action: ' + action);

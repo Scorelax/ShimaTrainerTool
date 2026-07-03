@@ -442,17 +442,18 @@ export function attachIndexListeners() {
     setTimeout(() => {
       document.getElementById('cacheModalCancel')?.addEventListener('click', hideCacheModal);
       document.getElementById('cacheModalConfirm')?.addEventListener('click', async () => {
-        // Show progress while the server cache is cleared
+        // Show progress while the server refreshes its data
         showCacheModal({
           icon: '⏳',
-          title: 'Clearing...',
-          message: 'Clearing server and device caches.',
+          title: 'Refreshing...',
+          message: 'Fetching fresh game data on the server. This can take up to a minute.',
           buttons: '',
         });
 
-        // Clear the SERVER-side upstream cache first (pokemon dex, moves,
-        // items, pokedex config), so the next login refetches fresh data.
-        // Best-effort: keep going even if the backend is unreachable.
+        // Refresh the SERVER-side upstream cache in place (pokemon dex,
+        // moves, items, pokedex config) so the data is fresh AND the cache
+        // stays warm. Best-effort: keep going even if the backend is
+        // unreachable.
         try {
           await GameDataAPI.clearServerCache();
         } catch (e) {

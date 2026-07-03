@@ -589,14 +589,16 @@ export class GameDataAPI {
   }
 
   /**
-   * Clear the SERVER-side upstream cache (pokemon DB, moves, items,
-   * pokedex config), forcing fresh fetches on the next request.
-   * Used by the Reset Cache button. No-op on backends without the route.
+   * Refresh the SERVER-side upstream cache in place (pokemon DB, moves,
+   * items, pokedex config are re-fetched and overwritten, so the cache
+   * stays warm). Used by the Reset Cache button. Can take a while when
+   * the upstream scripts are slow, hence the long timeout.
+   * No-op on backends without the route.
    */
   static async clearServerCache() {
     return API.request('game-data', 'clear-cache', {}, {
       useCache: false,
-      timeout: 15000,
+      timeout: HEAVY_TIMEOUT,
       retries: 0
     });
   }

@@ -1,4 +1,6 @@
 // Landing Page (Index) - Continue Journey or Start New Adventure
+import { GameDataAPI } from '../api.js';
+
 export function renderIndex() {
   return `
     <div class="landing-page">
@@ -439,7 +441,24 @@ export function attachIndexListeners() {
     // Attach buttons after injecting HTML
     setTimeout(() => {
       document.getElementById('cacheModalCancel')?.addEventListener('click', hideCacheModal);
-      document.getElementById('cacheModalConfirm')?.addEventListener('click', () => {
+      document.getElementById('cacheModalConfirm')?.addEventListener('click', async () => {
+        // Show progress while the server cache is cleared
+        showCacheModal({
+          icon: '⏳',
+          title: 'Clearing...',
+          message: 'Clearing server and device caches.',
+          buttons: '',
+        });
+
+        // Clear the SERVER-side upstream cache first (pokemon dex, moves,
+        // items, pokedex config), so the next login refetches fresh data.
+        // Best-effort: keep going even if the backend is unreachable.
+        try {
+          await GameDataAPI.clearServerCache();
+        } catch (e) {
+          console.warn('Server cache clear failed (continuing):', e.message);
+        }
+
         // Clear sessionStorage
         sessionStorage.clear();
 
@@ -462,13 +481,13 @@ export function attachIndexListeners() {
         showCacheModal({
           icon: '✅',
           title: 'Cache Cleared!',
-          message: 'All session data has been cleared. The page will now reload.',
+          message: 'Server and device caches have been cleared. The page will now reload.',
           buttons: `<button class="cache-modal-btn cache-modal-ok" id="cacheModalOk">OK</button>`,
         });
 
         setTimeout(() => {
           document.getElementById('cacheModalOk')?.addEventListener('click', () => {
-            window.location.reload(true);
+            window.location.reload();
           });
         }, 0);
       });

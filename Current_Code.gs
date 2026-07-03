@@ -203,9 +203,11 @@ const REGISTERED_POKEMON_COLUMN_INDICES = {
 
 // ------------------------------------------------------------------Import Pokémon information Start--------------------------------------------------
 // Import Move Data from external source
-function fetchMoveData() {
-    const cached = cacheGetChunked('upstream:moves');
-    if (cached) return cached;
+function fetchMoveData(force) {
+    if (!force) {
+        const cached = cacheGetChunked('upstream:moves');
+        if (cached) return cached;
+    }
     const response = UrlFetchApp.fetch(MOVE_DATA_URL);
     const jsonData = JSON.parse(response.getContentText());
     cachePutChunked('upstream:moves', jsonData, UPSTREAM_CACHE_TTL);
@@ -219,9 +221,11 @@ function fetchRegisteredPokemon() {
 }
 
 // Full Pokedex config (registered list, visibility, defaults, splashCount)
-function getPokedexConfig() {
-  const cached = cacheGetChunked('upstream:pokedexConfig');
-  if (cached) return cached;
+function getPokedexConfig(force) {
+  if (!force) {
+    const cached = cacheGetChunked('upstream:pokedexConfig');
+    if (cached) return cached;
+  }
 
   const startTime = Date.now();
   try {
@@ -317,10 +321,13 @@ function cacheGetChunked(key) {
   }
 }
 
-// Cached fetch of the full upstream Pokemon database (the slowest dependency)
-function fetchUpstreamPokemonData() {
-  const cached = cacheGetChunked('upstream:pokemonDB');
-  if (cached) return cached;
+// Cached fetch of the full upstream Pokemon database (the slowest dependency).
+// Pass force=true to bypass the cache and refresh it (used by the warmer).
+function fetchUpstreamPokemonData(force) {
+  if (!force) {
+    const cached = cacheGetChunked('upstream:pokemonDB');
+    if (cached) return cached;
+  }
   const startTime = Date.now();
   const response = UrlFetchApp.fetch(POKEMON_DATA_URL);
   const data = JSON.parse(response.getContentText());
@@ -329,16 +336,20 @@ function fetchUpstreamPokemonData() {
   return data;
 }
 
-// Cache warmer — run this on a time-based trigger (e.g. hourly) so player
-// logins never hit the slow cold path. Set up via the Apps Script editor:
-// Triggers (clock icon) → Add Trigger → warmUpstreamCache → time-driven →
-// hour timer → every hour. Uses the saved script, no redeploy needed.
+// Cache warmer — run this on a time-based trigger so player logins never hit
+// the slow cold path. Each run FORCE-refreshes the upstream data, which both
+// resets the 6h cache TTL and picks up upstream edits — so with a trigger
+// every 4 hours the cache is always warm and data is at most 4h stale.
+// If a fetch fails, the previous cache entry is kept (only replaced on
+// success). Setup: Triggers (clock icon) → Add Trigger → warmUpstreamCache →
+// time-driven → hour timer → every 4 hours. Uses the saved script, no
+// redeploy needed.
 function warmUpstreamCache() {
   const startTime = Date.now();
-  try { fetchUpstreamPokemonData(); } catch (e) { Logger.log('warm: pokemonDB failed: ' + e); }
-  try { fetchMoveData(); } catch (e) { Logger.log('warm: moves failed: ' + e); }
-  try { loadItemsData(); } catch (e) { Logger.log('warm: items failed: ' + e); }
-  try { getPokedexConfig(); } catch (e) { Logger.log('warm: pokedexConfig failed: ' + e); }
+  try { fetchUpstreamPokemonData(true); } catch (e) { Logger.log('warm: pokemonDB failed: ' + e); }
+  try { fetchMoveData(true); } catch (e) { Logger.log('warm: moves failed: ' + e); }
+  try { loadItemsData(true); } catch (e) { Logger.log('warm: items failed: ' + e); }
+  try { getPokedexConfig(true); } catch (e) { Logger.log('warm: pokedexConfig failed: ' + e); }
   Logger.log('warmUpstreamCache done in ' + (Date.now() - startTime) + ' ms');
 }
 
@@ -2454,9 +2465,11 @@ function sanitizeString(str) {
     .trim();                    // Trim leading and trailing spaces
 }
 
-function loadItemsData() {
-    const cached = cacheGetChunked('upstream:items');
-    if (cached) return cached;
+function loadItemsData(force) {
+    if (!force) {
+        const cached = cacheGetChunked('upstream:items');
+        if (cached) return cached;
+    }
     try {
         // Fetch data from the URL stored in the ITEMS_DATA constant
         const response = UrlFetchApp.fetch(ITEMS_DATA);

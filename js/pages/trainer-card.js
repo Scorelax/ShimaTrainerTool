@@ -176,14 +176,14 @@ export function renderTrainerCard() {
   }
 
   const html = `
-    <div class="trainer-card-page">
+    <div class="trainer-card-page theme-dark">
       <style>
         body, .content {
           background:
-            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
-            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
-            linear-gradient(to bottom, #EE1515 0%, #C91010 50%, #A00808 100%);
+            radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.06) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.12) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.10) 0%, transparent 40%),
+            linear-gradient(to bottom, #1a1a2e 0%, #14141f 100%);
           min-height: 100vh;
           position: relative;
           overflow-x: hidden;
@@ -242,15 +242,15 @@ export function renderTrainerCard() {
           transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
           border-radius: clamp(15px, 3vw, 25px);
           overflow: hidden;
-          border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
-          box-shadow: 0 clamp(10px, 2vh, 15px) clamp(25px, 5vh, 40px) rgba(0,0,0,0.5);
+          border: 2px solid var(--border-accent);
+          box-shadow: var(--shadow-md);
           background: white;
         }
 
         .trainer-image-container:hover {
           transform: translateY(clamp(-5px, -1.2vh, -8px)) scale(1.02);
-          box-shadow: 0 clamp(15px, 3vh, 25px) clamp(40px, 8vh, 60px) rgba(0,0,0,0.6),
-                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.6);
+          border-color: var(--poke-yellow);
+          box-shadow: var(--shadow-lg), var(--glow-yellow);
         }
 
         .trainer-image {
@@ -326,8 +326,8 @@ export function renderTrainerCard() {
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
           margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          border: 2px solid var(--border-accent);
+          box-shadow: var(--shadow-md);
           background-color: #fff;
         }
 
@@ -399,8 +399,8 @@ export function renderTrainerCard() {
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
           margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          border: 2px solid var(--border-accent);
+          box-shadow: var(--shadow-md);
           background-color: #fff;
         }
 
@@ -435,8 +435,8 @@ export function renderTrainerCard() {
           align-items: center;
           gap: clamp(0.3rem, 0.6vw, 0.5rem);
           padding: clamp(0.5rem, 1vh, 0.75rem) clamp(1rem, 2vw, 1.5rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.6);
-          border-radius: clamp(10px, 2vw, 15px);
+          border: 1px solid rgba(255,222,0,0.35);
+          border-radius: var(--radius-md);
           color: white;
           font-weight: 800;
           font-size: clamp(0.8rem, 1.6vw, 1rem);
@@ -444,14 +444,13 @@ export function renderTrainerCard() {
           letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 clamp(4px, 0.8vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.3);
+          box-shadow: var(--shadow-sm);
           background: linear-gradient(135deg, #3B4CCA 0%, #2A3BA0 100%);
         }
 
         .my-pokemon-btn:hover {
           transform: translateY(clamp(-2px, -0.5vh, -3px));
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4),
-                      0 0 clamp(15px, 3vw, 20px) rgba(255,222,0,0.4);
+          box-shadow: var(--shadow-md), var(--glow-yellow-soft);
         }
 
         .my-pokemon-btn:active {
@@ -463,8 +462,8 @@ export function renderTrainerCard() {
           align-items: center;
           gap: clamp(0.3rem, 0.6vw, 0.5rem);
           padding: clamp(0.5rem, 1vh, 0.75rem) clamp(1rem, 2vw, 1.5rem);
-          border: clamp(2px, 0.4vw, 3px) solid rgba(255,222,0,0.6);
-          border-radius: clamp(10px, 2vw, 15px);
+          border: 1px solid rgba(255,222,0,0.35);
+          border-radius: var(--radius-md);
           color: white;
           font-weight: 800;
           font-size: clamp(0.8rem, 1.6vw, 1rem);
@@ -472,7 +471,7 @@ export function renderTrainerCard() {
           letter-spacing: clamp(0.3px, 0.2vw, 0.5px);
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 clamp(4px, 0.8vh, 6px) clamp(10px, 2vh, 15px) rgba(0,0,0,0.3);
+          box-shadow: var(--shadow-sm);
         }
 
         .short-rest-btn {
@@ -488,16 +487,16 @@ export function renderTrainerCard() {
           position: fixed;
           top: clamp(15px, 3vh, 25px);
           right: clamp(15px, 3vw, 25px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
+          background: rgba(20, 20, 31, 0.75);
+          color: var(--text);
           width: clamp(45px, 9vw, 60px);
           height: clamp(45px, 9vw, 60px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
+          border: 1px solid var(--border-subtle);
           border-radius: 50%;
           font-size: clamp(1.3rem, 2.8vw, 1.8rem);
           font-weight: 900;
           cursor: pointer;
-          box-shadow: 0 clamp(8px, 2vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
+          box-shadow: var(--shadow-md);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           align-items: center;
@@ -507,10 +506,9 @@ export function renderTrainerCard() {
         }
 
         .combat-corner-btn:hover {
-          transform: scale(1.15);
-          box-shadow: 0 clamp(12px, 3vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
-                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.6);
-          border-color: #FFC700;
+          transform: scale(1.12);
+          box-shadow: var(--shadow-md), var(--glow-yellow);
+          border-color: var(--border-accent);
         }
 
         .combat-corner-btn:active {
@@ -519,8 +517,7 @@ export function renderTrainerCard() {
 
         .rest-btn:hover {
           transform: translateY(clamp(-2px, -0.5vh, -3px));
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4),
-                      0 0 clamp(15px, 3vw, 20px) rgba(255,222,0,0.4);
+          box-shadow: var(--shadow-md), var(--glow-yellow-soft);
         }
 
         .rest-btn:active {
@@ -577,8 +574,8 @@ export function renderTrainerCard() {
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
           margin-bottom: clamp(0.5rem, 1vh, 0.75rem);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          border: 2px solid var(--border-accent);
+          box-shadow: var(--shadow-md);
           background-color: #fff;
         }
 
@@ -591,204 +588,9 @@ export function renderTrainerCard() {
           text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
 
-        /* Back Button */
-        .back-button {
-          position: fixed;
-          top: clamp(15px, 3vh, 25px);
-          left: clamp(15px, 3vw, 25px);
-          background: linear-gradient(135deg, #FFFFFF 0%, #F5F5F5 100%);
-          color: #333;
-          width: clamp(45px, 9vw, 60px);
-          height: clamp(45px, 9vw, 60px);
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          border-radius: 50%;
-          font-size: clamp(1.6rem, 3.5vw, 2.2rem);
-          font-weight: 900;
-          cursor: pointer;
-          box-shadow: 0 clamp(8px, 2vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.4);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          padding: 0;
-        }
+        /* Back button: shared theme-dark styles in css/styles.css */
 
-        .back-button:hover {
-          transform: scale(1.15);
-          box-shadow: 0 clamp(12px, 3vh, 18px) clamp(30px, 6vh, 45px) rgba(0,0,0,0.5),
-                      0 0 clamp(20px, 4vw, 30px) rgba(255,222,0,0.6);
-          border-color: #FFC700;
-        }
-
-        .back-button:active {
-          transform: scale(1.05);
-        }
-
-        /* Popup Overlay Styles (for rest popups) */
-        .popup-overlay {
-          display: none;
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.7);
-          z-index: 2000;
-          justify-content: center;
-          align-items: center;
-          backdrop-filter: blur(3px);
-        }
-
-        .popup-overlay.active {
-          display: flex;
-        }
-
-        .popup-content {
-          background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
-          border: clamp(3px, 0.6vw, 5px) solid #FFDE00;
-          border-radius: clamp(15px, 3vw, 20px);
-          padding: clamp(1.5rem, 3vw, 2.5rem);
-          max-width: min(90vw, 600px);
-          max-height: 80vh;
-          overflow-y: auto;
-          position: relative;
-          box-shadow: 0 15px 40px rgba(0,0,0,0.8);
-        }
-
-        .popup-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: clamp(1rem, 2vh, 1.5rem);
-          padding-bottom: clamp(0.75rem, 1.5vh, 1rem);
-          border-bottom: clamp(2px, 0.4vw, 3px) solid #FFDE00;
-        }
-
-        .popup-title {
-          font-size: clamp(1.3rem, 3vw, 1.8rem);
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.3vw, 1px);
-          color: #FFDE00;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-        }
-
-        .popup-close {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
-          color: white;
-          border: clamp(2px, 0.4vw, 3px) solid #333;
-          border-radius: 50%;
-          width: clamp(35px, 7vw, 45px);
-          height: clamp(35px, 7vw, 45px);
-          font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-          font-weight: bold;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          flex-shrink: 0;
-        }
-
-        .popup-close:hover {
-          transform: scale(1.1) rotate(90deg);
-          box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-        }
-
-        .popup-body {
-          color: #e0e0e0;
-          font-size: clamp(0.95rem, 2vw, 1.1rem);
-          line-height: 1.6;
-        }
-
-        /* Exit Confirmation Modal */
-        .exit-modal {
-          display: none;
-          position: fixed;
-          left: 0;
-          top: 0;
-          width: 100%;
-          height: 100%;
-          background-color: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(5px);
-          z-index: 9999;
-          justify-content: center;
-          align-items: center;
-        }
-
-        .exit-modal.active {
-          display: flex;
-        }
-
-        .exit-modal-content {
-          background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
-          border: clamp(4px, 0.7vw, 6px) solid #FFDE00;
-          border-radius: clamp(20px, 4vw, 30px);
-          padding: clamp(2rem, 4vh, 3rem);
-          box-shadow: 0 clamp(15px, 3vh, 25px) clamp(40px, 8vh, 60px) rgba(0,0,0,0.6),
-                      inset 0 clamp(-4px, -0.8vh, -6px) 0 rgba(0,0,0,0.05);
-          text-align: center;
-          width: 90%;
-          max-width: 500px;
-        }
-
-        .exit-modal-content h2 {
-          font-size: clamp(1.8rem, 4vw, 2.5rem);
-          margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
-          color: #333;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: clamp(0.5px, 0.3vw, 1px);
-        }
-
-        .exit-modal-content p {
-          font-size: clamp(1rem, 2.2vw, 1.4rem);
-          color: #666;
-          margin-bottom: clamp(1.5rem, 3vh, 2rem);
-        }
-
-        .exit-buttons {
-          display: flex;
-          gap: clamp(0.75rem, 1.5vw, 1rem);
-          justify-content: center;
-        }
-
-        .exit-confirm {
-          background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
-          color: white;
-          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
-          font-weight: 900;
-          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1.5rem, 3vw, 2rem);
-          border: none;
-          border-radius: clamp(12px, 2.5vw, 18px);
-          cursor: pointer;
-          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 18px) rgba(76,175,80,0.4);
-          transition: all 0.3s;
-        }
-
-        .exit-confirm:hover {
-          transform: translateY(clamp(-2px, -0.5vh, -3px));
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(76,175,80,0.5);
-        }
-
-        .exit-cancel {
-          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
-          color: white;
-          font-size: clamp(1.1rem, 2.3vw, 1.5rem);
-          font-weight: 900;
-          padding: clamp(0.75rem, 1.5vh, 1rem) clamp(1.5rem, 3vw, 2rem);
-          border: none;
-          border-radius: clamp(12px, 2.5vw, 18px);
-          cursor: pointer;
-          box-shadow: 0 clamp(5px, 1vh, 8px) clamp(12px, 2.5vh, 18px) rgba(238,21,21,0.4);
-          transition: all 0.3s;
-        }
-
-        .exit-cancel:hover {
-          transform: translateY(clamp(-2px, -0.5vh, -3px));
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(18px, 3.5vh, 25px) rgba(238,21,21,0.5);
-        }
+        /* Popups and confirmation modals: shared theme-dark styles in css/styles.css */
 
         /* Badge Collection */
         .badge-section {
@@ -833,8 +635,8 @@ export function renderTrainerCard() {
           aspect-ratio: 1;
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;
-          border: clamp(3px, 0.6vw, 4px) solid #FFDE00;
-          box-shadow: 0 clamp(8px, 1.5vh, 12px) clamp(20px, 4vh, 30px) rgba(0,0,0,0.5);
+          border: 2px solid var(--border-accent);
+          box-shadow: var(--shadow-sm);
           background-color: transparent;
         }
 

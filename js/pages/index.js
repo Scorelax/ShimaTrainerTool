@@ -321,6 +321,20 @@ export function renderIndex() {
           box-shadow: 0 4px 14px rgba(0,0,0,0.4), 0 0 14px rgba(255,222,0,0.4);
           transform: translateY(-2px);
         }
+
+        /* App Version Tag */
+        .app-version-tag {
+          position: fixed;
+          bottom: clamp(8px, 1.5vh, 14px);
+          right: clamp(10px, 2vw, 16px);
+          font-family: monospace;
+          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
+          font-weight: 700;
+          color: rgba(255, 255, 255, 0.55);
+          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+          z-index: 1000;
+          pointer-events: none;
+        }
       </style>
 
       <!-- Cache Reset Confirm Modal -->
@@ -353,11 +367,30 @@ export function renderIndex() {
           Start New Adventure
         </button>
       </div>
+
+      <div class="app-version-tag" id="appVersionTag"></div>
     </div>
   `;
 }
 
 export function attachIndexListeners() {
+  // App version tag — reads the ACTIVE service worker cache name, so it shows
+  // what this device is really running (not what the code claims to be).
+  const versionTag = document.getElementById('appVersionTag');
+  if (versionTag) {
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        const versions = names
+          .map(n => n.match(/^pokemon-dnd-v(\d+)$/))
+          .filter(Boolean)
+          .map(m => parseInt(m[1], 10));
+        versionTag.textContent = versions.length ? `v${Math.max(...versions)}` : 'no cache yet';
+      }).catch(() => { versionTag.textContent = 'cache unavailable'; });
+    } else {
+      versionTag.textContent = 'no sw support';
+    }
+  }
+
   // Show TitleScreen loading screen immediately when Continue Journey is clicked
   const continueBtn = document.querySelector('[data-route="continue-journey"]');
   if (continueBtn) {

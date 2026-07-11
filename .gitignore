@@ -27,3 +27,11 @@ build/
 # Logs
 *.log
 logs/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Pi server live database - never commit
+pi-server/data/

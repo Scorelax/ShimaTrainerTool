@@ -5,9 +5,17 @@
 // CONFIGURATION
 // ============================================================================
 
-// Replace with your actual Google Apps Script deployment URL
+// When the app is served by the pi-server itself (localhost test run, or
+// the Raspberry Pi later), talk to that same server. When served from
+// GitHub Pages (the live player-facing version), keep using Google Apps
+// Script until cutover.
+const SERVED_BY_PI_SERVER = window.location.protocol.startsWith('http')
+  && !window.location.hostname.endsWith('github.io');
+
 const API_CONFIG = {
-  baseUrl: 'https://script.google.com/macros/s/AKfycbwXsojbcIhuqpYeWFVgsMzf74HvwvV7thts7K6VBV49CWHCNFQ5aKBGeMlWpJaG2YzC/exec',
+  baseUrl: SERVED_BY_PI_SERVER
+    ? `${window.location.origin}/api`
+    : 'https://script.google.com/macros/s/AKfycbwXsojbcIhuqpYeWFVgsMzf74HvwvV7thts7K6VBV49CWHCNFQ5aKBGeMlWpJaG2YzC/exec',
   timeout: 30000 // 30 seconds
 };
 

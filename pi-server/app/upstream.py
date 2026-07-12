@@ -107,12 +107,28 @@ def registered_pokemon_names(conn):
 
 
 def warm_upstream(conn):
-    """Force-refresh every snapshot; failures keep the previous data."""
-    for fn in (fetch_pokemon_db, fetch_moves, fetch_items, fetch_pokedex_config):
+    """Force-refresh every snapshot; failures keep the previous data.
+
+    The four sources are fetched in parallel (each on its own SQLite
+    connection - connections aren't shareable across threads), so the wall
+    time is the slowest upstream instead of the sum of all four. The passed
+    conn is unused but kept so callers don't change."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from . import db
+
+    def refresh(fn):
+        c = db.connect()
         try:
-            fn(conn, force=True)
+            fn(c, force=True)
         except Exception:
             pass
+        finally:
+            c.close()
+
+    fns = (fetch_pokemon_db, fetch_moves, fetch_items, fetch_pokedex_config)
+    with ThreadPoolExecutor(max_workers=len(fns)) as pool:
+        list(pool.map(refresh, fns))
 
 
 def get_image_url(conn, pokemon_name, pokemon_id):

@@ -446,7 +446,7 @@ export function attachIndexListeners() {
         showCacheModal({
           icon: '⏳',
           title: 'Refreshing...',
-          message: 'Fetching fresh game data on the server. This can take up to a minute.',
+          message: 'Fetching fresh game data on the server. This usually takes a few seconds.',
           buttons: '',
         });
 

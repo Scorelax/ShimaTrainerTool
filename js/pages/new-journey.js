@@ -657,7 +657,7 @@ async function handleFormSubmit() {
 }
 
 async function getTrainerImage(trainerName) {
-  const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/';
+  const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/characters/';
   const IMAGE_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
 
   const sanitizedName = trainerName.toLowerCase()

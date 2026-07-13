@@ -9,7 +9,7 @@ import { getMoveTypeColor, getTextColorForBackground } from '../utils/pokemon-ty
 let selectedPokemon = null;
 let allEncounteredPokemon = [];
 const imageCache = new Map();
-const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/';
+const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/';
 const IMAGE_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
 
 export function renderNewPokemon() {

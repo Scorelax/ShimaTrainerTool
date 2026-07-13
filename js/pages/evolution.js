@@ -748,7 +748,7 @@ async function resolveImageUrl(pokemonName, pokemonId, isShiny) {
   const baseFileName = `${paddedId}-${sanitizedName}`;
 
   const formats = ['png', 'jpg', 'jpeg', 'jfif'];
-  const baseUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/';
+  const baseUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/';
 
   if (isShiny === 'Y') {
     for (const format of formats) {

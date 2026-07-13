@@ -1,6 +1,6 @@
 // Code.gs
 // Constants
-const IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/';
+const IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/';
 const IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
 const IMG_BACKGROUND = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/background/background.png';
 const POKEMON_DATA_URL = 'https://script.google.com/macros/s/AKfycbwIT3OS2bdCv2kkDPh6IjRRirv17iPnuttlPcY47LCHBbpNPuHF_IjVq0mCt7TkkWoW/exec?action=pokemon';

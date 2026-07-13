@@ -1,5 +1,5 @@
 // Service Worker for Pokemon D&D Trainer Tool
-const CACHE_NAME = 'pokemon-dnd-v91';
+const CACHE_NAME = 'pokemon-dnd-v92';
 
 // Files to cache for offline use (relative paths for subdirectory hosting)
 const STATIC_ASSETS = [
@@ -30,7 +30,8 @@ const STATIC_ASSETS = [
   './assets/Pokeball.png',
   './assets/Grey Pokeball.png',
   './assets/pokecenter.png',
-  './assets/Locked_Badge.png'
+  './assets/Locked_Badge.png',
+  './assets/TitleScreen.png'
 ];
 
 // Install event - cache static assets

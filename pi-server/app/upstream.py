@@ -17,7 +17,7 @@ MOVE_DATA_URL = 'https://script.google.com/macros/s/AKfycbz5jkSQ1HuCpCrbg_mePsfL
 ITEMS_DATA_URL = 'https://script.google.com/macros/s/AKfycbwIT3OS2bdCv2kkDPh6IjRRirv17iPnuttlPcY47LCHBbpNPuHF_IjVq0mCt7TkkWoW/exec?action=items'
 POKEDEX_CONFIG_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/pokedex_config.json'
 
-IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/'
+IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/'
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
 
 # Apps Script upstreams can be slow (cold starts)

@@ -24,9 +24,22 @@ app.add_middleware(
     allow_origins=['*'],
     allow_methods=['GET'],
     allow_headers=['*'],
+    expose_headers=['X-Data-Version'],
 )
 
 db.init()
+
+
+def _data_version():
+    """Newest upstream fetch time. Changes whenever the snapshots refresh
+    (Reset Cache button or scripts/refresh_upstream.py), which tells clients
+    to drop their locally cached static game data."""
+    conn = db.connect()
+    try:
+        row = conn.execute('SELECT MAX(fetched_at) FROM upstream_cache').fetchone()
+        return (row and row[0]) or 'none'
+    finally:
+        conn.close()
 
 
 def _dispatch(params):
@@ -73,7 +86,7 @@ def api(request: Request):
     except Exception as e:
         # Same contract as the Apps Script doGet: HTTP 200 with an error payload
         result = {'error': str(e), 'status': 'error'}
-    return JSONResponse(result)
+    return JSONResponse(result, headers={'X-Data-Version': _data_version()})
 
 
 # Serve the PWA from the same origin (mounted last so /api and /exec win)

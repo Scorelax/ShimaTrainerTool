@@ -74,8 +74,9 @@ class CacheManager {
 const cache = new CacheManager();
 
 // TTL for static game data (moves, items, feats, natures, pokedex config).
-// This data only changes when the sheets are edited between sessions;
-// the Reset Cache button on the landing page clears it manually.
+// The Reset Cache button clears it manually, and on the pi-server backend
+// the X-Data-Version response header clears it automatically whenever the
+// server refreshes its upstream snapshots; the TTL is the fallback bound.
 const STATIC_DATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Heavy endpoints (login bundle, full game data) get a longer timeout so a
@@ -132,6 +133,18 @@ class API {
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // Server-driven cache invalidation: the pi-server tags every response
+        // with the timestamp of its last upstream refresh. When it changes
+        // (someone pressed Reset Cache, or the scheduled refresh ran), drop
+        // the locally cached game data so this device picks up the new
+        // content on its next fetch. Backends without the header (Apps
+        // Script) are unaffected.
+        const dataVersion = response.headers.get('X-Data-Version');
+        if (dataVersion && localStorage.getItem('dataVersion') !== dataVersion) {
+          cache.clear();
+          localStorage.setItem('dataVersion', dataVersion);
         }
 
         const data = await response.json();

@@ -5,13 +5,40 @@ const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-poke
 const SPLASH_API_URL = 'https://api.github.com/repos/Benjakronk/shima-pokedex/contents/images/splashes';
 const FALLBACK_SPLASH_COUNT = 50; // Fallback if API call fails
 
-// Fetch the list of available splash images from GitHub (cached per session)
+// Same backend detection as api.js: anything not github.io is the pi-server,
+// which mirrors the splash images locally (much faster than GitHub raw)
+const SPLASH_FROM_PI_SERVER = window.location.protocol.startsWith('http')
+  && !window.location.hostname.endsWith('github.io');
+
+// Fetch the list of available splash images (cached per session).
+// On the pi-server, prefer its local mirror; GitHub is the fallback.
 async function getSplashList() {
   const cached = sessionStorage.getItem('splashImageList');
   if (cached) {
     try {
-      return JSON.parse(cached);
+      const parsed = JSON.parse(cached);
+      if (parsed.baseUrl) return parsed; // ignore pre-baseUrl cache entries
     } catch (e) { /* ignore bad cache */ }
+  }
+
+  if (SPLASH_FROM_PI_SERVER) {
+    try {
+      const response = await fetch(`${window.location.origin}/api?route=game-data&action=splash-list`);
+      const data = await response.json();
+      if (data.status === 'success' && data.splashFiles.length > 0) {
+        const result = {
+          splashFiles: data.splashFiles,
+          hasSession: data.hasSession,
+          baseUrl: '/splashes/'
+        };
+        sessionStorage.setItem('splashImageList', JSON.stringify(result));
+        console.log(`[Splash] Using ${data.splashFiles.length} local splash images from the pi-server`);
+        return result;
+      }
+      console.warn('[Splash] Pi splash mirror not available, falling back to GitHub');
+    } catch (error) {
+      console.warn('[Splash] Pi splash-list failed, falling back to GitHub:', error);
+    }
   }
 
   try {
@@ -30,7 +57,7 @@ async function getSplashList() {
       }
     }
 
-    const result = { splashFiles, hasSession };
+    const result = { splashFiles, hasSession, baseUrl: SPLASH_BASE_URL };
     sessionStorage.setItem('splashImageList', JSON.stringify(result));
     console.log(`[Splash] Found ${splashFiles.length} splash images, session.png: ${hasSession}`);
     return result;
@@ -40,7 +67,7 @@ async function getSplashList() {
     for (let i = 1; i <= FALLBACK_SPLASH_COUNT; i++) {
       splashFiles.push(`splash-${i}.png`);
     }
-    return { splashFiles, hasSession: false };
+    return { splashFiles, hasSession: false, baseUrl: SPLASH_BASE_URL };
   }
 }
 
@@ -66,16 +93,16 @@ function preloadImage(url) {
  * Select and preload a random splash image (prioritizes session.png if it exists)
  */
 export async function selectAndPreloadSplashImage() {
-  const { splashFiles, hasSession } = await getSplashList();
+  const { splashFiles, hasSession, baseUrl } = await getSplashList();
 
   if (hasSession) {
-    const sessionUrl = `${SPLASH_BASE_URL}session.png`;
+    const sessionUrl = `${baseUrl}session.png`;
     console.log('[Splash] Using session splash:', sessionUrl);
     return preloadImage(sessionUrl);
   }
 
   const randomFile = splashFiles[Math.floor(Math.random() * splashFiles.length)];
-  const splashUrl = `${SPLASH_BASE_URL}${randomFile}`;
+  const splashUrl = `${baseUrl}${randomFile}`;
 
   console.log('[Splash] Selected splash image:', splashUrl);
   return preloadImage(splashUrl);

@@ -101,6 +101,17 @@ def fetch_pokedex_config(conn, force=False):
         }
 
 
+def store_pokedex_config(conn, config):
+    """Accept a config pushed directly by Benjakronk's admin panel, replacing
+    the snapshot without waiting for GitHub's raw CDN (up to 5 min stale).
+    Storing bumps fetched_at, hence X-Data-Version, so clients refresh."""
+    if not isinstance(config, dict) or not isinstance(config.get('registered'), list):
+        raise ValueError("config must be an object with a 'registered' array")
+    if 'visibility' in config and not isinstance(config['visibility'], dict):
+        raise ValueError("'visibility' must be an object")
+    _cache_put(conn, 'pokedexConfig', config)
+
+
 def registered_pokemon_names(conn):
     config = fetch_pokedex_config(conn)
     return config.get('registered', []) if config else []

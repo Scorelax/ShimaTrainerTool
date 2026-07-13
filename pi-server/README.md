@@ -112,6 +112,38 @@ Two layers, both from `crontab -e`:
    Note: after cutover the sheet is a mirror, not the admin UI — manual
    edits to those two tabs get overwritten nightly.
 
+### Live config push (from Benjakronk's admin panel)
+
+`POST /api/pokedex-config` with header `X-Push-Key: <secret>` and the config
+JSON as the body stores it as the `pokedexConfig` snapshot immediately — no
+waiting on GitHub raw's 5-minute CDN. Guarded by env `CONFIG_PUSH_KEY` on the
+service; **the endpoint is disabled (503) until that env var is set.** The
+drop-in publish function for Benjakronk's repo is in
+`docs/benjakronk-publish.md`. GitHub stays the source of truth: Reset Cache
+still re-fetches from GitHub raw, the push is just the fast path.
+
+### Splash image mirror (daily)
+
+Splash images are mirrored locally so loading screens don't wait on GitHub.
+One-time setup on the Pi (a sparse clone downloads only the splashes folder):
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/Benjakronk/shima-pokedex ~/shima-splashes
+cd ~/shima-splashes && git sparse-checkout set images/splashes
+```
+
+Daily sync from `crontab -e` (04:30, after the backups):
+
+```bash
+30 4 * * * cd /home/scorelax/shima-splashes && git pull --quiet >> /home/scorelax/splash-sync.log 2>&1
+```
+
+The server serves the folder at `/splashes/` and lists it via
+`?route=game-data&action=splash-list` (folder path override: env `SPLASH_DIR`).
+The frontend uses the mirror when served by the pi-server and falls back to
+GitHub if the mirror is missing. Restart the service after the first clone so
+the `/splashes` mount appears.
+
 ## 4. Cutover (and rollback)
 
 In `js/api.js`, change `baseUrl` to the Pi:

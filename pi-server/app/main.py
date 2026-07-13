@@ -7,22 +7,25 @@ frontend change needed is API_CONFIG.baseUrl in js/api.js.
 Run locally:  uvicorn app.main:app --host 0.0.0.0 --port 8080
 Env vars:     POKEDEX_DB (sqlite path), PWA_DIR (static files root)
 """
+import hmac
 import os
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, routes_pokemon, routes_trainer, routes_gamedata
+from . import db, routes_pokemon, routes_trainer, routes_gamedata, upstream
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
+# POST is for /api/pokedex-config, pushed cross-origin from Benjakronk's
+# admin panel on benjakronk.github.io
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['*'],
-    allow_methods=['GET'],
+    allow_methods=['GET', 'POST'],
     allow_headers=['*'],
     expose_headers=['X-Data-Version'],
 )
@@ -88,6 +91,36 @@ def api(request: Request):
         result = {'error': str(e), 'status': 'error'}
     return JSONResponse(result, headers={'X-Data-Version': _data_version()})
 
+
+@app.post('/api/pokedex-config')
+def push_pokedex_config(config: dict, x_push_key: str = Header(default='')):
+    """Direct push from Benjakronk's admin panel: updates the pokedexConfig
+    snapshot immediately instead of waiting for a GitHub fetch. Guarded by a
+    shared secret (env CONFIG_PUSH_KEY); disabled when the env var is unset."""
+    expected = os.environ.get('CONFIG_PUSH_KEY', '')
+    if not expected:
+        return JSONResponse(
+            {'status': 'error', 'error': 'push disabled: CONFIG_PUSH_KEY not set'},
+            status_code=503)
+    if not hmac.compare_digest(x_push_key, expected):
+        return JSONResponse({'status': 'error', 'error': 'invalid push key'},
+                            status_code=403)
+    conn = db.connect()
+    try:
+        upstream.store_pokedex_config(conn, config)
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)}, status_code=400)
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success', 'message': 'Config stored'},
+                        headers={'X-Data-Version': _data_version()})
+
+
+# Local mirror of Benjakronk's splash images (daily git pull on the Pi);
+# mounted before the PWA catch-all so /splashes wins
+if os.path.isdir(routes_gamedata.SPLASH_DIR):
+    app.mount('/splashes', StaticFiles(directory=routes_gamedata.SPLASH_DIR),
+              name='splashes')
 
 # Serve the PWA from the same origin (mounted last so /api and /exec win)
 _default_pwa = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))

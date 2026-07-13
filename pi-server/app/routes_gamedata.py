@@ -1,7 +1,15 @@
 """route=game-data — port of handleGameDataRoute and the static-data loaders."""
+import os
+import re
+
 from . import db, upstream
 from .jsutil import js_number
 from .routes_pokemon import get_nature_data
+
+# Local mirror of Benjakronk's images/splashes folder, synced by a daily
+# git pull on the Pi (see README). Served at /splashes by main.py.
+SPLASH_DIR = os.path.expanduser(
+    os.environ.get('SPLASH_DIR', '~/shima-splashes/images/splashes'))
 
 
 def handle(conn, action, params):
@@ -28,7 +36,24 @@ def handle(conn, action, params):
         upstream.warm_upstream(conn)
         return {'status': 'success', 'message': 'Server cache refreshed'}
 
+    if action == 'splash-list':
+        return splash_list()
+
     raise ValueError('Unknown game-data action: ' + str(action))
+
+
+def splash_list():
+    """Same shape the frontend built from the GitHub contents API: splash-N.png
+    files plus whether session.png exists. Error status -> frontend falls back
+    to GitHub."""
+    if not os.path.isdir(SPLASH_DIR):
+        return {'status': 'error', 'message': 'splash cache not synced'}
+    names = os.listdir(SPLASH_DIR)
+    return {
+        'status': 'success',
+        'splashFiles': sorted(n for n in names if re.match(r'^splash-\d+\.png$', n)),
+        'hasSession': 'session.png' in names,
+    }
 
 
 def load_all_game_data(conn):

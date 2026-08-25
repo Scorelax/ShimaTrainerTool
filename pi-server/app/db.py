@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS type_chart_defend (ord INTEGER PRIMARY KEY, type);
 CREATE TABLE IF NOT EXISTS type_chart_matrix (attack_ord INTEGER, defend_ord INTEGER, value, PRIMARY KEY (attack_ord, defend_ord));
 CREATE TABLE IF NOT EXISTS upstream_cache (key TEXT PRIMARY KEY, json TEXT, fetched_at TEXT);
 CREATE TABLE IF NOT EXISTS image_cache (key TEXT PRIMARY KEY, url TEXT);
-CREATE TABLE IF NOT EXISTS music_sync (track TEXT PRIMARY KEY, started_at TEXT);
+CREATE TABLE IF NOT EXISTS music_sync (track TEXT PRIMARY KEY, started_at TEXT, listeners INTEGER DEFAULT 0);
 """
 
 
@@ -84,8 +84,17 @@ def init(path=None):
     os.makedirs(os.path.dirname(target), exist_ok=True)
     conn = connect(target)
     conn.executescript(_schema_sql())
+    _migrate(conn)
     conn.commit()
     return conn
+
+
+def _migrate(conn):
+    """One-off column additions for tables CREATE TABLE IF NOT EXISTS won't
+    touch on an already-existing database."""
+    cols = [r[1] for r in conn.execute('PRAGMA table_info(music_sync)')]
+    if 'listeners' not in cols:
+        conn.execute('ALTER TABLE music_sync ADD COLUMN listeners INTEGER DEFAULT 0')
 
 
 def fetch_rows(conn, table, columns):

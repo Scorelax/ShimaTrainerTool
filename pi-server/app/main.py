@@ -75,7 +75,7 @@ def _dispatch(params):
                     'gameData': ['all', 'conduit', 'moves', 'natures',
                                  'type-effectiveness', 'pokedex-config'],
                     'battle': ['calculate-damage', 'roll-initiative'],
-                    'music': ['sync'],
+                    'music': ['sync', 'leave'],
                 },
             }
         return {'error': 'Unknown route: ' + str(route), 'status': 'error'}

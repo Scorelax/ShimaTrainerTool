@@ -21,6 +21,7 @@ class AudioManager {
     this.pendingTransition = null;
     this.cache = {};
     this.volume = 0.8; // 0-1, set from saved settings at app start via setVolume()
+    this.syncedTrack = null; // track name currently joined server-side, if any
   }
 
   setVolume(percent) {
@@ -109,6 +110,7 @@ class AudioManager {
 
       this.bgAudio = audio;
       this.currentTrack = trackName;
+      this.syncedTrack = trackName;
     } catch (e) {
       console.warn(`[Audio] Sync failed for ${trackName}, playing locally:`, e.message);
       this.playBg(trackName);
@@ -116,6 +118,10 @@ class AudioManager {
   }
 
   stopBg() {
+    if (this.syncedTrack) {
+      MusicAPI.leave(this.syncedTrack);
+      this.syncedTrack = null;
+    }
     if (this.pendingTransition) {
       clearTimeout(this.pendingTransition);
       this.pendingTransition = null;
@@ -157,3 +163,13 @@ class AudioManager {
 }
 
 export const audioManager = new AudioManager();
+
+// In-app navigation already leaves via stopBg() (called at the start of
+// every route render). This covers the tab/app actually closing, which
+// never runs that code path -- pagehide is the reliable modern event for
+// it (unlike beforeunload, which mobile Safari often skips).
+window.addEventListener('pagehide', () => {
+  if (audioManager.syncedTrack) {
+    MusicAPI.leave(audioManager.syncedTrack);
+  }
+});

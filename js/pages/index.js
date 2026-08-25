@@ -477,7 +477,7 @@ export function renderIndex() {
 
           <div class="settings-info">
             Version: <span id="settingsVersionTag">—</span><br>
-            Last updated: <span id="settingsLastUpdate">—</span>
+            Last data update: <span id="settingsLastUpdate">—</span>
           </div>
 
           <button class="cache-modal-btn cache-modal-confirm settings-reset-btn" id="settingsResetCacheButton">
@@ -510,7 +510,7 @@ export function renderIndex() {
 
       <div class="app-version-tag">
         <span id="appVersionTag"></span>
-        <span class="app-update-tag" id="appUpdateTag"></span>
+        <span class="app-update-tag">Last data update: <span id="appUpdateTag"></span></span>
       </div>
     </div>
   `;
@@ -523,7 +523,7 @@ function formatLastUpdate(iso) {
   const then = new Date(iso);
   if (isNaN(then)) return 'unknown';
   const minutes = Math.floor((Date.now() - then.getTime()) / 60000);
-  if (minutes < 1) return 'just now';
+  if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
@@ -535,11 +535,16 @@ function getActiveSwVersion() {
   return new Promise((resolve) => {
     if (!('caches' in window)) return resolve('no sw support');
     caches.keys().then(names => {
-      const versions = names
-        .map(n => n.match(/^pokemon-dnd-v(\d+)$/))
-        .filter(Boolean)
-        .map(m => parseInt(m[1], 10));
-      resolve(versions.length ? `v${Math.max(...versions)}` : 'no cache yet');
+      // Matches both the old flat-integer scheme (v99) and the new
+      // major.minor one (v0.99, v1.0, ...) -- keeps the original string
+      // formatting (so "v1.0" doesn't get reprinted as "v1") by picking
+      // the highest-value match rather than reformatting a parsed number.
+      const matches = names
+        .map(n => n.match(/^pokemon-dnd-v(\d+(?:\.\d+)?)$/))
+        .filter(Boolean);
+      if (!matches.length) return resolve('no cache yet');
+      const best = matches.reduce((a, b) => parseFloat(a[1]) >= parseFloat(b[1]) ? a : b);
+      resolve(`v${best[1]}`);
     }).catch(() => resolve('cache unavailable'));
   });
 }

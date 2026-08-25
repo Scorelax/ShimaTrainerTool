@@ -658,6 +658,18 @@ export class MusicAPI {
       retries: 0
     });
   }
+
+  /**
+   * Fire-and-forget: tells the server this device stopped listening to
+   * trackName, so the shared loop resets to 0 for the next joiner once
+   * everyone's left. keepalive lets the request survive a page navigation
+   * that happens right after (same tick this is called from).
+   */
+  static leave(trackName) {
+    fetch(`${API_CONFIG.baseUrl}?route=music&action=leave&track=${encodeURIComponent(trackName)}`, {
+      keepalive: true
+    }).catch(() => {});
+  }
 }
 
 // ============================================================================

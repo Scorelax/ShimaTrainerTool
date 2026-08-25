@@ -15,6 +15,7 @@ import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js'
 import { renderCombat, attachCombatListeners } from './pages/combat.js';
 import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
+import { getSettings } from './utils/settings.js';
 
 // ============================================================================
 // APPLICATION STATE
@@ -259,6 +260,9 @@ async function initApp() {
   try {
     // Show loading screen
     document.getElementById('loading-screen').classList.add('active');
+
+    // Apply the saved volume before any track plays
+    audioManager.setVolume(getSettings().volume);
 
     // Preload Index and ContinueJourney audio before showing the app,
     // then load the remaining tracks in the background

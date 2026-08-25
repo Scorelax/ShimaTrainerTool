@@ -157,6 +157,10 @@ class API {
           cache.clear();
           localStorage.setItem('dataVersion', dataVersion);
         }
+        // Surfaced in the UI (home page / settings) as "last updated" — separate
+        // from dataVersion above, which drives cache invalidation and is only
+        // rewritten when the value actually changes.
+        if (dataVersion) localStorage.setItem('lastDataUpdate', dataVersion);
 
         const data = await response.json();
 

@@ -92,13 +92,13 @@ predictable address. A dynamic public IP is irrelevant — Tailscale handles it.
 
 ### Backups (nightly)
 
-Two layers, both from `crontab -e`:
+Two layers, both from `crontab -e` (actual entries on the live Pi, user `scorelax`):
 
 ```bash
 # 04:00 local snapshot; .backup is safe while the server runs (WAL mode)
-0 4 * * * sqlite3 /home/pi/pokemon-dnd/pi-server/data/pokedex.db ".backup /home/pi/backups/pokedex-$(date +\%w).db"
-# 04:10 Google Sheets mirror (survives the Pi entirely)
-10 4 * * * cd /home/pi/pokemon-dnd/pi-server && SHEETS_BACKUP_URL=... SHEETS_BACKUP_SECRET=... .venv/bin/python scripts/backup_to_sheets.py >> /home/pi/backup.log 2>&1
+0 4 * * * sqlite3 /home/scorelax/pokemon-dnd/pi-server/data/pokedex.db ".backup /home/scorelax/backups/pokedex-$(date +\%w).db"
+# 04:15 Google Sheets mirror (survives the Pi entirely)
+15 4 * * * cd /home/scorelax/pokemon-dnd/pi-server && SHEETS_BACKUP_URL=... SHEETS_BACKUP_SECRET=... .venv/bin/python scripts/backup_to_sheets.py >> /home/scorelax/backup.log 2>&1
 ```
 
 1. **Local snapshot** — weekday-numbered files give a rolling 7-day history.
@@ -112,23 +112,24 @@ Two layers, both from `crontab -e`:
    Note: after cutover the sheet is a mirror, not the admin UI — manual
    edits to those two tabs get overwritten nightly.
 
-### Upstream data mirror (nightly)
+### Upstream data mirror (daily)
 
 `scripts/refresh_upstream.py` fetches Benjakronk's pokemon/moves/items/
-pokedex-config snapshots and stores them in SQLite — it was written for the
-one-time migration, but there's no reason it can't run nightly like the
-backups and splash mirror do, so the Pi is never depending on a live fetch
-from Apps Script/GitHub during actual play:
+pokedex-config snapshots and stores them in SQLite. Already scheduled on the
+live Pi:
 
 ```bash
-# 04:20 upstream snapshot refresh, after the backups and before the splash mirror
-20 4 * * * cd /home/pi/pokemon-dnd/pi-server && .venv/bin/python scripts/refresh_upstream.py >> /home/pi/upstream-refresh.log 2>&1
+# 16:00 daily upstream snapshot refresh
+0 16 * * * cd /home/scorelax/pokemon-dnd/pi-server && .venv/bin/python scripts/refresh_upstream.py >> /home/scorelax/logs/dnd/upstream.log 2>&1
 ```
 
-With this scheduled, the in-app **Reset Cache** button becomes a rare manual
-override — only needed if you want data sooner than the next nightly run
-(e.g. Benjakronk added a species same-day and you want it live immediately).
-A failed fetch keeps the previous snapshot either way, so a bad night doesn't
+(Note this job logs to `~/logs/dnd/upstream.log`, unlike the flat `~/backup.log`
+the other two jobs use — an existing inconsistency, not a typo.)
+
+With this scheduled, the in-app **Reset Cache** button is a rare manual
+override — only needed if you want data sooner than the next run (e.g.
+Benjakronk added a species same-day and you want it live immediately). A
+failed fetch keeps the previous snapshot either way, so a bad run doesn't
 wipe anything.
 
 ### Live upstream push (from Benjakronk's admin panel)

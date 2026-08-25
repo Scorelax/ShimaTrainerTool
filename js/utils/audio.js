@@ -14,6 +14,12 @@ class AudioManager {
     this.currentTrack = null;
     this.pendingTransition = null;
     this.cache = {};
+    this.volume = 0.8; // 0-1, set from saved settings at app start via setVolume()
+  }
+
+  setVolume(percent) {
+    this.volume = Math.max(0, Math.min(100, percent)) / 100;
+    if (this.bgAudio) this.bgAudio.volume = this.volume;
   }
 
   _preloadTrack(track) {
@@ -39,11 +45,11 @@ class AudioManager {
   }
 
   _getAudio(trackName) {
-    if (this.cache[trackName]) {
-      const audio = this.cache[trackName].cloneNode();
-      return audio;
-    }
-    return new Audio(`${AUDIO_PATH}${trackName}.mp3`);
+    const audio = this.cache[trackName]
+      ? this.cache[trackName].cloneNode()
+      : new Audio(`${AUDIO_PATH}${trackName}.mp3`);
+    audio.volume = this.volume;
+    return audio;
   }
 
   playBg(trackName, { loop = true, onEnded } = {}) {

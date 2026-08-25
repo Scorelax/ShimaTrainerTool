@@ -1,5 +1,7 @@
 // Landing Page (Index) - Continue Journey or Start New Adventure
 import { GameDataAPI } from '../api.js';
+import { audioManager } from '../utils/audio.js';
+import { getSettings, saveSettings } from '../utils/settings.js';
 
 export function renderIndex() {
   return `
@@ -336,6 +338,98 @@ export function renderIndex() {
           text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
           z-index: 1000;
           pointer-events: none;
+          text-align: right;
+          line-height: 1.4;
+        }
+
+        .app-update-tag {
+          display: block;
+          font-size: clamp(0.6rem, 1.3vw, 0.75rem);
+          font-weight: 500;
+          color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Settings Modal */
+        .settings-modal {
+          text-align: left;
+          max-width: min(440px, 90vw);
+        }
+
+        .settings-modal .cache-modal-title,
+        .settings-modal .cache-modal-icon {
+          text-align: center;
+        }
+
+        .settings-row {
+          margin: 0 0 1.25rem;
+        }
+
+        .settings-row label {
+          display: block;
+          font-size: clamp(0.8rem, 2vw, 0.95rem);
+          color: rgba(255,255,255,0.85);
+          margin-bottom: 0.4rem;
+        }
+
+        .settings-row-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+        }
+
+        .settings-row-checkbox label {
+          margin-bottom: 0;
+          flex: 1;
+        }
+
+        .settings-row-checkbox input[type="checkbox"] {
+          width: 1.2rem;
+          height: 1.2rem;
+          accent-color: #FFDE00;
+          flex-shrink: 0;
+        }
+
+        .settings-row-value {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .settings-row-value input[type="range"] {
+          flex: 1;
+          accent-color: #FFDE00;
+        }
+
+        .settings-row-value span {
+          font-family: monospace;
+          font-size: 0.85rem;
+          color: #FFDE00;
+          min-width: 2.5em;
+          text-align: right;
+        }
+
+        .settings-divider {
+          height: 1px;
+          background: rgba(255,255,255,0.15);
+          margin: 1.25rem 0;
+        }
+
+        .settings-info {
+          font-size: clamp(0.75rem, 1.8vw, 0.85rem);
+          color: rgba(255,255,255,0.6);
+          margin-bottom: 1.25rem;
+          line-height: 1.6;
+        }
+
+        .settings-info span {
+          color: rgba(255,255,255,0.85);
+          font-family: monospace;
+        }
+
+        .settings-reset-btn {
+          width: 100%;
+          max-width: none;
+          margin-bottom: 1rem;
         }
       </style>
 
@@ -352,10 +446,54 @@ export function renderIndex() {
         </div>
       </div>
 
-      <!-- Cache Reset Button -->
-      <button class="cache-reset-button" id="cacheResetButton">
-        <span class="cache-reset-icon">🔄</span>
-        <span>Reset Cache</span>
+      <!-- Settings Modal -->
+      <div id="settingsModal" class="cache-modal-overlay" style="display:none;">
+        <div class="cache-modal settings-modal">
+          <div class="cache-modal-icon">⚙️</div>
+          <h2 class="cache-modal-title">Settings</h2>
+
+          <div class="settings-row">
+            <label for="volumeSlider">Volume</label>
+            <div class="settings-row-value">
+              <input type="range" id="volumeSlider" min="0" max="100" step="1">
+              <span id="volumeValue">80</span>
+            </div>
+          </div>
+
+          <div class="settings-row settings-row-checkbox">
+            <label for="syncMusicCheckbox">Synchronize music across devices</label>
+            <input type="checkbox" id="syncMusicCheckbox">
+          </div>
+
+          <div class="settings-row">
+            <label for="idleSplashSlider">Show splash art after idle (minutes)</label>
+            <div class="settings-row-value">
+              <input type="range" id="idleSplashSlider" min="5" max="30" step="1">
+              <span id="idleSplashValue">10</span>
+            </div>
+          </div>
+
+          <div class="settings-divider"></div>
+
+          <div class="settings-info">
+            Version: <span id="settingsVersionTag">—</span><br>
+            Last updated: <span id="settingsLastUpdate">—</span>
+          </div>
+
+          <button class="cache-modal-btn cache-modal-confirm settings-reset-btn" id="settingsResetCacheButton">
+            🔄 Reset Cache
+          </button>
+
+          <div class="cache-modal-buttons">
+            <button class="cache-modal-btn cache-modal-ok" id="settingsCloseButton" style="max-width:none;">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Button -->
+      <button class="cache-reset-button" id="settingsButton">
+        <span class="cache-reset-icon">⚙️</span>
+        <span>Settings</span>
       </button>
 
       <h1 class="landing-title">Shima Pokemon D&D</h1>
@@ -370,28 +508,49 @@ export function renderIndex() {
         </button>
       </div>
 
-      <div class="app-version-tag" id="appVersionTag"></div>
+      <div class="app-version-tag">
+        <span id="appVersionTag"></span>
+        <span class="app-update-tag" id="appUpdateTag"></span>
+      </div>
     </div>
   `;
+}
+
+// "Updated 2h ago" from an ISO timestamp; falls back gracefully when unset
+// (e.g. Apps Script backend, which never sends X-Data-Version at all).
+function formatLastUpdate(iso) {
+  if (!iso) return 'unknown';
+  const then = new Date(iso);
+  if (isNaN(then)) return 'unknown';
+  const minutes = Math.floor((Date.now() - then.getTime()) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function getActiveSwVersion() {
+  return new Promise((resolve) => {
+    if (!('caches' in window)) return resolve('no sw support');
+    caches.keys().then(names => {
+      const versions = names
+        .map(n => n.match(/^pokemon-dnd-v(\d+)$/))
+        .filter(Boolean)
+        .map(m => parseInt(m[1], 10));
+      resolve(versions.length ? `v${Math.max(...versions)}` : 'no cache yet');
+    }).catch(() => resolve('cache unavailable'));
+  });
 }
 
 export function attachIndexListeners() {
   // App version tag — reads the ACTIVE service worker cache name, so it shows
   // what this device is really running (not what the code claims to be).
   const versionTag = document.getElementById('appVersionTag');
-  if (versionTag) {
-    if ('caches' in window) {
-      caches.keys().then(names => {
-        const versions = names
-          .map(n => n.match(/^pokemon-dnd-v(\d+)$/))
-          .filter(Boolean)
-          .map(m => parseInt(m[1], 10));
-        versionTag.textContent = versions.length ? `v${Math.max(...versions)}` : 'no cache yet';
-      }).catch(() => { versionTag.textContent = 'cache unavailable'; });
-    } else {
-      versionTag.textContent = 'no sw support';
-    }
-  }
+  const updateTag = document.getElementById('appUpdateTag');
+  getActiveSwVersion().then(v => { if (versionTag) versionTag.textContent = v; });
+  if (updateTag) updateTag.textContent = formatLastUpdate(localStorage.getItem('lastDataUpdate'));
 
   // Show TitleScreen loading screen immediately when Continue Journey is clicked
   const continueBtn = document.querySelector('[data-route="continue-journey"]');
@@ -427,7 +586,56 @@ export function attachIndexListeners() {
   // Close on overlay click
   cacheModal?.addEventListener('click', (e) => { if (e.target === cacheModal) hideCacheModal(); });
 
-  document.getElementById('cacheResetButton')?.addEventListener('click', () => {
+  // Settings modal
+  const settingsModal = document.getElementById('settingsModal');
+  const showSettingsModal = () => { settingsModal.style.display = 'flex'; };
+  const hideSettingsModal = () => { settingsModal.style.display = 'none'; };
+  settingsModal?.addEventListener('click', (e) => { if (e.target === settingsModal) hideSettingsModal(); });
+
+  const volumeSlider = document.getElementById('volumeSlider');
+  const volumeValue = document.getElementById('volumeValue');
+  const syncMusicCheckbox = document.getElementById('syncMusicCheckbox');
+  const idleSplashSlider = document.getElementById('idleSplashSlider');
+  const idleSplashValue = document.getElementById('idleSplashValue');
+
+  document.getElementById('settingsButton')?.addEventListener('click', () => {
+    const settings = getSettings();
+    volumeSlider.value = settings.volume;
+    volumeValue.textContent = settings.volume;
+    syncMusicCheckbox.checked = settings.syncMusic;
+    idleSplashSlider.value = settings.idleSplashMinutes;
+    idleSplashValue.textContent = settings.idleSplashMinutes;
+    getActiveSwVersion().then(v => {
+      document.getElementById('settingsVersionTag').textContent = v;
+    });
+    document.getElementById('settingsLastUpdate').textContent =
+      formatLastUpdate(localStorage.getItem('lastDataUpdate'));
+    showSettingsModal();
+  });
+
+  document.getElementById('settingsCloseButton')?.addEventListener('click', hideSettingsModal);
+
+  volumeSlider?.addEventListener('input', () => {
+    volumeValue.textContent = volumeSlider.value;
+    audioManager.setVolume(parseInt(volumeSlider.value, 10));
+  });
+  volumeSlider?.addEventListener('change', () => {
+    saveSettings({ volume: parseInt(volumeSlider.value, 10) });
+  });
+
+  syncMusicCheckbox?.addEventListener('change', () => {
+    saveSettings({ syncMusic: syncMusicCheckbox.checked });
+  });
+
+  idleSplashSlider?.addEventListener('input', () => {
+    idleSplashValue.textContent = idleSplashSlider.value;
+  });
+  idleSplashSlider?.addEventListener('change', () => {
+    saveSettings({ idleSplashMinutes: parseInt(idleSplashSlider.value, 10) });
+  });
+
+  document.getElementById('settingsResetCacheButton')?.addEventListener('click', () => {
+    hideSettingsModal();
     showCacheModal({
       icon: '🔄',
       title: 'Reset Cache?',

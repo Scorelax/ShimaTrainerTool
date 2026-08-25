@@ -1,5 +1,5 @@
 // Service Worker for Pokemon D&D Trainer Tool
-const CACHE_NAME = 'pokemon-dnd-v94';
+const CACHE_NAME = 'pokemon-dnd-v95';
 
 // Files to cache for offline use (relative paths for subdirectory hosting)
 const STATIC_ASSETS = [
@@ -27,6 +27,7 @@ const STATIC_ASSETS = [
   './js/utils/notifications.js',
   './js/utils/pokemon-types.js',
   './js/utils/move-popup.js',
+  './js/utils/settings.js',
   './assets/Pokeball.png',
   './assets/Grey Pokeball.png',
   './assets/pokecenter.png',

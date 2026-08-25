@@ -71,13 +71,24 @@ class CacheManager {
   }
 }
 
-const cache = new CacheManager();
+// Now that the Pi backend is a fast same-origin server rather than
+// rate-limited Apps Script, keep TTLs short -- they're a fallback bound,
+// not the primary invalidation mechanism (that's cache.remove() calls on
+// write, or the X-Data-Version header below).
+const cache = new CacheManager(5 * 60 * 1000); // 5 minutes default
 
 // TTL for static game data (moves, items, feats, natures, pokedex config).
 // The Reset Cache button clears it manually, and on the pi-server backend
 // the X-Data-Version response header clears it automatically whenever the
 // server refreshes its upstream snapshots; the TTL is the fallback bound.
-const STATIC_DATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const STATIC_DATA_TTL = 2 * 60 * 60 * 1000; // 2 hours
+
+// TTL for the registered/complete Pokemon lists. These grow every time a
+// player registers a Pokemon, but that write never bumps the server's
+// upstream_cache, so X-Data-Version doesn't cover them -- unlike the truly
+// static data above, this TTL is the only thing bounding staleness across
+// devices.
+const LIVE_LIST_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Heavy endpoints (login bundle, full game data) get a longer timeout so a
 // slow Apps Script day degrades to "slow" instead of failing at 30s.
@@ -186,7 +197,7 @@ export class PokemonAPI {
     return API.request('pokemon', 'registered-list', {}, {
       cacheKey: 'pokemon:registered-list',
       useCache: true,
-      cacheTtl: STATIC_DATA_TTL,
+      cacheTtl: LIVE_LIST_TTL,
       timeout: HEAVY_TIMEOUT
     });
   }
@@ -198,7 +209,7 @@ export class PokemonAPI {
     return API.request('pokemon', 'list', {}, {
       cacheKey: 'pokemon:complete-list',
       useCache: true,
-      cacheTtl: STATIC_DATA_TTL,
+      cacheTtl: LIVE_LIST_TTL,
       timeout: HEAVY_TIMEOUT
     });
   }

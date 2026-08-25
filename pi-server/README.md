@@ -115,14 +115,16 @@ Two layers, both from `crontab -e`:
 ### Live upstream push (from Benjakronk's admin panel)
 
 `POST /api/upstream-push` with header `X-Push-Key: <secret>` and body
-`{"dataset": "pokemon-db"|"moves"|"items"|"pokedex-config", "data": ...}`
-stores that snapshot immediately — no waiting on GitHub raw's 5-minute CDN or
-his own script's schedule. Each dataset keeps the exact shape its GET action
-already returns. Guarded by env `UPSTREAM_PUSH_KEY` on the service; **the
-endpoint is disabled (503) until that env var is set.** The drop-in publish
-helper for Benjakronk's repo is in `docs/benjakronk-publish.md`. His own
-sources (sheet / repo) stay the source of truth: Reset Cache still re-fetches
-from them, the push is just the fast path.
+`{"dataset": "pokedex-config", "data": ...}` stores the shared player-visible
+pokedex snapshot immediately — no waiting on GitHub raw's 5-minute CDN. This
+is the one upstream dataset that actually changes mid-session; pokemon-db,
+moves, and items stay pull-only (Reset Cache / the nightly refresh script) —
+see `PUSHABLE_DATASETS` in `app/upstream.py` to add another dataset to the
+push path later. Guarded by env `UPSTREAM_PUSH_KEY` on the service; **the
+endpoint is disabled (503) until that env var is set.** The full connect-and-use
+guide for Benjakronk is `docs/benjakronk-guide.md`. His own repo stays the
+source of truth: Reset Cache still re-fetches from GitHub raw, the push is
+just the fast path.
 
 ### Splash image mirror (daily)
 

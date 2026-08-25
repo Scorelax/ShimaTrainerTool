@@ -1,5 +1,5 @@
 // Service Worker for Pokemon D&D Trainer Tool
-const CACHE_NAME = 'pokemon-dnd-v92';
+const CACHE_NAME = 'pokemon-dnd-v93';
 
 // Files to cache for offline use (relative paths for subdirectory hosting)
 const STATIC_ASSETS = [
@@ -77,8 +77,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip API requests (Google Apps Script)
-  if (event.request.url.includes('script.google.com')) {
+  // Skip API requests (Google Apps Script, and the pi-server's same-origin
+  // /api and /exec routes — those must always hit the network, never be
+  // served stale from Cache Storage)
+  const requestPath = new URL(event.request.url).pathname;
+  if (event.request.url.includes('script.google.com')
+    || requestPath === '/api' || requestPath === '/exec') {
     return;
   }
 

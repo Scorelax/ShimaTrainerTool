@@ -11,18 +11,25 @@ let overlayShowing = false;
 /**
  * Add a one-shot "Tap to continue" prompt to an already-visible full-screen
  * element; the next click/touch on it removes the prompt and calls onDismiss.
- * Shared by the idle overlay here and the post-login loading screen.
+ * Shared by the idle overlay here and the post-login loading screen. Pass
+ * showPrompt: false when the element already displays its own "tap to
+ * continue" text elsewhere (e.g. the loading bar's own progress text) --
+ * this then only wires up the tap-to-dismiss behavior.
  */
-export function showTapToContinue(element, onDismiss) {
-  if (!element || element.querySelector('.tap-to-continue-prompt')) return;
+export function showTapToContinue(element, onDismiss, { showPrompt = true } = {}) {
+  if (!element) return;
 
-  const prompt = document.createElement('div');
-  prompt.className = 'tap-to-continue-prompt';
-  prompt.textContent = 'Tap to continue';
-  element.appendChild(prompt);
+  let prompt = null;
+  if (showPrompt) {
+    if (element.querySelector('.tap-to-continue-prompt')) return;
+    prompt = document.createElement('div');
+    prompt.className = 'tap-to-continue-prompt';
+    prompt.textContent = 'Tap to continue';
+    element.appendChild(prompt);
+  }
 
   const dismiss = () => {
-    prompt.remove();
+    if (prompt) prompt.remove();
     element.removeEventListener('click', dismiss);
     element.removeEventListener('touchstart', dismiss);
     onDismiss();

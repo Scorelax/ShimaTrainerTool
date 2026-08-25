@@ -716,7 +716,7 @@ export function attachContinueJourneyListeners() {
             showTapToContinue(loadingScreen, () => {
               _log('Navigating to trainer-card');
               window.dispatchEvent(new CustomEvent('navigate', { detail: { route } }));
-            });
+            }, { showPrompt: false });
           } else {
             updateLoadingProgress(95, 'Almost ready...');
             _log(`Navigating to ${route}`);
@@ -816,7 +816,7 @@ export function attachContinueJourneyListeners() {
           showTapToContinue(loadingScreen, () => {
             _log('Navigating to trainer-card');
             window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
-          });
+          }, { showPrompt: false });
 
         } else {
           _step = 'loading conduit data';

@@ -127,6 +127,10 @@ if os.path.isdir(routes_gamedata.SPLASH_DIR):
     app.mount('/splashes', StaticFiles(directory=routes_gamedata.SPLASH_DIR),
               name='splashes')
 
+# Self-uploaded animated sprites (see upstream.GIF_DIR / upstream.local_gif_url)
+if os.path.isdir(upstream.GIF_DIR):
+    app.mount('/gifs', StaticFiles(directory=upstream.GIF_DIR), name='gifs')
+
 # Serve the PWA from the same origin (mounted last so /api and /exec win)
 _default_pwa = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
 PWA_DIR = os.environ.get('PWA_DIR', _default_pwa)

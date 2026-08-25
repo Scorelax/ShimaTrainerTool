@@ -6,6 +6,8 @@ they persist until explicitly refreshed — the Reset Cache button in the app
 A failed fetch keeps the previous snapshot.
 """
 import json
+import os
+import re
 from datetime import datetime, timezone
 
 import httpx
@@ -19,6 +21,12 @@ POKEDEX_CONFIG_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex
 
 IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/'
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
+
+# User-uploaded animated sprites, local to the Pi -- unrelated to Benjakronk's
+# repo/pipeline above. Named just <sanitized-species-name>.gif, no dex-id
+# prefix. Checked live on every request (a plain filesystem stat, not a
+# network probe), so no caching layer is needed here.
+GIF_DIR = os.path.expanduser(os.environ.get('GIF_DIR', '~/pokemon-dnd/pokemon-gifs'))
 
 # Apps Script upstreams can be slow (cold starts)
 _FETCH_TIMEOUT = 120.0
@@ -181,4 +189,15 @@ def get_image_url(conn, pokemon_name, pokemon_id):
                 return url
         except Exception:
             continue
+    return None
+
+
+def local_gif_url(pokemon_name):
+    """Self-uploaded animated sprite for pokemon_name, if one exists in
+    GIF_DIR. Same sanitization as get_image_url() for one consistent
+    filename rule across both, but otherwise unrelated -- no dex-id prefix,
+    no Benjakronk repo, no network probe/cache."""
+    sanitized = re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(pokemon_name).lower()))
+    if os.path.isfile(os.path.join(GIF_DIR, f'{sanitized}.gif')):
+        return f'/gifs/{sanitized}.gif'
     return None

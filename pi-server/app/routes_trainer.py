@@ -88,6 +88,18 @@ def get_trainers(conn):
     } for i, (_, row) in enumerate(db.fetch_rows(conn, 'trainers', T), start=1)]
 
 
+def _with_local_gif(row):
+    """Swap in a self-uploaded animated sprite for this row's image field,
+    if one exists (upstream.local_gif_url) -- otherwise leave the stored
+    image untouched."""
+    gif = upstream.local_gif_url(row[2])
+    if not gif:
+        return row
+    row = list(row)
+    row[1] = gif
+    return row
+
+
 def store_trainer_and_pokemon_data(conn, trainer_name):
     trainer_entry = next(
         (row for _, row in db.fetch_rows(conn, 'trainers', T)
@@ -96,7 +108,7 @@ def store_trainer_and_pokemon_data(conn, trainer_name):
         return None
 
     pokemon_entries = [
-        row for _, row in db.fetch_rows(conn, 'pokemon', P)
+        _with_local_gif(row) for _, row in db.fetch_rows(conn, 'pokemon', P)
         if str(row[0]).lower() == trainer_name.lower()
     ]
     return {'trainerData': trainer_entry, 'pokemonData': pokemon_entries}

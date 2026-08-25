@@ -168,6 +168,19 @@ The frontend uses the mirror when served by the pi-server and falls back to
 GitHub if the mirror is missing. Restart the service after the first clone so
 the `/splashes` mount appears.
 
+### Animated sprites (self-uploaded, local only)
+
+Unrelated to Benjakronk's repo. Drop hand-made `.gif` files into
+`~/pokemon-dnd/pokemon-gifs` (folder path override: env `GIF_DIR`), named
+`<sanitized-species-name>.gif` -- lowercase, non-alphanumeric characters
+collapsed to `-` (e.g. "Mr. Mime" → `mr-mime.gif`), same rule
+`upstream.get_image_url()` uses for the GitHub-sourced sprites, just without
+the dex-id prefix. No restart needed to pick up new files day-to-day (checked
+live via a filesystem stat on every request, `upstream.local_gif_url()`) --
+only the first time, so the `/gifs` mount appears. Applies to any owned
+Pokémon whose species has a matching gif, including ones already registered
+before the gif existed; falls back to the existing stored image otherwise.
+
 ## 4. Cutover (and rollback)
 
 In `js/api.js`, change `baseUrl` to the Pi:

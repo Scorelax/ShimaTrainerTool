@@ -711,7 +711,7 @@ export function attachContinueJourneyListeners() {
 
           const route = bundleClass === 'Pokemon Trainer' ? 'trainer-card' : 'conduit-card';
           if (route === 'trainer-card') {
-            updateLoadingProgress(95, 'Ready!');
+            updateLoadingProgress(95, 'Tap to continue');
             _log('Waiting for tap before entering trainer-card');
             showTapToContinue(loadingScreen, () => {
               _log('Navigating to trainer-card');
@@ -811,7 +811,7 @@ export function attachContinueJourneyListeners() {
           sessionStorage.setItem('preloadedSplashImage', splashUrl);
           _log('Splash image preloaded:', splashUrl);
 
-          updateLoadingProgress(95, 'Ready!');
+          updateLoadingProgress(95, 'Tap to continue');
           _log('Waiting for tap before entering trainer-card');
           showTapToContinue(loadingScreen, () => {
             _log('Navigating to trainer-card');

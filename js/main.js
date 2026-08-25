@@ -16,6 +16,7 @@ import { renderCombat, attachCombatListeners } from './pages/combat.js';
 import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
 import { getSettings } from './utils/settings.js';
+import { initIdleSplash } from './utils/idle-splash.js';
 
 // ============================================================================
 // APPLICATION STATE
@@ -274,6 +275,9 @@ async function initApp() {
 
     // Initialize router (game data will be loaded on-demand by continue-journey page)
     new Router();
+
+    // Idle splash screensaver -- survives navigation, so init once here
+    initIdleSplash();
 
     // Hide loading screen, show app
     document.getElementById('loading-screen').classList.remove('active');

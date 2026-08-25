@@ -1,6 +1,7 @@
 // Continue Journey Page - Trainer Selection with PIN
 import { TrainerAPI } from '../api.js';
 import { selectAndPreloadSplashImage } from '../utils/splash.js';
+import { showTapToContinue } from '../utils/idle-splash.js';
 
 // ============================================================================
 // KNOWN MOVES SYNC
@@ -801,9 +802,12 @@ export function attachContinueJourneyListeners() {
           sessionStorage.setItem('preloadedSplashImage', splashUrl);
           _log('Splash image preloaded:', splashUrl);
 
-          updateLoadingProgress(95, 'Almost ready...');
-          _log('Navigating to trainer-card');
-          window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+          updateLoadingProgress(95, 'Ready!');
+          _log('Waiting for tap before entering trainer-card');
+          showTapToContinue(loadingScreen, () => {
+            _log('Navigating to trainer-card');
+            window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+          });
 
         } else {
           _step = 'loading conduit data';

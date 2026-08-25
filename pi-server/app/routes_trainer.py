@@ -92,7 +92,7 @@ def _with_local_gif(row):
     """Swap in a self-uploaded animated sprite for this row's image field,
     if one exists (upstream.local_gif_url) -- otherwise leave the stored
     image untouched."""
-    gif = upstream.local_gif_url(row[2])
+    gif = upstream.local_gif_url(row[2], shiny=(row[61] == 'Y'))
     if not gif:
         return row
     row = list(row)

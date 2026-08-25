@@ -105,7 +105,7 @@ def get_pokemon_info(conn, trainer_name, pokemon_name):
     for _, row in db.fetch_rows(conn, 'pokemon', P):
         if (str(row[0]).lower() == trainer_name.lower()
                 and str(row[2]).lower() == pokemon_name.lower()):
-            gif = upstream.local_gif_url(row[2])
+            gif = upstream.local_gif_url(row[2], shiny=(row[61] == 'Y'))
             if gif:
                 row = list(row)
                 row[1] = gif

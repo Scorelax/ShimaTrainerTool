@@ -192,12 +192,18 @@ def get_image_url(conn, pokemon_name, pokemon_id):
     return None
 
 
-def local_gif_url(pokemon_name):
+def local_gif_url(pokemon_name, shiny=False):
     """Self-uploaded animated sprite for pokemon_name, if one exists in
     GIF_DIR. Same sanitization as get_image_url() for one consistent
     filename rule across both, but otherwise unrelated -- no dex-id prefix,
-    no Benjakronk repo, no network probe/cache."""
+    no Benjakronk repo, no network probe/cache. Shiny uses a -shiny suffix,
+    matching the convention Benjakronk's own shiny sprites already use
+    elsewhere; falls back to the non-shiny gif if only that exists."""
     sanitized = re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(pokemon_name).lower()))
+    if shiny:
+        shiny_path = os.path.join(GIF_DIR, f'{sanitized}-shiny.gif')
+        if os.path.isfile(shiny_path):
+            return f'/gifs/{sanitized}-shiny.gif'
     if os.path.isfile(os.path.join(GIF_DIR, f'{sanitized}.gif')):
         return f'/gifs/{sanitized}.gif'
     return None

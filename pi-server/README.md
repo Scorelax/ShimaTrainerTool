@@ -180,6 +180,8 @@ live via a filesystem stat on every request, `upstream.local_gif_url()`) --
 only the first time, so the `/gifs` mount appears. Applies to any owned
 Pokémon whose species has a matching gif, including ones already registered
 before the gif existed; falls back to the existing stored image otherwise.
+Shiny Pokémon look for `<sanitized-species-name>-shiny.gif` first, falling
+back to the non-shiny gif (then the static image) if only that exists.
 
 ## 4. Cutover (and rollback)
 

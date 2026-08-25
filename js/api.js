@@ -644,15 +644,29 @@ export class GameDataAPI {
 // MUSIC SYNC API
 // ============================================================================
 
+// Stable per-tab identity for music presence tracking. sessionStorage (not
+// localStorage) so a new tab reads as a genuinely new listener, matching
+// how a fresh device joining the room should behave.
+function getMusicClientId() {
+  let id = sessionStorage.getItem('musicClientId');
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    sessionStorage.setItem('musicClientId', id);
+  }
+  return id;
+}
+
 export class MusicAPI {
   /**
-   * Get (or, for the first caller, create) the shared start-time anchor for a
+   * Join (or heartbeat-renew presence on) the shared start-time anchor for a
    * looping background track, so every device seeks to the same point in the
-   * loop instead of starting from 0. No-op / throws on backends without the
-   * route (Apps Script) -- callers should fall back to local playback.
+   * loop instead of starting from 0. The room is considered empty -- and the
+   * epoch resets -- once no listener has synced/heartbeated in a while server-
+   * side; see routes_music.py. No-op / throws on backends without the route
+   * (Apps Script) -- callers should fall back to local playback.
    */
   static async sync(trackName) {
-    return API.request('music', 'sync', { track: trackName }, {
+    return API.request('music', 'sync', { track: trackName, client: getMusicClientId() }, {
       useCache: false,
       timeout: 5000,
       retries: 0
@@ -661,14 +675,14 @@ export class MusicAPI {
 
   /**
    * Fire-and-forget: tells the server this device stopped listening to
-   * trackName, so the shared loop resets to 0 for the next joiner once
-   * everyone's left. keepalive lets the request survive a page navigation
-   * that happens right after (same tick this is called from).
+   * trackName, so the room can go empty immediately instead of waiting for
+   * this listener's heartbeat to go stale. keepalive lets the request
+   * survive a page navigation/reload that happens right after.
    */
   static leave(trackName) {
-    fetch(`${API_CONFIG.baseUrl}?route=music&action=leave&track=${encodeURIComponent(trackName)}`, {
-      keepalive: true
-    }).catch(() => {});
+    const url = `${API_CONFIG.baseUrl}?route=music&action=leave`
+      + `&track=${encodeURIComponent(trackName)}&client=${encodeURIComponent(getMusicClientId())}`;
+    fetch(url, { keepalive: true }).catch(() => {});
   }
 }
 

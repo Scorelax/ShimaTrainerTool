@@ -676,8 +676,12 @@ export function attachIndexListeners() {
         // Clear sessionStorage
         sessionStorage.clear();
 
-        // Clear localStorage (if used)
+        // Clear localStorage, but keep device preferences (volume/sync/idle
+        // timer) -- those are settings, not cached server data, and this
+        // button is the reason they never seemed to "stick".
+        const savedSettings = localStorage.getItem('appSettings');
         localStorage.clear();
+        if (savedSettings) localStorage.setItem('appSettings', savedSettings);
 
         // Clear any service worker cache if present
         if ('caches' in window) {

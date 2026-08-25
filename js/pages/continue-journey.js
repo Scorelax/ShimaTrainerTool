@@ -709,10 +709,19 @@ export function attachContinueJourneyListeners() {
             }
           }
 
-          updateLoadingProgress(95, 'Almost ready...');
           const route = bundleClass === 'Pokemon Trainer' ? 'trainer-card' : 'conduit-card';
-          _log(`Navigating to ${route}`);
-          window.dispatchEvent(new CustomEvent('navigate', { detail: { route } }));
+          if (route === 'trainer-card') {
+            updateLoadingProgress(95, 'Ready!');
+            _log('Waiting for tap before entering trainer-card');
+            showTapToContinue(loadingScreen, () => {
+              _log('Navigating to trainer-card');
+              window.dispatchEvent(new CustomEvent('navigate', { detail: { route } }));
+            });
+          } else {
+            updateLoadingProgress(95, 'Almost ready...');
+            _log(`Navigating to ${route}`);
+            window.dispatchEvent(new CustomEvent('navigate', { detail: { route } }));
+          }
           return;
         }
 

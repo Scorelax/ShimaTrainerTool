@@ -5,52 +5,88 @@ fetched_at, which drives the X-Data-Version header and wipes every client's
 localStorage game-data cache on change. A music-sync request has nothing to
 do with game data and must never trigger that.
 
-Tracks a listener count per track so the loop restarts from 0 the next time
-someone joins an empty room, rather than a client joining a track nobody's
-listened to in hours picking up wherever a stale anchor left off. This is a
-best-effort presence count (a client's "leave" beacon can be lost if its
-browser/tab dies uncleanly) -- acceptable for a small at-the-table app; it
-just means the count can occasionally overcount until the next full reset.
+Presence is tracked per listening device (music_listeners), not as a single
+running counter -- a plain increment/decrement counter drifts upward every
+time a client reloads or crashes without its "leave" beacon completing (the
+common case during testing, and not rare in real use either), since there's
+no way to tell a missed decrement from a room that's genuinely still
+occupied. Instead each client sends a heartbeat while it's listening; a
+listener who hasn't been heard from in STALE_AFTER_SECONDS is treated as
+gone, so a dropped leave signal self-heals within one stale window instead
+of permanently inflating the count.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+STALE_AFTER_SECONDS = 40
 
 
 def handle(conn, action, params):
     track = params.get('track')
+    client_id = params.get('client')
     if not track:
         raise ValueError('Missing track')
 
     if action == 'sync':
-        return {'status': 'success', 'startedAt': _join(conn, track)}
+        if not client_id:
+            raise ValueError('Missing client')
+        now = datetime.now(timezone.utc)
+        return {
+            'status': 'success',
+            'startedAt': _join(conn, track, client_id, now),
+            'serverNow': now.isoformat(),
+        }
 
     if action == 'leave':
-        _leave(conn, track)
+        if client_id:
+            conn.execute(
+                'DELETE FROM music_listeners WHERE track = ? AND client_id = ?', (track, client_id))
+            conn.commit()
         return {'status': 'success'}
 
     raise ValueError('Unknown music action: ' + str(action))
 
 
-def _join(conn, track):
-    row = conn.execute(
-        'SELECT started_at, listeners FROM music_sync WHERE track = ?', (track,)).fetchone()
+def _join(conn, track, client_id, now):
+    now_iso = now.isoformat()
+    cutoff = (now - timedelta(seconds=STALE_AFTER_SECONDS)).isoformat()
 
-    if row and row[1] > 0:
+    # Prune anyone (any track) not heard from recently -- self-heals missed
+    # leave signals without needing perfect client-side cleanup.
+    conn.execute('DELETE FROM music_listeners WHERE last_seen <= ?', (cutoff,))
+
+    self_row = conn.execute(
+        'SELECT 1 FROM music_listeners WHERE track = ? AND client_id = ?',
+        (track, client_id)).fetchone()
+
+    if self_row:
+        # Heartbeat renewal from an already-known listener -- never touch the epoch.
         conn.execute(
-            'UPDATE music_sync SET listeners = listeners + 1 WHERE track = ?', (track,))
+            'UPDATE music_listeners SET last_seen = ? WHERE track = ? AND client_id = ?',
+            (now_iso, track, client_id))
+        row = conn.execute('SELECT started_at FROM music_sync WHERE track = ?', (track,)).fetchone()
+        conn.commit()
+        return row[0] if row else _reset_epoch(conn, track, now_iso)
+
+    others_live = conn.execute(
+        'SELECT 1 FROM music_listeners WHERE track = ? AND client_id != ? LIMIT 1',
+        (track, client_id)).fetchone()  # whatever's left after pruning is, by definition, live
+
+    conn.execute(
+        'INSERT INTO music_listeners (track, client_id, last_seen) VALUES (?, ?, ?)',
+        (track, client_id, now_iso))
+
+    if others_live:
+        row = conn.execute('SELECT started_at FROM music_sync WHERE track = ?', (track,)).fetchone()
         conn.commit()
         return row[0]
 
-    # Empty room (or never-seen track): fresh epoch, first listener.
-    started_at = datetime.now(timezone.utc).isoformat()
+    return _reset_epoch(conn, track, now_iso)
+
+
+def _reset_epoch(conn, track, started_at):
     conn.execute(
-        'INSERT INTO music_sync (track, started_at, listeners) VALUES (?, ?, 1) '
-        'ON CONFLICT(track) DO UPDATE SET started_at = excluded.started_at, listeners = 1',
+        'INSERT INTO music_sync (track, started_at) VALUES (?, ?) '
+        'ON CONFLICT(track) DO UPDATE SET started_at = excluded.started_at',
         (track, started_at))
     conn.commit()
     return started_at
-
-
-def _leave(conn, track):
-    conn.execute(
-        'UPDATE music_sync SET listeners = MAX(listeners - 1, 0) WHERE track = ?', (track,))
-    conn.commit()

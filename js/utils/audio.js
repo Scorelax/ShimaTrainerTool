@@ -14,6 +14,10 @@ const REMAINING_TRACKS = [
   'LevelUp', 'NewItem', 'Berry', 'GymBadge', 'PokeCenter'
 ];
 
+// Must stay comfortably under the server's STALE_AFTER_SECONDS (40s in
+// routes_music.py) so a listener's presence never lapses between beats.
+const HEARTBEAT_INTERVAL_MS = 15000;
+
 class AudioManager {
   constructor() {
     this.bgAudio = null;
@@ -22,6 +26,7 @@ class AudioManager {
     this.cache = {};
     this.volume = 0.8; // 0-1, set from saved settings at app start via setVolume()
     this.syncedTrack = null; // track name currently joined server-side, if any
+    this.heartbeatTimer = null;
   }
 
   setVolume(percent) {
@@ -88,17 +93,31 @@ class AudioManager {
     }
 
     try {
+      const requestSentAt = Date.now();
       const result = await MusicAPI.sync(trackName);
+      const responseReceivedAt = Date.now();
+
       const startedAt = new Date(result.startedAt).getTime();
-      if (isNaN(startedAt)) throw new Error('Invalid startedAt');
-      const elapsedSeconds = (Date.now() - startedAt) / 1000;
+      const serverNow = new Date(result.serverNow).getTime();
+      if (isNaN(startedAt) || isNaN(serverNow)) throw new Error('Invalid sync response');
+
+      // Client and server clocks aren't assumed to agree. Estimate the
+      // offset NTP-style: assume the server captured serverNow at roughly
+      // the midpoint of this round trip, so "server clock - client clock"
+      // is serverNow minus what the client's clock read at that midpoint.
+      const roundTripMs = responseReceivedAt - requestSentAt;
+      const clockOffsetMs = serverNow - (requestSentAt + roundTripMs / 2);
 
       this.stopBg();
       const audio = this._getAudio(trackName);
       audio.loop = true;
 
       const seekAndPlay = () => {
-        const offset = audio.duration > 0 ? elapsedSeconds % audio.duration : 0;
+        const nowOnServerClock = Date.now() + clockOffsetMs;
+        const elapsedSeconds = (nowOnServerClock - startedAt) / 1000;
+        const offset = audio.duration > 0
+          ? ((elapsedSeconds % audio.duration) + audio.duration) % audio.duration
+          : 0;
         audio.currentTime = offset;
         audio.play().catch(() => {});
       };
@@ -111,6 +130,12 @@ class AudioManager {
       this.bgAudio = audio;
       this.currentTrack = trackName;
       this.syncedTrack = trackName;
+
+      // Keep this listener's presence alive server-side so the room isn't
+      // mistaken for empty while still occupied (see routes_music.py).
+      this.heartbeatTimer = setInterval(() => {
+        MusicAPI.sync(trackName).catch(() => {});
+      }, HEARTBEAT_INTERVAL_MS);
     } catch (e) {
       console.warn(`[Audio] Sync failed for ${trackName}, playing locally:`, e.message);
       this.playBg(trackName);
@@ -118,6 +143,10 @@ class AudioManager {
   }
 
   stopBg() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
     if (this.syncedTrack) {
       MusicAPI.leave(this.syncedTrack);
       this.syncedTrack = null;

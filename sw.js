@@ -1,5 +1,5 @@
 // Service Worker for Pokemon D&D Trainer Tool
-const CACHE_NAME = 'pokemon-dnd-v97';
+const CACHE_NAME = 'pokemon-dnd-v98';
 
 // Files to cache for offline use (relative paths for subdirectory hosting)
 const STATIC_ASSETS = [
@@ -43,7 +43,13 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        // cache.addAll() fetches subject to normal HTTP caching -- a stale
+        // browser/server-cached response can get baked into this brand-new
+        // cache bucket even though CACHE_NAME just changed. Force every
+        // install-time fetch to bypass HTTP cache entirely instead.
+        return Promise.all(STATIC_ASSETS.map((url) =>
+          fetch(url, { cache: 'reload' }).then((response) => cache.put(url, response))
+        ));
       })
       .catch((error) => {
         console.log('[SW] Cache failed:', error);

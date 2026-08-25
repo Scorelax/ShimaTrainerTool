@@ -641,6 +641,26 @@ export class GameDataAPI {
 }
 
 // ============================================================================
+// MUSIC SYNC API
+// ============================================================================
+
+export class MusicAPI {
+  /**
+   * Get (or, for the first caller, create) the shared start-time anchor for a
+   * looping background track, so every device seeks to the same point in the
+   * loop instead of starting from 0. No-op / throws on backends without the
+   * route (Apps Script) -- callers should fall back to local playback.
+   */
+  static async sync(trackName) {
+    return API.request('music', 'sync', { track: trackName }, {
+      useCache: false,
+      timeout: 5000,
+      retries: 0
+    });
+  }
+}
+
+// ============================================================================
 // OFFLINE DETECTION
 // ============================================================================
 

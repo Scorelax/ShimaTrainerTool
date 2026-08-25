@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, routes_pokemon, routes_trainer, routes_gamedata, upstream
+from . import db, routes_pokemon, routes_trainer, routes_gamedata, routes_music, upstream
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
@@ -56,6 +56,8 @@ def _dispatch(params):
             return routes_trainer.handle(conn, action, params)
         if route == 'game-data':
             return routes_gamedata.handle(conn, action, params)
+        if route == 'music':
+            return routes_music.handle(conn, action, params)
         if route == 'battle':
             if action in ('calculate-damage', 'roll-initiative'):
                 return {'status': 'not_implemented'}
@@ -73,6 +75,7 @@ def _dispatch(params):
                     'gameData': ['all', 'conduit', 'moves', 'natures',
                                  'type-effectiveness', 'pokedex-config'],
                     'battle': ['calculate-damage', 'roll-initiative'],
+                    'music': ['sync'],
                 },
             }
         return {'error': 'Unknown route: ' + str(route), 'status': 'error'}

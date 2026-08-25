@@ -130,11 +130,11 @@ class Router {
     const content = document.getElementById('content');
     content.innerHTML = renderIndex();
     attachIndexListeners();
-    audioManager.playBg('Index');
+    audioManager.playBgSynced('Index');
   }
 
   async renderContinueJourney() {
-    audioManager.playBg('ContinueJourney');
+    audioManager.playBgSynced('ContinueJourney');
     const content = document.getElementById('content');
     const html = await renderContinueJourney();
     content.innerHTML = html;
@@ -216,7 +216,7 @@ class Router {
     const html = renderNewJourney();
     content.innerHTML = html;
     attachNewJourneyListeners();
-    audioManager.playBg('NewJourney');
+    audioManager.playBgSynced('NewJourney');
   }
 
   async renderNewPokemon(params) {

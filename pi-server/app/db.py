@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS type_chart_defend (ord INTEGER PRIMARY KEY, type);
 CREATE TABLE IF NOT EXISTS type_chart_matrix (attack_ord INTEGER, defend_ord INTEGER, value, PRIMARY KEY (attack_ord, defend_ord));
 CREATE TABLE IF NOT EXISTS upstream_cache (key TEXT PRIMARY KEY, json TEXT, fetched_at TEXT);
 CREATE TABLE IF NOT EXISTS image_cache (key TEXT PRIMARY KEY, url TEXT);
+CREATE TABLE IF NOT EXISTS music_sync (track TEXT PRIMARY KEY, started_at TEXT);
 """
 
 

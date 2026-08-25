@@ -1,6 +1,12 @@
 // Audio Manager - Singleton for background music and sound effects
+import { MusicAPI } from '../api.js';
+import { getSettings } from './settings.js';
 
 const AUDIO_PATH = 'assets/';
+
+// Tracks eligible for cross-device sync (looping page-background music only —
+// not sfx, not the one-shot Evolution intro).
+const SYNCABLE_TRACKS = ['Index', 'ContinueJourney', 'NewJourney'];
 
 const REMAINING_TRACKS = [
   'NewJourney', 'FindPokemon',
@@ -64,6 +70,49 @@ class AudioManager {
     this.bgAudio = audio;
     this.currentTrack = trackName;
     audio.play().catch(() => {});
+  }
+
+  /**
+   * Like playBg(), but for the 3 shared page-background tracks: joins the
+   * server's shared "when did this track start looping" anchor so every
+   * device hears roughly the same point in the loop, instead of everyone
+   * starting from 0. Falls back to plain playBg() if sync is disabled, the
+   * track isn't eligible, or the server request fails (e.g. Apps Script
+   * backend, which has no /music route at all).
+   */
+  async playBgSynced(trackName) {
+    if (this.currentTrack === trackName) return;
+    if (!SYNCABLE_TRACKS.includes(trackName) || !getSettings().syncMusic) {
+      return this.playBg(trackName);
+    }
+
+    try {
+      const result = await MusicAPI.sync(trackName);
+      const startedAt = new Date(result.startedAt).getTime();
+      if (isNaN(startedAt)) throw new Error('Invalid startedAt');
+      const elapsedSeconds = (Date.now() - startedAt) / 1000;
+
+      this.stopBg();
+      const audio = this._getAudio(trackName);
+      audio.loop = true;
+
+      const seekAndPlay = () => {
+        const offset = audio.duration > 0 ? elapsedSeconds % audio.duration : 0;
+        audio.currentTime = offset;
+        audio.play().catch(() => {});
+      };
+      if (audio.readyState >= 1 /* HAVE_METADATA */) {
+        seekAndPlay();
+      } else {
+        audio.addEventListener('loadedmetadata', seekAndPlay, { once: true });
+      }
+
+      this.bgAudio = audio;
+      this.currentTrack = trackName;
+    } catch (e) {
+      console.warn(`[Audio] Sync failed for ${trackName}, playing locally:`, e.message);
+      this.playBg(trackName);
+    }
   }
 
   stopBg() {

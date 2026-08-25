@@ -101,15 +101,40 @@ def fetch_pokedex_config(conn, force=False):
         }
 
 
-def store_pokedex_config(conn, config):
-    """Accept a config pushed directly by Benjakronk's admin panel, replacing
-    the snapshot without waiting for GitHub's raw CDN (up to 5 min stale).
-    Storing bumps fetched_at, hence X-Data-Version, so clients refresh."""
-    if not isinstance(config, dict) or not isinstance(config.get('registered'), list):
-        raise ValueError("config must be an object with a 'registered' array")
-    if 'visibility' in config and not isinstance(config['visibility'], dict):
-        raise ValueError("'visibility' must be an object")
-    _cache_put(conn, 'pokedexConfig', config)
+# Maps the dataset name used by the push endpoint to the upstream_cache key
+# the matching pull-based fetch_* function already uses.
+PUSHABLE_DATASETS = {
+    'pokemon-db': 'pokemonDB',
+    'moves': 'moves',
+    'items': 'items',
+    'pokedex-config': 'pokedexConfig',
+}
+
+
+def store_pushed_dataset(conn, dataset, data):
+    """Accept a dataset pushed directly by Benjakronk's admin panel, replacing
+    the snapshot without waiting on GitHub raw / his own script's schedule.
+    Storing bumps fetched_at, hence X-Data-Version, so clients refresh. Each
+    dataset keeps the exact shape its GET action already returns -- that's
+    the shape Benjakronk's own script already produces for the pull path."""
+    if dataset not in PUSHABLE_DATASETS:
+        raise ValueError(
+            'unknown dataset %r; expected one of %s'
+            % (dataset, ', '.join(PUSHABLE_DATASETS)))
+
+    if dataset == 'pokedex-config':
+        if not isinstance(data, dict) or not isinstance(data.get('registered'), list):
+            raise ValueError("pokedex-config must be an object with a 'registered' array")
+        if 'visibility' in data and not isinstance(data['visibility'], dict):
+            raise ValueError("'visibility' must be an object")
+    elif dataset == 'items':
+        if not isinstance(data, dict) or not isinstance(data.get('items'), list):
+            raise ValueError("items must be an object with an 'items' array")
+    else:  # pokemon-db, moves: raw row arrays, same shape their GET action returns
+        if not isinstance(data, list):
+            raise ValueError(dataset + ' must be an array')
+
+    _cache_put(conn, PUSHABLE_DATASETS[dataset], data)
 
 
 def registered_pokemon_names(conn):

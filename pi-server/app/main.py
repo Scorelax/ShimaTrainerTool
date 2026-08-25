@@ -20,7 +20,7 @@ from . import db, routes_pokemon, routes_trainer, routes_gamedata, upstream
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
-# POST is for /api/pokedex-config, pushed cross-origin from Benjakronk's
+# POST is for /api/upstream-push, pushed cross-origin from Benjakronk's
 # admin panel on benjakronk.github.io
 app.add_middleware(
     CORSMiddleware,
@@ -92,27 +92,29 @@ def api(request: Request):
     return JSONResponse(result, headers={'X-Data-Version': _data_version()})
 
 
-@app.post('/api/pokedex-config')
-def push_pokedex_config(config: dict, x_push_key: str = Header(default='')):
-    """Direct push from Benjakronk's admin panel: updates the pokedexConfig
-    snapshot immediately instead of waiting for a GitHub fetch. Guarded by a
-    shared secret (env CONFIG_PUSH_KEY); disabled when the env var is unset."""
-    expected = os.environ.get('CONFIG_PUSH_KEY', '')
+@app.post('/api/upstream-push')
+def push_upstream_dataset(payload: dict, x_push_key: str = Header(default='')):
+    """Direct push from Benjakronk's admin panel: updates one of the four
+    upstream snapshots (pokemon-db, moves, items, pokedex-config) immediately
+    instead of waiting for the next pull. Guarded by a shared secret (env
+    UPSTREAM_PUSH_KEY); disabled when the env var is unset."""
+    expected = os.environ.get('UPSTREAM_PUSH_KEY', '')
     if not expected:
         return JSONResponse(
-            {'status': 'error', 'error': 'push disabled: CONFIG_PUSH_KEY not set'},
+            {'status': 'error', 'error': 'push disabled: UPSTREAM_PUSH_KEY not set'},
             status_code=503)
     if not hmac.compare_digest(x_push_key, expected):
         return JSONResponse({'status': 'error', 'error': 'invalid push key'},
                             status_code=403)
+    dataset = payload.get('dataset')
     conn = db.connect()
     try:
-        upstream.store_pokedex_config(conn, config)
+        upstream.store_pushed_dataset(conn, dataset, payload.get('data'))
     except ValueError as e:
         return JSONResponse({'status': 'error', 'error': str(e)}, status_code=400)
     finally:
         conn.close()
-    return JSONResponse({'status': 'success', 'message': 'Config stored'},
+    return JSONResponse({'status': 'success', 'message': f'{dataset} stored'},
                         headers={'X-Data-Version': _data_version()})
 
 

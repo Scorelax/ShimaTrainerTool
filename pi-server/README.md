@@ -112,15 +112,17 @@ Two layers, both from `crontab -e`:
    Note: after cutover the sheet is a mirror, not the admin UI — manual
    edits to those two tabs get overwritten nightly.
 
-### Live config push (from Benjakronk's admin panel)
+### Live upstream push (from Benjakronk's admin panel)
 
-`POST /api/pokedex-config` with header `X-Push-Key: <secret>` and the config
-JSON as the body stores it as the `pokedexConfig` snapshot immediately — no
-waiting on GitHub raw's 5-minute CDN. Guarded by env `CONFIG_PUSH_KEY` on the
-service; **the endpoint is disabled (503) until that env var is set.** The
-drop-in publish function for Benjakronk's repo is in
-`docs/benjakronk-publish.md`. GitHub stays the source of truth: Reset Cache
-still re-fetches from GitHub raw, the push is just the fast path.
+`POST /api/upstream-push` with header `X-Push-Key: <secret>` and body
+`{"dataset": "pokemon-db"|"moves"|"items"|"pokedex-config", "data": ...}`
+stores that snapshot immediately — no waiting on GitHub raw's 5-minute CDN or
+his own script's schedule. Each dataset keeps the exact shape its GET action
+already returns. Guarded by env `UPSTREAM_PUSH_KEY` on the service; **the
+endpoint is disabled (503) until that env var is set.** The drop-in publish
+helper for Benjakronk's repo is in `docs/benjakronk-publish.md`. His own
+sources (sheet / repo) stay the source of truth: Reset Cache still re-fetches
+from them, the push is just the fast path.
 
 ### Splash image mirror (daily)
 

@@ -112,19 +112,38 @@ Two layers, both from `crontab -e`:
    Note: after cutover the sheet is a mirror, not the admin UI — manual
    edits to those two tabs get overwritten nightly.
 
+### Upstream data mirror (nightly)
+
+`scripts/refresh_upstream.py` fetches Benjakronk's pokemon/moves/items/
+pokedex-config snapshots and stores them in SQLite — it was written for the
+one-time migration, but there's no reason it can't run nightly like the
+backups and splash mirror do, so the Pi is never depending on a live fetch
+from Apps Script/GitHub during actual play:
+
+```bash
+# 04:20 upstream snapshot refresh, after the backups and before the splash mirror
+20 4 * * * cd /home/pi/pokemon-dnd/pi-server && .venv/bin/python scripts/refresh_upstream.py >> /home/pi/upstream-refresh.log 2>&1
+```
+
+With this scheduled, the in-app **Reset Cache** button becomes a rare manual
+override — only needed if you want data sooner than the next nightly run
+(e.g. Benjakronk added a species same-day and you want it live immediately).
+A failed fetch keeps the previous snapshot either way, so a bad night doesn't
+wipe anything.
+
 ### Live upstream push (from Benjakronk's admin panel)
 
 `POST /api/upstream-push` with header `X-Push-Key: <secret>` and body
 `{"dataset": "pokedex-config", "data": ...}` stores the shared player-visible
 pokedex snapshot immediately — no waiting on GitHub raw's 5-minute CDN. This
 is the one upstream dataset that actually changes mid-session; pokemon-db,
-moves, and items stay pull-only (Reset Cache / the nightly refresh script) —
-see `PUSHABLE_DATASETS` in `app/upstream.py` to add another dataset to the
-push path later. Guarded by env `UPSTREAM_PUSH_KEY` on the service; **the
-endpoint is disabled (503) until that env var is set.** The full connect-and-use
-guide for Benjakronk is `docs/benjakronk-guide.md`. His own repo stays the
-source of truth: Reset Cache still re-fetches from GitHub raw, the push is
-just the fast path.
+moves, and items stay on the nightly mirror above — see `PUSHABLE_DATASETS`
+in `app/upstream.py` to add another dataset to the push path later. Guarded
+by env `UPSTREAM_PUSH_KEY` on the service; **the endpoint is disabled (503)
+until that env var is set.** The full connect-and-use guide for Benjakronk is
+`docs/benjakronk-guide.md`. His own repo stays the source of truth: the
+nightly mirror still re-fetches from GitHub raw, the push is just the fast
+path.
 
 ### Splash image mirror (daily)
 

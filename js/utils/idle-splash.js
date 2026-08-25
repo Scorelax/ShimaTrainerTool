@@ -10,11 +10,19 @@ let overlayShowing = false;
 
 /**
  * Add a one-shot "Tap to continue" prompt to an already-visible full-screen
- * element; the next click/touch on it removes the prompt and calls onDismiss.
+ * element; the next tap on it removes the prompt and calls onDismiss.
  * Shared by the idle overlay here and the post-login loading screen. Pass
  * showPrompt: false when the element already displays its own "tap to
  * continue" text elsewhere (e.g. the loading bar's own progress text) --
  * this then only wires up the tap-to-dismiss behavior.
+ *
+ * Deliberately listens for 'click' only, not 'touchstart': dismissing (and
+ * navigating) on touchstart removes this element mid-tap, and the browser's
+ * trailing synthetic click from that same physical tap then lands on
+ * whatever page element is now underneath that screen position -- e.g.
+ * tapping the loading screen right where trainer-card's "My Pokemon" button
+ * ends up opened it immediately. 'click' is the last event in a tap
+ * sequence, so nothing is left to bleed through afterward.
  */
 export function showTapToContinue(element, onDismiss, { showPrompt = true } = {}) {
   if (!element) return;
@@ -30,12 +38,9 @@ export function showTapToContinue(element, onDismiss, { showPrompt = true } = {}
 
   const dismiss = () => {
     if (prompt) prompt.remove();
-    element.removeEventListener('click', dismiss);
-    element.removeEventListener('touchstart', dismiss);
     onDismiss();
   };
   element.addEventListener('click', dismiss, { once: true });
-  element.addEventListener('touchstart', dismiss, { once: true });
 }
 
 function resetIdleTimer() {

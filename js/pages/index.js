@@ -326,27 +326,18 @@ export function renderIndex() {
           transform: translateY(-2px);
         }
 
-        /* App Version Tag */
-        .app-version-tag {
+        /* Last Data Update Tag */
+        .app-update-tag {
           position: fixed;
           bottom: clamp(8px, 1.5vh, 14px);
           right: clamp(10px, 2vw, 16px);
           font-family: monospace;
-          font-size: clamp(0.7rem, 1.5vw, 0.85rem);
-          font-weight: 700;
-          color: rgba(255, 255, 255, 0.55);
+          font-size: clamp(0.65rem, 1.4vw, 0.8rem);
+          font-weight: 500;
+          color: rgba(255, 255, 255, 0.45);
           text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
           z-index: 1000;
           pointer-events: none;
-          text-align: right;
-          line-height: 1.4;
-        }
-
-        .app-update-tag {
-          display: block;
-          font-size: clamp(0.6rem, 1.3vw, 0.75rem);
-          font-weight: 500;
-          color: rgba(255, 255, 255, 0.4);
         }
 
         /* Settings Modal */
@@ -476,7 +467,6 @@ export function renderIndex() {
           <div class="settings-divider"></div>
 
           <div class="settings-info">
-            Version: <span id="settingsVersionTag">—</span><br>
             Last data update: <span id="settingsLastUpdate">—</span>
           </div>
 
@@ -508,10 +498,7 @@ export function renderIndex() {
         </button>
       </div>
 
-      <div class="app-version-tag">
-        <span id="appVersionTag"></span>
-        <span class="app-update-tag">Last data update: <span id="appUpdateTag"></span></span>
-      </div>
+      <div class="app-update-tag">Last data update: <span id="appUpdateTag"></span></div>
     </div>
   `;
 }
@@ -531,30 +518,8 @@ function formatLastUpdate(iso) {
   return `${days}d ago`;
 }
 
-function getActiveSwVersion() {
-  return new Promise((resolve) => {
-    if (!('caches' in window)) return resolve('no sw support');
-    caches.keys().then(names => {
-      // Matches both the old flat-integer scheme (v99) and the new
-      // major.minor one (v0.99, v1.0, ...) -- keeps the original string
-      // formatting (so "v1.0" doesn't get reprinted as "v1") by picking
-      // the highest-value match rather than reformatting a parsed number.
-      const matches = names
-        .map(n => n.match(/^pokemon-dnd-v(\d+(?:\.\d+)?)$/))
-        .filter(Boolean);
-      if (!matches.length) return resolve('no cache yet');
-      const best = matches.reduce((a, b) => parseFloat(a[1]) >= parseFloat(b[1]) ? a : b);
-      resolve(`v${best[1]}`);
-    }).catch(() => resolve('cache unavailable'));
-  });
-}
-
 export function attachIndexListeners() {
-  // App version tag — reads the ACTIVE service worker cache name, so it shows
-  // what this device is really running (not what the code claims to be).
-  const versionTag = document.getElementById('appVersionTag');
   const updateTag = document.getElementById('appUpdateTag');
-  getActiveSwVersion().then(v => { if (versionTag) versionTag.textContent = v; });
   if (updateTag) updateTag.textContent = formatLastUpdate(localStorage.getItem('lastDataUpdate'));
 
   // Show TitleScreen loading screen immediately when Continue Journey is clicked
@@ -610,9 +575,6 @@ export function attachIndexListeners() {
     syncMusicCheckbox.checked = settings.syncMusic;
     idleSplashSlider.value = settings.idleSplashMinutes;
     idleSplashValue.textContent = settings.idleSplashMinutes;
-    getActiveSwVersion().then(v => {
-      document.getElementById('settingsVersionTag').textContent = v;
-    });
     document.getElementById('settingsLastUpdate').textContent =
       formatLastUpdate(localStorage.getItem('lastDataUpdate'));
     showSettingsModal();
@@ -682,18 +644,6 @@ export function attachIndexListeners() {
         const savedSettings = localStorage.getItem('appSettings');
         localStorage.clear();
         if (savedSettings) localStorage.setItem('appSettings', savedSettings);
-
-        // Clear any service worker cache if present
-        if ('caches' in window) {
-          caches.keys().then(names => { names.forEach(name => caches.delete(name)); });
-        }
-
-        // Unregister service workers if present
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(registrations => {
-            registrations.forEach(r => r.unregister());
-          });
-        }
 
         // Show success state
         showCacheModal({

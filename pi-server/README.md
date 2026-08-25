@@ -75,7 +75,7 @@ WantedBy=multi-user.target
 sudo systemctl enable --now pokedex
 ```
 
-### HTTPS (required for the PWA service worker)
+### HTTPS (Tailscale serve)
 
 Tailscale on the Pi + each tablet, then:
 

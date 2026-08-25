@@ -83,14 +83,21 @@
   <!-- Scripts -->
   <script type="module" src="js/main.js"></script>
 
-  <!-- Service Worker Registration -->
+  <!-- Service worker: no caching, registered purely so Android Chrome
+       treats the app as installable ("Add to Home Screen") -- see sw.js.
+       updateViaCache: 'none' so the browser never trusts HTTP cache when
+       checking sw.js itself for changes. -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-          .then(reg => console.log('[PWA] Service worker registered:', reg.scope))
-          .catch(err => console.log('[PWA] Service worker registration failed:', err));
-      });
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then(reg => console.log('[PWA] Service worker registered:', reg.scope))
+        .catch(err => console.log('[PWA] Service worker registration failed:', err));
+    }
+    // One-time cleanup: purge any Cache Storage buckets left behind by the
+    // old cache-first service worker -- this one never writes to Cache
+    // Storage, so those would otherwise be orphaned dead weight forever.
+    if ('caches' in window) {
+      caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
   </script>
 </body>

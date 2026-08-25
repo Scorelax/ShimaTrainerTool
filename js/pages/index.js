@@ -428,8 +428,8 @@ export function renderIndex() {
       <div id="cacheModal" class="cache-modal-overlay" style="display:none;">
         <div class="cache-modal">
           <div class="cache-modal-icon" id="cacheModalIcon">🔄</div>
-          <h2 class="cache-modal-title" id="cacheModalTitle">Reset Cache?</h2>
-          <p class="cache-modal-message" id="cacheModalMessage">This will clear all session data and reload the page.</p>
+          <h2 class="cache-modal-title" id="cacheModalTitle">Reload Data?</h2>
+          <p class="cache-modal-message" id="cacheModalMessage">This will fetch fresh data from the server and reload the page.</p>
           <div class="cache-modal-buttons" id="cacheModalButtons">
             <button class="cache-modal-btn cache-modal-cancel" id="cacheModalCancel">Cancel</button>
             <button class="cache-modal-btn cache-modal-confirm" id="cacheModalConfirm">Reset</button>
@@ -471,7 +471,7 @@ export function renderIndex() {
           </div>
 
           <button class="cache-modal-btn cache-modal-confirm settings-reset-btn" id="settingsResetCacheButton">
-            🔄 Reset Cache
+            🔄 Reload Data
           </button>
 
           <div class="cache-modal-buttons">
@@ -605,8 +605,8 @@ export function attachIndexListeners() {
     hideSettingsModal();
     showCacheModal({
       icon: '🔄',
-      title: 'Reset Cache?',
-      message: 'This will clear all session data and reload the page.',
+      title: 'Reload Data?',
+      message: 'This will fetch fresh data from the server and reload the page.',
       buttons: `
         <button class="cache-modal-btn cache-modal-cancel" id="cacheModalCancel">Cancel</button>
         <button class="cache-modal-btn cache-modal-confirm" id="cacheModalConfirm">Reset</button>
@@ -648,8 +648,8 @@ export function attachIndexListeners() {
         // Show success state
         showCacheModal({
           icon: '✅',
-          title: 'Cache Cleared!',
-          message: 'Server and device caches have been cleared. The page will now reload.',
+          title: 'Data Reloaded!',
+          message: 'Fresh data has been loaded from the server. The page will now reload.',
           buttons: `<button class="cache-modal-btn cache-modal-ok" id="cacheModalOk">OK</button>`,
         });
 

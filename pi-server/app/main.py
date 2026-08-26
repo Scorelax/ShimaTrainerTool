@@ -36,21 +36,37 @@ app.add_middleware(
 db.init()
 
 
+# Binary media: self-uploaded GIF sprites, Benjakronk splash mirror, and the
+# bundled audio/images in PWA_DIR/assets (27MB of mp3s and pngs). These are
+# large, rarely change, and are re-displayed constantly during normal use
+# (every navigation back to a screen showing an owned Pokemon re-requests its
+# sprite) -- no-store on these was forcing a full multi-MB re-download every
+# single time, which is what was making self-uploaded GIFs stutter/re-buffer
+# on every screen change instead of playing instantly from a local copy.
+_CACHEABLE_MEDIA_PREFIXES = ('/gifs/', '/splashes/', '/assets/')
+
+
 @app.middleware('http')
-async def no_caching(request: Request, call_next):
-    """No response from this server is ever stored by the browser, full stop.
-    An earlier attempt used Cache-Control: no-cache (revalidate-before-use,
-    not "don't cache") on the theory that StaticFiles' existing Last-Modified/
-    ETag would make that revalidation cheap and reliable -- but that still
-    leaves a locally-stored copy sitting around for some browser/WebView to
-    get revalidation wrong on (exactly the kind of stale-PWA-cache bug that
-    got the old service worker retired -- see git history around 2026-08-25).
-    This is a small LAN/Tailscale tool with a handful of players, not a CDN-
-    backed site serving thousands of hits -- there's no bandwidth reason to
-    let anything be cached, so no-store removes the ambiguity entirely: every
-    load is a full fetch from this server, every time."""
+async def caching_policy(request: Request, call_next):
+    """App code and API responses (HTML/JS/CSS, /api, /api/events) stay
+    no-store -- these are small, change often, and must always be instantly
+    fresh (see git history around this date: an earlier no-cache attempt
+    still left a locally-stored copy sitting around for some browser/WebView
+    to get revalidation wrong on, which is exactly the class of stale-PWA-
+    cache bug that got the old service worker retired too).
+
+    Binary media under _CACHEABLE_MEDIA_PREFIXES gets no-cache instead: the
+    browser still asks the server on every load (so replacing a file is
+    never stuck stale, same guarantee as no-store), but StaticFiles' existing
+    Last-Modified/ETag means an unchanged file comes back as an empty 304
+    instead of retransferring the full body -- keeping the "always eventually
+    fresh, nothing to manually clear" property while fixing the re-buffering."""
     response = await call_next(request)
-    response.headers['Cache-Control'] = 'no-store'
+    path = request.url.path
+    if path.startswith(_CACHEABLE_MEDIA_PREFIXES):
+        response.headers['Cache-Control'] = 'no-cache'
+    else:
+        response.headers['Cache-Control'] = 'no-store'
     return response
 
 

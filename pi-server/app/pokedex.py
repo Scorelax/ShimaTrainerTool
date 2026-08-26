@@ -74,13 +74,19 @@ def _format_row(row, image, with_shiny):
 
 
 def get_complete_pokemon_data(conn):
-    """pokemon/list — resolves image URLs server-side (cached in SQLite)."""
+    """pokemon/list — resolves image URLs server-side (cached in SQLite).
+    Prefers a self-uploaded animated sprite over the static Benjakronk image
+    when one exists for that species (non-shiny -- this list is a flat
+    per-species reference, not tied to any one trainer's shiny Pokemon), so
+    the evolution-target preview picks up GIFs the same way owned Pokemon do.
+    Falls back to the static image untouched when no GIF is uploaded."""
     registered = upstream.registered_pokemon_names(conn)
     try:
         all_data = upstream.fetch_pokemon_db(conn)
         filtered = [row for row in all_data if row[2] in registered]
         return [
-            _format_row(row, upstream.get_image_url(conn, row[2], row[1]), with_shiny=False)
+            _format_row(row, upstream.local_gif_url(row[2]) or upstream.get_image_url(conn, row[2], row[1]),
+                        with_shiny=False)
             for row in filtered
         ]
     except Exception:

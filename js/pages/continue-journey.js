@@ -36,12 +36,27 @@ function _parseKnownMovesForSync(str) {
 // Warms the browser's cache for self-uploaded animated sprites while the
 // player is still on this loading screen, so the first view of a screen
 // showing them (trainer-card, pokemon-card, combat, ...) doesn't stall on a
-// multi-MB download. Fire-and-forget: new Image() starts the request without
-// blocking anything else here, and the browser handles the rest.
+// multi-MB download. Fire-and-forget from the caller's perspective (never
+// awaited at the call sites below) -- but internally it waits for the active
+// party + utility Pokemon (trainer-card, the first screen after this one) to
+// actually finish loading before starting the rest of the roster, so those
+// aren't left competing for bandwidth/connection slots with the ones the
+// player is about to see immediately.
 // ============================================================================
 
-function prefetchGifSprites() {
-  const seen = new Set();
+function _loadImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = resolve;
+    img.onerror = resolve;
+    img.src = url;
+  });
+}
+
+async function prefetchGifSprites() {
+  const priorityUrls = new Set();
+  const otherUrls = new Set();
+
   Object.keys(sessionStorage)
     .filter(k => k.startsWith('pokemon_'))
     .forEach(key => {
@@ -52,11 +67,23 @@ function prefetchGifSprites() {
         return;
       }
       const url = pokemon && pokemon[1];
-      if (typeof url === 'string' && url.endsWith('.gif') && !seen.has(url)) {
-        seen.add(url);
-        new Image().src = url;
-      }
+      if (typeof url !== 'string' || !url.endsWith('.gif')) return;
+
+      // Matches trainer-card.js's own active-party/utility-slot detection:
+      // pokemon[38] is the active party slot number (1-6), pokemon[56] === 1
+      // marks the utility slot.
+      const slotNumber = parseInt(pokemon[38], 10);
+      const isActiveParty = slotNumber >= 1 && slotNumber <= 6;
+      const isUtility = pokemon[56] === 1;
+
+      (isActiveParty || isUtility ? priorityUrls : otherUrls).add(url);
     });
+
+  await Promise.all([...priorityUrls].map(_loadImage));
+
+  [...otherUrls]
+    .filter(url => !priorityUrls.has(url))
+    .forEach(url => { new Image().src = url; });
 }
 
 function syncKnownMovesForAllPokemon() {

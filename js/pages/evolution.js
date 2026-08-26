@@ -478,7 +478,7 @@ export function renderEvolution() {
 
         <div class="pokemon-details empty" id="pokemonDetails">
           <div id="pokemonDetailsContent" style="display: none; width: 100%; flex-direction: column; align-items: center;">
-            <img src="" alt="Pokemon" id="pokemonImage" onerror="this.src='assets/Pokeball.png'">
+            <img src="" alt="Pokemon" id="pokemonImage" decoding="async" onerror="this.src='assets/Pokeball.png'">
             <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
             <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
             <div class="detail-item">Type: <strong id="pokemonType"></strong></div>

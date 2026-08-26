@@ -94,12 +94,18 @@ def get_complete_pokemon_data(conn):
 
 
 def get_registered_pokemon_list(conn):
-    """pokemon/registered-list — images resolved client-side (image = None)."""
+    """pokemon/registered-list — static images resolved client-side (image =
+    None unless a self-uploaded GIF exists). get_image_url's GitHub probe is
+    deliberately deferred to the client for this bulk endpoint since it's
+    slow -- but local_gif_url is a plain filesystem check, cheap enough to
+    always do here, so this list (which feeds completePokemonData, and from
+    there the evolution-target preview) knows about GIFs immediately instead
+    of falling back to the static-only client-side resolver every time."""
     try:
         registered = upstream.registered_pokemon_names(conn)
         all_data = upstream.fetch_pokemon_db(conn)
         data = [
-            _format_row(row, None, with_shiny=True)
+            _format_row(row, upstream.local_gif_url(row[2]), with_shiny=True)
             for row in all_data if row[2] in registered
         ]
         data.sort(key=lambda r: js_number(r[2]))

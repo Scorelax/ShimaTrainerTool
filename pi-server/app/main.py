@@ -33,6 +33,22 @@ app.add_middleware(
 db.init()
 
 
+@app.middleware('http')
+async def no_heuristic_caching(request: Request, call_next):
+    """Force revalidation on every response instead of letting browsers apply
+    their own heuristic freshness rules. StaticFiles below already sets
+    Last-Modified/ETag on every static file, but never told browsers to
+    actually use them -- so a plain refresh could serve JS straight from disk
+    cache with no request to the server at all, deploy or not. Cache-Control:
+    no-cache (not no-store) keeps that conditional-GET machinery but forces a
+    check with the server every time: fast 304 when nothing changed, fresh
+    body when a deploy changed the file's mtime. This is what actually makes
+    "just refresh the tab" work, independent of the (retired) service worker."""
+    response = await call_next(request)
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
 def _data_version():
     """Newest upstream fetch time. Changes whenever the snapshots refresh
     (Reset Cache button or scripts/refresh_upstream.py), which tells clients

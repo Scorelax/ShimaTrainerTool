@@ -87,16 +87,19 @@ export function renderEvolution() {
 
         .evolution-container {
           display: flex;
-          justify-content: space-between;
+          flex-direction: column;
+          align-items: center;
           width: 90%;
-          max-width: clamp(900px, 95vw, 1400px);
-          flex-grow: 1;
+          max-width: clamp(500px, 90vw, 650px);
           gap: clamp(1.5rem, 3vw, 2rem);
         }
 
         .evolution-list {
-          width: 58%;
-          max-height: 65vh;
+          width: 100%;
+          /* Sized to content -- normally just 1-2 options, so no reason to
+             reserve a tall fixed box. max-height + scroll only kicks in for
+             the rare case of a long branching-evolution list. */
+          max-height: 40vh;
           overflow-y: auto;
           border: 2px solid var(--border-accent);
           border-radius: clamp(15px, 2.5vw, 20px);
@@ -147,15 +150,14 @@ export function renderEvolution() {
         }
 
         .pokemon-details {
-          width: 38%;
+          width: 100%;
           text-align: center;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
           background: transparent;
-          padding: clamp(1.5rem, 3vw, 2rem);
-          min-height: 60vh;
+          padding: clamp(1rem, 2.5vw, 1.5rem) 0;
         }
 
         .pokemon-details.visible {
@@ -163,11 +165,8 @@ export function renderEvolution() {
         }
 
         .pokemon-details.empty {
-          display: flex;
-          align-items: center;
-          justify-content: center;
           color: #FFDE00;
-          font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+          font-size: clamp(1rem, 2.2vw, 1.2rem);
           font-style: italic;
           font-weight: 600;
           text-shadow: 0 2px 6px rgba(0,0,0,0.8);
@@ -455,13 +454,7 @@ export function renderEvolution() {
 
         @media (max-width: 480px) {
           .evolution-container {
-            flex-direction: column;
             gap: clamp(0.5rem, 1.5vw, 1rem);
-          }
-
-          .evolution-list,
-          .pokemon-details {
-            width: 100%;
           }
         }
       </style>
@@ -484,7 +477,7 @@ export function renderEvolution() {
             <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
             <button class="evolve-button" id="evolveButton">Evolve Pokemon</button>
           </div>
-          <div id="pokemonPlaceholder"></div>
+          <div id="pokemonPlaceholder">Select an evolution above to see its details</div>
         </div>
       </div>
 
@@ -682,6 +675,12 @@ async function loadEvolutionOptions() {
       document.getElementById('pokemonList').innerHTML = '<li style="text-align: center; color: #666;">This Pokemon\'s evolution is currently not available in the registered Pokedex.</li>';
     } else {
       displayEvolutionOptions(evolutionOptions);
+      // There are normally only 1-2 options here, so preload both now
+      // instead of waiting for a click -- by the time the player picks one,
+      // the image (GIF or static) is already sitting in the browser's cache.
+      evolutionOptions.forEach(option => {
+        if (option[0]) new Image().src = option[0];
+      });
     }
 
   } catch (error) {

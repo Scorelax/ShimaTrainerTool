@@ -2,6 +2,7 @@
 import { TrainerAPI } from '../api.js';
 import { selectAndPreloadSplashImage } from '../utils/splash.js';
 import { showTapToContinue } from '../utils/idle-splash.js';
+import { prefetchSprite } from '../utils/sprite-media.js';
 
 // ============================================================================
 // KNOWN MOVES SYNC
@@ -32,26 +33,19 @@ function _parseKnownMovesForSync(str) {
 }
 
 // ============================================================================
-// GIF SPRITE PREFETCH
-// Warms the browser's cache for self-uploaded animated sprites while the
-// player is still on this loading screen, so the first view of a screen
-// showing them (trainer-card, pokemon-card, combat, ...) doesn't stall on a
-// multi-MB download. Fire-and-forget from the caller's perspective (never
-// awaited at the call sites below) -- but internally it waits for the active
-// party + utility Pokemon (trainer-card, the first screen after this one) to
-// actually finish loading before starting the rest of the roster, so those
-// aren't left competing for bandwidth/connection slots with the ones the
-// player is about to see immediately.
+// SPRITE PREFETCH
+// Warms the browser's cache for self-uploaded animated sprites (MP4 or GIF)
+// while the player is still on this loading screen, so the first view of a
+// screen showing them (trainer-card, pokemon-card, combat, ...) doesn't
+// stall on a multi-MB download. Fire-and-forget from the caller's
+// perspective (never awaited at the call sites below) -- but internally it
+// waits for the active party + utility Pokemon (trainer-card, the first
+// screen after this one) to actually finish loading before starting the
+// rest of the roster, so those aren't left competing for bandwidth/
+// connection slots with the ones the player is about to see immediately.
 // ============================================================================
 
-function _loadImage(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = resolve;
-    img.onerror = resolve;
-    img.src = url;
-  });
-}
+const SPRITE_EXTENSIONS = /\.(mp4|gif)$/i;
 
 async function prefetchGifSprites() {
   const priorityUrls = new Set();
@@ -67,7 +61,7 @@ async function prefetchGifSprites() {
         return;
       }
       const url = pokemon && pokemon[1];
-      if (typeof url !== 'string' || !url.endsWith('.gif')) return;
+      if (typeof url !== 'string' || !SPRITE_EXTENSIONS.test(url)) return;
 
       // Matches trainer-card.js's own active-party/utility-slot detection:
       // pokemon[38] is the active party slot number (1-6), pokemon[56] === 1
@@ -79,11 +73,11 @@ async function prefetchGifSprites() {
       (isActiveParty || isUtility ? priorityUrls : otherUrls).add(url);
     });
 
-  await Promise.all([...priorityUrls].map(_loadImage));
+  await Promise.all([...priorityUrls].map(prefetchSprite));
 
   [...otherUrls]
     .filter(url => !priorityUrls.has(url))
-    .forEach(url => { new Image().src = url; });
+    .forEach(prefetchSprite);
 }
 
 function syncKnownMovesForAllPokemon() {

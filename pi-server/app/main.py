@@ -193,7 +193,7 @@ if os.path.isdir(routes_gamedata.SPLASH_DIR):
     app.mount('/splashes', StaticFiles(directory=routes_gamedata.SPLASH_DIR),
               name='splashes')
 
-# Self-uploaded animated sprites (see upstream.GIF_DIR / upstream.local_gif_url)
+# Self-uploaded animated sprites, mp4 or gif (see upstream.GIF_DIR / upstream.local_sprite_url)
 if os.path.isdir(upstream.GIF_DIR):
     app.mount('/gifs', StaticFiles(directory=upstream.GIF_DIR), name='gifs')
 

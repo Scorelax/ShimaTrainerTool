@@ -192,18 +192,29 @@ def get_image_url(conn, pokemon_name, pokemon_id):
     return None
 
 
-def local_gif_url(pokemon_name, shiny=False):
+def local_sprite_url(pokemon_name, shiny=False):
     """Self-uploaded animated sprite for pokemon_name, if one exists in
-    GIF_DIR. Same sanitization as get_image_url() for one consistent
-    filename rule across both, but otherwise unrelated -- no dex-id prefix,
-    no Benjakronk repo, no network probe/cache. Shiny uses a -shiny suffix,
-    matching the convention Benjakronk's own shiny sprites already use
-    elsewhere; falls back to the non-shiny gif if only that exists."""
+    GIF_DIR (which despite the name now holds both .mp4 and .gif -- kept the
+    directory/env var name to avoid any Pi-side path changes). Same
+    sanitization as get_image_url() for one consistent filename rule across
+    both, but otherwise unrelated -- no dex-id prefix, no Benjakronk repo,
+    no network probe/cache.
+
+    Checked in this order, so shiny-correctness always wins over format
+    preference: shiny+mp4, shiny+gif, non-shiny mp4, non-shiny gif. MP4 has
+    real video compression (much smaller, hardware-decoded on phones) vs
+    GIF's per-pixel palette encoding, so it's preferred whenever both exist
+    for a species -- verified with actual pixel data that these sprites
+    carry no transparency, so MP4's lack of an alpha channel loses nothing
+    here. Shiny uses a -shiny suffix, matching the convention Benjakronk's
+    own shiny sprites already use elsewhere; falls back through to the
+    non-shiny variant if no shiny file exists in either format."""
     sanitized = re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(pokemon_name).lower()))
+    candidates = []
     if shiny:
-        shiny_path = os.path.join(GIF_DIR, f'{sanitized}-shiny.gif')
-        if os.path.isfile(shiny_path):
-            return f'/gifs/{sanitized}-shiny.gif'
-    if os.path.isfile(os.path.join(GIF_DIR, f'{sanitized}.gif')):
-        return f'/gifs/{sanitized}.gif'
+        candidates += [f'{sanitized}-shiny.mp4', f'{sanitized}-shiny.gif']
+    candidates += [f'{sanitized}.mp4', f'{sanitized}.gif']
+    for filename in candidates:
+        if os.path.isfile(os.path.join(GIF_DIR, filename)):
+            return f'/gifs/{filename}'
     return None

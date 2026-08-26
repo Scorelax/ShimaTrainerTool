@@ -107,10 +107,10 @@ def get_pokemon_info(conn, trainer_name, pokemon_name, animated=True):
         if (str(row[0]).lower() == trainer_name.lower()
                 and str(row[2]).lower() == pokemon_name.lower()):
             if animated:
-                gif = upstream.local_gif_url(row[2], shiny=(row[61] == 'Y'))
-                if gif:
+                sprite = upstream.local_sprite_url(row[2], shiny=(row[61] == 'Y'))
+                if sprite:
                     row = list(row)
-                    row[1] = gif
+                    row[1] = sprite
             return {field: row[idx] for field, idx in _INFO_FIELDS}
     return None
 

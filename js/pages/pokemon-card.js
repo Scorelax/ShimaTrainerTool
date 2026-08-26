@@ -5,6 +5,7 @@ import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData, SPECIALIZATION_TO_TYPE } from '../utils/pokemon-types.js';
 import { showMovePopup, showDrainHealPopupForCard } from '../utils/move-popup.js';
+import { spriteMediaHtml } from '../utils/sprite-media.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -446,7 +447,8 @@ export function renderPokemonCard(pokemonName) {
           border-color: #FFC700;
         }
 
-        .pokemon-image-container img {
+        .pokemon-image-container img,
+        .pokemon-image-container video {
           width: 100%;
           height: 100%;
           object-fit: cover;
@@ -2319,7 +2321,7 @@ export function renderPokemonCard(pokemonName) {
         <!-- Left Column: Image + Info List + Buttons -->
         <div class="left-column">
           <div class="pokemon-image-container">
-            <img id="pokemonImage" src="${image}" alt="${name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
+            ${spriteMediaHtml(image, name, '', 'pokemonImage')}
           </div>
 
           <div class="trainer-info-list">
@@ -2413,7 +2415,7 @@ export function renderPokemonCard(pokemonName) {
         <!-- Left Column: Image + Battle Info -->
         <div class="left-column">
           <div class="pokemon-image-container">
-            <img id="pokemonImageBattle" src="${image}" alt="${name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
+            ${spriteMediaHtml(image, name, '', 'pokemonImageBattle')}
           </div>
 
           <div class="trainer-info-list">

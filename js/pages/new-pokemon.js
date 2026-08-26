@@ -4,6 +4,7 @@ import { PokemonAPI } from '../api.js';
 import { showError } from '../utils/notifications.js';
 import { initializeVisibility, getPokemonVisibility } from '../utils/visibility.js';
 import { getMoveTypeColor, getTextColorForBackground } from '../utils/pokemon-types.js';
+import { spriteMediaHtml, renderSpriteInto } from '../utils/sprite-media.js';
 
 // Module state
 let selectedPokemon = null;
@@ -169,7 +170,8 @@ export function renderNewPokemon() {
           text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
 
-        .pokemon-details img {
+        .pokemon-details img,
+        .pokemon-details video {
           width: 85%;
           max-width: 300px;
           aspect-ratio: 1;
@@ -182,7 +184,8 @@ export function renderNewPokemon() {
           transition: transform 0.3s, filter 0.3s;
         }
 
-        .pokemon-details img:hover {
+        .pokemon-details img:hover,
+        .pokemon-details video:hover {
           transform: translateY(clamp(-3px, -0.8vh, -5px));
           filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
@@ -310,7 +313,7 @@ export function renderNewPokemon() {
 
         <div class="pokemon-details empty" id="pokemonDetails">
           <div id="pokemonDetailsContent" style="display: none; width: 100%; flex-direction: column; align-items: center;">
-            <img alt="Pokemon" id="pokemonImage" decoding="async" onerror="this.src='assets/Pokeball.png'">
+            ${spriteMediaHtml(null, 'Pokemon', '', 'pokemonImage')}
             <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
             <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
             <div class="detail-item">Type: <div id="pokemonType" style="display: inline-block;"></div></div>
@@ -442,7 +445,7 @@ async function selectPokemon(pokemon, listItem) {
     pokemon[0] = imageUrl;
   }
 
-  document.getElementById('pokemonImage').src = imageUrl;
+  renderSpriteInto('pokemonImage', imageUrl, pokemon[1]);
   document.getElementById('pokemonName').textContent = pokemon[1];
   document.getElementById('pokemonDexEntry').textContent = pokemon[2];
 

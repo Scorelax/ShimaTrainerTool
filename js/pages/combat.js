@@ -4,6 +4,7 @@ import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showToast } from '../utils/notifications.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData } from '../utils/pokemon-types.js';
 import { showMovePopup } from '../utils/move-popup.js';
+import { spriteMediaHtml } from '../utils/sprite-media.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -330,7 +331,7 @@ function renderSetupPhase() {
   const pokemonCards = partyPokemon.map(p => `
     <div class="setup-pokemon-card" data-pokemon-key="${p.key}">
       <div class="setup-check">✓</div>
-      <img src="${p.image}" alt="${p.name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
+      ${spriteMediaHtml(p.image, p.name)}
       <div class="setup-pokemon-info">
         <div class="setup-pokemon-name">${p.name}</div>
         <div class="setup-pokemon-level">Lv ${p.level}</div>
@@ -372,7 +373,7 @@ function renderSetupPhase() {
 function renderInitiativePhase(state) {
   const rows = state.combatants.map(c => `
     <div class="initiative-row">
-      <img src="${c.image}" alt="${c.name}" class="initiative-img" decoding="async" onerror="this.src='assets/Pokeball.png'">
+      ${spriteMediaHtml(c.image, c.name, 'initiative-img')}
       <div class="initiative-info">
         <div class="initiative-name">${c.name} <span class="initiative-level">Lv ${c.level}</span></div>
         <div class="initiative-score-label">Initiative Score: <strong>${c.initiativeScore}</strong></div>
@@ -739,7 +740,7 @@ function renderCombatCard(c, isActive) {
   return `
     <div class="combat-card ${isActive ? 'combat-card--active' : ''} ${fainted ? 'combat-card--fainted' : ''}" data-combatant-id="${c.id}" id="card_${c.id}">
       <div class="combat-card-main">
-        <img src="${c.image}" alt="${c.name}" class="combat-card-img" decoding="async" onerror="this.src='assets/Pokeball.png'">
+        ${spriteMediaHtml(c.image, c.name, 'combat-card-img')}
         <div class="combat-card-body">
           <div class="combat-card-name-row">
             <span class="combat-card-name ${fainted ? 'fainted-name' : ''}">${c.name}</span>
@@ -1043,7 +1044,8 @@ function getCombatCSS() {
     .setup-pokemon-card.selected { border-color: #4CAF50; background: rgba(76,175,80,0.12); }
     .setup-check { position: absolute; top: 6px; right: 8px; font-size: 1rem; color: #4CAF50; opacity: 0; transition: opacity 0.2s; }
     .setup-pokemon-card.selected .setup-check { opacity: 1; }
-    .setup-pokemon-card img { width: 48px; height: 48px; object-fit: contain; }
+    .setup-pokemon-card img,
+    .setup-pokemon-card video { width: 48px; height: 48px; object-fit: contain; }
     .setup-pokemon-name { font-weight: 600; font-size: 0.95rem; }
     .setup-pokemon-level { font-size: 0.8rem; color: #aaa; }
     .setup-pokemon-types { display: flex; gap: 4px; margin-top: 2px; }
@@ -1812,7 +1814,7 @@ function showSwitchPopup(state) {
       : `<span class="switch-init-label switch-init-new">Roll Init</span>`;
     return `
       <div class="switch-pokemon-card ${fainted ? 'fainted-bench' : ''}" data-pokemon-id="${p.id}">
-        <img src="${p.image}" alt="${p.name}" decoding="async" onerror="this.src='assets/Pokeball.png'" class="switch-poke-img">
+        ${spriteMediaHtml(p.image, p.name, 'switch-poke-img')}
         <div class="switch-poke-info">
           <div class="switch-poke-name">${p.name} <span class="combat-card-level">Lv ${p.level}</span> ${typeBadges}</div>
           <div class="switch-poke-stats">

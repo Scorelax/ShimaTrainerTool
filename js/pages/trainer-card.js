@@ -2,6 +2,7 @@
 
 import { showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
+import { spriteMediaHtml } from '../utils/sprite-media.js';
 
 // Helper function to get max charges for a buff based on trainer level
 function getMaxCharges(buffName, trainerLevel) {
@@ -319,7 +320,8 @@ export function renderTrainerCard() {
           filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
 
-        .utility-slot img {
+        .utility-slot img,
+        .utility-slot video {
           width: 85%;
           height: auto;
           aspect-ratio: 1;
@@ -392,7 +394,8 @@ export function renderTrainerCard() {
           filter: brightness(1.1) drop-shadow(0 0 clamp(15px, 3vw, 25px) rgba(255,222,0,0.6));
         }
 
-        .pokemon-slot img {
+        .pokemon-slot img,
+        .pokemon-slot video {
           width: 85%;
           height: auto;
           aspect-ratio: 1;
@@ -783,7 +786,8 @@ export function renderTrainerCard() {
             gap: clamp(0.5rem, 1.5vw, 1rem);
           }
 
-          .pokemon-slot img {
+          .pokemon-slot img,
+          .pokemon-slot video {
             border-width: clamp(2px, 0.4vw, 3px);
           }
 
@@ -929,7 +933,7 @@ export function renderTrainerCard() {
           <div class="utility-label">Utility</div>
           ${utilityPokemon ? `
             <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
-              <img src="${utilityPokemon.image}" alt="${utilityPokemon.name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
+              ${spriteMediaHtml(utilityPokemon.image, utilityPokemon.name)}
               <div class="pokemon-name">${utilityPokemon.nickname || utilityPokemon.name}</div>
               <div class="pokemon-level">Level ${utilityPokemon.level}</div>
             </div>
@@ -951,7 +955,7 @@ export function renderTrainerCard() {
               const displayName = pokemon.nickname || pokemon.name;
               return `
                 <div class="pokemon-slot" data-pokemon-name="${pokemon.name.toLowerCase()}">
-                  <img src="${pokemon.image}" alt="${pokemon.name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
+                  ${spriteMediaHtml(pokemon.image, pokemon.name)}
                   <div class="pokemon-name">${displayName}</div>
                   <div class="pokemon-level">Level ${pokemon.level}</div>
                 </div>

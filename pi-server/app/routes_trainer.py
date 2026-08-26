@@ -90,19 +90,19 @@ def get_trainers(conn):
     } for i, (_, row) in enumerate(db.fetch_rows(conn, 'trainers', T), start=1)]
 
 
-def _with_local_gif(row, animated=True):
+def _with_local_sprite(row, animated=True):
     """Swap in a self-uploaded animated sprite for this row's image field,
-    if one exists (upstream.local_gif_url) -- otherwise leave the stored
+    if one exists (upstream.local_sprite_url) -- otherwise leave the stored
     image untouched. Skipped entirely when the caller has animated sprites
     turned off (Settings > Animated Sprites), so the stored static image
     always comes through unchanged."""
     if not animated:
         return row
-    gif = upstream.local_gif_url(row[2], shiny=(row[61] == 'Y'))
-    if not gif:
+    sprite = upstream.local_sprite_url(row[2], shiny=(row[61] == 'Y'))
+    if not sprite:
         return row
     row = list(row)
-    row[1] = gif
+    row[1] = sprite
     return row
 
 
@@ -114,7 +114,7 @@ def store_trainer_and_pokemon_data(conn, trainer_name, animated=True):
         return None
 
     pokemon_entries = [
-        _with_local_gif(row, animated) for _, row in db.fetch_rows(conn, 'pokemon', P)
+        _with_local_sprite(row, animated) for _, row in db.fetch_rows(conn, 'pokemon', P)
         if str(row[0]).lower() == trainer_name.lower()
     ]
     return {'trainerData': trainer_entry, 'pokemonData': pokemon_entries}

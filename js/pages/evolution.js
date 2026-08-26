@@ -5,6 +5,7 @@ import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility, getPokemonVisibility } from '../utils/visibility.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
+import { spriteMediaHtml, renderSpriteInto, prefetchSprite } from '../utils/sprite-media.js';
 
 // Module-level state
 let selectedPokemon = null;
@@ -172,7 +173,8 @@ export function renderEvolution() {
           text-shadow: 0 2px 6px rgba(0,0,0,0.8);
         }
 
-        .pokemon-details img {
+        .pokemon-details img,
+        .pokemon-details video {
           width: 85%;
           max-width: 300px;
           aspect-ratio: 1;
@@ -185,7 +187,8 @@ export function renderEvolution() {
           transition: transform 0.3s, filter 0.3s;
         }
 
-        .pokemon-details img:hover {
+        .pokemon-details img:hover,
+        .pokemon-details video:hover {
           transform: translateY(clamp(-3px, -0.8vh, -5px));
           filter: brightness(1.1) drop-shadow(0 0 clamp(10px, 2vw, 15px) rgba(255,222,0,0.6));
         }
@@ -471,7 +474,7 @@ export function renderEvolution() {
 
         <div class="pokemon-details empty" id="pokemonDetails">
           <div id="pokemonDetailsContent" style="display: none; width: 100%; flex-direction: column; align-items: center;">
-            <img alt="Pokemon" id="pokemonImage" decoding="async" onerror="this.src='assets/Pokeball.png'">
+            ${spriteMediaHtml(null, 'Pokemon', '', 'pokemonImage')}
             <div class="detail-item">Name: <strong id="pokemonName"></strong></div>
             <div class="detail-item">Dex Entry: <strong id="pokemonDexEntry"></strong></div>
             <div class="detail-item">Type: <strong id="pokemonType"></strong></div>
@@ -677,10 +680,8 @@ async function loadEvolutionOptions() {
       displayEvolutionOptions(evolutionOptions);
       // There are normally only 1-2 options here, so preload both now
       // instead of waiting for a click -- by the time the player picks one,
-      // the image (GIF or static) is already sitting in the browser's cache.
-      evolutionOptions.forEach(option => {
-        if (option[0]) new Image().src = option[0];
-      });
+      // the sprite (MP4, GIF, or static) is already sitting in the cache.
+      evolutionOptions.forEach(option => prefetchSprite(option[0]));
     }
 
   } catch (error) {
@@ -752,7 +753,7 @@ async function selectEvolution(pokemon, listItem) {
     console.log('[Evolution] Resolved and stored image URL:', imageUrl);
   }
 
-  document.getElementById('pokemonImage').src = imageUrl;
+  renderSpriteInto('pokemonImage', imageUrl, pokemon[1]);
 }
 
 async function resolveImageUrl(pokemonName, pokemonId, isShiny) {

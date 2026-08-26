@@ -24,7 +24,7 @@ export function initLiveUpdates() {
     let event;
     try {
       event = JSON.parse(e.data);
-    } catch {
+    } catch (err) {
       return;
     }
     if (event.dataset === 'pokedex-config') {

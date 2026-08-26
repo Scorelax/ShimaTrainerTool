@@ -12,6 +12,7 @@ let currentPokemon = null;
 let availableSkillPoints = 0;
 let allocatedSkillPoints = 0;
 let evolutionOptions = [];
+let pokedexUpdateHandler = null;
 
 export function renderEvolution() {
   const selectedPokemonName = sessionStorage.getItem('selectedPokemonName');
@@ -597,6 +598,15 @@ export async function attachEvolutionListeners() {
 
   // Load evolution options
   loadEvolutionOptions();
+
+  // Re-run when a live Pokedex push arrives (see live-updates.js) so a newly
+  // visible evolution shows up without leaving this screen. Remove any
+  // listener from a previous visit first -- window-level listeners aren't
+  // cleaned up by the router's innerHTML swap between pages, so re-adding
+  // without removing would stack a duplicate on every return visit.
+  if (pokedexUpdateHandler) window.removeEventListener('app:pokedex-updated', pokedexUpdateHandler);
+  pokedexUpdateHandler = () => loadEvolutionOptions();
+  window.addEventListener('app:pokedex-updated', pokedexUpdateHandler);
 
   // Evolve button
   document.getElementById('evolveButton')?.addEventListener('click', evolvePokemon);

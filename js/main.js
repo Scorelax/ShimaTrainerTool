@@ -17,6 +17,7 @@ import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
 import { getSettings } from './utils/settings.js';
 import { initIdleSplash } from './utils/idle-splash.js';
+import { initLiveUpdates } from './utils/live-updates.js';
 
 // ============================================================================
 // APPLICATION STATE
@@ -278,6 +279,10 @@ async function initApp() {
 
     // Idle splash screensaver -- survives navigation, so init once here
     initIdleSplash();
+
+    // Live push notifications (Benjakronk's Pokedex pushes) -- one SSE
+    // connection for the whole session, same "init once" reasoning as above
+    initLiveUpdates();
 
     // Hide loading screen, show app
     document.getElementById('loading-screen').classList.remove('active');

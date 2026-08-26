@@ -7,16 +7,19 @@ frontend change needed is API_CONFIG.baseUrl in js/api.js.
 Run locally:  uvicorn app.main:app --host 0.0.0.0 --port 8080
 Env vars:     POKEDEX_DB (sqlite path), PWA_DIR (static files root)
 """
+import asyncio
 import hmac
+import json
 import os
+import queue as queue_mod
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, routes_pokemon, routes_trainer, routes_gamedata, routes_music, upstream
+from . import db, live, routes_pokemon, routes_trainer, routes_gamedata, routes_music, upstream
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
@@ -135,8 +138,37 @@ def push_upstream_dataset(payload: dict, x_push_key: str = Header(default='')):
         return JSONResponse({'status': 'error', 'error': str(e)}, status_code=400)
     finally:
         conn.close()
+    version = _data_version()
+    live.publish({'dataset': dataset, 'version': version})
     return JSONResponse({'status': 'success', 'message': f'{dataset} stored'},
-                        headers={'X-Data-Version': _data_version()})
+                        headers={'X-Data-Version': version})
+
+
+@app.get('/api/events')
+async def live_events(request: Request):
+    """Server-Sent Events stream: notifies connected devices the instant
+    push_upstream_dataset() above lands a new Pokedex push, instead of
+    waiting for the next Reload Data / login. One connection per device,
+    opened once at app startup (see js/utils/live-updates.js) and reused for
+    the whole session -- the frontend is a real SPA, not page-by-page
+    navigation, so this doesn't need to reconnect between screens."""
+    q = live.subscribe()
+
+    async def event_stream():
+        try:
+            yield ': connected\n\n'
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.to_thread(q.get, timeout=15)
+                    yield f'data: {json.dumps(event)}\n\n'
+                except queue_mod.Empty:
+                    yield ': keepalive\n\n'
+        finally:
+            live.unsubscribe(q)
+
+    return StreamingResponse(event_stream(), media_type='text/event-stream')
 
 
 # Local mirror of Benjakronk's splash images (daily git pull on the Pi);

@@ -21,6 +21,10 @@ const API_CONFIG = {
   timeout: 30000 // 30 seconds
 };
 
+// Server-Sent Events stream for live push notifications (Benjakronk's
+// Pokedex-config pushes) -- pi-server only, Apps Script has no such route.
+export const EVENTS_URL = SERVED_BY_PI_SERVER ? `${window.location.origin}/api/events` : null;
+
 // ============================================================================
 // CACHE MANAGER
 // ============================================================================
@@ -102,10 +106,12 @@ const HEAVY_TIMEOUT = 90000;
 
 class API {
   static async request(route, action, params = {}, options = {}) {
-    const { useCache = true, cacheKey, cacheTtl, timeout = API_CONFIG.timeout, retries = 1 } = options;
+    const { useCache = true, cacheKey, cacheTtl, timeout = API_CONFIG.timeout, retries = 1, bypassCache = false } = options;
 
-    // Check cache first
-    if (useCache && cacheKey) {
+    // Check cache first -- bypassCache skips this read (forces a network
+    // fetch) but the cache is still warmed below, so other callers still
+    // benefit from it.
+    if (useCache && cacheKey && !bypassCache) {
       const cached = cache.get(cacheKey);
       if (cached) {
         console.log('Cache hit:', cacheKey);
@@ -211,10 +217,11 @@ export class PokemonAPI {
   /**
    * Get complete Pokemon data (all registered)
    */
-  static async getCompleteList() {
+  static async getCompleteList(forceRefresh = false) {
     return API.request('pokemon', 'list', {}, {
       cacheKey: 'pokemon:complete-list',
       useCache: true,
+      bypassCache: forceRefresh,
       cacheTtl: LIVE_LIST_TTL,
       timeout: HEAVY_TIMEOUT
     });
@@ -620,10 +627,11 @@ export class GameDataAPI {
   /**
    * Get Pokedex config (visibility settings, defaults, etc.)
    */
-  static async getPokedexConfig() {
+  static async getPokedexConfig(forceRefresh = false) {
     return API.request('game-data', 'pokedex-config', {}, {
       cacheKey: 'game-data:pokedex-config',
       useCache: true,
+      bypassCache: forceRefresh,
       cacheTtl: STATIC_DATA_TTL
     });
   }

@@ -47,6 +47,18 @@ export async function initializeVisibility() {
 }
 
 /**
+ * Overwrite the in-memory Pokedex config and sessionStorage together, so
+ * neither can drift out of sync with the other. Used by live-updates.js when
+ * a fresh push arrives mid-session -- without this, the module-level
+ * `pokedexConfig` above would keep serving its first-load value forever,
+ * since initializeVisibility() only re-reads sessionStorage when it's null.
+ */
+export function setPokedexConfig(config) {
+  pokedexConfig = config;
+  sessionStorage.setItem('pokedexConfig', JSON.stringify(config));
+}
+
+/**
  * Get visibility settings for a specific Pokemon
  * @param {string} pokemonName - Name of the Pokemon
  * @returns {Object} Visibility settings object or defaults

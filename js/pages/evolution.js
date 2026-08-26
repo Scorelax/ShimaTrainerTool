@@ -726,7 +726,24 @@ async function selectEvolution(pokemon, listItem) {
   document.querySelectorAll('.evolution-list li').forEach(li => li.classList.remove('selected'));
   listItem.classList.add('selected');
 
-  // Display details and resolve image URL
+  // Show details + evolve button immediately -- none of this depends on the
+  // image, which can be slow to resolve the first time (see below), and
+  // there's no reason to make the player wait on it just to see the button.
+  document.getElementById('pokemonName').textContent = pokemon[1];
+  document.getElementById('pokemonDexEntry').textContent = pokemon[2];
+
+  const typeText = pokemon[5] ? `${pokemon[4]} / ${pokemon[5]}` : pokemon[4];
+  document.getElementById('pokemonType').textContent = typeText;
+
+  document.getElementById('pokemonPlaceholder').style.display = 'none';
+  document.getElementById('pokemonDetailsContent').style.display = 'flex';
+  document.getElementById('pokemonDetails').classList.remove('empty');
+  document.getElementById('pokemonDetails').classList.add('visible');
+
+  // Image loads in independently of the above -- pokemon[0] is normally
+  // already resolved server-side, but the rare fallback below probes
+  // Benjakronk's GitHub images one format at a time over the network, which
+  // used to block the whole panel above along with it.
   const isShiny = currentPokemon ? currentPokemon[61] : '';
   const imageUrl = pokemon[0] || await resolveImageUrl(pokemon[1], pokemon[2], isShiny);
 
@@ -737,17 +754,6 @@ async function selectEvolution(pokemon, listItem) {
   }
 
   document.getElementById('pokemonImage').src = imageUrl;
-  document.getElementById('pokemonName').textContent = pokemon[1];
-  document.getElementById('pokemonDexEntry').textContent = pokemon[2];
-
-  const typeText = pokemon[5] ? `${pokemon[4]} / ${pokemon[5]}` : pokemon[4];
-  document.getElementById('pokemonType').textContent = typeText;
-
-  // Hide placeholder and show content
-  document.getElementById('pokemonPlaceholder').style.display = 'none';
-  document.getElementById('pokemonDetailsContent').style.display = 'flex';
-  document.getElementById('pokemonDetails').classList.remove('empty');
-  document.getElementById('pokemonDetails').classList.add('visible');
 }
 
 async function resolveImageUrl(pokemonName, pokemonId, isShiny) {

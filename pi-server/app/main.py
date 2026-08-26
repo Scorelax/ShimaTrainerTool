@@ -34,18 +34,20 @@ db.init()
 
 
 @app.middleware('http')
-async def no_heuristic_caching(request: Request, call_next):
-    """Force revalidation on every response instead of letting browsers apply
-    their own heuristic freshness rules. StaticFiles below already sets
-    Last-Modified/ETag on every static file, but never told browsers to
-    actually use them -- so a plain refresh could serve JS straight from disk
-    cache with no request to the server at all, deploy or not. Cache-Control:
-    no-cache (not no-store) keeps that conditional-GET machinery but forces a
-    check with the server every time: fast 304 when nothing changed, fresh
-    body when a deploy changed the file's mtime. This is what actually makes
-    "just refresh the tab" work, independent of the (retired) service worker."""
+async def no_caching(request: Request, call_next):
+    """No response from this server is ever stored by the browser, full stop.
+    An earlier attempt used Cache-Control: no-cache (revalidate-before-use,
+    not "don't cache") on the theory that StaticFiles' existing Last-Modified/
+    ETag would make that revalidation cheap and reliable -- but that still
+    leaves a locally-stored copy sitting around for some browser/WebView to
+    get revalidation wrong on (exactly the kind of stale-PWA-cache bug that
+    got the old service worker retired -- see git history around 2026-08-25).
+    This is a small LAN/Tailscale tool with a handful of players, not a CDN-
+    backed site serving thousands of hits -- there's no bandwidth reason to
+    let anything be cached, so no-store removes the ambiguity entirely: every
+    load is a full fetch from this server, every time."""
     response = await call_next(request)
-    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Cache-Control'] = 'no-store'
     return response
 
 

@@ -36,7 +36,8 @@ def handle(conn, action, params):
     if action == 'get':
         if not params.get('trainer') or not params.get('name'):
             raise ValueError('Missing trainer or pokemon name')
-        return {'status': 'success', 'data': get_pokemon_info(conn, params['trainer'], params['name'])}
+        animated = params.get('animated', '1') != '0'
+        return {'status': 'success', 'data': get_pokemon_info(conn, params['trainer'], params['name'], animated)}
 
     if action == 'register':
         if not params.get('trainer') or not params.get('data'):
@@ -101,14 +102,15 @@ def handle(conn, action, params):
     raise ValueError('Unknown pokemon action: ' + str(action))
 
 
-def get_pokemon_info(conn, trainer_name, pokemon_name):
+def get_pokemon_info(conn, trainer_name, pokemon_name, animated=True):
     for _, row in db.fetch_rows(conn, 'pokemon', P):
         if (str(row[0]).lower() == trainer_name.lower()
                 and str(row[2]).lower() == pokemon_name.lower()):
-            gif = upstream.local_gif_url(row[2], shiny=(row[61] == 'Y'))
-            if gif:
-                row = list(row)
-                row[1] = gif
+            if animated:
+                gif = upstream.local_gif_url(row[2], shiny=(row[61] == 'Y'))
+                if gif:
+                    row = list(row)
+                    row[1] = gif
             return {field: row[idx] for field, idx in _INFO_FIELDS}
     return None
 

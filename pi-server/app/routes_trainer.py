@@ -17,12 +17,14 @@ def handle(conn, action, params):
     if action == 'get':
         if not params.get('name'):
             raise ValueError('Missing trainer name')
-        return {'status': 'success', 'data': store_trainer_and_pokemon_data(conn, params['name'])}
+        animated = params.get('animated', '1') != '0'
+        return {'status': 'success', 'data': store_trainer_and_pokemon_data(conn, params['name'], animated)}
 
     if action == 'get-full':
         if not params.get('name'):
             raise ValueError('Missing trainer name')
-        return load_trainer_full_bundle(conn, params['name'])
+        animated = params.get('animated', '1') != '0'
+        return load_trainer_full_bundle(conn, params['name'], animated)
 
     if action == 'create':
         if not params.get('data'):
@@ -88,10 +90,14 @@ def get_trainers(conn):
     } for i, (_, row) in enumerate(db.fetch_rows(conn, 'trainers', T), start=1)]
 
 
-def _with_local_gif(row):
+def _with_local_gif(row, animated=True):
     """Swap in a self-uploaded animated sprite for this row's image field,
     if one exists (upstream.local_gif_url) -- otherwise leave the stored
-    image untouched."""
+    image untouched. Skipped entirely when the caller has animated sprites
+    turned off (Settings > Animated Sprites), so the stored static image
+    always comes through unchanged."""
+    if not animated:
+        return row
     gif = upstream.local_gif_url(row[2], shiny=(row[61] == 'Y'))
     if not gif:
         return row
@@ -100,7 +106,7 @@ def _with_local_gif(row):
     return row
 
 
-def store_trainer_and_pokemon_data(conn, trainer_name):
+def store_trainer_and_pokemon_data(conn, trainer_name, animated=True):
     trainer_entry = next(
         (row for _, row in db.fetch_rows(conn, 'trainers', T)
          if str(row[1]).lower() == trainer_name.lower()), None)
@@ -108,16 +114,16 @@ def store_trainer_and_pokemon_data(conn, trainer_name):
         return None
 
     pokemon_entries = [
-        _with_local_gif(row) for _, row in db.fetch_rows(conn, 'pokemon', P)
+        _with_local_gif(row, animated) for _, row in db.fetch_rows(conn, 'pokemon', P)
         if str(row[0]).lower() == trainer_name.lower()
     ]
     return {'trainerData': trainer_entry, 'pokemonData': pokemon_entries}
 
 
-def load_trainer_full_bundle(conn, trainer_name):
+def load_trainer_full_bundle(conn, trainer_name, animated=True):
     start = time.time()
     try:
-        trainer_pokemon = store_trainer_and_pokemon_data(conn, trainer_name)
+        trainer_pokemon = store_trainer_and_pokemon_data(conn, trainer_name, animated)
         if not trainer_pokemon or not trainer_pokemon['trainerData']:
             raise ValueError('Trainer not found: ' + trainer_name)
 

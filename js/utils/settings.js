@@ -5,7 +5,8 @@ const STORAGE_KEY = 'appSettings';
 const DEFAULTS = {
   volume: 80,           // 0-100
   syncMusic: true,
-  idleSplashMinutes: 10 // 5-30
+  idleSplashMinutes: 10, // 5-30
+  animatedSprites: true
 };
 
 export function getSettings() {

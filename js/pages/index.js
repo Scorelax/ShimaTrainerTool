@@ -456,6 +456,11 @@ export function renderIndex() {
             <input type="checkbox" id="syncMusicCheckbox">
           </div>
 
+          <div class="settings-row settings-row-checkbox">
+            <label for="animatedSpritesCheckbox">Animated sprites</label>
+            <input type="checkbox" id="animatedSpritesCheckbox">
+          </div>
+
           <div class="settings-row">
             <label for="idleSplashSlider">Show splash art after idle (minutes)</label>
             <div class="settings-row-value">
@@ -565,6 +570,7 @@ export function attachIndexListeners() {
   const volumeSlider = document.getElementById('volumeSlider');
   const volumeValue = document.getElementById('volumeValue');
   const syncMusicCheckbox = document.getElementById('syncMusicCheckbox');
+  const animatedSpritesCheckbox = document.getElementById('animatedSpritesCheckbox');
   const idleSplashSlider = document.getElementById('idleSplashSlider');
   const idleSplashValue = document.getElementById('idleSplashValue');
 
@@ -573,6 +579,7 @@ export function attachIndexListeners() {
     volumeSlider.value = settings.volume;
     volumeValue.textContent = settings.volume;
     syncMusicCheckbox.checked = settings.syncMusic;
+    animatedSpritesCheckbox.checked = settings.animatedSprites;
     idleSplashSlider.value = settings.idleSplashMinutes;
     idleSplashValue.textContent = settings.idleSplashMinutes;
     document.getElementById('settingsLastUpdate').textContent =
@@ -592,6 +599,10 @@ export function attachIndexListeners() {
 
   syncMusicCheckbox?.addEventListener('change', () => {
     saveSettings({ syncMusic: syncMusicCheckbox.checked });
+  });
+
+  animatedSpritesCheckbox?.addEventListener('change', () => {
+    saveSettings({ animatedSprites: animatedSpritesCheckbox.checked });
   });
 
   idleSplashSlider?.addEventListener('input', () => {

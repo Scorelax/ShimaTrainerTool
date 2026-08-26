@@ -1,6 +1,8 @@
 // API Client for Pokemon D&D Tool
 // Handles all communication with Google Apps Script backend
 
+import { getSettings } from './utils/settings.js';
+
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -224,9 +226,10 @@ export class PokemonAPI {
   static async get(trainerName, pokemonName) {
     return API.request('pokemon', 'get', {
       trainer: trainerName,
-      name: pokemonName
+      name: pokemonName,
+      animated: getSettings().animatedSprites ? 1 : 0
     }, {
-      cacheKey: `pokemon:${trainerName}:${pokemonName}`
+      cacheKey: `pokemon:${trainerName}:${pokemonName}:${getSettings().animatedSprites ? 1 : 0}`
     });
   }
 
@@ -387,8 +390,9 @@ export class TrainerAPI {
    * Get specific trainer with their Pokemon
    */
   static async get(name) {
-    return API.request('trainer', 'get', { name }, {
-      cacheKey: `trainer:${name}`,
+    const animated = getSettings().animatedSprites ? 1 : 0;
+    return API.request('trainer', 'get', { name, animated }, {
+      cacheKey: `trainer:${name}:${animated}`,
       useCache: true,
       timeout: HEAVY_TIMEOUT
     });
@@ -401,7 +405,7 @@ export class TrainerAPI {
    * this throws. Never cached: live trainer stats must be fresh.
    */
   static async getFull(name) {
-    return API.request('trainer', 'get-full', { name }, {
+    return API.request('trainer', 'get-full', { name, animated: getSettings().animatedSprites ? 1 : 0 }, {
       useCache: false,
       timeout: HEAVY_TIMEOUT
     });

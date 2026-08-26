@@ -31,6 +31,34 @@ function _parseKnownMovesForSync(str) {
   return result;
 }
 
+// ============================================================================
+// GIF SPRITE PREFETCH
+// Warms the browser's cache for self-uploaded animated sprites while the
+// player is still on this loading screen, so the first view of a screen
+// showing them (trainer-card, pokemon-card, combat, ...) doesn't stall on a
+// multi-MB download. Fire-and-forget: new Image() starts the request without
+// blocking anything else here, and the browser handles the rest.
+// ============================================================================
+
+function prefetchGifSprites() {
+  const seen = new Set();
+  Object.keys(sessionStorage)
+    .filter(k => k.startsWith('pokemon_'))
+    .forEach(key => {
+      let pokemon;
+      try {
+        pokemon = JSON.parse(sessionStorage.getItem(key));
+      } catch (err) {
+        return;
+      }
+      const url = pokemon && pokemon[1];
+      if (typeof url === 'string' && url.endsWith('.gif') && !seen.has(url)) {
+        seen.add(url);
+        new Image().src = url;
+      }
+    });
+}
+
 function syncKnownMovesForAllPokemon() {
   const allMoves = JSON.parse(sessionStorage.getItem('moves') || '[]');
   if (allMoves.length === 0) return;
@@ -697,6 +725,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'syncing known moves';
           syncKnownMovesForAllPokemon();
+          prefetchGifSprites();
 
           if (bundleClass === 'Pokemon Trainer') {
             _step = 'preloading splash image';
@@ -804,6 +833,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'syncing known moves';
           syncKnownMovesForAllPokemon();
+          prefetchGifSprites();
 
           _step = 'preloading splash image';
           updateLoadingProgress(85, 'Loading splash images...');
@@ -839,6 +869,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'syncing known moves';
           syncKnownMovesForAllPokemon();
+          prefetchGifSprites();
 
           updateLoadingProgress(95, 'Almost ready...');
           _log('Navigating to conduit-card');

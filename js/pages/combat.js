@@ -330,7 +330,7 @@ function renderSetupPhase() {
   const pokemonCards = partyPokemon.map(p => `
     <div class="setup-pokemon-card" data-pokemon-key="${p.key}">
       <div class="setup-check">✓</div>
-      <img src="${p.image}" alt="${p.name}" onerror="this.src='assets/Pokeball.png'">
+      <img src="${p.image}" alt="${p.name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
       <div class="setup-pokemon-info">
         <div class="setup-pokemon-name">${p.name}</div>
         <div class="setup-pokemon-level">Lv ${p.level}</div>
@@ -372,7 +372,7 @@ function renderSetupPhase() {
 function renderInitiativePhase(state) {
   const rows = state.combatants.map(c => `
     <div class="initiative-row">
-      <img src="${c.image}" alt="${c.name}" class="initiative-img" onerror="this.src='assets/Pokeball.png'">
+      <img src="${c.image}" alt="${c.name}" class="initiative-img" decoding="async" onerror="this.src='assets/Pokeball.png'">
       <div class="initiative-info">
         <div class="initiative-name">${c.name} <span class="initiative-level">Lv ${c.level}</span></div>
         <div class="initiative-score-label">Initiative Score: <strong>${c.initiativeScore}</strong></div>
@@ -739,7 +739,7 @@ function renderCombatCard(c, isActive) {
   return `
     <div class="combat-card ${isActive ? 'combat-card--active' : ''} ${fainted ? 'combat-card--fainted' : ''}" data-combatant-id="${c.id}" id="card_${c.id}">
       <div class="combat-card-main">
-        <img src="${c.image}" alt="${c.name}" class="combat-card-img" onerror="this.src='assets/Pokeball.png'">
+        <img src="${c.image}" alt="${c.name}" class="combat-card-img" decoding="async" onerror="this.src='assets/Pokeball.png'">
         <div class="combat-card-body">
           <div class="combat-card-name-row">
             <span class="combat-card-name ${fainted ? 'fainted-name' : ''}">${c.name}</span>
@@ -1812,7 +1812,7 @@ function showSwitchPopup(state) {
       : `<span class="switch-init-label switch-init-new">Roll Init</span>`;
     return `
       <div class="switch-pokemon-card ${fainted ? 'fainted-bench' : ''}" data-pokemon-id="${p.id}">
-        <img src="${p.image}" alt="${p.name}" onerror="this.src='assets/Pokeball.png'" class="switch-poke-img">
+        <img src="${p.image}" alt="${p.name}" decoding="async" onerror="this.src='assets/Pokeball.png'" class="switch-poke-img">
         <div class="switch-poke-info">
           <div class="switch-poke-name">${p.name} <span class="combat-card-level">Lv ${p.level}</span> ${typeBadges}</div>
           <div class="switch-poke-stats">

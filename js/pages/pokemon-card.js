@@ -2319,7 +2319,7 @@ export function renderPokemonCard(pokemonName) {
         <!-- Left Column: Image + Info List + Buttons -->
         <div class="left-column">
           <div class="pokemon-image-container">
-            <img id="pokemonImage" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+            <img id="pokemonImage" src="${image}" alt="${name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
           </div>
 
           <div class="trainer-info-list">
@@ -2413,7 +2413,7 @@ export function renderPokemonCard(pokemonName) {
         <!-- Left Column: Image + Battle Info -->
         <div class="left-column">
           <div class="pokemon-image-container">
-            <img id="pokemonImageBattle" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+            <img id="pokemonImageBattle" src="${image}" alt="${name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
           </div>
 
           <div class="trainer-info-list">

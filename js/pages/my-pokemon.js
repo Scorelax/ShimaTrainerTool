@@ -1133,7 +1133,7 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
       const isMove = section === 'move';
       return `
         <div class="party-pokemon-row${isMove ? ' type-detail-expandable' : ''}">
-          <img class="party-pokemon-avatar" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+          <img class="party-pokemon-avatar" src="${image}" alt="${name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
           <div class="party-pokemon-info">
             <div class="party-pokemon-label">${displayName}</div>
             <div class="party-pokemon-sublabel">Lv. ${data[4] || '?'} &nbsp;·&nbsp; ${data[5] || ''}${t2}</div>
@@ -1243,7 +1243,7 @@ function renderPartyModalList(pokemonFullData) {
 
     return `
       <div class="party-pokemon-row">
-        <img class="party-pokemon-avatar" src="${image}" alt="${name}" onerror="this.src='assets/Pokeball.png'">
+        <img class="party-pokemon-avatar" src="${image}" alt="${name}" decoding="async" onerror="this.src='assets/Pokeball.png'">
         <div class="party-pokemon-info">
           <div class="party-pokemon-label">${displayName}</div>
           <div class="party-pokemon-sublabel">${subLabel}</div>

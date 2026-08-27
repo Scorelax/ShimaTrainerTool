@@ -151,27 +151,65 @@ body {
 }
 
 /* Empty by default -- pokemon-form.js fills this with a sprite (video/img)
-   in place of the splash art background while a Pokemon is being
-   registered. Any other use of #loading-screen leaves it untouched, so it
-   has no effect there. */
+   and a caption in place of the splash art background while a Pokemon is
+   being registered. Any other use of #loading-screen leaves it untouched,
+   so it has no effect there. */
 .loading-sprite-reveal {
   display: none;
+  position: relative;
   flex: 1;
   width: 100%;
-  align-items: center;
-  justify-content: center;
 }
 
 .loading-sprite-reveal.active {
   display: flex;
 }
 
-.loading-sprite-reveal img,
-.loading-sprite-reveal video {
+.loading-sprite-media {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-sprite-media img,
+.loading-sprite-media video {
   max-width: 70vw;
   max-height: 55vh;
   object-fit: contain;
   filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.5));
+}
+
+.loading-sprite-caption {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 85vw;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  padding: 0.6rem 1.4rem;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 14px;
+  z-index: 1;
+}
+
+/* Matches the red gradient used on pokemon-form-page/evolution -- set by
+   showLoadingWithSprite() so the registration reveal looks like the rest
+   of the app instead of a plain black screen (the default fallback that
+   #loading-screen otherwise needs so a missing splash image can't turn it
+   see-through -- see the background-color rule above). */
+.loading-screen.sprite-reveal-mode {
+  background-color: #6e0404;
+  background-image:
+    radial-gradient(circle at 20% 80%, rgba(255, 222, 0, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(59, 76, 202, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(238, 21, 21, 0.3) 0%, transparent 40%),
+    linear-gradient(to bottom, #c41111 0%, #970909 50%, #6e0404 100%);
 }
 
 /* Fixed to the true top edge, independent of .loading-screen's own flex

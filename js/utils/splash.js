@@ -146,11 +146,15 @@ export function showLoadingWithSplash(splashUrl) {
 
     // Clear any leftover sprite reveal from a previous showLoadingWithSprite()
     // call (e.g. registering a Pokemon) so it can't show through here too.
-    const spriteReveal = document.getElementById('loading-sprite-reveal');
-    if (spriteReveal) {
-      spriteReveal.classList.remove('active');
-      spriteReveal.innerHTML = '';
-    }
+    // Clears the media/caption *contents*, not #loading-sprite-reveal
+    // itself -- that element's own children are permanent (defined in
+    // index.html), so wiping its innerHTML would delete them for good.
+    loadingScreen.classList.remove('sprite-reveal-mode');
+    document.getElementById('loading-sprite-reveal')?.classList.remove('active');
+    const spriteMedia = document.getElementById('loading-sprite-media');
+    if (spriteMedia) spriteMedia.innerHTML = '';
+    const spriteCaption = document.getElementById('loading-sprite-caption');
+    if (spriteCaption) spriteCaption.textContent = '';
 
     // Now show the loading screen
     loadingScreen.classList.add('active');
@@ -158,19 +162,23 @@ export function showLoadingWithSplash(splashUrl) {
 }
 
 /**
- * Show the loading screen with a Pokemon's sprite (video or image) in
- * place of splash art -- used when registering a Pokemon, so the player
- * sees the actual catch instead of generic splash art while the sound
- * plays. Call prefetchSprite() on the same URL ahead of time (e.g. while
- * the player is still filling out the form) so it's ready instantly here.
+ * Show the loading screen with a Pokemon's sprite (video or image) and a
+ * caption in place of splash art -- used when registering a Pokemon, so
+ * the player sees the actual catch (with "<Trainer> caught a <Pokemon>!")
+ * instead of generic splash art while the sound plays. Uses the app's own
+ * red gradient background instead of the plain black/TitleScreen default,
+ * so it matches the rest of the app. Call prefetchSprite() on the same URL
+ * ahead of time (e.g. while the player is still filling out the form) so
+ * it's ready instantly here.
  */
-export function showLoadingWithSprite(spriteUrl, altText) {
+export function showLoadingWithSprite(spriteUrl, altText, captionText = '') {
   const loadingScreen = document.getElementById('loading-screen');
   if (loadingScreen) {
-    // Plain black background -- no splash art for this flow. 'none' (not
-    // '') is required to actually override the CSS default TitleScreen.png,
-    // not just clear back to it.
+    // 'none' (not '') is required to actually override the CSS default
+    // TitleScreen.png background-image, not just clear back to it --
+    // sprite-reveal-mode supplies its own background instead.
     loadingScreen.style.backgroundImage = 'none';
+    loadingScreen.classList.add('sprite-reveal-mode');
     const fill = document.getElementById('loading-progress-fill');
     const text = document.getElementById('loading-progress-text');
     if (fill) fill.style.width = '0%';
@@ -178,11 +186,14 @@ export function showLoadingWithSprite(spriteUrl, altText) {
     loadingScreen.classList.add('active');
   }
 
+  const spriteMedia = document.getElementById('loading-sprite-media');
+  if (spriteMedia) spriteMedia.innerHTML = spriteMediaHtml(spriteUrl, altText);
+
+  const spriteCaption = document.getElementById('loading-sprite-caption');
+  if (spriteCaption) spriteCaption.textContent = captionText;
+
   const spriteReveal = document.getElementById('loading-sprite-reveal');
-  if (spriteReveal) {
-    spriteReveal.innerHTML = spriteMediaHtml(spriteUrl, altText);
-    spriteReveal.classList.add('active');
-  }
+  if (spriteReveal) spriteReveal.classList.add('active');
 }
 
 /**
@@ -192,12 +203,15 @@ export function hideLoading() {
   const loadingScreen = document.getElementById('loading-screen');
   if (loadingScreen) {
     loadingScreen.classList.remove('active');
+    loadingScreen.classList.remove('sprite-reveal-mode');
     // Keep background image set for instant display next time
   }
 
-  const spriteReveal = document.getElementById('loading-sprite-reveal');
-  if (spriteReveal) {
-    spriteReveal.classList.remove('active');
-    spriteReveal.innerHTML = '';
-  }
+  // See showLoadingWithSplash() -- clear contents, not the permanent
+  // container elements themselves.
+  document.getElementById('loading-sprite-reveal')?.classList.remove('active');
+  const spriteMedia = document.getElementById('loading-sprite-media');
+  if (spriteMedia) spriteMedia.innerHTML = '';
+  const spriteCaption = document.getElementById('loading-sprite-caption');
+  if (spriteCaption) spriteCaption.textContent = '';
 }

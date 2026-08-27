@@ -403,7 +403,9 @@ export async function attachPokemonFormListeners() {
     const revealUrl = shinyChecked && baseImageUrl && baseImageUrl !== 'assets/Pokeball.png'
       ? baseImageUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1')
       : baseImageUrl;
-    showLoadingWithSprite(revealUrl, selectedPokemonData[1]);
+    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    const captionText = trainerData ? `${trainerData[1]} caught a ${selectedPokemonData[1]}!` : '';
+    showLoadingWithSprite(revealUrl, selectedPokemonData[1], captionText);
 
     await handleFormSubmit();
   });

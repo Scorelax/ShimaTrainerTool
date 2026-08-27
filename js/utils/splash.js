@@ -121,6 +121,26 @@ export function showLoadingWithSplash(splashUrl) {
       // Force a reflow to ensure image is set before showing
       loadingScreen.offsetHeight;
     }
+
+    // #loading-screen's progress bar/status text are shared, persistent DOM
+    // elements (defined once in index.html) that any flow can write to via
+    // updateLoadingProgress() -- continue-journey.js's own login sequence
+    // ends by setting these to 100%/"Tap to continue" and never resets them
+    // afterward. Without this, a completely unrelated later use of this
+    // same generic loading screen (registering a Pokemon, evolution's
+    // splash fallback) would inherit that leftover state: the bar already
+    // full and the text claiming tappable-and-ready, even though nothing
+    // in THAT flow is actually listening for a tap -- exactly what looked
+    // like "the prompt appeared before it actually worked". Reset to the
+    // neutral defaults from index.html here so every fresh use starts
+    // clean; a caller doing its own real progress reporting (like
+    // continue-journey.js) immediately overwrites this with real values
+    // right after anyway.
+    const fill = document.getElementById('loading-progress-fill');
+    const text = document.getElementById('loading-progress-text');
+    if (fill) fill.style.width = '0%';
+    if (text) text.textContent = 'Preparing...';
+
     // Now show the loading screen
     loadingScreen.classList.add('active');
   }

@@ -150,6 +150,30 @@ body {
   display: none;
 }
 
+/* Empty by default -- pokemon-form.js fills this with a sprite (video/img)
+   in place of the splash art background while a Pokemon is being
+   registered. Any other use of #loading-screen leaves it untouched, so it
+   has no effect there. */
+.loading-sprite-reveal {
+  display: none;
+  flex: 1;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-sprite-reveal.active {
+  display: flex;
+}
+
+.loading-sprite-reveal img,
+.loading-sprite-reveal video {
+  max-width: 70vw;
+  max-height: 55vh;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.5));
+}
+
 /* Fixed to the true top edge, independent of .loading-screen's own flex
    layout -- edge-to-edge like the bottom-strip version, just bigger so the
    status/tap-to-continue text fits inside it. */

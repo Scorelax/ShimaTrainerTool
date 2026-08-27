@@ -4,7 +4,7 @@ import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
-import { showLoadingWithSplash, hideLoading, selectAndPreloadSplashImage } from '../utils/splash.js';
+import { hideLoading, showLoadingWithSprite } from '../utils/splash.js';
 import { prefetchSprite } from '../utils/sprite-media.js';
 
 export function renderPokemonForm() {
@@ -368,6 +368,16 @@ export async function attachPokemonFormListeners() {
   // Populate abilities from cache or API (like edit-pokemon does)
   await populateAbilityOptions(selectedPokemonData);
 
+  // Warm the cache for this Pokemon's sprite (and shiny variant, since the
+  // player can toggle the checkbox any time before submitting) while they
+  // fill out the rest of the form, so it's ready to display instantly the
+  // moment they click Register instead of a generic splash screen.
+  const preloadBaseUrl = selectedPokemonData[0] || '';
+  if (preloadBaseUrl && preloadBaseUrl !== 'assets/Pokeball.png') {
+    prefetchSprite(preloadBaseUrl);
+    prefetchSprite(preloadBaseUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1'));
+  }
+
   // Back button
   document.getElementById('backButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
@@ -386,9 +396,14 @@ export async function attachPokemonFormListeners() {
   document.getElementById('pokemonForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // Show loading screen with a fresh random splash
-    const splashUrl = await selectAndPreloadSplashImage();
-    showLoadingWithSplash(splashUrl);
+    // Show this Pokemon's own sprite (video/image, shiny-aware) in place of
+    // generic splash art -- already warmed above, so this is instant.
+    const baseImageUrl = selectedPokemonData[0] || '';
+    const shinyChecked = document.getElementById('shiny')?.checked;
+    const revealUrl = shinyChecked && baseImageUrl && baseImageUrl !== 'assets/Pokeball.png'
+      ? baseImageUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1')
+      : baseImageUrl;
+    showLoadingWithSprite(revealUrl, selectedPokemonData[1]);
 
     await handleFormSubmit();
   });

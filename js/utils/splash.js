@@ -1,6 +1,8 @@
 // Splash Image Utility - Shared across pages
 // Only splash images are shown on loading screens (no default background fallback)
 
+import { spriteMediaHtml } from './sprite-media.js';
+
 const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/splashes/';
 const SPLASH_API_URL = 'https://api.github.com/repos/Benjakronk/shima-pokedex/contents/images/splashes';
 const FALLBACK_SPLASH_COUNT = 50; // Fallback if API call fails
@@ -115,12 +117,13 @@ export async function selectAndPreloadSplashImage() {
 export function showLoadingWithSplash(splashUrl) {
   const loadingScreen = document.getElementById('loading-screen');
   if (loadingScreen) {
-    if (splashUrl) {
-      // Set background image first (before making visible)
-      loadingScreen.style.backgroundImage = `url('${splashUrl}')`;
-      // Force a reflow to ensure image is set before showing
-      loadingScreen.offsetHeight;
-    }
+    // Set background image first (before making visible). Always assign,
+    // even when falsy (falls back to the CSS default) -- otherwise a prior
+    // showLoadingWithSprite() call's inline 'none' would linger and leave
+    // this black instead of showing splash art.
+    loadingScreen.style.backgroundImage = splashUrl ? `url('${splashUrl}')` : '';
+    // Force a reflow to ensure image is set before showing
+    loadingScreen.offsetHeight;
 
     // #loading-screen's progress bar/status text are shared, persistent DOM
     // elements (defined once in index.html) that any flow can write to via
@@ -141,8 +144,44 @@ export function showLoadingWithSplash(splashUrl) {
     if (fill) fill.style.width = '0%';
     if (text) text.textContent = 'Preparing...';
 
+    // Clear any leftover sprite reveal from a previous showLoadingWithSprite()
+    // call (e.g. registering a Pokemon) so it can't show through here too.
+    const spriteReveal = document.getElementById('loading-sprite-reveal');
+    if (spriteReveal) {
+      spriteReveal.classList.remove('active');
+      spriteReveal.innerHTML = '';
+    }
+
     // Now show the loading screen
     loadingScreen.classList.add('active');
+  }
+}
+
+/**
+ * Show the loading screen with a Pokemon's sprite (video or image) in
+ * place of splash art -- used when registering a Pokemon, so the player
+ * sees the actual catch instead of generic splash art while the sound
+ * plays. Call prefetchSprite() on the same URL ahead of time (e.g. while
+ * the player is still filling out the form) so it's ready instantly here.
+ */
+export function showLoadingWithSprite(spriteUrl, altText) {
+  const loadingScreen = document.getElementById('loading-screen');
+  if (loadingScreen) {
+    // Plain black background -- no splash art for this flow. 'none' (not
+    // '') is required to actually override the CSS default TitleScreen.png,
+    // not just clear back to it.
+    loadingScreen.style.backgroundImage = 'none';
+    const fill = document.getElementById('loading-progress-fill');
+    const text = document.getElementById('loading-progress-text');
+    if (fill) fill.style.width = '0%';
+    if (text) text.textContent = 'Preparing...';
+    loadingScreen.classList.add('active');
+  }
+
+  const spriteReveal = document.getElementById('loading-sprite-reveal');
+  if (spriteReveal) {
+    spriteReveal.innerHTML = spriteMediaHtml(spriteUrl, altText);
+    spriteReveal.classList.add('active');
   }
 }
 
@@ -154,5 +193,11 @@ export function hideLoading() {
   if (loadingScreen) {
     loadingScreen.classList.remove('active');
     // Keep background image set for instant display next time
+  }
+
+  const spriteReveal = document.getElementById('loading-sprite-reveal');
+  if (spriteReveal) {
+    spriteReveal.classList.remove('active');
+    spriteReveal.innerHTML = '';
   }
 }

@@ -10,21 +10,6 @@ from .jsutil import js_parse_int, js_parse_int_or, js_truthy, floor_div2, intify
 
 P = db.POKEMON_COLUMNS
 
-# Field order of getPokemonInfo's response object (subset of the row)
-_INFO_FIELDS = [
-    ('trainerName', 0), ('image', 1), ('name', 2), ('dexEntry', 3), ('level', 4),
-    ('primaryType', 5), ('secondaryType', 6), ('ability', 7), ('ac', 8),
-    ('hitDice', 9), ('hp', 10), ('vitalityDice', 11), ('vp', 12), ('speed', 13),
-    ('totalStats', 14), ('strength', 15), ('dexterity', 16), ('constitution', 17),
-    ('intelligence', 18), ('wisdom', 19), ('charisma', 20), ('savingThrows', 21),
-    ('skills', 22), ('startingMoves', 23), ('level2Moves', 24), ('level6Moves', 25),
-    ('level10Moves', 26), ('level14Moves', 27), ('level18Moves', 28),
-    ('evolutionRequirement', 29), ('initiative', 30), ('proficiencyBonus', 31),
-    ('nature', 32), ('loyalty', 33), ('stab', 34), ('heldItem', 35), ('nickname', 36),
-    ('customMoves', 37), ('inActiveParty', 38), ('strmodifier', 39), ('dexmodifier', 40),
-    ('conmodifier', 41), ('intmodifier', 42), ('wismodifier', 43), ('chamodifier', 44),
-]
-
 
 def handle(conn, action, params):
     if action == 'list':
@@ -112,15 +97,23 @@ def handle(conn, action, params):
 
 
 def get_pokemon_info(conn, trainer_name, pokemon_name, animated=True):
+    """pokemon/get -- returns the full row as a plain positional array (same
+    shape as a pokemonData entry from trainer/get, or register/evolve's
+    newPokemonData), not the old _INFO_FIELDS named-dict subset it used to
+    return. That subset only covered indices 0-44 -- missing utility slot
+    (56), shiny (61), live HP/VP/AC (45-47) and others every other part of
+    the app reads positionally -- and nothing else in the frontend actually
+    consumed the named-dict shape, so returning the same array shape as
+    everything else is strictly more correct, not just more consistent."""
     for _, row in db.fetch_rows(conn, 'pokemon', P):
         if (str(row[0]).lower() == trainer_name.lower()
                 and str(row[2]).lower() == pokemon_name.lower()):
+            row = list(row)
             if animated:
                 sprite = upstream.local_sprite_url(row[2], shiny=(row[61] == 'Y'))
                 if sprite:
-                    row = list(row)
                     row[1] = sprite
-            return {field: row[idx] for field, idx in _INFO_FIELDS}
+            return row
     return None
 
 

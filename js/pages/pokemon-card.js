@@ -2320,7 +2320,7 @@ export function renderPokemonCard(pokemonName) {
       <div id="infoPage" class="info-page-grid active-page">
         <!-- Left Column: Image + Info List + Buttons -->
         <div class="left-column">
-          <div class="pokemon-image-container">
+          <div class="pokemon-image-container" id="pokemonImageContainer">
             ${spriteMediaHtml(image, name, '', 'pokemonImage')}
           </div>
 
@@ -3902,8 +3902,11 @@ export function attachPokemonCardListeners() {
     }));
   });
 
-  // Pokemon image click - show evolution confirmation popup
-  document.getElementById('pokemonImage')?.addEventListener('click', () => {
+  // Pokemon image click - show evolution confirmation popup. Listens on the
+  // container, not #pokemonImage directly -- a video sprite has
+  // pointer-events:none (kills Chrome's hover play/pause + PiP overlay), so
+  // clicks land on whatever's underneath, which is this container.
+  document.getElementById('pokemonImageContainer')?.addEventListener('click', () => {
     document.getElementById('evolutionConfirmPopup')?.classList.add('active');
   });
 

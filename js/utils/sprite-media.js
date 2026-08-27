@@ -28,7 +28,16 @@ export function spriteMediaHtml(url, altText, className = '', id = '') {
   const classAttr = className ? ` class="${className}"` : '';
   const idAttr = id ? ` id="${id}"` : '';
   if (url && IS_VIDEO.test(url)) {
-    return `<video src="${url}"${idAttr}${classAttr} autoplay muted loop playsinline onerror="window.__spriteFallback(this)"></video>`;
+    // pointer-events:none is what actually stops Chrome's hover-triggered
+    // play/pause + picture-in-picture overlay from appearing -- neither
+    // disablepictureinpicture nor disableremoteplayback alone prevents the
+    // hover chrome itself, only their respective icons once it's already
+    // showing, and this is meant to be a purely decorative sprite with zero
+    // interactivity. Callers that need clicks on the sprite area (e.g.
+    // pokemon-card.js's evolution-confirm trigger) listen on the *container*
+    // instead -- the click still lands there since a pointer-events:none
+    // child is skipped during hit-testing.
+    return `<video src="${url}"${idAttr}${classAttr} style="pointer-events:none" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback onerror="window.__spriteFallback(this)"></video>`;
   }
   // No src attribute at all when url is empty -- src="" triggers a real
   // (failing) request in some browsers before any real src is set, which

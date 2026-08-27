@@ -119,15 +119,21 @@ def get_pokemon_info(conn, trainer_name, pokemon_name, animated=True):
 
 
 def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
-    # The client resolves this species' image itself (new-pokemon.js /
-    # pokemon-form.js), normally the static Benjakronk URL -- but since
-    # get_registered_pokemon_list() now prefers a self-uploaded sprite when
-    # one exists for that species, the client's copy can be a /gifs/ URL.
-    # That must never become this Pokemon's permanently stored image -- if
-    # it looks like one, re-resolve the real static image server-side
-    # instead of trusting it.
-    if str(new_pokemon_data[1] or '').startswith(upstream.SPRITE_URL_PREFIX):
-        new_pokemon_data[1] = upstream.get_image_url(conn, new_pokemon_data[2], new_pokemon_data[3]) or ''
+    # Never trust the client's image field for what gets permanently stored
+    # -- always resolve the real static image fresh, server-side, exactly
+    # like the evolve action already does unconditionally. Two ways the
+    # client's own value can be wrong: it may be a self-uploaded sprite URL
+    # (get_registered_pokemon_list() now prefers those for display), which
+    # must never become this Pokemon's canonical image -- the read-time swap
+    # in get_pokemon_info/_with_local_sprite already shows it dynamically on
+    # every fetch regardless of what's stored. Or it may be new-pokemon.js's
+    # own last-resort fallback ('assets/Pokeball.png', from resolveImageUrl()
+    # exhausting every format probe) baked in permanently from a moment when
+    # Benjakronk simply hadn't uploaded that species' artwork yet -- always
+    # re-resolving here means a species that gets its art added later is
+    # picked up by the *next* registration instead of staying stuck on
+    # whatever the first attempt saw.
+    new_pokemon_data[1] = upstream.get_image_url(conn, new_pokemon_data[2], new_pokemon_data[3]) or ''
 
     level = js_parse_int(new_pokemon_data[4])
     hd = js_parse_int(new_pokemon_data[9])

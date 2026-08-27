@@ -170,18 +170,42 @@ the `/splashes` mount appears.
 
 ### Animated sprites (self-uploaded, local only)
 
-Unrelated to Benjakronk's repo. Drop hand-made `.gif` files into
-`~/pokemon-dnd/pokemon-gifs` (folder path override: env `GIF_DIR`), named
-`<sanitized-species-name>.gif` -- lowercase, non-alphanumeric characters
-collapsed to `-` (e.g. "Mr. Mime" → `mr-mime.gif`), same rule
+Unrelated to Benjakronk's repo. Drop hand-made `.mp4` or `.gif` files into
+`~/pokemon-dnd/pokemon-sprites` (folder path override: env `SPRITE_DIR`),
+named `<sanitized-species-name>.mp4`/`.gif` -- lowercase, non-alphanumeric
+characters collapsed to `-` (e.g. "Mr. Mime" → `mr-mime.mp4`), same rule
 `upstream.get_image_url()` uses for the GitHub-sourced sprites, just without
-the dex-id prefix. No restart needed to pick up new files day-to-day (checked
-live via a filesystem stat on every request, `upstream.local_gif_url()`) --
-only the first time, so the `/gifs` mount appears. Applies to any owned
-Pokémon whose species has a matching gif, including ones already registered
-before the gif existed; falls back to the existing stored image otherwise.
-Shiny Pokémon look for `<sanitized-species-name>-shiny.gif` first, falling
-back to the non-shiny gif (then the static image) if only that exists.
+the dex-id prefix. `.mp4` is preferred over `.gif` when both exist for a
+species -- real video compression means much smaller files and
+hardware-decoded playback on phones, and none of these sprites have ever
+needed transparency (verified with actual pixel data), so MP4's lack of an
+alpha channel costs nothing. No restart needed to pick up new files day-to-day
+(checked live via a filesystem stat on every request,
+`upstream.local_sprite_url()`) -- only the first time, so the `/gifs` mount
+appears (the URL prefix stays `/gifs` even after the folder's `pokemon-gifs` →
+`pokemon-sprites` rename -- it's baked into every Pokemon's stored image URL
+in the live DB, so renaming it would 404 all of them until each got
+re-saved). Applies to any owned Pokémon whose species has a matching file,
+including ones already registered before it existed; falls back to the
+existing stored image otherwise. Shiny Pokémon look for
+`<sanitized-species-name>-shiny.mp4` first, then `-shiny.gif`, then the
+non-shiny variants, then the static image.
+
+### Evolution transition videos (self-uploaded, local only)
+
+Same idea, separate folder: drop `.mp4` files into
+`~/pokemon-dnd/evolution_video` (folder path override: env
+`EVOLUTION_VIDEO_DIR`), named `<sanitized-pre-evolved>_<sanitized-evolved>.mp4`
+(e.g. `pikachu_raichu.mp4` -- underscore as the separator between the two
+species is unambiguous since the sanitizer already turns every other
+character into a hyphen). When a player confirms an evolution that has a
+matching file, it plays as a full-screen fade transition (with the
+evolution loop music, not the video's own audio track, which is muted)
+instead of the plain splash-art loading screen; falls back to the splash
+screen untouched when no video exists for that specific pair. Same
+live-filesystem-check, no-caching-layer, no-restart-to-add-files pattern as
+the sprites above -- only the very first file needs a restart, so the
+`/evolution-videos` mount appears.
 
 ## 4. Cutover (and rollback)
 

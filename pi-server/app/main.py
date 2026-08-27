@@ -193,9 +193,11 @@ if os.path.isdir(routes_gamedata.SPLASH_DIR):
     app.mount('/splashes', StaticFiles(directory=routes_gamedata.SPLASH_DIR),
               name='splashes')
 
-# Self-uploaded animated sprites, mp4 or gif (see upstream.GIF_DIR / upstream.local_sprite_url)
-if os.path.isdir(upstream.GIF_DIR):
-    app.mount('/gifs', StaticFiles(directory=upstream.GIF_DIR), name='gifs')
+# Self-uploaded animated sprites, mp4 or gif (see upstream.SPRITE_DIR /
+# upstream.local_sprite_url). URL prefix stays /gifs -- see
+# upstream.SPRITE_URL_PREFIX for why that's not renamed along with the folder.
+if os.path.isdir(upstream.SPRITE_DIR):
+    app.mount('/gifs', StaticFiles(directory=upstream.SPRITE_DIR), name='gifs')
 
 # Self-uploaded evolution transition videos (see upstream.EVOLUTION_VIDEO_DIR /
 # upstream.local_evolution_video_url)

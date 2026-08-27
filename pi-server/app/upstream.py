@@ -22,21 +22,24 @@ POKEDEX_CONFIG_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex
 IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/'
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
 
-# User-uploaded animated sprites, local to the Pi -- unrelated to Benjakronk's
-# repo/pipeline above. Named just <sanitized-species-name>.gif, no dex-id
-# prefix. Checked live on every request (a plain filesystem stat, not a
-# network probe), so no caching layer is needed here.
-GIF_DIR = os.path.expanduser(os.environ.get('GIF_DIR', '~/pokemon-dnd/pokemon-gifs'))
+# User-uploaded animated sprites (mp4 or gif), local to the Pi -- unrelated
+# to Benjakronk's repo/pipeline above. Named just <sanitized-species-name>
+# .mp4/.gif, no dex-id prefix. Checked live on every request (a plain
+# filesystem stat, not a network probe), so no caching layer is needed here.
+SPRITE_DIR = os.path.expanduser(os.environ.get('SPRITE_DIR', '~/pokemon-dnd/pokemon-sprites'))
 
 # Every local_sprite_url() return value starts with this -- used elsewhere to
 # recognize (and refuse to persist) a sprite URL that shouldn't have reached
 # permanent storage. See routes_pokemon.py's register/update/evolve guards.
+# Kept as /gifs/ even after the SPRITE_DIR rename -- this is the URL prefix,
+# already baked into every Pokemon's stored image field in the live DB;
+# changing it would 404 every one of them until each got re-saved.
 SPRITE_URL_PREFIX = '/gifs/'
 
 # Self-uploaded evolution transition videos, e.g. pikachu_raichu.mp4 --
-# unrelated to GIF_DIR above (different content, different naming: two
+# unrelated to SPRITE_DIR above (different content, different naming: two
 # species joined by an underscore instead of one). Same live-filesystem-
-# check, no-caching-layer reasoning as GIF_DIR.
+# check, no-caching-layer reasoning as SPRITE_DIR.
 EVOLUTION_VIDEO_DIR = os.path.expanduser(
     os.environ.get('EVOLUTION_VIDEO_DIR', '~/pokemon-dnd/evolution_video'))
 
@@ -213,11 +216,9 @@ def get_image_url(conn, pokemon_name, pokemon_id):
 
 def local_sprite_url(pokemon_name, shiny=False):
     """Self-uploaded animated sprite for pokemon_name, if one exists in
-    GIF_DIR (which despite the name now holds both .mp4 and .gif -- kept the
-    directory/env var name to avoid any Pi-side path changes). Same
-    sanitization as get_image_url() for one consistent filename rule across
-    both, but otherwise unrelated -- no dex-id prefix, no Benjakronk repo,
-    no network probe/cache.
+    SPRITE_DIR. Same sanitization as get_image_url() for one consistent
+    filename rule across both, but otherwise unrelated -- no dex-id prefix,
+    no Benjakronk repo, no network probe/cache.
 
     Checked in this order, so shiny-correctness always wins over format
     preference: shiny+mp4, shiny+gif, non-shiny mp4, non-shiny gif. MP4 has
@@ -234,7 +235,7 @@ def local_sprite_url(pokemon_name, shiny=False):
         candidates += [f'{sanitized}-shiny.mp4', f'{sanitized}-shiny.gif']
     candidates += [f'{sanitized}.mp4', f'{sanitized}.gif']
     for filename in candidates:
-        if os.path.isfile(os.path.join(GIF_DIR, filename)):
+        if os.path.isfile(os.path.join(SPRITE_DIR, filename)):
             return f'{SPRITE_URL_PREFIX}{filename}'
     return None
 

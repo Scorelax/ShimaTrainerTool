@@ -88,9 +88,12 @@ def handle(conn, action, params):
         evolve_data = json.loads(params['data'])
         calculated = calculate_modifiers(evolve_data, 'None', 'None')
         if calculated['status'] == 'success':
+            # Always overwrite, never conditionally -- the incoming value
+            # here can be a self-uploaded sprite URL (evolution.js shows
+            # GIFs/MP4s on the target preview), which must never end up
+            # persisted as this Pokemon's canonical stored image.
             resolved = upstream.get_image_url(conn, calculated['newPokemonData'][2], evolve_data[3])
-            if resolved:
-                calculated['newPokemonData'][1] = resolved
+            calculated['newPokemonData'][1] = resolved or ''
             replaced = replace_pokemon(conn, params['currentName'], params['trainer'],
                                        calculated['newPokemonData'])
             if replaced['status'] == 'success':
@@ -116,6 +119,16 @@ def get_pokemon_info(conn, trainer_name, pokemon_name, animated=True):
 
 
 def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
+    # The client resolves this species' image itself (new-pokemon.js /
+    # pokemon-form.js), normally the static Benjakronk URL -- but since
+    # get_registered_pokemon_list() now prefers a self-uploaded sprite when
+    # one exists for that species, the client's copy can be a /gifs/ URL.
+    # That must never become this Pokemon's permanently stored image -- if
+    # it looks like one, re-resolve the real static image server-side
+    # instead of trusting it.
+    if str(new_pokemon_data[1] or '').startswith(upstream.SPRITE_URL_PREFIX):
+        new_pokemon_data[1] = upstream.get_image_url(conn, new_pokemon_data[2], new_pokemon_data[3]) or ''
+
     level = js_parse_int(new_pokemon_data[4])
     hd = js_parse_int(new_pokemon_data[9])
     vd = js_parse_int(new_pokemon_data[11])
@@ -180,6 +193,15 @@ def update_pokemon_data(conn, new_pokemon_data):
     pokemon_name = str(new_pokemon_data[2]).lower()
     for rowid, row in db.fetch_rows(conn, 'pokemon', P):
         if str(row[0]).lower() == trainer_name and str(row[2]).lower() == pokemon_name:
+            # Never trust the client's image field here -- GET responses
+            # temporarily swap it to a self-uploaded GIF/MP4 URL for display
+            # (see upstream.local_sprite_url), and that swapped value ends up
+            # sitting in the client's copy of this Pokemon's data. This
+            # endpoint is for saving stat/move/item changes, not the image --
+            # always keep whatever's already canonically stored instead of
+            # whatever the client happened to be holding.
+            new_pokemon_data = list(new_pokemon_data)
+            new_pokemon_data[1] = row[1]
             db.update_row(conn, 'pokemon', rowid, P, new_pokemon_data)
             return {'status': 'success'}
     return {'status': 'error', 'message': 'Pokémon not found.'}

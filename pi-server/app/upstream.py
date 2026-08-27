@@ -28,6 +28,11 @@ IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
 # network probe), so no caching layer is needed here.
 GIF_DIR = os.path.expanduser(os.environ.get('GIF_DIR', '~/pokemon-dnd/pokemon-gifs'))
 
+# Every local_sprite_url() return value starts with this -- used elsewhere to
+# recognize (and refuse to persist) a sprite URL that shouldn't have reached
+# permanent storage. See routes_pokemon.py's register/update/evolve guards.
+SPRITE_URL_PREFIX = '/gifs/'
+
 # Apps Script upstreams can be slow (cold starts)
 _FETCH_TIMEOUT = 120.0
 
@@ -216,5 +221,5 @@ def local_sprite_url(pokemon_name, shiny=False):
     candidates += [f'{sanitized}.mp4', f'{sanitized}.gif']
     for filename in candidates:
         if os.path.isfile(os.path.join(GIF_DIR, filename)):
-            return f'/gifs/{filename}'
+            return f'{SPRITE_URL_PREFIX}{filename}'
     return None

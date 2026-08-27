@@ -230,13 +230,14 @@ export class PokemonAPI {
   /**
    * Get specific Pokemon info
    */
-  static async get(trainerName, pokemonName) {
+  static async get(trainerName, pokemonName, forceRefresh = false) {
     return API.request('pokemon', 'get', {
       trainer: trainerName,
       name: pokemonName,
       animated: getSettings().animatedSprites ? 1 : 0
     }, {
-      cacheKey: `pokemon:${trainerName}:${pokemonName}:${getSettings().animatedSprites ? 1 : 0}`
+      cacheKey: `pokemon:${trainerName}:${pokemonName}:${getSettings().animatedSprites ? 1 : 0}`,
+      bypassCache: forceRefresh
     });
   }
 

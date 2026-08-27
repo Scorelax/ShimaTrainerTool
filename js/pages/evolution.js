@@ -1377,23 +1377,29 @@ async function evolveOnServer(str, dex, con, int, wis, cha) {
     throw new Error('Evolution failed: ' + (response.message || 'Unknown error'));
   }
 
-  let finalEvolvedPokemon;
+  // The evolve action deliberately always resolves the static image
+  // server-side (see "Always overwrite, never conditionally" in
+  // routes_pokemon.py's evolve handler), so response.newPokemonData is
+  // never the display-ready copy -- always re-fetch via the sprite-aware
+  // endpoint to pick up a GIF/MP4 if the evolved species has one, same
+  // fix as pokemon-form.js's registration flow needed.
+  const registeredName = (response.newPokemonData || evolvedPokemonData)[2];
+  const fetchResponse = await PokemonAPI.get(currentPokemon[0], registeredName, true);
 
-  if (response.newPokemonData) {
-    // Server returned the calculated data (preferred)
+  let finalEvolvedPokemon;
+  if (fetchResponse.status === 'success' && fetchResponse.data) {
+    finalEvolvedPokemon = fetchResponse.data;
+    console.log('[Evolution] Fetched sprite-aware evolved Pokemon from database');
+  } else if (response.newPokemonData) {
+    // Sprite-aware fetch failed for some reason -- fall back to what
+    // evolve() already returned rather than losing the evolution entirely.
     finalEvolvedPokemon = response.newPokemonData;
-    console.log('[Evolution] Using newPokemonData from server response');
+    console.warn('[Evolution] Sprite-aware fetch failed, using evolve() response as-is');
   } else {
-    // Fallback: Server updated database but didn't return data, so fetch it
-    console.log('[Evolution] Server didnt return newPokemonData, fetching from database...');
-    const fetchResponse = await PokemonAPI.get(currentPokemon[0], evolvedPokemonData[2]);
-    if (fetchResponse.status === 'success' && fetchResponse.data) {
-      finalEvolvedPokemon = fetchResponse.data;
-      console.log('[Evolution] Fetched evolved Pokemon from database');
-    } else {
-      throw new Error('Failed to fetch evolved Pokemon data from database');
-    }
+    throw new Error('Failed to fetch evolved Pokemon data from database');
   }
+
+  await prefetchSprite(finalEvolvedPokemon[1]);
 
   console.log('[Evolution] Final evolved Pokemon:', {
     name: finalEvolvedPokemon[2],

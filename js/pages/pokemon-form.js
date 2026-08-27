@@ -5,6 +5,7 @@ import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 import { showLoadingWithSplash, hideLoading, selectAndPreloadSplashImage } from '../utils/splash.js';
+import { prefetchSprite } from '../utils/sprite-media.js';
 
 export function renderPokemonForm() {
   // Load selected Pokemon data from session storage
@@ -682,8 +683,28 @@ async function handleFormSubmit() {
     console.log('[Pokemon Form] Backend response:', response);
 
     if (response.status === 'success') {
-      // Update session storage with new Pokemon
-      const finalPokemonData = response.newPokemonData || newPokemonData;
+      // Show success message (keep loading screen visible)
+      showSuccess(`${trainerData[1]} caught a ${selectedPokemonData[1]}!`);
+
+      // register_pokemon_for_trainer() deliberately always returns the
+      // static image (never a self-uploaded sprite URL -- see its guard
+      // against persisting one), so this response alone isn't the
+      // display-ready copy. Re-fetch via the sprite-aware endpoint to
+      // pick up a GIF/MP4 if this species has one, concurrently with the
+      // "new pokemon" sound so it doesn't add any wait beyond what the
+      // player's already sitting through.
+      const registeredName = (response.newPokemonData || newPokemonData)[2];
+      audioManager.stopBg();
+      const [spriteAwareFetch] = await Promise.all([
+        PokemonAPI.get(trainerData[1], registeredName, true),
+        audioManager.playSfxAndWait('NewPokemon')
+      ]);
+
+      let finalPokemonData = response.newPokemonData || newPokemonData;
+      if (spriteAwareFetch.status === 'success' && spriteAwareFetch.data) {
+        finalPokemonData = spriteAwareFetch.data;
+      }
+      await prefetchSprite(finalPokemonData[1]);
 
       console.log('[Pokemon Form] finalPokemonData:');
       console.log('[Pokemon Form] - Index 1 (Image):', finalPokemonData[1]);
@@ -691,12 +712,6 @@ async function handleFormSubmit() {
 
       sessionStorage.setItem(`pokemon_${selectedPokemonData[1].toLowerCase()}`, JSON.stringify(finalPokemonData));
 
-      // Show success message (keep loading screen visible)
-      showSuccess(`${trainerData[1]} caught a ${selectedPokemonData[1]}!`);
-
-      // Play new pokemon sound, then navigate (keep splash visible until sound finishes)
-      audioManager.stopBg();
-      await audioManager.playSfxAndWait('NewPokemon');
       hideLoading();
       window.dispatchEvent(new CustomEvent('navigate', {
         detail: { route: 'my-pokemon' }

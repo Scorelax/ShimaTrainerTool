@@ -285,6 +285,21 @@ export class PokemonAPI {
   }
 
   /**
+   * Check for a self-uploaded evolution transition video for this specific
+   * pre-evolved -> evolved pair. Never cached -- must reflect whatever's
+   * actually on disk right now, not a stale "no video" result from before
+   * one was uploaded.
+   */
+  static async getEvolutionVideo(fromName, toName) {
+    return API.request('pokemon', 'evolution-video', {
+      from: fromName,
+      to: toName
+    }, {
+      useCache: false
+    });
+  }
+
+  /**
    * Update active party status
    */
   static async updatePartyStatus(trainerName, pokemonName, pokeslots, operation) {

@@ -14,6 +14,8 @@ let availableSkillPoints = 0;
 let allocatedSkillPoints = 0;
 let evolutionOptions = [];
 let pokedexUpdateHandler = null;
+let evolutionVideoUrl = null;
+let evolutionVideoReady = null;
 
 export function renderEvolution() {
   const selectedPokemonName = sessionStorage.getItem('selectedPokemonName');
@@ -404,6 +406,38 @@ export function renderEvolution() {
           margin-top: 0;
         }
 
+        /* Evolution transition video: starts fully transparent and
+           click-through, faded in/out via the .visible class. This is the
+           first real opacity transition in the app -- the splash-art
+           loading screen it stands in for just toggles display:none/flex
+           instantly, no fade. */
+        .evolution-video-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: #000;
+          z-index: 10000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.5s ease;
+        }
+
+        .evolution-video-overlay.visible {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .evolution-video-overlay video {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+
         .back-button {
           position: fixed;
           top: clamp(15px, 3vh, 20px);
@@ -554,6 +588,11 @@ export function renderEvolution() {
         <p>Your Pokemon has evolved into <strong id="evolvedPokemonName"></strong>!</p>
       </div>
 
+      <!-- Evolution Transition Video -->
+      <div id="evolutionVideoOverlay" class="evolution-video-overlay">
+        <video id="evolutionVideoPlayer" playsinline></video>
+      </div>
+
       <!-- Back Button -->
       <button class="back-button" id="backButton">←</button>
     </div>
@@ -567,6 +606,8 @@ export async function attachEvolutionListeners() {
   selectedPokemon = null;
   allocatedSkillPoints = 0;
   evolutionOptions = [];
+  evolutionVideoUrl = null;
+  evolutionVideoReady = null;
 
   // Set splash image on loading screen immediately (before it's shown)
   const loadingScreen = document.getElementById('loading-screen');
@@ -817,6 +858,25 @@ function evolvePokemon() {
 
   // Show modal
   document.getElementById('evolutionModal').classList.add('visible');
+
+  // Start checking for a self-uploaded transition video now, not on
+  // confirm -- the player fills out this form for a while, which is more
+  // than enough time for the check + prefetch to finish in the background.
+  checkAndPreloadEvolutionVideo();
+}
+
+async function checkAndPreloadEvolutionVideo() {
+  evolutionVideoUrl = null;
+  evolutionVideoReady = null;
+  try {
+    const result = await PokemonAPI.getEvolutionVideo(currentPokemon[2], selectedPokemon[1]);
+    if (result.status === 'success' && result.url) {
+      evolutionVideoUrl = result.url;
+      evolutionVideoReady = prefetchSprite(result.url);
+    }
+  } catch (err) {
+    console.warn('[Evolution] Video check failed:', err);
+  }
 }
 
 const STAT_INDEX_MAP = { str: 15, dex: 16, con: 17, int: 18, wis: 19, cha: 20 };
@@ -955,10 +1015,6 @@ async function confirmEvolution() {
     return;
   }
 
-  // Show loading screen IMMEDIATELY before any processing
-  const splashUrl = sessionStorage.getItem('preloadedSplashImage');
-  showLoadingWithSplash(splashUrl);
-
   // Read input values BEFORE clearing the DOM
   const str = parseInt(document.getElementById('strPoints').value) || 0;
   const dex = parseInt(document.getElementById('dexPoints').value) || 0;
@@ -967,298 +1023,62 @@ async function confirmEvolution() {
   const wis = parseInt(document.getElementById('wisPoints').value) || 0;
   const cha = parseInt(document.getElementById('chaPoints').value) || 0;
 
-  // Hide modal and show loading
   document.getElementById('evolutionModal').classList.remove('visible');
-  document.getElementById('content').innerHTML = '<div class="loading">Evolving Pokemon...</div>';
+
+  // Only show the plain splash loading screen when there's no transition
+  // video -- the video overlay (opaque, fixed, covers everything) handles
+  // hiding the old content itself when one exists.
+  const hasVideo = !!evolutionVideoUrl;
+  if (!hasVideo) {
+    const splashUrl = sessionStorage.getItem('preloadedSplashImage');
+    showLoadingWithSplash(splashUrl);
+    document.getElementById('content').innerHTML = '<div class="loading">Evolving Pokemon...</div>';
+  }
 
   try {
+    // Run the server call and the video transition concurrently -- the
+    // video's play time absorbs the API latency instead of stacking after
+    // it. Invisible to the player either way, since they're watching the
+    // video regardless.
+    const [finalEvolvedPokemon] = await Promise.all([
+      evolveOnServer(str, dex, con, int, wis, cha),
+      hasVideo ? playEvolutionVideoTransition() : Promise.resolve()
+    ]);
 
-    // Calculate new stats
-    const newSTR = currentPokemon[15] + str;
-    const newDEX = currentPokemon[16] + dex;
-    const newCON = currentPokemon[17] + con;
-    const newINT = currentPokemon[18] + int;
-    const newWIS = currentPokemon[19] + wis;
-    const newCHA = currentPokemon[20] + cha;
+    // Clean up pre-evolved Pokemon from cache
+    const preEvolvedKey = `pokemon_${currentPokemon[2].toLowerCase()}`;
+    sessionStorage.removeItem(preEvolvedKey);
 
-    // Combine skills
-    let preEvoSkills = currentPokemon[22] ? currentPokemon[22].split(',').map(s => s.trim()) : [];
-    let evoSkills = selectedPokemon[23] ? selectedPokemon[23].split(',').map(s => s.trim()) : [];
-    let combinedSkills = [...new Set([...preEvoSkills, ...evoSkills])].join(', ');
-
-    // Format movement and senses
-    const movementData = selectedPokemon[31] || {};
-    const sensesData = selectedPokemon[32] || {};
-
-    const movementDataString = [
-      movementData.walking || '-',
-      movementData.climbing || '-',
-      movementData.flying || '-',
-      movementData.hovering || '-',
-      movementData.swimming || '-',
-      movementData.burrowing || '-'
-    ].join(', ');
-
-    const sensesDataString = [
-      sensesData.sight || '-',
-      sensesData.hearing || '-',
-      sensesData.smell || '-',
-      sensesData.tremorsense || '-',
-      sensesData.echolocation || '-',
-      sensesData.telepathy || '-',
-      sensesData.blindsight || '-',
-      sensesData.darkvision || '-',
-      sensesData.truesight || '-'
-    ].join(', ');
-
-    // Get type effectiveness
-    console.log('[Evolution] Fetching type effectiveness for:', {
-      primaryType: selectedPokemon[4],
-      secondaryType: selectedPokemon[5]
-    });
-
-    const typeResponse = await GameDataAPI.getTypeEffectiveness(
-      selectedPokemon[4],
-      selectedPokemon[5]
-    );
-
-    console.log('[Evolution] Type effectiveness response:', typeResponse);
-
-    const typematchupsString = (typeResponse.data || typeResponse.effectiveness) ?
-      (typeResponse.data || typeResponse.effectiveness).join(', ') : '';
-
-    console.log('[Evolution] Type matchups string:', typematchupsString);
-
-    // Map abilities from current to evolved Pokemon
-    const evolvedAbilities = [];
-    const evolvedPokemonName = selectedPokemon[1]; // Name at index 1
-
-    // Support both old format (single field at index 7) and new format (3 fields at indices 7, 8, 9)
-    let currentAbilities = [];
-    const ability7 = currentPokemon[7] || '';
-    const ability8 = currentPokemon[8] || '';
-    const ability9 = currentPokemon[9] || '';
-
-    console.log('[Evolution] Current Pokemon abilities:', { ability7, ability8, ability9 });
-
-    // Check if old format (contains pipe separator) or new format (separate fields)
-    if (typeof ability7 === 'string' && ability7.includes('|')) {
-      // Old format: single field with pipe-separated values
-      currentAbilities = ability7.split('|').map(a => a.trim()).filter(a => a);
-    } else {
-      // New format: three separate fields - only add if they are non-empty strings
-      if (ability7 && typeof ability7 === 'string') currentAbilities.push(ability7);
-      if (ability8 && typeof ability8 === 'string') currentAbilities.push(ability8);
-      if (ability9 && typeof ability9 === 'string') currentAbilities.push(ability9);
+    // Clear pokemon list cache
+    const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
+    if (trainerData) {
+      sessionStorage.removeItem(`pokemonList_${trainerData[1]}`);
     }
 
-    console.log('[Evolution] Parsed current abilities:', currentAbilities);
+    // Store evolved Pokemon with all calculated values
+    sessionStorage.setItem(`pokemon_${finalEvolvedPokemon[2].toLowerCase()}`, JSON.stringify(finalEvolvedPokemon));
+    sessionStorage.setItem('selectedPokemonName', finalEvolvedPokemon[2]);
 
-    if (currentAbilities.length > 0) {
+    console.log('[Evolution] Stored in sessionStorage, about to navigate');
 
-      // Get evolved Pokemon's abilities (pokedex format: "Name, Description")
-      const evolvedPokemonAbilities = [
-        selectedPokemon[6],  // Primary
-        selectedPokemon[7],  // Secondary
-        selectedPokemon[8]   // Hidden
-      ];
-
-      console.log('[Evolution] Evolved Pokemon abilities from Pokedex:', evolvedPokemonAbilities);
-
-      currentAbilities.forEach(abilityData => {
-        // Ensure abilityData is a string before calling indexOf
-        if (typeof abilityData !== 'string') {
-          console.warn('[Evolution] Skipping non-string ability data:', abilityData);
-          return;
-        }
-
-        const colonIndex = abilityData.indexOf(':');
-        let slotIndex = 0;
-
-        if (colonIndex !== -1 && colonIndex < 3) {
-          slotIndex = parseInt(abilityData.substring(0, colonIndex));
-        }
-
-        // Check if hidden ability (slotIndex 2) should be visible
-        if (slotIndex === 2 && !isFieldVisible(evolvedPokemonName, 'hiddenAbility')) {
-          return; // Skip hidden ability if not visible for evolved Pokemon
-        }
-
-        const evolvedAbilityData = evolvedPokemonAbilities[slotIndex];
-        if (evolvedAbilityData) {
-          const parts = evolvedAbilityData.split(',');
-          const abilityName = parts[0].trim();
-          const abilityDescription = parts.slice(1).join(',').trim();
-          evolvedAbilities.push(slotIndex + ':' + abilityName + ';' + abilityDescription);
-        }
-      });
-    }
-
-    // Default to primary ability if no mapping
-    if (evolvedAbilities.length === 0) {
-      const primaryAbility = selectedPokemon[6];
-      if (primaryAbility) {
-        const parts = primaryAbility.split(',');
-        evolvedAbilities.push('0:' + parts[0].trim() + ';' + parts.slice(1).join(',').trim());
-      }
-    }
-
-    // Combine evolved abilities into single pipe-separated string
-    const evolvedAbilitiesString = evolvedAbilities.join('|');
-
-    // Extract Size from evolved Pokemon data (index 34 - at end of array from code.gs)
-    const evolvedSize = selectedPokemon[34] || '';
-
-    // Build evolved Pokemon data array with placeholders for calculated values
-    const evolvedPokemonData = [
-      currentPokemon[0],           // 0: Trainer Name
-      selectedPokemon[0],          // 1: Image
-      selectedPokemon[1],          // 2: Name
-      selectedPokemon[2],          // 3: Dex Entry
-      currentPokemon[4],           // 4: Level
-      selectedPokemon[4],          // 5: Primary Type
-      selectedPokemon[5],          // 6: Secondary Type
-      evolvedAbilitiesString,      // 7: Ability (combined with pipes)
-      selectedPokemon[9],          // 8: AC
-      selectedPokemon[10],         // 9: Hit Dice
-      '',                          // 10: HP (will be calculated by server)
-      selectedPokemon[12],         // 11: Vitality Dice
-      '',                          // 12: VP (will be calculated by server)
-      movementDataString,          // 13: Speed
-      selectedPokemon[15],         // 14: Total Stats
-      newSTR,                      // 15: Strength
-      newDEX,                      // 16: Dexterity
-      newCON,                      // 17: Constitution
-      newINT,                      // 18: Intelligence
-      newWIS,                      // 19: Wisdom
-      newCHA,                      // 20: Charisma
-      selectedPokemon[22],         // 21: Saving Throws
-      combinedSkills,              // 22: Skills
-      selectedPokemon[24],         // 23: Starting Moves
-      selectedPokemon[25],         // 24: Level 2 Moves
-      selectedPokemon[26],         // 25: Level 6 Moves
-      selectedPokemon[27],         // 26: Level 10 Moves
-      selectedPokemon[28],         // 27: Level 14 Moves
-      selectedPokemon[29],         // 28: Level 18 Moves
-      selectedPokemon[30],         // 29: Evolution Requirement
-      '',                          // 30: Initiative (calculated)
-      '',                          // 31: Proficiency Bonus (calculated)
-      currentPokemon[32],          // 32: Nature
-      currentPokemon[33],          // 33: Loyalty
-      currentPokemon[34],          // 34: STAB
-      currentPokemon[35] || '',    // 35: Held Item
-      currentPokemon[36] || '',    // 36: Nickname
-      currentPokemon[37] || '',    // 37: Custom Moves
-      currentPokemon[38] || '',    // 38: In Active Party
-      '',                          // 39: STR modifier (calculated)
-      '',                          // 40: DEX modifier (calculated)
-      '',                          // 41: CON modifier (calculated)
-      '',                          // 42: INT modifier (calculated)
-      '',                          // 43: WIS modifier (calculated)
-      '',                          // 44: CHA modifier (calculated)
-      currentPokemon[45] || '',    // 45: CurrentHP
-      currentPokemon[46] || '',    // 46: CurrentVP
-      currentPokemon[47] || '',    // 47: CurrentAC
-      currentPokemon[48] || '',    // 48: Comment
-      sensesDataString,            // 49: Senses
-      currentPokemon[50] || '',    // 50: Feats
-      currentPokemon[51] || '',    // 51: Gear
-      selectedPokemon[33] || '',   // 52: Flavor text
-      typematchupsString,          // 53: Type matchups
-      currentPokemon[54] || '',    // 54: Current HD
-      currentPokemon[55] || '',    // 55: Current VD
-      currentPokemon[56] || '',    // 56: Utility Slot
-      evolvedSize,                 // 57: Size
-      currentPokemon[58] || '',    // 58: Cry (carry over if set)
-      '',                          // 59: KnownMoves (reset on evolution)
-      '',                          // 60: StatusCondition (reset on evolution)
-      currentPokemon[61] || '',    // 61: Shiny (carry over from pre-evolved)
-    ];
-
-    // Log what we're sending to the server
-    console.log('[Evolution] Sending evolvedPokemonData to server:', {
-      name: evolvedPokemonData[2],
-      image: evolvedPokemonData[1],
-      hitDice: evolvedPokemonData[9],
-      hp: evolvedPokemonData[10],
-      vitalityDice: evolvedPokemonData[11],
-      vp: evolvedPokemonData[12],
-      typeMatchups: evolvedPokemonData[53],
-      fullData: evolvedPokemonData
-    });
-
-    // Call API to evolve Pokemon and wait for full calculated data (loading screen already shown)
-    const response = await PokemonAPI.evolve(
-      currentPokemon[2],
-      currentPokemon[0],
-      evolvedPokemonData
-    );
-
-    console.log('[Evolution] Received response from server:', response);
-
-    if (response.status === 'success') {
-      let finalEvolvedPokemon;
-
-      if (response.newPokemonData) {
-        // Server returned the calculated data (preferred)
-        finalEvolvedPokemon = response.newPokemonData;
-        console.log('[Evolution] Using newPokemonData from server response');
-      } else {
-        // Fallback: Server updated database but didn't return data, so fetch it
-        console.log('[Evolution] Server didnt return newPokemonData, fetching from database...');
-        const fetchResponse = await PokemonAPI.get(currentPokemon[0], evolvedPokemonData[2]);
-        if (fetchResponse.status === 'success' && fetchResponse.data) {
-          finalEvolvedPokemon = fetchResponse.data;
-          console.log('[Evolution] Fetched evolved Pokemon from database');
-        } else {
-          throw new Error('Failed to fetch evolved Pokemon data from database');
-        }
-      }
-
-      console.log('[Evolution] Final evolved Pokemon:', {
-        name: finalEvolvedPokemon[2],
-        image: finalEvolvedPokemon[1],
-        hitDice: finalEvolvedPokemon[9],
-        hp: finalEvolvedPokemon[10],
-        vitalityDice: finalEvolvedPokemon[11],
-        vp: finalEvolvedPokemon[12],
-        typeMatchups: finalEvolvedPokemon[53],
-        fullData: finalEvolvedPokemon
-      });
-
-      // Clean up pre-evolved Pokemon from cache
-      const preEvolvedKey = `pokemon_${currentPokemon[2].toLowerCase()}`;
-      sessionStorage.removeItem(preEvolvedKey);
-
-      // Clear pokemon list cache
-      const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-      if (trainerData) {
-        sessionStorage.removeItem(`pokemonList_${trainerData[1]}`);
-      }
-
-      // Store evolved Pokemon with all calculated values
-      sessionStorage.setItem(`pokemon_${finalEvolvedPokemon[2].toLowerCase()}`, JSON.stringify(finalEvolvedPokemon));
-      sessionStorage.setItem('selectedPokemonName', finalEvolvedPokemon[2]);
-
-      console.log('[Evolution] Stored in sessionStorage, about to navigate');
-
-      // Hide loading screen
-      hideLoading();
-
-      // Play evolution finish sound, then navigate
-      audioManager.stopBg();
-      await audioManager.playSfxAndWait('EvolutionFinish');
-
-      // Navigate to pokemon card
+    if (hasVideo) {
+      // Still covered by the opaque video overlay -- navigate first so
+      // there's no flash of stale content, then fade out to reveal it.
       window.dispatchEvent(new CustomEvent('navigate', {
         detail: { route: 'pokemon-card', pokemonName: finalEvolvedPokemon[2] }
       }));
+      fadeOutEvolutionVideoOverlay();
     } else {
-      console.error('[Evolution] API returned error:', response);
-      throw new Error('Evolution failed: ' + (response.message || 'Unknown error'));
+      hideLoading();
+      audioManager.stopBg();
+      await audioManager.playSfxAndWait('EvolutionFinish');
+      window.dispatchEvent(new CustomEvent('navigate', {
+        detail: { route: 'pokemon-card', pokemonName: finalEvolvedPokemon[2] }
+      }));
     }
   } catch (error) {
     console.error('Error during evolution:', error);
+    if (hasVideo) fadeOutEvolutionVideoOverlay();
     hideLoading();
     showError('Evolution failed. Please try again.');
     setTimeout(() => {
@@ -1267,6 +1087,313 @@ async function confirmEvolution() {
       }));
     }, 2000);
   }
+}
+
+/**
+ * Fades to black, plays the pre-loaded evolution transition video, and
+ * resolves once it ends (or errors -- same resolve-on-either pattern as
+ * audioManager.playSfxAndWait, so a broken video can't hang the flow
+ * forever). Deliberately leaves the overlay opaque on return -- the caller
+ * stores data and navigates while still covered, then fades out, so
+ * there's no flash of stale content mid-transition.
+ */
+async function playEvolutionVideoTransition() {
+  const overlay = document.getElementById('evolutionVideoOverlay');
+  const video = document.getElementById('evolutionVideoPlayer');
+  audioManager.stopBg();
+
+  // Resolves instantly if the prefetch (started when the stat modal opened)
+  // already finished during form-fill, otherwise waits the remainder.
+  await evolutionVideoReady;
+
+  video.src = evolutionVideoUrl;
+  overlay.classList.add('visible');
+  await new Promise(resolve => setTimeout(resolve, 500)); // let the fade-in finish
+
+  try {
+    await video.play();
+  } catch (err) {
+    console.warn('[Evolution] Video play failed:', err);
+  }
+
+  await new Promise((resolve) => {
+    video.addEventListener('ended', resolve, { once: true });
+    video.addEventListener('error', resolve, { once: true });
+  });
+}
+
+function fadeOutEvolutionVideoOverlay() {
+  const overlay = document.getElementById('evolutionVideoOverlay');
+  overlay.classList.remove('visible');
+  setTimeout(() => {
+    const video = document.getElementById('evolutionVideoPlayer');
+    if (video) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    }
+  }, 500);
+}
+
+async function evolveOnServer(str, dex, con, int, wis, cha) {
+  // Calculate new stats
+  const newSTR = currentPokemon[15] + str;
+  const newDEX = currentPokemon[16] + dex;
+  const newCON = currentPokemon[17] + con;
+  const newINT = currentPokemon[18] + int;
+  const newWIS = currentPokemon[19] + wis;
+  const newCHA = currentPokemon[20] + cha;
+
+  // Combine skills
+  let preEvoSkills = currentPokemon[22] ? currentPokemon[22].split(',').map(s => s.trim()) : [];
+  let evoSkills = selectedPokemon[23] ? selectedPokemon[23].split(',').map(s => s.trim()) : [];
+  let combinedSkills = [...new Set([...preEvoSkills, ...evoSkills])].join(', ');
+
+  // Format movement and senses
+  const movementData = selectedPokemon[31] || {};
+  const sensesData = selectedPokemon[32] || {};
+
+  const movementDataString = [
+    movementData.walking || '-',
+    movementData.climbing || '-',
+    movementData.flying || '-',
+    movementData.hovering || '-',
+    movementData.swimming || '-',
+    movementData.burrowing || '-'
+  ].join(', ');
+
+  const sensesDataString = [
+    sensesData.sight || '-',
+    sensesData.hearing || '-',
+    sensesData.smell || '-',
+    sensesData.tremorsense || '-',
+    sensesData.echolocation || '-',
+    sensesData.telepathy || '-',
+    sensesData.blindsight || '-',
+    sensesData.darkvision || '-',
+    sensesData.truesight || '-'
+  ].join(', ');
+
+  // Get type effectiveness
+  console.log('[Evolution] Fetching type effectiveness for:', {
+    primaryType: selectedPokemon[4],
+    secondaryType: selectedPokemon[5]
+  });
+
+  const typeResponse = await GameDataAPI.getTypeEffectiveness(
+    selectedPokemon[4],
+    selectedPokemon[5]
+  );
+
+  console.log('[Evolution] Type effectiveness response:', typeResponse);
+
+  const typematchupsString = (typeResponse.data || typeResponse.effectiveness) ?
+    (typeResponse.data || typeResponse.effectiveness).join(', ') : '';
+
+  console.log('[Evolution] Type matchups string:', typematchupsString);
+
+  // Map abilities from current to evolved Pokemon
+  const evolvedAbilities = [];
+  const evolvedPokemonName = selectedPokemon[1]; // Name at index 1
+
+  // Support both old format (single field at index 7) and new format (3 fields at indices 7, 8, 9)
+  let currentAbilities = [];
+  const ability7 = currentPokemon[7] || '';
+  const ability8 = currentPokemon[8] || '';
+  const ability9 = currentPokemon[9] || '';
+
+  console.log('[Evolution] Current Pokemon abilities:', { ability7, ability8, ability9 });
+
+  // Check if old format (contains pipe separator) or new format (separate fields)
+  if (typeof ability7 === 'string' && ability7.includes('|')) {
+    // Old format: single field with pipe-separated values
+    currentAbilities = ability7.split('|').map(a => a.trim()).filter(a => a);
+  } else {
+    // New format: three separate fields - only add if they are non-empty strings
+    if (ability7 && typeof ability7 === 'string') currentAbilities.push(ability7);
+    if (ability8 && typeof ability8 === 'string') currentAbilities.push(ability8);
+    if (ability9 && typeof ability9 === 'string') currentAbilities.push(ability9);
+  }
+
+  console.log('[Evolution] Parsed current abilities:', currentAbilities);
+
+  if (currentAbilities.length > 0) {
+
+    // Get evolved Pokemon's abilities (pokedex format: "Name, Description")
+    const evolvedPokemonAbilities = [
+      selectedPokemon[6],  // Primary
+      selectedPokemon[7],  // Secondary
+      selectedPokemon[8]   // Hidden
+    ];
+
+    console.log('[Evolution] Evolved Pokemon abilities from Pokedex:', evolvedPokemonAbilities);
+
+    currentAbilities.forEach(abilityData => {
+      // Ensure abilityData is a string before calling indexOf
+      if (typeof abilityData !== 'string') {
+        console.warn('[Evolution] Skipping non-string ability data:', abilityData);
+        return;
+      }
+
+      const colonIndex = abilityData.indexOf(':');
+      let slotIndex = 0;
+
+      if (colonIndex !== -1 && colonIndex < 3) {
+        slotIndex = parseInt(abilityData.substring(0, colonIndex));
+      }
+
+      // Check if hidden ability (slotIndex 2) should be visible
+      if (slotIndex === 2 && !isFieldVisible(evolvedPokemonName, 'hiddenAbility')) {
+        return; // Skip hidden ability if not visible for evolved Pokemon
+      }
+
+      const evolvedAbilityData = evolvedPokemonAbilities[slotIndex];
+      if (evolvedAbilityData) {
+        const parts = evolvedAbilityData.split(',');
+        const abilityName = parts[0].trim();
+        const abilityDescription = parts.slice(1).join(',').trim();
+        evolvedAbilities.push(slotIndex + ':' + abilityName + ';' + abilityDescription);
+      }
+    });
+  }
+
+  // Default to primary ability if no mapping
+  if (evolvedAbilities.length === 0) {
+    const primaryAbility = selectedPokemon[6];
+    if (primaryAbility) {
+      const parts = primaryAbility.split(',');
+      evolvedAbilities.push('0:' + parts[0].trim() + ';' + parts.slice(1).join(',').trim());
+    }
+  }
+
+  // Combine evolved abilities into single pipe-separated string
+  const evolvedAbilitiesString = evolvedAbilities.join('|');
+
+  // Extract Size from evolved Pokemon data (index 34 - at end of array from code.gs)
+  const evolvedSize = selectedPokemon[34] || '';
+
+  // Build evolved Pokemon data array with placeholders for calculated values
+  const evolvedPokemonData = [
+    currentPokemon[0],           // 0: Trainer Name
+    selectedPokemon[0],          // 1: Image
+    selectedPokemon[1],          // 2: Name
+    selectedPokemon[2],          // 3: Dex Entry
+    currentPokemon[4],           // 4: Level
+    selectedPokemon[4],          // 5: Primary Type
+    selectedPokemon[5],          // 6: Secondary Type
+    evolvedAbilitiesString,      // 7: Ability (combined with pipes)
+    selectedPokemon[9],          // 8: AC
+    selectedPokemon[10],         // 9: Hit Dice
+    '',                          // 10: HP (will be calculated by server)
+    selectedPokemon[12],         // 11: Vitality Dice
+    '',                          // 12: VP (will be calculated by server)
+    movementDataString,          // 13: Speed
+    selectedPokemon[15],         // 14: Total Stats
+    newSTR,                      // 15: Strength
+    newDEX,                      // 16: Dexterity
+    newCON,                      // 17: Constitution
+    newINT,                      // 18: Intelligence
+    newWIS,                      // 19: Wisdom
+    newCHA,                      // 20: Charisma
+    selectedPokemon[22],         // 21: Saving Throws
+    combinedSkills,              // 22: Skills
+    selectedPokemon[24],         // 23: Starting Moves
+    selectedPokemon[25],         // 24: Level 2 Moves
+    selectedPokemon[26],         // 25: Level 6 Moves
+    selectedPokemon[27],         // 26: Level 10 Moves
+    selectedPokemon[28],         // 27: Level 14 Moves
+    selectedPokemon[29],         // 28: Level 18 Moves
+    selectedPokemon[30],         // 29: Evolution Requirement
+    '',                          // 30: Initiative (calculated)
+    '',                          // 31: Proficiency Bonus (calculated)
+    currentPokemon[32],          // 32: Nature
+    currentPokemon[33],          // 33: Loyalty
+    currentPokemon[34],          // 34: STAB
+    currentPokemon[35] || '',    // 35: Held Item
+    currentPokemon[36] || '',    // 36: Nickname
+    currentPokemon[37] || '',    // 37: Custom Moves
+    currentPokemon[38] || '',    // 38: In Active Party
+    '',                          // 39: STR modifier (calculated)
+    '',                          // 40: DEX modifier (calculated)
+    '',                          // 41: CON modifier (calculated)
+    '',                          // 42: INT modifier (calculated)
+    '',                          // 43: WIS modifier (calculated)
+    '',                          // 44: CHA modifier (calculated)
+    currentPokemon[45] || '',    // 45: CurrentHP
+    currentPokemon[46] || '',    // 46: CurrentVP
+    currentPokemon[47] || '',    // 47: CurrentAC
+    currentPokemon[48] || '',    // 48: Comment
+    sensesDataString,            // 49: Senses
+    currentPokemon[50] || '',    // 50: Feats
+    currentPokemon[51] || '',    // 51: Gear
+    selectedPokemon[33] || '',   // 52: Flavor text
+    typematchupsString,          // 53: Type matchups
+    currentPokemon[54] || '',    // 54: Current HD
+    currentPokemon[55] || '',    // 55: Current VD
+    currentPokemon[56] || '',    // 56: Utility Slot
+    evolvedSize,                 // 57: Size
+    currentPokemon[58] || '',    // 58: Cry (carry over if set)
+    '',                          // 59: KnownMoves (reset on evolution)
+    '',                          // 60: StatusCondition (reset on evolution)
+    currentPokemon[61] || '',    // 61: Shiny (carry over from pre-evolved)
+  ];
+
+  // Log what we're sending to the server
+  console.log('[Evolution] Sending evolvedPokemonData to server:', {
+    name: evolvedPokemonData[2],
+    image: evolvedPokemonData[1],
+    hitDice: evolvedPokemonData[9],
+    hp: evolvedPokemonData[10],
+    vitalityDice: evolvedPokemonData[11],
+    vp: evolvedPokemonData[12],
+    typeMatchups: evolvedPokemonData[53],
+    fullData: evolvedPokemonData
+  });
+
+  // Call API to evolve Pokemon and wait for full calculated data
+  const response = await PokemonAPI.evolve(
+    currentPokemon[2],
+    currentPokemon[0],
+    evolvedPokemonData
+  );
+
+  console.log('[Evolution] Received response from server:', response);
+
+  if (response.status !== 'success') {
+    console.error('[Evolution] API returned error:', response);
+    throw new Error('Evolution failed: ' + (response.message || 'Unknown error'));
+  }
+
+  let finalEvolvedPokemon;
+
+  if (response.newPokemonData) {
+    // Server returned the calculated data (preferred)
+    finalEvolvedPokemon = response.newPokemonData;
+    console.log('[Evolution] Using newPokemonData from server response');
+  } else {
+    // Fallback: Server updated database but didn't return data, so fetch it
+    console.log('[Evolution] Server didnt return newPokemonData, fetching from database...');
+    const fetchResponse = await PokemonAPI.get(currentPokemon[0], evolvedPokemonData[2]);
+    if (fetchResponse.status === 'success' && fetchResponse.data) {
+      finalEvolvedPokemon = fetchResponse.data;
+      console.log('[Evolution] Fetched evolved Pokemon from database');
+    } else {
+      throw new Error('Failed to fetch evolved Pokemon data from database');
+    }
+  }
+
+  console.log('[Evolution] Final evolved Pokemon:', {
+    name: finalEvolvedPokemon[2],
+    image: finalEvolvedPokemon[1],
+    hitDice: finalEvolvedPokemon[9],
+    hp: finalEvolvedPokemon[10],
+    vitalityDice: finalEvolvedPokemon[11],
+    vp: finalEvolvedPokemon[12],
+    typeMatchups: finalEvolvedPokemon[53],
+    fullData: finalEvolvedPokemon
+  });
+
+  return finalEvolvedPokemon;
 }
 
 function cancelEvolution() {

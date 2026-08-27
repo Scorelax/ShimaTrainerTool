@@ -43,7 +43,7 @@ db.init()
 # sprite) -- no-store on these was forcing a full multi-MB re-download every
 # single time, which is what was making self-uploaded GIFs stutter/re-buffer
 # on every screen change instead of playing instantly from a local copy.
-_CACHEABLE_MEDIA_PREFIXES = ('/gifs/', '/splashes/', '/assets/')
+_CACHEABLE_MEDIA_PREFIXES = ('/gifs/', '/splashes/', '/assets/', '/evolution-videos/')
 
 
 @app.middleware('http')
@@ -196,6 +196,12 @@ if os.path.isdir(routes_gamedata.SPLASH_DIR):
 # Self-uploaded animated sprites, mp4 or gif (see upstream.GIF_DIR / upstream.local_sprite_url)
 if os.path.isdir(upstream.GIF_DIR):
     app.mount('/gifs', StaticFiles(directory=upstream.GIF_DIR), name='gifs')
+
+# Self-uploaded evolution transition videos (see upstream.EVOLUTION_VIDEO_DIR /
+# upstream.local_evolution_video_url)
+if os.path.isdir(upstream.EVOLUTION_VIDEO_DIR):
+    app.mount('/evolution-videos', StaticFiles(directory=upstream.EVOLUTION_VIDEO_DIR),
+              name='evolution-videos')
 
 # Serve the PWA from the same origin (mounted last so /api and /exec win)
 _default_pwa = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))

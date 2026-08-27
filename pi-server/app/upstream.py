@@ -33,6 +33,13 @@ GIF_DIR = os.path.expanduser(os.environ.get('GIF_DIR', '~/pokemon-dnd/pokemon-gi
 # permanent storage. See routes_pokemon.py's register/update/evolve guards.
 SPRITE_URL_PREFIX = '/gifs/'
 
+# Self-uploaded evolution transition videos, e.g. pikachu_raichu.mp4 --
+# unrelated to GIF_DIR above (different content, different naming: two
+# species joined by an underscore instead of one). Same live-filesystem-
+# check, no-caching-layer reasoning as GIF_DIR.
+EVOLUTION_VIDEO_DIR = os.path.expanduser(
+    os.environ.get('EVOLUTION_VIDEO_DIR', '~/pokemon-dnd/evolution_video'))
+
 # Apps Script upstreams can be slow (cold starts)
 _FETCH_TIMEOUT = 120.0
 
@@ -170,12 +177,19 @@ def warm_upstream(conn):
         list(pool.map(refresh, fns))
 
 
+def _sanitize_species_name(name):
+    """Lowercase, non-alphanumeric runs collapsed to a single hyphen, no
+    leading/trailing hyphens. The one filename rule shared by every local
+    (get_image_url, local_sprite_url, local_evolution_video_url) or
+    self-uploaded (local_sprite_url, local_evolution_video_url) lookup."""
+    return re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(name).lower()))
+
+
 def get_image_url(conn, pokemon_name, pokemon_id):
     """Port of getImageUrl: probe GitHub for the sprite in each format.
     Successful lookups are cached in SQLite so this stays fast."""
     padded = str(pokemon_id).zfill(3)
-    import re
-    sanitized = re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(pokemon_name).lower()))
+    sanitized = _sanitize_species_name(pokemon_name)
     base = f'{padded}-{sanitized}'
 
     row = conn.execute('SELECT url FROM image_cache WHERE key = ?', (base,)).fetchone()
@@ -214,7 +228,7 @@ def local_sprite_url(pokemon_name, shiny=False):
     here. Shiny uses a -shiny suffix, matching the convention Benjakronk's
     own shiny sprites already use elsewhere; falls back through to the
     non-shiny variant if no shiny file exists in either format."""
-    sanitized = re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(pokemon_name).lower()))
+    sanitized = _sanitize_species_name(pokemon_name)
     candidates = []
     if shiny:
         candidates += [f'{sanitized}-shiny.mp4', f'{sanitized}-shiny.gif']
@@ -222,4 +236,17 @@ def local_sprite_url(pokemon_name, shiny=False):
     for filename in candidates:
         if os.path.isfile(os.path.join(GIF_DIR, filename)):
             return f'{SPRITE_URL_PREFIX}{filename}'
+    return None
+
+
+def local_evolution_video_url(pre_evolved_name, evolved_name):
+    """Self-uploaded evolution transition video for this specific
+    <pre-evolved> -> <evolved> pair, if one exists in EVOLUTION_VIDEO_DIR.
+    Named <sanitized-pre-evolved>_<sanitized-evolved>.mp4 -- underscore as
+    the separator between the two species is unambiguous since
+    _sanitize_species_name() already turns every other character into a
+    hyphen, so it can never appear inside either segment itself."""
+    filename = f'{_sanitize_species_name(pre_evolved_name)}_{_sanitize_species_name(evolved_name)}.mp4'
+    if os.path.isfile(os.path.join(EVOLUTION_VIDEO_DIR, filename)):
+        return f'/evolution-videos/{filename}'
     return None

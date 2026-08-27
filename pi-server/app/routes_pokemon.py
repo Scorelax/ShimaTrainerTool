@@ -63,6 +63,12 @@ def handle(conn, action, params):
         limit = js_parse_int(params.get('limit', 20)) or 20
         return pokedex.get_evolution_options(conn, dex_entry, limit)
 
+    if action == 'evolution-video':
+        if not params.get('from') or not params.get('to'):
+            raise ValueError('Missing from/to pokemon names')
+        return {'status': 'success',
+                'url': upstream.local_evolution_video_url(params['from'], params['to'])}
+
     if action == 'party-status':
         return update_active_party_status(
             conn, params.get('trainer'), params.get('pokemon'),

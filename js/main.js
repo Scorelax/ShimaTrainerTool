@@ -27,6 +27,12 @@ const AppState = {
   currentRoute: 'index'
 };
 
+// Routes whose render method calls audioManager.playBg()/playBgSynced()
+// itself -- see the comment on Router.render() for why this matters.
+const ROUTES_WITH_OWN_MUSIC = new Set([
+  'index', 'continue-journey', 'new-journey', 'new-pokemon', 'pokemon-form'
+]);
+
 // ============================================================================
 // ROUTER
 // ============================================================================
@@ -101,7 +107,17 @@ class Router {
   }
 
   async render(route, params) {
-    audioManager.stopBg();
+    // Routes not in this set have no dedicated track of their own and rely
+    // on this stopBg() for silence. Routes that DO manage their own music
+    // (below) call playBg()/playBgSynced() themselves once rendered, which
+    // already no-ops if it's the same track already playing (e.g.
+    // new-pokemon -> pokemon-form, both "FindPokemon") -- stopping here
+    // first would reset currentTrack to null before that check ever runs,
+    // defeating it and restarting the track on every navigation between
+    // pages that are meant to share one continuous loop.
+    if (!ROUTES_WITH_OWN_MUSIC.has(route)) {
+      audioManager.stopBg();
+    }
     const content = document.getElementById('content');
 
     // Scroll to top on navigation

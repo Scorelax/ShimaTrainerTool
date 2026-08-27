@@ -590,7 +590,7 @@ export function renderEvolution() {
 
       <!-- Evolution Transition Video -->
       <div id="evolutionVideoOverlay" class="evolution-video-overlay">
-        <video id="evolutionVideoPlayer" playsinline></video>
+        <video id="evolutionVideoPlayer" playsinline muted></video>
       </div>
 
       <!-- Back Button -->
@@ -1090,17 +1090,25 @@ async function confirmEvolution() {
 }
 
 /**
- * Fades to black, plays the pre-loaded evolution transition video, and
- * resolves once it ends (or errors -- same resolve-on-either pattern as
+ * Fades to black, plays the pre-loaded evolution transition video (its own
+ * audio track muted -- see the <video muted> attribute -- while the
+ * EvolutionStart/Evolution loop keeps playing underneath, same as the
+ * splash-art path would have had if this video didn't exist), and resolves
+ * once it ends (or errors -- same resolve-on-either pattern as
  * audioManager.playSfxAndWait, so a broken video can't hang the flow
- * forever). Deliberately leaves the overlay opaque on return -- the caller
- * stores data and navigates while still covered, then fades out, so
- * there's no flash of stale content mid-transition.
+ * forever) and the finish sting has played. Deliberately leaves the overlay
+ * opaque on return -- the caller stores data and navigates while still
+ * covered, then fades out, so there's no flash of stale content
+ * mid-transition.
  */
 async function playEvolutionVideoTransition() {
   const overlay = document.getElementById('evolutionVideoOverlay');
   const video = document.getElementById('evolutionVideoPlayer');
-  audioManager.stopBg();
+
+  // Was dead code before this feature -- built (EvolutionStart once, then
+  // loops into Evolution) but never actually called anywhere. Starting it
+  // here instead of stopBg() means it plays right through the video.
+  audioManager.playEvolutionSequence();
 
   // Resolves instantly if the prefetch (started when the stat modal opened)
   // already finished during form-fill, otherwise waits the remainder.
@@ -1120,6 +1128,11 @@ async function playEvolutionVideoTransition() {
     video.addEventListener('ended', resolve, { once: true });
     video.addEventListener('error', resolve, { once: true });
   });
+
+  // Video's done -- stop the loop and play the finish sting before the
+  // caller fades out.
+  audioManager.stopBg();
+  await audioManager.playSfxAndWait('EvolutionFinish');
 }
 
 function fadeOutEvolutionVideoOverlay() {

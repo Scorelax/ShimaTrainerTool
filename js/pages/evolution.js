@@ -1115,6 +1115,21 @@ async function playEvolutionVideoTransition() {
   await evolutionVideoReady;
 
   video.src = evolutionVideoUrl;
+
+  // Wait for an actual decodable frame before revealing/playing anything --
+  // a fixed delay here risked calling play() before the browser had
+  // buffered enough to show a frame at all (especially for a large file
+  // whose moov atom isn't near the start, e.g. a raw editor export with no
+  // +faststart pass), which could leave the overlay showing solid black
+  // indefinitely even though play() itself never errored. Safety timeout
+  // so a video that never becomes playable can't strand the player here.
+  await new Promise((resolve) => {
+    if (video.readyState >= 3 /* HAVE_FUTURE_DATA */) { resolve(); return; }
+    video.addEventListener('canplay', resolve, { once: true });
+    video.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, 15000);
+  });
+
   overlay.classList.add('visible');
   await new Promise(resolve => setTimeout(resolve, 500)); // let the fade-in finish
 

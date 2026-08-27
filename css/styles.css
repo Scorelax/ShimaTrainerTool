@@ -122,6 +122,10 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
+  /* Fallback so a failed/missing splash image can't turn this see-through --
+     without it, a page with its own body background (like evolution.js's
+     red gradient) shows through instead of a blank loading screen. */
+  background-color: #000;
   background-image: url('../assets/TitleScreen.png');
   background-size: cover;
   background-position: center;

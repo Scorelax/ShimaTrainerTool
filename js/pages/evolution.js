@@ -873,6 +873,14 @@ async function checkAndPreloadEvolutionVideo() {
     if (result.status === 'success' && result.url) {
       evolutionVideoUrl = result.url;
       evolutionVideoReady = prefetchSprite(result.url);
+
+      // Start the loop here, as soon as we know a video exists, instead of
+      // waiting for Confirm -- with the player likely still adjusting stat
+      // points for a while yet, this gives the EvolutionStart->Evolution
+      // handoff plenty of room to settle into the loop well before the
+      // video ever appears, instead of the two coinciding and sounding
+      // like a restart right as the video starts playing.
+      audioManager.playEvolutionSequence();
     }
   } catch (err) {
     console.warn('[Evolution] Video check failed:', err);
@@ -1078,7 +1086,10 @@ async function confirmEvolution() {
     }
   } catch (error) {
     console.error('Error during evolution:', error);
-    if (hasVideo) fadeOutEvolutionVideoOverlay();
+    if (hasVideo) {
+      fadeOutEvolutionVideoOverlay();
+      audioManager.stopBg();
+    }
     hideLoading();
     showError('Evolution failed. Please try again.');
     setTimeout(() => {
@@ -1092,23 +1103,18 @@ async function confirmEvolution() {
 /**
  * Fades to black, plays the pre-loaded evolution transition video (its own
  * audio track muted -- see the <video muted> attribute -- while the
- * EvolutionStart/Evolution loop keeps playing underneath, same as the
- * splash-art path would have had if this video didn't exist), and resolves
- * once it ends (or errors -- same resolve-on-either pattern as
- * audioManager.playSfxAndWait, so a broken video can't hang the flow
- * forever) and the finish sting has played. Deliberately leaves the overlay
- * opaque on return -- the caller stores data and navigates while still
- * covered, then fades out, so there's no flash of stale content
+ * EvolutionStart/Evolution loop keeps playing underneath, started earlier
+ * by checkAndPreloadEvolutionVideo() as soon as a video was confirmed to
+ * exist), and resolves once it ends (or errors -- same resolve-on-either
+ * pattern as audioManager.playSfxAndWait, so a broken video can't hang the
+ * flow forever) and the finish sting has played. Deliberately leaves the
+ * overlay opaque on return -- the caller stores data and navigates while
+ * still covered, then fades out, so there's no flash of stale content
  * mid-transition.
  */
 async function playEvolutionVideoTransition() {
   const overlay = document.getElementById('evolutionVideoOverlay');
   const video = document.getElementById('evolutionVideoPlayer');
-
-  // Was dead code before this feature -- built (EvolutionStart once, then
-  // loops into Evolution) but never actually called anywhere. Starting it
-  // here instead of stopBg() means it plays right through the video.
-  audioManager.playEvolutionSequence();
 
   // Resolves instantly if the prefetch (started when the stat modal opened)
   // already finished during form-fill, otherwise waits the remainder.
@@ -1139,15 +1145,42 @@ async function playEvolutionVideoTransition() {
     console.warn('[Evolution] Video play failed:', err);
   }
 
+  // Start the finish sting FINISH_LEAD_SECONDS before the video's natural
+  // end (instead of waiting for it to finish first) so the two land
+  // together, rather than the sting trailing after a beat of silence.
+  // Falls straight through immediately if the video ends/errors before
+  // ever reaching that point (e.g. a clip shorter than the lead time).
+  const FINISH_LEAD_SECONDS = 4;
   await new Promise((resolve) => {
-    video.addEventListener('ended', resolve, { once: true });
-    video.addEventListener('error', resolve, { once: true });
+    const finish = () => {
+      video.removeEventListener('timeupdate', onTimeUpdate);
+      video.removeEventListener('ended', finish);
+      video.removeEventListener('error', finish);
+      resolve();
+    };
+    const onTimeUpdate = () => {
+      if (isFinite(video.duration) && video.duration - video.currentTime <= FINISH_LEAD_SECONDS) finish();
+    };
+    video.addEventListener('timeupdate', onTimeUpdate);
+    video.addEventListener('ended', finish, { once: true });
+    video.addEventListener('error', finish, { once: true });
+    onTimeUpdate(); // in case duration/currentTime already satisfy it
   });
 
-  // Video's done -- stop the loop and play the finish sting before the
-  // caller fades out.
+  // Stop the loop and start the finish sting now -- concurrently with
+  // whatever's left of the video playing out.
   audioManager.stopBg();
-  await audioManager.playSfxAndWait('EvolutionFinish');
+  const finishSting = audioManager.playSfxAndWait('EvolutionFinish');
+
+  if (!video.ended) {
+    await new Promise((resolve) => {
+      video.addEventListener('ended', resolve, { once: true });
+      video.addEventListener('error', resolve, { once: true });
+    });
+  }
+
+  // Let the sting finish even if it outlasts the video itself.
+  await finishSting;
 }
 
 function fadeOutEvolutionVideoOverlay() {
@@ -1432,6 +1465,11 @@ async function evolveOnServer(str, dex, con, int, wis, cha) {
 
 function cancelEvolution() {
   document.getElementById('evolutionModal').classList.remove('visible');
+
+  // The evolution loop may already be playing (started as soon as a video
+  // was found, while the modal was still open) -- stop it on cancel too,
+  // not just after a completed evolution.
+  audioManager.stopBg();
 
   // Reset inputs
   ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(stat => {

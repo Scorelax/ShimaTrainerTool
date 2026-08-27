@@ -908,14 +908,17 @@ function renderPokemonList() {
     const slot = document.createElement('div');
     slot.className = 'pokemon-slot';
 
-    const img = document.createElement('img');
-    img.className = 'pokemon-image';
-    img.src = pokemon.image || 'assets/Pokeball.png';
-    img.alt = pokemon.name;
-    img.onerror = () => { img.src = 'assets/Pokeball.png'; };
+    // Built via spriteMediaHtml (not a raw createElement('img')) so an mp4
+    // sprite renders as a <video>, not a broken image -- this was the one
+    // spot in the file still missed when the rest of it moved over earlier.
+    const imgWrapper = document.createElement('div');
+    imgWrapper.innerHTML = spriteMediaHtml(pokemon.image, pokemon.name, 'pokemon-image');
+    const img = imgWrapper.firstElementChild;
 
-    // Make image clickable to view details
-    img.addEventListener('click', () => {
+    // Click listener on the whole slot, not the sprite element itself -- a
+    // video sprite has pointer-events:none (suppresses Chrome's hover
+    // video controls), which would also block clicks landing on it directly.
+    slot.addEventListener('click', () => {
       sessionStorage.setItem('selectedPokemonName', pokemon.name);
       sessionStorage.setItem('previousRoute', 'my-pokemon');
       window.dispatchEvent(new CustomEvent('navigate', {

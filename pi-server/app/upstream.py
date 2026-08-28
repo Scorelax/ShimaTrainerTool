@@ -235,8 +235,14 @@ def local_sprite_url(pokemon_name, shiny=False):
         candidates += [f'{sanitized}-shiny.mp4', f'{sanitized}-shiny.gif']
     candidates += [f'{sanitized}.mp4', f'{sanitized}.gif']
     for filename in candidates:
-        if os.path.isfile(os.path.join(SPRITE_DIR, filename)):
-            return f'{SPRITE_URL_PREFIX}{filename}'
+        path = os.path.join(SPRITE_DIR, filename)
+        if os.path.isfile(path):
+            # `?t=<mtime>` lets main.py cache this response hard (long
+            # max-age, no per-load revalidation round-trip) while still
+            # invalidating automatically the moment this exact file is
+            # replaced -- the URL itself changes, so there's no stale copy to
+            # ever manually clear.
+            return f'{SPRITE_URL_PREFIX}{filename}?t={int(os.path.getmtime(path))}'
     return None
 
 
@@ -248,6 +254,9 @@ def local_evolution_video_url(pre_evolved_name, evolved_name):
     _sanitize_species_name() already turns every other character into a
     hyphen, so it can never appear inside either segment itself."""
     filename = f'{_sanitize_species_name(pre_evolved_name)}_{_sanitize_species_name(evolved_name)}.mp4'
-    if os.path.isfile(os.path.join(EVOLUTION_VIDEO_DIR, filename)):
-        return f'/evolution-videos/{filename}'
+    path = os.path.join(EVOLUTION_VIDEO_DIR, filename)
+    if os.path.isfile(path):
+        # See the matching comment in local_sprite_url() above -- same
+        # mtime-stamped-URL reasoning.
+        return f'/evolution-videos/{filename}?t={int(os.path.getmtime(path))}'
     return None

@@ -36,14 +36,27 @@ app.add_middleware(
 db.init()
 
 
-# Binary media: self-uploaded GIF sprites, Benjakronk splash mirror, and the
-# bundled audio/images in PWA_DIR/assets (27MB of mp3s and pngs). These are
-# large, rarely change, and are re-displayed constantly during normal use
-# (every navigation back to a screen showing an owned Pokemon re-requests its
-# sprite) -- no-store on these was forcing a full multi-MB re-download every
-# single time, which is what was making self-uploaded GIFs stutter/re-buffer
-# on every screen change instead of playing instantly from a local copy.
-_CACHEABLE_MEDIA_PREFIXES = ('/gifs/', '/splashes/', '/assets/', '/evolution-videos/')
+# Binary media: self-uploaded GIF/MP4 sprites, evolution videos, Benjakronk's
+# splash mirror, and the bundled audio/images in PWA_DIR/assets (27MB of mp3s
+# and pngs). These are large, rarely change, and are re-displayed constantly
+# during normal use (every navigation back to a screen showing an owned
+# Pokemon re-requests its sprite) -- no-store on these was forcing a full
+# multi-MB re-download every single time, which is what was making
+# self-uploaded GIFs stutter/re-buffer on every screen change instead of
+# playing instantly from a local copy.
+#
+# Sprites and evolution videos are cached *hard* (no per-load network
+# round-trip at all): upstream.local_sprite_url/local_evolution_video_url
+# stamp a `?t=<mtime>` onto the URL itself, so a replaced file gets a brand
+# new URL automatically -- nothing for the browser to revalidate, nothing to
+# ever go stale, nothing to manually clear.
+_VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/')
+
+# Benjakronk's splash mirror and the bundled PWA assets aren't stamped with a
+# version (their filenames stay constant even when the content behind them
+# changes), so they can't be cached hard the same way -- they keep
+# revalidating every load instead, same as before.
+_REVALIDATED_MEDIA_PREFIXES = ('/splashes/', '/assets/')
 
 
 @app.middleware('http')
@@ -55,15 +68,18 @@ async def caching_policy(request: Request, call_next):
     to get revalidation wrong on, which is exactly the class of stale-PWA-
     cache bug that got the old service worker retired too).
 
-    Binary media under _CACHEABLE_MEDIA_PREFIXES gets no-cache instead: the
-    browser still asks the server on every load (so replacing a file is
-    never stuck stale, same guarantee as no-store), but StaticFiles' existing
-    Last-Modified/ETag means an unchanged file comes back as an empty 304
-    instead of retransferring the full body -- keeping the "always eventually
-    fresh, nothing to manually clear" property while fixing the re-buffering."""
+    Binary media under _VERSIONED_MEDIA_PREFIXES gets a long, immutable
+    max-age -- safe because the URL itself changes whenever the file does, so
+    there's no staleness risk to guard against with revalidation. Media under
+    _REVALIDATED_MEDIA_PREFIXES keeps the old no-cache behavior: the browser
+    still asks the server on every load (so replacing a file is never stuck
+    stale), but StaticFiles' existing Last-Modified/ETag means an unchanged
+    file comes back as an empty 304 instead of retransferring the full body."""
     response = await call_next(request)
     path = request.url.path
-    if path.startswith(_CACHEABLE_MEDIA_PREFIXES):
+    if path.startswith(_VERSIONED_MEDIA_PREFIXES):
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    elif path.startswith(_REVALIDATED_MEDIA_PREFIXES):
         response.headers['Cache-Control'] = 'no-cache'
     else:
         response.headers['Cache-Control'] = 'no-store'

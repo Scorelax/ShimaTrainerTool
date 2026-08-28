@@ -5,7 +5,10 @@
 // goes through here instead of repeating <img>/<video> markup and error
 // handling per call site.
 
-const IS_VIDEO = /\.mp4$/i;
+// Allows a trailing cache-busting query string (e.g. `?t=<mtime>`, see
+// upstream.local_sprite_url) after the extension -- plain `\.mp4$` would stop
+// matching the moment one gets appended.
+const IS_VIDEO = /\.mp4(\?|$)/i;
 
 // A <video> can't just have its src swapped to a static fallback image and
 // render correctly -- the element itself has to be replaced with a real

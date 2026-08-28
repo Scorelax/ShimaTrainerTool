@@ -221,24 +221,24 @@ def local_sprite_url(pokemon_name, shiny=False):
     no Benjakronk repo, no network probe/cache.
 
     Checked in this order, so shiny-correctness always wins over format
-    preference: shiny+gif, shiny+mp4, non-shiny gif, non-shiny mp4. GIF is
-    preferred whenever both exist for a species: a <video> element (what an
-    .mp4 renders as, see sprite-media.js) can't paint anything until it's
-    decoded a real first frame, and that decode restarts from scratch every
-    time one of these gets re-created -- every page navigation, for every
-    visible sprite at once -- which showed up as a visible blank-box flash
-    even once the file itself was cached and loading instantly. A <img>
-    (what .gif renders as) has no such readiness gate. MP4 is smaller and
-    hardware-decoded, which is why it was tried first, but the decode-startup
-    cost turned out to matter more here than file size. Shiny uses a -shiny
-    suffix, matching the convention Benjakronk's own shiny sprites already
-    use elsewhere; falls back through to the non-shiny variant if no shiny
-    file exists in either format."""
+    preference: shiny+mp4, shiny+gif, non-shiny mp4, non-shiny gif. MP4 is
+    preferred whenever both exist for a species. GIF was tried first instead
+    (see git history around this date) to avoid the blank-box flash a
+    <video> element shows while decoding its first frame on every re-render
+    -- but animated GIF decoding is done frame-by-frame in software, with no
+    hardware acceleration, and paying that continuously (especially with
+    several sprites animating on screen at once, e.g. a full party grid)
+    turned out to be laggier overall than MP4's one-time decode-startup
+    pause, once actually compared side by side. Real video compression also
+    means much smaller files. Shiny uses a -shiny suffix, matching the
+    convention Benjakronk's own shiny sprites already use elsewhere; falls
+    back through to the non-shiny variant if no shiny file exists in either
+    format."""
     sanitized = _sanitize_species_name(pokemon_name)
     candidates = []
     if shiny:
-        candidates += [f'{sanitized}-shiny.gif', f'{sanitized}-shiny.mp4']
-    candidates += [f'{sanitized}.gif', f'{sanitized}.mp4']
+        candidates += [f'{sanitized}-shiny.mp4', f'{sanitized}-shiny.gif']
+    candidates += [f'{sanitized}.mp4', f'{sanitized}.gif']
     for filename in candidates:
         path = os.path.join(SPRITE_DIR, filename)
         if os.path.isfile(path):

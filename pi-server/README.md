@@ -175,11 +175,14 @@ Unrelated to Benjakronk's repo. Drop hand-made `.mp4` or `.gif` files into
 named `<sanitized-species-name>.mp4`/`.gif` -- lowercase, non-alphanumeric
 characters collapsed to `-` (e.g. "Mr. Mime" → `mr-mime.mp4`), same rule
 `upstream.get_image_url()` uses for the GitHub-sourced sprites, just without
-the dex-id prefix. `.mp4` is preferred over `.gif` when both exist for a
-species -- real video compression means much smaller files and
-hardware-decoded playback on phones, and none of these sprites have ever
-needed transparency (verified with actual pixel data), so MP4's lack of an
-alpha channel costs nothing. No restart needed to pick up new files day-to-day
+the dex-id prefix. `.gif` is preferred over `.mp4` when both exist for a
+species -- MP4 renders as a `<video>`, which can't paint anything until it
+decodes a real first frame, and that decode restarts every time the page
+re-creates the element (every navigation, every visible sprite at once) --
+visible as a blank-box flash even with the file cached and loading
+instantly. GIF renders as a plain `<img>`, no such readiness gate.
+
+No restart needed to pick up new files day-to-day
 (checked live via a filesystem stat on every request,
 `upstream.local_sprite_url()`) -- only the first time, so the `/gifs` mount
 appears (the URL prefix stays `/gifs` even after the folder's `pokemon-gifs` →
@@ -188,7 +191,7 @@ in the live DB, so renaming it would 404 all of them until each got
 re-saved). Applies to any owned Pokémon whose species has a matching file,
 including ones already registered before it existed; falls back to the
 existing stored image otherwise. Shiny Pokémon look for
-`<sanitized-species-name>-shiny.mp4` first, then `-shiny.gif`, then the
+`<sanitized-species-name>-shiny.gif` first, then `-shiny.mp4`, then the
 non-shiny variants, then the static image.
 
 ### Evolution transition videos (self-uploaded, local only)

@@ -1334,21 +1334,21 @@ export function attachTrainerCardListeners() {
       pokemonToUpdate.push(pokemonData);
     });
 
-    // Update database in background
-    import('../api.js').then(({ TrainerAPI, PokemonAPI }) => {
+    // Update database, and play PokeCenter sound, then reload once BOTH are done
+    // (previously the save was fire-and-forget, relying on the sound's length
+    // to outlast it -- awaiting it explicitly here removes that race).
+    const saveToBackend = import('../api.js').then(({ TrainerAPI, PokemonAPI }) => Promise.allSettled([
       TrainerAPI.update(trainerData).then(() => {
         console.log('Pokemon Center: trainer data saved');
-      }).catch(err => console.error('Pokemon Center: trainer save error:', err));
-
-      pokemonToUpdate.forEach(pokemon => {
+      }).catch(err => console.error('Pokemon Center: trainer save error:', err)),
+      ...pokemonToUpdate.map(pokemon =>
         PokemonAPI.update(pokemon).then(() => {
           console.log(`Pokemon Center: ${pokemon[2]} saved`);
-        }).catch(err => console.error(`Pokemon Center: ${pokemon[2]} save error:`, err));
-      });
-    });
+        }).catch(err => console.error(`Pokemon Center: ${pokemon[2]} save error:`, err))
+      ),
+    ]));
 
-    // Play PokeCenter sound, then reload to reflect changes
-    await audioManager.playSfxAndWait('PokeCenter');
+    await Promise.all([audioManager.playSfxAndWait('PokeCenter'), saveToBackend]);
     window.location.reload();
   });
 
@@ -1665,10 +1665,13 @@ async function processShortRestHealing() {
 
     sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
-    // Update database in background
-    TrainerAPI.update(trainerData).catch(error => {
+    // Update database -- awaited so a Short Rest on the last entity can't
+    // reload the page before this save has actually landed.
+    try {
+      await TrainerAPI.update(trainerData);
+    } catch (error) {
       console.error('Error updating trainer data:', error);
-    });
+    }
   } else {
     // Process Pokemon healing
     const pokemon = JSON.parse(sessionStorage.getItem(entity.storageKey));
@@ -1704,10 +1707,13 @@ async function processShortRestHealing() {
 
     sessionStorage.setItem(entity.storageKey, JSON.stringify(pokemon));
 
-    // Update database in background
-    PokemonAPI.update(pokemon).catch(error => {
+    // Update database -- awaited so a Short Rest on the last entity can't
+    // reload the page before this save has actually landed.
+    try {
+      await PokemonAPI.update(pokemon);
+    } catch (error) {
       console.error('Error updating Pokemon data:', error);
-    });
+    }
   }
 
   // Move to next entity
@@ -1873,24 +1879,27 @@ async function completeLongRest(selectedPokemon) {
     pokemonToUpdate.push(pokemonData);
   });
 
-  // Close selection popup and reload
+  // Close selection popup
   document.getElementById('shortRestPokemonSelectionPopup')?.classList.remove('active');
-  window.location.reload();
 
-  // Update database in background
+  // Update database, then reload once every save has actually completed
+  // (previously the reload ran first and the saves below it were dead code).
   const { TrainerAPI, PokemonAPI } = await import('../api.js');
 
-  TrainerAPI.update(trainerData).then(() => {
-    console.log('Long rest trainer data saved to backend');
-  }).catch(error => {
-    console.error('Error saving trainer long rest to backend:', error);
-  });
-
-  pokemonToUpdate.forEach(pokemon => {
-    PokemonAPI.update(pokemon).then(() => {
-      console.log(`Long rest: ${pokemon[2]} saved to backend`);
+  await Promise.allSettled([
+    TrainerAPI.update(trainerData).then(() => {
+      console.log('Long rest trainer data saved to backend');
     }).catch(error => {
-      console.error(`Error saving ${pokemon[2]} long rest to backend:`, error);
-    });
-  });
+      console.error('Error saving trainer long rest to backend:', error);
+    }),
+    ...pokemonToUpdate.map(pokemon =>
+      PokemonAPI.update(pokemon).then(() => {
+        console.log(`Long rest: ${pokemon[2]} saved to backend`);
+      }).catch(error => {
+        console.error(`Error saving ${pokemon[2]} long rest to backend:`, error);
+      })
+    ),
+  ]);
+
+  window.location.reload();
 }

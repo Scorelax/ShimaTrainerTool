@@ -77,10 +77,13 @@ class Router {
       this.navigate(route, params);
     });
 
-    // Handle browser back/forward
+    // Handle browser back/forward. Uses navigate(..., false) rather than a
+    // bare render() so AppState.currentRoute stays in sync -- but with
+    // pushState suppressed, since the browser already moved the history
+    // pointer itself; pushing again here would corrupt the back/forward stack.
     window.addEventListener('popstate', (e) => {
       if (e.state && e.state.route) {
-        this.render(e.state.route, e.state.params);
+        this.navigate(e.state.route, e.state.params, false);
       }
     });
 

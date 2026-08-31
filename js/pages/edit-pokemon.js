@@ -796,11 +796,15 @@ export async function attachEditPokemonListeners() {
   // Nature change listener for stat recalculation
   const natureRadios = document.querySelectorAll('input[name="nature"]');
   const originalNature = pokemonData[32] || '';
+  // Tracks whichever nature is currently reflected in the stat inputs, so a
+  // second nature change reverses the one just applied, not the DB original.
+  let currentAppliedNature = originalNature;
 
   natureRadios.forEach(radio => {
     radio.addEventListener('change', (e) => {
       if (e.target.checked) {
-        recalculateStatsForNatureChange(originalNature, e.target.value, pokemonData);
+        recalculateStatsForNatureChange(currentAppliedNature, e.target.value, pokemonData);
+        currentAppliedNature = e.target.value;
       }
     });
   });

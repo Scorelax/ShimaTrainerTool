@@ -27,6 +27,10 @@ class AudioManager {
     this.volume = 0.8; // 0-1, set from saved settings at app start via setVolume()
     this.syncedTrack = null; // track name currently joined server-side, if any
     this.heartbeatTimer = null;
+    // Bumped by stopBg() on every real track change, so an in-flight
+    // playBgSynced() network round-trip can tell it's been superseded by a
+    // newer navigation and avoid clobbering whatever's playing now.
+    this._navToken = 0;
   }
 
   setVolume(percent) {
@@ -94,8 +98,13 @@ class AudioManager {
 
     try {
       const requestSentAt = Date.now();
+      const tokenBeforeRequest = this._navToken;
       const result = await MusicAPI.sync(trackName);
       const responseReceivedAt = Date.now();
+
+      // A newer navigation/track change already happened while this request
+      // was in flight -- don't let this stale response override it.
+      if (this._navToken !== tokenBeforeRequest) return;
 
       const startedAt = new Date(result.startedAt).getTime();
       const serverNow = new Date(result.serverNow).getTime();
@@ -109,10 +118,12 @@ class AudioManager {
       const clockOffsetMs = serverNow - (requestSentAt + roundTripMs / 2);
 
       this.stopBg();
+      const myToken = this._navToken; // fresh token for the track we're committing to
       const audio = this._getAudio(trackName);
       audio.loop = true;
 
       const seekAndPlay = () => {
+        if (this._navToken !== myToken) return; // superseded before metadata loaded
         const nowOnServerClock = Date.now() + clockOffsetMs;
         const elapsedSeconds = (nowOnServerClock - startedAt) / 1000;
         const offset = audio.duration > 0
@@ -134,6 +145,10 @@ class AudioManager {
       // Keep this listener's presence alive server-side so the room isn't
       // mistaken for empty while still occupied (see routes_music.py).
       this.heartbeatTimer = setInterval(() => {
+        if (this._navToken !== myToken) {
+          clearInterval(this.heartbeatTimer);
+          return;
+        }
         MusicAPI.sync(trackName).catch(() => {});
       }, HEARTBEAT_INTERVAL_MS);
     } catch (e) {
@@ -143,6 +158,7 @@ class AudioManager {
   }
 
   stopBg() {
+    this._navToken++;
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;

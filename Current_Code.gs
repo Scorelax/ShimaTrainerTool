@@ -1707,28 +1707,35 @@ function updateUtilitySlotStatus(trainerName, pokemonName, action) {
     
     try {
         if (action === 'add') {
-            // First, remove any existing pokemon from utility slot for this trainer
+            // Find the target pokemon and check eligibility BEFORE touching
+            // anyone else's utility slot -- a rejected request must not have
+            // any side effect on the previous utility-slot holder.
+            let targetRow = -1;
+            for (let i = 1; i < data.length; i++) {
+                if (data[i][0] === trainerName && data[i][2] === pokemonName) {
+                    targetRow = i;
+                    break;
+                }
+            }
+            if (targetRow === -1) {
+                return { status: 'error', message: 'Pokemon not found' };
+            }
+            if (data[targetRow][38]) {
+                return {
+                    status: 'error',
+                    message: 'A Pokémon cannot be in the active party and the utility slot at the same time'
+                };
+            }
+
+            // Eligible: now remove any existing pokemon from utility slot for this trainer
             for (let i = 1; i < data.length; i++) {
                 if (data[i][0] === trainerName && data[i][56] === 1 && data[i][2] !== pokemonName) {
                     POKEMON_DATA_SHEET.getRange(i + 1, 57).setValue(''); // Column 57 is index 56
                 }
             }
-            
-            // Then add the current pokemon to utility slot
-            for (let i = 1; i < data.length; i++) {
-                if (data[i][0] === trainerName && data[i][2] === pokemonName) {
-                    // Check if pokemon is in active party
-                    if (data[i][38]) {
-                        return { 
-                            status: 'error', 
-                            message: 'A Pokémon cannot be in the active party and the utility slot at the same time' 
-                        };
-                    }
-                    
-                    POKEMON_DATA_SHEET.getRange(i + 1, 57).setValue(1); // Column 57 is index 56 - use number not string
-                    return { status: 'success' };
-                }
-            }
+
+            POKEMON_DATA_SHEET.getRange(targetRow + 1, 57).setValue(1); // Column 57 is index 56 - use number not string
+            return { status: 'success' };
         } else if (action === 'remove') {
             // Remove pokemon from utility slot
             for (let i = 1; i < data.length; i++) {

@@ -223,10 +223,12 @@ def replace_pokemon(conn, pre_evolved_name, trainer_name, new_pokemon_data):
 
 def update_active_party_status(conn, trainer_name, pokemon_name, pokeslots, operation):
     rows = db.fetch_rows(conn, 'pokemon', P)
+    trainer_key = str(trainer_name).lower()
+    pokemon_key = str(pokemon_name).lower()
 
     active_party = sorted(
         js_parse_int(row[38]) for _, row in rows
-        if row[0] == trainer_name and js_truthy(row[38])
+        if str(row[0]).lower() == trainer_key and js_truthy(row[38])
     )
 
     if operation == 'add':
@@ -238,14 +240,14 @@ def update_active_party_status(conn, trainer_name, pokemon_name, pokeslots, oper
                 next_slot = i
                 break
         for rowid, row in rows:
-            if row[0] == trainer_name and row[2] == pokemon_name:
+            if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
                 db.set_cell(conn, 'pokemon', rowid, 'inactiveparty', next_slot)
                 break
         return {'status': 'success', 'slot': next_slot}
 
     if operation == 'remove':
         for rowid, row in rows:
-            if row[0] == trainer_name and row[2] == pokemon_name:
+            if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
                 db.set_cell(conn, 'pokemon', rowid, 'inactiveparty', '')
                 break
         return {'status': 'success', 'message': 'Removed from party'}
@@ -254,21 +256,29 @@ def update_active_party_status(conn, trainer_name, pokemon_name, pokeslots, oper
 
 def update_utility_slot_status(conn, trainer_name, pokemon_name, operation):
     rows = db.fetch_rows(conn, 'pokemon', P)
+    trainer_key = str(trainer_name).lower()
+    pokemon_key = str(pokemon_name).lower()
     try:
         if operation == 'add':
+            target_row = None
             for rowid, row in rows:
-                if row[0] == trainer_name and row[56] == 1 and row[2] != pokemon_name:
+                if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
+                    target_row = (rowid, row)
+                    break
+            if target_row is None:
+                return {'status': 'error', 'message': 'Pokemon not found'}
+            target_rowid, target = target_row
+            if js_truthy(target[38]):
+                return {'status': 'error',
+                        'message': 'A Pokémon cannot be in the active party and the utility slot at the same time'}
+            for rowid, row in rows:
+                if str(row[0]).lower() == trainer_key and row[56] == 1 and str(row[2]).lower() != pokemon_key:
                     db.set_cell(conn, 'pokemon', rowid, 'utilityslot', '')
-            for rowid, row in rows:
-                if row[0] == trainer_name and row[2] == pokemon_name:
-                    if js_truthy(row[38]):
-                        return {'status': 'error',
-                                'message': 'A Pokémon cannot be in the active party and the utility slot at the same time'}
-                    db.set_cell(conn, 'pokemon', rowid, 'utilityslot', 1)
-                    return {'status': 'success'}
+            db.set_cell(conn, 'pokemon', target_rowid, 'utilityslot', 1)
+            return {'status': 'success'}
         elif operation == 'remove':
             for rowid, row in rows:
-                if row[0] == trainer_name and row[2] == pokemon_name:
+                if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
                     db.set_cell(conn, 'pokemon', rowid, 'utilityslot', '')
                     return {'status': 'success'}
         return {'status': 'error', 'message': 'Pokemon not found'}
@@ -277,9 +287,11 @@ def update_utility_slot_status(conn, trainer_name, pokemon_name, operation):
 
 
 def write_pokemon_live_stats(conn, trainer_name, pokemon_name, stat, new_value):
+    trainer_key = str(trainer_name).lower()
+    pokemon_key = str(pokemon_name).lower()
     try:
         for rowid, row in db.fetch_rows(conn, 'pokemon', P):
-            if row[0] == trainer_name and row[2] == pokemon_name:
+            if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
                 if stat == 'HP':
                     db.set_cell(conn, 'pokemon', rowid, 'currentHP', js_parse_int(new_value))
                 elif stat == 'VP':
@@ -292,7 +304,7 @@ def write_pokemon_live_stats(conn, trainer_name, pokemon_name, stat, new_value):
                 else:  # AC
                     db.set_cell(conn, 'pokemon', rowid, 'currentAC', js_parse_int(new_value))
                 return {'status': 'success'}
-        return {'status': 'error', 'message': 'Trainer not found'}
+        return {'status': 'error', 'message': 'Pokémon not found for this trainer'}
     except Exception:
         return {'status': 'error', 'message': 'Failed to write Pokemon Live Stats'}
 

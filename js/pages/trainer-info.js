@@ -54,9 +54,11 @@ export function renderTrainerInfo() {
   const wisModifier = trainerData[31] || 0;
   const chaModifier = trainerData[32] || 0;
   const trainerFeats = trainerData[33] || 'None';
-  const currentHP = trainerData[34] || trainerHP;
-  const currentVP = trainerData[35] || trainerVP;
-  const currentAC = trainerData[36] || trainerAC;
+  // Explicit null/undefined/'' checks -- a trainer legitimately at 0 HP/VP/AC
+  // must not fall back to the max value the way `||` would treat it.
+  const currentHP = (trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== '') ? trainerData[34] : trainerHP;
+  const currentVP = (trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? trainerData[35] : trainerVP;
+  const currentAC = (trainerData[36] !== null && trainerData[36] !== undefined && trainerData[36] !== '') ? trainerData[36] : trainerAC;
   const gear = trainerData[37] || 'None';
   const inventory = trainerData[20] || 'None';
   const affinity = trainerData[23] || 'None';
@@ -4427,15 +4429,12 @@ async function saveAffinity(affinity) {
 
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
   const trainerName = trainerData[1];
-  const trainerLevel = parseInt(trainerData[2], 10) || 1;
   let affinitiesStored = trainerData[23] ? trainerData[23].split(',').map(a => a.trim()).filter(a => a) : [];
 
-  // Update affinity based on level
-  if (trainerLevel < 7) {
-    affinitiesStored[0] = affinity.name; // First affinity
-  } else {
-    affinitiesStored[1] = affinity.name; // Second affinity (or improved)
-  }
+  // A trainer only ever has ONE affinity, chosen once. At level 7 it just
+  // upgrades in place (see the affinityButton display logic above) -- there
+  // is no separate second affinity to pick or store.
+  affinitiesStored = [affinity.name];
 
   const affinityString = affinitiesStored.join(', ');
   trainerData[23] = affinityString;

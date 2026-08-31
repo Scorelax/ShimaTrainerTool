@@ -854,12 +854,20 @@ function setupAutocomplete(inputId, dropdownId, dataSource) {
     }
   });
 
-  // Close dropdown when clicking outside
-  document.addEventListener('click', (e) => {
+  // Close dropdown when clicking outside -- remove any handler registered
+  // for this input the last time this page was visited, so repeated visits
+  // don't stack document-level listeners.
+  setupAutocomplete._handlers = setupAutocomplete._handlers || {};
+  if (setupAutocomplete._handlers[inputId]) {
+    document.removeEventListener('click', setupAutocomplete._handlers[inputId]);
+  }
+  const outsideClickHandler = (e) => {
     if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${dropdownId}`)) {
       dropdown.classList.remove('open');
     }
-  });
+  };
+  setupAutocomplete._handlers[inputId] = outsideClickHandler;
+  document.addEventListener('click', outsideClickHandler);
 }
 
 function addItemChip(itemName) {

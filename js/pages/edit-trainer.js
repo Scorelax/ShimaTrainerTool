@@ -5,6 +5,11 @@ import { showToast, showSuccess, showError } from '../utils/notifications.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 import { audioManager } from '../utils/audio.js';
 
+// Tracks the gear-autocomplete outside-click handler across repeated visits
+// to this page, so attachEditTrainerListeners() doesn't stack a fresh
+// document-level listener every time.
+let gearOutsideClickHandler = null;
+
 export function renderEditTrainer() {
   // Load trainer data from session storage
   const trainerDataStr = sessionStorage.getItem('trainerData');
@@ -642,11 +647,15 @@ export function attachEditTrainerListeners() {
   });
 
   // Close dropdown when clicking outside
-  document.addEventListener('click', (e) => {
+  if (gearOutsideClickHandler) {
+    document.removeEventListener('click', gearOutsideClickHandler);
+  }
+  gearOutsideClickHandler = (e) => {
     if (!e.target.closest('.autocomplete-container')) {
       gearDropdown?.classList.remove('open');
     }
-  });
+  };
+  document.addEventListener('click', gearOutsideClickHandler);
 
   // Remove gear chip
   document.querySelectorAll('.remove-gear').forEach(btn => {

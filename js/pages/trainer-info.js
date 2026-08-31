@@ -3770,12 +3770,17 @@ export function attachTrainerInfoListeners() {
       }
     });
 
-    // Hide autocomplete when clicking outside
-    document.addEventListener('click', function(e) {
+    // Hide autocomplete when clicking outside -- remove any handler left over
+    // from a previous time this modal was opened so they don't accumulate.
+    if (setupItemAutocomplete._outsideClickHandler) {
+      document.removeEventListener('click', setupItemAutocomplete._outsideClickHandler);
+    }
+    setupItemAutocomplete._outsideClickHandler = function(e) {
       if (!itemSearch.contains(e.target) && !autocompleteResults.contains(e.target)) {
         autocompleteResults.style.display = 'none';
       }
-    });
+    };
+    document.addEventListener('click', setupItemAutocomplete._outsideClickHandler);
   }
 
   // Specialization button - fixed to show 3 stages with effects

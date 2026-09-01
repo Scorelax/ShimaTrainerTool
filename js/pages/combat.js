@@ -5,6 +5,7 @@ import { showToast } from '../utils/notifications.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData } from '../utils/pokemon-types.js';
 import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
+import { preloadBattleAnimation } from '../utils/battle-animation.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -257,9 +258,15 @@ function buildPokemonCombatant(pokemonKey) {
     });
   }
 
+  // Battle animation is keyed by species, not nickname -- and known as soon
+  // as this combatant is built, well before any move gets confirmed -- so
+  // kick off the preload right here rather than waiting on the move popup.
+  preloadBattleAnimation(pokemonData[2]);
+
   return {
     id: pokemonKey, type: 'pokemon', entityKey: pokemonKey,
     name: pokemonData[36] || pokemonData[2] || 'Pokemon',
+    speciesName: pokemonData[2] || '',
     image: pokemonData[1] || 'assets/Pokeball.png',
     level, initiativeScore: initiative, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: initiative,
     ac: parseInt(pokemonData[8]) || 10, baseAc: parseInt(pokemonData[8]) || 10, critMod: 0,
@@ -2431,6 +2438,9 @@ function showCombatMoveDetails(moveName, combatantId, state) {
     critMod: c.critMod,
     trainerData,
     chargesLeft,
+    spriteUrl: c.image,
+    spriteAlt: c.name,
+    speciesName: c.speciesName,
     noteText: _stackNote,
     disableUse: _isStackMove && _stacks === 0,
     disableUseMsg: 'No Stockpile stacks — use Stockpile first',

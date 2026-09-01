@@ -54,6 +54,12 @@ def handle(conn, action, params):
         return {'status': 'success',
                 'url': upstream.local_evolution_video_url(params['from'], params['to'])}
 
+    if action == 'battle-animation':
+        if not params.get('name'):
+            raise ValueError('Missing pokemon name')
+        return {'status': 'success',
+                'url': upstream.local_battle_animation_url(params['name'])}
+
     if action == 'party-status':
         return update_active_party_status(
             conn, params.get('trainer'), params.get('pokemon'),

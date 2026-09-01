@@ -225,6 +225,12 @@ if os.path.isdir(upstream.EVOLUTION_VIDEO_DIR):
 if os.path.isdir(upstream.CRY_DIR):
     app.mount('/cries', StaticFiles(directory=upstream.CRY_DIR), name='cries')
 
+# Self-uploaded "use move" battle animations (see upstream.BATTLE_ANIMATION_DIR /
+# upstream.local_battle_animation_url)
+if os.path.isdir(upstream.BATTLE_ANIMATION_DIR):
+    app.mount('/battle-animations', StaticFiles(directory=upstream.BATTLE_ANIMATION_DIR),
+              name='battle-animations')
+
 # Serve the PWA from the same origin (mounted last so /api and /exec win)
 _default_pwa = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
 PWA_DIR = os.environ.get('PWA_DIR', _default_pwa)

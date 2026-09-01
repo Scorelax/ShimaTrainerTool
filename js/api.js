@@ -301,6 +301,18 @@ export class PokemonAPI {
   }
 
   /**
+   * Check for a self-uploaded "use move" battle animation for this species.
+   * Never cached -- same reasoning as getEvolutionVideo above.
+   */
+  static async getBattleAnimation(pokemonName) {
+    return API.request('pokemon', 'battle-animation', {
+      name: pokemonName
+    }, {
+      useCache: false
+    });
+  }
+
+  /**
    * Update active party status
    */
   static async updatePartyStatus(trainerName, pokemonName, pokeslots, operation) {

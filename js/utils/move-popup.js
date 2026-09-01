@@ -4,6 +4,8 @@
 import { getMoveTypeColor, getTextColorForBackground } from './pokemon-types.js';
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showToast } from './notifications.js';
+import { spriteMediaHtml } from './sprite-media.js';
+import { getBattleAnimationUrl } from './battle-animation.js';
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 
@@ -14,6 +16,13 @@ function _injectStyles() {
   style.textContent = `
     .combat-popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
     .combat-popup-content { background: #1e1e34; border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; max-width: 560px; width: 92%; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+    /* Confirm popup: stacked column, pushed toward the bottom of the screen
+       so the battle-media area above has real room to breathe instead of
+       being squeezed against a vertically-centered box. */
+    .combat-move-confirm-overlay { flex-direction: column; justify-content: flex-end; padding-bottom: clamp(2rem, 6vh, 4rem); gap: clamp(0.8rem, 2vh, 1.2rem); }
+    .combat-confirm-media { width: min(92vw, 420px); max-height: 45vh; display: flex; align-items: flex-end; justify-content: center; }
+    .combat-confirm-media:empty { display: none; }
+    .combat-confirm-media img, .combat-confirm-media video { max-width: 100%; max-height: 45vh; border-radius: 12px; object-fit: contain; }
     .combat-move-popup-header { padding: 1.1rem 1.2rem; border-radius: 16px 16px 0 0; border-bottom: 2px solid rgba(0,0,0,0.3); display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; position: relative; }
     .combat-move-popup-header h2 { margin: 0; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; }
     .combat-move-type-badge { padding: 0.2rem 0.7rem; border-radius: 12px; font-size: 0.85rem; font-weight: 700; background: rgba(255,255,255,0.25); }
@@ -95,10 +104,11 @@ function _createPopupDOM() {
   document.body.appendChild(overlay);
 
   const confirmOverlay = document.createElement('div');
-  confirmOverlay.className = 'combat-popup-overlay';
+  confirmOverlay.className = 'combat-popup-overlay combat-move-confirm-overlay';
   confirmOverlay.id = 'combatMoveConfirmPopup';
   confirmOverlay.style.display = 'none';
   confirmOverlay.innerHTML = `
+    <div class="combat-confirm-media" id="combatConfirmMedia"></div>
     <div class="combat-popup-content" style="max-width:360px;text-align:center;padding:2rem;">
       <h3 id="combatConfirmText" style="margin:0 0 1.5rem 0;color:#e0e0e0;"></h3>
       <div style="display:flex;gap:1rem;">
@@ -121,20 +131,40 @@ function _createPopupDOM() {
     const btn = document.getElementById('useCombatMoveBtn');
     document.getElementById('combatConfirmText').textContent =
       `Use ${btn.dataset.moveName} (${btn.dataset.vpCost} VP)?`;
+    // Idle sprite (the same one already shown elsewhere for this Pokemon) --
+    // gives the battle-animation clip below something to appear "over" once
+    // Yes is clicked, and something sensible to show even when no animation
+    // exists for this species at all.
+    const media = document.getElementById('combatConfirmMedia');
+    if (media) media.innerHTML = spriteMediaHtml(overlay._spriteUrl, overlay._spriteAlt, '', '');
     confirmOverlay.style.display = 'flex';
   });
 
   document.getElementById('confirmCombatMoveNo').addEventListener('click', () => {
+    if (confirmOverlay._playingAnimation) return;
     confirmOverlay.style.display = 'none';
   });
   confirmOverlay.addEventListener('click', e => {
+    if (confirmOverlay._playingAnimation) return;
     if (e.target === confirmOverlay) confirmOverlay.style.display = 'none';
   });
 
-  document.getElementById('confirmCombatMoveYes').addEventListener('click', () => {
+  document.getElementById('confirmCombatMoveYes').addEventListener('click', async () => {
+    if (confirmOverlay._playingAnimation) return;
     const btn = document.getElementById('useCombatMoveBtn');
     const moveName = btn.dataset.moveName;
     const vpCost = parseInt(btn.dataset.vpCost) || 0;
+
+    const yesBtn = document.getElementById('confirmCombatMoveYes');
+    const noBtn = document.getElementById('confirmCombatMoveNo');
+    confirmOverlay._playingAnimation = true;
+    yesBtn.disabled = true;
+    noBtn.disabled = true;
+    await _playBattleAnimation(overlay._speciesName);
+    confirmOverlay._playingAnimation = false;
+    yesBtn.disabled = false;
+    noBtn.disabled = false;
+
     if (overlay._onUseMove) overlay._onUseMove(moveName, vpCost);
     confirmOverlay.style.display = 'none';
     overlay.style.display = 'none';
@@ -152,6 +182,53 @@ function _createPopupDOM() {
         if (overlay._onDirectHeal) overlay._onDirectHeal();
       }
     }
+  });
+}
+
+// ── Battle animation playback ──────────────────────────────────────────────
+
+/**
+ * Plays the preloaded battle animation for speciesName over the confirm
+ * popup's media area, if one exists, and resolves once it's done (ended,
+ * errored, or a safety timeout expired -- never hangs the move-use flow on
+ * a broken clip). No-ops immediately (no delay at all) when no animation
+ * exists for this species, or none was ever preloaded for it.
+ */
+async function _playBattleAnimation(speciesName) {
+  const url = await getBattleAnimationUrl(speciesName);
+  if (!url) return;
+
+  const media = document.getElementById('combatConfirmMedia');
+  if (!media) return;
+
+  const video = document.createElement('video');
+  video.src = url;
+  video.playsInline = true;
+  video.disablePictureInPicture = true;
+  media.innerHTML = '';
+  media.appendChild(video);
+
+  // Preloaded already (see preloadBattleAnimation), so this should resolve
+  // almost instantly -- but still bounded in case the browser needs a beat
+  // to actually decode a first frame.
+  await new Promise((resolve) => {
+    if (video.readyState >= 3 /* HAVE_FUTURE_DATA */) { resolve(); return; }
+    video.addEventListener('canplay', resolve, { once: true });
+    video.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, 5000);
+  });
+
+  try {
+    await video.play();
+  } catch (err) {
+    console.warn('[BattleAnimation] Video play failed:', err);
+    return;
+  }
+
+  await new Promise((resolve) => {
+    video.addEventListener('ended', resolve, { once: true });
+    video.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, 15000); // safety cap -- never hang on a stuck clip
   });
 }
 
@@ -424,8 +501,11 @@ function _renderCommander(trainerData) {
  * @param {Array}  params.trainerData   - Full trainer data array
  * @param {function} [params.onUseMove]    - Callback(moveName, vpCost) for platform-specific VP deduction
  * @param {function} [params.onDrainHeal] - Callback() invoked when move matches the drain heal pattern
+ * @param {string} [params.spriteUrl]    - This Pokemon's already-resolved sprite URL (mp4 or static image), shown in the confirm popup
+ * @param {string} [params.spriteAlt]    - Alt text for spriteUrl
+ * @param {string} [params.speciesName]  - Species name used to look up a preloaded battle animation (see utils/battle-animation.js)
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, spriteUrl, spriteAlt, speciesName }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -439,6 +519,9 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   popup._onDrainHeal = onDrainHeal || null;
   popup._onDirectHeal = onDirectHeal || null;
   popup._currentMove = move;
+  popup._spriteUrl = spriteUrl || null;
+  popup._spriteAlt = spriteAlt || move[0];
+  popup._speciesName = speciesName || null;
 
   const { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice } = computedData;
   const fmtMod = v => v >= 0 ? `+${v}` : `${v}`;

@@ -50,6 +50,18 @@ EVOLUTION_VIDEO_DIR = os.path.expanduser(
 # here: the frontend builds the URL itself and no-ops on a 404.
 CRY_DIR = os.path.expanduser(os.environ.get('CRY_DIR', '~/pokemon-dnd/pokemon-cries'))
 
+# Self-uploaded "use move" battle animation, e.g. pikachu.mp4 -- one clip per
+# species (no per-move variants), named with the same _sanitize_species_name()
+# rule as the others. Played in combat once the player confirms a move, over
+# the idle sprite already shown in the confirm popup. Same live-filesystem-
+# check, no-caching-layer reasoning as SPRITE_DIR/EVOLUTION_VIDEO_DIR -- and
+# like those two (unlike CRY_DIR) it needs a lookup function, since the
+# frontend has to know up front whether one exists at all in order to
+# preload it ahead of the Yes click instead of finding out only when trying
+# to play it.
+BATTLE_ANIMATION_DIR = os.path.expanduser(
+    os.environ.get('BATTLE_ANIMATION_DIR', '~/pokemon-dnd/battle-animations'))
+
 # Apps Script upstreams can be slow (cold starts)
 _FETCH_TIMEOUT = 120.0
 
@@ -271,4 +283,15 @@ def local_evolution_video_url(pre_evolved_name, evolved_name):
         # See the matching comment in local_sprite_url() above -- same
         # mtime-stamped-URL reasoning.
         return f'/evolution-videos/{filename}?t={int(os.path.getmtime(path))}'
+    return None
+
+
+def local_battle_animation_url(pokemon_name):
+    """Self-uploaded "use move" battle animation for pokemon_name, if one
+    exists in BATTLE_ANIMATION_DIR. Same sanitization/mtime-stamped-URL
+    reasoning as local_sprite_url()/local_evolution_video_url()."""
+    filename = f'{_sanitize_species_name(pokemon_name)}.mp4'
+    path = os.path.join(BATTLE_ANIMATION_DIR, filename)
+    if os.path.isfile(path):
+        return f'/battle-animations/{filename}?t={int(os.path.getmtime(path))}'
     return None

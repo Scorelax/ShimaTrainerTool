@@ -213,6 +213,21 @@ live-filesystem-check, no-caching-layer, no-restart-to-add-files pattern as
 the sprites above -- only the very first file needs a restart, so the
 `/evolution-videos` mount appears.
 
+### Battle animations (self-uploaded, local only)
+
+Same idea again: drop `.mp4` files into `~/pokemon-dnd/battle-animations`
+(folder path override: env `BATTLE_ANIMATION_DIR`), named
+`<sanitized-species-name>.mp4` -- one clip per species, no per-move variants.
+In combat, the move-confirmation popup always shows that Pokémon's regular
+sprite (the animated sprite above, or the static image if none was
+uploaded); if a matching battle-animation file exists it's preloaded in the
+background as soon as the Pokémon enters combat, then played over that same
+spot the instant the player confirms a move, before the popup closes and VP
+is deducted. Falls straight through with no delay when no file exists for
+that species. Same live-filesystem-check, no-caching-layer,
+no-restart-to-add-files pattern as the other two -- only the very first file
+needs a restart, so the `/battle-animations` mount appears.
+
 ## 4. Cutover (and rollback)
 
 In `js/api.js`, change `baseUrl` to the Pi:

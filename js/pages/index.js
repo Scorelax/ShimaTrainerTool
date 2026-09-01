@@ -1,5 +1,5 @@
 // Landing Page (Index) - Continue Journey or Start New Adventure
-import { GameDataAPI } from '../api.js';
+import { GameDataAPI, SERVED_BY_PI_SERVER } from '../api.js';
 import { audioManager } from '../utils/audio.js';
 import { getSettings, saveSettings } from '../utils/settings.js';
 
@@ -422,6 +422,22 @@ export function renderIndex() {
           max-width: none;
           margin-bottom: 1rem;
         }
+
+        /* Old-backend Migration Banner */
+        .migration-banner {
+          position: relative;
+          z-index: 1;
+          max-width: min(600px, 90vw);
+          margin: 0 0 clamp(1.5rem, 3vh, 2.5rem);
+          padding: clamp(0.75rem, 2vh, 1.1rem) clamp(1rem, 3vw, 1.5rem);
+          background: rgba(255, 222, 0, 0.95);
+          color: #3a2a00;
+          border-radius: clamp(10px, 2vw, 14px);
+          font-size: clamp(0.85rem, 2vw, 1rem);
+          font-weight: 600;
+          line-height: 1.5;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+        }
       </style>
 
       <!-- Cache Reset Confirm Modal -->
@@ -490,6 +506,13 @@ export function renderIndex() {
         <span class="cache-reset-icon">⚙️</span>
         <span>Settings</span>
       </button>
+
+      ${!SERVED_BY_PI_SERVER ? `
+        <div class="migration-banner">
+          ⚠️ This app has moved to a local server. Please use the new link
+          instead — changes made here won't be saved to the actual game.
+        </div>
+      ` : ''}
 
       <h1 class="landing-title">Shima Pokemon D&D</h1>
       <div class="landing-subtitle">Your Adventure Awaits</div>

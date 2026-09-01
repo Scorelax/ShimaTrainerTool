@@ -11,7 +11,7 @@ import { getSettings } from './utils/settings.js';
 // the Raspberry Pi later), talk to that same server. When served from
 // GitHub Pages (the live player-facing version), keep using Google Apps
 // Script until cutover.
-const SERVED_BY_PI_SERVER = window.location.protocol.startsWith('http')
+export const SERVED_BY_PI_SERVER = window.location.protocol.startsWith('http')
   && !window.location.hostname.endsWith('github.io');
 
 const API_CONFIG = {

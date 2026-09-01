@@ -6,7 +6,6 @@ import { audioManager } from '../utils/audio.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData, SPECIALIZATION_TO_TYPE } from '../utils/pokemon-types.js';
 import { showMovePopup, showDrainHealPopupForCard } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
-import { preloadBattleAnimation } from '../utils/battle-animation.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -2910,11 +2909,6 @@ export function attachPokemonCardListeners() {
   _pokemonData = pokemonData;
   _trainerData = trainerData;
 
-  // This Pokemon is known as soon as the card loads, well before any move
-  // gets confirmed on the battle page -- kick off the battle-animation
-  // preload here rather than waiting on the move popup.
-  preloadBattleAnimation(pokemonData[2]);
-
   // Global damage multiplier for type effectiveness
   let damageMultiplier = 1;
 
@@ -4793,9 +4787,6 @@ function showMoveDetails(moveName) {
       critMod: 0,
       trainerData,
       chargesLeft,
-      spriteUrl: pokemonData[1],
-      spriteAlt: pokemonData[2],
-      speciesName: pokemonData[2],
       onUseMove: (usedMoveName, vpCost) => {
         const currentVpText = document.getElementById('combatCurrentVP')?.textContent || '0 / 0';
         const currentHpText = document.getElementById('combatCurrentHP')?.textContent || '0 / 0';

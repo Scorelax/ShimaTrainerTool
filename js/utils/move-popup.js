@@ -131,12 +131,21 @@ function _createPopupDOM() {
     const btn = document.getElementById('useCombatMoveBtn');
     document.getElementById('combatConfirmText').textContent =
       `Use ${btn.dataset.moveName} (${btn.dataset.vpCost} VP)?`;
-    // Idle sprite (the same one already shown elsewhere for this Pokemon) --
-    // gives the battle-animation clip below something to appear "over" once
-    // Yes is clicked, and something sensible to show even when no animation
-    // exists for this species at all.
+
+    // Battle-animation media area is a combat-page-only feature (see the
+    // combat.js call site passing spriteUrl/speciesName) -- other callers
+    // (e.g. pokemon-card.js) get the plain centered confirm box unchanged,
+    // no reserved space, no lookup, no swap-to-animation on Yes.
+    const showMedia = !!(overlay._spriteUrl || overlay._speciesName);
+    confirmOverlay.classList.toggle('combat-move-confirm-overlay', showMedia);
     const media = document.getElementById('combatConfirmMedia');
-    if (media) media.innerHTML = spriteMediaHtml(overlay._spriteUrl, overlay._spriteAlt, '', '');
+    if (media) {
+      // Idle sprite (the same one already shown elsewhere for this Pokemon)
+      // -- gives the battle-animation clip below something to appear "over"
+      // once Yes is clicked, and something sensible to show even when no
+      // animation exists for this species at all.
+      media.innerHTML = showMedia ? spriteMediaHtml(overlay._spriteUrl, overlay._spriteAlt, '', '') : '';
+    }
     confirmOverlay.style.display = 'flex';
   });
 

@@ -43,6 +43,13 @@ SPRITE_URL_PREFIX = '/gifs/'
 EVOLUTION_VIDEO_DIR = os.path.expanduser(
     os.environ.get('EVOLUTION_VIDEO_DIR', '~/pokemon-dnd/evolution_video'))
 
+# Self-uploaded cry sound, e.g. pikachu.mp3 -- named with the same
+# _sanitize_species_name() rule as SPRITE_DIR/EVOLUTION_VIDEO_DIR, but played
+# once client-side on card view rather than persisted anywhere, so unlike
+# local_sprite_url()/local_evolution_video_url() there's no lookup function
+# here: the frontend builds the URL itself and no-ops on a 404.
+CRY_DIR = os.path.expanduser(os.environ.get('CRY_DIR', '~/pokemon-dnd/pokemon-cries'))
+
 # Apps Script upstreams can be slow (cold starts)
 _FETCH_TIMEOUT = 120.0
 

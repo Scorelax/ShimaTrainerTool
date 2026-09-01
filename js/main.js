@@ -33,6 +33,23 @@ const ROUTES_WITH_OWN_MUSIC = new Set([
   'index', 'continue-journey', 'new-journey', 'new-pokemon', 'pokemon-form'
 ]);
 
+// Self-uploaded per-species cry, played once on entering that Pokemon's
+// card page. Unlike audioManager's tracks these aren't bundled assets, so
+// this builds the URL itself rather than going through playSfx() -- same
+// filename sanitization as the sprite/evolution-video lookups on the Pi
+// (lowercase, non-alphanumeric collapsed to a hyphen), and a plain
+// fetch-and-ignore-failure if the file doesn't exist there.
+function playPokemonCry(pokemonName) {
+  const sanitized = pokemonName.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!sanitized) return;
+
+  const audio = new Audio(`${window.location.origin}/cries/${sanitized}.mp3`);
+  audio.volume = getSettings().volume / 100;
+  audio.play().catch(() => {});
+}
+
 // ============================================================================
 // ROUTER
 // ============================================================================
@@ -219,6 +236,7 @@ class Router {
     const html = renderPokemonCard(pokemonName);
     content.innerHTML = html;
     attachPokemonCardListeners();
+    playPokemonCry(pokemonName);
 
     // Hide loading screen if it's active
     document.getElementById('loading-screen')?.classList.remove('active');

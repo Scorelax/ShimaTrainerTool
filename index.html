@@ -84,6 +84,25 @@
     <button onclick="location.reload()">Retry</button>
   </div>
 
+  <!-- Boot watchdog: if a transient network hiccup (e.g. Tailscale still
+       reconnecting) makes main.js -- or one of the modules it imports --
+       fail to load, the whole app silently never runs, leaving this page
+       frozen on the loading screen's default "Preparing..." text forever
+       with no feedback. This is a plain inline script (not a module import)
+       so it always runs regardless of what main.js does. initApp() clears
+       it once boot actually succeeds; if it's still armed after 10s, boot
+       never completed, so offer a tap-to-retry instead of a silent freeze. -->
+  <script>
+    window.__bootWatchdog = setTimeout(() => {
+      const loadingScreen = document.getElementById('loading-screen');
+      if (!loadingScreen || !loadingScreen.classList.contains('active')) return;
+      const text = document.getElementById('loading-progress-text');
+      if (text) text.textContent = 'Taking longer than expected -- tap to retry';
+      loadingScreen.style.cursor = 'pointer';
+      loadingScreen.addEventListener('click', () => location.reload(), { once: true });
+    }, 10000);
+  </script>
+
   <!-- Scripts -->
   <script type="module" src="js/main.js"></script>
 

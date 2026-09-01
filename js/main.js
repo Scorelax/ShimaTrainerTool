@@ -325,6 +325,10 @@ async function initApp() {
     document.getElementById('loading-screen').classList.remove('active');
     document.getElementById('app').classList.remove('hidden');
 
+    // Boot succeeded -- disarm the inline watchdog in index.html so it
+    // doesn't fire a "tap to retry" prompt over a working app.
+    clearTimeout(window.__bootWatchdog);
+
     console.log('✨ App ready!');
 
   } catch (error) {

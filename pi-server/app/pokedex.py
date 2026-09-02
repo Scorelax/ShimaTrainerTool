@@ -78,8 +78,8 @@ def get_complete_pokemon_data(conn):
     Prefers a self-uploaded animated sprite over the static Benjakronk image
     when one exists for that species (non-shiny -- this list is a flat
     per-species reference, not tied to any one trainer's shiny Pokemon), so
-    the evolution-target preview picks up GIFs the same way owned Pokemon do.
-    Falls back to the static image untouched when no GIF is uploaded."""
+    the evolution-target preview picks up MP4s the same way owned Pokemon do.
+    Falls back to the static image untouched when none is uploaded."""
     registered = upstream.registered_pokemon_names(conn)
     try:
         all_data = upstream.fetch_pokemon_db(conn)

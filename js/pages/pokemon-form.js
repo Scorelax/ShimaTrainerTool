@@ -707,7 +707,7 @@ async function handleFormSubmit() {
       // static image (never a self-uploaded sprite URL -- see its guard
       // against persisting one), so this response alone isn't the
       // display-ready copy. Re-fetch via the sprite-aware endpoint to
-      // pick up a GIF/MP4 if this species has one, concurrently with the
+      // pick up an MP4 if this species has one, concurrently with the
       // "new pokemon" sound so it doesn't add any wait beyond what the
       // player's already sitting through.
       const registeredName = (response.newPokemonData || newPokemonData)[2];

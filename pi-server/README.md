@@ -170,32 +170,30 @@ the `/splashes` mount appears.
 
 ### Animated sprites (self-uploaded, local only)
 
-Unrelated to Benjakronk's repo. Drop hand-made `.mp4` or `.gif` files into
+Unrelated to Benjakronk's repo. Drop hand-made `.mp4` files into
 `~/pokemon-dnd/pokemon-sprites` (folder path override: env `SPRITE_DIR`),
-named `<sanitized-species-name>.mp4`/`.gif` -- lowercase, non-alphanumeric
+named `<sanitized-species-name>.mp4` -- lowercase, non-alphanumeric
 characters collapsed to `-` (e.g. "Mr. Mime" → `mr-mime.mp4`), same rule
 `upstream.get_image_url()` uses for the GitHub-sourced sprites, just without
-the dex-id prefix. `.mp4` is preferred over `.gif` when both exist for a
-species -- real video compression means much smaller files and
-hardware-decoded playback on phones. GIF was tried first instead (see git
-history around this date) to dodge the blank-box flash a `<video>` shows
-while decoding its first frame on every re-render, but animated GIF
-decoding runs frame-by-frame in software with no hardware acceleration, and
-paying that continuously -- especially with several sprites animating on
-screen at once -- turned out laggier overall than MP4's one-time
-decode-startup pause, once actually compared side by side.
+the dex-id prefix. `.gif` was supported early on but has since been dropped
+entirely -- animated GIF decoding runs frame-by-frame in software with no
+hardware acceleration, and paying that continuously (especially with
+several sprites animating on screen at once) was laggier overall than MP4's
+one-time decode-startup pause, plus real video compression means much
+smaller files.
 
 No restart needed to pick up new files day-to-day
 (checked live via a filesystem stat on every request,
 `upstream.local_sprite_url()`) -- only the first time, so the `/gifs` mount
 appears (the URL prefix stays `/gifs` even after the folder's `pokemon-gifs` →
-`pokemon-sprites` rename -- it's baked into every Pokemon's stored image URL
-in the live DB, so renaming it would 404 all of them until each got
-re-saved). Applies to any owned Pokémon whose species has a matching file,
-including ones already registered before it existed; falls back to the
-existing stored image otherwise. Shiny Pokémon look for
-`<sanitized-species-name>-shiny.mp4` first, then `-shiny.gif`, then the
-non-shiny variants, then the static image.
+`pokemon-sprites` rename and the gif-format drop -- it's baked into every
+Pokemon's stored image URL in the live DB, so renaming it would 404 all of
+them until each got re-saved; treat it as a legacy path name at this point,
+unrelated to file format). Applies to any owned Pokémon whose species has a
+matching file, including ones already registered before it existed; falls
+back to the existing stored image otherwise. Shiny Pokémon look for
+`<sanitized-species-name>-shiny.mp4` first, then the non-shiny variant, then
+the static image.
 
 ### Evolution transition videos (self-uploaded, local only)
 

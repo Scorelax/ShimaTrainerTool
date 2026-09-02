@@ -60,7 +60,7 @@ def splash_list():
 
 
 def media_list():
-    """Inventory of self-uploaded mp4/gif files (see upstream.SPRITE_DIR /
+    """Inventory of self-uploaded mp4 files (see upstream.SPRITE_DIR /
     EVOLUTION_VIDEO_DIR / BATTLE_ANIMATION_DIR), for Benjakronk's tooling to
     discover what's available before fetching -- these folders aren't
     browsable directly, since they're served via StaticFiles mounts with no

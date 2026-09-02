@@ -34,7 +34,7 @@ function _parseKnownMovesForSync(str) {
 
 // ============================================================================
 // SPRITE PREFETCH
-// Warms the browser's cache for self-uploaded animated sprites (MP4 or GIF)
+// Warms the browser's cache for self-uploaded animated sprites (MP4)
 // while the player is still on this loading screen, so the first view of a
 // screen showing them (trainer-card, pokemon-card, combat, ...) doesn't
 // stall on a multi-MB download. Fire-and-forget from the caller's
@@ -45,9 +45,9 @@ function _parseKnownMovesForSync(str) {
 // connection slots with the ones the player is about to see immediately.
 // ============================================================================
 
-const SPRITE_EXTENSIONS = /\.(mp4|gif)$/i;
+const SPRITE_EXTENSIONS = /\.mp4$/i;
 
-async function prefetchGifSprites() {
+async function prefetchAnimatedSprites() {
   const priorityUrls = new Set();
   const otherUrls = new Set();
 
@@ -746,7 +746,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'syncing known moves';
           syncKnownMovesForAllPokemon();
-          prefetchGifSprites();
+          prefetchAnimatedSprites();
 
           if (bundleClass === 'Pokemon Trainer') {
             _step = 'preloading splash image';
@@ -854,7 +854,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'syncing known moves';
           syncKnownMovesForAllPokemon();
-          prefetchGifSprites();
+          prefetchAnimatedSprites();
 
           _step = 'preloading splash image';
           updateLoadingProgress(85, 'Loading splash images...');
@@ -890,7 +890,7 @@ export function attachContinueJourneyListeners() {
 
           _step = 'syncing known moves';
           syncKnownMovesForAllPokemon();
-          prefetchGifSprites();
+          prefetchAnimatedSprites();
 
           updateLoadingProgress(95, 'Almost ready...');
           _log('Navigating to conduit-card');

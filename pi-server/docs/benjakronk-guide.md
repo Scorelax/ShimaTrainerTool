@@ -80,7 +80,7 @@ Your GitHub repo stays the source of truth — keep committing `pokedex_config.j
 as normal. This push is just a fast path so players don't wait on the CDN;
 if it ever fails, the Trainer Tool catches up on its own next refresh.
 
-## 4. New: pulling the hand-made mp4/gif animations
+## 4. New: pulling the hand-made mp4 animations
 
 Scorelax has been hand-making animated sprites, evolution transition videos,
 and "use move" battle animations for some species — these live only on the

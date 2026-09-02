@@ -22,18 +22,20 @@ POKEDEX_CONFIG_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex
 IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/'
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
 
-# User-uploaded animated sprites (mp4 or gif), local to the Pi -- unrelated
-# to Benjakronk's repo/pipeline above. Named just <sanitized-species-name>
-# .mp4/.gif, no dex-id prefix. Checked live on every request (a plain
-# filesystem stat, not a network probe), so no caching layer is needed here.
+# User-uploaded animated sprites (mp4 only -- gif support was dropped, see
+# local_sprite_url()), local to the Pi -- unrelated to Benjakronk's
+# repo/pipeline above. Named just <sanitized-species-name>.mp4, no dex-id
+# prefix. Checked live on every request (a plain filesystem stat, not a
+# network probe), so no caching layer is needed here.
 SPRITE_DIR = os.path.expanduser(os.environ.get('SPRITE_DIR', '~/pokemon-dnd/pokemon-sprites'))
 
 # Every local_sprite_url() return value starts with this -- used elsewhere to
 # recognize (and refuse to persist) a sprite URL that shouldn't have reached
 # permanent storage. See routes_pokemon.py's register/update/evolve guards.
-# Kept as /gifs/ even after the SPRITE_DIR rename -- this is the URL prefix,
-# already baked into every Pokemon's stored image field in the live DB;
-# changing it would 404 every one of them until each got re-saved.
+# Kept as /gifs/ even after the SPRITE_DIR rename and the gif-format drop --
+# it's just a legacy URL prefix name at this point, already baked into every
+# Pokemon's stored image field in the live DB; changing it would 404 every
+# one of them until each got re-saved.
 SPRITE_URL_PREFIX = '/gifs/'
 
 # Self-uploaded evolution transition videos, e.g. pikachu_raichu.mp4 --
@@ -239,25 +241,15 @@ def local_sprite_url(pokemon_name, shiny=False):
     filename rule across both, but otherwise unrelated -- no dex-id prefix,
     no Benjakronk repo, no network probe/cache.
 
-    Checked in this order, so shiny-correctness always wins over format
-    preference: shiny+mp4, shiny+gif, non-shiny mp4, non-shiny gif. MP4 is
-    preferred whenever both exist for a species. GIF was tried first instead
-    (see git history around this date) to avoid the blank-box flash a
-    <video> element shows while decoding its first frame on every re-render
-    -- but animated GIF decoding is done frame-by-frame in software, with no
-    hardware acceleration, and paying that continuously (especially with
-    several sprites animating on screen at once, e.g. a full party grid)
-    turned out to be laggier overall than MP4's one-time decode-startup
-    pause, once actually compared side by side. Real video compression also
-    means much smaller files. Shiny uses a -shiny suffix, matching the
-    convention Benjakronk's own shiny sprites already use elsewhere; falls
-    back through to the non-shiny variant if no shiny file exists in either
-    format."""
+    Checked in this order, so shiny-correctness always wins: shiny.mp4, then
+    non-shiny.mp4. Shiny uses a -shiny suffix, matching the convention
+    Benjakronk's own shiny sprites already use elsewhere; falls back through
+    to the non-shiny variant if no shiny file exists."""
     sanitized = _sanitize_species_name(pokemon_name)
     candidates = []
     if shiny:
-        candidates += [f'{sanitized}-shiny.mp4', f'{sanitized}-shiny.gif']
-    candidates += [f'{sanitized}.mp4', f'{sanitized}.gif']
+        candidates.append(f'{sanitized}-shiny.mp4')
+    candidates.append(f'{sanitized}.mp4')
     for filename in candidates:
         path = os.path.join(SPRITE_DIR, filename)
         if os.path.isfile(path):

@@ -1,4 +1,4 @@
-// Renders a self-uploaded sprite URL (MP4 or GIF) or a static image as the
+// Renders a self-uploaded sprite URL (MP4) or a static image as the
 // right kind of tag, and prefetches it correctly. The one place this
 // decision is made -- every page that shows an owned Pokemon's sprite
 // (trainer-card, pokemon-card, combat, my-pokemon, evolution, new-pokemon)

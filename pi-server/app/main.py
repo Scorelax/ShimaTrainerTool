@@ -36,13 +36,13 @@ app.add_middleware(
 db.init()
 
 
-# Binary media: self-uploaded GIF/MP4 sprites, evolution videos, Benjakronk's
+# Binary media: self-uploaded MP4 sprites, evolution videos, Benjakronk's
 # splash mirror, and the bundled audio/images in PWA_DIR/assets (27MB of mp3s
 # and pngs). These are large, rarely change, and are re-displayed constantly
 # during normal use (every navigation back to a screen showing an owned
 # Pokemon re-requests its sprite) -- no-store on these was forcing a full
 # multi-MB re-download every single time, which is what was making
-# self-uploaded GIFs stutter/re-buffer on every screen change instead of
+# self-uploaded sprites stutter/re-buffer on every screen change instead of
 # playing instantly from a local copy.
 #
 # Sprites and evolution videos are cached *hard* (no per-load network
@@ -210,7 +210,7 @@ if os.path.isdir(routes_gamedata.SPLASH_DIR):
     app.mount('/splashes', StaticFiles(directory=routes_gamedata.SPLASH_DIR),
               name='splashes')
 
-# Self-uploaded animated sprites, mp4 or gif (see upstream.SPRITE_DIR /
+# Self-uploaded animated sprites, mp4 only (see upstream.SPRITE_DIR /
 # upstream.local_sprite_url). URL prefix stays /gifs -- see
 # upstream.SPRITE_URL_PREFIX for why that's not renamed along with the folder.
 if os.path.isdir(upstream.SPRITE_DIR):

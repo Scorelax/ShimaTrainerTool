@@ -86,9 +86,9 @@ def handle(conn, action, params):
         calculated = calculate_modifiers(evolve_data, 'None', 'None')
         if calculated['status'] == 'success':
             # Always overwrite, never conditionally -- the incoming value
-            # here can be a self-uploaded sprite URL (evolution.js shows
-            # GIFs/MP4s on the target preview), which must never end up
-            # persisted as this Pokemon's canonical stored image.
+            # here can be a self-uploaded sprite URL (evolution.js shows an
+            # MP4 on the target preview when one exists), which must never
+            # end up persisted as this Pokemon's canonical stored image.
             resolved = upstream.get_image_url(conn, calculated['newPokemonData'][2], evolve_data[3])
             calculated['newPokemonData'][1] = resolved or ''
             replaced = replace_pokemon(conn, params['currentName'], params['trainer'],
@@ -205,7 +205,7 @@ def update_pokemon_data(conn, new_pokemon_data):
     for rowid, row in db.fetch_rows(conn, 'pokemon', P):
         if str(row[0]).lower() == trainer_name and str(row[2]).lower() == pokemon_name:
             # Never trust the client's image field here -- GET responses
-            # temporarily swap it to a self-uploaded GIF/MP4 URL for display
+            # temporarily swap it to a self-uploaded MP4 URL for display
             # (see upstream.local_sprite_url), and that swapped value ends up
             # sitting in the client's copy of this Pokemon's data. This
             # endpoint is for saving stat/move/item changes, not the image --

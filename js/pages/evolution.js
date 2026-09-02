@@ -721,7 +721,7 @@ async function loadEvolutionOptions() {
       displayEvolutionOptions(evolutionOptions);
       // There are normally only 1-2 options here, so preload both now
       // instead of waiting for a click -- by the time the player picks one,
-      // the sprite (MP4, GIF, or static) is already sitting in the cache.
+      // the sprite (MP4 or static) is already sitting in the cache.
       evolutionOptions.forEach(option => prefetchSprite(option[0]));
     }
 
@@ -1429,7 +1429,7 @@ async function evolveOnServer(str, dex, con, int, wis, cha) {
   // server-side (see "Always overwrite, never conditionally" in
   // routes_pokemon.py's evolve handler), so response.newPokemonData is
   // never the display-ready copy -- always re-fetch via the sprite-aware
-  // endpoint to pick up a GIF/MP4 if the evolved species has one, same
+  // endpoint to pick up an MP4 if the evolved species has one, same
   // fix as pokemon-form.js's registration flow needed.
   const registeredName = (response.newPokemonData || evolvedPokemonData)[2];
   const fetchResponse = await PokemonAPI.get(currentPokemon[0], registeredName, true);

@@ -302,13 +302,21 @@ export class PokemonAPI {
 
   /**
    * Check for a self-uploaded "use move" battle animation for this species.
-   * Never cached -- same reasoning as getEvolutionVideo above.
+   * Never cached -- same reasoning as getEvolutionVideo above. Short timeout
+   * and no retry -- this is a cosmetic flourish preloaded well before the
+   * player confirms a move (see utils/battle-animation.js), and the confirm
+   * flow has no bound of its own while awaiting this lookup. If it's ever
+   * left to the default 30s x (1 retry) it can hang the move-confirmation
+   * popup for up to a minute with the Yes/No buttons disabled and no
+   * loading feedback -- better to fail fast and just skip the animation.
    */
   static async getBattleAnimation(pokemonName) {
     return API.request('pokemon', 'battle-animation', {
       name: pokemonName
     }, {
-      useCache: false
+      useCache: false,
+      timeout: 6000,
+      retries: 0
     });
   }
 

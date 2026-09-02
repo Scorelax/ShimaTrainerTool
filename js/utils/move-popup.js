@@ -224,7 +224,7 @@ async function _playBattleAnimation(speciesName) {
     if (video.readyState >= 3 /* HAVE_FUTURE_DATA */) { resolve(); return; }
     video.addEventListener('canplay', resolve, { once: true });
     video.addEventListener('error', resolve, { once: true });
-    setTimeout(resolve, 5000);
+    setTimeout(resolve, 3000);
   });
 
   try {
@@ -237,7 +237,7 @@ async function _playBattleAnimation(speciesName) {
   await new Promise((resolve) => {
     video.addEventListener('ended', resolve, { once: true });
     video.addEventListener('error', resolve, { once: true });
-    setTimeout(resolve, 15000); // safety cap -- never hang on a stuck clip
+    setTimeout(resolve, 8000); // safety cap -- never hang on a stuck clip
   });
 }
 

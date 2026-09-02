@@ -2356,9 +2356,9 @@ export function renderPokemonCard(pokemonName) {
           </div>
 
           <div class="info-buttons-grid">
-            <button class="info-button" id="commentsButton">💬 Comments (${comments.length})</button>
-            <button class="info-button" id="editPokemonButton">✏️ Edit Pokémon</button>
             <button class="info-button battle-toggle-btn" id="battlePageButton">⚔️ Battle Page</button>
+            <button class="info-button" id="editPokemonButton">✏️ Edit Pokémon</button>
+            <button class="info-button" id="commentsButton">💬 Comments (${comments.length})</button>
           </div>
         </div>
 
@@ -2578,32 +2578,8 @@ export function renderPokemonCard(pokemonName) {
           </div>
           <div class="popup-body">
             <div class="combat-tracker-container">
-              <!-- Trainer Section -->
-              <div style="margin-bottom: clamp(0.5rem, 1vh, 0.75rem);">
-                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${trainerData[1]}</div>
-                <div class="combat-stats-row">
-                  <div class="combat-stat-column">
-                    <div class="combat-stat-label">HP</div>
-                    <div class="combat-stat-value" id="trainerCombatCurrentHP">${(trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== '') ? trainerData[34] : trainerData[11]} / ${trainerData[11]}</div>
-                    <input type="number" id="trainerHpChangeInput" class="combat-input" placeholder="HP Amount">
-                  </div>
-                  <div class="combat-stat-column">
-                    <div class="combat-stat-label">VP</div>
-                    <div class="combat-stat-value" id="trainerCombatCurrentVP">${(trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? trainerData[35] : trainerData[12]} / ${trainerData[12]}</div>
-                    <input type="number" id="trainerVpChangeInput" class="combat-input" placeholder="VP Amount">
-                  </div>
-                </div>
-                <div class="combat-buttons">
-                  <button id="addTrainerStats" class="combat-btn combat-btn-add">➕ Add</button>
-                  <button id="removeTrainerStats" class="combat-btn combat-btn-remove">➖ Remove</button>
-                  <button id="fullRestoreTrainer" class="combat-btn combat-btn-restore">✨ Full Restore</button>
-                </div>
-              </div>
-
-              <div class="combat-section-separator"></div>
-
               <!-- Pokemon Section -->
-              <div>
+              <div style="margin-bottom: clamp(0.5rem, 1vh, 0.75rem);">
                 <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${displayName}</div>
 
                 <!-- Type Effectiveness Buttons -->
@@ -2642,6 +2618,30 @@ export function renderPokemonCard(pokemonName) {
                   <button id="addStats" class="combat-btn combat-btn-add">➕ Add</button>
                   <button id="removeStats" class="combat-btn combat-btn-remove">➖ Remove</button>
                   <button id="fullRestore" class="combat-btn combat-btn-restore">✨ Full Restore</button>
+                </div>
+              </div>
+
+              <div class="combat-section-separator"></div>
+
+              <!-- Trainer Section -->
+              <div>
+                <div style="font-weight: 900; font-size: clamp(1rem, 2.2vw, 1.2rem); color: #FFDE00; text-transform: uppercase; margin-bottom: clamp(0.5rem, 1vh, 0.75rem); text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">${trainerData[1]}</div>
+                <div class="combat-stats-row">
+                  <div class="combat-stat-column">
+                    <div class="combat-stat-label">HP</div>
+                    <div class="combat-stat-value" id="trainerCombatCurrentHP">${(trainerData[34] !== null && trainerData[34] !== undefined && trainerData[34] !== '') ? trainerData[34] : trainerData[11]} / ${trainerData[11]}</div>
+                    <input type="number" id="trainerHpChangeInput" class="combat-input" placeholder="HP Amount">
+                  </div>
+                  <div class="combat-stat-column">
+                    <div class="combat-stat-label">VP</div>
+                    <div class="combat-stat-value" id="trainerCombatCurrentVP">${(trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? trainerData[35] : trainerData[12]} / ${trainerData[12]}</div>
+                    <input type="number" id="trainerVpChangeInput" class="combat-input" placeholder="VP Amount">
+                  </div>
+                </div>
+                <div class="combat-buttons">
+                  <button id="addTrainerStats" class="combat-btn combat-btn-add">➕ Add</button>
+                  <button id="removeTrainerStats" class="combat-btn combat-btn-remove">➖ Remove</button>
+                  <button id="fullRestoreTrainer" class="combat-btn combat-btn-restore">✨ Full Restore</button>
                 </div>
               </div>
             </div>

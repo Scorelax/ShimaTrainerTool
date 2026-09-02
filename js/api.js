@@ -296,7 +296,9 @@ export class PokemonAPI {
       from: fromName,
       to: toName
     }, {
-      useCache: false
+      useCache: false,
+      timeout: 6000,
+      retries: 0
     });
   }
 

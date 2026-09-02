@@ -15,6 +15,7 @@ let allocatedSkillPoints = 0;
 let evolutionOptions = [];
 let pokedexUpdateHandler = null;
 let evolutionVideoUrl = null;
+let evolutionVideoBlobUrl = null;
 let evolutionVideoReady = null;
 
 export function renderEvolution() {
@@ -607,6 +608,7 @@ export async function attachEvolutionListeners() {
   allocatedSkillPoints = 0;
   evolutionOptions = [];
   evolutionVideoUrl = null;
+  evolutionVideoBlobUrl = null;
   evolutionVideoReady = null;
 
   // Set splash image on loading screen immediately (before it's shown)
@@ -867,12 +869,23 @@ function evolvePokemon() {
 
 async function checkAndPreloadEvolutionVideo() {
   evolutionVideoUrl = null;
+  evolutionVideoBlobUrl = null;
   evolutionVideoReady = null;
   try {
     const result = await PokemonAPI.getEvolutionVideo(currentPokemon[2], selectedPokemon[1]);
     if (result.status === 'success' && result.url) {
       evolutionVideoUrl = result.url;
-      evolutionVideoReady = prefetchSprite(result.url);
+      // Fetch the full clip into memory rather than prefetchSprite()'s
+      // header-only fetch -- that resolves once response headers arrive,
+      // not once the body has actually finished downloading, so it never
+      // guaranteed the clip was playable yet (same issue fixed in
+      // battle-animation.js -- see that file for the full writeup).
+      // Falls back to the plain remote URL below if this fails, so a video
+      // still gets attempted rather than silently dropped.
+      evolutionVideoReady = fetch(result.url)
+        .then(res => res.ok ? res.blob() : null)
+        .then(blob => { if (blob) evolutionVideoBlobUrl = URL.createObjectURL(blob); })
+        .catch(() => {});
 
       // Start the loop here, as soon as we know a video exists, instead of
       // waiting for Confirm -- with the player likely still adjusting stat
@@ -1120,7 +1133,7 @@ async function playEvolutionVideoTransition() {
   // already finished during form-fill, otherwise waits the remainder.
   await evolutionVideoReady;
 
-  video.src = evolutionVideoUrl;
+  video.src = evolutionVideoBlobUrl || evolutionVideoUrl;
 
   // Wait for an actual decodable frame before revealing/playing anything --
   // a fixed delay here risked calling play() before the browser had
@@ -1176,6 +1189,12 @@ async function playEvolutionVideoTransition() {
     await new Promise((resolve) => {
       video.addEventListener('ended', resolve, { once: true });
       video.addEventListener('error', resolve, { once: true });
+      // Safety cap -- by this point the video should be within
+      // FINISH_LEAD_SECONDS of its natural end already, so this is only
+      // ever hit if the clip stalls; without it a stalled clip here would
+      // strand the player (and the pending evolveOnServer() Promise.all)
+      // forever with no recovery.
+      setTimeout(resolve, 15000);
     });
   }
 

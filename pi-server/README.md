@@ -228,6 +228,15 @@ that species. Same live-filesystem-check, no-caching-layer,
 no-restart-to-add-files pattern as the other two -- only the very first file
 needs a restart, so the `/battle-animations` mount appears.
 
+None of these three folders are browsable directly (StaticFiles serves
+individual files, not directory listings), so
+`?route=game-data&action=media-list` returns what's in each one as
+`{pokemonSprites, battleAnimations, evolutionVideos}` -- kept as separate
+keys since `pokemonSprites` and `battleAnimations` share the exact same
+`<species-name>.mp4` filename convention for unrelated content. This is what
+lets Benjakronk's tooling discover and pull these without SSH/folder access;
+see `docs/benjakronk-guide.md`.
+
 ## 4. Cutover (and rollback)
 
 In `js/api.js`, change `baseUrl` to the Pi:

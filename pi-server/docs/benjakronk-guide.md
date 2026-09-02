@@ -80,14 +80,42 @@ Your GitHub repo stays the source of truth — keep committing `pokedex_config.j
 as normal. This push is just a fast path so players don't wait on the CDN;
 if it ever fails, the Trainer Tool catches up on its own next refresh.
 
-## 4. What stays as-is (no action needed from you)
+## 4. New: pulling the hand-made mp4/gif animations
 
-- **Species/move/item databases** — these barely change mid-session, so
-  they're still pulled on a schedule (nightly + the app's own Reset Cache
-  button), not pushed. Keep maintaining them wherever you already do.
-- **Splash images** — still a nightly `git pull` mirror from your repo's
-  `images/splashes` folder. Just commit as normal.
+Scorelax has been hand-making animated sprites, evolution transition videos,
+and "use move" battle animations for some species — these live only on the
+Pi (never in your repo), so there's a small read-only endpoint to discover
+and fetch them:
 
-## Questions
+```
+GET https://scorelaxpi.tail32272d.ts.net/api?route=game-data&action=media-list
+```
 
-Ping Scorelax directly — this is a two-person integration, not a public API.
+Returns three separate lists — keep them separate, don't merge them:
+
+```json
+{
+  "status": "success",
+  "pokemonSprites":   [{ "file": "pikachu.mp4", "url": "/gifs/pikachu.mp4?t=..." }, ...],
+  "battleAnimations": [{ "file": "pikachu.mp4", "url": "/battle-animations/pikachu.mp4?t=..." }, ...],
+  "evolutionVideos":  [{ "file": "pikachu_raichu.mp4", "url": "/evolution-videos/pikachu_raichu.mp4?t=..." }, ...]
+}
+```
+
+**`pokemonSprites` and `battleAnimations` use the identical `<species>.mp4`
+filename for completely unrelated clips** (idle animated sprite vs. the
+move-use animation) — always go by which top-level key a file came from, not
+the filename alone, since the same `pikachu.mp4` name can legitimately show
+up in both with different content.
+
+Each `url` is already a full relative path (prefix `/gifs/`, `/battle-animations/`,
+or `/evolution-videos/` depending on category) with a cache-busting `?t=`
+stamp — fetch it as-is from the base URL above, e.g.:
+
+```
+https://scorelaxpi.tail32272d.ts.net/gifs/pikachu.mp4?t=1788334451
+```
+
+Requires the tailnet like everything else here, no separate auth. Files are
+checked live on every request, so the list always reflects what's currently
+on the Pi.

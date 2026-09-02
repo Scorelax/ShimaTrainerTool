@@ -39,6 +39,9 @@ def handle(conn, action, params):
     if action == 'splash-list':
         return splash_list()
 
+    if action == 'media-list':
+        return media_list()
+
     raise ValueError('Unknown game-data action: ' + str(action))
 
 
@@ -54,6 +57,44 @@ def splash_list():
         'splashFiles': sorted(n for n in names if re.match(r'^splash-\d+\.png$', n)),
         'hasSession': 'session.png' in names,
     }
+
+
+def media_list():
+    """Inventory of self-uploaded mp4/gif files (see upstream.SPRITE_DIR /
+    EVOLUTION_VIDEO_DIR / BATTLE_ANIMATION_DIR), for Benjakronk's tooling to
+    discover what's available before fetching -- these folders aren't
+    browsable directly, since they're served via StaticFiles mounts with no
+    directory listing.
+
+    pokemon-sprites and battle-animations use the exact same
+    <species-name>.mp4 filename for unrelated content (idle sprite vs. move
+    animation), so the three categories are kept under separate top-level
+    keys here rather than one merged list -- that's what lets a consumer
+    tell them apart, since the filename alone can't."""
+    return {
+        'status': 'success',
+        'pokemonSprites': _list_media_dir(upstream.SPRITE_DIR, upstream.SPRITE_URL_PREFIX),
+        'battleAnimations': _list_media_dir(upstream.BATTLE_ANIMATION_DIR, '/battle-animations/'),
+        'evolutionVideos': _list_media_dir(upstream.EVOLUTION_VIDEO_DIR, '/evolution-videos/'),
+    }
+
+
+def _list_media_dir(dir_path, url_prefix):
+    """Sorted [{file, url}] for every file directly in dir_path. `url` is the
+    same `?t=<mtime>` cache-busted shape local_sprite_url() etc. already hand
+    the frontend, so a consumer can fetch it as-is with no separate
+    revalidation step."""
+    if not os.path.isdir(dir_path):
+        return []
+    entries = []
+    for filename in sorted(os.listdir(dir_path)):
+        path = os.path.join(dir_path, filename)
+        if os.path.isfile(path):
+            entries.append({
+                'file': filename,
+                'url': f'{url_prefix}{filename}?t={int(os.path.getmtime(path))}',
+            })
+    return entries
 
 
 def load_all_game_data(conn):

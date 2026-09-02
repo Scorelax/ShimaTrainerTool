@@ -172,8 +172,8 @@ export function renderNewPokemon() {
 
         .pokemon-details img,
         .pokemon-details video {
-          width: 85%;
-          max-width: 300px;
+          width: 95%;
+          max-width: 360px;
           aspect-ratio: 1;
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;

@@ -39,10 +39,13 @@ function _parseKnownMovesForSync(str) {
 // screen showing them (trainer-card, pokemon-card, combat, ...) doesn't
 // stall on a multi-MB download. Fire-and-forget from the caller's
 // perspective (never awaited at the call sites below) -- but internally it
-// waits for the active party + utility Pokemon (trainer-card, the first
-// screen after this one) to actually finish loading before starting the
-// rest of the roster, so those aren't left competing for bandwidth/
-// connection slots with the ones the player is about to see immediately.
+// runs three strictly sequential tiers, each awaited before the next
+// starts, so a later tier's downloads never compete for bandwidth/
+// connection slots with a higher-priority one still in flight:
+//   1. active party + utility slot   (trainer-card, the very next screen)
+//   2. the rest of the trainer's owned roster (my-pokemon, combat swaps)
+//   3. the rest of the registered Pokedex (only needed if/when the player
+//      opens "register new pokemon")
 // ============================================================================
 
 const SPRITE_EXTENSIONS = /\.mp4$/i;
@@ -75,8 +78,27 @@ async function prefetchAnimatedSprites() {
 
   await Promise.all([...priorityUrls].map(prefetchSprite));
 
-  [...otherUrls]
-    .filter(url => !priorityUrls.has(url))
+  await Promise.all(
+    [...otherUrls]
+      .filter(url => !priorityUrls.has(url))
+      .map(prefetchSprite)
+  );
+
+  // Tier 3: the rest of the registered Pokedex (completePokemonData is
+  // already in sessionStorage by the time this runs -- see call sites).
+  // Each entry is [image, name, dexNumber, ...]; image is only an mp4 URL
+  // when a self-uploaded sprite exists for that species (see
+  // pokedex.py get_registered_pokemon_list).
+  let pokedexList;
+  try {
+    pokedexList = JSON.parse(sessionStorage.getItem('completePokemonData') || '[]');
+  } catch (err) {
+    return;
+  }
+
+  pokedexList
+    .map(entry => entry && entry[0])
+    .filter(url => typeof url === 'string' && SPRITE_EXTENSIONS.test(url) && !priorityUrls.has(url) && !otherUrls.has(url))
     .forEach(prefetchSprite);
 }
 

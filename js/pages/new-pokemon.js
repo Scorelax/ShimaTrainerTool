@@ -71,15 +71,15 @@ export function renderNewPokemon() {
 
         .register-container {
           display: flex;
-          justify-content: space-between;
+          justify-content: flex-start;
           align-items: flex-start;
-          width: 90%;
-          max-width: clamp(900px, 95vw, 1400px);
+          width: 96%;
+          max-width: clamp(960px, 98vw, 1600px);
           gap: clamp(1.5rem, 3vw, 2rem);
         }
 
         .pokemon-list {
-          width: 52%;
+          flex: 52 1 0%;
           max-height: 70vh;
           overflow-y: auto;
           border: 2px solid var(--border-accent);
@@ -144,7 +144,7 @@ export function renderNewPokemon() {
         }
 
         .pokemon-details {
-          width: 44%;
+          flex: 44 1 0%;
           text-align: center;
           display: flex;
           flex-direction: column;

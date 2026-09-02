@@ -79,7 +79,7 @@ export function renderNewPokemon() {
         }
 
         .pokemon-list {
-          width: 58%;
+          width: 52%;
           max-height: 70vh;
           overflow-y: auto;
           border: 2px solid var(--border-accent);
@@ -144,7 +144,7 @@ export function renderNewPokemon() {
         }
 
         .pokemon-details {
-          width: 38%;
+          width: 44%;
           text-align: center;
           display: flex;
           flex-direction: column;
@@ -173,7 +173,7 @@ export function renderNewPokemon() {
         .pokemon-details img,
         .pokemon-details video {
           width: 95%;
-          max-width: 360px;
+          max-width: 480px;
           aspect-ratio: 1;
           border-radius: clamp(12px, 2.5vw, 18px);
           object-fit: cover;

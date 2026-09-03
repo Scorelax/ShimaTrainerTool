@@ -87,6 +87,10 @@ function restoreRechargesForRest(pokemonData, restType) {
 let shortRestQueue = [];
 let shortRestCurrentIndex = 0;
 
+// See the matching handler in trainer-info.js for why this must be removed
+// before being re-added on every visit.
+let trainerUpdateHandler = null;
+
 export function renderTrainerCard() {
   // Load trainer data from session storage
   const trainerDataStr = sessionStorage.getItem('trainerData');
@@ -1147,6 +1151,18 @@ export function renderTrainerCard() {
 }
 
 export function attachTrainerCardListeners() {
+  // Re-render in place when a live push (see live-updates.js) refreshes this
+  // trainer's sessionStorage data -- e.g. Benjakronk handing over an item or
+  // a Pokemon -- instead of requiring a trip back through continue-journey.
+  if (trainerUpdateHandler) window.removeEventListener('app:trainer-updated', trainerUpdateHandler);
+  trainerUpdateHandler = () => {
+    const content = document.getElementById('content');
+    if (!content) return;
+    content.innerHTML = renderTrainerCard();
+    attachTrainerCardListeners();
+  };
+  window.addEventListener('app:trainer-updated', trainerUpdateHandler);
+
   // Trainer image click - navigate to trainer info
   document.getElementById('trainerImageContainer')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {

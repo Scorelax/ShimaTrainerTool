@@ -2,7 +2,7 @@
 import json
 import time
 
-from . import db, routes_gamedata, pokedex, upstream
+from . import db, live, routes_gamedata, pokedex, upstream
 from .calculations import calculate_hp_vp
 from .jsutil import js_parse_int, js_number, floor_div2
 
@@ -251,6 +251,11 @@ def _write_trainer_cell(conn, trainer_name, column, value, success=None, fail='W
         if rowid is None:
             return {'status': 'error', 'message': 'Trainer not found'}
         db.set_cell(conn, 'trainers', rowid, column, value)
+        # Covers every caller of this helper (inventory/gear/money/affinity/
+        # specialization/trainer-path) -- notably including Benjakronk's
+        # external game-write API, which lands here with no other signal to
+        # an already-open client that this trainer's data just changed.
+        live.publish({'type': 'trainer-data', 'trainer': trainer_name})
         result = {'status': 'success'}
         if success:
             result['message'] = success

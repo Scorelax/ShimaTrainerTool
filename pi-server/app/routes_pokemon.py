@@ -1,7 +1,7 @@
 """route=pokemon — port of handlePokemonRoute and its sheet helpers."""
 import json
 
-from . import db, pokedex, upstream
+from . import db, live, pokedex, upstream
 from .calculations import (
     apply_feat_changes, calculate_hp_vp, calculate_modifiers,
     proficiency_for_level, stab_for_level,
@@ -193,6 +193,11 @@ def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
     new_pokemon_data[46] = vp                            # currentVP
 
     db.insert_row(conn, 'pokemon', P, new_pokemon_data)
+
+    # Same trainer-data event _write_trainer_cell publishes for inventory/gear/
+    # money -- register is the other half of Benjakronk's external game-write
+    # API, and needs the same "already-open client picks this up live" fix.
+    live.publish({'type': 'trainer-data', 'trainer': trainer_name})
 
     return {'status': 'success',
             'message': f'{trainer_name} caught a {new_pokemon_data[2]}!',

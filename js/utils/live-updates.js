@@ -1,10 +1,15 @@
 // Live push notifications from the Pi server (see pi-server/app/live.py and
-// main.py's /api/events). Right now the only thing pushed is a fresh
-// pokedex-config from Benjakronk's admin panel; when one arrives, refresh the
-// session's copy in the background so any screen that reads it (currently
-// evolution.js) reflects it without the player hitting Reload Data.
+// main.py's /api/events). Two kinds of event arrive here:
+//  - a fresh pokedex-config push from Benjakronk's admin panel; refresh the
+//    session's copy in the background so any screen that reads it (evolution.js,
+//    new-pokemon.js) reflects it without the player hitting Reload Data.
+//  - a trainer-data event (routes_trainer.py / routes_pokemon.py publish this
+//    on every inventory/gear/money/pokemon write, notably Benjakronk's
+//    external game-write API) -- if it's for the trainer currently loaded in
+//    this tab, refetch that trainer so trainer-info/trainer-card don't need a
+//    trip back through continue-journey to see it.
 
-import { EVENTS_URL, GameDataAPI, PokemonAPI } from '../api.js';
+import { EVENTS_URL, GameDataAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { setPokedexConfig } from './visibility.js';
 
 let source = null;
@@ -29,6 +34,8 @@ export function initLiveUpdates() {
     }
     if (event.dataset === 'pokedex-config') {
       refreshPokedexData();
+    } else if (event.type === 'trainer-data' && event.trainer) {
+      refreshActiveTrainerData(event.trainer);
     }
   };
 }
@@ -48,5 +55,37 @@ async function refreshPokedexData() {
     window.dispatchEvent(new CustomEvent('app:pokedex-updated'));
   } catch (err) {
     console.warn('[LiveUpdates] Failed to refresh pokedex data:', err);
+  }
+}
+
+/**
+ * Every device shares this one SSE stream regardless of which trainer it has
+ * loaded, so only act when the push is actually for the trainer sitting in
+ * this tab's sessionStorage -- otherwise every open device would refetch on
+ * every other player's inventory change.
+ */
+async function refreshActiveTrainerData(trainerName) {
+  try {
+    const currentTrainerData = JSON.parse(sessionStorage.getItem('trainerData') || 'null');
+    const currentName = currentTrainerData && currentTrainerData[1];
+    if (!currentName || currentName.toLowerCase() !== trainerName.toLowerCase()) return;
+
+    const bundle = await TrainerAPI.getFull(trainerName);
+    if (!bundle || bundle.status !== 'success' || !bundle.trainerData) return;
+
+    sessionStorage.setItem('trainerData', JSON.stringify(bundle.trainerData));
+    (bundle.pokemonData || []).forEach((pokemon) => {
+      sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
+    });
+    if (bundle.registeredList) {
+      sessionStorage.setItem('completePokemonData', JSON.stringify(bundle.registeredList));
+    }
+    if (bundle.pokedexConfig) {
+      setPokedexConfig(bundle.pokedexConfig);
+    }
+
+    window.dispatchEvent(new CustomEvent('app:trainer-updated'));
+  } catch (err) {
+    console.warn('[LiveUpdates] Failed to refresh trainer data:', err);
   }
 }

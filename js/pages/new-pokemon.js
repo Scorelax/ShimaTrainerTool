@@ -9,6 +9,9 @@ import { spriteMediaHtml, renderSpriteInto } from '../utils/sprite-media.js';
 // Module state
 let selectedPokemon = null;
 let allEncounteredPokemon = [];
+// See the matching handler in evolution.js -- window-level listeners survive
+// the router's innerHTML swap, so this must be removed before being re-added.
+let pokedexUpdateHandler = null;
 const imageCache = new Map();
 const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/';
 const IMAGE_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
@@ -340,6 +343,12 @@ export async function attachNewPokemonListeners() {
 
   // Load encountered Pokemon
   loadEncounteredPokemon();
+
+  // Re-run when a live Pokedex push arrives (see live-updates.js) so a newly
+  // registered species shows up in the list without leaving this screen.
+  if (pokedexUpdateHandler) window.removeEventListener('app:pokedex-updated', pokedexUpdateHandler);
+  pokedexUpdateHandler = () => loadEncounteredPokemon();
+  window.addEventListener('app:pokedex-updated', pokedexUpdateHandler);
 
   // Search functionality
   document.getElementById('pokemonSearch')?.addEventListener('input', handleSearch);

@@ -6,6 +6,11 @@ import { audioManager } from '../utils/audio.js';
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
 
+// Handler reference for the live trainer-data push listener -- window-level
+// listeners survive the router's innerHTML swap between pages, so this must
+// be removed before being re-added on every visit or it stacks duplicates.
+let trainerUpdateHandler = null;
+
 function parseFeatsFromString(featsStr) {
   if (!featsStr || featsStr === 'None') return [];
   return featsStr.split(',').map(entry => {
@@ -2533,6 +2538,18 @@ export function renderTrainerInfo() {
 export function attachTrainerInfoListeners() {
   const trainerDataStr = sessionStorage.getItem('trainerData');
   const trainerData = trainerDataStr ? JSON.parse(trainerDataStr) : null;
+
+  // Re-render in place when a live push (see live-updates.js) refreshes this
+  // trainer's sessionStorage data -- e.g. Benjakronk handing over an item or
+  // a Pokemon -- instead of requiring a trip back through continue-journey.
+  if (trainerUpdateHandler) window.removeEventListener('app:trainer-updated', trainerUpdateHandler);
+  trainerUpdateHandler = () => {
+    const content = document.getElementById('content');
+    if (!content) return;
+    content.innerHTML = renderTrainerInfo();
+    attachTrainerInfoListeners();
+  };
+  window.addEventListener('app:trainer-updated', trainerUpdateHandler);
 
   // Helper function to open popup
   const openPopup = (popupId) => {

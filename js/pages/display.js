@@ -39,7 +39,14 @@ function preloadAllAnimations() {
 }
 
 // ---------------------------------------------------------------------------
-// Render
+// Render -- the skeleton (spotlight card, strip, overlay, volume slider) is
+// built once and left alone; every subsequent push only patches text, bar
+// widths and classes in place. Critically, a participant's portrait
+// <video>/<img> is only ever rebuilt when its image URL actually changes --
+// touching it on every push (the old full-innerHTML-rebuild approach) reset
+// every idle-sprite loop back to frame 0 on every single combat event, which
+// will be constant once per-move HP ticks exist instead of just occasional
+// join/turn/visibility changes.
 // ---------------------------------------------------------------------------
 
 function render() {
@@ -51,18 +58,34 @@ function render() {
     return;
   }
 
-  const activeId = session.reactingParticipantId || session.turnOrder[session.turnIndex];
-  const spotlight = session.participants[activeId];
-  const allParticipants = Object.values(session.participants);
+  ensureSkeleton(root);
 
-  // Full re-render on every push -- fine while combat events are infrequent
-  // (participants/turns/visibility). Once frequent per-move HP ticks land,
-  // this will visibly restart every idle-sprite loop in the strip and is
-  // worth revisiting to patch in place instead.
+  const activeId = session.reactingParticipantId || session.turnOrder[session.turnIndex];
+  const roundEl = document.getElementById('displayRound');
+  if (roundEl) {
+    roundEl.textContent = `Round ${session.round}${session.reactingParticipantId ? ' · ⚡ Reaction in progress' : ''}`;
+  }
+
+  updateSpotlight(activeId);
+  updateStrip(activeId);
+}
+
+/** Builds the fixed page structure once. No-op (and, crucially, doesn't
+ * touch existing children) if it's already there -- the whole point is that
+ * render() can be called on every SSE push without ever recreating this. */
+function ensureSkeleton(root) {
+  if (document.getElementById('displaySpotlightCard')) return;
+
   root.innerHTML = `
-    <div class="display-round">Round ${session.round}${session.reactingParticipantId ? ' · ⚡ Reaction in progress' : ''}</div>
-    <div class="display-spotlight">${spotlight ? renderSpotlight(spotlight) : ''}</div>
-    <div class="display-strip">${allParticipants.map(p => renderStripCard(p, p.id === activeId)).join('')}</div>
+    <div class="display-round" id="displayRound"></div>
+    <div class="display-spotlight">
+      <div class="display-spotlight-card" id="displaySpotlightCard" hidden>
+        <div class="display-spotlight-portrait" id="spotlightPortrait"></div>
+        <div class="display-spotlight-name" id="spotlightName"></div>
+        <div class="display-spotlight-bars" id="spotlightBars"></div>
+      </div>
+    </div>
+    <div class="display-strip" id="displayStrip"></div>
     <div class="display-anim-overlay" id="animOverlay" hidden></div>
     <div class="display-volume">🔊 <input type="range" id="displayVolume" min="0" max="100" value="${getSettings().volume}"></div>
   `;
@@ -80,36 +103,85 @@ function visibleTo(p, field) {
   return p.side === 'player' || p.visibility[field];
 }
 
-function barsHtml(p, sizeClass = '') {
+function barsHtml(p) {
   const hpPct = p.maxHP > 0 ? Math.max(0, Math.min(100, (p.currentHP / p.maxHP) * 100)) : 0;
   const vpPct = p.maxVP > 0 ? Math.max(0, Math.min(100, (p.currentVP / p.maxVP) * 100)) : 0;
   return `
-    ${visibleTo(p, 'hp') ? `<div class="display-bar hp ${sizeClass}"><div class="display-bar-fill" style="width:${hpPct}%"></div></div>` : ''}
-    ${visibleTo(p, 'vp') ? `<div class="display-bar vp ${sizeClass}"><div class="display-bar-fill" style="width:${vpPct}%"></div></div>` : ''}
+    ${visibleTo(p, 'hp') ? `<div class="display-bar hp"><div class="display-bar-fill" style="width:${hpPct}%"></div></div>` : ''}
+    ${visibleTo(p, 'vp') ? `<div class="display-bar vp"><div class="display-bar-fill" style="width:${vpPct}%"></div></div>` : ''}
   `;
 }
 
-function renderSpotlight(p) {
-  const name = visibleTo(p, 'name') ? p.name : '???';
-  return `
-    <div class="display-spotlight-card">
-      <div class="display-spotlight-portrait">${spriteMediaHtml(p.image, name)}</div>
-      <div class="display-spotlight-name">${name}</div>
-      <div class="display-spotlight-bars">${barsHtml(p)}</div>
-    </div>`;
+/** Rebuilds a portrait's media element only when the image URL it's
+ * currently showing differs from what it should show now -- an unchanged
+ * URL leaves the existing <video>/<img> (and its playing loop) untouched. */
+function patchPortrait(portraitEl, image, altText) {
+  if (!portraitEl) return;
+  const url = image || '';
+  if (portraitEl.dataset.image === url) return;
+  portraitEl.dataset.image = url;
+  portraitEl.innerHTML = spriteMediaHtml(image, altText);
 }
 
-function renderStripCard(p, isActive) {
+function updateSpotlight(activeId) {
+  const card = document.getElementById('displaySpotlightCard');
+  const p = session.participants[activeId];
+  if (!card) return;
+  if (!p) { card.hidden = true; return; }
+
+  card.hidden = false;
   const name = visibleTo(p, 'name') ? p.name : '???';
-  const classes = ['display-strip-card', p.side];
-  if (isActive) classes.push('active');
-  if (p.status === 'spectating') classes.push('spectating');
-  return `
-    <div class="${classes.join(' ')}">
-      <div class="display-strip-portrait">${spriteMediaHtml(p.image, name)}</div>
-      <div class="display-strip-name">${name}</div>
-      ${barsHtml(p)}
-    </div>`;
+  patchPortrait(document.getElementById('spotlightPortrait'), p.image, name);
+  document.getElementById('spotlightName').textContent = name;
+  document.getElementById('spotlightBars').innerHTML = barsHtml(p);
+}
+
+function updateStrip(activeId) {
+  const stripEl = document.getElementById('displayStrip');
+  if (!stripEl) return;
+
+  const liveIds = new Set(Object.keys(session.participants));
+  [...stripEl.children].forEach(card => {
+    if (!liveIds.has(card.dataset.id)) card.remove();
+  });
+
+  // Turn order first (left to right), then anyone spectating (not in
+  // turnOrder) appended after, so the strip still shows the whole table.
+  const orderedIds = [
+    ...session.turnOrder,
+    ...Object.keys(session.participants).filter(id => !session.turnOrder.includes(id)),
+  ];
+
+  orderedIds.forEach((id, index) => {
+    const p = session.participants[id];
+    if (!p) return;
+
+    let card = stripEl.querySelector(`[data-id="${id}"]`);
+    if (!card) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = `
+        <div class="display-strip-card" data-id="${id}">
+          <div class="display-strip-portrait" id="stripPortrait-${id}"></div>
+          <div class="display-strip-name"></div>
+          <div class="display-strip-bars"></div>
+        </div>`;
+      card = wrapper.firstElementChild;
+    }
+
+    const name = visibleTo(p, 'name') ? p.name : '???';
+    card.className = ['display-strip-card', p.side,
+      id === activeId ? 'active' : '',
+      p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');
+    card.querySelector('.display-strip-name').textContent = name;
+    card.querySelector('.display-strip-bars').innerHTML = barsHtml(p);
+    patchPortrait(card.querySelector('.display-strip-portrait'), p.image, name);
+
+    // Reorder without recreating -- insertBefore on a node already in the
+    // document moves it in place and does not restart its media playback.
+    if (stripEl.children[index] !== card) {
+      stripEl.insertBefore(card, stripEl.children[index] || null);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

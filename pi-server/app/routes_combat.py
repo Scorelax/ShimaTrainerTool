@@ -1,5 +1,4 @@
-"""route=combat -- the shared multiplayer combat session (Phase 1 of the new
-combat tool: schema + real-time plumbing only, no move/damage logic yet).
+"""route=combat -- the shared multiplayer combat session.
 
 One active session at a time, matching the rest of this app's "single shared
 state" model (see the one shared pokedex in upstream.py) -- this is a
@@ -13,12 +12,20 @@ Every mutation re-publishes the *whole* session over the existing SSE
 channel (live.py) rather than a delta -- sessions are small (a handful of
 combatants), so broadcasting the full state avoids an entire class of
 client-side patching bugs for negligible bandwidth cost.
+
+use-move deliberately only covers the generic mechanic every move shares
+(spend VP, optionally hit a target for a manually-rolled damage number) --
+it is NOT a port of combat.js's per-move rules engine (Ingrain healing,
+Stockpile/Spit Up stacks, recharge tracking, etc.). Those stay in the
+legacy single-player combat page's client-side state for now; porting each
+one here is future work, not part of this session/turn-order plumbing.
 """
 import json
 import uuid
 from datetime import datetime, timezone
 
-from . import db, live
+from . import db, live, upstream
+from .jsutil import js_parse_int
 
 _EMPTY_STATE = {
     'active': False,
@@ -81,6 +88,16 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id')
         return _play_animation(conn, params['id'], params.get('species'))
 
+    if action == 'use-move':
+        if not params.get('id') or not params.get('move'):
+            raise ValueError('Missing participant id or move name')
+        return _use_move(
+            conn, params['id'], params['move'],
+            target_id=params.get('targetId') or None,
+            damage=js_parse_int(params.get('damage')) or 0,
+            species=params.get('species'),
+        )
+
     raise ValueError('Unknown combat action: ' + str(action))
 
 
@@ -131,6 +148,40 @@ def _play_animation(conn, pid, species):
         'species': species or participant['name'],
     })
     return {'status': 'success'}
+
+
+def _move_vp_cost(conn, move_name):
+    """VP cost straight from the moves dataset (column 4, same array shape
+    move-popup.js already destructures client-side) rather than trusting a
+    client-supplied number -- this is the one number in use-move actually
+    derivable from data, so it's looked up authoritatively same as anything
+    else server-authoritative in this file. Unknown move name -> 0, not an
+    error, so a still-being-typed custom/homebrew move name never hard-blocks
+    a turn."""
+    for row in upstream.fetch_moves(conn):
+        if row and str(row[0]).strip().lower() == move_name.strip().lower():
+            return js_parse_int(row[4]) or 0
+    return 0
+
+
+def _use_move(conn, pid, move_name, target_id, damage, species):
+    """The generic move-use mechanic every move shares: spend the user's VP
+    (overflow drains their own HP, exactly mirroring combat.js's existing
+    onUseMove behavior -- see the matching comment on _apply_move below),
+    then optionally apply a manually-rolled damage number to a target. Also
+    fires the same animation cue play-animation does, so using a move for
+    real is what actually drives the display module now instead of only the
+    WIP page's manual test button."""
+    vp_cost = _move_vp_cost(conn, move_name)
+    result = _mutate(conn, lambda s: _apply_move(s, pid, vp_cost, target_id, damage))
+
+    attacker = result['data']['participants'].get(pid, {})
+    live.publish({
+        'type': 'combat-animation',
+        'participantId': pid,
+        'species': species or attacker.get('name', ''),
+    })
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -244,3 +295,41 @@ def _reaction_end(state):
     # turnIndex was never touched during the reaction, so the floor returns
     # to exactly where the normal order left off.
     state['reactingParticipantId'] = None
+
+
+def _active_participant_id(state):
+    if state['reactingParticipantId']:
+        return state['reactingParticipantId']
+    if state['turnOrder']:
+        return state['turnOrder'][state['turnIndex']]
+    return None
+
+
+def _apply_move(state, pid, vp_cost, target_id, damage):
+    attacker = state['participants'].get(pid)
+    if not attacker:
+        raise ValueError('Unknown participant: ' + pid)
+    if pid != _active_participant_id(state):
+        raise ValueError("It's not this participant's turn")
+
+    # Mirrors combat.js's onUseMove exactly: VP floors at 0, and unlike
+    # ordinary combat damage (no HP floor anywhere else in this project --
+    # negative HP is how injury severity/death saves are read), VP overspend
+    # specifically clamps the self-inflicted overflow at 0 HP. That asymmetry
+    # is the existing game's actual behavior, not a new rule invented here.
+    new_vp = attacker['currentVP'] - vp_cost
+    new_hp = attacker['currentHP']
+    if new_vp < 0:
+        new_hp = max(0, new_hp + new_vp)
+        new_vp = 0
+    attacker['currentHP'] = new_hp
+    attacker['currentVP'] = new_vp
+
+    if target_id:
+        target = state['participants'].get(target_id)
+        if not target:
+            raise ValueError('Unknown target: ' + target_id)
+        if damage:
+            # Ordinary combat damage has no floor -- see the HP/VP rules note
+            # above; this can and should go negative.
+            target['currentHP'] -= damage

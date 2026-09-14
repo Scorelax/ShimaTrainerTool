@@ -790,6 +790,19 @@ export class CombatAPI {
   static async playAnimation(id, species) {
     return API.request('combat', 'play-animation', { id, species }, { useCache: false });
   }
+
+  /**
+   * The generic move-use mechanic: id must be whoever currently has the
+   * floor (active turn or mid-reaction) -- the server enforces this and
+   * rejects it otherwise. VP cost is looked up server-side from the moves
+   * dataset, not sent from here. damage is the manually-rolled number
+   * applied to targetId's HP, same as today's combat page's drain-damage
+   * popup -- omit both for a self-only/no-target move. Also triggers the
+   * display module's animation playback for this species.
+   */
+  static async useMove(id, move, { targetId, damage, species } = {}) {
+    return API.request('combat', 'use-move', { id, move, targetId, damage, species }, { useCache: false });
+  }
 }
 
 // ============================================================================

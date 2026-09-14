@@ -157,6 +157,7 @@ function renderParticipant(p, state, activeId) {
         </button>
         <button data-reaction="${p.id}" ${canReact ? '' : 'disabled'}>⚡ React${p.reactionUsed ? ' (used)' : ''}</button>
         ${p.side === 'enemy' ? visToggle('hp', 'HP') + visToggle('vp', 'VP') + visToggle('name', 'Name') : ''}
+        <button data-use-move="${p.id}" title="Only works when it's this participant's turn (or they're reacting) -- server enforces it">⚔️ Use Move</button>
         <button data-play-anim="${p.id}" data-anim-species="${p.name}" title="Test the display screen's animation playback">🎬 Play Anim</button>
         <button class="remove" data-remove="${p.id}">Remove</button>
       </div>
@@ -222,6 +223,24 @@ function attachBodyListeners() {
   document.querySelectorAll('[data-reaction]').forEach(btn => {
     btn.addEventListener('click', async () => {
       try { await CombatAPI.reactionStart(btn.dataset.reaction); } catch (err) { alert(err.message); }
+    });
+  });
+
+  document.querySelectorAll('[data-use-move]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.useMove;
+      const move = prompt('Move name (VP cost is looked up server-side from the moves dataset):');
+      if (!move) return;
+      const others = Object.values(session.participants).filter(p => p.id !== id);
+      const targetPrompt = others.length
+        ? `Target id (optional, leave blank for a self-only move) -- one of:\n${others.map(p => `${p.id} = ${p.name}`).join('\n')}`
+        : 'Target id (optional -- no other participants to target)';
+      const targetId = prompt(targetPrompt, '') || undefined;
+      const damageStr = targetId ? prompt('Damage dealt to target (optional, blank = none):', '') : '';
+      const damage = damageStr ? parseInt(damageStr, 10) : undefined;
+      try {
+        await CombatAPI.useMove(id, move, { targetId, damage });
+      } catch (err) { alert(err.message); }
     });
   });
 

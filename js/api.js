@@ -795,13 +795,16 @@ export class CombatAPI {
    * The generic move-use mechanic: id must be whoever currently has the
    * floor (active turn or mid-reaction) -- the server enforces this and
    * rejects it otherwise. VP cost is looked up server-side from the moves
-   * dataset, not sent from here. damage is the manually-rolled number
-   * applied to targetId's HP, same as today's combat page's drain-damage
-   * popup -- omit both for a self-only/no-target move. Also triggers the
-   * display module's animation playback for this species.
+   * dataset, not sent from here. diceRoll is the raw number rolled at the
+   * table (there's no digital dice in this game) -- the server converts it
+   * to actual damage against targetId using the move's type vs. the
+   * target's stored type(s); omit both targetId and diceRoll for a
+   * self-only move. Resolves to { status, data: <session>, multiplier,
+   * damageApplied } when a target was hit. Also triggers the display
+   * module's animation playback for this species.
    */
-  static async useMove(id, move, { targetId, damage, species } = {}) {
-    return API.request('combat', 'use-move', { id, move, targetId, damage, species }, { useCache: false });
+  static async useMove(id, move, { targetId, diceRoll, species } = {}) {
+    return API.request('combat', 'use-move', { id, move, targetId, diceRoll, species }, { useCache: false });
   }
 }
 

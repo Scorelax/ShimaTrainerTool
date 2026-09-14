@@ -124,6 +124,8 @@ function renderBody(state) {
       </select>
       <input type="number" name="maxHP" placeholder="HP" value="20" min="0">
       <input type="number" name="maxVP" placeholder="VP" value="10" min="0">
+      <input type="text" name="type1" placeholder="Type 1 (optional)" style="width:110px;">
+      <input type="text" name="type2" placeholder="Type 2 (optional)" style="width:110px;">
       <button type="submit" class="combat-wip-btn-primary">Add</button>
     </form>
 
@@ -150,7 +152,7 @@ function renderParticipant(p, state, activeId) {
     <div class="${classes.join(' ')}">
       <span class="combat-wip-side-badge ${p.side}">${p.side}</span>
       <span class="combat-wip-p-name">${p.name}</span>
-      <span class="combat-wip-p-stats">HP ${p.currentHP}/${p.maxHP} · VP ${p.currentVP}/${p.maxVP}</span>
+      <span class="combat-wip-p-stats">HP ${p.currentHP}/${p.maxHP} · VP ${p.currentVP}/${p.maxVP}${[p.type1, p.type2].filter(Boolean).length ? ' · ' + [p.type1, p.type2].filter(Boolean).join('/') : ''}</span>
       <div class="combat-wip-p-controls">
         <button data-toggle-status="${p.id}" data-next-status="${p.status === 'participating' ? 'spectating' : 'participating'}">
           ${p.status === 'participating' ? 'Bench' : 'Join Fight'}
@@ -208,6 +210,8 @@ function attachBodyListeners() {
       status: data.get('status'),
       maxHP, currentHP: maxHP,
       maxVP, currentVP: maxVP,
+      type1: data.get('type1') || '',
+      type2: data.get('type2') || '',
     });
     form.reset();
   });
@@ -236,10 +240,13 @@ function attachBodyListeners() {
         ? `Target id (optional, leave blank for a self-only move) -- one of:\n${others.map(p => `${p.id} = ${p.name}`).join('\n')}`
         : 'Target id (optional -- no other participants to target)';
       const targetId = prompt(targetPrompt, '') || undefined;
-      const damageStr = targetId ? prompt('Damage dealt to target (optional, blank = none):', '') : '';
-      const damage = damageStr ? parseInt(damageStr, 10) : undefined;
+      const rollStr = targetId ? prompt('Dice roll result (the raw number rolled at the table, optional):', '') : '';
+      const diceRoll = rollStr ? parseInt(rollStr, 10) : undefined;
       try {
-        await CombatAPI.useMove(id, move, { targetId, damage });
+        const result = await CombatAPI.useMove(id, move, { targetId, diceRoll });
+        if (result.multiplier !== undefined) {
+          alert(`${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`);
+        }
       } catch (err) { alert(err.message); }
     });
   });

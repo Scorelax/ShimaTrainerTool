@@ -1927,7 +1927,11 @@ function handleHpVpDelta(btn, state) {
   const c = state.combatants.find(x => x.id === btn.dataset.combatantId);
   if (!c) return;
   const delta = parseInt(btn.dataset.delta);
-  if (btn.dataset.stat === 'hp') c.currentHp = Math.max(0, Math.min(c.currentHp + delta, c.maxHp));
+  // HP has no floor (negative HP is how this game reads injury severity/
+  // death saves -- see project notes); only capped against maxHp on the
+  // heal side, via Math.min below. VP below is intentionally different --
+  // it does floor at 0.
+  if (btn.dataset.stat === 'hp') c.currentHp = Math.min(c.currentHp + delta, c.maxHp);
   if (btn.dataset.stat === 'vp') c.currentVp = Math.max(0, Math.min(c.currentVp + delta, c.maxVp));
   if (btn.dataset.stat === 'ac') c.ac = Math.max(0, c.ac + delta);
   if (btn.dataset.stat === 'crit') c.critMod = Math.max(-5, Math.min(5, (c.critMod || 0) + delta));
@@ -2263,7 +2267,7 @@ function showTrainerHpVpPopup(combatant, state) {
   document.getElementById('trainerHpVpRemoveBtn').addEventListener('click', () => {
     const hp = parseInt(hpInput.value) || 0;
     const vp = parseInt(vpInput.value) || 0;
-    if (hp > 0) combatant.currentHp = Math.max(0, combatant.currentHp - hp);
+    if (hp > 0) combatant.currentHp = combatant.currentHp - hp; // no floor -- see handleHpVpDelta
     if (vp > 0) combatant.currentVp = Math.max(0, combatant.currentVp - vp);
     saveCombatState(state);
     rerenderBattle(state);
@@ -2292,7 +2296,7 @@ function endTurnForCombatant(combatantId, state) {
     }
     if (se.name === 'Poison' || se.name === 'Burn') {
       const dmg = c.proficiency;
-      c.currentHp = Math.max(0, c.currentHp - dmg);
+      c.currentHp = c.currentHp - dmg; // no floor -- see handleHpVpDelta
       showToast(`${c.name}: ${se.name}! −${dmg} HP`, 'warning');
     } else if (se.name === 'Confusion') {
       showToast(`${c.name}: Confused! Roll a confusion check.`, 'info');
@@ -2461,7 +2465,7 @@ function showCombatMoveDetails(moveName, combatantId, state) {
 
       let newVp = target.currentVp - vpCost;
       let newHp = target.currentHp;
-      if (newVp < 0) { newHp = Math.max(0, newHp + newVp); newVp = 0; }
+      if (newVp < 0) { newHp = newHp + newVp; newVp = 0; } // no floor -- see handleHpVpDelta
       target.currentHp = newHp;
       target.currentVp = newVp;
 
@@ -2855,7 +2859,7 @@ function showTypeCalcPopup(combatantId, state) {
     const selectedType = selectedBtn?.dataset.type;
     const mult = selectedType ? (multMap[selectedType] ?? 1) : 1;
     const actualHp = Math.round(hpAmt * mult);
-    if (actualHp > 0) c.currentHp = Math.max(0, c.currentHp - actualHp);
+    if (actualHp > 0) c.currentHp = c.currentHp - actualHp; // no floor -- see handleHpVpDelta
     if (vpAmt > 0) c.currentVp = Math.max(0, c.currentVp - vpAmt);
     // Energy Intensive: Psychic damage also drains VP equal to HP taken
     if (actualHp > 0 && hasAbility(c, 'Energy Intensive')) {

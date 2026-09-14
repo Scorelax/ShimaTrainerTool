@@ -12,6 +12,9 @@
 //    mutation) -- forwarded as-is via a CustomEvent; pages that care (the WIP
 //    combat tool) listen for it directly instead of this module knowing
 //    anything about combat's shape.
+//  - a combat-animation event (routes_combat.py's play-animation action) --
+//    a one-shot "play this species' clip now" cue, not session state;
+//    forwarded the same way for the display module to react to.
 
 import { EVENTS_URL, GameDataAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { setPokedexConfig } from './visibility.js';
@@ -42,6 +45,8 @@ export function initLiveUpdates() {
       refreshActiveTrainerData(event.trainer);
     } else if (event.type === 'combat') {
       window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: event.session }));
+    } else if (event.type === 'combat-animation') {
+      window.dispatchEvent(new CustomEvent('app:combat-animation', { detail: event }));
     }
   };
 }

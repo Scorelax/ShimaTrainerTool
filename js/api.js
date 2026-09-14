@@ -783,6 +783,13 @@ export class CombatAPI {
   static async reactionEnd() {
     return API.request('combat', 'reaction-end', {}, { useCache: false });
   }
+
+  /** Fire-and-forget cue for the display module to play a species' battle
+   * animation clip right now -- not session state, nothing to await beyond
+   * the request landing. */
+  static async playAnimation(id, species) {
+    return API.request('combat', 'play-animation', { id, species }, { useCache: false });
+  }
 }
 
 // ============================================================================

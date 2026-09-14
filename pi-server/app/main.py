@@ -134,7 +134,7 @@ def _dispatch(params):
                     'music': ['sync', 'leave'],
                     'combat': ['get-state', 'create-session', 'end-session', 'add-participant',
                                'remove-participant', 'set-status', 'set-visibility',
-                               'advance-turn', 'reaction-start', 'reaction-end'],
+                               'advance-turn', 'reaction-start', 'reaction-end', 'play-animation'],
                 },
             }
         return {'error': 'Unknown route: ' + str(route), 'status': 'error'}

@@ -76,6 +76,11 @@ def handle(conn, action, params):
     if action == 'reaction-end':
         return _mutate(conn, _reaction_end)
 
+    if action == 'play-animation':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _play_animation(conn, params['id'], params.get('species'))
+
     raise ValueError('Unknown combat action: ' + str(action))
 
 
@@ -107,6 +112,25 @@ def _mutate(conn, fn):
         raise ValueError('No active combat session')
     fn(state)
     return _save_and_publish(conn, state)
+
+
+def _play_animation(conn, pid, species):
+    """Fire-and-forget: tells every connected screen (namely the display
+    module) to play a species' battle animation clip right now. Doesn't
+    touch combat_session at all -- this is a cue, not state, so there's
+    nothing to persist or to hand a client that connects after the fact."""
+    state = load_state(conn)
+    if not state.get('active'):
+        raise ValueError('No active combat session')
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    live.publish({
+        'type': 'combat-animation',
+        'participantId': pid,
+        'species': species or participant['name'],
+    })
+    return {'status': 'success'}
 
 
 # ---------------------------------------------------------------------------

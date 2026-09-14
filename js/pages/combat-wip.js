@@ -157,6 +157,7 @@ function renderParticipant(p, state, activeId) {
         </button>
         <button data-reaction="${p.id}" ${canReact ? '' : 'disabled'}>⚡ React${p.reactionUsed ? ' (used)' : ''}</button>
         ${p.side === 'enemy' ? visToggle('hp', 'HP') + visToggle('vp', 'VP') + visToggle('name', 'Name') : ''}
+        <button data-play-anim="${p.id}" data-anim-species="${p.name}" title="Test the display screen's animation playback">🎬 Play Anim</button>
         <button class="remove" data-remove="${p.id}">Remove</button>
       </div>
     </div>`;
@@ -221,6 +222,13 @@ function attachBodyListeners() {
   document.querySelectorAll('[data-reaction]').forEach(btn => {
     btn.addEventListener('click', async () => {
       try { await CombatAPI.reactionStart(btn.dataset.reaction); } catch (err) { alert(err.message); }
+    });
+  });
+
+  document.querySelectorAll('[data-play-anim]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const species = prompt('Species name for the animation clip (must match an uploaded battle-animation filename):', btn.dataset.animSpecies);
+      if (species) CombatAPI.playAnimation(btn.dataset.playAnim, species);
     });
   });
 

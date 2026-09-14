@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Combat Display</title>
+<link rel="icon" href="assets/Pokeball.png">
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #0a0a12; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  #displayRoot { display: flex; flex-direction: column; justify-content: space-between; height: 100vh; box-sizing: border-box; padding: 1.5rem 2rem; }
+
+  .display-empty { margin: auto; font-size: 1.6rem; color: #a0a0c0; text-align: center; }
+
+  .display-round { font-size: 1.3rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 2px; }
+
+  .display-spotlight { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .display-spotlight-card { text-align: center; }
+  .display-spotlight-portrait { width: 320px; height: 320px; display: flex; align-items: center; justify-content: center; }
+  .display-spotlight-portrait img, .display-spotlight-portrait video { max-width: 100%; max-height: 100%; filter: drop-shadow(0 0 24px rgba(255,215,0,0.35)); }
+  .display-spotlight-name { font-size: 1.6rem; font-weight: 700; margin-top: 0.5rem; }
+  .display-spotlight-bars { width: 280px; margin: 0.75rem auto 0; }
+
+  .display-strip { display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.25rem; }
+  .display-strip-card {
+    flex: 0 0 auto; width: 96px; text-align: center; padding: 0.5rem;
+    border-radius: 10px; border: 2px solid transparent; background: rgba(255,255,255,0.05);
+  }
+  .display-strip-card.active { border-color: #FFD700; background: rgba(255,215,0,0.1); }
+  .display-strip-card.spectating { opacity: 0.4; }
+  .display-strip-portrait { width: 64px; height: 64px; margin: 0 auto; }
+  .display-strip-portrait img, .display-strip-portrait video { width: 100%; height: 100%; object-fit: contain; }
+  .display-strip-name { font-size: 0.75rem; font-weight: 600; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .display-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.15); overflow: hidden; margin-top: 0.25rem; }
+  .display-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+  .display-bar.hp .display-bar-fill { background: #2ecc71; }
+  .display-bar.vp .display-bar-fill { background: #3498db; }
+
+  .display-anim-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: flex; align-items: center; justify-content: center; z-index: 10;
+  }
+  .display-anim-overlay video { max-width: 90vw; max-height: 90vh; }
+
+  .display-volume {
+    position: fixed; bottom: 0.75rem; right: 1rem; z-index: 20;
+    background: rgba(0,0,0,0.4); border-radius: 20px; padding: 0.3rem 0.8rem;
+    display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+  <div id="displayRoot"><div class="display-empty">Loading…</div></div>
+  <script type="module" src="js/pages/display.js"></script>
+</body>
+</html>

@@ -6,6 +6,7 @@
 // the other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI } from '../api.js';
+import { pickTarget } from '../utils/target-picker.js';
 
 const WIP_CSS = `
   .combat-wip-page { min-height: 100vh; background: #14141f; color: #e0e0e0; font-family: inherit; }
@@ -235,11 +236,7 @@ function attachBodyListeners() {
       const id = btn.dataset.useMove;
       const move = prompt('Move name (VP cost is looked up server-side from the moves dataset):');
       if (!move) return;
-      const others = Object.values(session.participants).filter(p => p.id !== id);
-      const targetPrompt = others.length
-        ? `Target id (optional, leave blank for a self-only move) -- one of:\n${others.map(p => `${p.id} = ${p.name}`).join('\n')}`
-        : 'Target id (optional -- no other participants to target)';
-      const targetId = prompt(targetPrompt, '') || undefined;
+      const targetId = await pickTarget(id) || undefined;
       const rollStr = targetId ? prompt('Dice roll result (the raw number rolled at the table, optional):', '') : '';
       const diceRoll = rollStr ? parseInt(rollStr, 10) : undefined;
       try {

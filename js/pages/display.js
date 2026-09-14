@@ -11,6 +11,7 @@ import { audioManager } from '../utils/audio.js';
 import { getSettings, saveSettings } from '../utils/settings.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation, getBattleAnimationUrl } from '../utils/battle-animation.js';
+import { visibleToViewer } from '../utils/combat-visibility.js';
 
 let session = { active: false, participants: {}, turnOrder: [], turnIndex: 0, round: 0, reactingParticipantId: null };
 
@@ -97,18 +98,12 @@ function ensureSkeleton(root) {
   });
 }
 
-function visibleTo(p, field) {
-  // Allies are always fully shown to the table; enemies only show what the
-  // DM has made visible (see routes_combat.py's per-participant visibility).
-  return p.side === 'player' || p.visibility[field];
-}
-
 function barsHtml(p) {
   const hpPct = p.maxHP > 0 ? Math.max(0, Math.min(100, (p.currentHP / p.maxHP) * 100)) : 0;
   const vpPct = p.maxVP > 0 ? Math.max(0, Math.min(100, (p.currentVP / p.maxVP) * 100)) : 0;
   return `
-    ${visibleTo(p, 'hp') ? `<div class="display-bar hp"><div class="display-bar-fill" style="width:${hpPct}%"></div></div>` : ''}
-    ${visibleTo(p, 'vp') ? `<div class="display-bar vp"><div class="display-bar-fill" style="width:${vpPct}%"></div></div>` : ''}
+    ${visibleToViewer(p, 'hp') ? `<div class="display-bar hp"><div class="display-bar-fill" style="width:${hpPct}%"></div></div>` : ''}
+    ${visibleToViewer(p, 'vp') ? `<div class="display-bar vp"><div class="display-bar-fill" style="width:${vpPct}%"></div></div>` : ''}
   `;
 }
 
@@ -130,7 +125,7 @@ function updateSpotlight(activeId) {
   if (!p) { card.hidden = true; return; }
 
   card.hidden = false;
-  const name = visibleTo(p, 'name') ? p.name : '???';
+  const name = visibleToViewer(p, 'name') ? p.name : '???';
   patchPortrait(document.getElementById('spotlightPortrait'), p.image, name);
   document.getElementById('spotlightName').textContent = name;
   document.getElementById('spotlightBars').innerHTML = barsHtml(p);
@@ -168,7 +163,7 @@ function updateStrip(activeId) {
       card = wrapper.firstElementChild;
     }
 
-    const name = visibleTo(p, 'name') ? p.name : '???';
+    const name = visibleToViewer(p, 'name') ? p.name : '???';
     card.className = ['display-strip-card', p.side,
       id === activeId ? 'active' : '',
       p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');

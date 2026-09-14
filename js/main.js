@@ -299,7 +299,7 @@ class Router {
       return;
     }
     const content = document.getElementById('content');
-    content.innerHTML = renderCombatWip();
+    content.innerHTML = await renderCombatWip();
     attachCombatWipListeners();
   }
 }

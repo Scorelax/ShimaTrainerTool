@@ -737,6 +737,55 @@ export class MusicAPI {
 }
 
 // ============================================================================
+// COMBAT API (new shared combat tool -- see pi-server/app/routes_combat.py)
+// ============================================================================
+
+export class CombatAPI {
+  /** Current session state (or {active:false, ...} if none). Never cached --
+   * must always reflect the live session, and live-updates.js already keeps
+   * callers fresh via SSE without needing a poll. */
+  static async getState() {
+    return API.request('combat', 'get-state', {}, { useCache: false });
+  }
+
+  static async createSession() {
+    return API.request('combat', 'create-session', {}, { useCache: false });
+  }
+
+  static async endSession() {
+    return API.request('combat', 'end-session', {}, { useCache: false });
+  }
+
+  static async addParticipant(participant) {
+    return API.request('combat', 'add-participant', { data: JSON.stringify(participant) }, { useCache: false });
+  }
+
+  static async removeParticipant(id) {
+    return API.request('combat', 'remove-participant', { id }, { useCache: false });
+  }
+
+  static async setStatus(id, status) {
+    return API.request('combat', 'set-status', { id, status }, { useCache: false });
+  }
+
+  static async setVisibility(id, field, visible) {
+    return API.request('combat', 'set-visibility', { id, field, visible: visible ? 1 : 0 }, { useCache: false });
+  }
+
+  static async advanceTurn() {
+    return API.request('combat', 'advance-turn', {}, { useCache: false });
+  }
+
+  static async reactionStart(id) {
+    return API.request('combat', 'reaction-start', { id }, { useCache: false });
+  }
+
+  static async reactionEnd() {
+    return API.request('combat', 'reaction-end', {}, { useCache: false });
+  }
+}
+
+// ============================================================================
 // OFFLINE DETECTION
 // ============================================================================
 

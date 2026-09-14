@@ -8,6 +8,10 @@
 //    external game-write API) -- if it's for the trainer currently loaded in
 //    this tab, refetch that trainer so trainer-info/trainer-card don't need a
 //    trip back through continue-journey to see it.
+//  - a combat event (routes_combat.py publishes the whole session on every
+//    mutation) -- forwarded as-is via a CustomEvent; pages that care (the WIP
+//    combat tool) listen for it directly instead of this module knowing
+//    anything about combat's shape.
 
 import { EVENTS_URL, GameDataAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { setPokedexConfig } from './visibility.js';
@@ -36,6 +40,8 @@ export function initLiveUpdates() {
       refreshPokedexData();
     } else if (event.type === 'trainer-data' && event.trainer) {
       refreshActiveTrainerData(event.trainer);
+    } else if (event.type === 'combat') {
+      window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: event.session }));
     }
   };
 }

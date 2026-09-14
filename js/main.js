@@ -13,6 +13,7 @@ import { renderNewPokemon, attachNewPokemonListeners } from './pages/new-pokemon
 import { renderPokemonForm, attachPokemonFormListeners } from './pages/pokemon-form.js';
 import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js';
 import { renderCombat, attachCombatListeners } from './pages/combat.js';
+import { renderCombatWip, attachCombatWipListeners } from './pages/combat-wip.js';
 import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
 import { getSettings } from './utils/settings.js';
@@ -70,7 +71,8 @@ class Router {
       'new-pokemon': this.renderNewPokemon.bind(this),
       'pokemon-form': this.renderPokemonForm.bind(this),
       'evolution': this.renderEvolution.bind(this),
-      'combat': this.renderCombat.bind(this)
+      'combat': this.renderCombat.bind(this),
+      'combat-wip': this.renderCombatWip.bind(this)
     };
 
     this.init();
@@ -286,6 +288,19 @@ class Router {
     const content = document.getElementById('content');
     content.innerHTML = renderCombat();
     attachCombatListeners();
+  }
+
+  async renderCombatWip() {
+    // Joey-only, same as the WIP button that links here (see combat.js setup header) --
+    // guarded here too so the route isn't reachable by typing the hash directly.
+    const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    if (trainerData[1] !== 'Joey') {
+      this.navigate('combat');
+      return;
+    }
+    const content = document.getElementById('content');
+    content.innerHTML = renderCombatWip();
+    attachCombatWipListeners();
   }
 }
 

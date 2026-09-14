@@ -353,7 +353,7 @@ function renderSetupPhase() {
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Back</button>
         <div class="combat-header-title">⚔️ Combat Setup</div>
-        <div></div>
+        ${trainerName === 'Joey' ? '<button class="combat-wip-btn" id="combatWipBtn">🛠️ WIP</button>' : '<div></div>'}
       </div>
       <div class="combat-setup-container">
         <div class="setup-section-label">TRAINER (always included)</div>
@@ -1034,6 +1034,10 @@ function getCombatCSS() {
       background: linear-gradient(135deg, #c0392b, #922b21); border: none;
       color: #fff; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
     }
+    .combat-wip-btn {
+      background: linear-gradient(135deg, #8e44ad, #5b2c6f); border: none;
+      color: #fff; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600;
+    }
 
     /* SETUP */
     .combat-setup-container { max-width: 600px; margin: 0 auto; padding: 1rem; }
@@ -1434,6 +1438,10 @@ export function attachCombatListeners() {
 function attachSetupListeners() {
   document.getElementById('combatBackBtn')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+  });
+
+  document.getElementById('combatWipBtn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat-wip' } }));
   });
 
   const startBtn = document.getElementById('startCombatBtn');

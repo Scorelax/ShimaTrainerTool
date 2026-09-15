@@ -43,6 +43,19 @@ _EMPTY_STATE = {
     'reactingParticipantId': None,
     'participants': {},
     'fieldEffects': [],
+    # The battle-map screen's state -- a second, separate physical display
+    # shown alongside the HP/turn screen, purely spatial (positions/terrain,
+    # never HP/VP). Lives here rather than as its own session/lifecycle
+    # because it only ever makes sense alongside an active fight, so tying
+    # it to create-session/end-session is free. 'grid' is the only
+    # templateType for now; the field is already generic so a future
+    # 'cave'/'zone' template is additive, not a breaking change.
+    'board': {
+        'templateType': 'grid',
+        'grid': {'cols': 10, 'rows': 8},
+        'cells': {},   # "col,row" -> {'terrain': '<freeform DM-typed label>'}
+        'tokens': {},  # participantId -> {'col': int, 'row': int}
+    },
 }
 
 
@@ -109,6 +122,32 @@ def handle(conn, action, params):
             dice_roll=js_parse_int(params.get('diceRoll')) or 0,
             species=params.get('species'),
         )
+
+    if action == 'set-board-template':
+        cols = js_parse_int(params.get('cols'))
+        rows = js_parse_int(params.get('rows'))
+        if not cols or not rows or cols < 1 or rows < 1:
+            raise ValueError('cols and rows must be positive integers')
+        return _mutate(conn, lambda s: _set_board_template(s, cols, rows))
+
+    if action == 'set-cell-terrain':
+        col = js_parse_int(params.get('col'))
+        row = js_parse_int(params.get('row'))
+        if col is None or row is None:
+            raise ValueError('Missing col or row')
+        return _mutate(conn, lambda s: _set_cell_terrain(s, col, row, params.get('terrain', '')))
+
+    if action == 'set-token-position':
+        col = js_parse_int(params.get('col'))
+        row = js_parse_int(params.get('row'))
+        if not params.get('id') or col is None or row is None:
+            raise ValueError('Missing participant id, col, or row')
+        return _mutate(conn, lambda s: _set_token_position(s, params['id'], col, row))
+
+    if action == 'clear-token-position':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _clear_token_position(s, params['id']))
 
     raise ValueError('Unknown combat action: ' + str(action))
 
@@ -258,6 +297,7 @@ def _add_participant(state, data):
 
 def _remove_participant(state, pid):
     state['participants'].pop(pid, None)
+    state['board']['tokens'].pop(pid, None)
     _rebuild_turn_order(state)
 
 
@@ -379,3 +419,37 @@ def _apply_move(conn, state, pid, vp_cost, target_id, dice_roll, move_type):
             target['currentHP'] -= actual_damage  # no floor, same reasoning as above
             outcome = {'multiplier': multiplier, 'damageApplied': actual_damage}
     return outcome
+
+
+# ---------------------------------------------------------------------------
+# Battle map -- see the 'board' shape on _EMPTY_STATE above. Positioning is
+# deliberately NOT turn-gated (unlike use-move) -- it's DM/setup-driven
+# battlefield state, not an action a participant spends their turn on.
+# ---------------------------------------------------------------------------
+
+def _set_board_template(state, cols, rows):
+    # Changing grid size invalidates any existing terrain marks (they were
+    # placed against the old dimensions), but leaves token positions as-is --
+    # simplicity over defensive bounds-checking, consistent with how lightly
+    # this file already treats edge cases elsewhere.
+    state['board']['templateType'] = 'grid'
+    state['board']['grid'] = {'cols': cols, 'rows': rows}
+    state['board']['cells'] = {}
+
+
+def _set_cell_terrain(state, col, row, terrain):
+    key = f'{col},{row}'
+    if terrain:
+        state['board']['cells'][key] = {'terrain': terrain}
+    else:
+        state['board']['cells'].pop(key, None)
+
+
+def _set_token_position(state, pid, col, row):
+    if pid not in state['participants']:
+        raise ValueError('Unknown participant: ' + pid)
+    state['board']['tokens'][pid] = {'col': col, 'row': row}
+
+
+def _clear_token_position(state, pid):
+    state['board']['tokens'].pop(pid, None)

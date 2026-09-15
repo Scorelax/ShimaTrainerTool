@@ -135,7 +135,8 @@ def _dispatch(params):
                     'combat': ['get-state', 'create-session', 'end-session', 'add-participant',
                                'remove-participant', 'set-status', 'set-visibility',
                                'advance-turn', 'reaction-start', 'reaction-end', 'play-animation',
-                               'use-move'],
+                               'use-move', 'set-board-template', 'set-cell-terrain',
+                               'set-token-position', 'clear-token-position'],
                 },
             }
         return {'error': 'Unknown route: ' + str(route), 'status': 'error'}

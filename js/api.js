@@ -808,6 +808,27 @@ export class CombatAPI {
   static async useMove(id, move, { targetId, diceRoll, species } = {}) {
     return API.request('combat', 'use-move', { id, move, targetId, diceRoll, species }, { useCache: false });
   }
+
+  // -- Battle map (see pi-server/app/routes_combat.py's 'board' state) --
+  // A second, separate display, purely spatial (positions/terrain, never
+  // HP/VP) shown alongside the combat screen these other methods drive.
+
+  static async setBoardTemplate(cols, rows) {
+    return API.request('combat', 'set-board-template', { cols, rows }, { useCache: false });
+  }
+
+  /** Empty-string terrain clears the cell. */
+  static async setCellTerrain(col, row, terrain) {
+    return API.request('combat', 'set-cell-terrain', { col, row, terrain }, { useCache: false });
+  }
+
+  static async setTokenPosition(id, col, row) {
+    return API.request('combat', 'set-token-position', { id, col, row }, { useCache: false });
+  }
+
+  static async clearTokenPosition(id) {
+    return API.request('combat', 'clear-token-position', { id }, { useCache: false });
+  }
 }
 
 // ============================================================================

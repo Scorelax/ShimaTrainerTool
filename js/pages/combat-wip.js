@@ -1,9 +1,12 @@
-// New shared combat tool -- work in progress, Joey-only entry point (see
-// combat.js setup header). Phase 1 vertical slice: prove the combat-session
-// schema and the real-time SSE plumbing (pi-server/app/routes_combat.py)
-// hold up, before any real game logic or player-facing UI is built on top.
-// Open this page in two tabs and add/remove/advance a session in one --
-// the other should update within the SSE stream's normal latency, with no
+// New shared combat tool -- work in progress, open to every trainer (see
+// combat.js setup header) so multiple people can log in as different
+// trainers and actually test the shared/live parts together. The old
+// combat page keeps being what's actually used to play until the real
+// switchover. Phase 1 vertical slice: prove the combat-session schema and
+// the real-time SSE plumbing (pi-server/app/routes_combat.py) hold up,
+// before any real game logic or player-facing UI is built on top. Open
+// this page in two tabs and add/remove/advance a session in one -- the
+// other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';

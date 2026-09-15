@@ -291,13 +291,12 @@ class Router {
   }
 
   async renderCombatWip() {
-    // Joey-only, same as the WIP button that links here (see combat.js setup header) --
-    // guarded here too so the route isn't reachable by typing the hash directly.
-    const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
-    if (trainerData[1] !== 'Joey') {
-      this.navigate('combat');
-      return;
-    }
+    // Open to every trainer (not gated to one trainer) so multiple people
+    // can log in as different trainers to actually test the shared/live
+    // parts of this -- that's the only way to see it working for real
+    // until Benjakronk's own tool can drive it. The old combat page (see
+    // renderCombat above) stays the one actually used to play until the
+    // real switchover, which is well down the road.
     const content = document.getElementById('content');
     content.innerHTML = await renderCombatWip();
     attachCombatWipListeners();

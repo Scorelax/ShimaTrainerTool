@@ -353,7 +353,7 @@ function renderSetupPhase() {
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Back</button>
         <div class="combat-header-title">⚔️ Combat Setup</div>
-        ${trainerName === 'Joey' ? '<button class="combat-wip-btn" id="combatWipBtn">🛠️ WIP</button>' : '<div></div>'}
+        <button class="combat-wip-btn" id="combatWipBtn">🛠️ WIP</button>
       </div>
       <div class="combat-setup-container">
         <div class="setup-section-label">TRAINER (always included)</div>

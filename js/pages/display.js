@@ -64,7 +64,8 @@ function render() {
   const activeId = session.reactingParticipantId || session.turnOrder[session.turnIndex];
   const roundEl = document.getElementById('displayRound');
   if (roundEl) {
-    roundEl.textContent = `Round ${session.round}${session.reactingParticipantId ? ' · ⚡ Reaction in progress' : ''}`;
+    const battleLabel = session.battleType === 'pvp' ? 'PvP' : 'PvE';
+    roundEl.textContent = `Round ${session.round} · ${battleLabel}${session.reactingParticipantId ? ' · ⚡ Reaction in progress' : ''}`;
   }
 
   updateSpotlight(activeId);

@@ -36,6 +36,7 @@ from .jsutil import js_parse_int
 
 _EMPTY_STATE = {
     'active': False,
+    'battleType': None,
     'round': 0,
     'turnIndex': 0,
     'turnOrder': [],
@@ -50,8 +51,12 @@ def handle(conn, action, params):
         return {'status': 'success', 'data': load_state(conn)}
 
     if action == 'create-session':
+        battle_type = params.get('battleType', 'pve')
+        if battle_type not in ('pvp', 'pve'):
+            raise ValueError('battleType must be pvp or pve')
         state = dict(_EMPTY_STATE)
         state['active'] = True
+        state['battleType'] = battle_type
         state['round'] = 1
         return _save_and_publish(conn, state)
 

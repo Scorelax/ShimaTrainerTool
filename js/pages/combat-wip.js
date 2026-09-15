@@ -8,7 +8,7 @@
 // this page in two tabs and add/remove/advance a session in one -- the
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
-import { CombatAPI } from '../api.js';
+import { CombatAPI, TrainerAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
 
 const WIP_CSS = `
@@ -38,7 +38,23 @@ const WIP_CSS = `
     background: rgba(255,255,255,0.05); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem;
   }
   .combat-wip-round-label { font-weight: 700; color: #FFD700; }
+  .combat-wip-battle-badge {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    background: rgba(255,255,255,0.12); border-radius: 4px; padding: 0.15rem 0.5rem; margin-left: 0.5rem;
+  }
   .combat-wip-reacting-note { color: #e67e22; font-size: 0.85rem; }
+  .combat-wip-battle-type-choice {
+    display: flex; flex-direction: column; gap: 0.6rem; max-width: 380px; margin: 0 auto 1.5rem; text-align: left;
+  }
+  .combat-wip-battle-type-choice label {
+    display: flex; gap: 0.5rem; align-items: flex-start; background: rgba(255,255,255,0.05);
+    border-radius: 8px; padding: 0.6rem 0.8rem; cursor: pointer;
+  }
+  .combat-wip-battle-type-choice small { display: block; color: #a0a0c0; }
+  .combat-wip-section-label {
+    font-size: 0.75rem; font-weight: 700; color: #a0a0c0; text-transform: uppercase;
+    letter-spacing: 0.5px; margin: 1rem 0 0.4rem;
+  }
   .combat-wip-add-form {
     display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
     background: rgba(255,255,255,0.05); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem;
@@ -95,7 +111,17 @@ function renderBody(state) {
     return `
       <div class="combat-wip-empty">
         <h2>No active session</h2>
-        <p>Phase 1 slice: create a session, add test participants, and confirm the turn order / reaction rules sync live across every open tab.</p>
+        <p>Add real trainers and their party Pokémon, and confirm the turn order / reaction rules sync live across every open tab.</p>
+        <div class="combat-wip-battle-type-choice">
+          <label>
+            <input type="radio" name="battleType" value="pve" checked>
+            <span><strong>PvE</strong><small>Players vs. DM-controlled enemies -- the DM adds freeform enemies below.</small></span>
+          </label>
+          <label>
+            <input type="radio" name="battleType" value="pvp">
+            <span><strong>PvP</strong><small>Players fight each other -- no DM setup, everyone's added from real trainer data.</small></span>
+          </label>
+        </div>
         <button class="combat-wip-btn-primary" id="createSessionBtn">Create Session</button>
       </div>`;
   }
@@ -106,7 +132,7 @@ function renderBody(state) {
   return `
     <div class="combat-wip-round-bar">
       <div>
-        <div class="combat-wip-round-label">Round ${state.round}</div>
+        <div class="combat-wip-round-label">Round ${state.round} <span class="combat-wip-battle-badge">${state.battleType === 'pvp' ? 'PvP' : 'PvE'}</span></div>
         <div style="font-size:0.8rem;color:#a0a0c0;">${orderLabel}</div>
         ${state.reactingParticipantId ? `<div class="combat-wip-reacting-note">⚡ ${state.participants[state.reactingParticipantId]?.name} is reacting out of turn</div>` : ''}
       </div>
@@ -116,12 +142,17 @@ function renderBody(state) {
       </div>
     </div>
 
+    <div class="combat-wip-section-label">Add Real Trainer / Pokémon</div>
+    <div class="combat-wip-add-form" id="addRealForm">
+      <select id="realTrainerSelect"><option value="">Loading trainers…</option></select>
+      <select id="realEntitySelect" disabled><option value="">Select trainer first…</option></select>
+      <button type="button" class="combat-wip-btn-primary" id="realAddBtn" disabled>Add</button>
+    </div>
+
+    ${state.battleType === 'pve' ? `
+    <div class="combat-wip-section-label">Add Freeform Enemy (DM-controlled)</div>
     <form class="combat-wip-add-form" id="addParticipantForm">
       <input type="text" name="name" placeholder="Name" required>
-      <select name="side">
-        <option value="player">Player</option>
-        <option value="enemy">Enemy</option>
-      </select>
       <select name="status">
         <option value="participating">Participating</option>
         <option value="spectating">Spectating</option>
@@ -131,7 +162,7 @@ function renderBody(state) {
       <input type="text" name="type1" placeholder="Type 1 (optional)" style="width:110px;">
       <input type="text" name="type2" placeholder="Type 2 (optional)" style="width:110px;">
       <button type="submit" class="combat-wip-btn-primary">Add</button>
-    </form>
+    </form>` : ''}
 
     <div class="combat-wip-participant-list">
       ${Object.values(state.participants).map(p => renderParticipant(p, state, activeId)).join('') || '<p style="color:#a0a0c0;">No participants yet.</p>'}
@@ -191,7 +222,8 @@ export function attachCombatWipListeners() {
 
 function attachBodyListeners() {
   document.getElementById('createSessionBtn')?.addEventListener('click', async () => {
-    await CombatAPI.createSession();
+    const battleType = document.querySelector('input[name="battleType"]:checked')?.value || 'pve';
+    await CombatAPI.createSession(battleType);
   });
 
   document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
@@ -210,7 +242,7 @@ function attachBodyListeners() {
     const maxVP = parseInt(data.get('maxVP'), 10) || 0;
     await CombatAPI.addParticipant({
       name: data.get('name'),
-      side: data.get('side'),
+      side: 'enemy', // this form is PvE-only (see renderBody) -- freeform is always DM-controlled enemies
       status: data.get('status'),
       maxHP, currentHP: maxHP,
       maxVP, currentVP: maxVP,
@@ -219,6 +251,8 @@ function attachBodyListeners() {
     });
     form.reset();
   });
+
+  _initRealAddForm();
 
   document.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => CombatAPI.removeParticipant(btn.dataset.remove));
@@ -269,4 +303,105 @@ function attachBodyListeners() {
       '<button class="combat-wip-btn-secondary" id="reactionEndBtn">End Reaction</button>');
     document.getElementById('reactionEndBtn')?.addEventListener('click', () => CombatAPI.reactionEnd());
   }
+}
+
+// ---------------------------------------------------------------------------
+// Add Real Trainer / Pokémon -- pulls from the actual app data (TrainerAPI)
+// instead of hand-typed test values, so this can be tested against the real
+// trainers/party. Column indices below mirror the exact same ones
+// combat.js's buildTrainerCombatant/buildPokemonCombatant already use
+// (POKEMON_COLUMNS/TRAINER_COLUMNS in pi-server/app/db.py), and the active-
+// party filter (slot 1-6) matches renderSetupPhase's own logic there, so a
+// participant added here reflects the same "active party" combat.js itself
+// would show.
+// ---------------------------------------------------------------------------
+
+let _trainerListCache = null;
+
+async function _getTrainerList() {
+  if (_trainerListCache) return _trainerListCache;
+  const result = await TrainerAPI.getAll();
+  _trainerListCache = result.status === 'success' ? result.data : [];
+  return _trainerListCache;
+}
+
+// JS `value ?? fallback` isn't enough here -- an empty string is a real
+// "no current value saved yet" case in this sheet-derived data, same
+// fallback-to-max reasoning combat.js's own buildXCombatant functions use.
+function _numOr(value, fallback) {
+  return (value !== null && value !== undefined && value !== '') ? parseInt(value, 10) : fallback;
+}
+
+async function _initRealAddForm() {
+  const trainerSelect = document.getElementById('realTrainerSelect');
+  const entitySelect = document.getElementById('realEntitySelect');
+  const addBtn = document.getElementById('realAddBtn');
+  if (!trainerSelect || !entitySelect || !addBtn) return; // no active session this render
+
+  const trainers = await _getTrainerList();
+  trainerSelect.innerHTML = '<option value="">Select trainer…</option>' +
+    trainers.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+
+  trainerSelect.addEventListener('change', async () => {
+    const name = trainerSelect.value;
+    entitySelect.disabled = true;
+    addBtn.disabled = true;
+    entitySelect._trainerData = null;
+    entitySelect._activeParty = null;
+    if (!name) {
+      entitySelect.innerHTML = '<option value="">Select trainer first…</option>';
+      return;
+    }
+
+    entitySelect.innerHTML = '<option value="">Loading…</option>';
+    const result = await TrainerAPI.get(name);
+    if (result.status !== 'success' || !result.data) {
+      entitySelect.innerHTML = '<option value="">Failed to load</option>';
+      return;
+    }
+
+    const trainerData = result.data.trainerData;
+    const activeParty = (result.data.pokemonData || []).filter(p => {
+      const slot = parseInt(p[38], 10);
+      return slot >= 1 && slot <= 6;
+    });
+    entitySelect._trainerData = trainerData;
+    entitySelect._activeParty = activeParty;
+
+    const pokemonOptions = activeParty.map((p, i) =>
+      `<option value="pokemon:${i}">${p[36] || p[2] || 'Unknown'} (Lv ${p[4] || '?'})</option>`);
+    entitySelect.innerHTML = [`<option value="trainer">${trainerData[1]} (Trainer)</option>`, ...pokemonOptions].join('');
+    entitySelect.disabled = false;
+    addBtn.disabled = false;
+  });
+
+  addBtn.addEventListener('click', async () => {
+    const value = entitySelect.value;
+    const trainerData = entitySelect._trainerData;
+    if (!value || !trainerData) return;
+
+    let participant;
+    if (value === 'trainer') {
+      const maxHP = parseInt(trainerData[11], 10) || 0;
+      const maxVP = parseInt(trainerData[12], 10) || 0;
+      participant = {
+        name: trainerData[1], side: 'player', image: trainerData[0],
+        maxHP, currentHP: _numOr(trainerData[34], maxHP),
+        maxVP, currentVP: _numOr(trainerData[35], maxVP),
+      };
+    } else {
+      const p = entitySelect._activeParty[parseInt(value.split(':')[1], 10)];
+      const maxHP = parseInt(p[10], 10) || 0;
+      const maxVP = parseInt(p[12], 10) || 0;
+      participant = {
+        name: p[36] || p[2] || 'Unknown', side: 'player', image: p[1],
+        maxHP, currentHP: _numOr(p[45], maxHP),
+        maxVP, currentVP: _numOr(p[46], maxVP),
+        type1: p[5] || '', type2: p[6] || '',
+      };
+    }
+    try {
+      await CombatAPI.addParticipant(participant);
+    } catch (err) { alert(err.message); }
+  });
 }

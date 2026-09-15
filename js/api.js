@@ -748,8 +748,10 @@ export class CombatAPI {
     return API.request('combat', 'get-state', {}, { useCache: false });
   }
 
-  static async createSession() {
-    return API.request('combat', 'create-session', {}, { useCache: false });
+  /** battleType: 'pvp' (players fight each other, no DM setup) or 'pve'
+   * (players vs DM-controlled enemies, the default). */
+  static async createSession(battleType = 'pve') {
+    return API.request('combat', 'create-session', { battleType }, { useCache: false });
   }
 
   static async endSession() {

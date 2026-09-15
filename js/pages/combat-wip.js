@@ -142,10 +142,9 @@ function renderBody(state) {
       </div>
     </div>
 
-    <div class="combat-wip-section-label">Add Real Trainer / Pokémon</div>
+    <div class="combat-wip-section-label">Join as ${_currentTrainerName() || 'yourself'}</div>
     <div class="combat-wip-add-form" id="addRealForm">
-      <select id="realTrainerSelect"><option value="">Loading trainers…</option></select>
-      <select id="realEntitySelect" disabled><option value="">Select trainer first…</option></select>
+      <select id="realEntitySelect" disabled><option value="">Loading your party…</option></select>
       <button type="button" class="combat-wip-btn-primary" id="realAddBtn" disabled>Add</button>
     </div>
 
@@ -306,23 +305,21 @@ function attachBodyListeners() {
 }
 
 // ---------------------------------------------------------------------------
-// Add Real Trainer / Pokémon -- pulls from the actual app data (TrainerAPI)
-// instead of hand-typed test values, so this can be tested against the real
-// trainers/party. Column indices below mirror the exact same ones
-// combat.js's buildTrainerCombatant/buildPokemonCombatant already use
-// (POKEMON_COLUMNS/TRAINER_COLUMNS in pi-server/app/db.py), and the active-
-// party filter (slot 1-6) matches renderSetupPhase's own logic there, so a
-// participant added here reflects the same "active party" combat.js itself
-// would show.
+// Join as yourself -- pulls from the actual app data (TrainerAPI) instead of
+// hand-typed test values, so this can be tested against the real trainers/
+// party. Deliberately NOT a "pick any trainer" picker: a trainer can only
+// add themselves (and their own active-party Pokémon), never someone else's
+// -- whoever's logged in on this device is the only one this form can add.
+// Column indices below mirror the exact same ones combat.js's
+// buildTrainerCombatant/buildPokemonCombatant already use (POKEMON_COLUMNS/
+// TRAINER_COLUMNS in pi-server/app/db.py), and the active-party filter
+// (slot 1-6) matches renderSetupPhase's own logic there, so a participant
+// added here reflects the same "active party" combat.js itself would show.
 // ---------------------------------------------------------------------------
 
-let _trainerListCache = null;
-
-async function _getTrainerList() {
-  if (_trainerListCache) return _trainerListCache;
-  const result = await TrainerAPI.getAll();
-  _trainerListCache = result.status === 'success' ? result.data : [];
-  return _trainerListCache;
+function _currentTrainerName() {
+  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  return trainerData[1] || '';
 }
 
 // JS `value ?? fallback` isn't enough here -- an empty string is a real
@@ -333,47 +330,35 @@ function _numOr(value, fallback) {
 }
 
 async function _initRealAddForm() {
-  const trainerSelect = document.getElementById('realTrainerSelect');
   const entitySelect = document.getElementById('realEntitySelect');
   const addBtn = document.getElementById('realAddBtn');
-  if (!trainerSelect || !entitySelect || !addBtn) return; // no active session this render
+  if (!entitySelect || !addBtn) return; // no active session this render
 
-  const trainers = await _getTrainerList();
-  trainerSelect.innerHTML = '<option value="">Select trainer…</option>' +
-    trainers.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+  const name = _currentTrainerName();
+  if (!name) {
+    entitySelect.innerHTML = '<option value="">No trainer logged in</option>';
+    return;
+  }
 
-  trainerSelect.addEventListener('change', async () => {
-    const name = trainerSelect.value;
-    entitySelect.disabled = true;
-    addBtn.disabled = true;
-    entitySelect._trainerData = null;
-    entitySelect._activeParty = null;
-    if (!name) {
-      entitySelect.innerHTML = '<option value="">Select trainer first…</option>';
-      return;
-    }
+  const result = await TrainerAPI.get(name);
+  if (result.status !== 'success' || !result.data) {
+    entitySelect.innerHTML = '<option value="">Failed to load your data</option>';
+    return;
+  }
 
-    entitySelect.innerHTML = '<option value="">Loading…</option>';
-    const result = await TrainerAPI.get(name);
-    if (result.status !== 'success' || !result.data) {
-      entitySelect.innerHTML = '<option value="">Failed to load</option>';
-      return;
-    }
-
-    const trainerData = result.data.trainerData;
-    const activeParty = (result.data.pokemonData || []).filter(p => {
-      const slot = parseInt(p[38], 10);
-      return slot >= 1 && slot <= 6;
-    });
-    entitySelect._trainerData = trainerData;
-    entitySelect._activeParty = activeParty;
-
-    const pokemonOptions = activeParty.map((p, i) =>
-      `<option value="pokemon:${i}">${p[36] || p[2] || 'Unknown'} (Lv ${p[4] || '?'})</option>`);
-    entitySelect.innerHTML = [`<option value="trainer">${trainerData[1]} (Trainer)</option>`, ...pokemonOptions].join('');
-    entitySelect.disabled = false;
-    addBtn.disabled = false;
+  const trainerData = result.data.trainerData;
+  const activeParty = (result.data.pokemonData || []).filter(p => {
+    const slot = parseInt(p[38], 10);
+    return slot >= 1 && slot <= 6;
   });
+  entitySelect._trainerData = trainerData;
+  entitySelect._activeParty = activeParty;
+
+  const pokemonOptions = activeParty.map((p, i) =>
+    `<option value="pokemon:${i}">${p[36] || p[2] || 'Unknown'} (Lv ${p[4] || '?'})</option>`);
+  entitySelect.innerHTML = [`<option value="trainer">${trainerData[1]} (Trainer)</option>`, ...pokemonOptions].join('');
+  entitySelect.disabled = false;
+  addBtn.disabled = false;
 
   addBtn.addEventListener('click', async () => {
     const value = entitySelect.value;

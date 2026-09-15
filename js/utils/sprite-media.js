@@ -67,6 +67,25 @@ export function renderSpriteInto(elementId, url, altText, className = '') {
 }
 
 /**
+ * Patches a portrait container's sprite in place, but ONLY rebuilds the
+ * <video>/<img> when the image URL actually differs from what's already
+ * showing there (tracked via a data-image attribute) -- an unchanged URL
+ * leaves the existing element, and any loop it's mid-playing, untouched.
+ * Unlike renderSpriteInto() above (always rebuilds, for a page's own
+ * one-off elements addressed by id), this is for a *container* re-rendered
+ * on every live push (see display.js/battle-map.js's participant strips),
+ * where avoiding an unnecessary rebuild -- and the video-restart flicker
+ * that comes with it -- is the entire point.
+ */
+export function patchPortraitMedia(containerEl, url, altText) {
+  if (!containerEl) return;
+  const safeUrl = url || '';
+  if (containerEl.dataset.image === safeUrl) return;
+  containerEl.dataset.image = safeUrl;
+  containerEl.innerHTML = spriteMediaHtml(url, altText);
+}
+
+/**
  * Warms the browser's cache for a sprite URL without displaying it.
  * new Image() doesn't work for video -- fetch() does, for either type, but
  * .mp4 needs it specifically since Image() would just fail on it.

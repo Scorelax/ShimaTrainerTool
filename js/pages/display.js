@@ -9,7 +9,7 @@ import { CombatAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { audioManager } from '../utils/audio.js';
 import { getSettings, saveSettings } from '../utils/settings.js';
-import { spriteMediaHtml } from '../utils/sprite-media.js';
+import { spriteMediaHtml, patchPortraitMedia } from '../utils/sprite-media.js';
 import { preloadBattleAnimation, getBattleAnimationUrl } from '../utils/battle-animation.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 
@@ -108,17 +108,6 @@ function barsHtml(p) {
   `;
 }
 
-/** Rebuilds a portrait's media element only when the image URL it's
- * currently showing differs from what it should show now -- an unchanged
- * URL leaves the existing <video>/<img> (and its playing loop) untouched. */
-function patchPortrait(portraitEl, image, altText) {
-  if (!portraitEl) return;
-  const url = image || '';
-  if (portraitEl.dataset.image === url) return;
-  portraitEl.dataset.image = url;
-  portraitEl.innerHTML = spriteMediaHtml(image, altText);
-}
-
 function updateSpotlight(activeId) {
   const card = document.getElementById('displaySpotlightCard');
   const p = session.participants[activeId];
@@ -127,7 +116,7 @@ function updateSpotlight(activeId) {
 
   card.hidden = false;
   const name = visibleToViewer(p, 'name') ? p.name : '???';
-  patchPortrait(document.getElementById('spotlightPortrait'), p.image, name);
+  patchPortraitMedia(document.getElementById('spotlightPortrait'), p.image, name);
   document.getElementById('spotlightName').textContent = name;
   document.getElementById('spotlightBars').innerHTML = barsHtml(p);
 }
@@ -170,7 +159,7 @@ function updateStrip(activeId) {
       p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');
     card.querySelector('.display-strip-name').textContent = name;
     card.querySelector('.display-strip-bars').innerHTML = barsHtml(p);
-    patchPortrait(card.querySelector('.display-strip-portrait'), p.image, name);
+    patchPortraitMedia(card.querySelector('.display-strip-portrait'), p.image, name);
 
     // Reorder without recreating -- insertBefore on a node already in the
     // document moves it in place and does not restart its media playback.

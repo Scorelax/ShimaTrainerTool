@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle Map</title>
+<link rel="icon" href="assets/Pokeball.png">
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #0a0a12; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  #mapRoot { height: 100vh; box-sizing: border-box; }
+  .map-empty { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 1.6rem; color: #a0a0c0; }
+
+  .map-stage { position: relative; width: 100%; height: 100%; }
+
+  .map-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
+  .map-cell { background: #20202e; }
+  .map-cell.marked {
+    background: #4a3520; display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; color: #e0c080; overflow: hidden; text-overflow: ellipsis;
+    padding: 2px; text-align: center; box-sizing: border-box;
+  }
+
+  .map-tokens { position: absolute; inset: 0; pointer-events: none; }
+  .map-token {
+    position: absolute; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 4px; box-sizing: border-box;
+  }
+  .map-token-portrait { width: 70%; height: 70%; }
+  .map-token-portrait img, .map-token-portrait video {
+    width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 6px rgba(0,0,0,0.8));
+  }
+  .map-token-name {
+    font-size: 0.65rem; font-weight: 700; text-shadow: 0 1px 2px #000;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  }
+  .map-token.player .map-token-name { color: #5dade2; }
+  .map-token.enemy .map-token-name { color: #e57373; }
+</style>
+</head>
+<body>
+  <div id="mapRoot"><div class="map-empty">Loading…</div></div>
+  <script type="module" src="js/pages/battle-map.js"></script>
+</body>
+</html>

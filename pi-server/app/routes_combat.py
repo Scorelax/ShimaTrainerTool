@@ -163,6 +163,21 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _clear_token_position(s, params['id']))
 
+    if action == 'confirm-placement':
+        col = js_parse_int(params.get('col'))
+        row = js_parse_int(params.get('row'))
+        if not params.get('id') or col is None or row is None:
+            raise ValueError('Missing participant id, col, or row')
+        return _mutate(conn, lambda s: _confirm_placement(s, params['id'], col, row))
+
+    if action == 'hover-token':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _hover_token(
+            conn, params['id'],
+            js_parse_int(params.get('col')), js_parse_int(params.get('row')),
+        )
+
     raise ValueError('Unknown combat action: ' + str(action))
 
 
@@ -212,6 +227,21 @@ def _play_animation(conn, pid, species):
         'participantId': pid,
         'species': species or participant['name'],
     })
+    return {'status': 'success'}
+
+
+def _hover_token(conn, pid, col, row):
+    """Fire-and-forget, same shape as _play_animation -- a live "here's where
+    I'm currently considering placing this token" preview during the
+    placement step (see combat-wip.js's placement screen), not persisted
+    state. col/row both None means "stopped hovering," which the client
+    renders as clearing the ghost token."""
+    state = load_state(conn)
+    if not state.get('active'):
+        raise ValueError('No active combat session')
+    if pid not in state['participants']:
+        raise ValueError('Unknown participant: ' + pid)
+    live.publish({'type': 'combat-hover', 'participantId': pid, 'col': col, 'row': row})
     return {'status': 'success'}
 
 
@@ -314,6 +344,13 @@ def _add_participant(state, data):
         # those after everyone who has rolled, same as a DM-added enemy with
         # no initiative today.
         'initiative': data.get('initiative'),
+        # Whether this participant has been placed on the battle map through
+        # the (per-player) placement step -- see confirm-placement below.
+        # Only ever checked client-side against a participant's own `owner`
+        # (has *this* device's trainer finished placing everyone they own?),
+        # so a freeform enemy's flag never actually gates anything; it just
+        # starts false like everyone else rather than needing a special case.
+        'placed': False,
         'status': status,
         'reactionUsed': False,
         # Meaningful for side='enemy' only -- allies are always fully visible
@@ -515,3 +552,16 @@ def _move_token(state, pid, col, row):
 
 def _clear_token_position(state, pid):
     state['board']['tokens'].pop(pid, None)
+
+
+def _confirm_placement(state, pid, col, row):
+    """The per-player placement step (see combat-wip.js's placement screen):
+    like set-token-position (unrestricted, not turn-gated -- this happens
+    before battle even starts), but also marks the participant placed so
+    that player's client knows to move on once every participant they own
+    has one."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    state['board']['tokens'][pid] = {'col': col, 'row': row}
+    participant['placed'] = True

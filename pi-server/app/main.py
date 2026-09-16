@@ -136,7 +136,8 @@ def _dispatch(params):
                                'remove-participant', 'set-status', 'set-visibility',
                                'advance-turn', 'reaction-start', 'reaction-end', 'play-animation',
                                'use-move', 'set-board-template', 'set-cell-terrain',
-                               'set-token-position', 'move-token', 'clear-token-position'],
+                               'set-token-position', 'move-token', 'clear-token-position',
+                               'confirm-placement', 'hover-token'],
                 },
             }
         return {'error': 'Unknown route: ' + str(route), 'status': 'error'}

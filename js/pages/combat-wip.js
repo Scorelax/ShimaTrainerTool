@@ -11,7 +11,7 @@
 import { CombatAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
-import { gridCellsHtml, gridTemplateStyle, cellRect } from '../utils/battle-map-grid.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import {
@@ -112,7 +112,13 @@ const WIP_CSS = `
   }
   .wip-foreign-focus-name { font-size: 1.1rem; font-weight: 700; color: #FFD700; margin-bottom: 0.4rem; }
   .wip-foreign-focus-row { color: #cfd0e0; margin-top: 0.25rem; font-size: 0.95rem; }
-  .combat-wip-empty { text-align: center; padding: 3rem 1rem; }
+  /* Centered both ways within the viewport, not just horizontally --
+     min-height keeps it clear of the header/footer chrome so a short
+     "Battle Mode" panel doesn't just sit pinned to the top of a tall page. */
+  .combat-wip-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 60vh; text-align: center; padding: 3rem 1rem;
+  }
   .combat-wip-empty h2 { color: #FFD700; margin-bottom: 1.25rem; }
   .combat-wip-btn-primary, .combat-wip-btn-danger, .combat-wip-btn-secondary {
     border: none; border-radius: 6px; padding: 0.6rem 1.2rem; font-size: 0.95rem;
@@ -208,9 +214,15 @@ const PLACEMENT_CSS = `
     background: linear-gradient(135deg, #27ae60, #1e8449); border: none; border-radius: 6px;
     color: #fff; font-weight: 700; font-size: 0.95rem; padding: 0.55rem 1.4rem; cursor: pointer;
   }
-  .placement-stage { position: relative; width: 100%; aspect-ratio: 5 / 4; background: #0a0a12; border-radius: 8px; overflow: hidden; }
+  /* aspect-ratio is set inline from the board's own cols/rows (see
+     renderPlacementPhase) so cells stay square for whatever grid size is
+     actually set, not just the default -- see .bmap-stage's own comment in
+     battle-map-popup.js for the same reasoning. */
+  .placement-stage { position: relative; width: 100%; background: #0a0a12; border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; }
   .placement-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
+  .placement-stage.has-bg .placement-grid { background: rgba(26,26,36,0.35); }
   .bmap-cell { background: #20202e; cursor: pointer; }
+  .placement-stage.has-bg .bmap-cell { background: rgba(32,32,46,0.35); }
   .bmap-cell:hover { outline: 1px solid rgba(255,215,0,0.5); outline-offset: -1px; }
   .bmap-cell.marked {
     background: #4a3520; display: flex; align-items: center; justify-content: center;
@@ -218,23 +230,31 @@ const PLACEMENT_CSS = `
   }
   .bmap-cell.taken { background: #3a1f1f; cursor: not-allowed; }
   .bmap-cell.taken:hover { outline: 1px solid rgba(231,76,60,0.6); outline-offset: -1px; }
+  .placement-bg-picker { margin-top: 1rem; text-align: center; }
+  .placement-bg-picker label { display: block; font-size: 0.8rem; color: #a0a0c0; margin-bottom: 0.4rem; }
+  .placement-bg-picker select {
+    background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
+    border-radius: 6px; padding: 0.5rem 0.7rem; font-size: 0.9rem; min-width: 200px;
+  }
   .placement-tokens { position: absolute; inset: 0; pointer-events: none; }
   .placement-token {
     position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
     padding: 3px; box-sizing: border-box;
   }
-  .placement-token-portrait { width: 70%; height: 70%; }
+  /* Portrait fills the whole footprint now that there's no name label to
+     leave room for -- side, previously conveyed by the name's text color,
+     moves to an outline on the portrait itself instead (name's still
+     available as a title tooltip, see _renderPlacementTokens). */
+  .placement-token-portrait { width: 100%; height: 100%; }
   .placement-token-portrait img, .placement-token-portrait video {
     width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(0,0,0,0.9));
   }
-  .placement-token-name { font-size: 0.6rem; font-weight: 700; text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .placement-token.player .placement-token-name { color: #5dade2; }
-  .placement-token.enemy .placement-token-name { color: #e57373; }
+  .placement-token.player .placement-token-portrait { outline: 2px solid rgba(93,173,226,0.55); outline-offset: -2px; border-radius: 4px; }
+  .placement-token.enemy .placement-token-portrait { outline: 2px solid rgba(231,115,115,0.55); outline-offset: -2px; border-radius: 4px; }
   .placement-token.ghost { opacity: 0.5; }
-  .placement-token.ghost .placement-token-name { color: #FFD700; font-style: italic; }
+  .placement-token.ghost .placement-token-portrait { outline-color: rgba(255,215,0,0.55); }
   .placement-token.staged { opacity: 0.85; }
   .placement-token.staged .placement-token-portrait { outline: 2px dashed #27ae60; outline-offset: 2px; border-radius: 6px; animation: placementPulse 1.1s ease-in-out infinite; }
-  .placement-token.staged .placement-token-name { color: #27ae60; }
   @keyframes placementPulse { 0%, 100% { outline-color: #27ae60; } 50% { outline-color: rgba(39,174,96,0.3); } }
 `;
 
@@ -363,6 +383,7 @@ function _combatantToParticipant(c) {
     type2: (c.types && c.types[1]) || '',
     initiative: c.initiativeTotal,
     level: c.level,
+    size: c.size || '', // map footprint -- see footprintForSize in battle-map-grid.js; trainers have no size at all, always 1x1
   };
 }
 
@@ -549,6 +570,8 @@ function _syncLocalCombatState(session) {
 
 function renderPlacementPhase(state, currentId) {
   const current = state.participants[currentId];
+  const { cols, rows } = state.board.grid;
+  const bg = state.board.backgroundImage;
   return `
     <div class="placement-page">
       <style>${PLACEMENT_CSS}</style>
@@ -559,25 +582,88 @@ function renderPlacementPhase(state, currentId) {
       <div class="placement-body">
         <div class="placement-prompt">Click a cell to preview <strong>${current?.name || '…'}</strong>'s position, then confirm it.</div>
         <div class="placement-actions" id="placementActions"></div>
-        <div class="placement-stage">
+        <div class="placement-stage${bg ? ' has-bg' : ''}" id="placementStage"
+             style="aspect-ratio:${cols} / ${rows};${bg ? ` background-image:url(${bg});` : ''}">
           <div class="placement-grid" id="placementGrid" style="${gridTemplateStyle(state.board)}">${gridCellsHtml(state.board, 'bmap-cell')}</div>
           <div class="placement-tokens" id="placementTokens"></div>
         </div>
+        ${state.battleType === 'pvp' ? `
+        <div class="placement-bg-picker">
+          <label for="placementBgSelect">Battle Background</label>
+          <select id="placementBgSelect">
+            <option value="">No Background</option>
+          </select>
+        </div>` : ''}
       </div>
     </div>`;
 }
 
-/** A cell already holding a CONFIRMED token (anyone's -- a trainer and
- * their own Pokémon can't share a square either), or another participant's
- * CURRENT hover/staging preview, can't be picked. `currentId`'s own
- * hover echo (the server broadcasts your own hover-token calls back to
+/** A cell is unusable as currentId's placement anchor if ANY cell of ITS
+ * OWN footprint from here (a Large/Huge Pokemon spans more than the one
+ * cell actually clicked -- see footprintForSize) would run off the grid,
+ * or would overlap a cell already holding a CONFIRMED token (anyone's --
+ * a trainer and their own Pokémon can't share a square either, and each
+ * existing token blocks its own full footprint, not just its anchor cell)
+ * or another participant's CURRENT hover/staging preview. `currentId`'s
+ * own hover echo (the server broadcasts your own hover-token calls back to
  * you too) is excluded, same as the ghost-rendering below already did. */
 function _isCellTaken(state, col, row, currentId) {
+  const { cols, rows } = state.board.grid;
+  const mySize = footprintForSize(state.participants[currentId]?.size);
+  const myCells = footprintCells(col, row, mySize);
+  if (myCells.some(c => c.col < 0 || c.row < 0 || c.col >= cols || c.row >= rows)) return true;
+
+  const overlaps = (otherCol, otherRow, otherSize) =>
+    footprintCells(otherCol, otherRow, otherSize)
+      .some(oc => myCells.some(mc => mc.col === oc.col && mc.row === oc.row));
+
   const occupied = Object.entries(state.board.tokens)
-    .some(([id, pos]) => pos.col === col && pos.row === row && id !== currentId);
+    .some(([id, pos]) => id !== currentId &&
+      overlaps(pos.col, pos.row, footprintForSize(state.participants[id]?.size)));
   if (occupied) return true;
+
   return Object.entries(_hoverGhosts)
-    .some(([id, pos]) => pos && id !== currentId && pos.col === col && pos.row === row);
+    .some(([id, pos]) => pos && id !== currentId &&
+      overlaps(pos.col, pos.row, footprintForSize(state.participants[id]?.size)));
+}
+
+let _backgroundOptionsCache = null; // [{key,label,url}] from list-backgrounds, fetched once and reused
+
+/** Fills in every option beyond the static "No Background" one already in
+ * the markup (see renderPlacementPhase) -- async since the list is a
+ * network call the initial synchronous render can't wait on. Guards
+ * against the select having been torn down (rerendered away, or this
+ * trainer's placement finished) by the time the fetch resolves. */
+async function _populateBackgroundSelect(selectEl, currentUrl) {
+  if (!_backgroundOptionsCache) {
+    try {
+      const result = await CombatAPI.listBackgrounds();
+      _backgroundOptionsCache = result.status === 'success' ? result.backgrounds : [];
+    } catch {
+      _backgroundOptionsCache = [];
+    }
+  }
+  if (!document.body.contains(selectEl)) return;
+  selectEl.insertAdjacentHTML('beforeend',
+    _backgroundOptionsCache.map(b => `<option value="${b.url}">${b.label}</option>`).join(''));
+  selectEl.value = currentUrl || '';
+}
+
+/** Keeps the placement stage's background/aspect-ratio and the picker's own
+ * value in sync with the live session -- another player picking a
+ * background (or the DM resizing the grid) should show up here too, not
+ * just on whoever set it. */
+function _syncPlacementBackground(state) {
+  const stageEl = document.getElementById('placementStage');
+  if (stageEl) {
+    const { cols, rows } = state.board.grid;
+    stageEl.style.aspectRatio = `${cols} / ${rows}`;
+    const url = state.board.backgroundImage;
+    stageEl.classList.toggle('has-bg', !!url);
+    stageEl.style.backgroundImage = url ? `url(${url})` : '';
+  }
+  const bgSelect = document.getElementById('placementBgSelect');
+  if (bgSelect && document.activeElement !== bgSelect) bgSelect.value = state.board.backgroundImage || '';
 }
 
 function _renderPlacementActions(currentId) {
@@ -607,11 +693,10 @@ function _renderPlacementTokens(state, currentId) {
     const p = state.participants[id];
     if (!p) return;
     const name = visibleToViewer(p, 'name') ? p.name : '???';
-    const rect = cellRect(state.board, pos.col, pos.row);
+    const rect = cellRect(state.board, pos.col, pos.row, footprintForSize(p.size));
     html.push(`
-      <div class="placement-token ${p.side}" data-token-id="${id}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
+      <div class="placement-token ${p.side}" data-token-id="${id}" title="${name}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
         <div class="placement-token-portrait" data-portrait-id="${id}"></div>
-        <div class="placement-token-name">${name}</div>
       </div>`);
   });
 
@@ -621,11 +706,10 @@ function _renderPlacementTokens(state, currentId) {
     const p = state.participants[id];
     if (!p) return;
     const name = visibleToViewer(p, 'name') ? p.name : '???';
-    const rect = cellRect(state.board, pos.col, pos.row);
+    const rect = cellRect(state.board, pos.col, pos.row, footprintForSize(p.size));
     html.push(`
-      <div class="placement-token ghost ${p.side}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
+      <div class="placement-token ghost ${p.side}" title="${name}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
         <div class="placement-token-portrait" data-portrait-id="${id}"></div>
-        <div class="placement-token-name">${name}</div>
       </div>`);
   });
 
@@ -633,11 +717,10 @@ function _renderPlacementTokens(state, currentId) {
     const current = state.participants[currentId];
     if (current) {
       const name = visibleToViewer(current, 'name') ? current.name : '???';
-      const rect = cellRect(state.board, _stagedPosition.col, _stagedPosition.row);
+      const rect = cellRect(state.board, _stagedPosition.col, _stagedPosition.row, footprintForSize(current.size));
       html.push(`
-        <div class="placement-token staged ${current.side}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
+        <div class="placement-token staged ${current.side}" title="${name}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
           <div class="placement-token-portrait" data-portrait-id="${currentId}"></div>
-          <div class="placement-token-name">${name}</div>
         </div>`);
     }
   }
@@ -667,6 +750,18 @@ function attachPlacementListeners(state, currentId) {
     _joinStage = null; _joinState = null; _placementQueue = []; _hoverGhosts = {};
     window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
   });
+
+  // Battle background picker (PvP only, see renderPlacementPhase) -- the
+  // list is fetched once and cached module-wide (rarely changes), and the
+  // select is left showing whatever's already chosen so it reflects
+  // another player's pick too, not just whoever set it first.
+  const bgSelect = document.getElementById('placementBgSelect');
+  if (bgSelect) {
+    _populateBackgroundSelect(bgSelect, state.board.backgroundImage);
+    bgSelect.addEventListener('change', () => {
+      CombatAPI.setBoardBackground(bgSelect.value).catch(err => alert(err.message));
+    });
+  }
 
   const gridEl = document.getElementById('placementGrid');
   if (!gridEl) return;
@@ -1003,7 +1098,21 @@ function _syncMainFocus(state) {
   if (!ctx.isMine) { el.innerHTML = _renderForeignFocusInfo(ctx.p); return; }
   if (document.getElementById('battleList')) {
     setBattleCardOptions(ctx.cardOptions);
+    // rerenderBattle always rebuilds the card fresh (a plain innerHTML
+    // replace shared with the legacy multi-card page, which this doesn't
+    // touch) -- for this single focused card, that means every HP/VP/stat
+    // tweak restarts an mp4 sprite's playback from frame 0, unlike the
+    // turn-order sidebar's own portraits (patched via patchPortraitMedia,
+    // which skips the rebuild entirely when the src hasn't changed).
+    // Preserve the play position across the rebuild here instead.
+    const oldVideo = document.querySelector('#battleList video.combat-card-img');
+    const oldSrc = oldVideo?.getAttribute('src') || null;
+    const oldTime = oldVideo?.currentTime || 0;
     rerenderBattle(ctx.filteredState);
+    if (oldSrc) {
+      const newVideo = document.querySelector('#battleList video.combat-card-img');
+      if (newVideo && newVideo.getAttribute('src') === oldSrc) newVideo.currentTime = oldTime;
+    }
   } else {
     el.innerHTML = renderBattlePhase(ctx.filteredState, ctx.cardOptions);
     _attachMainFocusListeners(state);
@@ -1025,6 +1134,7 @@ export function attachCombatWipListeners() {
       if (_placementQueue.length) {
         _renderPlacementTokens(session, _placementQueue[0]);
         _refreshCellTakenStates(session, _placementQueue[0]);
+        _syncPlacementBackground(session);
       }
       return;
     }
@@ -1171,16 +1281,14 @@ function attachBodyListeners() {
  * top of whatever number it's given, it doesn't know about ability/STAB/
  * proficiency modifiers itself. */
 async function _handleDamageResolved({ combatantId, moveName, move, computedData }) {
-  const targetId = await pickTarget(combatantId);
-  if (!targetId) return; // "no target" / closed -- move's own cost still applied, nothing more to do
-
   const modifier = computedData.damageBonus || 0;
-  const rollStr = prompt(
-    `Raw dice roll for ${moveName} (the ${modifier >= 0 ? '+' : ''}${modifier} modifier is added automatically):`
-  );
-  if (!rollStr) return;
-  const rawRoll = parseInt(rollStr, 10);
-  if (Number.isNaN(rawRoll)) return;
+  // pickTarget's own popup covers both target selection AND the roll input
+  // now (see target-picker.js) -- the move's animation (triggered by
+  // applyDamage below, once it lands server-side) only plays after this
+  // whole thing resolves, never before.
+  const picked = await pickTarget(combatantId, { modifier });
+  if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
+  const { targetId, rawRoll } = picked;
 
   const moveType = (move && move[1]) || '';
   try {

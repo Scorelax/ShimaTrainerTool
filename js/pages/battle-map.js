@@ -9,6 +9,7 @@ import { CombatAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
+import { cellRect, footprintForSize } from '../utils/battle-map-grid.js';
 
 let session = { active: false, participants: {}, board: null };
 
@@ -44,6 +45,7 @@ function render() {
   }
 
   ensureSkeleton(root);
+  updateBackground();
   updateGrid();
   updateTokens();
 }
@@ -51,10 +53,22 @@ function render() {
 function ensureSkeleton(root) {
   if (document.getElementById('mapGrid')) return;
   root.innerHTML = `
-    <div class="map-stage">
+    <div class="map-stage" id="mapStage">
+      <div class="map-bg" id="mapBg"></div>
       <div class="map-grid" id="mapGrid"></div>
       <div class="map-tokens" id="mapTokens"></div>
     </div>`;
+}
+
+/** See .map-bg's own comment in battle-map.html for why this is rotated
+ * 90deg here but not on the player-facing popup/placement screens. */
+function updateBackground() {
+  const stage = document.getElementById('mapStage');
+  const bg = document.getElementById('mapBg');
+  if (!stage || !bg) return;
+  const url = session.board.backgroundImage;
+  stage.classList.toggle('has-bg', !!url);
+  bg.style.backgroundImage = url ? `url(${url})` : '';
 }
 
 function updateGrid() {
@@ -80,7 +94,6 @@ function updateTokens() {
   const layer = document.getElementById('mapTokens');
   if (!layer) return;
 
-  const { cols, rows } = session.board.grid;
   const tokens = session.board.tokens;
 
   const liveIds = new Set(Object.keys(tokens));
@@ -98,20 +111,15 @@ function updateTokens() {
       wrapper.innerHTML = `
         <div class="map-token" data-id="${id}">
           <div class="map-token-portrait"></div>
-          <div class="map-token-name"></div>
         </div>`;
       el = wrapper.firstElementChild;
       layer.appendChild(el);
     }
 
-    el.style.left = `${(pos.col / cols) * 100}%`;
-    el.style.top = `${(pos.row / rows) * 100}%`;
-    el.style.width = `${(1 / cols) * 100}%`;
-    el.style.height = `${(1 / rows) * 100}%`;
-    el.className = `map-token ${p.side}`;
-
     const name = visibleToViewer(p, 'name') ? p.name : '???';
-    el.querySelector('.map-token-name').textContent = name;
+    Object.assign(el.style, cellRect(session.board, pos.col, pos.row, footprintForSize(p.size)));
+    el.className = `map-token ${p.side}`;
+    el.title = name;
     patchPortraitMedia(el.querySelector('.map-token-portrait'), p.image, name);
   });
 }

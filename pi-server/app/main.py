@@ -56,7 +56,7 @@ _VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/')
 # version (their filenames stay constant even when the content behind them
 # changes), so they can't be cached hard the same way -- they keep
 # revalidating every load instead, same as before.
-_REVALIDATED_MEDIA_PREFIXES = ('/splashes/', '/assets/')
+_REVALIDATED_MEDIA_PREFIXES = ('/splashes/', '/assets/', '/battle-images/')
 
 
 @app.middleware('http')
@@ -132,12 +132,12 @@ def _dispatch(params):
                                  'splash-list', 'media-list'],
                     'battle': ['calculate-damage', 'roll-initiative'],
                     'music': ['sync', 'leave'],
-                    'combat': ['get-state', 'create-session', 'end-session', 'add-participant',
+                    'combat': ['get-state', 'create-session', 'end-session', 'leave-session', 'add-participant',
                                'remove-participant', 'set-status', 'set-visibility',
                                'advance-turn', 'reaction-start', 'reaction-end', 'play-animation',
                                'use-move', 'apply-damage', 'update-stats', 'set-board-template', 'set-cell-terrain',
                                'set-token-position', 'move-token', 'clear-token-position',
-                               'confirm-placement', 'hover-token'],
+                               'confirm-placement', 'hover-token', 'list-backgrounds', 'set-board-background'],
                 },
             }
         return {'error': 'Unknown route: ' + str(route), 'status': 'error'}
@@ -239,6 +239,11 @@ if os.path.isdir(upstream.CRY_DIR):
 if os.path.isdir(upstream.BATTLE_ANIMATION_DIR):
     app.mount('/battle-animations', StaticFiles(directory=upstream.BATTLE_ANIMATION_DIR),
               name='battle-animations')
+
+# Battle-map background images (see upstream.BATTLE_IMAGE_DIR / routes_combat.py's list-backgrounds)
+if os.path.isdir(upstream.BATTLE_IMAGE_DIR):
+    app.mount('/battle-images', StaticFiles(directory=upstream.BATTLE_IMAGE_DIR),
+              name='battle-images')
 
 # Serve the PWA from the same origin (mounted last so /api and /exec win)
 _default_pwa = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))

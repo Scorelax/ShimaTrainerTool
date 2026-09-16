@@ -877,6 +877,18 @@ export class CombatAPI {
   static async hoverToken(id, col, row) {
     return API.request('combat', 'hover-token', { id, col, row }, { useCache: false });
   }
+
+  /** Battle-map background images available on the Pi (see
+   * upstream.BATTLE_IMAGE_DIR) -- {status, backgrounds: [{key, label, url}]}.
+   * Not session state -- safe to call any time, active session or not. */
+  static async listBackgrounds() {
+    return API.request('combat', 'list-backgrounds', {}, { useCache: false });
+  }
+
+  /** Sets the shared board's background image (empty string clears it). */
+  static async setBoardBackground(url) {
+    return API.request('combat', 'set-board-background', { url }, { useCache: false });
+  }
 }
 
 // ============================================================================

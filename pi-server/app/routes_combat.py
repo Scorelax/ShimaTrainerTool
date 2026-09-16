@@ -28,6 +28,8 @@ moves dataset) and the target's stored type(s), the same type-chart data
 game-data/type-effectiveness already exposes.
 """
 import json
+import os
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -59,9 +61,15 @@ _EMPTY_STATE = {
     # 'cave'/'zone' template is additive, not a breaking change.
     'board': {
         'templateType': 'grid',
-        'grid': {'cols': 10, 'rows': 8},
+        'grid': {'cols': 10, 'rows': 16},  # portrait by default -- matches the table display's orientation
         'cells': {},   # "col,row" -> {'terrain': '<freeform DM-typed label>'}
         'tokens': {},  # participantId -> {'col': int, 'row': int}
+        # Chosen from list-backgrounds (see upstream.BATTLE_IMAGE_DIR), or
+        # None for the plain dark stage. Set once via the placement screen's
+        # PvP-only dropdown (combat-wip.js) and shared by every viewer --
+        # the same URL string every screen (in-app popup, placement, kiosk
+        # display) renders against.
+        'backgroundImage': None,
     },
 }
 
@@ -167,6 +175,12 @@ def handle(conn, action, params):
         if col is None or row is None:
             raise ValueError('Missing col or row')
         return _mutate(conn, lambda s: _set_cell_terrain(s, col, row, params.get('terrain', '')))
+
+    if action == 'list-backgrounds':
+        return _list_backgrounds()
+
+    if action == 'set-board-background':
+        return _mutate(conn, lambda s: _set_board_background(s, params.get('url', '')))
 
     if action == 'set-token-position':
         col = js_parse_int(params.get('col'))
@@ -389,6 +403,12 @@ def _add_participant(state, data):
         # Shown on the external display screen alongside name/HP/VP (see
         # display.js) -- purely informational, no gameplay effect server-side.
         'level': data.get('level'),
+        # Battle-map footprint hint -- a freeform sheet value (Tiny/Small/
+        # Large/Huge/...), not a fixed enum here, same trust model as
+        # type1/type2 above. Blank for trainers and freeform enemies (both
+        # always 1x1 -- see footprintForSize in battle-map-grid.js, the
+        # only place this is actually interpreted).
+        'size': data.get('size', ''),
         # Whether this participant has been placed on the battle map through
         # the (per-player) placement step -- see confirm-placement below.
         # Only ever checked client-side against a participant's own `owner`
@@ -658,6 +678,34 @@ def _set_cell_terrain(state, col, row, terrain):
         state['board']['cells'][key] = {'terrain': terrain}
     else:
         state['board']['cells'].pop(key, None)
+
+
+_BACKGROUND_FILENAME_RE = re.compile(r'^battle-(.+)\.png$', re.IGNORECASE)
+
+
+def _list_backgrounds():
+    """Battle-map background images available on disk (see
+    upstream.BATTLE_IMAGE_DIR) -- named battle-<key>.png, e.g.
+    battle-forest.png -> {"key": "forest", "label": "Forest", "url": "/battle-images/battle-forest.png"}.
+    Not session state (doesn't touch `state` at all) -- just a filesystem
+    listing, same "browsable directory" reasoning as routes_gamedata.py's
+    media_list(), kept here instead since this is purely a combat/board
+    concern with nothing else needing to know about it."""
+    if not os.path.isdir(upstream.BATTLE_IMAGE_DIR):
+        return {'status': 'success', 'backgrounds': []}
+    backgrounds = []
+    for filename in sorted(os.listdir(upstream.BATTLE_IMAGE_DIR)):
+        m = _BACKGROUND_FILENAME_RE.match(filename)
+        if not m:
+            continue
+        key = m.group(1)
+        label = key.replace('_', ' ').replace('-', ' ').title()
+        backgrounds.append({'key': key, 'label': label, 'url': f'/battle-images/{filename}'})
+    return {'status': 'success', 'backgrounds': backgrounds}
+
+
+def _set_board_background(state, url):
+    state['board']['backgroundImage'] = url or None
 
 
 def _set_token_position(state, pid, col, row):

@@ -18,7 +18,7 @@
 import { CombatAPI } from '../api.js';
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { gridCellsHtml, gridTemplateStyle, cellRect } from './battle-map-grid.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 
 function _injectStyles() {
   if (document.getElementById('battle-map-popup-styles')) return;
@@ -52,9 +52,20 @@ function _injectStyles() {
       background: linear-gradient(135deg, #8e44ad, #5b2c6f); border: none; color: #fff;
       border-radius: 6px; padding: 0.35rem 0.8rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
     }
-    .bmap-stage { position: relative; width: 100%; aspect-ratio: 5 / 4; background: #0a0a12; border-radius: 8px; overflow: hidden; }
+    /* aspect-ratio is set inline per-render from the board's own cols/rows
+       (see _applyStageAspect) -- gridTemplateStyle only ever divides this
+       box into equal fractions, it doesn't know or care about shape, so
+       nothing here keeps cells square for a grid size other than whatever
+       one aspect-ratio value happened to be hardcoded. */
+    .bmap-stage { position: relative; width: 100%; background: #0a0a12; border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; }
     .bmap-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
+    /* Translucent instead of solid once a background image is set, so the
+       artwork actually shows through the grid instead of being fully
+       covered by it -- unmarked cells only; .marked/.taken stay opaque
+       since those are meaningful state, not "empty ground". */
+    .bmap-stage.has-bg .bmap-grid { background: rgba(26,26,36,0.35); }
     .bmap-cell { background: #20202e; cursor: pointer; }
+    .bmap-stage.has-bg .bmap-cell { background: rgba(32,32,46,0.35); }
     .bmap-cell:hover { outline: 1px solid rgba(255,215,0,0.5); outline-offset: -1px; }
     .bmap-cell.marked {
       background: #4a3520; display: flex; align-items: center; justify-content: center;
@@ -75,16 +86,19 @@ function _injectStyles() {
       padding: 3px; box-sizing: border-box; pointer-events: none;
     }
     /* .my-turn is the only clickable state -- .mine alone (yours, but not
-       your turn right now) is shown (gold name) but not interactive. */
+       your turn right now) is shown (gold portrait outline) but not
+       interactive. */
     .bmap-token.my-turn { pointer-events: auto; cursor: pointer; }
     .bmap-token.my-turn:not(.selected) { outline: 2px solid rgba(255,215,0,0.55); outline-offset: -2px; border-radius: 4px; }
     .bmap-token.selected { outline: 2px solid #FFD700; outline-offset: -2px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,215,0,0.6); }
-    .bmap-token-portrait { width: 70%; height: 70%; }
+    /* Portrait fills the whole cell now that there's no name label to leave
+       room for -- side/ownership, previously conveyed by the name's text
+       color, moves to an outline on the portrait itself instead. */
+    .bmap-token-portrait { width: 100%; height: 100%; }
     .bmap-token-portrait img, .bmap-token-portrait video { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(0,0,0,0.9)); }
-    .bmap-token-name { font-size: 0.6rem; font-weight: 700; text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-    .bmap-token.player .bmap-token-name { color: #5dade2; }
-    .bmap-token.enemy .bmap-token-name { color: #e57373; }
-    .bmap-token.mine .bmap-token-name { color: #FFD700; }
+    .bmap-token.player .bmap-token-portrait { outline: 2px solid rgba(93,173,226,0.55); outline-offset: -2px; border-radius: 4px; }
+    .bmap-token.enemy .bmap-token-portrait { outline: 2px solid rgba(231,115,115,0.55); outline-offset: -2px; border-radius: 4px; }
+    .bmap-token.mine .bmap-token-portrait { outline: 2px solid rgba(255,215,0,0.55); outline-offset: -2px; border-radius: 4px; }
   `;
   document.head.appendChild(style);
 }
@@ -119,7 +133,7 @@ function _ensureDom() {
           <span style="color:#a0a0c0;font-size:0.78rem;">Click a cell to mark/clear terrain. Resizing clears existing marks.</span>
         </div>
         <div class="bmap-hint" id="bmapHint"></div>
-        <div class="bmap-stage">
+        <div class="bmap-stage" id="bmapStage">
           <div class="bmap-grid" id="bmapGrid"></div>
           <div class="bmap-tokens" id="bmapTokens"></div>
         </div>
@@ -203,8 +217,24 @@ function _render() {
         : "It's not your turn -- you can only move a token on your own turn.";
     }
   }
+  _renderStage();
   _renderGrid();
   _renderTokens();
+}
+
+/** Keeps cells square for WHATEVER grid size is currently set (not just the
+ * default) -- gridTemplateStyle divides the stage into equal fractions
+ * regardless of shape, so the stage's own aspect-ratio has to be kept in
+ * sync by hand here. Also applies/clears the background image + its
+ * has-bg translucency hook on the cells (see the CSS). */
+function _renderStage() {
+  const stageEl = document.getElementById('bmapStage');
+  if (!stageEl) return;
+  const { cols, rows } = _session.board.grid;
+  stageEl.style.aspectRatio = `${cols} / ${rows}`;
+  const url = _session.board.backgroundImage;
+  stageEl.classList.toggle('has-bg', !!url);
+  stageEl.style.backgroundImage = url ? `url(${url})` : '';
 }
 
 function _renderGrid() {
@@ -261,11 +291,10 @@ function _renderTokens() {
     const el = document.createElement('div');
     el.className = classes.join(' ');
     el.dataset.id = id;
-    Object.assign(el.style, cellRect(_session.board, pos.col, pos.row));
-    el.innerHTML = `<div class="bmap-token-portrait"></div><div class="bmap-token-name"></div>`;
-
     const name = visibleToViewer(p, 'name') ? p.name : '???';
-    el.querySelector('.bmap-token-name').textContent = name;
+    el.title = name;
+    Object.assign(el.style, cellRect(_session.board, pos.col, pos.row, footprintForSize(p.size)));
+    el.innerHTML = `<div class="bmap-token-portrait"></div>`;
     patchPortraitMedia(el.querySelector('.bmap-token-portrait'), p.image, name);
 
     if (isMyTurn && !_dmMode) {

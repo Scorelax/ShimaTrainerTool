@@ -13,10 +13,34 @@
   #mapRoot { height: 100vh; box-sizing: border-box; }
   .map-empty { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 1.6rem; color: #a0a0c0; }
 
-  .map-stage { position: relative; width: 100%; height: 100%; }
+  /* container-type:size lets .map-bg below size itself off THIS element's
+     own actual pixel box (via cqw/cqh) rather than the viewport -- needed
+     for the rotate-90 trick to come out exact regardless of what this page
+     ends up embedded in. */
+  .map-stage { position: relative; width: 100%; height: 100%; overflow: hidden; container-type: size; }
+
+  /* The battle background image, rotated 90 clockwise -- the table's
+     screen is landscape but the map/background art is portrait (see
+     routes_combat.py board.backgroundImage), so this is oriented to match
+     the screen while every player's own tablet shows the same image
+     upright (see .bmap-stage/.placement-stage, which don't rotate). Pre-
+     rotation the box is sized HEIGHTxWIDTH (swapped) so that after the
+     90-degree turn it exactly fills the stage's actual WIDTHxHEIGHT with
+     no gaps or overflow -- sizing it WIDTHxHEIGHT like the stage itself
+     would rotate into a HEIGHTxWIDTH box instead, either leaving letterbox
+     gaps or overflowing, depending on which side is longer. */
+  .map-bg {
+    position: absolute; top: 50%; left: 50%; display: none;
+    width: 100cqh; height: 100cqw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    background-size: cover; background-position: center;
+  }
+  .map-stage.has-bg .map-bg { display: block; }
 
   .map-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
+  .map-stage.has-bg .map-grid { background: rgba(26,26,36,0.35); }
   .map-cell { background: #20202e; }
+  .map-stage.has-bg .map-cell { background: rgba(32,32,46,0.35); }
   .map-cell.marked {
     background: #4a3520; display: flex; align-items: center; justify-content: center;
     font-size: 0.7rem; color: #e0c080; overflow: hidden; text-overflow: ellipsis;
@@ -28,16 +52,16 @@
     position: absolute; display: flex; flex-direction: column;
     align-items: center; justify-content: center; padding: 4px; box-sizing: border-box;
   }
-  .map-token-portrait { width: 70%; height: 70%; }
+  /* Portrait fills the whole footprint -- no name label to leave room for
+     (see js/pages/battle-map.js, a title attribute covers identification
+     for anyone actually interacting with this screen). Side, previously
+     conveyed by the name's text color, moves to an outline instead. */
+  .map-token-portrait { width: 100%; height: 100%; }
   .map-token-portrait img, .map-token-portrait video {
     width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 6px rgba(0,0,0,0.8));
   }
-  .map-token-name {
-    font-size: 0.65rem; font-weight: 700; text-shadow: 0 1px 2px #000;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-  }
-  .map-token.player .map-token-name { color: #5dade2; }
-  .map-token.enemy .map-token-name { color: #e57373; }
+  .map-token.player .map-token-portrait { outline: 2px solid rgba(93,173,226,0.55); outline-offset: -2px; border-radius: 4px; }
+  .map-token.enemy .map-token-portrait { outline: 2px solid rgba(231,115,115,0.55); outline-offset: -2px; border-radius: 4px; }
 </style>
 </head>
 <body>

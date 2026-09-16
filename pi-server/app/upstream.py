@@ -64,6 +64,13 @@ CRY_DIR = os.path.expanduser(os.environ.get('CRY_DIR', '~/pokemon-dnd/pokemon-cr
 BATTLE_ANIMATION_DIR = os.path.expanduser(
     os.environ.get('BATTLE_ANIMATION_DIR', '~/pokemon-dnd/battle-animations'))
 
+# Battle-map background images, e.g. battle-forest.png -- browsed directly
+# (routes_combat.py's list-backgrounds), unlike the per-species dirs above
+# which are only ever looked up by an exact expected filename. Same live-
+# filesystem-check, no-caching-layer reasoning as the others.
+BATTLE_IMAGE_DIR = os.path.expanduser(
+    os.environ.get('BATTLE_IMAGE_DIR', '~/pokemon-dnd/battle-images'))
+
 # Apps Script upstreams can be slow (cold starts)
 _FETCH_TIMEOUT = 120.0
 

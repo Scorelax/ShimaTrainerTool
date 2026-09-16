@@ -9,7 +9,6 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI } from '../api.js';
-import { pickTarget } from '../utils/target-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
@@ -23,7 +22,18 @@ import {
 } from './combat.js';
 
 const WIP_CSS = `
-  .combat-wip-page { min-height: 100vh; background: #14141f; color: #e0e0e0; font-family: inherit; }
+  /* Breaks out of the SPA shell's own centered/padded ".app" container
+     (max-width:1400px, padding:20px, both on top of a dark red body
+     background) so this page's own background actually reaches every edge
+     of the viewport instead of leaving a red band around it regardless of
+     nesting depth -- the width:100vw + negative-margin pair is relative to
+     the viewport, not the parent, which is what makes that possible here. */
+  .combat-wip-page {
+    min-height: 100vh; background: #14141f; color: #e0e0e0; font-family: inherit;
+    width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw);
+    overflow-x: hidden; /* 100vw can run a few px wider than the true scrollbar-adjusted
+      viewport -- clip that sliver instead of letting it show as a stray offset/scrollbar */
+  }
   .combat-wip-header-bar {
     display: flex; align-items: center; justify-content: space-between;
     padding: 0.75rem 1rem; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -36,26 +46,26 @@ const WIP_CSS = `
   .combat-wip-layout { display: flex; align-items: flex-start; gap: 1rem; padding: 0 1rem; }
   .combat-wip-body { flex: 1 1 auto; min-width: 0; max-width: 700px; padding: 1.5rem 0 3rem; }
   .combat-wip-turnorder {
-    flex: 0 0 96px; display: flex; flex-direction: column; gap: 0.6rem;
+    flex: 0 0 42px; display: flex; flex-direction: column; gap: 0.4rem;
     padding: 1.5rem 0 3rem; position: sticky; top: 0;
   }
   .wip-turn-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
   .wip-turn-portrait {
-    position: relative; width: 96px; height: 96px; border-radius: 10px; overflow: hidden;
-    background: rgba(255,255,255,0.05); border: 3px solid transparent; box-sizing: border-box;
+    position: relative; width: 42px; height: 42px; border-radius: 6px; overflow: hidden;
+    background: rgba(255,255,255,0.05); border: 2px solid transparent; box-sizing: border-box;
   }
-  .wip-turn-item.active .wip-turn-portrait { border-color: #FFD700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
+  .wip-turn-item.active .wip-turn-portrait { border-color: #FFD700; box-shadow: 0 0 5px rgba(255,215,0,0.5); }
   .wip-turn-item.spectating { opacity: 0.4; }
   .wip-turn-portrait-media { width: 100%; height: 100%; }
   .wip-turn-portrait-media img, .wip-turn-portrait-media video { width: 100%; height: 100%; object-fit: contain; }
   .wip-turn-reaction {
-    position: absolute; bottom: 2px; left: 4px; font-size: 0.95rem;
+    position: absolute; bottom: 0; left: 1px; font-size: 0.55rem;
     filter: grayscale(1) opacity(0.35); text-shadow: 0 1px 2px #000;
   }
   .wip-turn-reaction.used { filter: none; }
   .wip-turn-name {
-    font-size: 0.7rem; font-weight: 600; margin-top: 0.25rem; text-align: center;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px;
+    font-size: 0.55rem; font-weight: 600; margin-top: 0.15rem; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42px;
   }
   .wip-turn-detail-popup {
     position: fixed; z-index: 50; width: 200px; background: #1e1e2e;
@@ -108,27 +118,6 @@ const WIP_CSS = `
   }
   .combat-wip-add-form input[type="text"] { flex: 1; min-width: 100px; }
   .combat-wip-add-form input[type="number"] { width: 64px; }
-  .combat-wip-participant-list { display: flex; flex-direction: column; gap: 0.5rem; }
-  .combat-wip-participant {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-    background: rgba(255,255,255,0.05); border: 1px solid transparent; border-radius: 8px; padding: 0.6rem 0.8rem;
-  }
-  .combat-wip-participant.active-turn { border-color: #FFD700; background: rgba(255,215,0,0.08); }
-  .combat-wip-participant.reacting { border-color: #e67e22; background: rgba(230,126,34,0.1); }
-  .combat-wip-participant.spectating { opacity: 0.55; }
-  .combat-wip-side-badge { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.4rem; border-radius: 4px; }
-  .combat-wip-side-badge.player { background: #2980b9; }
-  .combat-wip-side-badge.enemy { background: #922b21; }
-  .combat-wip-p-name { font-weight: 600; }
-  .combat-wip-p-stats { color: #a0a0c0; font-size: 0.8rem; }
-  .combat-wip-p-controls { margin-left: auto; display: flex; flex-wrap: wrap; gap: 0.35rem; }
-  .combat-wip-p-controls button {
-    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
-    border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.75rem; cursor: pointer;
-  }
-  .combat-wip-p-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
-  .combat-wip-p-controls button.on { background: #27ae60; border-color: #27ae60; }
-  .combat-wip-p-controls button.remove { background: #922b21; border-color: #922b21; }
   #wipBattlePhase #endCombatBtn { display: none; } /* "End Session" above already covers this, shared-session-wide */
 `;
 
@@ -699,9 +688,7 @@ function renderBody(state) {
       <button type="submit" class="combat-wip-btn-primary">Add</button>
     </form>` : ''}
 
-    <div id="wipBattlePhase">${renderBattlePhase(_syncLocalCombatState(state))}</div>
-
-    <div class="combat-wip-participant-list" id="wipOwnControls">${_renderOwnControls(state)}</div>`;
+    <div id="wipBattlePhase">${renderBattlePhase(_syncLocalCombatState(state))}</div>`;
 }
 
 function _renderRoundBar(state) {
@@ -739,43 +726,6 @@ function _attachRoundBarListeners() {
   document.getElementById('advanceTurnBtn')?.addEventListener('click', async () => {
     try { await CombatAPI.advanceTurn(); } catch (err) { alert(err.message); }
   });
-}
-
-/** Controls for THIS trainer's own combatants -- everything combat.js's own
- * card above already shows (name, HP/VP, stats) is deliberately not
- * repeated here, just the multiplayer-specific actions that engine has no
- * concept of: benching, reacting out of turn, attacking a chosen target
- * (server-computed type effectiveness -- distinct from clicking a move
- * inside the card above, which only spends its own user's VP), and
- * leaving the fight. Attack/React are only enabled when this combatant
- * actually holds the floor (or is eligible to react) -- the server
- * enforces the same check regardless, this just avoids offering a button
- * that would only come back as an error. */
-function _renderOwnControls(state) {
-  const myName = _currentTrainerName();
-  const mine = Object.values(state.participants).filter(p => p.owner === myName);
-  if (!mine.length) return '';
-  const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
-  return mine.map(p => _renderControlRow(p, state, activeId)).join('');
-}
-
-function _renderControlRow(p, state, activeId) {
-  const canAct = p.id === activeId;
-  const canReact = p.status === 'participating' && !p.reactionUsed && !state.reactingParticipantId && p.id !== state.turnOrder[state.turnIndex];
-
-  return `
-    <div class="combat-wip-participant ${p.status === 'spectating' ? 'spectating' : ''}">
-      <span class="combat-wip-p-name">${p.name}</span>
-      <div class="combat-wip-p-controls">
-        <button data-toggle-status="${p.id}" data-next-status="${p.status === 'participating' ? 'spectating' : 'participating'}">
-          ${p.status === 'participating' ? 'Bench' : 'Join Fight'}
-        </button>
-        <button data-reaction="${p.id}" ${canReact ? '' : 'disabled'}>⚡ React${p.reactionUsed ? ' (used)' : ''}</button>
-        <button data-use-move="${p.id}" ${canAct ? '' : 'disabled'}
-          title="${canAct ? 'Attack a chosen target' : "Only usable on this combatant's turn (or while reacting)"}">⚔️ Attack</button>
-        <button class="remove" data-remove="${p.id}">Remove</button>
-      </div>
-    </div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -959,10 +909,6 @@ export function attachCombatWipListeners() {
       const roundBar = document.getElementById('wipRoundBar');
       if (roundBar) { roundBar.innerHTML = _renderRoundBar(session); _attachRoundBarListeners(); }
 
-      const ownControls = document.getElementById('wipOwnControls');
-      if (ownControls) ownControls.innerHTML = _renderOwnControls(session);
-
-      _attachActionRowListeners();
       _syncTurnOrderSidebar(session);
 
       updateBattleMap(session);
@@ -1093,41 +1039,7 @@ function attachBodyListeners() {
     }
   });
 
-  _attachActionRowListeners();
   _syncTurnOrderSidebar(session);
-}
-
-function _attachActionRowListeners() {
-  document.querySelectorAll('[data-remove]').forEach(btn => {
-    btn.addEventListener('click', () => CombatAPI.removeParticipant(btn.dataset.remove));
-  });
-
-  document.querySelectorAll('[data-toggle-status]').forEach(btn => {
-    btn.addEventListener('click', () => CombatAPI.setStatus(btn.dataset.toggleStatus, btn.dataset.nextStatus));
-  });
-
-  document.querySelectorAll('[data-reaction]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      try { await CombatAPI.reactionStart(btn.dataset.reaction); } catch (err) { alert(err.message); }
-    });
-  });
-
-  document.querySelectorAll('[data-use-move]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.useMove;
-      const move = prompt('Move name (VP cost is looked up server-side from the moves dataset):');
-      if (!move) return;
-      const targetId = await pickTarget(id) || undefined;
-      const rollStr = targetId ? prompt('Dice roll result (the raw number rolled at the table, optional):', '') : '';
-      const diceRoll = rollStr ? parseInt(rollStr, 10) : undefined;
-      try {
-        const result = await CombatAPI.useMove(id, move, { targetId, diceRoll });
-        if (result.multiplier !== undefined) {
-          alert(`${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`);
-        }
-      } catch (err) { alert(err.message); }
-    });
-  });
 }
 
 function _currentTrainerName() {

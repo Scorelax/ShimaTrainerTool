@@ -33,7 +33,39 @@ const WIP_CSS = `
     background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
     color: #e0e0e0; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
   }
-  .combat-wip-body { max-width: 700px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+  .combat-wip-layout { display: flex; align-items: flex-start; gap: 1rem; padding: 0 1rem; }
+  .combat-wip-body { flex: 1 1 auto; min-width: 0; max-width: 700px; padding: 1.5rem 0 3rem; }
+  .combat-wip-turnorder {
+    flex: 0 0 96px; display: flex; flex-direction: column; gap: 0.6rem;
+    padding: 1.5rem 0 3rem; position: sticky; top: 0;
+  }
+  .wip-turn-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+  .wip-turn-portrait {
+    position: relative; width: 96px; height: 96px; border-radius: 10px; overflow: hidden;
+    background: rgba(255,255,255,0.05); border: 3px solid transparent; box-sizing: border-box;
+  }
+  .wip-turn-item.active .wip-turn-portrait { border-color: #FFD700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
+  .wip-turn-item.spectating { opacity: 0.4; }
+  .wip-turn-portrait-media { width: 100%; height: 100%; }
+  .wip-turn-portrait-media img, .wip-turn-portrait-media video { width: 100%; height: 100%; object-fit: contain; }
+  .wip-turn-reaction {
+    position: absolute; bottom: 2px; left: 4px; font-size: 0.95rem;
+    filter: grayscale(1) opacity(0.35); text-shadow: 0 1px 2px #000;
+  }
+  .wip-turn-reaction.used { filter: none; }
+  .wip-turn-name {
+    font-size: 0.7rem; font-weight: 600; margin-top: 0.25rem; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px;
+  }
+  .wip-turn-detail-popup {
+    position: fixed; z-index: 50; width: 200px; background: #1e1e2e;
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 0.75rem 0.9rem;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5); font-size: 0.85rem;
+  }
+  .wip-turn-detail-popup .wip-turn-detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+  .wip-turn-detail-popup .wip-turn-detail-name { font-weight: 700; color: #FFD700; }
+  .wip-turn-detail-popup .wip-turn-detail-close { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+  .wip-turn-detail-popup .wip-turn-detail-row { color: #cfd0e0; margin-top: 0.2rem; }
   .combat-wip-empty { text-align: center; padding: 3rem 1rem; }
   .combat-wip-empty h2 { color: #FFD700; margin-bottom: 0.5rem; }
   .combat-wip-empty p { color: #a0a0c0; line-height: 1.5; margin-bottom: 1.5rem; }
@@ -244,7 +276,10 @@ function _renderCurrentView() {
         <div class="combat-wip-title">🛠️ New Combat Tool (WIP)</div>
         <div></div>
       </div>
-      <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
+      <div class="combat-wip-layout">
+        <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
+        <div class="combat-wip-turnorder" id="wipTurnOrder"></div>
+      </div>
     </div>`;
 }
 
@@ -290,6 +325,7 @@ function _exitBattleSync() {
   _statsSyncPending = {};
   setCombatStateKey('combatState');
   setOnCombatStateSave(null);
+  _hideTurnOrderDetail();
 }
 
 /** combat.js's own battle engine (Ingrain/direct/drain heals, VP cost of
@@ -665,9 +701,7 @@ function renderBody(state) {
 
     <div id="wipBattlePhase">${renderBattlePhase(_syncLocalCombatState(state))}</div>
 
-    <div class="combat-wip-participant-list" id="wipOwnControls">${_renderOwnControls(state)}</div>
-
-    <div id="wipEnemySection">${_renderEnemySection(state)}</div>`;
+    <div class="combat-wip-participant-list" id="wipOwnControls">${_renderOwnControls(state)}</div>`;
 }
 
 function _renderRoundBar(state) {
@@ -722,33 +756,12 @@ function _renderOwnControls(state) {
   const mine = Object.values(state.participants).filter(p => p.owner === myName);
   if (!mine.length) return '';
   const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
-  return mine.map(p => _renderControlRow(p, state, activeId, false)).join('');
+  return mine.map(p => _renderControlRow(p, state, activeId)).join('');
 }
 
-/** Same idea, for DM-controlled enemies (side:'enemy', no owner -- nobody's
- * own device shows them otherwise) -- plus the per-field visibility
- * toggles only enemies have. Other players' own participants are
- * deliberately absent from this page entirely; that's what the external
- * display screen is for. */
-function _renderEnemySection(state) {
-  const enemies = Object.values(state.participants).filter(p => p.side === 'enemy');
-  if (!enemies.length) return '';
-  const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
-  return `
-    <div class="combat-wip-section-label">Enemies (DM)</div>
-    <div class="combat-wip-participant-list" id="wipEnemyControls">
-      ${enemies.map(p => _renderControlRow(p, state, activeId, true)).join('')}
-    </div>`;
-}
-
-function _renderControlRow(p, state, activeId, showVisibilityToggles) {
+function _renderControlRow(p, state, activeId) {
   const canAct = p.id === activeId;
   const canReact = p.status === 'participating' && !p.reactionUsed && !state.reactingParticipantId && p.id !== state.turnOrder[state.turnIndex];
-
-  const visToggle = (field, label) => `
-    <button class="${p.visibility[field] ? 'on' : ''}" data-vis-id="${p.id}" data-vis-field="${field}" data-vis-value="${p.visibility[field] ? 0 : 1}">
-      ${label} ${p.visibility[field] ? '👁️' : '🚫'}
-    </button>`;
 
   return `
     <div class="combat-wip-participant ${p.status === 'spectating' ? 'spectating' : ''}">
@@ -758,12 +771,148 @@ function _renderControlRow(p, state, activeId, showVisibilityToggles) {
           ${p.status === 'participating' ? 'Bench' : 'Join Fight'}
         </button>
         <button data-reaction="${p.id}" ${canReact ? '' : 'disabled'}>⚡ React${p.reactionUsed ? ' (used)' : ''}</button>
-        ${showVisibilityToggles ? visToggle('hp', 'HP') + visToggle('vp', 'VP') + visToggle('name', 'Name') : ''}
         <button data-use-move="${p.id}" ${canAct ? '' : 'disabled'}
           title="${canAct ? 'Attack a chosen target' : "Only usable on this combatant's turn (or while reacting)"}">⚔️ Attack</button>
         <button class="remove" data-remove="${p.id}">Remove</button>
       </div>
     </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Turn-order sidebar -- a compact column, in turn order, of every
+// participant's portrait (including DM-controlled enemies in PvE), the
+// current turn/reaction holder framed in gold, and a reaction-availability
+// bolt per portrait. Purely a "who's here and what's the order" glance --
+// clicking a portrait pops up a small read-only detail card (name, type,
+// HP/VP, level); no actions live here. Portraits are patched in place
+// (never rebuilt wholesale) the same way display.js's own strip is, so an
+// mp4 sprite's playback isn't restarted by an unrelated push.
+// ---------------------------------------------------------------------------
+
+let _turnOrderDetailOpenId = null;
+let _turnOrderDetailOutsideClickBound = false;
+
+function _syncTurnOrderSidebar(state) {
+  const el = document.getElementById('wipTurnOrder');
+  if (!el) return;
+
+  if (!state || !state.active) {
+    el.innerHTML = '';
+    _hideTurnOrderDetail();
+    return;
+  }
+
+  const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
+  const orderedIds = [
+    ...state.turnOrder,
+    ...Object.keys(state.participants).filter(id => !state.turnOrder.includes(id)),
+  ];
+
+  const liveIds = new Set(Object.keys(state.participants));
+  [...el.children].forEach(node => { if (!liveIds.has(node.dataset.id)) node.remove(); });
+  if (_turnOrderDetailOpenId && !liveIds.has(_turnOrderDetailOpenId)) _hideTurnOrderDetail();
+
+  orderedIds.forEach((id, index) => {
+    const p = state.participants[id];
+    if (!p) return;
+
+    let node = el.querySelector(`[data-id="${id}"]`);
+    if (!node) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = `
+        <div class="wip-turn-item" data-id="${id}">
+          <div class="wip-turn-portrait">
+            <div class="wip-turn-portrait-media" data-portrait-id="${id}"></div>
+            <div class="wip-turn-reaction"></div>
+          </div>
+          <div class="wip-turn-name"></div>
+        </div>`;
+      node = wrapper.firstElementChild;
+      node.addEventListener('click', () => _toggleTurnOrderDetail(node, id));
+    }
+
+    const showName = visibleToViewer(p, 'name');
+    const name = showName ? p.name : '???';
+    node.className = ['wip-turn-item', id === activeId ? 'active' : '', p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');
+    node.querySelector('.wip-turn-name').textContent = name;
+    patchPortraitMedia(node.querySelector('[data-portrait-id]'), p.image, name);
+
+    const reactionEl = node.querySelector('.wip-turn-reaction');
+    reactionEl.textContent = p.status === 'participating' ? '⚡' : '';
+    reactionEl.classList.toggle('used', !!p.reactionUsed);
+
+    if (el.children[index] !== node) el.insertBefore(node, el.children[index] || null);
+  });
+
+  // Keep an already-open detail popup's numbers current (e.g. HP ticking
+  // down live) rather than just leaving it showing a stale snapshot.
+  if (_turnOrderDetailOpenId) {
+    const p = state.participants[_turnOrderDetailOpenId];
+    const node = el.querySelector(`[data-id="${_turnOrderDetailOpenId}"]`);
+    if (p && node) _renderTurnOrderDetail(node, p);
+    else _hideTurnOrderDetail();
+  }
+}
+
+function _toggleTurnOrderDetail(node, id) {
+  if (_turnOrderDetailOpenId === id) { _hideTurnOrderDetail(); return; }
+  const p = session?.participants?.[id];
+  if (!p) return;
+  _renderTurnOrderDetail(node, p);
+}
+
+function _renderTurnOrderDetail(anchorNode, p) {
+  let popup = document.getElementById('wipTurnDetailPopup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'wipTurnDetailPopup';
+    popup.className = 'wip-turn-detail-popup';
+    document.body.appendChild(popup);
+  }
+
+  const showName = visibleToViewer(p, 'name');
+  const showHp = visibleToViewer(p, 'hp');
+  const showVp = visibleToViewer(p, 'vp');
+  const typeBadges = [p.type1, p.type2].filter(Boolean)
+    .map(t => `<span class="type-badge type-${t.toLowerCase()}">${t}</span>`).join(' ');
+
+  popup.innerHTML = `
+    <div class="wip-turn-detail-header">
+      <span class="wip-turn-detail-name">${showName ? p.name : '???'}</span>
+      <button class="wip-turn-detail-close" id="wipTurnDetailCloseBtn">×</button>
+    </div>
+    ${typeBadges ? `<div class="wip-turn-detail-row">${typeBadges}</div>` : ''}
+    ${p.level ? `<div class="wip-turn-detail-row">Level ${p.level}</div>` : ''}
+    ${showHp ? `<div class="wip-turn-detail-row">HP: ${p.currentHP}/${p.maxHP}</div>` : ''}
+    ${showVp ? `<div class="wip-turn-detail-row">VP: ${p.currentVP}/${p.maxVP}</div>` : ''}
+  `;
+
+  const rect = anchorNode.getBoundingClientRect();
+  const popupWidth = 200;
+  let left = rect.left - popupWidth - 10;
+  if (left < 8) left = Math.min(rect.right + 10, window.innerWidth - popupWidth - 8);
+  const top = Math.min(rect.top, window.innerHeight - 180);
+  popup.style.left = `${Math.max(8, left)}px`;
+  popup.style.top = `${Math.max(8, top)}px`;
+  popup.style.display = 'block';
+
+  document.getElementById('wipTurnDetailCloseBtn')?.addEventListener('click', _hideTurnOrderDetail);
+  _turnOrderDetailOpenId = p.id;
+
+  if (!_turnOrderDetailOutsideClickBound) {
+    _turnOrderDetailOutsideClickBound = true;
+    document.addEventListener('click', (e) => {
+      if (!_turnOrderDetailOpenId) return;
+      if (e.target.closest('.wip-turn-detail-popup') || e.target.closest('.wip-turn-item')) return;
+      _hideTurnOrderDetail();
+    });
+  }
+}
+
+function _hideTurnOrderDetail() {
+  _turnOrderDetailOpenId = null;
+  const popup = document.getElementById('wipTurnDetailPopup');
+  if (popup) popup.style.display = 'none';
 }
 
 export function attachCombatWipListeners() {
@@ -813,10 +962,8 @@ export function attachCombatWipListeners() {
       const ownControls = document.getElementById('wipOwnControls');
       if (ownControls) ownControls.innerHTML = _renderOwnControls(session);
 
-      const enemySection = document.getElementById('wipEnemySection');
-      if (enemySection) enemySection.innerHTML = _renderEnemySection(session);
-
       _attachActionRowListeners();
+      _syncTurnOrderSidebar(session);
 
       updateBattleMap(session);
       return;
@@ -825,6 +972,7 @@ export function attachCombatWipListeners() {
     const body = document.getElementById('combatWipBody');
     if (body) body.innerHTML = renderBody(session);
     attachBodyListeners();
+    _syncTurnOrderSidebar(session);
     updateBattleMap(session); // no-ops if the popup isn't currently open
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
@@ -946,6 +1094,7 @@ function attachBodyListeners() {
   });
 
   _attachActionRowListeners();
+  _syncTurnOrderSidebar(session);
 }
 
 function _attachActionRowListeners() {
@@ -977,12 +1126,6 @@ function _attachActionRowListeners() {
           alert(`${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`);
         }
       } catch (err) { alert(err.message); }
-    });
-  });
-
-  document.querySelectorAll('[data-vis-id]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      CombatAPI.setVisibility(btn.dataset.visId, btn.dataset.visField, btn.dataset.visValue === '1');
     });
   });
 }

@@ -40,10 +40,7 @@ const WIP_CSS = `
     padding: 0.75rem 1rem; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1);
   }
   .combat-wip-title { font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px; }
-  .combat-wip-back-btn {
-    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-    color: #e0e0e0; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
-  }
+  .wip-map-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
   .combat-wip-layout { display: flex; align-items: flex-start; gap: 1rem; padding: 0 1rem; }
   .combat-wip-body { flex: 1 1 auto; min-width: 0; max-width: 700px; padding: 1.5rem 0 3rem; }
   .combat-wip-turnorder {
@@ -60,19 +57,28 @@ const WIP_CSS = `
   .wip-turn-item.spectating { opacity: 0.4; }
   .wip-turn-portrait-media { width: 100%; height: 100%; }
   .wip-turn-portrait-media img, .wip-turn-portrait-media video { width: 100%; height: 100%; object-fit: contain; }
+  /* Outer ring = availability (yellow = available, grey = used/unavailable);
+     inner circle stays red regardless, purely so the badge reads clearly
+     against any portrait behind it. Clips into the portrait's corner. */
   .wip-turn-reaction {
-    position: absolute; bottom: 0; left: 1px; font-size: 0.55rem;
-    filter: grayscale(1) opacity(0.35); text-shadow: 0 1px 2px #000;
+    position: absolute; bottom: -3px; left: -3px; width: 16px; height: 16px;
+    border-radius: 50%; background: #FFD700; box-shadow: 0 0 0 2px #14141f;
+    display: flex; align-items: center; justify-content: center;
   }
-  .wip-turn-reaction.used { filter: none; }
+  .wip-turn-reaction.used { background: #6b6b6b; }
+  .wip-turn-reaction-inner {
+    width: 11px; height: 11px; border-radius: 50%; background: #c0392b;
+    display: flex; align-items: center; justify-content: center; font-size: 0.5rem; line-height: 1;
+  }
   .wip-turn-name {
     font-size: 0.55rem; font-weight: 600; margin-top: 0.15rem; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42px;
   }
-  /* The single focused card's React button -- takes over the slot combat.js's
-     own card footer normally gives the End Turn button (which moves below
-     the moves section instead, see renderCombatCard's endTurnAtBottom
-     option and this same footer slot's showReactButton option). */
+  /* The single focused card's Reaction button -- sits in the name row, to
+     the right of the type badges (see renderCombatCard's compactWip
+     option), which is also where Init used to be (moved into the mods row
+     instead) and where End Turn used to be (moved below the moves section,
+     see the same option's endTurnAtBottom). */
   .wip-react-btn {
     background: linear-gradient(135deg, #f1c40f, #e67e22); color: #1a1a1a;
     border: none; border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.82rem; font-weight: 700; cursor: pointer;
@@ -97,10 +103,6 @@ const WIP_CSS = `
   .combat-wip-btn-primary { background: linear-gradient(135deg, #27ae60, #1e8449); }
   .combat-wip-btn-danger { background: linear-gradient(135deg, #c0392b, #922b21); }
   .combat-wip-btn-secondary { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
-  .combat-wip-round-bar {
-    display: flex; align-items: center; justify-content: flex-end;
-    margin-bottom: 1rem;
-  }
   .combat-wip-battle-type-choice {
     display: flex; flex-direction: column; gap: 0.6rem; max-width: 380px; margin: 0 auto 1.5rem; text-align: left;
   }
@@ -128,6 +130,28 @@ const WIP_CSS = `
      tracking (no longer shown at all, per explicit direction), so hidden
      wholesale rather than picked apart piece by piece. */
   #wipBattlePhase .combat-header-bar { display: none; }
+  /* Weather/Terrain -- explicitly parked for now, destination undecided. */
+  #wipBattlePhase .combat-global-bar { display: none; }
+  /* With that header and global bar both gone, .combat-page's own
+     min-height:100vh (sized for the legacy page's full turn-order list)
+     just leaves a lot of empty space below the one card now shown here. */
+  #wipBattlePhase .combat-page { min-height: 0; }
+  .combat-wip-body { padding: 0.75rem 0 1.5rem; }
+  /* A bit more room for the single focused card's portrait -- there's
+     nothing else competing for that space anymore. */
+  #wipBattlePhase .combat-card-img { width: 100px; height: 100px; }
+  /* Init moves into the read-only mods row (to the left of INT) instead of
+     the name row (see renderCombatCard's compactWip option) -- the badge's
+     own margin-left:auto (meant to push it to the far right of a flex row)
+     would instead just misalign it within its own grid cell here. */
+  #wipBattlePhase .combat-mods-row .combat-initiative-badge { margin-left: 0; }
+  /* Damage/HP-VP Calculator stacks below the HP+VP rows instead of beside
+     them (its own single-line text, set by the same compactWip option,
+     needs the extra width that frees up). */
+  #wipBattlePhase .hpvp-hpvp-left--stacked { flex-direction: column; align-items: stretch; }
+  /* End Turn, moved below the moves section by the same option, centered
+     rather than left-aligned like a plain block-level button defaults to. */
+  #wipBattlePhase .combat-end-turn-bottom { display: block; width: fit-content; margin: 0.7rem auto 0.9rem; }
 `;
 
 // Reuses .bmap-cell/.bmap-token's exact rules from battle-map-popup.js (same
@@ -270,7 +294,7 @@ function _renderCurrentView() {
     <div class="combat-wip-page">
       <style>${WIP_CSS}</style>
       <div class="combat-wip-header-bar">
-        <button class="combat-wip-back-btn" id="combatWipBackBtn">← Back</button>
+        <button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button>
         <div class="combat-wip-title" id="wipHeaderTitle"></div>
         <div id="wipHeaderEndBtn"></div>
       </div>
@@ -680,8 +704,6 @@ function renderBody(state) {
   }
 
   return `
-    <div class="combat-wip-round-bar" id="wipRoundBar">${_renderRoundBar(state)}</div>
-
     ${state.battleType === 'pve' ? `
     <div class="combat-wip-section-label">Add Freeform Enemy (DM-controlled)</div>
     <form class="combat-wip-add-form" id="addParticipantForm">
@@ -699,22 +721,6 @@ function renderBody(state) {
     </form>` : ''}
 
     <div id="wipBattlePhase">${_renderMainFocusHtml(state)}</div>`;
-}
-
-// Round/turn-order tracking, the reacting-participant note, and the
-// per-user Advance Turn gate all used to live here as text/buttons -- all
-// removed per explicit direction: the sidebar already shows turn order and
-// who's active/reacting at a glance, and End Turn (on the focused card,
-// see below) already covers ending a turn, so a separate Advance Turn
-// button is redundant. Only the Battle Map button is left.
-function _renderRoundBar(state) {
-  return `<button class="combat-wip-btn-secondary" id="battleMapBtn">🗺️ Battle Map</button>`;
-}
-
-function _attachRoundBarListeners() {
-  document.getElementById('battleMapBtn')?.addEventListener('click', () => {
-    showBattleMap(session, _currentTrainerName());
-  });
 }
 
 /** Header title ("PvP Combat"/"PvE Combat", based on the active session's
@@ -776,7 +782,7 @@ function _syncTurnOrderSidebar(state) {
         <div class="wip-turn-item" data-id="${id}">
           <div class="wip-turn-portrait">
             <div class="wip-turn-portrait-media" data-portrait-id="${id}"></div>
-            <div class="wip-turn-reaction"></div>
+            <div class="wip-turn-reaction"><div class="wip-turn-reaction-inner">⚡</div></div>
           </div>
           <div class="wip-turn-name"></div>
         </div>`;
@@ -794,7 +800,7 @@ function _syncTurnOrderSidebar(state) {
     patchPortraitMedia(node.querySelector('[data-portrait-id]'), p.image, name);
 
     const reactionEl = node.querySelector('.wip-turn-reaction');
-    reactionEl.textContent = p.status === 'participating' ? '⚡' : '';
+    reactionEl.style.display = p.status === 'participating' ? 'flex' : 'none';
     reactionEl.classList.toggle('used', !!p.reactionUsed);
 
     if (el.children[index] !== node) el.insertBefore(node, el.children[index] || null);
@@ -858,7 +864,7 @@ function _computeFocusContext(state) {
   const filteredState = { ...merged, combatants: [focused], activeTurnIndex: focused.id === activeId ? 0 : -1 };
   const canReact = p.status === 'participating' && !p.reactionUsed &&
     !state.reactingParticipantId && p.id !== state.turnOrder[state.turnIndex];
-  const cardOptions = { showReactButton: true, canReact, endTurnAtBottom: true };
+  const cardOptions = { compactWip: true, canReact, endTurnAtBottom: true };
   return { p, isMine: true, filteredState, cardOptions };
 }
 
@@ -979,9 +985,6 @@ export function attachCombatWipListeners() {
       // like move details/inventory, or someone else's read-only info).
       _syncMainFocus(session);
 
-      const roundBar = document.getElementById('wipRoundBar');
-      if (roundBar) { roundBar.innerHTML = _renderRoundBar(session); _attachRoundBarListeners(); }
-
       _syncTurnOrderSidebar(session);
       _syncHeaderBar(session);
       updateBattleMap(session);
@@ -1048,9 +1051,8 @@ export function attachCombatWipListeners() {
     return;
   }
 
-  document.getElementById('combatWipBackBtn')?.addEventListener('click', () => {
-    _exitBattleSync();
-    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat' } }));
+  document.getElementById('battleMapBtn')?.addEventListener('click', () => {
+    showBattleMap(session, _currentTrainerName());
   });
 
   attachBodyListeners();
@@ -1063,8 +1065,6 @@ function attachBodyListeners() {
   });
 
   if (!session || !session.active) return; // empty-state view has nothing else to wire
-
-  _attachRoundBarListeners();
 
   document.getElementById('addParticipantForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();

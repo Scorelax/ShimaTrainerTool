@@ -763,7 +763,7 @@ export function renderBattlePhase(state, cardOptions = {}) {
 // COMBAT CARD
 // ============================================================================
 
-export function renderCombatCard(c, isActive, { showReactButton, canReact, endTurnAtBottom } = {}) {
+export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom } = {}) {
   const fainted = c.currentHp <= 0;
   const hpPct = c.maxHp > 0 ? Math.round((c.currentHp / c.maxHp) * 100) : 0;
   const vpPct = c.maxVp > 0 ? Math.round((c.currentVp / c.maxVp) * 100) : 0;
@@ -781,7 +781,7 @@ export function renderCombatCard(c, isActive, { showReactButton, canReact, endTu
     return `<span class="status-badge ${cls}" data-combatant-id="${c.id}" data-effect="${se.name}">${se.name}${dur}</span>`;
   }).join('');
 
-  const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges) : '';
+  const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges, { compactWip }) : '';
 
   return `
     <div class="combat-card ${isActive ? 'combat-card--active' : ''} ${fainted ? 'combat-card--fainted' : ''}" data-combatant-id="${c.id}" id="card_${c.id}">
@@ -792,7 +792,9 @@ export function renderCombatCard(c, isActive, { showReactButton, canReact, endTu
             <span class="combat-card-name ${fainted ? 'fainted-name' : ''}">${c.name}</span>
             <span class="combat-card-level">Lv ${c.level}</span>
             ${typeBadges}
-            <span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>
+            ${compactWip
+              ? `<button class="wip-react-btn" data-combatant-id="${c.id}" ${canReact ? '' : 'disabled'}>⚡ Reaction</button>`
+              : `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>`}
           </div>
           <div class="combat-card-stats-group">
             ${c.hasStatBlock === false ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong></div>`}
@@ -810,6 +812,7 @@ export function renderCombatCard(c, isActive, { showReactButton, canReact, endTu
             <span>STR ${c.str}<small>(${formatMod(c.strMod)})</small></span>
             <span>DEX ${c.dex}<small>(${formatMod(c.dexMod)})</small></span>
             <span>CON ${c.con}<small>(${formatMod(c.conMod)})</small></span>
+            ${compactWip ? `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>` : ''}
             <span>INT ${c.int}<small>(${formatMod(c.intMod)})</small></span>
             <span>WIS ${c.wis}<small>(${formatMod(c.wisMod)})</small></span>
             <span>CHA ${c.cha}<small>(${formatMod(c.chaMod)})</small></span>
@@ -818,9 +821,7 @@ export function renderCombatCard(c, isActive, { showReactButton, canReact, endTu
       </div>
       <div class="combat-card-footer">
         <div class="combat-status-badges">${statusBadges}</div>
-        ${showReactButton
-          ? `<button class="wip-react-btn" data-combatant-id="${c.id}" ${canReact ? '' : 'disabled'}>⚡ React</button>`
-          : (isActive && !endTurnAtBottom ? `<button class="end-turn-btn" data-combatant-id="${c.id}">End Turn</button>` : '<div></div>')}
+        ${isActive && !endTurnAtBottom ? `<button class="end-turn-btn" data-combatant-id="${c.id}">End Turn</button>` : '<div></div>'}
       </div>
       ${expandedHTML}
       ${isActive && endTurnAtBottom ? `<button class="end-turn-btn combat-end-turn-bottom" data-combatant-id="${c.id}">End Turn</button>` : ''}
@@ -846,7 +847,7 @@ function renderItemForCombat(itemName) {
   return `<strong>${itemName}</strong>${desc ? `<span class="item-desc">: ${desc}</span>` : ''}`;
 }
 
-function renderExpandedSection(c, statusBadges) {
+function renderExpandedSection(c, statusBadges, { compactWip } = {}) {
   // --- Feats section (both) ---
   const featsSection = c.feats ? `
     <div class="expanded-feats-section">
@@ -915,8 +916,8 @@ function renderExpandedSection(c, statusBadges) {
 
   // --- HP / VP adjusters ---
   const typeCalcBtn = c.type === 'pokemon'
-    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮<br>Damage<br>Calculator</button>`
-    : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}" style="background:rgba(76,175,80,0.12);border-color:rgba(76,175,80,0.5);color:#4CAF50;">HP/VP<br>Calculator</button>`;
+    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮${compactWip ? ' Damage Calculator' : '<br>Damage<br>Calculator'}</button>`
+    : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}" style="background:rgba(76,175,80,0.12);border-color:rgba(76,175,80,0.5);color:#4CAF50;">HP/VP${compactWip ? ' Calculator' : '<br>Calculator'}</button>`;
   const critRow = c.type === 'pokemon' ? `
       <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
         <span class="hpvp-stat-label">Crit</span>
@@ -929,7 +930,7 @@ function renderExpandedSection(c, statusBadges) {
     <div class="expanded-hpvp-section">
       <div class="expanded-section-label">Adjust Stats</div>
       <div class="hpvp-hpvp-wrapper">
-        <div class="hpvp-hpvp-left">
+        <div class="hpvp-hpvp-left ${compactWip ? 'hpvp-hpvp-left--stacked' : ''}">
           <div class="hpvp-hpvp-rows">
             <div class="hpvp-adjust-row">
               <span class="hpvp-stat-label">HP</span>

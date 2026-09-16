@@ -36,40 +36,54 @@ const WIP_CSS = `
       viewport -- clip that sliver instead of letting it show as a stray offset/scrollbar */
   }
   .combat-wip-header-bar {
-    display: flex; align-items: center; justify-content: space-between;
+    position: relative; display: flex; align-items: center; justify-content: space-between;
     padding: 0.75rem 1rem; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1);
   }
-  .combat-wip-title { font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px; }
+  /* Absolutely positioned (out of the flex flow) so it sits dead-center on
+     the bar regardless of the Map button and End Battle button either side
+     being different widths -- justify-content:space-between alone would
+     only center it when both side items happen to match in width. */
+  .combat-wip-title {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px;
+    white-space: nowrap;
+  }
   .wip-map-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
   .combat-wip-layout { display: flex; align-items: flex-start; gap: 1rem; padding: 0 1rem; }
-  .combat-wip-body { flex: 1 1 auto; min-width: 0; max-width: 700px; padding: 1.5rem 0 3rem; }
+  /* margin:auto centers this column within the leftover space next to the
+     fixed-width turn-order sidebar -- without it, flex:1 1 auto just grows
+     the column to its max-width from the row's start, leaving it hugging
+     the sidebar instead of centered on the page. */
+  .combat-wip-body { flex: 1 1 auto; min-width: 0; max-width: 700px; margin: 0 auto; padding: 1.5rem 0 3rem; }
   .combat-wip-turnorder {
     flex: 0 0 42px; display: flex; flex-direction: column; gap: 0.4rem;
     padding: 1.5rem 0 3rem; position: sticky; top: 0;
   }
   .wip-turn-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
   .wip-turn-portrait {
-    position: relative; width: 42px; height: 42px; border-radius: 6px; overflow: hidden;
+    position: relative; width: 42px; height: 42px;
     background: rgba(255,255,255,0.05); border: 2px solid transparent; box-sizing: border-box;
   }
   .wip-turn-item.focused .wip-turn-portrait { border-color: #5dade2; }
   .wip-turn-item.active .wip-turn-portrait { border-color: #FFD700; box-shadow: 0 0 5px rgba(255,215,0,0.5); }
   .wip-turn-item.spectating { opacity: 0.4; }
-  .wip-turn-portrait-media { width: 100%; height: 100%; }
+  /* border-radius/overflow live here (not on .wip-turn-portrait) so the
+     reaction dot(s) below can sit fully outside the portrait's edge instead
+     of being clipped into its corner. */
+  .wip-turn-portrait-media { width: 100%; height: 100%; border-radius: 6px; overflow: hidden; }
   .wip-turn-portrait-media img, .wip-turn-portrait-media video { width: 100%; height: 100%; object-fit: contain; }
-  /* Outer ring = availability (yellow = available, grey = used/unavailable);
-     inner circle stays red regardless, purely so the badge reads clearly
-     against any portrait behind it. Clips into the portrait's corner. */
+  /* One dot per available reaction, stacked outside the portrait's left
+     edge (not clipped into it) so a boss with multiple reactions can just
+     get more .wip-turn-reaction-dot children here later. Green = available,
+     grey = used/unavailable. */
   .wip-turn-reaction {
-    position: absolute; bottom: -3px; left: -3px; width: 16px; height: 16px;
-    border-radius: 50%; background: #FFD700; box-shadow: 0 0 0 2px #14141f;
-    display: flex; align-items: center; justify-content: center;
+    position: absolute; top: 50%; right: calc(100% + 3px); transform: translateY(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
   }
-  .wip-turn-reaction.used { background: #6b6b6b; }
-  .wip-turn-reaction-inner {
-    width: 11px; height: 11px; border-radius: 50%; background: #c0392b;
-    display: flex; align-items: center; justify-content: center; font-size: 0.5rem; line-height: 1;
+  .wip-turn-reaction-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 0 2px #14141f;
   }
+  .wip-turn-reaction.used .wip-turn-reaction-dot { background: #6b6b6b; }
   .wip-turn-name {
     font-size: 0.55rem; font-weight: 600; margin-top: 0.15rem; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42px;
@@ -107,10 +121,9 @@ const WIP_CSS = `
     display: flex; flex-direction: column; gap: 0.6rem; max-width: 380px; margin: 0 auto 1.5rem; text-align: left;
   }
   .combat-wip-battle-type-choice label {
-    display: flex; gap: 0.5rem; align-items: flex-start; background: rgba(255,255,255,0.05);
+    display: flex; gap: 0.5rem; align-items: center; background: rgba(255,255,255,0.05);
     border-radius: 8px; padding: 0.6rem 0.8rem; cursor: pointer;
   }
-  .combat-wip-battle-type-choice small { display: block; color: #a0a0c0; }
   .combat-wip-section-label {
     font-size: 0.75rem; font-weight: 700; color: #a0a0c0; text-transform: uppercase;
     letter-spacing: 0.5px; margin: 1rem 0 0.4rem;
@@ -134,8 +147,11 @@ const WIP_CSS = `
   #wipBattlePhase .combat-global-bar { display: none; }
   /* With that header and global bar both gone, .combat-page's own
      min-height:100vh (sized for the legacy page's full turn-order list)
-     just leaves a lot of empty space below the one card now shown here. */
-  #wipBattlePhase .combat-page { min-height: 0; }
+     just leaves a lot of empty space below the one card now shown here --
+     and its padding-top:3.5rem (there to clear its own now-hidden *fixed*
+     header bar) leaves a big band of its burgundy background above the
+     card instead, so both get zeroed here. */
+  #wipBattlePhase .combat-page { min-height: 0; padding-top: 0; }
   .combat-wip-body { padding: 0.75rem 0 1.5rem; }
   /* A bit more room for the single focused card's portrait -- there's
      nothing else competing for that space anymore. */
@@ -162,8 +178,13 @@ const WIP_CSS = `
 const PLACEMENT_CSS = `
   .placement-page { min-height: 100vh; background: #14141f; color: #e0e0e0; font-family: inherit; }
   .placement-header-bar {
-    display: flex; align-items: center; justify-content: center;
+    position: relative; display: flex; align-items: center; justify-content: center;
     padding: 0.75rem 1rem; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .placement-back-btn {
+    position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
+    border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
   }
   .placement-title { font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px; }
   .placement-body { max-width: 640px; margin: 0 auto; padding: 1.5rem 1rem 3rem; text-align: center; }
@@ -518,7 +539,10 @@ function renderPlacementPhase(state, currentId) {
   return `
     <div class="placement-page">
       <style>${PLACEMENT_CSS}</style>
-      <div class="placement-header-bar"><div class="placement-title">📍 Place Your Team</div></div>
+      <div class="placement-header-bar">
+        <button class="placement-back-btn" id="placementBackBtn">← Back</button>
+        <div class="placement-title">📍 Place Your Team</div>
+      </div>
       <div class="placement-body">
         <div class="placement-prompt">Click a cell to preview <strong>${current?.name || '…'}</strong>'s position, then confirm it.</div>
         <div class="placement-actions" id="placementActions"></div>
@@ -619,6 +643,18 @@ function attachPlacementListeners(state, currentId) {
   _renderPlacementTokens(state, currentId);
   _refreshCellTakenStates(state, currentId);
 
+  // By this point the trainer's own combatants have already been added
+  // server-side (see onComplete above), so "back" can't just return to
+  // Setup/Initiative without leaving duplicates behind -- it backs all the
+  // way out of joining instead, via the same leave-session cleanup as the
+  // End Battle button, and drops the trainer back on their own card.
+  document.getElementById('placementBackBtn')?.addEventListener('click', async () => {
+    try { await CombatAPI.leaveSession(_currentTrainerName()); } catch (err) { alert(err.message); }
+    sessionStorage.removeItem(WIP_COMBAT_STATE_KEY);
+    _joinStage = null; _joinState = null; _placementQueue = []; _hoverGhosts = {};
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+  });
+
   const gridEl = document.getElementById('placementGrid');
   if (!gridEl) return;
 
@@ -692,11 +728,11 @@ function renderBody(state) {
         <div class="combat-wip-battle-type-choice">
           <label>
             <input type="radio" name="battleType" value="pve" checked>
-            <span><strong>PvE</strong><small>Players vs. DM-controlled enemies -- the DM adds freeform enemies below.</small></span>
+            <span><strong>PvE</strong></span>
           </label>
           <label>
             <input type="radio" name="battleType" value="pvp">
-            <span><strong>PvP</strong><small>Players fight each other -- no DM setup, everyone's added from real trainer data.</small></span>
+            <span><strong>PvP</strong></span>
           </label>
         </div>
         <button class="combat-wip-btn-primary" id="createSessionBtn">Create Session</button>
@@ -737,7 +773,9 @@ function _syncHeaderBar(state) {
   if (endBtnEl) {
     endBtnEl.innerHTML = state?.active ? '<button class="combat-wip-btn-danger" id="endSessionBtn">End Battle</button>' : '';
     document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
-      await CombatAPI.endSession();
+      await CombatAPI.leaveSession(_currentTrainerName());
+      sessionStorage.removeItem(WIP_COMBAT_STATE_KEY);
+      window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
     });
   }
 }
@@ -745,8 +783,9 @@ function _syncHeaderBar(state) {
 // ---------------------------------------------------------------------------
 // Turn-order sidebar -- a compact column, in turn order, of every
 // participant's portrait (including DM-controlled enemies in PvE), the
-// current turn/reaction holder framed in gold, a reaction-availability bolt
-// per portrait, and a lighter blue frame on whichever one is currently
+// current turn/reaction holder framed in gold, a reaction-availability dot
+// (outside the portrait's left edge) per portrait, and a lighter blue frame
+// on whichever one is currently
 // FOCUSED (see below). Clicking a portrait sets focus to it; portraits are
 // patched in place (never rebuilt wholesale) the same way display.js's own
 // strip is, so an mp4 sprite's playback isn't restarted by an unrelated push.
@@ -782,7 +821,7 @@ function _syncTurnOrderSidebar(state) {
         <div class="wip-turn-item" data-id="${id}">
           <div class="wip-turn-portrait">
             <div class="wip-turn-portrait-media" data-portrait-id="${id}"></div>
-            <div class="wip-turn-reaction"><div class="wip-turn-reaction-inner">⚡</div></div>
+            <div class="wip-turn-reaction"><div class="wip-turn-reaction-dot"></div></div>
           </div>
           <div class="wip-turn-name"></div>
         </div>`;

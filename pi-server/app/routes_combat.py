@@ -83,6 +83,9 @@ def handle(conn, action, params):
     if action == 'end-session':
         return _save_and_publish(conn, dict(_EMPTY_STATE))
 
+    if action == 'leave-session':
+        return _leave_session(conn, params.get('owner', ''))
+
     if action == 'add-participant':
         if not params.get('data'):
             raise ValueError('Missing participant data')
@@ -406,6 +409,27 @@ def _remove_participant(state, pid):
     state['participants'].pop(pid, None)
     state['board']['tokens'].pop(pid, None)
     _rebuild_turn_order(state)
+
+
+def _leave_session(conn, owner):
+    """combat-wip.js's End Battle button: removes only the calling trainer's
+    own participants instead of end-session's blunt reset-for-everyone, so
+    one player leaving doesn't throw everyone else out of a fight still in
+    progress. A DM's freeform enemies always have owner='' (see
+    _add_participant), so they never count as a "player" here -- once no
+    participant with a real owner is left, the session has no players left
+    in it either, and actually ends the same way end-session does."""
+    state = load_state(conn)
+    if not state.get('active'):
+        return {'status': 'success', 'data': state}
+    if owner:
+        for pid in [pid for pid, p in state['participants'].items() if p.get('owner') == owner]:
+            state['participants'].pop(pid, None)
+            state['board']['tokens'].pop(pid, None)
+    if not any(p.get('owner') for p in state['participants'].values()):
+        return _save_and_publish(conn, dict(_EMPTY_STATE))
+    _rebuild_turn_order(state)
+    return _save_and_publish(conn, state)
 
 
 def _set_status(state, pid, status):

@@ -758,6 +758,13 @@ export class CombatAPI {
     return API.request('combat', 'end-session', {}, { useCache: false });
   }
 
+  /** Removes just this trainer's own participants -- see routes_combat.py's
+   * _leave_session docstring for why this exists instead of endSession()
+   * (which resets the shared session for every player at once). */
+  static async leaveSession(owner) {
+    return API.request('combat', 'leave-session', { owner }, { useCache: false });
+  }
+
   static async addParticipant(participant) {
     return API.request('combat', 'add-participant', { data: JSON.stringify(participant) }, { useCache: false });
   }

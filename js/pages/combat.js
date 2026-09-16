@@ -1068,7 +1068,16 @@ function getCombatCSS() {
       border-bottom: 1px solid rgba(255,255,255,0.15);
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
     }
-    .combat-header-title { font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px; }
+    /* Absolutely positioned against the bar itself (already position:fixed,
+       so it's the containing block) rather than left in the flex flow --
+       justify-content:space-between only centers this when the button on
+       each side happens to match in width, which Setup/Initiative/Battle's
+       differing left+right buttons never do. */
+    .combat-header-title {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px;
+      white-space: nowrap;
+    }
     .combat-round-label { font-size: 1rem; font-weight: 700; color: #a0a0c0; }
     .combat-back-btn {
       background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);

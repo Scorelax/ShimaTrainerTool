@@ -822,8 +822,16 @@ export class CombatAPI {
     return API.request('combat', 'set-cell-terrain', { col, row, terrain }, { useCache: false });
   }
 
+  /** DM/setup placement -- NOT turn-gated, moves any token any time. */
   static async setTokenPosition(id, col, row) {
     return API.request('combat', 'set-token-position', { id, col, row }, { useCache: false });
+  }
+
+  /** A player moving their own token during combat -- server rejects this
+   * unless id is whoever currently has the floor (active turn or
+   * mid-reaction), same authority check as useMove. */
+  static async moveToken(id, col, row) {
+    return API.request('combat', 'move-token', { id, col, row }, { useCache: false });
   }
 
   static async clearTokenPosition(id) {

@@ -1,14 +1,15 @@
 // Interactive in-app battle map popup -- lets a player VIEW the same board
 // the table kiosk screen (battle-map.html) shows, and MOVE their own
-// token(s) by clicking one, then clicking a destination cell. This is
-// deliberately the simplest possible version: no turn-gating, no range/
-// distance limits, no terrain blocking -- the user explicitly asked to
-// prove movement works first and layer real movement rules on later.
-// Ownership ("is this token mine") is enforced client-side only, via each
-// participant's `owner` field (set by combat-wip.js's "Join as yourself"
-// flow) -- see routes_combat.py's set-token-position, which stays
-// unrestricted server-side, same trust model as this WIP tool's other
-// DM-facing actions.
+// token by clicking it, then clicking a destination cell. Deliberately
+// still the simplest possible version of movement itself: no range/
+// distance limits, no terrain blocking yet -- the user explicitly asked to
+// prove movement works first and layer real movement rules on later. Turn-
+// gating, however, is NOT one of those deferred rules -- the user was
+// explicit that movement only happens on your own turn, so a token is only
+// selectable when it's both yours (`owner` field, set by combat-wip.js's
+// "Join as yourself" flow) AND the current turn holder, and the server
+// enforces the same check (move-token in routes_combat.py, same authority
+// model as use-move) so this can't be bypassed from the client.
 //
 // Mirrors move-popup.js's overlay pattern (create the DOM once, reuse
 // across calls) and target-picker.js's self-contained-styles approach
@@ -44,8 +45,11 @@ function _injectStyles() {
       position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 3px; box-sizing: border-box; pointer-events: none;
     }
-    .bmap-token.mine { pointer-events: auto; cursor: pointer; }
-    .bmap-token.selected { outline: 2px solid #FFD700; outline-offset: -2px; border-radius: 4px; }
+    /* .my-turn is the only clickable state -- .mine alone (yours, but not
+       your turn right now) is shown (gold name) but not interactive. */
+    .bmap-token.my-turn { pointer-events: auto; cursor: pointer; }
+    .bmap-token.my-turn:not(.selected) { outline: 2px solid rgba(255,215,0,0.55); outline-offset: -2px; border-radius: 4px; }
+    .bmap-token.selected { outline: 2px solid #FFD700; outline-offset: -2px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,215,0,0.6); }
     .bmap-token-portrait { width: 70%; height: 70%; }
     .bmap-token-portrait img, .bmap-token-portrait video { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(0,0,0,0.9)); }
     .bmap-token-name { font-size: 0.6rem; font-weight: 700; text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -113,13 +117,29 @@ export function updateBattleMap(session) {
   if (_overlay && _overlay.style.display !== 'none') _render();
 }
 
+/** Whoever currently has the floor -- reacting participant if one's mid-
+ * reaction, otherwise the normal turn holder. Same definition as
+ * routes_combat.py's _active_participant_id, kept in sync manually since
+ * there's no shared module between Python and JS for this. */
+function _activeParticipantId(session) {
+  if (session.reactingParticipantId) return session.reactingParticipantId;
+  if (session.turnOrder && session.turnOrder.length) return session.turnOrder[session.turnIndex];
+  return null;
+}
+
 function _render() {
   if (!_session || !_session.board) return;
   const hint = document.getElementById('bmapHint');
   if (hint) {
-    hint.textContent = _selectedTokenId
-      ? 'Click a cell to move there.'
-      : 'Click one of your own tokens (gold name), then click a cell to move it.';
+    if (_selectedTokenId) {
+      hint.textContent = 'Click a cell to move there.';
+    } else {
+      const activeId = _activeParticipantId(_session);
+      const activeIsMine = !!activeId && _session.participants[activeId]?.owner === _ownerName;
+      hint.textContent = activeIsMine
+        ? 'Click your active token (gold outline) to select it, then click a cell to move it.'
+        : "It's not your turn -- you can only move a token on your own turn.";
+    }
   }
   _renderGrid();
   _renderTokens();
@@ -148,7 +168,11 @@ function _renderGrid() {
       const [col, row] = cell.dataset.cell.split(',').map(Number);
       const movingId = _selectedTokenId;
       _selectedTokenId = null;
-      CombatAPI.setTokenPosition(movingId, col, row).catch(err => alert(err.message));
+      // Turn-gated server-side (move-token, not the DM's unrestricted
+      // set-token-position) -- selection was already limited to your
+      // active-turn token below, but the server is the actual authority.
+      CombatAPI.moveToken(movingId, col, row).catch(err => alert(err.message));
+      _render();
     });
   });
 }
@@ -158,6 +182,7 @@ function _renderTokens() {
   if (!layer) return;
   const { cols, rows } = _session.board.grid;
   const tokens = _session.board.tokens;
+  const activeId = _activeParticipantId(_session);
 
   layer.innerHTML = '';
   Object.entries(tokens).forEach(([id, pos]) => {
@@ -165,8 +190,14 @@ function _renderTokens() {
     if (!p) return;
 
     const isMine = !!_ownerName && p.owner === _ownerName;
+    const isMyTurn = isMine && id === activeId;
+    const classes = ['bmap-token', p.side];
+    if (isMine) classes.push('mine');
+    if (isMyTurn) classes.push('my-turn');
+    if (id === _selectedTokenId) classes.push('selected');
+
     const el = document.createElement('div');
-    el.className = `bmap-token ${p.side}${isMine ? ' mine' : ''}${id === _selectedTokenId ? ' selected' : ''}`;
+    el.className = classes.join(' ');
     el.dataset.id = id;
     el.style.left = `${(pos.col / cols) * 100}%`;
     el.style.top = `${(pos.row / rows) * 100}%`;
@@ -178,7 +209,7 @@ function _renderTokens() {
     el.querySelector('.bmap-token-name').textContent = name;
     patchPortraitMedia(el.querySelector('.bmap-token-portrait'), p.image, name);
 
-    if (isMine) {
+    if (isMyTurn) {
       el.addEventListener('click', () => {
         _selectedTokenId = _selectedTokenId === id ? null : id;
         _render();

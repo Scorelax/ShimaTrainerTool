@@ -144,6 +144,13 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id, col, or row')
         return _mutate(conn, lambda s: _set_token_position(s, params['id'], col, row))
 
+    if action == 'move-token':
+        col = js_parse_int(params.get('col'))
+        row = js_parse_int(params.get('row'))
+        if not params.get('id') or col is None or row is None:
+            raise ValueError('Missing participant id, col, or row')
+        return _mutate(conn, lambda s: _move_token(s, params['id'], col, row))
+
     if action == 'clear-token-position':
         if not params.get('id'):
             raise ValueError('Missing participant id')
@@ -430,9 +437,16 @@ def _apply_move(conn, state, pid, vp_cost, target_id, dice_roll, move_type):
 
 
 # ---------------------------------------------------------------------------
-# Battle map -- see the 'board' shape on _EMPTY_STATE above. Positioning is
-# deliberately NOT turn-gated (unlike use-move) -- it's DM/setup-driven
-# battlefield state, not an action a participant spends their turn on.
+# Battle map -- see the 'board' shape on _EMPTY_STATE above. Two ways to
+# move a token, matching two different actors:
+#   - set-token-position (_set_token_position): DM/setup placement, NOT
+#     turn-gated -- the DM places/repositions any token (including enemies)
+#     whenever, same as the WIP test controls do today.
+#   - move-token (_move_token): a player moving their own token during
+#     combat. Turn-gated exactly like use-move -- only whoever currently
+#     has the floor (active turn, or mid-reaction) can move, and only
+#     themselves. Range/distance limits and terrain-blocking are explicit
+#     future work; this only enforces whose turn it is.
 # ---------------------------------------------------------------------------
 
 def _set_board_template(state, cols, rows):
@@ -456,6 +470,14 @@ def _set_cell_terrain(state, col, row, terrain):
 def _set_token_position(state, pid, col, row):
     if pid not in state['participants']:
         raise ValueError('Unknown participant: ' + pid)
+    state['board']['tokens'][pid] = {'col': col, 'row': row}
+
+
+def _move_token(state, pid, col, row):
+    if pid not in state['participants']:
+        raise ValueError('Unknown participant: ' + pid)
+    if pid != _active_participant_id(state):
+        raise ValueError("It's not this participant's turn")
     state['board']['tokens'][pid] = {'col': col, 'row': row}
 
 

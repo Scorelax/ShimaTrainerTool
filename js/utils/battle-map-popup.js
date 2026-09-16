@@ -60,7 +60,16 @@ function _injectStyles() {
       background: #4a3520; display: flex; align-items: center; justify-content: center;
       font-size: 0.6rem; color: #e0c080; overflow: hidden; text-align: center; padding: 1px; box-sizing: border-box;
     }
-    .bmap-tokens { position: absolute; inset: 0; }
+    /* pointer-events:none on the container (not just the default-none
+       individual tokens below) -- without it, this full-stage layer sits on
+       top of .bmap-grid in paint order and, having no click handler of its
+       own, silently swallows every click meant for a cell underneath except
+       where it exactly overlaps a .my-turn token (which opts back in below).
+       That's what made clicking a destination cell to move to do nothing --
+       selecting your own token still worked since that click landed on the
+       token itself. See .placement-tokens for the same fix already applied
+       to the placement screen's equivalent layer. */
+    .bmap-tokens { position: absolute; inset: 0; pointer-events: none; }
     .bmap-token {
       position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 3px; box-sizing: border-box; pointer-events: none;

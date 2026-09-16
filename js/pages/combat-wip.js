@@ -24,14 +24,19 @@ import {
 
 const WIP_CSS = `
   /* Breaks out of the SPA shell's own centered/padded ".app" container
-     (max-width:1400px, padding:20px, both on top of a dark red body
-     background) so this page's own background actually reaches every edge
-     of the viewport instead of leaving a red band around it regardless of
-     nesting depth -- the width:100vw + negative-margin pair is relative to
-     the viewport, not the parent, which is what makes that possible here. */
+     (max-width:1400px, padding:20px on every side, both on top of a dark
+     red body background) so this page's own background actually reaches
+     every edge of the viewport instead of leaving a red band around it
+     regardless of nesting depth -- the width:100vw + negative-margin pair
+     is relative to the viewport, not the parent, which is what makes that
+     possible here. The top/bottom -20px margins are the same trick applied
+     to .app's *vertical* padding, which the horizontal-only version of this
+     left uncovered (min-height:100vh alone only guarantees this fills the
+     viewport, not that it also eats into the padding around it). */
   .combat-wip-page {
     min-height: 100vh; background: #14141f; color: #e0e0e0; font-family: inherit;
     width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw);
+    margin-top: -20px; margin-bottom: -20px;
     overflow-x: hidden; /* 100vw can run a few px wider than the true scrollbar-adjusted
       viewport -- clip that sliver instead of letting it show as a stray offset/scrollbar */
   }
@@ -108,8 +113,7 @@ const WIP_CSS = `
   .wip-foreign-focus-name { font-size: 1.1rem; font-weight: 700; color: #FFD700; margin-bottom: 0.4rem; }
   .wip-foreign-focus-row { color: #cfd0e0; margin-top: 0.25rem; font-size: 0.95rem; }
   .combat-wip-empty { text-align: center; padding: 3rem 1rem; }
-  .combat-wip-empty h2 { color: #FFD700; margin-bottom: 0.5rem; }
-  .combat-wip-empty p { color: #a0a0c0; line-height: 1.5; margin-bottom: 1.5rem; }
+  .combat-wip-empty h2 { color: #FFD700; margin-bottom: 1.25rem; }
   .combat-wip-btn-primary, .combat-wip-btn-danger, .combat-wip-btn-secondary {
     border: none; border-radius: 6px; padding: 0.6rem 1.2rem; font-size: 0.95rem;
     font-weight: 600; cursor: pointer; color: #fff;
@@ -118,11 +122,20 @@ const WIP_CSS = `
   .combat-wip-btn-danger { background: linear-gradient(135deg, #c0392b, #922b21); }
   .combat-wip-btn-secondary { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
   .combat-wip-battle-type-choice {
-    display: flex; flex-direction: column; gap: 0.6rem; max-width: 380px; margin: 0 auto 1.5rem; text-align: left;
+    display: flex; flex-direction: row; gap: 0.75rem; max-width: 340px; margin: 0 auto 1.5rem;
   }
   .combat-wip-battle-type-choice label {
-    display: flex; gap: 0.5rem; align-items: center; background: rgba(255,255,255,0.05);
-    border-radius: 8px; padding: 0.6rem 0.8rem; cursor: pointer;
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 10px;
+    padding: 1.1rem 0.5rem; cursor: pointer; font-size: 1.1rem; font-weight: 700;
+    transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+  }
+  /* Native radio hidden but still present (and still keyboard-focusable/
+     tabbable) -- the label itself is the visible button, highlighted via
+     :has() rather than needing separate JS to toggle a "selected" class. */
+  .combat-wip-battle-type-choice input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .combat-wip-battle-type-choice label:has(input:checked) {
+    border-color: #FFD700; background: rgba(255,215,0,0.12); color: #FFD700;
   }
   .combat-wip-section-label {
     font-size: 0.75rem; font-weight: 700; color: #a0a0c0; text-transform: uppercase;
@@ -315,7 +328,7 @@ function _renderCurrentView() {
     <div class="combat-wip-page">
       <style>${WIP_CSS}</style>
       <div class="combat-wip-header-bar">
-        <button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button>
+        <div id="wipHeaderLeftBtn"></div>
         <div class="combat-wip-title" id="wipHeaderTitle"></div>
         <div id="wipHeaderEndBtn"></div>
       </div>
@@ -723,16 +736,15 @@ function renderBody(state) {
   if (!state || !state.active) {
     return `
       <div class="combat-wip-empty">
-        <h2>No active session</h2>
-        <p>Add real trainers and their party Pokémon, and confirm the turn order / reaction rules sync live across every open tab.</p>
+        <h2>Battle Mode</h2>
         <div class="combat-wip-battle-type-choice">
           <label>
             <input type="radio" name="battleType" value="pve" checked>
-            <span><strong>PvE</strong></span>
+            <span>PvE</span>
           </label>
           <label>
             <input type="radio" name="battleType" value="pvp">
-            <span><strong>PvP</strong></span>
+            <span>PvP</span>
           </label>
         </div>
         <button class="combat-wip-btn-primary" id="createSessionBtn">Create Session</button>
@@ -760,14 +772,27 @@ function renderBody(state) {
 }
 
 /** Header title ("PvP Combat"/"PvE Combat", based on the active session's
- * battleType) and the End Battle button (renamed from End Session, moved
- * here from the round bar) -- both live outside #combatWipBody, so unlike
- * everything the SSE fast path patches, these need their own explicit
- * refresh call wherever `session` changes. */
+ * battleType), the left-side button (Back before there's a session to show
+ * a map of, Map once one's active), and the End Battle button (renamed
+ * from End Session, moved here from the round bar) -- all three live
+ * outside #combatWipBody, so unlike everything the SSE fast path patches,
+ * they need their own explicit refresh call wherever `session` changes. */
 function _syncHeaderBar(state) {
   const titleEl = document.getElementById('wipHeaderTitle');
   if (titleEl) {
     titleEl.textContent = !state?.active ? '⚔️ Combat' : `⚔️ ${state.battleType === 'pvp' ? 'PvP' : 'PvE'} Combat`;
+  }
+  const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
+  if (leftBtnEl) {
+    leftBtnEl.innerHTML = state?.active
+      ? '<button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button>'
+      : '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">← Back</button>';
+    document.getElementById('battleMapBtn')?.addEventListener('click', () => {
+      showBattleMap(session, _currentTrainerName());
+    });
+    document.getElementById('wipHeaderBackBtn')?.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+    });
   }
   const endBtnEl = document.getElementById('wipHeaderEndBtn');
   if (endBtnEl) {
@@ -1090,10 +1115,6 @@ export function attachCombatWipListeners() {
     return;
   }
 
-  document.getElementById('battleMapBtn')?.addEventListener('click', () => {
-    showBattleMap(session, _currentTrainerName());
-  });
-
   attachBodyListeners();
 }
 
@@ -1102,6 +1123,11 @@ function attachBodyListeners() {
     const battleType = document.querySelector('input[name="battleType"]:checked')?.value || 'pve';
     await CombatAPI.createSession(battleType);
   });
+
+  // Always synced, even for the empty state -- it's what puts the Back
+  // button (rather than Map) in the header's left slot before there's a
+  // session to show a map of.
+  _syncHeaderBar(session);
 
   if (!session || !session.active) return; // empty-state view has nothing else to wire
 
@@ -1131,7 +1157,6 @@ function attachBodyListeners() {
   _attachMainFocusListeners(session);
 
   _syncTurnOrderSidebar(session);
-  _syncHeaderBar(session);
 }
 
 /** Wired into combat.js's move-popup flow as onDamageResolved (see

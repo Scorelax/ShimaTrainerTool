@@ -11,6 +11,9 @@
 import { CombatAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect } from '../utils/battle-map-grid.js';
+import { patchPortraitMedia } from '../utils/sprite-media.js';
+import { visibleToViewer } from '../utils/combat-visibility.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -93,6 +96,45 @@ const WIP_CSS = `
   .combat-wip-p-controls button.remove { background: #922b21; border-color: #922b21; }
 `;
 
+// Reuses .bmap-cell/.bmap-token's exact rules from battle-map-popup.js (same
+// class names, same properties) so the placement screen looks like the same
+// map surface the popup and kiosk screen show -- defined again here (rather
+// than only relying on battle-map-popup.js's injected <head> styles) so this
+// page works even if that popup has never been opened yet this session.
+const PLACEMENT_CSS = `
+  .placement-page { min-height: 100vh; background: #14141f; color: #e0e0e0; font-family: inherit; }
+  .placement-header-bar {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0.75rem 1rem; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .placement-title { font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px; }
+  .placement-body { max-width: 640px; margin: 0 auto; padding: 1.5rem 1rem 3rem; text-align: center; }
+  .placement-prompt { font-size: 1.05rem; margin-bottom: 1rem; }
+  .placement-prompt strong { color: #FFD700; }
+  .placement-stage { position: relative; width: 100%; aspect-ratio: 5 / 4; background: #0a0a12; border-radius: 8px; overflow: hidden; }
+  .placement-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
+  .bmap-cell { background: #20202e; cursor: pointer; }
+  .bmap-cell:hover { outline: 1px solid rgba(255,215,0,0.5); outline-offset: -1px; }
+  .bmap-cell.marked {
+    background: #4a3520; display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; color: #e0c080; overflow: hidden; text-align: center; padding: 1px; box-sizing: border-box;
+  }
+  .placement-tokens { position: absolute; inset: 0; pointer-events: none; }
+  .placement-token {
+    position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 3px; box-sizing: border-box;
+  }
+  .placement-token-portrait { width: 70%; height: 70%; }
+  .placement-token-portrait img, .placement-token-portrait video {
+    width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(0,0,0,0.9));
+  }
+  .placement-token-name { font-size: 0.6rem; font-weight: 700; text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .placement-token.player .placement-token-name { color: #5dade2; }
+  .placement-token.enemy .placement-token-name { color: #e57373; }
+  .placement-token.ghost { opacity: 0.5; }
+  .placement-token.ghost .placement-token-name { color: #FFD700; font-style: italic; }
+`;
+
 let session = null;
 let combatUpdateHandler = null;
 
@@ -105,8 +147,12 @@ let combatUpdateHandler = null;
 // local-only combat page exactly as before). This is purely local UI state
 // for *this device's* own join process -- separate from the shared
 // `session` above -- until it completes and pushes to the server.
-let _joinStage = null; // null | 'setup' | 'initiative'
+let _joinStage = null; // null | 'setup' | 'initiative' | 'placement'
 let _joinState = null; // { combatants: [trainerCombatant, activePokemon] } while in 'initiative'
+let _placementQueue = []; // participant ids this trainer still needs to place, while in 'placement'
+let _hoverGhosts = {}; // participantId -> {col,row} live previews from OTHER players, while in 'placement'
+let _hoverThrottle = null;
+let _placementHoverHandler = null;
 
 function _needsToJoin(state) {
   const name = _currentTrainerName();
@@ -121,9 +167,14 @@ export async function renderCombatWip() {
 }
 
 function _renderCurrentView() {
-  if (session.active && _needsToJoin(session)) {
+  const inJoinFlow = _joinStage === 'setup' || _joinStage === 'initiative' || _joinStage === 'placement';
+
+  if (session.active && (inJoinFlow || _needsToJoin(session))) {
     if (_joinStage === 'initiative' && _joinState) {
       return renderInitiativePhase(_joinState);
+    }
+    if (_joinStage === 'placement' && _placementQueue.length) {
+      return renderPlacementPhase(session, _placementQueue[0]);
     }
     _joinStage = 'setup';
     return renderSetupPhase({ showWipButton: false });
@@ -131,6 +182,8 @@ function _renderCurrentView() {
 
   _joinStage = null;
   _joinState = null;
+  _placementQueue = [];
+  _hoverGhosts = {};
 
   return `
     <div class="combat-wip-page">
@@ -168,6 +221,116 @@ function _combatantToParticipant(c) {
     type2: (c.types && c.types[1]) || '',
     initiative: c.initiativeTotal,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Placement -- after initiative, before the battle/turn-order view, each
+// player places their own trainer then their own Pokémon on the grid, one
+// at a time. Live: other players currently placing broadcast a hover
+// preview (see routes_combat.py's hover-token) that renders here as a
+// translucent ghost, and every confirmed placement (confirm-placement)
+// shows immediately via the normal session broadcast, same channel as
+// everything else in this file.
+// ---------------------------------------------------------------------------
+
+function renderPlacementPhase(state, currentId) {
+  const current = state.participants[currentId];
+  return `
+    <div class="placement-page">
+      <style>${PLACEMENT_CSS}</style>
+      <div class="placement-header-bar"><div class="placement-title">📍 Place Your Team</div></div>
+      <div class="placement-body">
+        <div class="placement-prompt">Click a cell to place <strong>${current?.name || '…'}</strong> on the map.</div>
+        <div class="placement-stage">
+          <div class="placement-grid" id="placementGrid" style="${gridTemplateStyle(state.board)}">${gridCellsHtml(state.board, 'bmap-cell')}</div>
+          <div class="placement-tokens" id="placementTokens"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function _renderPlacementTokens(state, currentId) {
+  const layer = document.getElementById('placementTokens');
+  if (!layer) return;
+
+  const html = [];
+
+  Object.entries(state.board.tokens).forEach(([id, pos]) => {
+    const p = state.participants[id];
+    if (!p) return;
+    const name = visibleToViewer(p, 'name') ? p.name : '???';
+    const rect = cellRect(state.board, pos.col, pos.row);
+    html.push(`
+      <div class="placement-token ${p.side}" data-token-id="${id}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
+        <div class="placement-token-portrait" data-portrait-id="${id}"></div>
+        <div class="placement-token-name">${name}</div>
+      </div>`);
+  });
+
+  Object.entries(_hoverGhosts).forEach(([id, pos]) => {
+    if (!pos || id === currentId) return; // no ghost for your own in-progress placement
+    if (state.board.tokens[id]) return; // already confirmed -- the real token above is authoritative
+    const p = state.participants[id];
+    if (!p) return;
+    const name = visibleToViewer(p, 'name') ? p.name : '???';
+    const rect = cellRect(state.board, pos.col, pos.row);
+    html.push(`
+      <div class="placement-token ghost ${p.side}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
+        <div class="placement-token-portrait" data-portrait-id="${id}"></div>
+        <div class="placement-token-name">${name}</div>
+      </div>`);
+  });
+
+  layer.innerHTML = html.join('');
+
+  layer.querySelectorAll('[data-portrait-id]').forEach(el => {
+    const p = state.participants[el.dataset.portraitId];
+    if (p) patchPortraitMedia(el, p.image, p.name);
+  });
+}
+
+function attachPlacementListeners(state, currentId) {
+  _renderPlacementTokens(state, currentId);
+
+  const gridEl = document.getElementById('placementGrid');
+  if (!gridEl) return;
+
+  gridEl.querySelectorAll('[data-cell]').forEach(cell => {
+    cell.addEventListener('click', async () => {
+      const [col, row] = cell.dataset.cell.split(',').map(Number);
+      try {
+        await CombatAPI.confirmPlacement(currentId, col, row);
+      } catch (err) {
+        alert(err.message);
+        return;
+      }
+      CombatAPI.hoverToken(currentId).catch(() => {}); // clear our own hover ghost for others
+      _placementQueue.shift();
+      if (!_placementQueue.length) _joinStage = null;
+      _rerenderFull();
+    });
+  });
+
+  gridEl.addEventListener('mousemove', (e) => {
+    const cell = e.target.closest('[data-cell]');
+    if (!cell) return;
+    if (_hoverThrottle) return;
+    _hoverThrottle = setTimeout(() => { _hoverThrottle = null; }, 150);
+    const [col, row] = cell.dataset.cell.split(',').map(Number);
+    CombatAPI.hoverToken(currentId, col, row).catch(() => {});
+  });
+
+  gridEl.addEventListener('mouseleave', () => {
+    CombatAPI.hoverToken(currentId).catch(() => {});
+  });
+
+  if (_placementHoverHandler) window.removeEventListener('app:combat-hover', _placementHoverHandler);
+  _placementHoverHandler = (e) => {
+    const { participantId, col, row } = e.detail;
+    _hoverGhosts[participantId] = (col === null || col === undefined) ? null : { col, row };
+    if (_joinStage === 'placement') _renderPlacementTokens(session, _placementQueue[0]);
+  };
+  window.addEventListener('app:combat-hover', _placementHoverHandler);
 }
 
 function renderBody(state) {
@@ -263,14 +426,19 @@ function renderParticipant(p, state, activeId) {
 
 export function attachCombatWipListeners() {
   // Re-render in place on every live combat push (see live-updates.js) --
-  // while mid-join-flow this only updates the background `session` var;
-  // the join screens are local to this device and aren't patched live
-  // (nothing about *your own* setup/initiative needs another player's
-  // action mid-roll) -- the normal view picks up the latest session the
-  // moment the join flow completes and re-renders.
+  // while mid-setup/initiative this only updates the background `session`
+  // var (nothing about *your own* roll needs another player's action
+  // mid-way); while placing, other players' just-confirmed tokens DO patch
+  // in live so "see everyone's placement live" isn't only true for hover
+  // previews. The normal view picks up the latest session the moment the
+  // join flow completes and re-renders.
   if (combatUpdateHandler) window.removeEventListener('app:combat-updated', combatUpdateHandler);
   combatUpdateHandler = (e) => {
     session = e.detail;
+    if (_joinStage === 'placement') {
+      if (_placementQueue.length) _renderPlacementTokens(session, _placementQueue[0]);
+      return;
+    }
     if (_joinStage) return;
 
     // Not already mid-join-flow, but the fresh session says this trainer
@@ -317,14 +485,25 @@ export function attachCombatWipListeners() {
           alert(err.message);
         }
         // Pick up whatever the server now has (including this device's own
-        // just-added participants) before falling through to the normal view.
+        // just-added participants) before deciding what's next.
         const result = await CombatAPI.getState();
         session = result.status === 'success' ? result.data : session;
-        _joinStage = null;
         _joinState = null;
+
+        const myName = _currentTrainerName();
+        _placementQueue = Object.values(session.participants)
+          .filter(p => p.owner === myName && !p.placed)
+          .map(p => p.id);
+
+        _joinStage = _placementQueue.length ? 'placement' : null;
         _rerenderFull();
       },
     });
+    return;
+  }
+
+  if (_joinStage === 'placement') {
+    attachPlacementListeners(session, _placementQueue[0]);
     return;
   }
 

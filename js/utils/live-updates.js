@@ -15,6 +15,9 @@
 //  - a combat-animation event (routes_combat.py's play-animation action) --
 //    a one-shot "play this species' clip now" cue, not session state;
 //    forwarded the same way for the display module to react to.
+//  - a combat-hover event (routes_combat.py's hover-token action) -- a live
+//    "here's where I'm considering placing this token" preview during the
+//    placement step, also not session state; forwarded the same way.
 
 import { EVENTS_URL, GameDataAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { setPokedexConfig } from './visibility.js';
@@ -47,6 +50,8 @@ export function initLiveUpdates() {
       window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: event.session }));
     } else if (event.type === 'combat-animation') {
       window.dispatchEvent(new CustomEvent('app:combat-animation', { detail: event }));
+    } else if (event.type === 'combat-hover') {
+      window.dispatchEvent(new CustomEvent('app:combat-hover', { detail: event }));
     }
   };
 }

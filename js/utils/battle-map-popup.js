@@ -18,6 +18,7 @@
 import { CombatAPI } from '../api.js';
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect } from './battle-map-grid.js';
 
 function _injectStyles() {
   if (document.getElementById('battle-map-popup-styles')) return;
@@ -200,19 +201,8 @@ function _render() {
 function _renderGrid() {
   const gridEl = document.getElementById('bmapGrid');
   if (!gridEl) return;
-  const { cols, rows } = _session.board.grid;
-  gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  gridEl.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-
-  const cells = [];
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const terrain = _session.board.cells[`${col},${row}`]?.terrain || '';
-      const classes = terrain ? 'bmap-cell marked' : 'bmap-cell';
-      cells.push(`<div class="${classes}" data-cell="${col},${row}"${terrain ? ` title="${terrain}"` : ''}>${terrain}</div>`);
-    }
-  }
-  gridEl.innerHTML = cells.join('');
+  gridEl.setAttribute('style', gridTemplateStyle(_session.board));
+  gridEl.innerHTML = gridCellsHtml(_session.board, 'bmap-cell');
 
   gridEl.querySelectorAll('[data-cell]').forEach(cell => {
     cell.addEventListener('click', async () => {
@@ -241,7 +231,6 @@ function _renderGrid() {
 function _renderTokens() {
   const layer = document.getElementById('bmapTokens');
   if (!layer) return;
-  const { cols, rows } = _session.board.grid;
   const tokens = _session.board.tokens;
   const activeId = _activeParticipantId(_session);
 
@@ -263,10 +252,7 @@ function _renderTokens() {
     const el = document.createElement('div');
     el.className = classes.join(' ');
     el.dataset.id = id;
-    el.style.left = `${(pos.col / cols) * 100}%`;
-    el.style.top = `${(pos.row / rows) * 100}%`;
-    el.style.width = `${(1 / cols) * 100}%`;
-    el.style.height = `${(1 / rows) * 100}%`;
+    Object.assign(el.style, cellRect(_session.board, pos.col, pos.row));
     el.innerHTML = `<div class="bmap-token-portrait"></div><div class="bmap-token-name"></div>`;
 
     const name = visibleToViewer(p, 'name') ? p.name : '???';

@@ -837,6 +837,19 @@ export class CombatAPI {
   static async clearTokenPosition(id) {
     return API.request('combat', 'clear-token-position', { id }, { useCache: false });
   }
+
+  /** The per-player placement step -- sets position AND marks the
+   * participant placed in one call. Not turn-gated (happens pre-battle). */
+  static async confirmPlacement(id, col, row) {
+    return API.request('combat', 'confirm-placement', { id, col, row }, { useCache: false });
+  }
+
+  /** Fire-and-forget live preview of where a player is currently considering
+   * placing a token, for other placement screens to render as a ghost.
+   * Omit col/row to signal "stopped hovering" (clears the ghost). */
+  static async hoverToken(id, col, row) {
+    return API.request('combat', 'hover-token', { id, col, row }, { useCache: false });
+  }
 }
 
 // ============================================================================

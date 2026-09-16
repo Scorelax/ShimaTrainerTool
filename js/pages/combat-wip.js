@@ -9,6 +9,7 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI } from '../api.js';
+import { pickTarget } from '../utils/target-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
@@ -76,6 +77,11 @@ const WIP_CSS = `
   .wip-turn-detail-popup .wip-turn-detail-name { font-weight: 700; color: #FFD700; }
   .wip-turn-detail-popup .wip-turn-detail-close { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 1.1rem; line-height: 1; }
   .wip-turn-detail-popup .wip-turn-detail-row { color: #cfd0e0; margin-top: 0.2rem; }
+  .wip-turn-detail-react-btn {
+    width: 100%; margin-top: 0.6rem; padding: 0.4rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08); color: #e0e0e0; font-size: 0.8rem; cursor: pointer;
+  }
+  .wip-turn-detail-react-btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .combat-wip-empty { text-align: center; padding: 3rem 1rem; }
   .combat-wip-empty h2 { color: #FFD700; margin-bottom: 0.5rem; }
   .combat-wip-empty p { color: #a0a0c0; line-height: 1.5; margin-bottom: 1.5rem; }
@@ -826,6 +832,19 @@ function _renderTurnOrderDetail(anchorNode, p) {
   const typeBadges = [p.type1, p.type2].filter(Boolean)
     .map(t => `<span class="type-badge type-${t.toLowerCase()}">${t}</span>`).join(' ');
 
+  // React lives here rather than as its own always-visible button --
+  // reusing the same lightning icon the portrait already shows -- and only
+  // for a participant this trainer actually owns; clicking into someone
+  // else's popup never offers it, own or not eligible right now.
+  const myName = _currentTrainerName();
+  const isMine = !!(p.owner && p.owner === myName);
+  const canReact = isMine && p.status === 'participating' && !p.reactionUsed &&
+    !session.reactingParticipantId && p.id !== session.turnOrder[session.turnIndex];
+  const reactTitle = canReact ? '' :
+    p.reactionUsed ? 'Reaction already used this cycle' :
+    session.reactingParticipantId ? 'Someone else is already reacting' :
+    "It's already this combatant's turn";
+
   popup.innerHTML = `
     <div class="wip-turn-detail-header">
       <span class="wip-turn-detail-name">${showName ? p.name : '???'}</span>
@@ -835,6 +854,10 @@ function _renderTurnOrderDetail(anchorNode, p) {
     ${p.level ? `<div class="wip-turn-detail-row">Level ${p.level}</div>` : ''}
     ${showHp ? `<div class="wip-turn-detail-row">HP: ${p.currentHP}/${p.maxHP}</div>` : ''}
     ${showVp ? `<div class="wip-turn-detail-row">VP: ${p.currentVP}/${p.maxVP}</div>` : ''}
+    ${isMine ? `
+    <button class="wip-turn-detail-react-btn" id="wipTurnDetailReactBtn" ${canReact ? '' : 'disabled'} title="${reactTitle}">
+      ⚡ React${p.reactionUsed ? ' (used)' : ''}
+    </button>` : ''}
   `;
 
   const rect = anchorNode.getBoundingClientRect();
@@ -847,6 +870,14 @@ function _renderTurnOrderDetail(anchorNode, p) {
   popup.style.display = 'block';
 
   document.getElementById('wipTurnDetailCloseBtn')?.addEventListener('click', _hideTurnOrderDetail);
+  document.getElementById('wipTurnDetailReactBtn')?.addEventListener('click', async () => {
+    try {
+      await CombatAPI.reactionStart(p.id);
+      _hideTurnOrderDetail();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
   _turnOrderDetailOpenId = p.id;
 
   if (!_turnOrderDetailOutsideClickBound) {
@@ -1017,7 +1048,7 @@ function attachBodyListeners() {
   // by the local mirror _syncLocalCombatState maintains (see its own
   // comment for why that mirror has to be a merge, not a rebuild).
   const merged = _syncLocalCombatState(session);
-  attachBattleListeners(merged);
+  attachBattleListeners(merged, { onDamageResolved: _handleDamageResolved });
 
   // The one extra thing this shared context needs on top of that engine:
   // ending a turn has to actually move the SERVER's turn pointer so every
@@ -1040,6 +1071,41 @@ function attachBodyListeners() {
   });
 
   _syncTurnOrderSidebar(session);
+}
+
+/** Wired into combat.js's move-popup flow as onDamageResolved (see
+ * attachBattleListeners above) -- fires right after the player confirms an
+ * offensive move (combat.js has already handled that move's own VP cost
+ * and local special-case mechanics by this point, synced up via
+ * updateStats). This is the OTHER half: pick who it hit, roll the damage
+ * dice, and resolve it server-side. computedData.damageBonus is the exact
+ * modifier combat.js's move popup just showed the player, so it's added to
+ * their raw table roll here client-side, before sending the combined total
+ * up -- apply-damage on the server only ever applies type effectiveness on
+ * top of whatever number it's given, it doesn't know about ability/STAB/
+ * proficiency modifiers itself. */
+async function _handleDamageResolved({ combatantId, moveName, move, computedData }) {
+  const targetId = await pickTarget(combatantId);
+  if (!targetId) return; // "no target" / closed -- move's own cost still applied, nothing more to do
+
+  const modifier = computedData.damageBonus || 0;
+  const rollStr = prompt(
+    `Raw dice roll for ${moveName} (the ${modifier >= 0 ? '+' : ''}${modifier} modifier is added automatically):`
+  );
+  if (!rollStr) return;
+  const rawRoll = parseInt(rollStr, 10);
+  if (Number.isNaN(rawRoll)) return;
+
+  const moveType = (move && move[1]) || '';
+  try {
+    const result = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + modifier, moveType, moveName);
+    if (result.multiplier !== undefined) {
+      const label = result.multiplier >= 2 ? 'Super effective!' : result.multiplier === 0 ? 'No effect!' : result.multiplier < 1 ? 'Not very effective...' : '';
+      alert(`${label ? label + ' — ' : ''}${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`);
+    }
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 function _currentTrainerName() {

@@ -130,6 +130,18 @@ def handle(conn, action, params):
             species=params.get('species'),
         )
 
+    if action == 'apply-damage':
+        if not params.get('id') or not params.get('targetId'):
+            raise ValueError('Missing attacker id or target id')
+        dice_roll = js_parse_int(params.get('diceRoll'))
+        if dice_roll is None:
+            raise ValueError('Missing diceRoll')
+        return _apply_damage(
+            conn, params['id'], params['targetId'], dice_roll,
+            move_type=params.get('moveType', ''),
+            species=params.get('species'),
+        )
+
     if action == 'update-stats':
         if not params.get('id'):
             raise ValueError('Missing participant id')
@@ -267,13 +279,30 @@ def _find_move(conn, move_name):
     return None
 
 
+def _clamp_type_multiplier(raw):
+    """This table's ruleset deliberately has no x4/x0.25 stacking for a
+    double-weak/double-resist dual-type target -- only four outcomes exist:
+    no effect (0), not very effective (0.5), neutral (1), super effective
+    (2), regardless of how the two types' chart values would otherwise
+    multiply out. Collapses whatever calculate_type_effectiveness's
+    multiplicative chart produced (0, 0.25, 0.5, 1, 2, or 4) into that set."""
+    if raw <= 0:
+        return 0
+    if raw < 1:
+        return 0.5
+    if raw > 1:
+        return 2
+    return 1
+
+
 def _type_multiplier(conn, attack_type, defend_type1, defend_type2):
     """Reuses game-data/type-effectiveness's own chart lookup (routes_gamedata
     .calculate_type_effectiveness), which returns one multiplier per
     attacking type in type_chart_attack's order -- this just also resolves
-    that order to find attack_type's position. Defaults to 1 (neutral)
-    whenever any type is missing/unrecognized, same as an untyped participant
-    or an off-chart move should behave."""
+    that order to find attack_type's position, then clamps it to this game's
+    four-outcome ruleset (see _clamp_type_multiplier). Defaults to 1
+    (neutral) whenever any type is missing/unrecognized, same as an untyped
+    participant or an off-chart move should behave."""
     if not attack_type or not defend_type1:
         return 1
     values = routes_gamedata.calculate_type_effectiveness(conn, defend_type1, defend_type2)
@@ -285,7 +314,8 @@ def _type_multiplier(conn, attack_type, defend_type1, defend_type2):
         idx = upper_attack.index(str(attack_type).upper())
     except ValueError:
         return 1
-    return values[idx] if idx < len(values) else 1
+    raw = values[idx] if idx < len(values) else 1
+    return _clamp_type_multiplier(raw)
 
 
 def _use_move(conn, pid, move_name, target_id, dice_roll, species):
@@ -530,6 +560,49 @@ def _apply_move(conn, state, pid, vp_cost, target_id, dice_roll, move_type):
             target['currentHP'] -= actual_damage  # no floor, same reasoning as above
             outcome = {'multiplier': multiplier, 'damageApplied': actual_damage}
     return outcome
+
+
+def _apply_damage(conn, pid, target_id, dice_roll, move_type, species):
+    """The other half of resolving an attack, split out from use-move: that
+    action's VP cost was for a single-participant local engine (combat.js's
+    own move popup, driven client-side) that already handles spending VP and
+    each move's special-case mechanics (Ingrain, Stockpile, etc.) entirely
+    on its own, synced up via update-stats -- calling use-move too would
+    double-deduct VP for the same move. This does only the target half:
+    given a dice roll the client already added its own damage modifier to
+    (computeMoveData's damageBonus -- combat.js already computes and shows
+    this in the move popup, so there's no reason to duplicate that
+    calculation server-side), convert it to damage via type effectiveness
+    and apply it. Same turn-authority rule as every other on-turn action."""
+    outcome = {}
+    result = _mutate(conn, lambda s: outcome.update(
+        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type)))
+    result.update(outcome)
+
+    attacker = result['data']['participants'].get(pid, {})
+    live.publish({
+        'type': 'combat-animation',
+        'participantId': pid,
+        'species': species or attacker.get('name', ''),
+    })
+    return result
+
+
+def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type):
+    attacker = state['participants'].get(pid)
+    if not attacker:
+        raise ValueError('Unknown participant: ' + pid)
+    if pid != _active_participant_id(state):
+        raise ValueError("It's not this participant's turn")
+    target = state['participants'].get(target_id)
+    if not target:
+        raise ValueError('Unknown target: ' + target_id)
+    state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
+
+    multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'))
+    actual_damage = round(dice_roll * multiplier)
+    target['currentHP'] -= actual_damage  # no floor, same reasoning as elsewhere in this module
+    return {'multiplier': multiplier, 'damageApplied': actual_damage}
 
 
 # ---------------------------------------------------------------------------

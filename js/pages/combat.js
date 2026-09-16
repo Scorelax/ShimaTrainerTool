@@ -1570,7 +1570,7 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
-export function attachBattleListeners(state) {
+export function attachBattleListeners(state, { onDamageResolved } = {}) {
   _battleState = state;
   loadCombatMoves();
   initializeRechargeStates(state);
@@ -1730,7 +1730,7 @@ export function attachBattleListeners(state) {
         if (moveItem.dataset.isDiceLocked === 'true') {
           showDiceRechargePopup(moveItem.dataset.move, moveItem.dataset.combatantId, moveItem.dataset.rechargeRange, state); return;
         }
-        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state); return;
+        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved }); return;
       }
       // Toggle expand on card click (not on controls)
       const card = e.target.closest('.combat-card');
@@ -2421,7 +2421,7 @@ function removeStatusEffect(combatantId, effectName, state) {
 // MOVE POPUP
 // ============================================================================
 
-function showCombatMoveDetails(moveName, combatantId, state) {
+function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved } = {}) {
   if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
   const move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
@@ -2480,6 +2480,11 @@ function showCombatMoveDetails(moveName, combatantId, state) {
   // Heal dice display for "regain a base X hit points" moves
   const _fullMoveDesc = (move[7] || '') + ' ' + (move[8] || '');
   const _isDirectHeal = /regain\s+a\s+base\s+.*?\s+hit\s+points/i.test(_fullMoveDesc);
+  // Same drain-heal pattern move-popup.js's own post-use check already uses
+  // -- reused here (rather than re-derived) so "is this move actually
+  // offensive" agrees with what that popup itself already decided a heal
+  // move is, instead of drifting from a second copy of the same regex.
+  const _isDrainHeal = /the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(_fullMoveDesc);
   let _diceLabel, _diceOverride, _diceBreakdownOverride;
   if (_isDirectHeal) {
     const _healDice = getHealDiceForLevel(move, c.level || 1);
@@ -2564,6 +2569,16 @@ function showCombatMoveDetails(moveName, combatantId, state) {
 
       saveCombatState(state);
       rerenderBattle(state);
+
+      // Optional hook (combat-wip.js's shared battle view only -- the
+      // legacy page never passes this, so its behavior is unchanged) for
+      // "now pick a target and roll damage against them" -- offered only
+      // for moves that actually deal damage to someone else, not self-heals
+      // or pure status/utility moves, matching the same signal
+      // move-popup.js's own drain/direct-heal post-use check already uses.
+      if (onDamageResolved && computedData.damageDice && !_isDrainHeal && !_isDirectHeal) {
+        onDamageResolved({ combatantId, moveName: usedMoveName, move, computedData });
+      }
     },
     onDrainHeal: () => {
       const target = state.combatants.find(x => x.id === combatantId);

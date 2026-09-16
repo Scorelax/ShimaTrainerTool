@@ -818,6 +818,17 @@ export class CombatAPI {
     return API.request('combat', 'update-stats', { id, currentHP, currentVP }, { useCache: false });
   }
 
+  /** Resolves an attack against a chosen target -- the other half of
+   * use-move, split out so it doesn't double-deduct VP that combat.js's own
+   * local move-popup flow (synced via updateStats) already spent. diceRoll
+   * is expected to already include the caller's own damage modifier (the
+   * same figure combat.js's move popup already computes and shows) --
+   * this endpoint only applies type effectiveness on top of it. Returns
+   * {multiplier, damageApplied} alongside the usual {status, data}. */
+  static async applyDamage(id, targetId, diceRoll, moveType, species) {
+    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species }, { useCache: false });
+  }
+
   // -- Battle map (see pi-server/app/routes_combat.py's 'board' state) --
   // A second, separate display, purely spatial (positions/terrain, never
   // HP/VP) shown alongside the combat screen these other methods drive.

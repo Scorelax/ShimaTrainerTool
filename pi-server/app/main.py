@@ -135,7 +135,7 @@ def _dispatch(params):
                     'combat': ['get-state', 'create-session', 'end-session', 'add-participant',
                                'remove-participant', 'set-status', 'set-visibility',
                                'advance-turn', 'reaction-start', 'reaction-end', 'play-animation',
-                               'use-move', 'update-stats', 'set-board-template', 'set-cell-terrain',
+                               'use-move', 'apply-damage', 'update-stats', 'set-board-template', 'set-cell-terrain',
                                'set-token-position', 'move-token', 'clear-token-position',
                                'confirm-placement', 'hover-token'],
                 },

@@ -12,7 +12,7 @@ import { CombatAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
-import { patchPortraitMedia } from '../utils/sprite-media.js';
+import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -50,20 +50,28 @@ const WIP_CSS = `
      only center it when both side items happen to match in width. */
   .combat-wip-title {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    display: flex; align-items: center; gap: 0.4rem;
     font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px;
     white-space: nowrap;
   }
+  .combat-wip-title img { height: 1.6em; width: auto; }
   .wip-map-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
-  .combat-wip-layout { display: flex; align-items: flex-start; gap: 1rem; padding: 0 1rem; }
-  /* margin:auto centers this column within the leftover space next to the
-     fixed-width turn-order sidebar -- without it, flex:1 1 auto just grows
-     the column to its max-width from the row's start, leaving it hugging
-     the sidebar instead of centered on the page. */
-  .combat-wip-body { flex: 1 1 auto; min-width: 0; max-width: 700px; margin: 0 auto; padding: 1.5rem 0 3rem; }
+  /* justify-content:center (rather than relying on margin:auto absorbing
+     whatever's left after flex-grow hits .combat-wip-body's max-width) is
+     what actually centers this row reliably -- that auto-margin approach
+     looked right on paper but kept coming out still hugging the sidebar
+     in practice. */
+  .combat-wip-layout { display: flex; align-items: flex-start; justify-content: center; gap: 1rem; padding: 0 1rem; }
+  .combat-wip-body { flex: 0 1 700px; min-width: 0; padding: 1.5rem 0 3rem; }
   .combat-wip-turnorder {
     flex: 0 0 42px; display: flex; flex-direction: column; gap: 0.4rem;
     padding: 1.5rem 0 3rem; position: sticky; top: 0;
   }
+  /* No participants yet (empty/setup screen) leaves this with zero
+     children -- collapse it out of the row entirely instead of still
+     reserving 42px+gap next to nothing, which was its own small but real
+     contributor to .combat-wip-body not reading as centered. */
+  .combat-wip-turnorder:empty { display: none; }
   .wip-turn-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
   .wip-turn-portrait {
     position: relative; width: 42px; height: 42px;
@@ -128,12 +136,12 @@ const WIP_CSS = `
   .combat-wip-btn-danger { background: linear-gradient(135deg, #c0392b, #922b21); }
   .combat-wip-btn-secondary { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
   .combat-wip-battle-type-choice {
-    display: flex; flex-direction: row; gap: 0.75rem; max-width: 340px; margin: 0 auto 1.5rem;
+    display: flex; flex-direction: row; gap: 1rem; max-width: 420px; margin: 0 auto 1.5rem;
   }
   .combat-wip-battle-type-choice label {
     flex: 1; display: flex; align-items: center; justify-content: center;
-    background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 10px;
-    padding: 1.1rem 0.5rem; cursor: pointer; font-size: 1.1rem; font-weight: 700;
+    background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 12px;
+    padding: 1.8rem 0.75rem; cursor: pointer; font-size: 1.4rem; font-weight: 700;
     transition: border-color 0.15s, background-color 0.15s, color 0.15s;
   }
   /* Native radio hidden but still present (and still keyboard-focusable/
@@ -319,6 +327,29 @@ function _needsToJoin(state) {
   return !Object.values(state.participants).some(p => p.owner === name);
 }
 
+let _prefetchedAllBackgrounds = false; // fire the list+warm pass at most once per page load
+
+/** Warms the browser's cache for EVERY available battle background, not
+ * just whichever one (if any) is already chosen -- the first player into
+ * a session is the one who'll actually pick a background once they reach
+ * Placement, so there's no single "the" URL to prefetch yet at this point.
+ * Shares _backgroundOptionsCache with _populateBackgroundSelect (see
+ * below) so whichever of the two runs first saves the other a redundant
+ * list-backgrounds call. */
+async function _prefetchAllBackgrounds() {
+  if (_prefetchedAllBackgrounds) return;
+  _prefetchedAllBackgrounds = true;
+  if (!_backgroundOptionsCache) {
+    try {
+      const result = await CombatAPI.listBackgrounds();
+      _backgroundOptionsCache = result.status === 'success' ? result.backgrounds : [];
+    } catch {
+      _backgroundOptionsCache = [];
+    }
+  }
+  _backgroundOptionsCache.forEach(b => prefetchSprite(b.url).catch(() => {}));
+}
+
 export async function renderCombatWip() {
   const result = await CombatAPI.getState();
   session = result.status === 'success' ? result.data : { active: false };
@@ -329,6 +360,13 @@ function _renderCurrentView() {
   const inJoinFlow = _joinStage === 'setup' || _joinStage === 'initiative' || _joinStage === 'placement';
 
   if (session.active && (inJoinFlow || _needsToJoin(session))) {
+    // Start warming the browser's cache for every available background now
+    // -- Setup/Initiative give a real few seconds of "picking a Pokemon,
+    // entering initiative" time, so by the time this trainer actually
+    // reaches Placement (where one gets picked, possibly by them if
+    // they're first in) it's very likely already local instead of a
+    // multi-MB fetch stalling that screen's first paint.
+    _prefetchAllBackgrounds();
     if (_joinStage === 'initiative' && _joinState) {
       return renderInitiativePhase(_joinState);
     }
@@ -842,7 +880,7 @@ function renderBody(state) {
             <span>PvP</span>
           </label>
         </div>
-        <button class="combat-wip-btn-primary" id="createSessionBtn">Create Session</button>
+        <button class="combat-wip-btn-primary" id="createSessionBtn">Create Battle</button>
       </div>`;
   }
 
@@ -875,7 +913,10 @@ function renderBody(state) {
 function _syncHeaderBar(state) {
   const titleEl = document.getElementById('wipHeaderTitle');
   if (titleEl) {
-    titleEl.textContent = !state?.active ? '⚔️ Combat' : `⚔️ ${state.battleType === 'pvp' ? 'PvP' : 'PvE'} Combat`;
+    const vsIcon = '<img src="assets/VS.png" alt="">';
+    titleEl.innerHTML = !state?.active
+      ? `${vsIcon}Battle`
+      : `${vsIcon}${state.battleType === 'pvp' ? 'PvP' : 'PvE'} Battle`;
   }
   const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
   if (leftBtnEl) {

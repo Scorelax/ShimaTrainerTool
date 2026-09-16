@@ -391,7 +391,7 @@ export function renderSetupPhase({ showWipButton = true } = {}) {
       <style>${COMBAT_CSS}</style>
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Back</button>
-        <div class="combat-header-title">⚔️ Combat Setup</div>
+        <div class="combat-header-title"><img src="assets/VS.png" alt="">Battle Setup</div>
         ${showWipButton ? '<button class="combat-wip-btn" id="combatWipBtn">🛠️ WIP</button>' : '<div></div>'}
       </div>
       <div class="combat-setup-container">
@@ -407,7 +407,7 @@ export function renderSetupPhase({ showWipButton = true } = {}) {
         <div class="setup-pokemon-list" id="setupPokemonList">
           ${pokemonCards || '<div class="setup-empty">No active party Pokémon found.</div>'}
         </div>
-        <button class="combat-start-btn" id="startCombatBtn" disabled>Start Combat →</button>
+        <button class="combat-start-btn" id="startCombatBtn" disabled>Start Battle →</button>
       </div>
     </div>`;
 }
@@ -436,7 +436,7 @@ export function renderInitiativePhase(state) {
       <style>${COMBAT_CSS}</style>
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Setup</button>
-        <div class="combat-header-title">⚔️ Initiative</div>
+        <div class="combat-header-title"><img src="assets/VS.png" alt="">Initiative</div>
         <div></div>
       </div>
       <div class="initiative-container">
@@ -510,8 +510,8 @@ export function renderBattlePhase(state, cardOptions = {}) {
       <style>${COMBAT_CSS}</style>
       <div class="combat-header-bar">
         <div class="combat-round-label">Round ${state.round}</div>
-        <div class="combat-header-title">⚔️ Battle</div>
-        <button class="combat-end-btn" id="endCombatBtn">End Combat</button>
+        <div class="combat-header-title"><img src="assets/VS.png" alt="">Battle</div>
+        <button class="combat-end-btn" id="endCombatBtn">End Battle</button>
       </div>
       ${renderGlobalBar(state)}
       <div class="battle-list" id="battleList">${cards}</div>
@@ -1075,9 +1075,11 @@ function getCombatCSS() {
        differing left+right buttons never do. */
     .combat-header-title {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      display: flex; align-items: center; gap: 0.4rem;
       font-size: 1.2rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 1px;
       white-space: nowrap;
     }
+    .combat-header-title img { height: 1.6em; width: auto; }
     .combat-round-label { font-size: 1rem; font-weight: 700; color: #a0a0c0; }
     .combat-back-btn {
       background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
@@ -1562,7 +1564,17 @@ export function attachInitiativeListeners(state, { onComplete, onBack } = {}) {
     input.addEventListener('input', () => recalcInitiativeTotal(input.id.replace('bonus_', ''), state));
   });
 
-  document.getElementById('beginBattleBtn')?.addEventListener('click', () => {
+  document.getElementById('beginBattleBtn')?.addEventListener('click', (e) => {
+    // onComplete (combat-wip.js) awaits an add-participant round-trip per
+    // combatant before finally re-rendering the page out from under this
+    // button -- without disabling it immediately, a second click (double-
+    // click, or just an impatient re-click while nothing visibly happens
+    // yet) fires onComplete again and adds the same trainer/Pokemon a
+    // second time under a brand new server-generated id.
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+
     state.combatants.forEach(c => {
       c.initiativeBonus = parseInt(document.getElementById(`bonus_${c.id}`)?.value) || 0;
       c.initiativeTotal = c.initiativeScore + c.initiativeBonus;

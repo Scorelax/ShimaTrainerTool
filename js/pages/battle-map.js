@@ -54,14 +54,17 @@ function ensureSkeleton(root) {
   if (document.getElementById('mapGrid')) return;
   root.innerHTML = `
     <div class="map-stage" id="mapStage">
-      <div class="map-bg" id="mapBg"></div>
-      <div class="map-grid" id="mapGrid"></div>
-      <div class="map-tokens" id="mapTokens"></div>
+      <div class="map-rotor">
+        <div class="map-bg" id="mapBg"></div>
+        <div class="map-grid" id="mapGrid"></div>
+        <div class="map-tokens" id="mapTokens"></div>
+      </div>
     </div>`;
 }
 
-/** See .map-bg's own comment in battle-map.html for why this is rotated
- * 90deg here but not on the player-facing popup/placement screens. */
+/** See .map-rotor's own comment in battle-map.html for why background,
+ * grid and tokens all rotate 90deg together here but not on the player-
+ * facing popup/placement screens. */
 function updateBackground() {
   const stage = document.getElementById('mapStage');
   const bg = document.getElementById('mapBg');

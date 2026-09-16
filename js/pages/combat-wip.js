@@ -8,9 +8,13 @@
 // this page in two tabs and add/remove/advance a session in one -- the
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
-import { CombatAPI, TrainerAPI } from '../api.js';
+import { CombatAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
+import {
+  renderSetupPhase, attachSetupListeners,
+  renderInitiativePhase, attachInitiativeListeners,
+} from './combat.js';
 
 const WIP_CSS = `
   .combat-wip-page { min-height: 100vh; background: #14141f; color: #e0e0e0; font-family: inherit; }
@@ -92,9 +96,42 @@ const WIP_CSS = `
 let session = null;
 let combatUpdateHandler = null;
 
+// Joining a fight reuses combat.js's actual Setup + Initiative phases
+// (trainer auto-included, pick one lead Pokémon, roll a d20) instead of a
+// separate ad-hoc picker -- see js/pages/combat.js's renderSetupPhase/
+// attachSetupListeners/renderInitiativePhase/attachInitiativeListeners,
+// exported with optional callback params specifically for this reuse (their
+// default, no-callback behavior is untouched, still driving the legacy
+// local-only combat page exactly as before). This is purely local UI state
+// for *this device's* own join process -- separate from the shared
+// `session` above -- until it completes and pushes to the server.
+let _joinStage = null; // null | 'setup' | 'initiative'
+let _joinState = null; // { combatants: [trainerCombatant, activePokemon] } while in 'initiative'
+
+function _needsToJoin(state) {
+  const name = _currentTrainerName();
+  if (!name) return false;
+  return !Object.values(state.participants).some(p => p.owner === name);
+}
+
 export async function renderCombatWip() {
   const result = await CombatAPI.getState();
   session = result.status === 'success' ? result.data : { active: false };
+  return _renderCurrentView();
+}
+
+function _renderCurrentView() {
+  if (session.active && _needsToJoin(session)) {
+    if (_joinStage === 'initiative' && _joinState) {
+      return renderInitiativePhase(_joinState);
+    }
+    _joinStage = 'setup';
+    return renderSetupPhase({ showWipButton: false });
+  }
+
+  _joinStage = null;
+  _joinState = null;
+
   return `
     <div class="combat-wip-page">
       <style>${WIP_CSS}</style>
@@ -105,6 +142,32 @@ export async function renderCombatWip() {
       </div>
       <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
     </div>`;
+}
+
+/** Full page re-render + re-attach -- used for join-flow transitions, which
+ * swap between entirely different page structures (combat.js's own
+ * self-styled pages vs. this page's own shell), unlike the SSE handler
+ * below which only patches #combatWipBody in place for the normal view. */
+function _rerenderFull() {
+  const content = document.getElementById('content');
+  if (content) content.innerHTML = _renderCurrentView();
+  attachCombatWipListeners();
+}
+
+/** combat.js's combatant shape (buildTrainerCombatant/buildPokemonCombatant)
+ * -> this app's participant payload (CombatAPI.addParticipant). */
+function _combatantToParticipant(c) {
+  return {
+    name: c.name,
+    side: 'player',
+    image: c.image,
+    owner: _currentTrainerName(),
+    maxHP: c.maxHp, currentHP: c.currentHp,
+    maxVP: c.maxVp, currentVP: c.currentVp,
+    type1: (c.types && c.types[0]) || '',
+    type2: (c.types && c.types[1]) || '',
+    initiative: c.initiativeTotal,
+  };
 }
 
 function renderBody(state) {
@@ -142,12 +205,6 @@ function renderBody(state) {
         <button class="combat-wip-btn-secondary" id="battleMapBtn">🗺️ Battle Map</button>
         <button class="combat-wip-btn-danger" id="endSessionBtn">End Session</button>
       </div>
-    </div>
-
-    <div class="combat-wip-section-label">Join as ${_currentTrainerName() || 'yourself'}</div>
-    <div class="combat-wip-add-form" id="addRealForm">
-      <select id="realEntitySelect" disabled><option value="">Loading your party…</option></select>
-      <button type="button" class="combat-wip-btn-primary" id="realAddBtn" disabled>Add</button>
     </div>
 
     ${state.battleType === 'pve' ? `
@@ -205,21 +262,75 @@ function renderParticipant(p, state, activeId) {
 }
 
 export function attachCombatWipListeners() {
-  document.getElementById('combatWipBackBtn')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat' } }));
-  });
-
   // Re-render in place on every live combat push (see live-updates.js) --
-  // this is the actual thing this slice exists to prove out.
+  // while mid-join-flow this only updates the background `session` var;
+  // the join screens are local to this device and aren't patched live
+  // (nothing about *your own* setup/initiative needs another player's
+  // action mid-roll) -- the normal view picks up the latest session the
+  // moment the join flow completes and re-renders.
   if (combatUpdateHandler) window.removeEventListener('app:combat-updated', combatUpdateHandler);
   combatUpdateHandler = (e) => {
     session = e.detail;
+    if (_joinStage) return;
+
+    // Not already mid-join-flow, but the fresh session says this trainer
+    // needs to join (e.g. this device just created the session, or a
+    // session just went active) -- switch into the join flow rather than
+    // patching the normal-view body with something that no longer applies.
+    if (session.active && _needsToJoin(session)) {
+      _rerenderFull();
+      return;
+    }
+
     const body = document.getElementById('combatWipBody');
     if (body) body.innerHTML = renderBody(session);
     attachBodyListeners();
     updateBattleMap(session); // no-ops if the popup isn't currently open
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
+
+  if (_joinStage === 'setup') {
+    attachSetupListeners({
+      backRoute: 'combat',
+      onStart: ({ trainerCombatant, activePokemon }) => {
+        _joinState = { combatants: [trainerCombatant, activePokemon] };
+        _joinStage = 'initiative';
+        _rerenderFull();
+      },
+    });
+    return;
+  }
+
+  if (_joinStage === 'initiative') {
+    attachInitiativeListeners(_joinState, {
+      onBack: () => {
+        _joinStage = 'setup';
+        _joinState = null;
+        _rerenderFull();
+      },
+      onComplete: async (combatants) => {
+        try {
+          for (const c of combatants) {
+            await CombatAPI.addParticipant(_combatantToParticipant(c));
+          }
+        } catch (err) {
+          alert(err.message);
+        }
+        // Pick up whatever the server now has (including this device's own
+        // just-added participants) before falling through to the normal view.
+        const result = await CombatAPI.getState();
+        session = result.status === 'success' ? result.data : session;
+        _joinStage = null;
+        _joinState = null;
+        _rerenderFull();
+      },
+    });
+    return;
+  }
+
+  document.getElementById('combatWipBackBtn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat' } }));
+  });
 
   attachBodyListeners();
 }
@@ -259,8 +370,6 @@ function attachBodyListeners() {
     });
     form.reset();
   });
-
-  _initRealAddForm();
 
   document.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => CombatAPI.removeParticipant(btn.dataset.remove));
@@ -313,91 +422,7 @@ function attachBodyListeners() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Join as yourself -- pulls from the actual app data (TrainerAPI) instead of
-// hand-typed test values, so this can be tested against the real trainers/
-// party. Deliberately NOT a "pick any trainer" picker: a trainer can only
-// add themselves (and their own active-party Pokémon), never someone else's
-// -- whoever's logged in on this device is the only one this form can add.
-// Column indices below mirror the exact same ones combat.js's
-// buildTrainerCombatant/buildPokemonCombatant already use (POKEMON_COLUMNS/
-// TRAINER_COLUMNS in pi-server/app/db.py), and the active-party filter
-// (slot 1-6) matches renderSetupPhase's own logic there, so a participant
-// added here reflects the same "active party" combat.js itself would show.
-// ---------------------------------------------------------------------------
-
 function _currentTrainerName() {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   return trainerData[1] || '';
-}
-
-// JS `value ?? fallback` isn't enough here -- an empty string is a real
-// "no current value saved yet" case in this sheet-derived data, same
-// fallback-to-max reasoning combat.js's own buildXCombatant functions use.
-function _numOr(value, fallback) {
-  return (value !== null && value !== undefined && value !== '') ? parseInt(value, 10) : fallback;
-}
-
-async function _initRealAddForm() {
-  const entitySelect = document.getElementById('realEntitySelect');
-  const addBtn = document.getElementById('realAddBtn');
-  if (!entitySelect || !addBtn) return; // no active session this render
-
-  const name = _currentTrainerName();
-  if (!name) {
-    entitySelect.innerHTML = '<option value="">No trainer logged in</option>';
-    return;
-  }
-
-  const result = await TrainerAPI.get(name);
-  if (result.status !== 'success' || !result.data) {
-    entitySelect.innerHTML = '<option value="">Failed to load your data</option>';
-    return;
-  }
-
-  const trainerData = result.data.trainerData;
-  const activeParty = (result.data.pokemonData || []).filter(p => {
-    const slot = parseInt(p[38], 10);
-    return slot >= 1 && slot <= 6;
-  });
-  entitySelect._trainerData = trainerData;
-  entitySelect._activeParty = activeParty;
-
-  const pokemonOptions = activeParty.map((p, i) =>
-    `<option value="pokemon:${i}">${p[36] || p[2] || 'Unknown'} (Lv ${p[4] || '?'})</option>`);
-  entitySelect.innerHTML = [`<option value="trainer">${trainerData[1]} (Trainer)</option>`, ...pokemonOptions].join('');
-  entitySelect.disabled = false;
-  addBtn.disabled = false;
-
-  addBtn.addEventListener('click', async () => {
-    const value = entitySelect.value;
-    const trainerData = entitySelect._trainerData;
-    if (!value || !trainerData) return;
-
-    const owner = _currentTrainerName(); // marks this as yours -- see the battle-map popup's move gating
-
-    let participant;
-    if (value === 'trainer') {
-      const maxHP = parseInt(trainerData[11], 10) || 0;
-      const maxVP = parseInt(trainerData[12], 10) || 0;
-      participant = {
-        name: trainerData[1], side: 'player', image: trainerData[0], owner,
-        maxHP, currentHP: _numOr(trainerData[34], maxHP),
-        maxVP, currentVP: _numOr(trainerData[35], maxVP),
-      };
-    } else {
-      const p = entitySelect._activeParty[parseInt(value.split(':')[1], 10)];
-      const maxHP = parseInt(p[10], 10) || 0;
-      const maxVP = parseInt(p[12], 10) || 0;
-      participant = {
-        name: p[36] || p[2] || 'Unknown', side: 'player', image: p[1], owner,
-        maxHP, currentHP: _numOr(p[45], maxHP),
-        maxVP, currentVP: _numOr(p[46], maxVP),
-        type1: p[5] || '', type2: p[6] || '',
-      };
-    }
-    try {
-      await CombatAPI.addParticipant(participant);
-    } catch (err) { alert(err.message); }
-  });
 }

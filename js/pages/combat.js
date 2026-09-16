@@ -156,7 +156,7 @@ function initializeRechargeStates(state) {
 // COMBATANT BUILDERS
 // ============================================================================
 
-function buildTrainerCombatant() {
+export function buildTrainerCombatant() {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const level = parseInt(trainerData[2]) || 1;
   const str = parseInt(trainerData[5]) || 10;
@@ -196,7 +196,7 @@ function buildTrainerCombatant() {
   };
 }
 
-function buildPokemonCombatant(pokemonKey) {
+export function buildPokemonCombatant(pokemonKey) {
   loadCombatMoves();
   const pokemonData = JSON.parse(sessionStorage.getItem(pokemonKey) || '[]');
   const level = parseInt(pokemonData[4]) || 1;
@@ -318,7 +318,7 @@ export function renderCombat() {
 // PHASE 1: SETUP
 // ============================================================================
 
-function renderSetupPhase() {
+export function renderSetupPhase({ showWipButton = true } = {}) {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const trainerName = trainerData[1] || 'Trainer';
   const trainerImage = trainerData[0] || 'assets/Pokeball.png';
@@ -353,7 +353,7 @@ function renderSetupPhase() {
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Back</button>
         <div class="combat-header-title">⚔️ Combat Setup</div>
-        <button class="combat-wip-btn" id="combatWipBtn">🛠️ WIP</button>
+        ${showWipButton ? '<button class="combat-wip-btn" id="combatWipBtn">🛠️ WIP</button>' : '<div></div>'}
       </div>
       <div class="combat-setup-container">
         <div class="setup-section-label">TRAINER (always included)</div>
@@ -377,7 +377,7 @@ function renderSetupPhase() {
 // PHASE 2: INITIATIVE
 // ============================================================================
 
-function renderInitiativePhase(state) {
+export function renderInitiativePhase(state) {
   const rows = state.combatants.map(c => `
     <div class="initiative-row">
       ${spriteMediaHtml(c.image, c.name, 'initiative-img')}
@@ -1435,9 +1435,14 @@ export function attachCombatListeners() {
 
 // -------------------------------- SETUP ------------------------------------
 
-function attachSetupListeners() {
+// onStart, when passed, is called with { trainerCombatant, activePokemon,
+// bench, allPartyKeys } instead of the default local saveCombatState +
+// render-initiative-locally behavior -- see combat-wip.js's reuse of this
+// same function for the shared multiplayer join flow. Omitted (the default),
+// this behaves exactly as before -- zero change to the legacy local flow.
+export function attachSetupListeners({ backRoute = 'trainer-card', onStart } = {}) {
   document.getElementById('combatBackBtn')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: backRoute } }));
   });
 
   document.getElementById('combatWipBtn')?.addEventListener('click', () => {
@@ -1464,7 +1469,7 @@ function attachSetupListeners() {
 
     const activePokemon = buildPokemonCombatant(selectedKeys[0]);
     activePokemon.hasRolledInitiative = false;
-    const combatants = [buildTrainerCombatant(), activePokemon];
+    const trainerCombatant = buildTrainerCombatant();
 
     const bench = benchKeys.map(k => {
       const bc = buildPokemonCombatant(k);
@@ -1472,6 +1477,12 @@ function attachSetupListeners() {
       return bc;
     });
 
+    if (onStart) {
+      onStart({ trainerCombatant, activePokemon, bench, allPartyKeys });
+      return;
+    }
+
+    const combatants = [trainerCombatant, activePokemon];
     saveCombatState({ phase: 'initiative', round: 1, activeTurnIndex: 0, combatants, bench, partyKeys: allPartyKeys });
     const content = document.getElementById('content');
     content.innerHTML = renderCombat();
@@ -1481,8 +1492,14 @@ function attachSetupListeners() {
 
 // ------------------------------ INITIATIVE ---------------------------------
 
-function attachInitiativeListeners(state) {
+// onComplete/onBack, when passed, replace the default local phase-transition
+// behavior (see attachSetupListeners above for the same pattern) -- omitted,
+// this is unchanged from before. onComplete receives state.combatants with
+// initiativeTotal set (not yet sorted/saved) so a caller can do its own
+// thing with the rolled values instead of the local sort+saveCombatState.
+export function attachInitiativeListeners(state, { onComplete, onBack } = {}) {
   document.getElementById('combatBackBtn')?.addEventListener('click', () => {
+    if (onBack) { onBack(); return; }
     sessionStorage.removeItem('combatState');
     document.getElementById('content').innerHTML = renderCombat();
     attachCombatListeners();
@@ -1498,6 +1515,12 @@ function attachInitiativeListeners(state) {
       c.initiativeTotal = c.initiativeScore + c.initiativeBonus;
       c.hasRolledInitiative = true;
     });
+
+    if (onComplete) {
+      onComplete(state.combatants);
+      return;
+    }
+
     state.combatants.sort((a, b) => b.initiativeTotal - a.initiativeTotal);
     state.phase = 'battle';
     state.activeTurnIndex = 0;

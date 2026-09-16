@@ -40,6 +40,13 @@ _EMPTY_STATE = {
     'round': 0,
     'turnIndex': 0,
     'turnOrder': [],
+    # Flips true on the first advance-turn. Before that, _rebuild_turn_order
+    # never anchors a "current" participant -- while people are still
+    # joining (each rolling initiative independently), there is no real
+    # turn in progress yet, so a newly-sorted-in higher roll should be free
+    # to land at the top rather than the system clinging to whoever
+    # happened to occupy index 0 before the roster was even final.
+    'started': False,
     'reactingParticipantId': None,
     'participants': {},
     'fieldEffects': [],
@@ -301,6 +308,12 @@ def _add_participant(state, data):
         # same trust model as this file's other DM-facing actions (no
         # per-caller auth beyond Tailscale network membership).
         'owner': data.get('owner', ''),
+        # The rolled d20 + initiative-score total from combat.js's reused
+        # Initiative phase (see js/pages/combat.js's attachInitiativeListeners
+        # onComplete). None means "no roll yet" -- _rebuild_turn_order appends
+        # those after everyone who has rolled, same as a DM-added enemy with
+        # no initiative today.
+        'initiative': data.get('initiative'),
         'status': status,
         'reactionUsed': False,
         # Meaningful for side='enemy' only -- allies are always fully visible
@@ -336,17 +349,32 @@ def _rebuild_turn_order(state):
     so flipping someone spectating<->participating mid-fight (the "rushes in
     from round 3" case) takes effect immediately rather than needing a
     separate reshuffle step. Whoever currently has the floor stays anchored
-    by id (not index) when the list shifts under them; newly-participating
-    combatants are appended at the end, i.e. they act from the top of the
-    next lap rather than cutting the current order."""
+    by id (not index) when the list shifts under them -- reordering never
+    changes *whose* turn it is, only where everyone else falls before/after.
+
+    Participants who have rolled initiative (combat.js's reused Initiative
+    phase) are fully re-sorted highest-first every time this runs, since
+    joins happen one at a time asynchronously (each player finishes their
+    own roll independently) -- sorting only newcomers-against-each-other
+    would be a no-op in practice (there's rarely more than one newcomer per
+    call). Anyone without a roll (a DM-added enemy) keeps plain insertion
+    order and is appended after everyone who has rolled. Anchoring only
+    applies once combat has actually 'started' (state['started'], set by the
+    first advance-turn) -- before that, turnIndex is always just recomputed
+    fresh (index 0 of the current sort), since there's no real turn in
+    progress yet to protect."""
     current_id = None
-    if state['turnOrder'] and state['turnIndex'] < len(state['turnOrder']):
+    if state.get('started') and state['turnOrder'] and state['turnIndex'] < len(state['turnOrder']):
         current_id = state['turnOrder'][state['turnIndex']]
 
-    live_ids = {pid for pid, p in state['participants'].items() if p['status'] == 'participating'}
-    kept = [pid for pid in state['turnOrder'] if pid in live_ids]
-    added = [pid for pid in state['participants'] if pid in live_ids and pid not in kept]
-    state['turnOrder'] = kept + added
+    live_ids = [pid for pid, p in state['participants'].items() if p['status'] == 'participating']
+    rolled = sorted(
+        (pid for pid in live_ids if state['participants'][pid].get('initiative') is not None),
+        key=lambda pid: state['participants'][pid]['initiative'],
+        reverse=True,
+    )
+    unrolled = [pid for pid in live_ids if state['participants'][pid].get('initiative') is None]
+    state['turnOrder'] = rolled + unrolled
 
     state['turnIndex'] = state['turnOrder'].index(current_id) if current_id in state['turnOrder'] else 0
     if state['reactingParticipantId'] not in state['participants']:
@@ -358,6 +386,7 @@ def _advance_turn(state):
         raise ValueError('Cannot advance turn while a reaction is in progress')
     if not state['turnOrder']:
         return
+    state['started'] = True
     state['turnIndex'] = (state['turnIndex'] + 1) % len(state['turnOrder'])
     if state['turnIndex'] == 0:
         state['round'] += 1
@@ -382,6 +411,7 @@ def _reaction_start(state, pid):
     if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
         raise ValueError("It's already this participant's turn")
 
+    state['started'] = True  # see _rebuild_turn_order -- a reaction means turn order is now live
     state['reactingParticipantId'] = pid
     participant['reactionUsed'] = True
 
@@ -408,6 +438,7 @@ def _apply_move(conn, state, pid, vp_cost, target_id, dice_roll, move_type):
         raise ValueError('Unknown participant: ' + pid)
     if pid != _active_participant_id(state):
         raise ValueError("It's not this participant's turn")
+    state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
 
     # VP floors at 0; overflow drains the user's own HP with NO floor --
     # negative HP is how this game reads injury severity/death saves, and
@@ -478,6 +509,7 @@ def _move_token(state, pid, col, row):
         raise ValueError('Unknown participant: ' + pid)
     if pid != _active_participant_id(state):
         raise ValueError("It's not this participant's turn")
+    state['started'] = True  # see _rebuild_turn_order -- acting on-turn means turn order is now live
     state['board']['tokens'][pid] = {'col': col, 'row': row}
 
 

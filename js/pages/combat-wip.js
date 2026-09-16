@@ -10,6 +10,7 @@
 // manual refresh.
 import { CombatAPI, TrainerAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
+import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 
 const WIP_CSS = `
   .combat-wip-page { min-height: 100vh; background: #14141f; color: #e0e0e0; font-family: inherit; }
@@ -145,6 +146,7 @@ function renderBody(state) {
       </div>
       <div style="display:flex; gap:0.5rem;">
         <button class="combat-wip-btn-secondary" id="advanceTurnBtn" ${state.reactingParticipantId ? 'disabled' : ''}>Advance Turn →</button>
+        <button class="combat-wip-btn-secondary" id="battleMapBtn">🗺️ Battle Map</button>
         <button class="combat-wip-btn-danger" id="endSessionBtn">End Session</button>
       </div>
     </div>
@@ -246,6 +248,7 @@ export function attachCombatWipListeners() {
     const body = document.getElementById('combatWipBody');
     if (body) body.innerHTML = renderBody(session);
     attachBodyListeners();
+    updateBattleMap(session); // no-ops if the popup isn't currently open
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
 
@@ -260,6 +263,10 @@ function attachBodyListeners() {
 
   document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
     await CombatAPI.endSession();
+  });
+
+  document.getElementById('battleMapBtn')?.addEventListener('click', () => {
+    showBattleMap(session, _currentTrainerName());
   });
 
   document.getElementById('advanceTurnBtn')?.addEventListener('click', async () => {
@@ -430,12 +437,14 @@ async function _initRealAddForm() {
     const trainerData = entitySelect._trainerData;
     if (!value || !trainerData) return;
 
+    const owner = _currentTrainerName(); // marks this as yours -- see the battle-map popup's move gating
+
     let participant;
     if (value === 'trainer') {
       const maxHP = parseInt(trainerData[11], 10) || 0;
       const maxVP = parseInt(trainerData[12], 10) || 0;
       participant = {
-        name: trainerData[1], side: 'player', image: trainerData[0],
+        name: trainerData[1], side: 'player', image: trainerData[0], owner,
         maxHP, currentHP: _numOr(trainerData[34], maxHP),
         maxVP, currentVP: _numOr(trainerData[35], maxVP),
       };
@@ -444,7 +453,7 @@ async function _initRealAddForm() {
       const maxHP = parseInt(p[10], 10) || 0;
       const maxVP = parseInt(p[12], 10) || 0;
       participant = {
-        name: p[36] || p[2] || 'Unknown', side: 'player', image: p[1],
+        name: p[36] || p[2] || 'Unknown', side: 'player', image: p[1], owner,
         maxHP, currentHP: _numOr(p[45], maxHP),
         maxVP, currentVP: _numOr(p[46], maxVP),
         type1: p[5] || '', type2: p[6] || '',

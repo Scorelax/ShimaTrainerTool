@@ -286,6 +286,14 @@ def _add_participant(state, data):
         # as neutral (1x), same as an off-chart move (see _type_multiplier).
         'type1': data.get('type1', ''),
         'type2': data.get('type2', ''),
+        # Which logged-in trainer this belongs to (combat-wip.js's "Join as
+        # yourself" flow sets this to the trainer's own name for both
+        # themselves and their Pokemon). Blank for DM-added freeform enemies
+        # -- nobody "owns" those. Used client-side to gate battle-map token
+        # movement to your own participants; not enforced server-side here,
+        # same trust model as this file's other DM-facing actions (no
+        # per-caller auth beyond Tailscale network membership).
+        'owner': data.get('owner', ''),
         'status': status,
         'reactionUsed': False,
         # Meaningful for side='enemy' only -- allies are always fully visible

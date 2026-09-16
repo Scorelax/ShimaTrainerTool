@@ -87,13 +87,6 @@ const WIP_CSS = `
   .combat-wip-p-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
   .combat-wip-p-controls button.on { background: #27ae60; border-color: #27ae60; }
   .combat-wip-p-controls button.remove { background: #922b21; border-color: #922b21; }
-  .combat-wip-map-grid { display: grid; gap: 2px; background: #1a1a24; margin-bottom: 1rem; max-width: 500px; }
-  .combat-wip-map-cell {
-    aspect-ratio: 1; background: #20202e; cursor: pointer; font-size: 0.55rem; color: #e0c080;
-    display: flex; align-items: center; justify-content: center; overflow: hidden; text-align: center; padding: 1px; box-sizing: border-box;
-  }
-  .combat-wip-map-cell:hover { outline: 1px solid #FFD700; outline-offset: -1px; }
-  .combat-wip-map-cell.marked { background: #4a3520; }
 `;
 
 let session = null;
@@ -172,31 +165,9 @@ function renderBody(state) {
       <button type="submit" class="combat-wip-btn-primary">Add</button>
     </form>` : ''}
 
-    <div class="combat-wip-section-label">Battle Map (test controls -- see battle-map.html for the real display)</div>
-    <div class="combat-wip-add-form">
-      <input type="number" id="mapColsInput" value="${state.board.grid.cols}" min="1" placeholder="Cols" style="width:60px;">
-      <input type="number" id="mapRowsInput" value="${state.board.grid.rows}" min="1" placeholder="Rows" style="width:60px;">
-      <button type="button" class="combat-wip-btn-primary" id="setGridBtn">Set Grid</button>
-      <span style="color:#a0a0c0;font-size:0.8rem;">Click a cell to mark/clear terrain. Resizing clears existing marks.</span>
-    </div>
-    ${renderMapGridHtml(state.board)}
-
     <div class="combat-wip-participant-list">
       ${Object.values(state.participants).map(p => renderParticipant(p, state, activeId)).join('') || '<p style="color:#a0a0c0;">No participants yet.</p>'}
     </div>`;
-}
-
-function renderMapGridHtml(board) {
-  const { cols, rows } = board.grid;
-  const cells = [];
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const terrain = board.cells[`${col},${row}`]?.terrain || '';
-      const classes = terrain ? 'combat-wip-map-cell marked' : 'combat-wip-map-cell';
-      cells.push(`<div class="${classes}" data-map-cell="${col},${row}" title="${terrain || 'Click to mark terrain'}">${terrain}</div>`);
-    }
-  }
-  return `<div class="combat-wip-map-grid" style="grid-template-columns:repeat(${cols}, 1fr);">${cells.join('')}</div>`;
 }
 
 function renderParticipant(p, state, activeId) {
@@ -228,8 +199,6 @@ function renderParticipant(p, state, activeId) {
         ${p.side === 'enemy' ? visToggle('hp', 'HP') + visToggle('vp', 'VP') + visToggle('name', 'Name') : ''}
         <button data-use-move="${p.id}" title="Only works when it's this participant's turn (or they're reacting) -- server enforces it">⚔️ Use Move</button>
         <button data-play-anim="${p.id}" data-anim-species="${p.name}" title="Test the display screen's animation playback">🎬 Play Anim</button>
-        <button data-place-token="${p.id}" title="Place/move this participant on the battle map">📍 Place</button>
-        ${mapPos ? `<button data-clear-token="${p.id}">✕ Unplace</button>` : ''}
         <button class="remove" data-remove="${p.id}">Remove</button>
       </div>
     </div>`;
@@ -335,38 +304,6 @@ function attachBodyListeners() {
     btn.addEventListener('click', () => {
       CombatAPI.setVisibility(btn.dataset.visId, btn.dataset.visField, btn.dataset.visValue === '1');
     });
-  });
-
-  document.getElementById('setGridBtn')?.addEventListener('click', async () => {
-    const cols = parseInt(document.getElementById('mapColsInput').value, 10) || 10;
-    const rows = parseInt(document.getElementById('mapRowsInput').value, 10) || 8;
-    try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { alert(err.message); }
-  });
-
-  document.querySelectorAll('[data-map-cell]').forEach(cell => {
-    cell.addEventListener('click', async () => {
-      const [col, row] = cell.dataset.mapCell.split(',').map(Number);
-      const current = cell.classList.contains('marked') ? cell.textContent : '';
-      const terrain = prompt('Terrain label for this cell (blank to clear):', current);
-      if (terrain === null) return; // cancelled
-      try { await CombatAPI.setCellTerrain(col, row, terrain); } catch (err) { alert(err.message); }
-    });
-  });
-
-  document.querySelectorAll('[data-place-token]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const colStr = prompt('Column (0-based):', '0');
-      if (colStr === null) return;
-      const rowStr = prompt('Row (0-based):', '0');
-      if (rowStr === null) return;
-      try {
-        await CombatAPI.setTokenPosition(btn.dataset.placeToken, parseInt(colStr, 10) || 0, parseInt(rowStr, 10) || 0);
-      } catch (err) { alert(err.message); }
-    });
-  });
-
-  document.querySelectorAll('[data-clear-token]').forEach(btn => {
-    btn.addEventListener('click', () => CombatAPI.clearTokenPosition(btn.dataset.clearToken));
   });
 
   if (session && session.reactingParticipantId) {

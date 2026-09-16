@@ -32,6 +32,25 @@ function _injectStyles() {
     .combat-move-popup-body { padding: 1rem 1.2rem; }
 
     .bmap-hint { font-size: 0.8rem; color: #a0a0c0; margin-bottom: 0.6rem; }
+    .bmap-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }
+    .bmap-dm-toggle {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
+      border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.8rem; cursor: pointer;
+    }
+    .bmap-dm-toggle.on { background: #8e44ad; border-color: #8e44ad; }
+    .bmap-dm-panel {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+      background: rgba(142,68,173,0.12); border: 1px solid rgba(142,68,173,0.4);
+      border-radius: 8px; padding: 0.6rem 0.7rem; margin-bottom: 0.8rem;
+    }
+    .bmap-dm-panel input {
+      background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
+      border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem;
+    }
+    .bmap-dm-panel button {
+      background: linear-gradient(135deg, #8e44ad, #5b2c6f); border: none; color: #fff;
+      border-radius: 6px; padding: 0.35rem 0.8rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    }
     .bmap-stage { position: relative; width: 100%; aspect-ratio: 5 / 4; background: #0a0a12; border-radius: 8px; overflow: hidden; }
     .bmap-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
     .bmap-cell { background: #20202e; cursor: pointer; }
@@ -64,6 +83,7 @@ let _overlay = null;
 let _session = null;
 let _ownerName = null;
 let _selectedTokenId = null;
+let _dmMode = false;
 
 function _ensureDom() {
   if (_overlay) return;
@@ -79,6 +99,15 @@ function _ensureDom() {
         <h2>🗺️ Battle Map</h2>
       </div>
       <div class="combat-move-popup-body">
+        <div class="bmap-toolbar">
+          <button id="bmapDmToggle" class="bmap-dm-toggle" title="Grid size + terrain marking -- temporary DM test controls, not the intended final setup UI">🛠️ DM Setup</button>
+        </div>
+        <div class="bmap-dm-panel" id="bmapDmPanel" hidden>
+          <input type="number" id="bmapCols" min="1" placeholder="Cols" style="width:60px;">
+          <input type="number" id="bmapRows" min="1" placeholder="Rows" style="width:60px;">
+          <button type="button" id="bmapSetGridBtn">Set Grid</button>
+          <span style="color:#a0a0c0;font-size:0.78rem;">Click a cell to mark/clear terrain. Resizing clears existing marks.</span>
+        </div>
         <div class="bmap-hint" id="bmapHint"></div>
         <div class="bmap-stage">
           <div class="bmap-grid" id="bmapGrid"></div>
@@ -91,6 +120,20 @@ function _ensureDom() {
 
   document.getElementById('battleMapClose').addEventListener('click', _close);
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(); });
+
+  document.getElementById('bmapDmToggle').addEventListener('click', () => {
+    _dmMode = !_dmMode;
+    _selectedTokenId = null;
+    document.getElementById('bmapDmToggle').classList.toggle('on', _dmMode);
+    document.getElementById('bmapDmPanel').hidden = !_dmMode;
+    _render();
+  });
+
+  document.getElementById('bmapSetGridBtn').addEventListener('click', async () => {
+    const cols = parseInt(document.getElementById('bmapCols').value, 10) || 10;
+    const rows = parseInt(document.getElementById('bmapRows').value, 10) || 8;
+    try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { alert(err.message); }
+  });
 }
 
 function _close() {
@@ -129,9 +172,18 @@ function _activeParticipantId(session) {
 
 function _render() {
   if (!_session || !_session.board) return;
+
+  // Don't clobber a value the DM is mid-typing when a live push re-renders.
+  const colsInput = document.getElementById('bmapCols');
+  const rowsInput = document.getElementById('bmapRows');
+  if (colsInput && document.activeElement !== colsInput) colsInput.value = _session.board.grid.cols;
+  if (rowsInput && document.activeElement !== rowsInput) rowsInput.value = _session.board.grid.rows;
+
   const hint = document.getElementById('bmapHint');
   if (hint) {
-    if (_selectedTokenId) {
+    if (_dmMode) {
+      hint.textContent = 'DM Setup: click a cell to mark/clear terrain.';
+    } else if (_selectedTokenId) {
       hint.textContent = 'Click a cell to move there.';
     } else {
       const activeId = _activeParticipantId(_session);
@@ -163,9 +215,18 @@ function _renderGrid() {
   gridEl.innerHTML = cells.join('');
 
   gridEl.querySelectorAll('[data-cell]').forEach(cell => {
-    cell.addEventListener('click', () => {
-      if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
+    cell.addEventListener('click', async () => {
       const [col, row] = cell.dataset.cell.split(',').map(Number);
+
+      if (_dmMode) {
+        const current = cell.classList.contains('marked') ? cell.textContent : '';
+        const terrain = prompt('Terrain label for this cell (blank to clear):', current);
+        if (terrain === null) return; // cancelled
+        try { await CombatAPI.setCellTerrain(col, row, terrain); } catch (err) { alert(err.message); }
+        return;
+      }
+
+      if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
       const movingId = _selectedTokenId;
       _selectedTokenId = null;
       // Turn-gated server-side (move-token, not the DM's unrestricted
@@ -190,7 +251,10 @@ function _renderTokens() {
     if (!p) return;
 
     const isMine = !!_ownerName && p.owner === _ownerName;
-    const isMyTurn = isMine && id === activeId;
+    // In DM Setup mode tokens are display-only -- otherwise a token sitting
+    // on a cell would swallow the click (pointer-events:auto from .my-turn)
+    // instead of letting it reach the cell underneath for terrain marking.
+    const isMyTurn = isMine && id === activeId && !_dmMode;
     const classes = ['bmap-token', p.side];
     if (isMine) classes.push('mine');
     if (isMyTurn) classes.push('my-turn');
@@ -209,7 +273,7 @@ function _renderTokens() {
     el.querySelector('.bmap-token-name').textContent = name;
     patchPortraitMedia(el.querySelector('.bmap-token-portrait'), p.image, name);
 
-    if (isMyTurn) {
+    if (isMyTurn && !_dmMode) {
       el.addEventListener('click', () => {
         _selectedTokenId = _selectedTokenId === id ? null : id;
         _render();

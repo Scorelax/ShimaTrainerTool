@@ -1056,8 +1056,15 @@ function _computeFocusContext(state) {
   if (p.owner !== myName) return { p, isMine: false };
 
   const merged = _syncLocalCombatState(state); // full mirror of ALL my own combatants, for continuity
-  const focused = merged.combatants.find(c => c.id === focusId);
-  if (!focused) return { p, isMine: false }; // couldn't resolve the rich object -- degrade to basic info rather than crash
+  // merged.combatants only ever covers session.turnOrder (see
+  // _syncLocalCombatState) -- if this participant has dropped out of it
+  // for any reason (e.g. status flipped away from 'participating' server-
+  // side) while still being genuinely owned by this trainer, fall back to
+  // a stand-in built straight from the raw participant instead of
+  // degrading all the way to the foreign read-only view below, which has
+  // no End Turn/HP-VP/anything -- this is still YOUR OWN combatant, it
+  // should stay interactive even in a degraded, moves-list-less form.
+  const focused = merged.combatants.find(c => c.id === focusId) || _standInCombatant(p);
 
   focused.isExpanded = true; // always uncollapsed -- there's only ever one shown at a time now
   const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
@@ -1151,8 +1158,15 @@ function _syncMainFocus(state) {
     const oldTime = oldVideo?.currentTime || 0;
     rerenderBattle(ctx.filteredState);
     if (oldSrc) {
-      const newVideo = document.querySelector('#battleList video.combat-card-img');
-      if (newVideo && newVideo.getAttribute('src') === oldSrc) newVideo.currentTime = oldTime;
+      try {
+        const newVideo = document.querySelector('#battleList video.combat-card-img');
+        if (newVideo && newVideo.getAttribute('src') === oldSrc) newVideo.currentTime = oldTime;
+      } catch {
+        // Best-effort cosmetic fix -- some WebViews throw setting
+        // currentTime before a video's metadata has loaded. Never let that
+        // take down the rest of this sync pass (turn-order sidebar, header,
+        // map) over a seek that was only ever saving a visual restart.
+      }
     }
   } else {
     el.innerHTML = renderBattlePhase(ctx.filteredState, ctx.cardOptions);

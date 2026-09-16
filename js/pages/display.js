@@ -117,7 +117,7 @@ function updateSpotlight(activeId) {
   card.hidden = false;
   const name = visibleToViewer(p, 'name') ? p.name : '???';
   patchPortraitMedia(document.getElementById('spotlightPortrait'), p.image, name);
-  document.getElementById('spotlightName').textContent = name;
+  document.getElementById('spotlightName').textContent = p.level ? `${name} · Lv ${p.level}` : name;
   document.getElementById('spotlightBars').innerHTML = barsHtml(p);
 }
 
@@ -146,8 +146,10 @@ function updateStrip(activeId) {
       const wrapper = document.createElement('div');
       wrapper.innerHTML = `
         <div class="display-strip-card" data-id="${id}">
+          <div class="display-strip-reaction"></div>
           <div class="display-strip-portrait" id="stripPortrait-${id}"></div>
           <div class="display-strip-name"></div>
+          <div class="display-strip-level"></div>
           <div class="display-strip-bars"></div>
         </div>`;
       card = wrapper.firstElementChild;
@@ -158,8 +160,19 @@ function updateStrip(activeId) {
       id === activeId ? 'active' : '',
       p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');
     card.querySelector('.display-strip-name').textContent = name;
+    card.querySelector('.display-strip-level').textContent = p.level ? `Lv ${p.level}` : '';
     card.querySelector('.display-strip-bars').innerHTML = barsHtml(p);
     patchPortraitMedia(card.querySelector('.display-strip-portrait'), p.image, name);
+
+    // A greyed-out bolt means "hasn't reacted yet, still eligible"; a lit
+    // one means "already used" -- shown either way (not just on use) so
+    // the table can see at a glance who still has a reaction in reserve.
+    // Meaningless for a benched/spectating combatant, so hidden there.
+    const reactionEl = card.querySelector('.display-strip-reaction');
+    if (reactionEl) {
+      reactionEl.textContent = p.status === 'participating' ? '⚡' : '';
+      reactionEl.classList.toggle('used', !!p.reactionUsed);
+    }
 
     // Reorder without recreating -- insertBefore on a node already in the
     // document moves it in place and does not restart its media playback.

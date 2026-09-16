@@ -353,6 +353,9 @@ def _add_participant(state, data):
         # those after everyone who has rolled, same as a DM-added enemy with
         # no initiative today.
         'initiative': data.get('initiative'),
+        # Shown on the external display screen alongside name/HP/VP (see
+        # display.js) -- purely informational, no gameplay effect server-side.
+        'level': data.get('level'),
         # Whether this participant has been placed on the battle map through
         # the (per-player) placement step -- see confirm-placement below.
         # Only ever checked client-side against a participant's own `owner`
@@ -584,9 +587,15 @@ def _confirm_placement(state, pid, col, row):
     like set-token-position (unrestricted, not turn-gated -- this happens
     before battle even starts), but also marks the participant placed so
     that player's client knows to move on once every participant they own
-    has one."""
+    has one. Two participants can't end up on the same cell -- rejected
+    here as the authoritative check; the placement screen also greys out
+    an occupied-or-currently-hovered cell client-side so this should be
+    a rare race rather than the normal path to seeing this error."""
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
+    for other_id, pos in state['board']['tokens'].items():
+        if other_id != pid and pos['col'] == col and pos['row'] == row:
+            raise ValueError('That square is already taken')
     state['board']['tokens'][pid] = {'col': col, 'row': row}
     participant['placed'] = True

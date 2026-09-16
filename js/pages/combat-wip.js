@@ -115,6 +115,11 @@ const PLACEMENT_CSS = `
   .placement-body { max-width: 640px; margin: 0 auto; padding: 1.5rem 1rem 3rem; text-align: center; }
   .placement-prompt { font-size: 1.05rem; margin-bottom: 1rem; }
   .placement-prompt strong { color: #FFD700; }
+  .placement-actions { min-height: 2.6rem; margin-bottom: 0.75rem; }
+  .placement-confirm-btn {
+    background: linear-gradient(135deg, #27ae60, #1e8449); border: none; border-radius: 6px;
+    color: #fff; font-weight: 700; font-size: 0.95rem; padding: 0.55rem 1.4rem; cursor: pointer;
+  }
   .placement-stage { position: relative; width: 100%; aspect-ratio: 5 / 4; background: #0a0a12; border-radius: 8px; overflow: hidden; }
   .placement-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
   .bmap-cell { background: #20202e; cursor: pointer; }
@@ -123,6 +128,8 @@ const PLACEMENT_CSS = `
     background: #4a3520; display: flex; align-items: center; justify-content: center;
     font-size: 0.6rem; color: #e0c080; overflow: hidden; text-align: center; padding: 1px; box-sizing: border-box;
   }
+  .bmap-cell.taken { background: #3a1f1f; cursor: not-allowed; }
+  .bmap-cell.taken:hover { outline: 1px solid rgba(231,76,60,0.6); outline-offset: -1px; }
   .placement-tokens { position: absolute; inset: 0; pointer-events: none; }
   .placement-token {
     position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -137,6 +144,10 @@ const PLACEMENT_CSS = `
   .placement-token.enemy .placement-token-name { color: #e57373; }
   .placement-token.ghost { opacity: 0.5; }
   .placement-token.ghost .placement-token-name { color: #FFD700; font-style: italic; }
+  .placement-token.staged { opacity: 0.85; }
+  .placement-token.staged .placement-token-portrait { outline: 2px dashed #27ae60; outline-offset: 2px; border-radius: 6px; animation: placementPulse 1.1s ease-in-out infinite; }
+  .placement-token.staged .placement-token-name { color: #27ae60; }
+  @keyframes placementPulse { 0%, 100% { outline-color: #27ae60; } 50% { outline-color: rgba(39,174,96,0.3); } }
 `;
 
 let session = null;
@@ -157,6 +168,11 @@ let _placementQueue = []; // participant ids this trainer still needs to place, 
 let _hoverGhosts = {}; // participantId -> {col,row} live previews from OTHER players, while in 'placement'
 let _hoverThrottle = null;
 let _placementHoverHandler = null;
+// The cell the player has clicked but not yet confirmed for the CURRENT
+// placement-queue entry -- placement no longer locks in on click; clicking
+// a cell only stages a preview (which can be changed by clicking elsewhere)
+// until the confirm button is pressed. Reset to null on every queue advance.
+let _stagedPosition = null; // {col, row} | null
 
 // The pokemonKey (e.g. "pokemon3") for whichever party Pokémon this device
 // chose during Setup -- remembered so the battle view can rebuild the same
@@ -255,6 +271,7 @@ function _combatantToParticipant(c) {
     type1: (c.types && c.types[0]) || '',
     type2: (c.types && c.types[1]) || '',
     initiative: c.initiativeTotal,
+    level: c.level,
   };
 }
 
@@ -343,24 +360,17 @@ function _resolveMyPokemonKey(participantName) {
 }
 
 /** Every field renderCombatCard/attachBattleListeners touch, filled with
- * safe placeholders -- used both for genuine "not mine" stand-ins and as a
- * last-resort fallback for a participant this trainer owns whose rich
- * local object couldn't be resolved (e.g. right after a page reload, if
- * the name-matching fallback in _resolveMyPokemonKey still comes up
- * empty), so a lookup miss degrades to a plain-looking card instead of
- * throwing and blanking the whole battle view. */
+ * safe placeholders -- a last-resort fallback for a participant this
+ * trainer owns whose rich local object couldn't be resolved (e.g. right
+ * after a page reload, if the name-matching fallback in
+ * _resolveMyPokemonKey still comes up empty), so a lookup miss degrades to
+ * a plain-looking card instead of throwing and blanking the battle view. */
 function _standInCombatant(p) {
-  const showName = visibleToViewer(p, 'name');
-  const showHp = visibleToViewer(p, 'hp');
-  const showVp = visibleToViewer(p, 'vp');
   return {
-    id: p.id,
-    name: showName ? p.name : '???',
-    image: p.image || 'assets/Pokeball.png',
+    id: p.id, name: p.name, image: p.image || 'assets/Pokeball.png',
     level: '?', types: [p.type1, p.type2].filter(Boolean),
     ac: '—', baseAc: '—', critMod: 0,
-    currentHp: showHp ? p.currentHP : 0, maxHp: showHp ? p.maxHP : 0,
-    currentVp: showVp ? p.currentVP : 0, maxVp: showVp ? p.maxVP : 0,
+    currentHp: p.currentHP, maxHp: p.maxHP, currentVp: p.currentVP, maxVp: p.maxVP,
     str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0,
     strMod: 0, dexMod: 0, conMod: 0, intMod: 0, wisMod: 0, chaMod: 0,
     initiativeTotal: p.initiative ?? '—',
@@ -370,13 +380,15 @@ function _standInCombatant(p) {
 
 /** Builds (first call) or merges (every subsequent server push) the local
  * mirror of the shared session that drives combat.js's actual
- * renderBattlePhase/attachBattleListeners. This device's own combatants
- * keep their FULL prior local object (recharge states, status effects,
- * Stockpile stacks, expand state -- everything that engine tracks) across
- * pushes, with only HP/VP overlaid fresh from the server; every other
- * participant is rebuilt fresh each time since there's no local authority
- * for them, showing only what the server actually tracks (name/image/HP/
- * VP/type), respecting the DM's per-field visibility toggles. */
+ * renderBattlePhase/attachBattleListeners -- deliberately restricted to
+ * ONLY this trainer's own combatants (their trainer + their Pokémon), not
+ * every participant. The user was explicit that this section is for
+ * managing your own stuff, not for watching everyone else's stats -- that
+ * information lives on the external display screen instead (see
+ * display.js), and having it here too just eats space for no reason. Kept
+ * combatants keep their FULL prior local object (recharge states, status
+ * effects, Stockpile stacks, expand state) across pushes, with only HP/VP
+ * overlaid fresh from the server both directions. */
 function _syncLocalCombatState(session) {
   _enterBattleSync();
 
@@ -390,43 +402,41 @@ function _syncLocalCombatState(session) {
 
   const combatants = session.turnOrder.map(id => {
     const p = session.participants[id];
-    if (!p) return null;
+    if (!p || !p.owner || p.owner !== myName) return null;
 
-    if (p.owner && p.owner === myName) {
-      _myParticipantIds.add(p.id);
-      const prior = existingById.get(p.id);
-      let merged, resolved = true;
-      if (prior) {
-        merged = { ...prior };
-      } else if (myTrainerRich && p.name === myTrainerRich.name) {
-        merged = { ...myTrainerRich };
+    _myParticipantIds.add(p.id);
+    const prior = existingById.get(p.id);
+    let merged, resolved = true;
+    if (prior) {
+      merged = { ...prior };
+    } else if (myTrainerRich && p.name === myTrainerRich.name) {
+      merged = { ...myTrainerRich };
+    } else {
+      const key = _resolveMyPokemonKey(p.name);
+      if (key) {
+        merged = { ...buildPokemonCombatant(key) };
       } else {
-        const key = _resolveMyPokemonKey(p.name);
-        if (key) {
-          merged = { ...buildPokemonCombatant(key) };
-        } else {
-          merged = _standInCombatant(p);
-          resolved = false;
-        }
+        merged = _standInCombatant(p);
+        resolved = false;
       }
-      merged.id = p.id;
-      merged.currentHp = p.currentHP; merged.maxHp = p.maxHP;
-      merged.currentVp = p.currentVP; merged.maxVp = p.maxVP;
-      if (resolved) merged.hasStatBlock = true;
-      // This IS the server's current value -- prime the dedupe cache with
-      // it so the very next local save (even one unrelated to HP/VP)
-      // doesn't get misread as a new change and echoed straight back.
-      _lastSyncedStats[p.id] = { hp: p.currentHP, vp: p.currentVP };
-      return merged;
     }
-
-    return _standInCombatant(p);
+    merged.id = p.id;
+    merged.currentHp = p.currentHP; merged.maxHp = p.maxHP;
+    merged.currentVp = p.currentVP; merged.maxVp = p.maxVP;
+    if (resolved) merged.hasStatBlock = true;
+    // This IS the server's current value -- prime the dedupe cache with it
+    // so the very next local save (even one unrelated to HP/VP) doesn't
+    // get misread as a new change and echoed straight back.
+    _lastSyncedStats[p.id] = { hp: p.currentHP, vp: p.currentVP };
+    return merged;
   }).filter(Boolean);
 
+  // -1, not 0, when the active participant isn't one of mine -- so no card
+  // in this now-own-only list is ever falsely highlighted as "your turn".
   const foundIdx = combatants.findIndex(c => c.id === activeId);
   const local = {
     phase: 'battle', round: session.round,
-    activeTurnIndex: foundIdx === -1 ? 0 : foundIdx,
+    activeTurnIndex: foundIdx,
     combatants,
     weather: existing?.weather || null, terrain: existing?.terrain || null,
   };
@@ -451,13 +461,44 @@ function renderPlacementPhase(state, currentId) {
       <style>${PLACEMENT_CSS}</style>
       <div class="placement-header-bar"><div class="placement-title">📍 Place Your Team</div></div>
       <div class="placement-body">
-        <div class="placement-prompt">Click a cell to place <strong>${current?.name || '…'}</strong> on the map.</div>
+        <div class="placement-prompt">Click a cell to preview <strong>${current?.name || '…'}</strong>'s position, then confirm it.</div>
+        <div class="placement-actions" id="placementActions"></div>
         <div class="placement-stage">
           <div class="placement-grid" id="placementGrid" style="${gridTemplateStyle(state.board)}">${gridCellsHtml(state.board, 'bmap-cell')}</div>
           <div class="placement-tokens" id="placementTokens"></div>
         </div>
       </div>
     </div>`;
+}
+
+/** A cell already holding a CONFIRMED token (anyone's -- a trainer and
+ * their own Pokémon can't share a square either), or another participant's
+ * CURRENT hover/staging preview, can't be picked. `currentId`'s own
+ * hover echo (the server broadcasts your own hover-token calls back to
+ * you too) is excluded, same as the ghost-rendering below already did. */
+function _isCellTaken(state, col, row, currentId) {
+  const occupied = Object.entries(state.board.tokens)
+    .some(([id, pos]) => pos.col === col && pos.row === row && id !== currentId);
+  if (occupied) return true;
+  return Object.entries(_hoverGhosts)
+    .some(([id, pos]) => pos && id !== currentId && pos.col === col && pos.row === row);
+}
+
+function _renderPlacementActions(currentId) {
+  const el = document.getElementById('placementActions');
+  if (!el) return;
+  el.innerHTML = _stagedPosition
+    ? `<button class="placement-confirm-btn" id="placementConfirmBtn">✅ Confirm Placement</button>`
+    : '';
+}
+
+function _refreshCellTakenStates(state, currentId) {
+  const gridEl = document.getElementById('placementGrid');
+  if (!gridEl) return;
+  gridEl.querySelectorAll('[data-cell]').forEach(cell => {
+    const [col, row] = cell.dataset.cell.split(',').map(Number);
+    cell.classList.toggle('taken', _isCellTaken(state, col, row, currentId));
+  });
 }
 
 function _renderPlacementTokens(state, currentId) {
@@ -492,6 +533,19 @@ function _renderPlacementTokens(state, currentId) {
       </div>`);
   });
 
+  if (_stagedPosition) {
+    const current = state.participants[currentId];
+    if (current) {
+      const name = visibleToViewer(current, 'name') ? current.name : '???';
+      const rect = cellRect(state.board, _stagedPosition.col, _stagedPosition.row);
+      html.push(`
+        <div class="placement-token staged ${current.side}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
+          <div class="placement-token-portrait" data-portrait-id="${currentId}"></div>
+          <div class="placement-token-name">${name}</div>
+        </div>`);
+    }
+  }
+
   layer.innerHTML = html.join('');
 
   layer.querySelectorAll('[data-portrait-id]').forEach(el => {
@@ -501,28 +555,50 @@ function _renderPlacementTokens(state, currentId) {
 }
 
 function attachPlacementListeners(state, currentId) {
+  _stagedPosition = null;
+  _renderPlacementActions(currentId);
   _renderPlacementTokens(state, currentId);
+  _refreshCellTakenStates(state, currentId);
 
   const gridEl = document.getElementById('placementGrid');
   if (!gridEl) return;
 
-  gridEl.querySelectorAll('[data-cell]').forEach(cell => {
-    cell.addEventListener('click', async () => {
-      const [col, row] = cell.dataset.cell.split(',').map(Number);
-      try {
-        await CombatAPI.confirmPlacement(currentId, col, row);
-      } catch (err) {
-        alert(err.message);
-        return;
-      }
-      CombatAPI.hoverToken(currentId).catch(() => {}); // clear our own hover ghost for others
-      _placementQueue.shift();
-      if (!_placementQueue.length) _joinStage = null;
-      _rerenderFull();
-    });
+  gridEl.addEventListener('click', (e) => {
+    const cell = e.target.closest('[data-cell]');
+    if (!cell || cell.classList.contains('taken')) return;
+    const [col, row] = cell.dataset.cell.split(',').map(Number);
+    _stagedPosition = { col, row };
+    CombatAPI.hoverToken(currentId, col, row).catch(() => {}); // sticky reservation preview for other placers
+    _renderPlacementActions(currentId);
+    _renderPlacementTokens(session, currentId);
+    _refreshCellTakenStates(session, currentId);
+  });
+
+  document.getElementById('placementActions')?.addEventListener('click', async (e) => {
+    if (!e.target.closest('#placementConfirmBtn') || !_stagedPosition) return;
+    const { col, row } = _stagedPosition;
+    try {
+      await CombatAPI.confirmPlacement(currentId, col, row);
+    } catch (err) {
+      alert(err.message);
+      // Someone else likely just took it -- drop the stale preview and let
+      // the next server push (which will include their now-confirmed
+      // token) redraw the grid so the real occupancy is visible again.
+      _stagedPosition = null;
+      _renderPlacementActions(currentId);
+      _renderPlacementTokens(session, currentId);
+      _refreshCellTakenStates(session, currentId);
+      return;
+    }
+    CombatAPI.hoverToken(currentId).catch(() => {}); // clear our own hover reservation for others
+    _stagedPosition = null;
+    _placementQueue.shift();
+    if (!_placementQueue.length) _joinStage = null;
+    _rerenderFull();
   });
 
   gridEl.addEventListener('mousemove', (e) => {
+    if (_stagedPosition) return; // reservation now sticks to the staged cell, not the raw cursor
     const cell = e.target.closest('[data-cell]');
     if (!cell) return;
     if (_hoverThrottle) return;
@@ -532,6 +608,7 @@ function attachPlacementListeners(state, currentId) {
   });
 
   gridEl.addEventListener('mouseleave', () => {
+    if (_stagedPosition) return; // still reserved until confirmed or restaged elsewhere
     CombatAPI.hoverToken(currentId).catch(() => {});
   });
 
@@ -539,7 +616,10 @@ function attachPlacementListeners(state, currentId) {
   _placementHoverHandler = (e) => {
     const { participantId, col, row } = e.detail;
     _hoverGhosts[participantId] = (col === null || col === undefined) ? null : { col, row };
-    if (_joinStage === 'placement') _renderPlacementTokens(session, _placementQueue[0]);
+    if (_joinStage === 'placement') {
+      _renderPlacementTokens(session, _placementQueue[0]);
+      _refreshCellTakenStates(session, _placementQueue[0]);
+    }
   };
   window.addEventListener('app:combat-hover', _placementHoverHandler);
 }
@@ -575,6 +655,7 @@ function renderBody(state) {
         <option value="participating">Participating</option>
         <option value="spectating">Spectating</option>
       </select>
+      <input type="number" name="level" placeholder="Lv" min="1" style="width:56px;">
       <input type="number" name="maxHP" placeholder="HP" value="20" min="0">
       <input type="number" name="maxVP" placeholder="VP" value="10" min="0">
       <input type="text" name="type1" placeholder="Type 1 (optional)" style="width:110px;">
@@ -584,12 +665,22 @@ function renderBody(state) {
 
     <div id="wipBattlePhase">${renderBattlePhase(_syncLocalCombatState(state))}</div>
 
-    <div class="combat-wip-section-label">Player Actions</div>
-    <div class="combat-wip-participant-list" id="wipActionRows">${_renderActionRows(state)}</div>`;
+    <div class="combat-wip-participant-list" id="wipOwnControls">${_renderOwnControls(state)}</div>
+
+    <div id="wipEnemySection">${_renderEnemySection(state)}</div>`;
 }
 
 function _renderRoundBar(state) {
   const orderLabel = state.turnOrder.map(id => state.participants[id]?.name || '?').join(' → ') || '(no participants yet)';
+  const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
+  const activeParticipant = state.participants[activeId];
+  const myName = _currentTrainerName();
+  // Whoever actually holds the floor should be the one advancing past it --
+  // an unowned (DM/freeform) enemy has no dedicated device, so anyone can
+  // advance past its turn, but another PLAYER's turn (or reaction) is
+  // theirs to end, not something reachable from someone else's screen.
+  const canAdvance = !state.reactingParticipantId &&
+    (!activeParticipant || !activeParticipant.owner || activeParticipant.owner === myName);
   return `
     <div>
       <div class="combat-wip-round-label">Round ${state.round} <span class="combat-wip-battle-badge">${state.battleType === 'pvp' ? 'PvP' : 'PvE'}</span></div>
@@ -597,8 +688,8 @@ function _renderRoundBar(state) {
       ${state.reactingParticipantId ? `<div class="combat-wip-reacting-note">⚡ ${state.participants[state.reactingParticipantId]?.name} is reacting out of turn</div>` : ''}
     </div>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-      <button class="combat-wip-btn-secondary" id="advanceTurnBtn" ${state.reactingParticipantId ? 'disabled' : ''}>Advance Turn →</button>
-      ${state.reactingParticipantId ? '<button class="combat-wip-btn-secondary" id="reactionEndBtn">End Reaction</button>' : ''}
+      <button class="combat-wip-btn-secondary" id="advanceTurnBtn" ${canAdvance ? '' : 'disabled'}
+        title="${canAdvance ? '' : 'Only whoever currently holds the floor can advance past their turn'}">Advance Turn →</button>
       <button class="combat-wip-btn-secondary" id="battleMapBtn">🗺️ Battle Map</button>
       <button class="combat-wip-btn-danger" id="endSessionBtn">End Session</button>
     </div>`;
@@ -614,26 +705,45 @@ function _attachRoundBarListeners() {
   document.getElementById('advanceTurnBtn')?.addEventListener('click', async () => {
     try { await CombatAPI.advanceTurn(); } catch (err) { alert(err.message); }
   });
-  document.getElementById('reactionEndBtn')?.addEventListener('click', () => CombatAPI.reactionEnd());
 }
 
-/** The multiplayer-specific actions combat.js's own local engine has no
- * concept of at all (join/bench, reactions, DM visibility toggles for
- * enemies, remove) plus the existing cross-player "commit this to
- * everyone" action -- use-move here computes type effectiveness and
- * applies damage to a chosen target server-side, distinct from clicking a
- * move inside a card above (which only spends its user's own VP and runs
- * that move's local special-case mechanics, same as the legacy page). */
-function _renderActionRows(state) {
-  return Object.values(state.participants).map(p => _renderActionRow(p, state)).join('')
-    || '<p style="color:#a0a0c0;">No participants yet.</p>';
-}
-
-function _renderActionRow(p, state) {
+/** Controls for THIS trainer's own combatants -- everything combat.js's own
+ * card above already shows (name, HP/VP, stats) is deliberately not
+ * repeated here, just the multiplayer-specific actions that engine has no
+ * concept of: benching, reacting out of turn, attacking a chosen target
+ * (server-computed type effectiveness -- distinct from clicking a move
+ * inside the card above, which only spends its own user's VP), and
+ * leaving the fight. Attack/React are only enabled when this combatant
+ * actually holds the floor (or is eligible to react) -- the server
+ * enforces the same check regardless, this just avoids offering a button
+ * that would only come back as an error. */
+function _renderOwnControls(state) {
+  const myName = _currentTrainerName();
+  const mine = Object.values(state.participants).filter(p => p.owner === myName);
+  if (!mine.length) return '';
   const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
-  const isActive = p.id === activeId;
+  return mine.map(p => _renderControlRow(p, state, activeId, false)).join('');
+}
+
+/** Same idea, for DM-controlled enemies (side:'enemy', no owner -- nobody's
+ * own device shows them otherwise) -- plus the per-field visibility
+ * toggles only enemies have. Other players' own participants are
+ * deliberately absent from this page entirely; that's what the external
+ * display screen is for. */
+function _renderEnemySection(state) {
+  const enemies = Object.values(state.participants).filter(p => p.side === 'enemy');
+  if (!enemies.length) return '';
+  const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
+  return `
+    <div class="combat-wip-section-label">Enemies (DM)</div>
+    <div class="combat-wip-participant-list" id="wipEnemyControls">
+      ${enemies.map(p => _renderControlRow(p, state, activeId, true)).join('')}
+    </div>`;
+}
+
+function _renderControlRow(p, state, activeId, showVisibilityToggles) {
+  const canAct = p.id === activeId;
   const canReact = p.status === 'participating' && !p.reactionUsed && !state.reactingParticipantId && p.id !== state.turnOrder[state.turnIndex];
-  const mapPos = state.board?.tokens?.[p.id];
 
   const visToggle = (field, label) => `
     <button class="${p.visibility[field] ? 'on' : ''}" data-vis-id="${p.id}" data-vis-field="${field}" data-vis-value="${p.visibility[field] ? 0 : 1}">
@@ -641,18 +751,16 @@ function _renderActionRow(p, state) {
     </button>`;
 
   return `
-    <div class="combat-wip-participant ${isActive ? 'active-turn' : ''} ${p.status === 'spectating' ? 'spectating' : ''}">
-      <span class="combat-wip-side-badge ${p.side}">${p.side}</span>
+    <div class="combat-wip-participant ${p.status === 'spectating' ? 'spectating' : ''}">
       <span class="combat-wip-p-name">${p.name}</span>
-      ${mapPos ? `<span class="combat-wip-p-stats">📍(${mapPos.col},${mapPos.row})</span>` : ''}
       <div class="combat-wip-p-controls">
         <button data-toggle-status="${p.id}" data-next-status="${p.status === 'participating' ? 'spectating' : 'participating'}">
           ${p.status === 'participating' ? 'Bench' : 'Join Fight'}
         </button>
         <button data-reaction="${p.id}" ${canReact ? '' : 'disabled'}>⚡ React${p.reactionUsed ? ' (used)' : ''}</button>
-        ${p.side === 'enemy' ? visToggle('hp', 'HP') + visToggle('vp', 'VP') + visToggle('name', 'Name') : ''}
-        <button data-use-move="${p.id}" title="Only works when it's this participant's turn (or they're reacting) -- server enforces it">⚔️ Use Move (attack)</button>
-        <button data-play-anim="${p.id}" data-anim-species="${p.name}" title="Test the display screen's animation playback">🎬 Play Anim</button>
+        ${showVisibilityToggles ? visToggle('hp', 'HP') + visToggle('vp', 'VP') + visToggle('name', 'Name') : ''}
+        <button data-use-move="${p.id}" ${canAct ? '' : 'disabled'}
+          title="${canAct ? 'Attack a chosen target' : "Only usable on this combatant's turn (or while reacting)"}">⚔️ Attack</button>
         <button class="remove" data-remove="${p.id}">Remove</button>
       </div>
     </div>`;
@@ -670,7 +778,10 @@ export function attachCombatWipListeners() {
   combatUpdateHandler = (e) => {
     session = e.detail;
     if (_joinStage === 'placement') {
-      if (_placementQueue.length) _renderPlacementTokens(session, _placementQueue[0]);
+      if (_placementQueue.length) {
+        _renderPlacementTokens(session, _placementQueue[0]);
+        _refreshCellTakenStates(session, _placementQueue[0]);
+      }
       return;
     }
     if (_joinStage) return;
@@ -688,8 +799,8 @@ export function attachCombatWipListeners() {
     if (!session.active) _exitBattleSync();
 
     if (session.active && _battleSyncActive && document.getElementById('wipBattlePhase')) {
-      // Fast path: patch the cards/round-bar/action-rows in place rather
-      // than replacing the whole body -- a full rerender would force-close
+      // Fast path: patch the cards/round-bar/controls in place rather than
+      // replacing the whole body -- a full rerender would force-close
       // whatever popup this player has open (move details, inventory,
       // switch...) every single time ANY player's action pushes a new
       // session, which given a lively multi-player fight is often.
@@ -699,8 +810,13 @@ export function attachCombatWipListeners() {
       const roundBar = document.getElementById('wipRoundBar');
       if (roundBar) { roundBar.innerHTML = _renderRoundBar(session); _attachRoundBarListeners(); }
 
-      const actionRows = document.getElementById('wipActionRows');
-      if (actionRows) { actionRows.innerHTML = _renderActionRows(session); _attachActionRowListeners(); }
+      const ownControls = document.getElementById('wipOwnControls');
+      if (ownControls) ownControls.innerHTML = _renderOwnControls(session);
+
+      const enemySection = document.getElementById('wipEnemySection');
+      if (enemySection) enemySection.innerHTML = _renderEnemySection(session);
+
+      _attachActionRowListeners();
 
       updateBattleMap(session);
       return;
@@ -792,6 +908,7 @@ function attachBodyListeners() {
       name: data.get('name'),
       side: 'enemy', // this form is PvE-only (see renderBody) -- freeform is always DM-controlled enemies
       status: data.get('status'),
+      level: data.get('level') ? parseInt(data.get('level'), 10) : undefined,
       maxHP, currentHP: maxHP,
       maxVP, currentVP: maxVP,
       type1: data.get('type1') || '',
@@ -812,9 +929,20 @@ function attachBodyListeners() {
   // ending a turn has to actually move the SERVER's turn pointer so every
   // other client agrees who's up, not just advance a local-only index.
   // This listens alongside (not instead of) attachBattleListeners' own
-  // handling of the same click -- both fire, no conflict.
+  // handling of the same click -- both fire, no conflict. The card that
+  // gets this button is whichever of your own combatants currently holds
+  // the floor, which -- since _syncLocalCombatState's activeTurnIndex
+  // already resolves to the REACTOR while a reaction is in progress -- is
+  // exactly as true when you're mid-reaction as when it's your normal
+  // turn. So the same button has to mean "give up the floor" either way:
+  // reactionEnd while reacting, advanceTurn otherwise.
   document.getElementById('battleList')?.addEventListener('click', (e) => {
-    if (e.target.closest('.end-turn-btn')) CombatAPI.advanceTurn().catch(() => {});
+    if (!e.target.closest('.end-turn-btn')) return;
+    if (session.reactingParticipantId) {
+      CombatAPI.reactionEnd().catch(() => {});
+    } else {
+      CombatAPI.advanceTurn().catch(() => {});
+    }
   });
 
   _attachActionRowListeners();
@@ -849,13 +977,6 @@ function _attachActionRowListeners() {
           alert(`${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`);
         }
       } catch (err) { alert(err.message); }
-    });
-  });
-
-  document.querySelectorAll('[data-play-anim]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const species = prompt('Species name for the animation clip (must match an uploaded battle-animation filename):', btn.dataset.animSpecies);
-      if (species) CombatAPI.playAnimation(btn.dataset.playAnim, species);
     });
   });
 

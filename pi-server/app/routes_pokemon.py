@@ -34,6 +34,11 @@ def handle(conn, action, params):
             raise ValueError('Missing pokemon data')
         return update_pokemon_data(conn, json.loads(params['data']))
 
+    if action == 'delete':
+        if not params.get('trainer') or not params.get('name'):
+            raise ValueError('Missing trainer or pokemon name')
+        return delete_pokemon_for_trainer(conn, params['trainer'], params['name'])
+
     if action == 'recalculate-stats':
         if not params.get('data'):
             raise ValueError('Missing pokemon data')
@@ -220,6 +225,21 @@ def update_pokemon_data(conn, new_pokemon_data):
             new_pokemon_data[1] = row[1]
             db.update_row(conn, 'pokemon', rowid, P, new_pokemon_data)
             return {'status': 'success'}
+    return {'status': 'error', 'message': 'Pokémon not found.'}
+
+
+def delete_pokemon_for_trainer(conn, trainer_name, pokemon_name):
+    """edit-pokemon.js's Release button -- removes exactly one trainer's
+    copy of a Pokemon, matched the same case-insensitive (trainer, name)
+    way every other lookup in this file already is, so another trainer's
+    Pokemon of the same species/nickname is never touched."""
+    trainer_key = str(trainer_name).lower()
+    pokemon_key = str(pokemon_name).lower()
+    for rowid, row in db.fetch_rows(conn, 'pokemon', P):
+        if str(row[0]).lower() == trainer_key and str(row[2]).lower() == pokemon_key:
+            db.delete_row(conn, 'pokemon', rowid)
+            live.publish({'type': 'trainer-data', 'trainer': trainer_name})
+            return {'status': 'success', 'message': f'{pokemon_name} released.'}
     return {'status': 'error', 'message': 'Pokémon not found.'}
 
 

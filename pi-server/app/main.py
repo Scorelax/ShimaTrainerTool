@@ -123,7 +123,7 @@ def _dispatch(params):
                 'message': 'API is working!',
                 'timestamp': datetime.now(timezone.utc).isoformat(),
                 'endpoints': {
-                    'pokemon': ['list', 'registered-list', 'get', 'register', 'update',
+                    'pokemon': ['list', 'registered-list', 'get', 'register', 'update', 'delete',
                                 'evolution-options', 'party-status', 'utility-slot', 'live-stats'],
                     'trainer': ['list', 'get', 'create', 'update', 'inventory', 'gear',
                                 'money', 'live-stats'],

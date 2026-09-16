@@ -125,6 +125,14 @@ def update_row(conn, table, rowid, columns, values):
     conn.commit()
 
 
+def delete_row(conn, table, rowid):
+    """Remove a row outright (Sheets deleteRow) -- unlike every write above,
+    there's no Sheets-parity reason to keep this soft (no archive table,
+    no tombstone column); a released Pokemon should just be gone."""
+    conn.execute(f'DELETE FROM {table} WHERE rowid = ?', (rowid,))
+    conn.commit()
+
+
 def set_cell(conn, table, rowid, column, value):
     """Write a single cell (Sheets getRange().setValue())."""
     conn.execute(f'UPDATE {table} SET "{column}" = ? WHERE rowid = ?', (_adapt(value), rowid))

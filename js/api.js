@@ -276,6 +276,27 @@ export class PokemonAPI {
   }
 
   /**
+   * Release (permanently delete) a Pokemon from one trainer's box -- the
+   * trainer+name pair is matched server-side the same case-insensitive way
+   * every other pokemon lookup already is, so another trainer's copy of
+   * the same species/nickname is never touched.
+   */
+  static async release(trainerName, pokemonName) {
+    const result = await API.request('pokemon', 'delete', {
+      trainer: trainerName,
+      name: pokemonName
+    }, {
+      useCache: false
+    });
+
+    cache.remove(`pokemon:${trainerName}:${pokemonName}`);
+    cache.remove(`trainer:${trainerName}`);
+    cache.remove('pokemon:registered-list');
+
+    return result;
+  }
+
+  /**
    * Get evolution options for a Pokemon
    */
   static async getEvolutionOptions(dexEntry, limit = 20) {

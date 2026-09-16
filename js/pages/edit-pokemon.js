@@ -468,6 +468,147 @@ export function renderEditPokemon(pokemonName) {
           transform: scale(1.08);
         }
 
+        /* Release button - mirrors back button on right side (see
+           pokemon-card.js's .bag-button, same "circular image button" look) */
+        .release-button {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          right: clamp(15px, 3vw, 20px);
+          background: var(--surface-glass);
+          color: var(--text);
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
+          border: 2px solid var(--border-accent);
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 0;
+          overflow: hidden;
+        }
+
+        .release-button img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 50%;
+        }
+
+        .release-button:hover {
+          transform: scale(1.15);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        .release-button:active {
+          transform: scale(1.08);
+        }
+
+        /* Release confirmation popup -- same modal look as pokemon-card.js's
+           own Remove Item confirmation (.inventory-modal and friends),
+           reused here under its own name since this page keeps its styles
+           self-contained rather than assuming that page's stylesheet is
+           also loaded. */
+        .release-modal {
+          display: none;
+          position: fixed;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background-color: rgba(0, 0, 0, 0.6);
+          z-index: 2100;
+          backdrop-filter: blur(5px);
+          animation: releaseFadeIn 0.2s ease;
+        }
+
+        .release-modal-content {
+          position: absolute;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: 90%;
+          max-width: clamp(400px, 80vw, 700px);
+          background: linear-gradient(160deg, var(--surface-solid) 0%, var(--surface-solid-deep) 100%);
+          border: 2px solid var(--border-accent);
+          border-radius: clamp(15px, 3vw, 25px);
+          box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+          overflow: hidden;
+          animation: releaseSlideIn 0.3s ease;
+        }
+
+        @keyframes releaseFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes releaseSlideIn {
+          from { opacity: 0; transform: translate(-50%, -45%); }
+          to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .release-modal .modal-header {
+          background: linear-gradient(135deg, #EE1515 0%, #C91010 100%);
+          padding: clamp(1rem, 2.5vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+          border-bottom: 1px solid var(--border-accent);
+        }
+
+        .release-modal .modal-header h2 {
+          color: white;
+          margin: 0;
+          font-size: clamp(1.3rem, 2.8vw, 1.8rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          text-align: center;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+        }
+
+        .release-modal .modal-body {
+          padding: clamp(1.5rem, 3vh, 2.5rem) clamp(1.5rem, 3vw, 2rem);
+        }
+
+        .release-modal .confirmation-text {
+          font-size: clamp(1.1rem, 2.4vw, 1.4rem);
+          color: #e0e0e0;
+          text-align: center;
+          line-height: 1.6;
+        }
+
+        .release-modal .confirmation-text strong {
+          color: #FFDE00;
+          font-weight: 900;
+        }
+
+        .release-modal .modal-actions {
+          display: flex;
+          gap: clamp(0.75rem, 1.5vw, 1rem);
+          padding: clamp(1rem, 2vh, 1.5rem) clamp(1.5rem, 3vw, 2rem);
+          background: linear-gradient(135deg, #252525 0%, #1a1a1a 100%);
+          border-top: clamp(2px, 0.4vw, 3px) solid #333;
+        }
+
+        .release-modal .action-btn {
+          flex: 1;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          gap: clamp(0.3rem, 0.8vh, 0.5rem);
+          padding: clamp(0.8rem, 1.8vh, 1.2rem);
+          border: clamp(2px, 0.4vw, 3px) solid #333;
+          border-radius: clamp(10px, 2vw, 15px);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          font-weight: 900;
+          text-transform: uppercase;
+          color: white;
+        }
+
+        .release-modal .action-btn.danger { background: linear-gradient(135deg, #EE1515 0%, #C91010 100%); }
+        .release-modal .action-btn.danger:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4), 0 0 15px rgba(238,21,21,0.6);
+        }
+        .release-modal .action-btn.secondary { background: linear-gradient(135deg, #666 0%, #555 100%); }
+        .release-modal .action-btn.secondary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+        }
+
         @media (max-width: 1024px) {
           .form-container {
             max-width: clamp(600px, 92vw, 800px);
@@ -676,6 +817,33 @@ export function renderEditPokemon(pokemonName) {
 
       <!-- Back Button -->
       <button class="back-button" id="backButton">←</button>
+
+      <!-- Release Button -->
+      <button class="release-button" id="releaseButton"><img src="assets/release.png" alt="Release"></button>
+
+      <!-- Release Confirmation Popup -->
+      <div id="releasePokemonModal" class="release-modal">
+        <div class="release-modal-content">
+          <div class="modal-header">
+            <h2>Release Pokémon?</h2>
+          </div>
+          <div class="modal-body">
+            <div class="confirmation-text">
+              Would you really like to release <strong>${nickname || name}</strong>?
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="action-btn danger" id="confirmReleasePokemon">
+              <span class="btn-icon">✔️</span>
+              <span class="btn-text">Yes</span>
+            </button>
+            <button class="action-btn secondary" id="cancelReleasePokemon">
+              <span class="btn-icon">✖️</span>
+              <span class="btn-text">No</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -791,6 +959,30 @@ export async function attachEditPokemonListeners() {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'pokemon-card', pokemonName: pokemonName }
     }));
+  });
+
+  // Release Pokemon
+  document.getElementById('releaseButton')?.addEventListener('click', () => {
+    document.getElementById('releasePokemonModal').style.display = 'block';
+  });
+
+  document.getElementById('cancelReleasePokemon')?.addEventListener('click', () => {
+    document.getElementById('releasePokemonModal').style.display = 'none';
+  });
+
+  document.getElementById('confirmReleasePokemon')?.addEventListener('click', async () => {
+    try {
+      const result = await PokemonAPI.release(pokemonData[0], pokemonName);
+      if (result.status !== 'success') {
+        showError(result.message || 'Failed to release Pokémon.');
+        return;
+      }
+      sessionStorage.removeItem(`pokemon_${pokemonName.toLowerCase()}`);
+      showSuccess(`${pokemonData[36] || pokemonData[2]} was released.`);
+      window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+    } catch (err) {
+      showError(err.message || 'Failed to release Pokémon.');
+    }
   });
 
   // Nature change listener for stat recalculation

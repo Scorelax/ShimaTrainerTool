@@ -510,6 +510,14 @@ export function renderTrainerCard() {
           justify-content: center;
           z-index: 1000;
           padding: 0;
+          overflow: hidden;
+        }
+
+        .combat-corner-btn img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 50%;
         }
 
         .combat-corner-btn:hover {
@@ -911,7 +919,7 @@ export function renderTrainerCard() {
       <button class="back-button" id="backButton">←</button>
 
       <!-- Combat Button -->
-      <button class="combat-corner-btn" id="combatBtn">⚔️</button>
+      <button class="combat-corner-btn" id="combatBtn"><img src="assets/VS.png" alt="Combat"></button>
 
       <!-- Trainer and Utility Container -->
       <div class="trainer-utility-wrapper">

@@ -130,6 +130,15 @@ def handle(conn, action, params):
             species=params.get('species'),
         )
 
+    if action == 'update-stats':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _update_stats(
+            s, params['id'],
+            js_parse_int(params.get('currentHP')),
+            js_parse_int(params.get('currentVP')),
+        ))
+
     if action == 'set-board-template':
         cols = js_parse_int(params.get('cols'))
         rows = js_parse_int(params.get('rows'))
@@ -372,6 +381,22 @@ def _set_status(state, pid, status):
         raise ValueError('Unknown participant: ' + pid)
     participant['status'] = status
     _rebuild_turn_order(state)
+
+
+def _update_stats(state, pid, current_hp, current_vp):
+    """Client-authoritative sync for HP/VP changes made through combat.js's
+    own local battle engine (VP cost of using a move, Ingrain/direct/drain
+    heals, manual HP/VP adjusters) -- those per-move mechanics are
+    intentionally not ported server-side (see module docstring), so the
+    client just computes the new value locally and tells the server what it
+    landed on, the same trust model as everywhere else in this app."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if current_hp is not None:
+        participant['currentHP'] = current_hp
+    if current_vp is not None:
+        participant['currentVP'] = current_vp
 
 
 def _set_visibility(state, pid, field, visible):

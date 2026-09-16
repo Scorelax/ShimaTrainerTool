@@ -293,13 +293,34 @@ export function buildPokemonCombatant(pokemonKey) {
 // SESSION STATE
 // ============================================================================
 
+// Both the sessionStorage key and an optional post-save hook are
+// swappable -- combat-wip.js's shared battle view points these at its own
+// key ('wipCombatState', see setCombatStateKey) and a hook that pushes
+// HP/VP deltas up to the server (setOnCombatStateSave) so it can reuse this
+// entire battle engine (renderBattlePhase/attachBattleListeners and every
+// popup underneath them) completely unmodified, operating on a local
+// mirror of the shared session instead of colliding with the legacy page's
+// own local-only 'combatState'. Both default to the legacy page's original
+// behavior -- zero change for any caller that doesn't touch these setters.
+let _combatStateKey = 'combatState';
+let _onCombatStateSave = null;
+
+export function setCombatStateKey(key) {
+  _combatStateKey = key || 'combatState';
+}
+
+export function setOnCombatStateSave(fn) {
+  _onCombatStateSave = fn || null;
+}
+
 function getCombatState() {
-  const raw = sessionStorage.getItem('combatState');
+  const raw = sessionStorage.getItem(_combatStateKey);
   return raw ? JSON.parse(raw) : null;
 }
 
 function saveCombatState(state) {
-  sessionStorage.setItem('combatState', JSON.stringify(state));
+  sessionStorage.setItem(_combatStateKey, JSON.stringify(state));
+  if (_onCombatStateSave) _onCombatStateSave(state);
 }
 
 // ============================================================================
@@ -307,6 +328,14 @@ function saveCombatState(state) {
 // ============================================================================
 
 export function renderCombat() {
+  // Defensive reset: guarantees the legacy page's own entry point always
+  // reads/writes its own default key with no stray hook attached, even if
+  // combat-wip.js's shared battle view (or a future caller) left these
+  // pointed elsewhere and the user navigated here without going through
+  // that page's own "back" cleanup.
+  setCombatStateKey('combatState');
+  setOnCombatStateSave(null);
+
   const state = getCombatState();
   const phase = state ? state.phase : 'setup';
   if (phase === 'initiative') return renderInitiativePhase(state);
@@ -464,7 +493,7 @@ function renderGlobalConditionModal() {
     </div>`;
 }
 
-function renderBattlePhase(state) {
+export function renderBattlePhase(state) {
   const cards = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex)).join('');
   return `
     <div class="combat-page">
@@ -1541,7 +1570,7 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
-function attachBattleListeners(state) {
+export function attachBattleListeners(state) {
   _battleState = state;
   loadCombatMoves();
   initializeRechargeStates(state);
@@ -1796,7 +1825,7 @@ function attachBattleListeners(state) {
   applyMoveColors();
 }
 
-function rerenderBattle(state) {
+export function rerenderBattle(state) {
   const battleList = document.getElementById('battleList');
   if (!battleList) return;
   battleList.innerHTML = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex)).join('');

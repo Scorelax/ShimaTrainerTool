@@ -18,7 +18,8 @@ import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
-  renderCombatCard, COMBAT_CSS,
+  renderBattlePhase, attachBattleListeners, rerenderBattle,
+  setCombatStateKey, setOnCombatStateSave,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -96,17 +97,7 @@ const WIP_CSS = `
   .combat-wip-p-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
   .combat-wip-p-controls button.on { background: #27ae60; border-color: #27ae60; }
   .combat-wip-p-controls button.remove { background: #922b21; border-color: #922b21; }
-
-  /* Battle view: each combat-card (reused verbatim from combat.js) plus this
-     page's own action row underneath it -- the card's own click-to-expand
-     interaction isn't wired here yet (see Milestone D's own-turn move popups,
-     still future work), so the pointer cursor it normally implies is turned
-     back off to avoid promising an interaction that doesn't do anything yet. */
-  .battle-card-wrap { margin-bottom: 0.6rem; }
-  .battle-card-wrap .combat-card-main { cursor: default; }
-  .battle-card-wrap .combat-wip-p-controls { margin: 0.4rem 0.2rem 0; }
-  .battle-card-wrap.reacting .combat-card { border-color: #e67e22; box-shadow: 0 0 10px rgba(230,126,34,0.35); }
-  .battle-card-wrap.spectating { opacity: 0.55; }
+  #wipBattlePhase #endCombatBtn { display: none; } /* "End Session" above already covers this, shared-session-wide */
 `;
 
 // Reuses .bmap-cell/.bmap-token's exact rules from battle-map-popup.js (same
@@ -173,8 +164,30 @@ let _placementHoverHandler = null;
 // buildPokemonCombatant already knows how to compute from sessionStorage)
 // on every re-render, the same way the legacy combat.js page does. Only
 // meaningful for the current trainer's own cards; every other participant's
-// card is a lightweight stand-in (see _buildBattleCombatants below).
+// card is a lightweight stand-in (see _syncLocalCombatState below).
 let _myPokemonKey = null;
+
+// ---------------------------------------------------------------------------
+// Battle view -- once placement is done, the normal view renders combat.js's
+// ACTUAL renderBattlePhase/attachBattleListeners (the full existing tool:
+// click-to-expand cards, moves list, HP/VP/AC/stat adjusters, status
+// effects, type calculator, inventory, trainer buffs, switching Pokémon --
+// everything), operating on a *local mirror* of the shared session rather
+// than the legacy page's own 'combatState' key (see setCombatStateKey/
+// setOnCombatStateSave, both exported from combat.js specifically for this).
+// This device's own combatants keep their full local object (recharge
+// states, status effects, Stockpile stacks, expand state) across every
+// server push; only HP/VP are kept in sync both directions -- pulled in
+// from the server on every push, and pushed back up whenever combat.js's
+// own engine changes them locally (VP cost of a move, Ingrain/direct/drain
+// heals, manual adjusters). Everything else (status effects, recharge
+// tracking, Stockpile) intentionally stays local-only for now, same
+// boundary use-move's own docstring already draws server-side.
+// ---------------------------------------------------------------------------
+const WIP_COMBAT_STATE_KEY = 'wipCombatState';
+let _battleSyncActive = false;
+let _myParticipantIds = new Set();
+let _lastSyncedStats = {}; // participantId -> {hp, vp} last pushed to the server, to dedupe redundant pushes
 
 function _needsToJoin(state) {
   const name = _currentTrainerName();
@@ -209,7 +222,7 @@ function _renderCurrentView() {
 
   return `
     <div class="combat-wip-page">
-      <style>${COMBAT_CSS}${WIP_CSS}</style>
+      <style>${WIP_CSS}</style>
       <div class="combat-wip-header-bar">
         <button class="combat-wip-back-btn" id="combatWipBackBtn">← Back</button>
         <div class="combat-wip-title">🛠️ New Combat Tool (WIP)</div>
@@ -245,61 +258,180 @@ function _combatantToParticipant(c) {
   };
 }
 
-/** combat.js's renderCombatCard expects a rich "combatant" shape. For this
- * device's own trainer/Pokémon we rebuild that full object fresh on every
- * call (buildTrainerCombatant/buildPokemonCombatant read straight from
- * sessionStorage, so this stays cheap and always current) -- every existing
- * mechanic that already works in the legacy combat page (ability scores,
- * types, moves data) shows up here unchanged. HP/VP are overlaid from the
- * server record so damage applied by anyone (via use-move) is reflected.
- * Every other participant -- another player's or the DM's -- only has the
- * lightweight fields the server actually tracks, so it gets a stand-in
- * combatant with hasStatBlock:false, which renderCombatCard renders without
- * the ability-score/AC rows rather than showing fabricated zeros. */
-function _buildBattleCombatants(state) {
-  const myName = _currentTrainerName();
-  const myRichByName = new Map();
-  if (myName) {
-    const trainerC = buildTrainerCombatant();
-    myRichByName.set(trainerC.name, trainerC);
-    if (_myPokemonKey) {
-      const pokemonC = buildPokemonCombatant(_myPokemonKey);
-      myRichByName.set(pokemonC.name, pokemonC);
+function _enterBattleSync() {
+  if (_battleSyncActive) return;
+  _battleSyncActive = true;
+  setCombatStateKey(WIP_COMBAT_STATE_KEY);
+  setOnCombatStateSave(_onLocalCombatStateSave);
+}
+
+function _exitBattleSync() {
+  _battleSyncActive = false;
+  _myParticipantIds = new Set();
+  _lastSyncedStats = {};
+  _statsSyncInFlight = {};
+  _statsSyncPending = {};
+  setCombatStateKey('combatState');
+  setOnCombatStateSave(null);
+}
+
+/** combat.js's own battle engine (Ingrain/direct/drain heals, VP cost of
+ * using a move, manual HP/VP adjusters -- everything that flows through
+ * saveCombatState) only ever touches the local mirror. This is the other
+ * half of the sync: whenever it changes one of OUR OWN combatants' HP/VP,
+ * push the result up so every other client (and the display screen) sees
+ * it too. Deduped against the last value actually sent so unrelated saves
+ * (status effects, stat adjusters, isExpanded toggles) don't spam the
+ * server with no-op requests. */
+function _onLocalCombatStateSave(state) {
+  state.combatants.forEach(c => {
+    if (!_myParticipantIds.has(c.id)) return;
+    const last = _lastSyncedStats[c.id];
+    if (last && last.hp === c.currentHp && last.vp === c.currentVp) return;
+    _lastSyncedStats[c.id] = { hp: c.currentHp, vp: c.currentVp };
+    _pushStatsSync(c.id, c.currentHp, c.currentVp);
+  });
+}
+
+// A rapid run of clicks (e.g. mashing the HP -1 button) fires several
+// saveCombatState calls in the same tick, each wanting its own updateStats
+// request -- with those as independent in-flight fetches, nothing
+// guarantees they land at the server in the order they were sent, so a
+// slow early request finishing last could silently overwrite a newer value
+// with a stale one. This coalesces: at most one request in flight per
+// participant at a time, with only the LATEST value queued behind it, so
+// the value that ultimately reaches the server is always whatever this
+// device's local state actually holds by the time the in-flight request
+// clears -- never a stale intermediate one.
+let _statsSyncInFlight = {}; // participantId -> true while a request is in flight
+let _statsSyncPending = {}; // participantId -> {hp, vp} latest value waiting behind it
+
+function _pushStatsSync(id, hp, vp) {
+  if (_statsSyncInFlight[id]) {
+    _statsSyncPending[id] = { hp, vp };
+    return;
+  }
+  _statsSyncInFlight[id] = true;
+  CombatAPI.updateStats(id, { currentHP: hp, currentVP: vp })
+    .catch(() => {})
+    .then(() => {
+      _statsSyncInFlight[id] = false;
+      const pending = _statsSyncPending[id];
+      if (pending) {
+        delete _statsSyncPending[id];
+        _pushStatsSync(id, pending.hp, pending.vp);
+      }
+    });
+}
+
+/** Which sessionStorage pokemon_* key backs a participant this trainer
+ * owns, by matching its name -- _myPokemonKey is set directly the moment
+ * this device rolls initiative for it (see the initiative onComplete
+ * handler below), but a page reload mid-battle loses that module var, so
+ * this re-derives it from the party list the same way Setup does. */
+function _resolveMyPokemonKey(participantName) {
+  if (_myPokemonKey) return _myPokemonKey;
+  for (const key of Object.keys(sessionStorage)) {
+    if (!key.startsWith('pokemon_')) continue;
+    const pData = JSON.parse(sessionStorage.getItem(key) || '[]');
+    if ((pData[36] || pData[2]) === participantName) {
+      _myPokemonKey = key;
+      return key;
     }
   }
+  return null;
+}
 
-  return state.turnOrder.map(id => {
-    const p = state.participants[id];
+/** Every field renderCombatCard/attachBattleListeners touch, filled with
+ * safe placeholders -- used both for genuine "not mine" stand-ins and as a
+ * last-resort fallback for a participant this trainer owns whose rich
+ * local object couldn't be resolved (e.g. right after a page reload, if
+ * the name-matching fallback in _resolveMyPokemonKey still comes up
+ * empty), so a lookup miss degrades to a plain-looking card instead of
+ * throwing and blanking the whole battle view. */
+function _standInCombatant(p) {
+  const showName = visibleToViewer(p, 'name');
+  const showHp = visibleToViewer(p, 'hp');
+  const showVp = visibleToViewer(p, 'vp');
+  return {
+    id: p.id,
+    name: showName ? p.name : '???',
+    image: p.image || 'assets/Pokeball.png',
+    level: '?', types: [p.type1, p.type2].filter(Boolean),
+    ac: '—', baseAc: '—', critMod: 0,
+    currentHp: showHp ? p.currentHP : 0, maxHp: showHp ? p.maxHP : 0,
+    currentVp: showVp ? p.currentVP : 0, maxVp: showVp ? p.maxVP : 0,
+    str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0,
+    strMod: 0, dexMod: 0, conMod: 0, intMod: 0, wisMod: 0, chaMod: 0,
+    initiativeTotal: p.initiative ?? '—',
+    statusEffects: [], isExpanded: false, hasStatBlock: false,
+  };
+}
+
+/** Builds (first call) or merges (every subsequent server push) the local
+ * mirror of the shared session that drives combat.js's actual
+ * renderBattlePhase/attachBattleListeners. This device's own combatants
+ * keep their FULL prior local object (recharge states, status effects,
+ * Stockpile stacks, expand state -- everything that engine tracks) across
+ * pushes, with only HP/VP overlaid fresh from the server; every other
+ * participant is rebuilt fresh each time since there's no local authority
+ * for them, showing only what the server actually tracks (name/image/HP/
+ * VP/type), respecting the DM's per-field visibility toggles. */
+function _syncLocalCombatState(session) {
+  _enterBattleSync();
+
+  const myName = _currentTrainerName();
+  const existing = JSON.parse(sessionStorage.getItem(WIP_COMBAT_STATE_KEY) || 'null');
+  const existingById = new Map((existing?.combatants || []).map(c => [c.id, c]));
+  const myTrainerRich = myName ? buildTrainerCombatant() : null;
+
+  _myParticipantIds = new Set();
+  const activeId = session.reactingParticipantId || session.turnOrder[session.turnIndex];
+
+  const combatants = session.turnOrder.map(id => {
+    const p = session.participants[id];
     if (!p) return null;
 
-    const rich = (p.owner && p.owner === myName) ? myRichByName.get(p.name) : null;
-    if (rich) {
-      return {
-        ...rich,
-        id: p.id,
-        currentHp: p.currentHP, maxHp: p.maxHP,
-        currentVp: p.currentVP, maxVp: p.maxVP,
-        hasStatBlock: true,
-      };
+    if (p.owner && p.owner === myName) {
+      _myParticipantIds.add(p.id);
+      const prior = existingById.get(p.id);
+      let merged, resolved = true;
+      if (prior) {
+        merged = { ...prior };
+      } else if (myTrainerRich && p.name === myTrainerRich.name) {
+        merged = { ...myTrainerRich };
+      } else {
+        const key = _resolveMyPokemonKey(p.name);
+        if (key) {
+          merged = { ...buildPokemonCombatant(key) };
+        } else {
+          merged = _standInCombatant(p);
+          resolved = false;
+        }
+      }
+      merged.id = p.id;
+      merged.currentHp = p.currentHP; merged.maxHp = p.maxHP;
+      merged.currentVp = p.currentVP; merged.maxVp = p.maxVP;
+      if (resolved) merged.hasStatBlock = true;
+      // This IS the server's current value -- prime the dedupe cache with
+      // it so the very next local save (even one unrelated to HP/VP)
+      // doesn't get misread as a new change and echoed straight back.
+      _lastSyncedStats[p.id] = { hp: p.currentHP, vp: p.currentVP };
+      return merged;
     }
 
-    const showName = visibleToViewer(p, 'name');
-    const showHp = visibleToViewer(p, 'hp');
-    const showVp = visibleToViewer(p, 'vp');
-    return {
-      id: p.id,
-      name: showName ? p.name : '???',
-      image: p.image || 'assets/Pokeball.png',
-      level: '?', types: [p.type1, p.type2].filter(Boolean),
-      ac: '—', baseAc: '—', critMod: 0,
-      currentHp: showHp ? p.currentHP : 0, maxHp: showHp ? p.maxHP : 0,
-      currentVp: showVp ? p.currentVP : 0, maxVp: showVp ? p.maxVP : 0,
-      str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0,
-      strMod: 0, dexMod: 0, conMod: 0, intMod: 0, wisMod: 0, chaMod: 0,
-      initiativeTotal: p.initiative ?? '—',
-      statusEffects: [], isExpanded: false, hasStatBlock: false,
-    };
+    return _standInCombatant(p);
   }).filter(Boolean);
+
+  const foundIdx = combatants.findIndex(c => c.id === activeId);
+  const local = {
+    phase: 'battle', round: session.round,
+    activeTurnIndex: foundIdx === -1 ? 0 : foundIdx,
+    combatants,
+    weather: existing?.weather || null, terrain: existing?.terrain || null,
+  };
+  sessionStorage.setItem(WIP_COMBAT_STATE_KEY, JSON.stringify(local));
+  return local;
 }
 
 // ---------------------------------------------------------------------------
@@ -432,22 +564,8 @@ function renderBody(state) {
       </div>`;
   }
 
-  const activeId = state.turnOrder[state.turnIndex];
-  const orderLabel = state.turnOrder.map(id => state.participants[id]?.name || '?').join(' → ') || '(no participants yet)';
-
   return `
-    <div class="combat-wip-round-bar">
-      <div>
-        <div class="combat-wip-round-label">Round ${state.round} <span class="combat-wip-battle-badge">${state.battleType === 'pvp' ? 'PvP' : 'PvE'}</span></div>
-        <div style="font-size:0.8rem;color:#a0a0c0;">${orderLabel}</div>
-        ${state.reactingParticipantId ? `<div class="combat-wip-reacting-note">⚡ ${state.participants[state.reactingParticipantId]?.name} is reacting out of turn</div>` : ''}
-      </div>
-      <div style="display:flex; gap:0.5rem;">
-        <button class="combat-wip-btn-secondary" id="advanceTurnBtn" ${state.reactingParticipantId ? 'disabled' : ''}>Advance Turn →</button>
-        <button class="combat-wip-btn-secondary" id="battleMapBtn">🗺️ Battle Map</button>
-        <button class="combat-wip-btn-danger" id="endSessionBtn">End Session</button>
-      </div>
-    </div>
+    <div class="combat-wip-round-bar" id="wipRoundBar">${_renderRoundBar(state)}</div>
 
     ${state.battleType === 'pve' ? `
     <div class="combat-wip-section-label">Add Freeform Enemy (DM-controlled)</div>
@@ -464,21 +582,57 @@ function renderBody(state) {
       <button type="submit" class="combat-wip-btn-primary">Add</button>
     </form>` : ''}
 
-    <div class="battle-list" id="battleList">
-      ${_buildBattleCombatants(state).map(c => _renderBattleCard(c, state, activeId)).join('') || '<p style="color:#a0a0c0;">No participants yet.</p>'}
+    <div id="wipBattlePhase">${renderBattlePhase(_syncLocalCombatState(state))}</div>
+
+    <div class="combat-wip-section-label">Player Actions</div>
+    <div class="combat-wip-participant-list" id="wipActionRows">${_renderActionRows(state)}</div>`;
+}
+
+function _renderRoundBar(state) {
+  const orderLabel = state.turnOrder.map(id => state.participants[id]?.name || '?').join(' → ') || '(no participants yet)';
+  return `
+    <div>
+      <div class="combat-wip-round-label">Round ${state.round} <span class="combat-wip-battle-badge">${state.battleType === 'pvp' ? 'PvP' : 'PvE'}</span></div>
+      <div style="font-size:0.8rem;color:#a0a0c0;">${orderLabel}</div>
+      ${state.reactingParticipantId ? `<div class="combat-wip-reacting-note">⚡ ${state.participants[state.reactingParticipantId]?.name} is reacting out of turn</div>` : ''}
+    </div>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <button class="combat-wip-btn-secondary" id="advanceTurnBtn" ${state.reactingParticipantId ? 'disabled' : ''}>Advance Turn →</button>
+      ${state.reactingParticipantId ? '<button class="combat-wip-btn-secondary" id="reactionEndBtn">End Reaction</button>' : ''}
+      <button class="combat-wip-btn-secondary" id="battleMapBtn">🗺️ Battle Map</button>
+      <button class="combat-wip-btn-danger" id="endSessionBtn">End Session</button>
     </div>`;
 }
 
-/** One combat-card (combat.js's real card -- same portrait, HP/VP bars, type
- * badges, ability scores when we have them) plus this page's own action row
- * underneath it (join/bench, react, visibility toggles, use-move, remove) --
- * that action mechanism is unchanged from before this milestone (already
- * server-integrated), only the visual card above it is new. */
-function _renderBattleCard(c, state, activeId) {
-  const p = state.participants[c.id];
-  const isActive = c.id === activeId && !state.reactingParticipantId;
-  const isReacting = c.id === state.reactingParticipantId;
-  const canReact = p.status === 'participating' && !p.reactionUsed && !state.reactingParticipantId && p.id !== activeId;
+function _attachRoundBarListeners() {
+  document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
+    await CombatAPI.endSession();
+  });
+  document.getElementById('battleMapBtn')?.addEventListener('click', () => {
+    showBattleMap(session, _currentTrainerName());
+  });
+  document.getElementById('advanceTurnBtn')?.addEventListener('click', async () => {
+    try { await CombatAPI.advanceTurn(); } catch (err) { alert(err.message); }
+  });
+  document.getElementById('reactionEndBtn')?.addEventListener('click', () => CombatAPI.reactionEnd());
+}
+
+/** The multiplayer-specific actions combat.js's own local engine has no
+ * concept of at all (join/bench, reactions, DM visibility toggles for
+ * enemies, remove) plus the existing cross-player "commit this to
+ * everyone" action -- use-move here computes type effectiveness and
+ * applies damage to a chosen target server-side, distinct from clicking a
+ * move inside a card above (which only spends its user's own VP and runs
+ * that move's local special-case mechanics, same as the legacy page). */
+function _renderActionRows(state) {
+  return Object.values(state.participants).map(p => _renderActionRow(p, state)).join('')
+    || '<p style="color:#a0a0c0;">No participants yet.</p>';
+}
+
+function _renderActionRow(p, state) {
+  const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
+  const isActive = p.id === activeId;
+  const canReact = p.status === 'participating' && !p.reactionUsed && !state.reactingParticipantId && p.id !== state.turnOrder[state.turnIndex];
   const mapPos = state.board?.tokens?.[p.id];
 
   const visToggle = (field, label) => `
@@ -486,22 +640,18 @@ function _renderBattleCard(c, state, activeId) {
       ${label} ${p.visibility[field] ? '👁️' : '🚫'}
     </button>`;
 
-  const wrapClasses = ['battle-card-wrap'];
-  if (isReacting) wrapClasses.push('reacting');
-  if (p.status === 'spectating') wrapClasses.push('spectating');
-
   return `
-    <div class="${wrapClasses.join(' ')}">
-      ${renderCombatCard(c, isActive || isReacting)}
+    <div class="combat-wip-participant ${isActive ? 'active-turn' : ''} ${p.status === 'spectating' ? 'spectating' : ''}">
+      <span class="combat-wip-side-badge ${p.side}">${p.side}</span>
+      <span class="combat-wip-p-name">${p.name}</span>
+      ${mapPos ? `<span class="combat-wip-p-stats">📍(${mapPos.col},${mapPos.row})</span>` : ''}
       <div class="combat-wip-p-controls">
-        <span class="combat-wip-side-badge ${p.side}">${p.side}</span>
-        ${mapPos ? `<span class="combat-wip-p-stats">📍(${mapPos.col},${mapPos.row})</span>` : ''}
         <button data-toggle-status="${p.id}" data-next-status="${p.status === 'participating' ? 'spectating' : 'participating'}">
           ${p.status === 'participating' ? 'Bench' : 'Join Fight'}
         </button>
         <button data-reaction="${p.id}" ${canReact ? '' : 'disabled'}>⚡ React${p.reactionUsed ? ' (used)' : ''}</button>
         ${p.side === 'enemy' ? visToggle('hp', 'HP') + visToggle('vp', 'VP') + visToggle('name', 'Name') : ''}
-        <button data-use-move="${p.id}" title="Only works when it's this participant's turn (or they're reacting) -- server enforces it">⚔️ Use Move</button>
+        <button data-use-move="${p.id}" title="Only works when it's this participant's turn (or they're reacting) -- server enforces it">⚔️ Use Move (attack)</button>
         <button data-play-anim="${p.id}" data-anim-species="${p.name}" title="Test the display screen's animation playback">🎬 Play Anim</button>
         <button class="remove" data-remove="${p.id}">Remove</button>
       </div>
@@ -530,7 +680,29 @@ export function attachCombatWipListeners() {
     // session just went active) -- switch into the join flow rather than
     // patching the normal-view body with something that no longer applies.
     if (session.active && _needsToJoin(session)) {
+      _exitBattleSync();
       _rerenderFull();
+      return;
+    }
+
+    if (!session.active) _exitBattleSync();
+
+    if (session.active && _battleSyncActive && document.getElementById('wipBattlePhase')) {
+      // Fast path: patch the cards/round-bar/action-rows in place rather
+      // than replacing the whole body -- a full rerender would force-close
+      // whatever popup this player has open (move details, inventory,
+      // switch...) every single time ANY player's action pushes a new
+      // session, which given a lively multi-player fight is often.
+      const merged = _syncLocalCombatState(session);
+      rerenderBattle(merged);
+
+      const roundBar = document.getElementById('wipRoundBar');
+      if (roundBar) { roundBar.innerHTML = _renderRoundBar(session); _attachRoundBarListeners(); }
+
+      const actionRows = document.getElementById('wipActionRows');
+      if (actionRows) { actionRows.innerHTML = _renderActionRows(session); _attachActionRowListeners(); }
+
+      updateBattleMap(session);
       return;
     }
 
@@ -593,6 +765,7 @@ export function attachCombatWipListeners() {
   }
 
   document.getElementById('combatWipBackBtn')?.addEventListener('click', () => {
+    _exitBattleSync();
     window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat' } }));
   });
 
@@ -605,23 +778,9 @@ function attachBodyListeners() {
     await CombatAPI.createSession(battleType);
   });
 
-  document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
-    await CombatAPI.endSession();
-  });
+  if (!session || !session.active) return; // empty-state view has nothing else to wire
 
-  document.getElementById('battleMapBtn')?.addEventListener('click', () => {
-    showBattleMap(session, _currentTrainerName());
-  });
-
-  document.getElementById('advanceTurnBtn')?.addEventListener('click', async () => {
-    try { await CombatAPI.advanceTurn(); } catch (err) { alert(err.message); }
-  });
-
-  document.querySelectorAll('.end-turn-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      try { await CombatAPI.advanceTurn(); } catch (err) { alert(err.message); }
-    });
-  });
+  _attachRoundBarListeners();
 
   document.getElementById('addParticipantForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -641,6 +800,27 @@ function attachBodyListeners() {
     form.reset();
   });
 
+  // combat.js's own battle engine (click-to-expand cards, move list, HP/VP/
+  // AC/stat adjusters, status effects, type calculator, inventory, trainer
+  // buffs, switching Pokémon -- everything), completely unmodified, driven
+  // by the local mirror _syncLocalCombatState maintains (see its own
+  // comment for why that mirror has to be a merge, not a rebuild).
+  const merged = _syncLocalCombatState(session);
+  attachBattleListeners(merged);
+
+  // The one extra thing this shared context needs on top of that engine:
+  // ending a turn has to actually move the SERVER's turn pointer so every
+  // other client agrees who's up, not just advance a local-only index.
+  // This listens alongside (not instead of) attachBattleListeners' own
+  // handling of the same click -- both fire, no conflict.
+  document.getElementById('battleList')?.addEventListener('click', (e) => {
+    if (e.target.closest('.end-turn-btn')) CombatAPI.advanceTurn().catch(() => {});
+  });
+
+  _attachActionRowListeners();
+}
+
+function _attachActionRowListeners() {
   document.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => CombatAPI.removeParticipant(btn.dataset.remove));
   });
@@ -684,12 +864,6 @@ function attachBodyListeners() {
       CombatAPI.setVisibility(btn.dataset.visId, btn.dataset.visField, btn.dataset.visValue === '1');
     });
   });
-
-  if (session && session.reactingParticipantId) {
-    document.getElementById('advanceTurnBtn')?.insertAdjacentHTML('afterend',
-      '<button class="combat-wip-btn-secondary" id="reactionEndBtn">End Reaction</button>');
-    document.getElementById('reactionEndBtn')?.addEventListener('click', () => CombatAPI.reactionEnd());
-  }
 }
 
 function _currentTrainerName() {

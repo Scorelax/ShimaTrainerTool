@@ -809,6 +809,15 @@ export class CombatAPI {
     return API.request('combat', 'use-move', { id, move, targetId, diceRoll, species }, { useCache: false });
   }
 
+  /** Client-authoritative HP/VP sync -- see routes_combat.py's _update_stats
+   * docstring for why this exists (combat.js's own per-move mechanics --
+   * VP cost, Ingrain/direct/drain heals, manual adjusters -- aren't ported
+   * server-side, so the client computes the new value locally and just
+   * reports where it landed). Omit a field to leave it untouched. */
+  static async updateStats(id, { currentHP, currentVP } = {}) {
+    return API.request('combat', 'update-stats', { id, currentHP, currentVP }, { useCache: false });
+  }
+
   // -- Battle map (see pi-server/app/routes_combat.py's 'board' state) --
   // A second, separate display, purely spatial (positions/terrain, never
   // HP/VP) shown alongside the combat screen these other methods drive.

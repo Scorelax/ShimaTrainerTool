@@ -18,7 +18,7 @@ import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
-  renderBattlePhase, attachBattleListeners, rerenderBattle,
+  renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions,
   setCombatStateKey, setOnCombatStateSave,
 } from './combat.js';
 
@@ -55,6 +55,7 @@ const WIP_CSS = `
     position: relative; width: 42px; height: 42px; border-radius: 6px; overflow: hidden;
     background: rgba(255,255,255,0.05); border: 2px solid transparent; box-sizing: border-box;
   }
+  .wip-turn-item.focused .wip-turn-portrait { border-color: #5dade2; }
   .wip-turn-item.active .wip-turn-portrait { border-color: #FFD700; box-shadow: 0 0 5px rgba(255,215,0,0.5); }
   .wip-turn-item.spectating { opacity: 0.4; }
   .wip-turn-portrait-media { width: 100%; height: 100%; }
@@ -68,20 +69,24 @@ const WIP_CSS = `
     font-size: 0.55rem; font-weight: 600; margin-top: 0.15rem; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42px;
   }
-  .wip-turn-detail-popup {
-    position: fixed; z-index: 50; width: 200px; background: #1e1e2e;
-    border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 0.75rem 0.9rem;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.5); font-size: 0.85rem;
+  /* The single focused card's React button -- takes over the slot combat.js's
+     own card footer normally gives the End Turn button (which moves below
+     the moves section instead, see renderCombatCard's endTurnAtBottom
+     option and this same footer slot's showReactButton option). */
+  .wip-react-btn {
+    background: linear-gradient(135deg, #f1c40f, #e67e22); color: #1a1a1a;
+    border: none; border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.82rem; font-weight: 700; cursor: pointer;
   }
-  .wip-turn-detail-popup .wip-turn-detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
-  .wip-turn-detail-popup .wip-turn-detail-name { font-weight: 700; color: #FFD700; }
-  .wip-turn-detail-popup .wip-turn-detail-close { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 1.1rem; line-height: 1; }
-  .wip-turn-detail-popup .wip-turn-detail-row { color: #cfd0e0; margin-top: 0.2rem; }
-  .wip-turn-detail-react-btn {
-    width: 100%; margin-top: 0.6rem; padding: 0.4rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2);
-    background: rgba(255,255,255,0.08); color: #e0e0e0; font-size: 0.8rem; cursor: pointer;
+  .wip-react-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* Compact read-only info shown in the main area when the focused sidebar
+     portrait isn't one of the viewer's own -- name/type/HP/VP/level only,
+     no card, no actions. */
+  .wip-foreign-focus {
+    max-width: 360px; margin: 2rem auto; padding: 1.2rem; text-align: center;
+    background: rgba(255,255,255,0.04); border-radius: 12px;
   }
-  .wip-turn-detail-react-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .wip-foreign-focus-name { font-size: 1.1rem; font-weight: 700; color: #FFD700; margin-bottom: 0.4rem; }
+  .wip-foreign-focus-row { color: #cfd0e0; margin-top: 0.25rem; font-size: 0.95rem; }
   .combat-wip-empty { text-align: center; padding: 3rem 1rem; }
   .combat-wip-empty h2 { color: #FFD700; margin-bottom: 0.5rem; }
   .combat-wip-empty p { color: #a0a0c0; line-height: 1.5; margin-bottom: 1.5rem; }
@@ -93,15 +98,9 @@ const WIP_CSS = `
   .combat-wip-btn-danger { background: linear-gradient(135deg, #c0392b, #922b21); }
   .combat-wip-btn-secondary { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
   .combat-wip-round-bar {
-    display: flex; align-items: center; justify-content: space-between;
-    background: rgba(255,255,255,0.05); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem;
+    display: flex; align-items: center; justify-content: flex-end;
+    margin-bottom: 1rem;
   }
-  .combat-wip-round-label { font-weight: 700; color: #FFD700; }
-  .combat-wip-battle-badge {
-    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-    background: rgba(255,255,255,0.12); border-radius: 4px; padding: 0.15rem 0.5rem; margin-left: 0.5rem;
-  }
-  .combat-wip-reacting-note { color: #e67e22; font-size: 0.85rem; }
   .combat-wip-battle-type-choice {
     display: flex; flex-direction: column; gap: 0.6rem; max-width: 380px; margin: 0 auto 1.5rem; text-align: left;
   }
@@ -124,7 +123,11 @@ const WIP_CSS = `
   }
   .combat-wip-add-form input[type="text"] { flex: 1; min-width: 100px; }
   .combat-wip-add-form input[type="number"] { width: 64px; }
-  #wipBattlePhase #endCombatBtn { display: none; } /* "End Session" above already covers this, shared-session-wide */
+  /* combat.js's own nested "Round X / ⚔️ Battle / End Combat" header --
+     redundant with this page's own header (title + End Battle) and round
+     tracking (no longer shown at all, per explicit direction), so hidden
+     wholesale rather than picked apart piece by piece. */
+  #wipBattlePhase .combat-header-bar { display: none; }
 `;
 
 // Reuses .bmap-cell/.bmap-token's exact rules from battle-map-popup.js (same
@@ -268,8 +271,8 @@ function _renderCurrentView() {
       <style>${WIP_CSS}</style>
       <div class="combat-wip-header-bar">
         <button class="combat-wip-back-btn" id="combatWipBackBtn">← Back</button>
-        <div class="combat-wip-title">🛠️ New Combat Tool (WIP)</div>
-        <div></div>
+        <div class="combat-wip-title" id="wipHeaderTitle"></div>
+        <div id="wipHeaderEndBtn"></div>
       </div>
       <div class="combat-wip-layout">
         <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
@@ -320,7 +323,8 @@ function _exitBattleSync() {
   _statsSyncPending = {};
   setCombatStateKey('combatState');
   setOnCombatStateSave(null);
-  _hideTurnOrderDetail();
+  _focusedParticipantId = null;
+  _focusManuallySet = false;
 }
 
 /** combat.js's own battle engine (Ingrain/direct/drain heals, VP cost of
@@ -694,59 +698,53 @@ function renderBody(state) {
       <button type="submit" class="combat-wip-btn-primary">Add</button>
     </form>` : ''}
 
-    <div id="wipBattlePhase">${renderBattlePhase(_syncLocalCombatState(state))}</div>`;
+    <div id="wipBattlePhase">${_renderMainFocusHtml(state)}</div>`;
 }
 
+// Round/turn-order tracking, the reacting-participant note, and the
+// per-user Advance Turn gate all used to live here as text/buttons -- all
+// removed per explicit direction: the sidebar already shows turn order and
+// who's active/reacting at a glance, and End Turn (on the focused card,
+// see below) already covers ending a turn, so a separate Advance Turn
+// button is redundant. Only the Battle Map button is left.
 function _renderRoundBar(state) {
-  const orderLabel = state.turnOrder.map(id => state.participants[id]?.name || '?').join(' → ') || '(no participants yet)';
-  const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
-  const activeParticipant = state.participants[activeId];
-  const myName = _currentTrainerName();
-  // Whoever actually holds the floor should be the one advancing past it --
-  // an unowned (DM/freeform) enemy has no dedicated device, so anyone can
-  // advance past its turn, but another PLAYER's turn (or reaction) is
-  // theirs to end, not something reachable from someone else's screen.
-  const canAdvance = !state.reactingParticipantId &&
-    (!activeParticipant || !activeParticipant.owner || activeParticipant.owner === myName);
-  return `
-    <div>
-      <div class="combat-wip-round-label">Round ${state.round} <span class="combat-wip-battle-badge">${state.battleType === 'pvp' ? 'PvP' : 'PvE'}</span></div>
-      <div style="font-size:0.8rem;color:#a0a0c0;">${orderLabel}</div>
-      ${state.reactingParticipantId ? `<div class="combat-wip-reacting-note">⚡ ${state.participants[state.reactingParticipantId]?.name} is reacting out of turn</div>` : ''}
-    </div>
-    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-      <button class="combat-wip-btn-secondary" id="advanceTurnBtn" ${canAdvance ? '' : 'disabled'}
-        title="${canAdvance ? '' : 'Only whoever currently holds the floor can advance past their turn'}">Advance Turn →</button>
-      <button class="combat-wip-btn-secondary" id="battleMapBtn">🗺️ Battle Map</button>
-      <button class="combat-wip-btn-danger" id="endSessionBtn">End Session</button>
-    </div>`;
+  return `<button class="combat-wip-btn-secondary" id="battleMapBtn">🗺️ Battle Map</button>`;
 }
 
 function _attachRoundBarListeners() {
-  document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
-    await CombatAPI.endSession();
-  });
   document.getElementById('battleMapBtn')?.addEventListener('click', () => {
     showBattleMap(session, _currentTrainerName());
   });
-  document.getElementById('advanceTurnBtn')?.addEventListener('click', async () => {
-    try { await CombatAPI.advanceTurn(); } catch (err) { alert(err.message); }
-  });
+}
+
+/** Header title ("PvP Combat"/"PvE Combat", based on the active session's
+ * battleType) and the End Battle button (renamed from End Session, moved
+ * here from the round bar) -- both live outside #combatWipBody, so unlike
+ * everything the SSE fast path patches, these need their own explicit
+ * refresh call wherever `session` changes. */
+function _syncHeaderBar(state) {
+  const titleEl = document.getElementById('wipHeaderTitle');
+  if (titleEl) {
+    titleEl.textContent = !state?.active ? '⚔️ Combat' : `⚔️ ${state.battleType === 'pvp' ? 'PvP' : 'PvE'} Combat`;
+  }
+  const endBtnEl = document.getElementById('wipHeaderEndBtn');
+  if (endBtnEl) {
+    endBtnEl.innerHTML = state?.active ? '<button class="combat-wip-btn-danger" id="endSessionBtn">End Battle</button>' : '';
+    document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
+      await CombatAPI.endSession();
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Turn-order sidebar -- a compact column, in turn order, of every
 // participant's portrait (including DM-controlled enemies in PvE), the
-// current turn/reaction holder framed in gold, and a reaction-availability
-// bolt per portrait. Purely a "who's here and what's the order" glance --
-// clicking a portrait pops up a small read-only detail card (name, type,
-// HP/VP, level); no actions live here. Portraits are patched in place
-// (never rebuilt wholesale) the same way display.js's own strip is, so an
-// mp4 sprite's playback isn't restarted by an unrelated push.
+// current turn/reaction holder framed in gold, a reaction-availability bolt
+// per portrait, and a lighter blue frame on whichever one is currently
+// FOCUSED (see below). Clicking a portrait sets focus to it; portraits are
+// patched in place (never rebuilt wholesale) the same way display.js's own
+// strip is, so an mp4 sprite's playback isn't restarted by an unrelated push.
 // ---------------------------------------------------------------------------
-
-let _turnOrderDetailOpenId = null;
-let _turnOrderDetailOutsideClickBound = false;
 
 function _syncTurnOrderSidebar(state) {
   const el = document.getElementById('wipTurnOrder');
@@ -754,11 +752,11 @@ function _syncTurnOrderSidebar(state) {
 
   if (!state || !state.active) {
     el.innerHTML = '';
-    _hideTurnOrderDetail();
     return;
   }
 
   const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
+  const focusId = _resolveFocusId(state);
   const orderedIds = [
     ...state.turnOrder,
     ...Object.keys(state.participants).filter(id => !state.turnOrder.includes(id)),
@@ -766,7 +764,6 @@ function _syncTurnOrderSidebar(state) {
 
   const liveIds = new Set(Object.keys(state.participants));
   [...el.children].forEach(node => { if (!liveIds.has(node.dataset.id)) node.remove(); });
-  if (_turnOrderDetailOpenId && !liveIds.has(_turnOrderDetailOpenId)) _hideTurnOrderDetail();
 
   orderedIds.forEach((id, index) => {
     const p = state.participants[id];
@@ -784,12 +781,15 @@ function _syncTurnOrderSidebar(state) {
           <div class="wip-turn-name"></div>
         </div>`;
       node = wrapper.firstElementChild;
-      node.addEventListener('click', () => _toggleTurnOrderDetail(node, id));
+      node.addEventListener('click', () => _setFocus(id));
     }
 
     const showName = visibleToViewer(p, 'name');
     const name = showName ? p.name : '???';
-    node.className = ['wip-turn-item', id === activeId ? 'active' : '', p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');
+    node.className = ['wip-turn-item',
+      id === activeId ? 'active' : '',
+      id === focusId ? 'focused' : '',
+      p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');
     node.querySelector('.wip-turn-name').textContent = name;
     patchPortraitMedia(node.querySelector('[data-portrait-id]'), p.image, name);
 
@@ -799,101 +799,145 @@ function _syncTurnOrderSidebar(state) {
 
     if (el.children[index] !== node) el.insertBefore(node, el.children[index] || null);
   });
-
-  // Keep an already-open detail popup's numbers current (e.g. HP ticking
-  // down live) rather than just leaving it showing a stale snapshot.
-  if (_turnOrderDetailOpenId) {
-    const p = state.participants[_turnOrderDetailOpenId];
-    const node = el.querySelector(`[data-id="${_turnOrderDetailOpenId}"]`);
-    if (p && node) _renderTurnOrderDetail(node, p);
-    else _hideTurnOrderDetail();
-  }
 }
 
-function _toggleTurnOrderDetail(node, id) {
-  if (_turnOrderDetailOpenId === id) { _hideTurnOrderDetail(); return; }
-  const p = session?.participants?.[id];
-  if (!p) return;
-  _renderTurnOrderDetail(node, p);
+function _setFocus(id) {
+  if (_focusManuallySet && _focusedParticipantId === id) return; // already focused, no-op
+  _focusedParticipantId = id;
+  _focusManuallySet = true;
+  _syncMainFocus(session);
+  _syncTurnOrderSidebar(session); // refresh the .focused highlight
 }
 
-function _renderTurnOrderDetail(anchorNode, p) {
-  let popup = document.getElementById('wipTurnDetailPopup');
-  if (!popup) {
-    popup = document.createElement('div');
-    popup.id = 'wipTurnDetailPopup';
-    popup.className = 'wip-turn-detail-popup';
-    document.body.appendChild(popup);
-  }
+// ---------------------------------------------------------------------------
+// Main focus area -- replaces the old "show every owned combatant's card"
+// approach: exactly ONE participant is shown at a time, big and (for the
+// viewer's own) always fully expanded, chosen either by clicking a sidebar
+// portrait (sticky until clicked elsewhere) or, absent that, defaulting to
+// whichever of the viewer's own combatants is earliest in turn order. Own
+// combatant -> combat.js's real card, single-entry so there's nothing left
+// to collapse, with React taking over the footer slot End Turn normally
+// sits in and End Turn itself moved below the moves section instead (both
+// via renderCombatCard's additive options). Anyone else's -> just the
+// read-only basics (name/type/HP/VP/level), no card, no actions.
+// ---------------------------------------------------------------------------
 
+let _focusedParticipantId = null;
+let _focusManuallySet = false;
+
+function _getDefaultFocusId(state) {
+  const myName = _currentTrainerName();
+  return state.turnOrder.find(id => state.participants[id]?.owner === myName) || null;
+}
+
+function _resolveFocusId(state) {
+  if (_focusManuallySet && state.participants[_focusedParticipantId]) return _focusedParticipantId;
+  const def = _getDefaultFocusId(state);
+  _focusedParticipantId = def; // keep in sync for the sidebar's .focused highlight even in auto mode
+  return def;
+}
+
+/** Everything both rendering and attaching need, computed once so they
+ * don't independently re-derive (and potentially disagree on) the same
+ * focus/eligibility logic. Returns null when there's nothing to focus on
+ * yet (no participants at all). */
+function _computeFocusContext(state) {
+  const focusId = _resolveFocusId(state);
+  const p = focusId ? state.participants[focusId] : null;
+  if (!p) return null;
+
+  const myName = _currentTrainerName();
+  if (p.owner !== myName) return { p, isMine: false };
+
+  const merged = _syncLocalCombatState(state); // full mirror of ALL my own combatants, for continuity
+  const focused = merged.combatants.find(c => c.id === focusId);
+  if (!focused) return { p, isMine: false }; // couldn't resolve the rich object -- degrade to basic info rather than crash
+
+  focused.isExpanded = true; // always uncollapsed -- there's only ever one shown at a time now
+  const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
+  const filteredState = { ...merged, combatants: [focused], activeTurnIndex: focused.id === activeId ? 0 : -1 };
+  const canReact = p.status === 'participating' && !p.reactionUsed &&
+    !state.reactingParticipantId && p.id !== state.turnOrder[state.turnIndex];
+  const cardOptions = { showReactButton: true, canReact, endTurnAtBottom: true };
+  return { p, isMine: true, filteredState, cardOptions };
+}
+
+function _renderForeignFocusInfo(p) {
   const showName = visibleToViewer(p, 'name');
   const showHp = visibleToViewer(p, 'hp');
   const showVp = visibleToViewer(p, 'vp');
-  const typeBadges = [p.type1, p.type2].filter(Boolean)
-    .map(t => `<span class="type-badge type-${t.toLowerCase()}">${t}</span>`).join(' ');
-
-  // React lives here rather than as its own always-visible button --
-  // reusing the same lightning icon the portrait already shows -- and only
-  // for a participant this trainer actually owns; clicking into someone
-  // else's popup never offers it, own or not eligible right now.
-  const myName = _currentTrainerName();
-  const isMine = !!(p.owner && p.owner === myName);
-  const canReact = isMine && p.status === 'participating' && !p.reactionUsed &&
-    !session.reactingParticipantId && p.id !== session.turnOrder[session.turnIndex];
-  const reactTitle = canReact ? '' :
-    p.reactionUsed ? 'Reaction already used this cycle' :
-    session.reactingParticipantId ? 'Someone else is already reacting' :
-    "It's already this combatant's turn";
-
-  popup.innerHTML = `
-    <div class="wip-turn-detail-header">
-      <span class="wip-turn-detail-name">${showName ? p.name : '???'}</span>
-      <button class="wip-turn-detail-close" id="wipTurnDetailCloseBtn">×</button>
-    </div>
-    ${typeBadges ? `<div class="wip-turn-detail-row">${typeBadges}</div>` : ''}
-    ${p.level ? `<div class="wip-turn-detail-row">Level ${p.level}</div>` : ''}
-    ${showHp ? `<div class="wip-turn-detail-row">HP: ${p.currentHP}/${p.maxHP}</div>` : ''}
-    ${showVp ? `<div class="wip-turn-detail-row">VP: ${p.currentVP}/${p.maxVP}</div>` : ''}
-    ${isMine ? `
-    <button class="wip-turn-detail-react-btn" id="wipTurnDetailReactBtn" ${canReact ? '' : 'disabled'} title="${reactTitle}">
-      ⚡ React${p.reactionUsed ? ' (used)' : ''}
-    </button>` : ''}
-  `;
-
-  const rect = anchorNode.getBoundingClientRect();
-  const popupWidth = 200;
-  let left = rect.left - popupWidth - 10;
-  if (left < 8) left = Math.min(rect.right + 10, window.innerWidth - popupWidth - 8);
-  const top = Math.min(rect.top, window.innerHeight - 180);
-  popup.style.left = `${Math.max(8, left)}px`;
-  popup.style.top = `${Math.max(8, top)}px`;
-  popup.style.display = 'block';
-
-  document.getElementById('wipTurnDetailCloseBtn')?.addEventListener('click', _hideTurnOrderDetail);
-  document.getElementById('wipTurnDetailReactBtn')?.addEventListener('click', async () => {
-    try {
-      await CombatAPI.reactionStart(p.id);
-      _hideTurnOrderDetail();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-  _turnOrderDetailOpenId = p.id;
-
-  if (!_turnOrderDetailOutsideClickBound) {
-    _turnOrderDetailOutsideClickBound = true;
-    document.addEventListener('click', (e) => {
-      if (!_turnOrderDetailOpenId) return;
-      if (e.target.closest('.wip-turn-detail-popup') || e.target.closest('.wip-turn-item')) return;
-      _hideTurnOrderDetail();
-    });
-  }
+  const typesText = [p.type1, p.type2].filter(Boolean).join(' / ');
+  return `
+    <div class="wip-foreign-focus">
+      <div class="wip-foreign-focus-name">${showName ? p.name : '???'}</div>
+      ${typesText ? `<div class="wip-foreign-focus-row">${typesText}</div>` : ''}
+      ${p.level ? `<div class="wip-foreign-focus-row">Level ${p.level}</div>` : ''}
+      ${showHp ? `<div class="wip-foreign-focus-row">HP: ${p.currentHP}/${p.maxHP}</div>` : ''}
+      ${showVp ? `<div class="wip-foreign-focus-row">VP: ${p.currentVP}/${p.maxVP}</div>` : ''}
+    </div>`;
 }
 
-function _hideTurnOrderDetail() {
-  _turnOrderDetailOpenId = null;
-  const popup = document.getElementById('wipTurnDetailPopup');
-  if (popup) popup.style.display = 'none';
+/** Builds the #wipBattlePhase HTML string -- used before the DOM exists
+ * (renderBody, for the initial page-shell string). See _attachMainFocusListeners
+ * for the matching post-insertion attach step, and _syncMainFocus for every
+ * subsequent update once the DOM already exists. */
+function _renderMainFocusHtml(state) {
+  const ctx = _computeFocusContext(state);
+  if (!ctx) return '<div class="combat-wip-empty"><p style="color:#a0a0c0;">No participants yet.</p></div>';
+  if (!ctx.isMine) return _renderForeignFocusInfo(ctx.p);
+  return renderBattlePhase(ctx.filteredState, ctx.cardOptions);
+}
+
+function _attachMainFocusListeners(state) {
+  const ctx = _computeFocusContext(state);
+  if (!ctx || !ctx.isMine) return;
+
+  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, ...ctx.cardOptions });
+
+  document.getElementById('battleList')?.addEventListener('click', (e) => {
+    const reactBtn = e.target.closest('.wip-react-btn');
+    if (reactBtn) {
+      if (!reactBtn.disabled) CombatAPI.reactionStart(reactBtn.dataset.combatantId).catch(err => alert(err.message));
+      return;
+    }
+    // The one extra thing this shared context needs on top of combat.js's
+    // own End Turn handling: actually move the SERVER's turn pointer so
+    // every other client agrees who's up, not just a local-only index.
+    // This listens alongside (not instead of) attachBattleListeners' own
+    // handling of the same click -- both fire, no conflict. Reacting vs.
+    // a normal turn both resolve to this same button (see
+    // _computeFocusContext's activeTurnIndex), so it has to mean "give up
+    // the floor" either way: reactionEnd while reacting, advanceTurn otherwise.
+    if (!e.target.closest('.end-turn-btn')) return;
+    if (session.reactingParticipantId) {
+      CombatAPI.reactionEnd().catch(() => {});
+    } else {
+      CombatAPI.advanceTurn().catch(() => {});
+    }
+  });
+}
+
+/** Updates #wipBattlePhase once the DOM already exists -- used by both the
+ * SSE push handler and a sidebar click (focus never changes from a server
+ * push, only a click, so either caller can safely assume "same context
+ * shape as last render" and take the cheap already-attached path when it
+ * applies). Patches combat.js's card in place (preserving any open popup --
+ * move details, inventory...) when already showing the engine for this same
+ * participant; otherwise (first entry, or focus just switched to/from a
+ * foreign participant) replaces the whole region and reattaches. */
+function _syncMainFocus(state) {
+  const el = document.getElementById('wipBattlePhase');
+  if (!el) return;
+  const ctx = _computeFocusContext(state);
+  if (!ctx) { el.innerHTML = '<div class="combat-wip-empty"><p style="color:#a0a0c0;">No participants yet.</p></div>'; return; }
+  if (!ctx.isMine) { el.innerHTML = _renderForeignFocusInfo(ctx.p); return; }
+  if (document.getElementById('battleList')) {
+    setBattleCardOptions(ctx.cardOptions);
+    rerenderBattle(ctx.filteredState);
+  } else {
+    el.innerHTML = renderBattlePhase(ctx.filteredState, ctx.cardOptions);
+    _attachMainFocusListeners(state);
+  }
 }
 
 export function attachCombatWipListeners() {
@@ -928,20 +972,18 @@ export function attachCombatWipListeners() {
 
     if (!session.active) _exitBattleSync();
 
-    if (session.active && _battleSyncActive && document.getElementById('wipBattlePhase')) {
-      // Fast path: patch the cards/round-bar/controls in place rather than
-      // replacing the whole body -- a full rerender would force-close
-      // whatever popup this player has open (move details, inventory,
-      // switch...) every single time ANY player's action pushes a new
-      // session, which given a lively multi-player fight is often.
-      const merged = _syncLocalCombatState(session);
-      rerenderBattle(merged);
+    if (session.active && document.getElementById('wipBattlePhase')) {
+      // Fast path: patch things in place rather than replacing the whole
+      // body -- _syncMainFocus already knows how to do this correctly for
+      // BOTH cases (the viewer's own combatant, preserving any open popup
+      // like move details/inventory, or someone else's read-only info).
+      _syncMainFocus(session);
 
       const roundBar = document.getElementById('wipRoundBar');
       if (roundBar) { roundBar.innerHTML = _renderRoundBar(session); _attachRoundBarListeners(); }
 
       _syncTurnOrderSidebar(session);
-
+      _syncHeaderBar(session);
       updateBattleMap(session);
       return;
     }
@@ -950,6 +992,7 @@ export function attachCombatWipListeners() {
     if (body) body.innerHTML = renderBody(session);
     attachBodyListeners();
     _syncTurnOrderSidebar(session);
+    _syncHeaderBar(session);
     updateBattleMap(session); // no-ops if the popup isn't currently open
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
@@ -1042,35 +1085,14 @@ function attachBodyListeners() {
     form.reset();
   });
 
-  // combat.js's own battle engine (click-to-expand cards, move list, HP/VP/
-  // AC/stat adjusters, status effects, type calculator, inventory, trainer
-  // buffs, switching Pokémon -- everything), completely unmodified, driven
-  // by the local mirror _syncLocalCombatState maintains (see its own
-  // comment for why that mirror has to be a merge, not a rebuild).
-  const merged = _syncLocalCombatState(session);
-  attachBattleListeners(merged, { onDamageResolved: _handleDamageResolved });
-
-  // The one extra thing this shared context needs on top of that engine:
-  // ending a turn has to actually move the SERVER's turn pointer so every
-  // other client agrees who's up, not just advance a local-only index.
-  // This listens alongside (not instead of) attachBattleListeners' own
-  // handling of the same click -- both fire, no conflict. The card that
-  // gets this button is whichever of your own combatants currently holds
-  // the floor, which -- since _syncLocalCombatState's activeTurnIndex
-  // already resolves to the REACTOR while a reaction is in progress -- is
-  // exactly as true when you're mid-reaction as when it's your normal
-  // turn. So the same button has to mean "give up the floor" either way:
-  // reactionEnd while reacting, advanceTurn otherwise.
-  document.getElementById('battleList')?.addEventListener('click', (e) => {
-    if (!e.target.closest('.end-turn-btn')) return;
-    if (session.reactingParticipantId) {
-      CombatAPI.reactionEnd().catch(() => {});
-    } else {
-      CombatAPI.advanceTurn().catch(() => {});
-    }
-  });
+  // combat.js's own battle engine (move list, HP/VP/AC/stat adjusters,
+  // status effects, type calculator, inventory, trainer buffs, switching
+  // Pokémon -- everything) for whichever single participant currently has
+  // focus, if it's one of the viewer's own -- see _attachMainFocusListeners.
+  _attachMainFocusListeners(session);
 
   _syncTurnOrderSidebar(session);
+  _syncHeaderBar(session);
 }
 
 /** Wired into combat.js's move-popup flow as onDamageResolved (see

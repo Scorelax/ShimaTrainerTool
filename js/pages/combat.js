@@ -10,6 +10,16 @@ import { preloadBattleAnimation } from '../utils/battle-animation.js';
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
 
+// Per-card render options (see renderCombatCard's own options param) that every internal
+// re-render needs to keep reusing -- set once by attachBattleListeners, refreshable in between
+// full attach cycles via setBattleCardOptions (e.g. combat-wip.js's shared view needs a card's
+// React-eligibility to stay current across SSE pushes without re-running the whole attach).
+let _battleCardOptions = {};
+
+export function setBattleCardOptions(options) {
+  _battleCardOptions = options || {};
+}
+
 // Module-level move cache — parsed once, reused everywhere
 let _moves = null;
 let _moveMap = null; // Map<name, moveData> for O(1) lookups
@@ -493,8 +503,8 @@ function renderGlobalConditionModal() {
     </div>`;
 }
 
-export function renderBattlePhase(state) {
-  const cards = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex)).join('');
+export function renderBattlePhase(state, cardOptions = {}) {
+  const cards = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex, cardOptions)).join('');
   return `
     <div class="combat-page">
       <style>${COMBAT_CSS}</style>
@@ -753,7 +763,7 @@ export function renderBattlePhase(state) {
 // COMBAT CARD
 // ============================================================================
 
-export function renderCombatCard(c, isActive) {
+export function renderCombatCard(c, isActive, { showReactButton, canReact, endTurnAtBottom } = {}) {
   const fainted = c.currentHp <= 0;
   const hpPct = c.maxHp > 0 ? Math.round((c.currentHp / c.maxHp) * 100) : 0;
   const vpPct = c.maxVp > 0 ? Math.round((c.currentVp / c.maxVp) * 100) : 0;
@@ -808,9 +818,12 @@ export function renderCombatCard(c, isActive) {
       </div>
       <div class="combat-card-footer">
         <div class="combat-status-badges">${statusBadges}</div>
-        ${isActive ? `<button class="end-turn-btn" data-combatant-id="${c.id}">End Turn</button>` : '<div></div>'}
+        ${showReactButton
+          ? `<button class="wip-react-btn" data-combatant-id="${c.id}" ${canReact ? '' : 'disabled'}>⚡ React</button>`
+          : (isActive && !endTurnAtBottom ? `<button class="end-turn-btn" data-combatant-id="${c.id}">End Turn</button>` : '<div></div>')}
       </div>
       ${expandedHTML}
+      ${isActive && endTurnAtBottom ? `<button class="end-turn-btn combat-end-turn-bottom" data-combatant-id="${c.id}">End Turn</button>` : ''}
     </div>`;
 }
 
@@ -1570,8 +1583,12 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
-export function attachBattleListeners(state, { onDamageResolved } = {}) {
+export function attachBattleListeners(state, { onDamageResolved, ...cardOptions } = {}) {
   _battleState = state;
+  _battleCardOptions = cardOptions; // see rerenderBattle -- every internal re-render (a move popup
+  // confirming, an HP/VP adjuster click, etc.) needs to keep reusing the same per-card render
+  // options this call was given, without every one of those many internal call sites having to
+  // pass them through by hand.
   loadCombatMoves();
   initializeRechargeStates(state);
 
@@ -1828,7 +1845,7 @@ export function attachBattleListeners(state, { onDamageResolved } = {}) {
 export function rerenderBattle(state) {
   const battleList = document.getElementById('battleList');
   if (!battleList) return;
-  battleList.innerHTML = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex)).join('');
+  battleList.innerHTML = state.combatants.map((c, idx) => renderCombatCard(c, idx === state.activeTurnIndex, _battleCardOptions)).join('');
   applyMoveColors();
 }
 

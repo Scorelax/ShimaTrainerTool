@@ -724,7 +724,7 @@ function renderBattlePhase(state) {
 // COMBAT CARD
 // ============================================================================
 
-function renderCombatCard(c, isActive) {
+export function renderCombatCard(c, isActive) {
   const fainted = c.currentHp <= 0;
   const hpPct = c.maxHp > 0 ? Math.round((c.currentHp / c.maxHp) * 100) : 0;
   const vpPct = c.maxVp > 0 ? Math.round((c.currentVp / c.maxVp) * 100) : 0;
@@ -756,7 +756,7 @@ function renderCombatCard(c, isActive) {
             <span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>
           </div>
           <div class="combat-card-stats-group">
-            <div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong></div>
+            ${c.hasStatBlock === false ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong></div>`}
             <div class="combat-card-stats-row">
               <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>
                 <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
@@ -766,6 +766,7 @@ function renderCombatCard(c, isActive) {
               </span>
             </div>
           </div>
+          ${c.hasStatBlock === false ? '' : `
           <div class="combat-card-stats-row combat-mods-row">
             <span>STR ${c.str}<small>(${formatMod(c.strMod)})</small></span>
             <span>DEX ${c.dex}<small>(${formatMod(c.dexMod)})</small></span>
@@ -773,7 +774,7 @@ function renderCombatCard(c, isActive) {
             <span>INT ${c.int}<small>(${formatMod(c.intMod)})</small></span>
             <span>WIS ${c.wis}<small>(${formatMod(c.wisMod)})</small></span>
             <span>CHA ${c.cha}<small>(${formatMod(c.chaMod)})</small></span>
-          </div>
+          </div>`}
         </div>
       </div>
       <div class="combat-card-footer">
@@ -1419,7 +1420,7 @@ function getCombatCSS() {
 }
 
 // Evaluated once at module load — avoids re-building and re-parsing the stylesheet on every phase transition
-const COMBAT_CSS = getCombatCSS();
+export const COMBAT_CSS = getCombatCSS();
 
 // ============================================================================
 // LISTENERS

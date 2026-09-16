@@ -17,6 +17,8 @@ import { visibleToViewer } from '../utils/combat-visibility.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
+  buildTrainerCombatant, buildPokemonCombatant,
+  renderCombatCard, COMBAT_CSS,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -94,6 +96,17 @@ const WIP_CSS = `
   .combat-wip-p-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
   .combat-wip-p-controls button.on { background: #27ae60; border-color: #27ae60; }
   .combat-wip-p-controls button.remove { background: #922b21; border-color: #922b21; }
+
+  /* Battle view: each combat-card (reused verbatim from combat.js) plus this
+     page's own action row underneath it -- the card's own click-to-expand
+     interaction isn't wired here yet (see Milestone D's own-turn move popups,
+     still future work), so the pointer cursor it normally implies is turned
+     back off to avoid promising an interaction that doesn't do anything yet. */
+  .battle-card-wrap { margin-bottom: 0.6rem; }
+  .battle-card-wrap .combat-card-main { cursor: default; }
+  .battle-card-wrap .combat-wip-p-controls { margin: 0.4rem 0.2rem 0; }
+  .battle-card-wrap.reacting .combat-card { border-color: #e67e22; box-shadow: 0 0 10px rgba(230,126,34,0.35); }
+  .battle-card-wrap.spectating { opacity: 0.55; }
 `;
 
 // Reuses .bmap-cell/.bmap-token's exact rules from battle-map-popup.js (same
@@ -154,6 +167,15 @@ let _hoverGhosts = {}; // participantId -> {col,row} live previews from OTHER pl
 let _hoverThrottle = null;
 let _placementHoverHandler = null;
 
+// The pokemonKey (e.g. "pokemon3") for whichever party Pokémon this device
+// chose during Setup -- remembered so the battle view can rebuild the same
+// rich local combatant (full stat block, moves, items -- everything
+// buildPokemonCombatant already knows how to compute from sessionStorage)
+// on every re-render, the same way the legacy combat.js page does. Only
+// meaningful for the current trainer's own cards; every other participant's
+// card is a lightweight stand-in (see _buildBattleCombatants below).
+let _myPokemonKey = null;
+
 function _needsToJoin(state) {
   const name = _currentTrainerName();
   if (!name) return false;
@@ -187,7 +209,7 @@ function _renderCurrentView() {
 
   return `
     <div class="combat-wip-page">
-      <style>${WIP_CSS}</style>
+      <style>${COMBAT_CSS}${WIP_CSS}</style>
       <div class="combat-wip-header-bar">
         <button class="combat-wip-back-btn" id="combatWipBackBtn">← Back</button>
         <div class="combat-wip-title">🛠️ New Combat Tool (WIP)</div>
@@ -221,6 +243,63 @@ function _combatantToParticipant(c) {
     type2: (c.types && c.types[1]) || '',
     initiative: c.initiativeTotal,
   };
+}
+
+/** combat.js's renderCombatCard expects a rich "combatant" shape. For this
+ * device's own trainer/Pokémon we rebuild that full object fresh on every
+ * call (buildTrainerCombatant/buildPokemonCombatant read straight from
+ * sessionStorage, so this stays cheap and always current) -- every existing
+ * mechanic that already works in the legacy combat page (ability scores,
+ * types, moves data) shows up here unchanged. HP/VP are overlaid from the
+ * server record so damage applied by anyone (via use-move) is reflected.
+ * Every other participant -- another player's or the DM's -- only has the
+ * lightweight fields the server actually tracks, so it gets a stand-in
+ * combatant with hasStatBlock:false, which renderCombatCard renders without
+ * the ability-score/AC rows rather than showing fabricated zeros. */
+function _buildBattleCombatants(state) {
+  const myName = _currentTrainerName();
+  const myRichByName = new Map();
+  if (myName) {
+    const trainerC = buildTrainerCombatant();
+    myRichByName.set(trainerC.name, trainerC);
+    if (_myPokemonKey) {
+      const pokemonC = buildPokemonCombatant(_myPokemonKey);
+      myRichByName.set(pokemonC.name, pokemonC);
+    }
+  }
+
+  return state.turnOrder.map(id => {
+    const p = state.participants[id];
+    if (!p) return null;
+
+    const rich = (p.owner && p.owner === myName) ? myRichByName.get(p.name) : null;
+    if (rich) {
+      return {
+        ...rich,
+        id: p.id,
+        currentHp: p.currentHP, maxHp: p.maxHP,
+        currentVp: p.currentVP, maxVp: p.maxVP,
+        hasStatBlock: true,
+      };
+    }
+
+    const showName = visibleToViewer(p, 'name');
+    const showHp = visibleToViewer(p, 'hp');
+    const showVp = visibleToViewer(p, 'vp');
+    return {
+      id: p.id,
+      name: showName ? p.name : '???',
+      image: p.image || 'assets/Pokeball.png',
+      level: '?', types: [p.type1, p.type2].filter(Boolean),
+      ac: '—', baseAc: '—', critMod: 0,
+      currentHp: showHp ? p.currentHP : 0, maxHp: showHp ? p.maxHP : 0,
+      currentVp: showVp ? p.currentVP : 0, maxVp: showVp ? p.maxVP : 0,
+      str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0,
+      strMod: 0, dexMod: 0, conMod: 0, intMod: 0, wisMod: 0, chaMod: 0,
+      initiativeTotal: p.initiative ?? '—',
+      statusEffects: [], isExpanded: false, hasStatBlock: false,
+    };
+  }).filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
@@ -385,33 +464,38 @@ function renderBody(state) {
       <button type="submit" class="combat-wip-btn-primary">Add</button>
     </form>` : ''}
 
-    <div class="combat-wip-participant-list">
-      ${Object.values(state.participants).map(p => renderParticipant(p, state, activeId)).join('') || '<p style="color:#a0a0c0;">No participants yet.</p>'}
+    <div class="battle-list" id="battleList">
+      ${_buildBattleCombatants(state).map(c => _renderBattleCard(c, state, activeId)).join('') || '<p style="color:#a0a0c0;">No participants yet.</p>'}
     </div>`;
 }
 
-function renderParticipant(p, state, activeId) {
-  const isActive = p.id === activeId && !state.reactingParticipantId;
-  const isReacting = p.id === state.reactingParticipantId;
+/** One combat-card (combat.js's real card -- same portrait, HP/VP bars, type
+ * badges, ability scores when we have them) plus this page's own action row
+ * underneath it (join/bench, react, visibility toggles, use-move, remove) --
+ * that action mechanism is unchanged from before this milestone (already
+ * server-integrated), only the visual card above it is new. */
+function _renderBattleCard(c, state, activeId) {
+  const p = state.participants[c.id];
+  const isActive = c.id === activeId && !state.reactingParticipantId;
+  const isReacting = c.id === state.reactingParticipantId;
   const canReact = p.status === 'participating' && !p.reactionUsed && !state.reactingParticipantId && p.id !== activeId;
-  const classes = ['combat-wip-participant'];
-  if (isActive) classes.push('active-turn');
-  if (isReacting) classes.push('reacting');
-  if (p.status === 'spectating') classes.push('spectating');
+  const mapPos = state.board?.tokens?.[p.id];
 
   const visToggle = (field, label) => `
     <button class="${p.visibility[field] ? 'on' : ''}" data-vis-id="${p.id}" data-vis-field="${field}" data-vis-value="${p.visibility[field] ? 0 : 1}">
       ${label} ${p.visibility[field] ? '👁️' : '🚫'}
     </button>`;
 
-  const mapPos = state.board?.tokens?.[p.id];
+  const wrapClasses = ['battle-card-wrap'];
+  if (isReacting) wrapClasses.push('reacting');
+  if (p.status === 'spectating') wrapClasses.push('spectating');
 
   return `
-    <div class="${classes.join(' ')}">
-      <span class="combat-wip-side-badge ${p.side}">${p.side}</span>
-      <span class="combat-wip-p-name">${p.name}</span>
-      <span class="combat-wip-p-stats">HP ${p.currentHP}/${p.maxHP} · VP ${p.currentVP}/${p.maxVP}${[p.type1, p.type2].filter(Boolean).length ? ' · ' + [p.type1, p.type2].filter(Boolean).join('/') : ''}${mapPos ? ` · 📍(${mapPos.col},${mapPos.row})` : ''}</span>
+    <div class="${wrapClasses.join(' ')}">
+      ${renderCombatCard(c, isActive || isReacting)}
       <div class="combat-wip-p-controls">
+        <span class="combat-wip-side-badge ${p.side}">${p.side}</span>
+        ${mapPos ? `<span class="combat-wip-p-stats">📍(${mapPos.col},${mapPos.row})</span>` : ''}
         <button data-toggle-status="${p.id}" data-next-status="${p.status === 'participating' ? 'spectating' : 'participating'}">
           ${p.status === 'participating' ? 'Bench' : 'Join Fight'}
         </button>
@@ -477,6 +561,7 @@ export function attachCombatWipListeners() {
         _rerenderFull();
       },
       onComplete: async (combatants) => {
+        _myPokemonKey = combatants[1]?.id || null;
         try {
           for (const c of combatants) {
             await CombatAPI.addParticipant(_combatantToParticipant(c));
@@ -530,6 +615,12 @@ function attachBodyListeners() {
 
   document.getElementById('advanceTurnBtn')?.addEventListener('click', async () => {
     try { await CombatAPI.advanceTurn(); } catch (err) { alert(err.message); }
+  });
+
+  document.querySelectorAll('.end-turn-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try { await CombatAPI.advanceTurn(); } catch (err) { alert(err.message); }
+    });
   });
 
   document.getElementById('addParticipantForm')?.addEventListener('submit', async (e) => {

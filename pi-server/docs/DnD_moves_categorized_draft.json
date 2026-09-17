@@ -16545,7 +16545,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "The targeted creature must make a Dexterity saving throw. On a failed save, the creature begins to turn to stone and is restrained. It must repeat the saving throw at the end of its next turn. On a success, the effect ends. On a failure, the creature is petrified for 1 minute.",
       "moveStat": "DEX",
@@ -16566,8 +16567,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "stat_buff_self"
+        "--POTENTIAL STAT INCREASE--"
       ],
       "description": "You lash out with unknown inner power. Make a melee attack roll against a creature, doing 1d10 + MOVE rock damage on a hit. On a natural attack roll of 19 or 20, all of your ability scores go up by 1 while you remain in battle. This move can be stacked for a maximum of +5 to all ability scores.",
       "moveStat": "STR/DEX/WIS",
@@ -16588,8 +16588,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You hurl a cloud of sharp crystals that damages all creatures in range. Creatures within 20 feet of you must make a CON save against your Move DC, taking 2d8 + MOVE rock damage on a failure, or half as much on a success.",
       "moveStat": "STR/DEX",
@@ -16610,7 +16611,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
         "recoil"
       ],
       "description": "You lower your head to deliver a dangerous headbutt. Make a melee attack, dealing 3d10 + MOVE rock damage on a hit. On a hit, the user takes 1/2 the damage dealt in typeless recoil.",
@@ -16631,7 +16631,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "The user fixes its gaze on one creature within 30 feet. The target must succeed on a Constitution saving throw or be restrained as it begins to turn to stone. At the end of its next turn, the target must repeat the saving throw. On a success, the effect ends. On a failure, the creature is petrified for 1 minute.",
       "moveStat": "CON",
@@ -16651,8 +16652,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "stat_buff_self"
+        "damage"
       ],
       "description": "A ray of light bursts out of your gemstone, damaging a creature in range. Make a ranged attack, dealing 1d10 + MOVE rock damage on a hit.",
       "moveStat": "DEX/CHA",
@@ -16713,7 +16713,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "Large boulders appear above a target creature in range, crashing down on top of it. The target must make a DEX save against your Move DC, taking 3d10 + MOVE rock damage and falling prone on a failed save, and half as much without falling prone on a success. Creatures that succeed the save by 5 or more dodge the attack entirely. The target gains advantage on the saving throw if this move is used consecutively.",
       "moveStat": "STR",
@@ -16754,7 +16756,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You summon a collection of boulders that attempt to surround a target. Force a creature in range to make a STR saving throw against your Move DC, taking 1d10 + MOVE rock damage and becoming restrained on a failure, or half as much without being restrained on a success. If it fails, at the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a creature is restrained, you may continue this move, as an action, to deal an automatic 1d10 + MOVE rock damage.",
       "moveStat": "STR",
@@ -16775,7 +16778,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recharge_locked"
+        "recharge_locked",
+        "--STATUS CONDITION--"
       ],
       "description": "You summon a huge boulder and launch it at a target in range. Make a ranged attack, dealing 4d12 + MOVE rock damage and be knocked prone on a hit. If this move hits, any creature standing within 5ft. of the target must succeed a DEX saving throw or take half of the damage rolled and be knocked prone. This move saps you of energy, and you may not make any attack until after the end of your next turn.",
       "moveStat": "STR",
@@ -16796,7 +16800,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "--POTENTIAL DAMAGE INCREASE--"
       ],
       "description": "You roll into a target, repeatedly making attacks with increasing strength. Make a melee attack on a creature, dealing 1d6 + MOVE rock damage on a hit. If you use this move on your turn in consecutive rounds, double the dice on each successful attack for a maximum of 5 attacks, in which case the damage would reset. For each consecutive use of this move, increase the VP cost by 1. The damage and VP cost reset if any of the attacks fail to damage a creature, if your speed is reduced to 0, or if you are incapacitated.",
       "moveStat": "STR",
@@ -16816,7 +16820,6 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
         "field_weather"
       ],
       "description": "You stir up a massive sandstorm in a 50 foot radius, centered on a point in range. When a non rock-, steel-, or ground-type creature enters the area for the first time on their turn, or begins their turn inside the area, they take an amount of rock damage equal to half your level, rounded up. The Sandstorm lasts for 5 rounds.",
@@ -16837,7 +16840,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--STATUS CONDITION--",
+        "--CONDITIONAL DAMAGE--"
       ],
       "description": "You throw a solid piece of stone at a creature in an attempt to bring them to the ground. Make a ranged attack, dealing 1d10 + MOVE rock damage on a hit. On a hit, the target is knocked prone, losing any flying speed and immunity to ground-type moves until the end of your next turn. If the target was in the air, it falls to the ground, taking 1d6 fall damage per 10 feet fallen, to a maximum of 20d6.",
       "moveStat": "STR",
@@ -16857,9 +16862,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "stat_buff_self",
-        "steal_disrupt"
+        "damage"
       ],
       "description": "You prepare jagged rocks to strike creatures that reveal themselves. For 1 minute (concentration), when a creature first becomes visible to you (entering your line of sight, appearing from stealth, being switched in, or emerging from teleportation), you may use your reaction to make a ranged attack against it, dealing 1d6 + MOVE rock damage on a hit. This reaction does not consume your reaction for the round. You can use this ability a number of times equal to your proficiency bonus per casting.",
       "moveStat": "STR/DEX",
@@ -16879,7 +16882,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "The earth moves beneath a target’s feet as sharp stone pierce through the ground underneath them. Creatures in a 10 foot radius centered on a point you choose in range must make a DEX save against your MOVE DC, taking 2d8 + MOVE rock damage on a fail, or half as much on a save.",
       "moveStat": "STR",
@@ -16900,7 +16905,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW ON HIT--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You bite down on an opponent in an attempt to swallow it. Make a melee attack against a creature, doing 3d10 + MOVE rock damage on a hit. If the creature is smaller than you, it has to make a DEX save against your move DC. On a failure, you swallow it, and it is considered grappled and restrained. At the start of the swallowed creature's turns, it takes 1d12 rock damage. On its turn, it may attempt to free itself by succeeding a STR contest against your CON, with disadvantage. If you lose half or more of your current HP in a single turn while having swallowed a creature, you must succeed a DC15 CON save, or have to spit out the swallowed creature.",
       "moveStat": "STR/DEX",
@@ -16920,7 +16926,8 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "protect_negate"
       ],
       "description": "You have the ability to guard your allies from area-of-effect moves. As a reaction, when a creature activates a damaging move that damages multiple allies within range, you may halve the damage dealt. On future instances of this reaction in the same combat, you must roll higher than a 15 on a d20 roll or forfeit the reaction with no effect.",
       "moveStat": "None",

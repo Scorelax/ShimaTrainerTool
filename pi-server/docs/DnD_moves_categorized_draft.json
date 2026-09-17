@@ -4255,7 +4255,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit_same_target"
+        "multi_hit_combined_roll"
       ],
       "description": "You strike twice with two devastating kicks. Make two melee attack rolls, doing 1d6 + MOVE fighting damage on each successful hit."
     },
@@ -8023,7 +8023,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit_same_target"
+        "multi_hit_combined_roll"
       ],
       "description": "You throw a boomerang and make two ranged attacks against a target. On each successful hit, do 1d10 + MOVE ground damage."
     },
@@ -10766,7 +10766,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit_same_target"
+        "multi_hit_combined_roll"
       ],
       "description": "You slice at your opponent with blades made of sharp paper. Make two attack rolls, dealing 1d4 + MOVE normal damage on a hit. This move ignores resistances and weaknesses, but not immunity. You may use this move as a bonus action."
     },
@@ -14542,7 +14542,7 @@
       "categories": [
         "damage",
         "fixed_special_damage",
-        "multi_hit_same_target"
+        "multi_hit_combined_roll"
       ],
       "description": "You hurl small metal objects towards a target. Make two ranged attacks, doing 1d4 steel damage on each successful hit. You may pay 25 x the damage rolled to double the damage of a hit from this move once per target per encounter."
     },
@@ -15205,7 +15205,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit_same_target"
+        "multi_hit_combined_roll"
       ],
       "description": "You shoot a series of quickly moving bubbles at a target. Make three ranged attacks, doing 1d4 water damage on each successful hit."
     },

@@ -15,12 +15,17 @@ function _injectStyles() {
     .combat-alert-title { font-weight: 800; font-size: 1.05rem; margin-bottom: 0.5rem; }
     .combat-alert-message { font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.1rem; white-space: pre-line; }
     .combat-alert-ok { width: 100%; padding: 0.65rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    .combat-alert-actions { display: flex; gap: 0.7rem; }
+    .combat-alert-actions .combat-alert-ok { flex: 1; }
+    .combat-alert-cancel { background: rgba(255,255,255,0.1) !important; }
   `;
   document.head.appendChild(style);
 }
 
 let _overlay = null;
 let _resolve = null;
+let _confirmOverlay = null;
+let _confirmResolve = null;
 
 function _ensureDom() {
   if (_overlay) return;
@@ -50,4 +55,42 @@ export function showCombatAlert(message, { title = '' } = {}) {
   document.getElementById('combatAlertMessage').textContent = message;
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });
+}
+
+function _ensureConfirmDom() {
+  if (_confirmOverlay) return;
+  _injectStyles();
+  _confirmOverlay = document.createElement('div');
+  _confirmOverlay.className = 'combat-alert-overlay';
+  _confirmOverlay.id = 'combatConfirmPopup2';
+  _confirmOverlay.style.display = 'none';
+  _confirmOverlay.innerHTML = `
+    <div class="combat-alert-box">
+      <div class="combat-alert-title" id="combatConfirmTitle2"></div>
+      <div class="combat-alert-message" id="combatConfirmMessage2"></div>
+      <div class="combat-alert-actions">
+        <button class="combat-alert-ok combat-alert-cancel" id="combatConfirmNo2"></button>
+        <button class="combat-alert-ok" id="combatConfirmYes2"></button>
+      </div>
+    </div>`;
+  document.body.appendChild(_confirmOverlay);
+  const close = (result) => { _confirmOverlay.style.display = 'none'; if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; } };
+  document.getElementById('combatConfirmYes2').addEventListener('click', () => close(true));
+  document.getElementById('combatConfirmNo2').addEventListener('click', () => close(false));
+  _confirmOverlay.addEventListener('click', (e) => { if (e.target === _confirmOverlay) close(false); });
+}
+
+/** Yes/No variant of showCombatAlert -- for "hit again?"-style loops
+ * (multi_hit_same_target/multi_hit_choice, see combat-wip.js) where the
+ * app needs an actual answer, not just an acknowledgement. Resolves to
+ * true/false; closing without choosing (backdrop click) counts as false. */
+export function showCombatConfirm(message, { title = '', yesLabel = 'Yes', noLabel = 'No' } = {}) {
+  _ensureConfirmDom();
+  document.getElementById('combatConfirmTitle2').textContent = title;
+  document.getElementById('combatConfirmTitle2').style.display = title ? 'block' : 'none';
+  document.getElementById('combatConfirmMessage2').textContent = message;
+  document.getElementById('combatConfirmYes2').textContent = yesLabel;
+  document.getElementById('combatConfirmNo2').textContent = noLabel;
+  _confirmOverlay.style.display = 'flex';
+  return new Promise((resolve) => { _confirmResolve = resolve; });
 }

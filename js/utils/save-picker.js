@@ -274,22 +274,25 @@ function _cardHtml(p) {
 }
 
 /**
- * The "on hit" counterpart to pickSaveTarget -- for a move that already
- * resolved an attack roll (target-picker.js) and only THEN triggers a
- * saving throw for a secondary consequence (e.g. Temporal Fang: hits for
- * damage, and the hit creature separately saves against being slowed).
- * The target is already fixed (whoever the attack just hit), so this skips
- * straight to the DC/Pass-Fail step -- no target grid, no Back button, and
- * no damage-roll follow-up (a secondary effect here is a status/other
- * consequence, not more damage; the primary attack already applied that).
- * Resolves to {targetId, passed: true|false}.
+ * The "already-have-a-target" counterpart to pickSaveTarget -- skips
+ * straight to the DC/Pass-Fail step, no target grid, no Back button. Two
+ * callers, two different needs: combat-wip.js's _handleSecondarySave (a
+ * move that already resolved an attack roll and only THEN triggers a save
+ * for a secondary consequence, e.g. Temporal Fang -- never has a damage
+ * component here, the primary attack already applied that) and
+ * _handleMultiHitAoe (one target of an AoE save move like Judgment, which
+ * DOES still need its own damage roll on a Fail -- hence hasDamage/
+ * damageModifier/speciesName being plumbed through same as pickSaveTarget
+ * itself). Resolves to {targetId, passed:true}, {targetId, passed:false}
+ * (no damage component), or {targetId, passed:false, rawRoll} (has one).
  */
-export async function confirmSecondarySave(target, targetName, { dc = 0 } = {}) {
+export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '' } = {}) {
   _ensureDom();
   _dc = dc;
   _manualDc = false;
-  _hasDamage = false;
-  _speciesName = '';
+  _hasDamage = hasDamage;
+  _damageModifier = damageModifier;
+  _speciesName = speciesName;
   _selectedTargetId = target.id;
   _showStep2(target, targetName);
   document.getElementById('savePickerBack').style.display = 'none';

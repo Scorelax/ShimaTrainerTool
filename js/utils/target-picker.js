@@ -290,6 +290,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _damageModifier = damageModifier;
   _speciesName = speciesName;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
+  document.getElementById('targetPickerBack').style.display = '';
   _showStep1();
   const grid = document.getElementById('targetPickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
@@ -301,6 +302,31 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
     });
   });
 
+  _overlay.style.display = 'flex';
+  return new Promise((resolve) => { _resolve = resolve; });
+}
+
+/**
+ * The multi_hit_same_target counterpart to pickTarget -- resumes the flow
+ * directly at the Attack Roll step against an ALREADY-known target,
+ * skipping target selection entirely (see combat-wip.js's
+ * _handleDamageResolved "hit again?" loop for Fury Attack/Rock Blast-style
+ * moves, which are always locked to whoever the first hit landed on -- no
+ * re-picking). Also reused for one target of a multi_hit_aoe move (see
+ * combat-wip.js's _handleMultiHitAoe), where the target was already fixed
+ * by the AoE target-selection step, not this popup. Same resolve shape as
+ * pickTarget: {targetId, hit:false}, {targetId, hit:true, rawRoll}, or
+ * null if closed.
+ */
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '' } = {}) {
+  _ensureDom();
+  _attackModifier = attackModifier;
+  _damageModifier = damageModifier;
+  _speciesName = speciesName;
+  document.getElementById('targetPickerAnimMedia').innerHTML = '';
+  _selectedTargetId = target.id;
+  _showStep2(target, targetName);
+  document.getElementById('targetPickerBack').style.display = 'none';
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });
 }

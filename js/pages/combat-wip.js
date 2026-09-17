@@ -9,14 +9,15 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
-import { pickTarget } from '../utils/target-picker.js';
+import { pickTarget, pickTargetAgain } from '../utils/target-picker.js';
 import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
+import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
-import { showCombatAlert } from '../utils/combat-alert.js';
+import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -1288,7 +1289,7 @@ function _attachMainFocusListeners(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx || !ctx.isMine) return;
 
-  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, ...ctx.cardOptions });
+  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, onMultiHitAoe: _handleMultiHitAoe, ...ctx.cardOptions });
 
   document.getElementById('battleList')?.addEventListener('click', (e) => {
     const reactBtn = e.target.closest('.wip-react-btn');
@@ -1553,7 +1554,50 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // the target's AC), and -- only on a Hit -- play the attacker's battle
   // animation and take a damage roll. See target-picker.js.
   const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName });
-  if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
+  let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
+
+  const categories = moveCategoriesFor(moveName);
+  const isSameTarget = categories.includes('multi_hit_same_target');
+  const isChoice = categories.includes('multi_hit_choice');
+  if (!isSameTarget && !isChoice) return;
+
+  // "Hit again?" loop, for moves tagged multi_hit_same_target (Fury Attack/
+  // Rock Blast's d4-continue-on-3-or-4 chains, Double Kick's fixed count --
+  // always the SAME target, no re-picking) or multi_hit_choice (Hyperspace
+  // Fury/Gear Grind -- a target chosen fresh each hit, possibly different
+  // each time). How many times to actually loop is left entirely to the
+  // human (a d4 roll, a fixed cap, a miss ending the chain -- all move-
+  // specific rules this app doesn't encode), same trust model as every
+  // other roll in this flow.
+  while (true) {
+    const again = await showCombatConfirm(
+      isSameTarget ? 'Hit the same target again?' : 'Attack again (pick a target)?',
+      { title: moveName, yesLabel: 'Hit Again', noLabel: 'Stop' },
+    );
+    if (!again) return;
+
+    let nextPicked;
+    if (isSameTarget) {
+      if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
+      const target = session?.participants?.[hitTargetId];
+      if (!target) return; // target left the battle mid-chain
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName });
+    } else {
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName });
+    }
+    hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
+  }
+}
+
+/** Resolves ONE already-picked hit ({targetId, hit, rawRoll} from
+ * pickTarget/pickTargetAgain, or null if closed without picking): logs a
+ * Miss, or applies damage (auto-logged server-side) and runs the ON HIT
+ * secondary save if the move has one. Returns the target's id if the hit
+ * actually landed (so a multi_hit_same_target loop knows who to keep
+ * hitting), or null otherwise. Shared by the single-hit path, the "hit
+ * again?" loop above, and _handleMultiHitAoe's per-target resolution. */
+async function _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked) {
+  if (!picked) return null; // "no target" / closed -- move's own cost still applied, nothing more to do
   if (!picked.hit) {
     // Miss -- VP already spent when the move was confirmed, nothing else to
     // do mechanically, but it still belongs in the shared log (a Miss never
@@ -1565,10 +1609,11 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       type: 'miss', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
       text: `${attackerName} used ${moveName} on ${targetName} -- Miss`,
     }).catch(() => {});
-    return;
+    return null;
   }
 
   const { targetId, rawRoll } = picked;
+  const damageModifier = computedData.damageBonus || 0;
   const moveType = (move && move[1]) || '';
   try {
     const result = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, speciesName, moveName);
@@ -1578,7 +1623,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
     }
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
-    return;
+    return null;
   }
 
   // Some moves land a hit AND separately make the hit creature save against
@@ -1590,6 +1635,65 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // landed, since a Miss never applies damage in the first place.
   if (moveCategoriesFor(moveName).includes('TRIGGER SAVING THROW ON HIT')) {
     await _handleSecondarySave(combatantId, targetId, moveName, computedData);
+  }
+  return targetId;
+}
+
+/** Wired into combat.js's move-popup flow as onMultiHitAoe -- for moves
+ * tagged multi_hit_aoe (Judgment, Meteor Swarm, etc.), where one move-use
+ * hits every creature caught in an area at once. This app has no
+ * positional range-checking (see battle-map-popup.js's own deferred
+ * range/distance note), so a human picks who was actually in range
+ * (multi-target-picker.js), then each selected target gets resolved one at
+ * a time via whichever mechanic the move already uses for a single target
+ * -- a shared save (confirmSecondarySave, same DC for everyone since it's
+ * one caster's move) if the move is ALSO TRIGGER SAVING THROW (Judgment:
+ * one DEX save per creature in the circle), or its own attack roll
+ * (pickTargetAgain + _resolveOneHit) otherwise (Meteor Swarm: "make as
+ * many ranged attacks as there are targets"). */
+async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
+  const targetIds = await pickMultipleTargets(combatantId);
+  if (!targetIds || !targetIds.length) return; // closed / nobody picked -- move's own cost still applied
+
+  const isSaveTriggered = moveCategoriesFor(moveName).includes('TRIGGER SAVING THROW');
+  const attackModifier = computedData.attackBonus || 0;
+  const damageModifier = computedData.damageBonus || 0;
+  const dc = computedData.moveDC ?? 0;
+  const hasDamage = !!computedData.damageDice;
+  const moveType = (move && move[1]) || '';
+  const attackerName = session?.participants?.[combatantId]?.name || '?';
+
+  for (const targetId of targetIds) {
+    const target = session?.participants?.[targetId];
+    if (!target) continue;
+
+    if (isSaveTriggered) {
+      const outcome = await confirmSecondarySave(target, target.name, { dc, hasDamage, damageModifier, speciesName });
+      if (!outcome) continue; // closed for this target -- move on to the next one
+      if (outcome.passed) {
+        CombatAPI.logEvent({
+          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
+          text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}`,
+        }).catch(() => {});
+      } else if (outcome.rawRoll !== undefined) {
+        try {
+          const result = await CombatAPI.applyDamage(combatantId, targetId, outcome.rawRoll + damageModifier, moveType, speciesName, moveName);
+          if (result.multiplier !== undefined) {
+            showCombatAlert(`${target.name} failed the save -- ${result.damageApplied} damage applied`, { title: 'Save Result' });
+          }
+        } catch (err) {
+          showCombatAlert(err.message, { title: 'Error' });
+        }
+      } else {
+        CombatAPI.logEvent({
+          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
+          text: `${target.name} failed the saving throw against ${attackerName}'s ${moveName} -- apply its effect`,
+        }).catch(() => {});
+      }
+    } else {
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName });
+      await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
+    }
   }
 }
 

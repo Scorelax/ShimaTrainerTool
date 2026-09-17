@@ -1656,7 +1656,7 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
-export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, onReactiveSave, ...cardOptions } = {}) {
+export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, ...cardOptions } = {}) {
   _battleState = state;
   _battleCardOptions = cardOptions; // see rerenderBattle -- every internal re-render (a move popup
   // confirming, an HP/VP adjuster click, etc.) needs to keep reusing the same per-card render
@@ -1821,7 +1821,7 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
         if (moveItem.dataset.isDiceLocked === 'true') {
           showDiceRechargePopup(moveItem.dataset.move, moveItem.dataset.combatantId, moveItem.dataset.rechargeRange, state); return;
         }
-        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave }); return;
+        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe }); return;
       }
       // Toggle expand on card click (not on controls)
       const card = e.target.closest('.combat-card');
@@ -2530,7 +2530,7 @@ function removeStatusEffect(combatantId, effectName, state) {
 // MOVE POPUP
 // ============================================================================
 
-function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave } = {}) {
+function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe } = {}) {
   if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
   const move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
@@ -2633,6 +2633,16 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
   // off to.
   const _isReactiveSave = moveCategoriesFor(moveName).includes('REACTIVE SAVE');
   const _willDeferToReactiveSave = _isReactiveSave && !!onReactiveSave;
+  // multi_hit_aoe moves (Judgment, Meteor Swarm, etc.) take priority over
+  // BOTH single-target detours above -- a move can be tagged multi_hit_aoe
+  // AND TRIGGER SAVING THROW at once (Judgment is exactly this: one save
+  // per creature in the blast), but the very first step differs -- who's
+  // even affected has to be picked (multi-target-picker.js) before any
+  // per-target save/attack-roll resolution can happen at all. See
+  // combat-wip.js's _handleMultiHitAoe, which re-uses pickTargetAgain/
+  // confirmSecondarySave per selected target once that's settled.
+  const _isMultiHitAoe = moveCategoriesFor(moveName).includes('multi_hit_aoe');
+  const _willDeferToMultiHitAoe = _isMultiHitAoe && !!onMultiHitAoe;
 
   showMovePopup({
     move,
@@ -2651,7 +2661,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
-    deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave,
+    deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave || _willDeferToMultiHitAoe,
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;
@@ -2714,6 +2724,8 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
       // move-popup.js's own drain/direct-heal post-use check already uses.
       if (_willDeferToReactiveSave) {
         onReactiveSave({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+      } else if (_willDeferToMultiHitAoe) {
+        onMultiHitAoe({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
       } else if (_willDeferToSavePicker) {
         onSaveTriggered({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
       } else if (onDamageResolved && computedData.damageDice && !_isDrainHeal && !_isDirectHeal) {

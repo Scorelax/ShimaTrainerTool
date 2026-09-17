@@ -6914,7 +6914,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--GUARANTEED HIT--"
       ],
       "description": "You dive at an opponent with such speed that it is impossible for them to avoid. This move is guaranteed to hit for 1d10 + MOVE flying damage, unless during the invulnerable stage of Fly, Dig, Bounce, Dive, etc. moves.",
       "moveStat": "DEX",
@@ -6934,8 +6935,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "stat_buff_self"
+        "damage"
       ],
       "description": "While in the air, you dive at a creature in range, ignoring your flying speed and any opportunity attacks you may incur. Make a melee attack, doing 1d10 + MOVE flying damage on a hit.",
       "moveStat": "DEX",
@@ -6956,6 +6956,8 @@
       "reaction": false,
       "categories": [
         "damage",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
         "recharge_locked"
       ],
       "description": "You shoot out a powerful vortex of air that shreds through opponents. All creatures caught in a 50 foot line, 5 feet wide, must make a DEX save against your Move DC, taking 2d8 + MOVE flying damage on a fail, and half as much on a save.",
@@ -7020,6 +7022,8 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
+        "--TRIGGER SAVING THROW ON HIT--",
+        "--POTENTIAL STATUS CONDITION--",
         "recoil"
       ],
       "description": "You may fly up to 30ft without provoking attacks of opportunity as part of your movement this turn. Then, drop towards a creature in range. Make an attack roll against your target, dealing 3d10 + MOVE flying or ground damage on a hit. On a natural attack roll of 19 or higher, the target must succeed a Dexterity saving throw or have their AC reduced by 2 until the end of their next turn. This effect triggers on lower numbers, and the saving throw DC is increased by 1 for every 10ft. of height above 10ft. dropped during the attack. On a natural 20 attack roll, this move does maximum damage and the saving throw always fails. On a miss, you take fall damage appropriate to the height dropped.",
@@ -7061,7 +7065,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "recoil"
       ],
       "description": "You tuck in your wings and dive at an opponent. Make a melee attack, dealing 3d10 + MOVE flying damage on a hit. On a hit, you also take a quarter of the total (rounded down) in recoil damage.",
       "moveStat": "STR/DEX",
@@ -7102,8 +7107,7 @@
       },
       "reaction": false,
       "categories": [
-        "field_weather",
-        "field_terrain"
+        "steal_disrupt"
       ],
       "description": "You summon a swift, magical breeze in a 50 foot radius, centered on you, that sweeps away foggy weather and obstacles. When activating this move, any area of effect moves that are still active end immediately (Examples: Misty Terrain, Fog Cloud, Smog, etc.).",
       "moveStat": "None",
@@ -7146,6 +7150,8 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
+        "--ADVANTAGE ON ATTACK ROLL--",
+        "--POTENTIAL PRONE--",
         "recharge_locked"
       ],
       "description": "While in the air, you dive at a creature in range, ignoring your flying speed and any opportunity attacks you may incur. Make a melee attack roll, doing 3d10 + MOVE flying damage on a hit. You always have advantage when using this move. On a natural roll of 19 or 20, the target is knocked prone.",
@@ -7165,7 +7171,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "--TRIGGER SAVING THROW--",
+        "stat_debuff_enemy"
+      ],
       "description": "You distract a creature in range with a beautiful dance. The target must make a WIS saving throw against your Move DC. On a fail, the target cannot add proficiency to its attack rolls for the duration.",
       "moveStat": "DEX/CHA",
       "vpCost": "2",
@@ -7185,7 +7194,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
         "recharge_locked"
       ],
       "description": "You let loose a flurry of razor sharp feathers in a 15 foot cone. All creatures caught in the flurry are forced to make a DEX save against your move DC, taking 2d8 + MOVE flying damage on a failure, and half as much on a success.",
@@ -7207,7 +7217,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "protect_negate"
+        "protect_negate",
+        "--ADVANTAGE ON ATTACK ROLL--"
       ],
       "description": "You fly high into the air to prepare for a dive bomb attack. When you activate this move, you flap your wings and disappear into the Ethereal plane above you. You cannot be targeted by attacks while you are in the Ethereal plane. On your next turn, you use your action to reappear and make a diving melee attack on a creature in range, with advantage, dealing 2d8 + MOVE flying damage on a successful hit.",
       "moveStat": "STR/DEX",
@@ -7247,7 +7258,8 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "protect_negate"
       ],
       "description": "When targeted or otherwise affected by a Ground type move affecting grounded creatures, you swiftly take flight, dodging ground based Ground moves until the beginning of your next turn.",
       "moveStat": "None",
@@ -7268,8 +7280,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "field_weather"
+        "status_inflict_threshold"
       ],
       "description": "You wrap a creature in a fierce wind. Make a ranged attack against a target, dealing 2d8 + MOVE flying damage on a hit. If this attack is activated during rain, roll the attack with advantage. If used during harsh sunlight, roll the attack with disadvantage. If the natural attack roll is 15 or higher, the target becomes confused.",
       "moveStat": "STR/DEX",
@@ -7289,7 +7300,10 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
+        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recoil",
         "recharge_locked"
       ],
@@ -7329,7 +7343,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "drain"
       ],
       "description": "You extend your wings and use a dark beam of energy to absorb the target's life force. Make a ranged attack against a creature, dealing 3d10 + MOVE flying damage on a hit, recovering your own hit points by the amount of damage dealt.",
       "moveStat": "STR/DEX",
@@ -7369,7 +7384,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--BERRY CHECK--"
       ],
       "description": "You peck at a target, attempting to grab their held berry. Make a melee attack on a creature, dealing 1d10 + MOVE flying damage on a hit. On a hit, if the target is holding a berry, you swallow it immediately and gain its effect.",
       "moveStat": "DEX",
@@ -7389,9 +7405,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
         "heal_self",
-        "stat_buff_self"
+        "--STAT DEBUF SELF--"
       ],
       "description": "You land on the ground to rest your body. Regain 2d8 + MOVE hit points, but become grounded and lose your ground-type resistance until the beginning of your next turn. You can't move after activating this move on the same turn.",
       "moveStat": "CON",
@@ -7411,7 +7426,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--TRIGGER SAVING THROW--",
+        "stat_debuff_enemy"
       ],
       "description": "When you use this move, you flap your wings menacingly and prepare to strike a creature within range. On your next turn’s action, if you keep your concentration, you dive at a creature in range, ignoring your flying speed and any opportunity attacks you may incur. Your target is forced to succeed a DEX save, taking 3d10 + MOVE flying damage and have disadvantage on attacks against you until the end of its next turn on a failure, half as much on a success.",
       "moveStat": "STR/DEX",
@@ -7432,7 +7449,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "status_inflict_auto"
       ],
       "description": "You reach out in an attempt to lift a creature up in the air for a slamming attack. When you activate this move, make a melee attack roll. On a hit, the target is grappled. The target may use its next action to attempt a STR save against your Move DC to get free. If it does not succeed, and you maintain your concentration, you may use your action on your next turn to lift the creature into the air, slamming it to the ground for 2d8 + MOVE flying damage.",
       "moveStat": "STR/DEX",
@@ -7553,7 +7570,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_ally"
       ],
       "description": "You spread your wings in a majestic display, inspiring allies close by. All allies within range that can see you receive a bonus to their attack rolls equal to 1d6 + your Charisma modifier, lasting until the beginning of your next turn.",
       "moveStat": "CHA",

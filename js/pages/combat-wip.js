@@ -10,6 +10,7 @@
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
+import { pickSaveTarget } from '../utils/save-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
@@ -1228,7 +1229,7 @@ function _attachMainFocusListeners(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx || !ctx.isMine) return;
 
-  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, ...ctx.cardOptions });
+  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, ...ctx.cardOptions });
 
   document.getElementById('battleList')?.addEventListener('click', (e) => {
     const reactBtn = e.target.closest('.wip-react-btn');
@@ -1515,6 +1516,60 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
     if (result.multiplier !== undefined) {
       const label = result.multiplier >= 2 ? 'Super effective!' : result.multiplier === 0 ? 'No effect!' : result.multiplier < 1 ? 'Not very effective...' : '';
       showCombatAlert(`${label ? label + ' — ' : ''}${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`, { title: 'Attack Result' });
+    }
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+/** Wired into combat.js's move-popup flow as onSaveTriggered (see
+ * attachBattleListeners above) -- the save-based counterpart to
+ * _handleDamageResolved, for moves the user's own categorization tagged
+ * TRIGGER SAVING THROW (see combat.js's moveCategoriesFor). No attack roll
+ * here: save-picker.js shows the target the Move DC and lets a human
+ * declare Save Success/Fail themselves, same "app shows the number, a
+ * human compares it" pattern as everywhere else in this flow.
+ *
+ * Status/other non-damage consequences of a failed save are deliberately
+ * NOT applied here -- addStatusEffect only ever touches the LOCAL device's
+ * own combat state (see combat.js), so this device has no way to mark a
+ * status on a Pokemon it doesn't own. Instead this logs what happened so
+ * the affected player can apply it to their own card themselves, the same
+ * way they already do for every other status effect in this tool. */
+async function _handleSaveTriggered({ combatantId, moveName, move, computedData, speciesName }) {
+  const dc = computedData.moveDC ?? 0;
+  const damageModifier = computedData.damageBonus || 0;
+  const hasDamage = !!computedData.damageDice;
+  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage });
+  if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
+
+  const attackerName = session?.participants?.[combatantId]?.name || '?';
+  const targetName = session?.participants?.[picked.targetId]?.name || '?';
+
+  if (picked.passed) {
+    CombatAPI.logEvent({
+      type: 'save', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
+      text: `${targetName} succeeded the saving throw against ${attackerName}'s ${moveName}`,
+    }).catch(() => {});
+    return;
+  }
+
+  if (picked.rawRoll === undefined) {
+    // No damage component -- purely a status/other effect (Taunt, Torment,
+    // Fear Ray, ...). Nothing for this device to apply server-side; log it
+    // so whoever owns the target's device knows to add the effect.
+    CombatAPI.logEvent({
+      type: 'save', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
+      text: `${targetName} failed the saving throw against ${attackerName}'s ${moveName} -- apply its effect`,
+    }).catch(() => {});
+    return;
+  }
+
+  const moveType = (move && move[1]) || '';
+  try {
+    const result = await CombatAPI.applyDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
+    if (result.multiplier !== undefined) {
+      showCombatAlert(`${targetName} failed the save -- ${result.damageApplied} damage applied`, { title: 'Save Result' });
     }
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });

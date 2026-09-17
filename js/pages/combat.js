@@ -1,6 +1,6 @@
 // Combat Page — Full encounter tracker with initiative, status effects, and move integration
 
-import { PokemonAPI, TrainerAPI } from '../api.js';
+import { PokemonAPI, TrainerAPI, CombatAPI } from '../api.js';
 import { showToast } from '../utils/notifications.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData } from '../utils/pokemon-types.js';
 import { showMovePopup } from '../utils/move-popup.js';
@@ -23,6 +23,29 @@ export function setBattleCardOptions(options) {
 // Module-level move cache — parsed once, reused everywhere
 let _moves = null;
 let _moveMap = null; // Map<name, moveData> for O(1) lookups
+
+// Move-name -> category tags (see pi-server/docs/DnD_moves_categorized_draft.json
+// and routes_combat.py's list-move-categories action) -- the user's own manual
+// pass over each move's actual effect (damage/save/heal/drain/crit-range/...),
+// used here just to route a move's post-use flow to the right popup (currently
+// only 'TRIGGER SAVING THROW', see showCombatMoveDetails). null until loaded;
+// a move with no entry (not yet categorized, or the fetch hasn't resolved yet)
+// just falls through to the existing attack-roll flow, same as before this
+// existed -- never a reason to block using a move.
+let _moveCategories = null;
+let _moveCategoriesLoading = false;
+
+function loadMoveCategories() {
+  if (_moveCategories || _moveCategoriesLoading) return;
+  _moveCategoriesLoading = true;
+  CombatAPI.listMoveCategories().then(result => {
+    if (result.status === 'success') _moveCategories = result.categories || {};
+  }).catch(() => {}).finally(() => { _moveCategoriesLoading = false; });
+}
+
+function moveCategoriesFor(moveName) {
+  return _moveCategories?.[moveName] || [];
+}
 
 // Module-level items DB cache — held items don't change during combat, so parse once
 let _itemsCache = null;
@@ -208,6 +231,7 @@ export function buildTrainerCombatant() {
 
 export function buildPokemonCombatant(pokemonKey) {
   loadCombatMoves();
+  loadMoveCategories();
   const pokemonData = JSON.parse(sessionStorage.getItem(pokemonKey) || '[]');
   const level = parseInt(pokemonData[4]) || 1;
   const str = parseInt(pokemonData[15]) || 10;
@@ -1534,6 +1558,7 @@ export function attachSetupListeners({ backRoute = 'trainer-card', onStart } = {
 
   startBtn?.addEventListener('click', () => {
     loadCombatMoves();
+    loadMoveCategories();
     const selectedKeys = [...document.querySelectorAll('.setup-pokemon-card.selected')].map(el => el.dataset.pokemonKey);
     const allPartyKeys = [...document.querySelectorAll('.setup-pokemon-card')].map(el => el.dataset.pokemonKey);
     const benchKeys = allPartyKeys.filter(k => !selectedKeys.includes(k));
@@ -1621,13 +1646,14 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
-export function attachBattleListeners(state, { onDamageResolved, ...cardOptions } = {}) {
+export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, ...cardOptions } = {}) {
   _battleState = state;
   _battleCardOptions = cardOptions; // see rerenderBattle -- every internal re-render (a move popup
   // confirming, an HP/VP adjuster click, etc.) needs to keep reusing the same per-card render
   // options this call was given, without every one of those many internal call sites having to
   // pass them through by hand.
   loadCombatMoves();
+  loadMoveCategories();
   initializeRechargeStates(state);
 
   document.getElementById('endCombatBtn')?.addEventListener('click', () => endCombat(state));
@@ -1785,7 +1811,7 @@ export function attachBattleListeners(state, { onDamageResolved, ...cardOptions 
         if (moveItem.dataset.isDiceLocked === 'true') {
           showDiceRechargePopup(moveItem.dataset.move, moveItem.dataset.combatantId, moveItem.dataset.rechargeRange, state); return;
         }
-        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved }); return;
+        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered }); return;
       }
       // Toggle expand on card click (not on controls)
       const card = e.target.closest('.combat-card');
@@ -2494,7 +2520,7 @@ function removeStatusEffect(combatantId, effectName, state) {
 // MOVE POPUP
 // ============================================================================
 
-function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved } = {}) {
+function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered } = {}) {
   if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
   const move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
@@ -2581,6 +2607,15 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved 
   // and plays immediately as before for anything else (self-heals, legacy
   // combat.js callers that never pass onDamageResolved at all).
   const _willDeferToTargetPicker = !!onDamageResolved && !!computedData.damageDice && !_isDrainHeal && !_isDirectHeal;
+  // Save-triggered moves (the user's own manual categorization -- see
+  // moveCategoriesFor's docstring) detour through save-picker.js instead:
+  // no attack roll, no AC comparison -- the TARGET rolls a save against
+  // this move's DC (already computed as computedData.moveDC). Takes
+  // priority over the target-picker detour above when both would
+  // otherwise apply -- a categorized move is either one or the other,
+  // never both, by construction of the categorization data itself.
+  const _isSaveTriggered = moveCategoriesFor(moveName).includes('TRIGGER SAVING THROW');
+  const _willDeferToSavePicker = _isSaveTriggered && !!onSaveTriggered;
 
   showMovePopup({
     move,
@@ -2599,7 +2634,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved 
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
-    deferAnimation: _willDeferToTargetPicker,
+    deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker,
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;
@@ -2660,7 +2695,9 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved 
       // for moves that actually deal damage to someone else, not self-heals
       // or pure status/utility moves, matching the same signal
       // move-popup.js's own drain/direct-heal post-use check already uses.
-      if (onDamageResolved && computedData.damageDice && !_isDrainHeal && !_isDirectHeal) {
+      if (_willDeferToSavePicker) {
+        onSaveTriggered({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+      } else if (onDamageResolved && computedData.damageDice && !_isDrainHeal && !_isDirectHeal) {
         onDamageResolved({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
       }
     },

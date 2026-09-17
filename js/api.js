@@ -914,6 +914,14 @@ export class CombatAPI {
     return API.request('combat', 'list-backgrounds', {}, { useCache: false });
   }
 
+  /** {status, categories: {moveName: [category, ...]}} -- the user's own
+   * manual move categorization (see routes_combat.py's list-move-categories
+   * action). Cacheable -- the file only changes between deploys, not
+   * within a single page session. */
+  static async listMoveCategories() {
+    return API.request('combat', 'list-move-categories', {}, { useCache: true, cacheKey: 'move-categories', cacheTtl: 300000 });
+  }
+
   /** Sets the shared board's background image (empty string clears it). */
   static async setBoardBackground(url) {
     return API.request('combat', 'set-board-background', { url }, { useCache: false });

@@ -3727,7 +3727,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "The targeted creature must succeed on a Wisdom saving throw or be charmed by the beholder for 1 hour, or until the beholder harms the creature.",
       "moveStat": "WIS",
@@ -3747,7 +3748,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--TRIGGER SAVING THROW--",
+        "--LETHAL FAINT--"
       ],
       "description": "You emit a thin, extremely high energy beam at a target. If the target is a creature, it must succeed on a Dexterity saving throw or take 4d12 MOVE + Fairy damage. If this damage reduces the creature to 0 hit points, its body becomes a pile of fine gray dust.",
       "moveStat": "DEX",
@@ -3767,7 +3770,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "stat_buff_ally"
       ],
       "description": "You release an aroma that inspires your allies. When you activate this move, you and any ally within 5 feet of you may add a d4 to any saving throw they make for the duration.",
       "moveStat": "None",
@@ -3787,7 +3791,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "--SITUATIONAL USE--"
       ],
       "description": "You channel energy from ancient artifacts to enhance your combat prowess. If an ancient artifact is within range and you know it is there, add double your proficiency bonus to attack and damage rolls.",
       "moveStat": "None",
@@ -3807,7 +3812,8 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "stat_debuff_enemy"
       ],
       "description": "You quickly widen your eyes in an attempt to charm an opponent, decreasing their will to fight. When you or an ally in range are targeted by a Move that requires an attack roll, you may use a reaction to impose disadvantage on the roll.",
       "moveStat": "None",
@@ -3827,7 +3833,7 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
+        "--TRIGGER SAVING THROW--",
         "stat_debuff_enemy"
       ],
       "description": "You attempt to charm an opponent, sharply decreasing its attack. A target you choose in range must make a WIS save against your Move DC. On a fail, the target adds -2 to all attacks against you for the duration.",
@@ -3848,7 +3854,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You attempt to charm a humanoid you can see within range. It must make a Wisdom saving throw, and does so with advantage if you or your companions are fighting it. If it fails the saving throw, it is charmed by you until the spell ends or until you or your companions do anything harmful to it. The charmed creature regards you as a friendly acquaintance. When the spell ends, the creature knows it was charmed by you.",
       "moveStat": "None",
@@ -3889,7 +3896,8 @@
       },
       "reaction": true,
       "categories": [
-        "protect_negate"
+        "protect_negate",
+        "counter_reaction_effect"
       ],
       "description": "You summon forth a mysterious power that blocks an incoming status condition. When you or an ally within 5 feet of you are subject to a status condition from an enemy move, you may use your reaction to nullify the condition.",
       "moveStat": "None",
@@ -3910,9 +3918,11 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
+        "--VARIABLE MOVE TYPE--"
       ],
       "description": "You may only use while your current hit points are above 75% of your maximum. Your form transforms into pure ether for an instant as you let out a massive burst of energy. All creatures in a 60ft. radius must succeed a Charisma saving throw, or take 4d12 + MOVE damage of any type, and be stunned for one round. The type of damage is determined by you. This move does not benefit from STAB even if your type aligns with the type of damage dealt. On a successful save, they take half damage and are not stunned. This move costs VP equal to your current HP. After using this move, you drop to 1 hit point and are not able to use attack moves or be recalled until the end of your next turn. This move may be used once per long rest.",
       "moveStat": "CHA",
@@ -3933,8 +3943,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You emit a powerful flash that damages all creatures in range. Creatures within 20 feet of you must make a CON save against your Move DC, taking 2d8 + MOVE fairy damage on a failure, or half as much on a success.",
       "moveStat": "DEX/CHA",
@@ -3954,7 +3965,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "The user creates a dazzling display of lights. All creatures within a 30-foot cone must succeed on a Constitution saving throw or be blinded until the end of the user's next turn.",
       "moveStat": "CON",
@@ -3973,7 +3986,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self"
+      ],
       "description": "You do a strange dance that allows you to phase in and out of existence. For the duration, all attacks against you are rolled with disadvantage.",
       "moveStat": "None",
       "vpCost": "5",
@@ -3992,7 +4007,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--GUARANTEED HIT--"
       ],
       "description": "You let out a charming cry, dealing emotional damage to any opponent in range that can hear you. This move automatically hits for 1d4 + MOVE fairy damage unless a creature is in the invulnerable stages of Fly, Dig, Bounce, etc.",
       "moveStat": "CHA",
@@ -4011,7 +4027,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "shield_temphp",
+        "stat_buff_self"
+      ],
       "description": "Your noodly appendages multiply, and your body grows to a huge size. While in this form, you gain the ability Spaghedeity; you get half of your current max HP as temporary bonus HP, and your melee reach is increased to 15ft.",
       "moveStat": "None",
       "vpCost": "21",
@@ -4050,7 +4069,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "heal_target_or_aoe"
+      ],
       "description": "You touch a sleeping creature, causing their sleep to rapidly restore their health for 3d10 + MOVE. The creature wakes up at the end of their next turn, fully refreshed.",
       "moveStat": "WIS",
       "vpCost": "10",
@@ -4068,7 +4089,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "positioning"
+      ],
       "description": "You summon forth a mystical power that locks down the battlefield. Creatures within a 40 foot circle, centered on you, may not flee or be switched out on their next turn.",
       "moveStat": "None",
       "vpCost": "4",
@@ -4086,7 +4109,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL DISADVANTAGE--"
+      ],
       "description": "You release a cloud of shimmering scales in a 15ft. cone. All affected creatures must succeed a DEX saving throw or have disadvantage on their attack rolls until the end of their next turn.",
       "moveStat": "DEX",
       "vpCost": "5",
@@ -4127,7 +4154,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "--STATUS CONDITION--"
       ],
       "description": "You smell the aroma of a creature within melee range, sending you into a ravenous frenzy. Make a melee attack, grappling and restraining the creature on a hit. On your next turn, if you kept your concentration, you swallow the creature whole. While inside you, the creature is incapacitated. If you faint, you regurgitate all swallowed creatures from this encounter. This move only works on creatures smaller than you.",
       "moveStat": "STR/DEX/CON",
@@ -4148,8 +4175,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You unleash a beam of energy in a 80 foot line, 5 feet wide. All creatures in its path must make a DEX save against your Move DC, taking 3d10 + MOVE fairy damage on a failure, or half as much on a success. Creatures failing the save by 5 or more are blinded until the end of their next turn. After activating this move, your next attack is rolled at disadvantage. If the next attack requires a saving throw, the target(s) gain advantage.",
       "moveStat": "WIS/CHA",
@@ -4169,9 +4198,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "heal_self",
-        "field_terrain"
+        "heal_target_or_aoe"
       ],
       "description": "You extend a healing energy to recover the hit points of a creature in range. The target gains 2d8 + MOVE hit points. If the terrain is grassy, double your MOVE modifier.",
       "moveStat": "CON",
@@ -4191,8 +4218,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally"
+        "stat_buff_ally",
+        "--SITUATIONAL USE--"
       ],
       "description": "Large flowers sprout from any grass-type allies in range, boosting their defense. For one minute, as long as you keep your concentration, grass-type allies in a 15 foot circle, centered on you, gain +2 to their AC.",
       "moveStat": "None",
@@ -4213,8 +4240,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "stat_buff_self"
+        "--POTENTIAL STAT INCREASE--"
       ],
       "description": "You lash out with the power of the forest. Make a ranged attack roll against a creature, doing 3d10 + MOVE fairy damage on a hit. On a natural attack roll of 15 or higher, all of your ability scores go up by 1 while you remain in battle. This move can be stacked for a maximum of +5 to all ability scores.",
       "moveStat": "STR/DEX/WIS",
@@ -4233,7 +4259,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_terrain"
+      ],
       "description": "You create a magical ring on the ground that encircles a 15ft. radius. For the duration, the DC for critical hits is lowered by 1 for any move activated within the circle.",
       "moveStat": "None",
       "vpCost": "15",
@@ -4272,8 +4300,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "recharge_locked"
+        "--SITUATIONAL USE--"
       ],
       "description": "You turn your held item into gold, increasing its value but otherwise making it unusable in battle. The value of your item is up to the DM's discretion.",
       "moveStat": "None",
@@ -4294,9 +4321,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain",
         "heal_target_or_aoe",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You exhale a cone of shimmering energy that damages enemies and heals allies. All affected hostile creatures must succeed a WIS saving throw or take 3d10 + MOVE fairy damage. Allied creatures caught in the blast heal for half the amount rolled + MOVE.",
       "moveStat": "WIS/CHA",
@@ -4337,9 +4365,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recoil",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "recoil"
       ],
       "description": "You draw forth a powerful natural essence, concentrating it into a beam of light 80ft long and 5 feet wide. All creatures caught in the blast must make DEX saving throw against your Move DC, taking 4d12 + MOVE fairy damage on a failure, or half as much on a success. The user takes recoil damage equal to half the damage rolled.",
       "moveStat": "DEX/CHA",
@@ -4360,10 +4389,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_debuff_enemy",
         "recharge_locked",
-        "multi_hit_choice"
+        "multi_hit_choice",
+        "--TRIGGER SAVING THROW ON HIT--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You hurl glowing spikes at up to three targets in range. Make three ranged attacks, dealing 3d10 + MOVE fairy damage on a hit. On a hit, the target needs to make a Constitution saving throw, or become drowsy for 1d4 minutes. While drowsy, the creature suffers disadvantage on saving throws and attack rolls, and other creatures have advantage on saving throws induced by this Pokémon. At the end of the drowsiness, the creature falls unconscious for 1d12 hours. For the duration, the creature can't be awakened by normal means unless it completes a long rest. They are, however, considered asleep, and can be damaged by Bad Dreams, Dream Eater or similar moves.",
       "moveStat": "STR/DEX/WIS",
@@ -4383,7 +4412,10 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL DISADVANTAGE--"
       ],
       "description": "When you are the target of an attack, you may use your reaction to emit a mesmerizing light pattern in a 30ft. radius. All creatures in range must make a Wisdom saving throw, suffering disadvantage on attack rolls against you until the beginning of your next turn. Then, roll a d10. On a 9 or 10, you regain your reaction.",
       "moveStat": "WIS",
@@ -4402,7 +4434,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "--STATUS CONDITION--"
+      ],
       "description": "A sinister, yet weirdly tangy, marinara mist descends on a creature in range. Make a ranged attack roll, gaining temporary control of the creature's senses on a hit. At the start of the creature's turn, you announce how you confuse its senses and how it responds. The red mist dissipates after 1 minute, or if the affected creature is healed of all status conditions by any means.",
       "moveStat": "None",
       "vpCost": "8",
@@ -4421,7 +4455,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "The user performs a captivating dance. All creatures within 30 feet that can see the user must succeed on a Wisdom saving throw or be charmed for 1 minute. While charmed, the creature's speed is zero. The creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "WIS",
@@ -4440,7 +4476,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_terrain"
+      ],
       "description": "You cover the ground in a thin, healing mist that surrounds a 60 foot circle, centered on you. For 3 turns, no grounded creatures inside the mist can suffer from new status conditions. Grounded creatures are those that do not have a flying speed or Levitate, Magnet Rise, or similar ability.",
       "moveStat": "None",
       "vpCost": "5",
@@ -4460,8 +4498,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "stat_debuff_enemy"
+        "status_inflict_threshold"
       ],
       "description": "You summon forth a powerful moonbeam that strikes a creature. Make a ranged attack on a target in range, dealing 2d8 + MOVE fairy damage on a hit. On a natural attack roll of 15 or more, the target has disadvantage on its next attack.",
       "moveStat": "DEX/CHA",
@@ -4501,11 +4538,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "status_inflict_save",
         "drain",
-        "heal_self",
-        "heal_target_or_aoe"
+        "--TRIGGER SAVING THROW ON HIT--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You grab a creature and attempt a mystical waltz that drains its vitality. Make a melee attack, grappling and restraining the creature on a hit. The target must then succeed a WIS saving throw or become charmed by you. For three turns, or until you lose concentration, you are locked in a dance that as your action drains the target of 2d8 VP each turn. You regain half of the VP drained as HP. The target may use its action to attempt to break free from your grapple on its turn, unless it is charmed. You may use your action to stop dancing on your turn. After the dance ends, the charm persists until it is broken.",
       "moveStat": "None",
@@ -4524,7 +4559,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self"
+      ],
       "description": "An eerie glow surrounds you, creating illusory copies of yourself. For the duration, all attack rolls against you are rolled with disadvantage.",
       "moveStat": "None",
       "vpCost": "5",
@@ -4542,7 +4579,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "--TRIGGER SAVING THROW--",
+        "fixed_special_damage"
+      ],
       "description": "You harness all the power of nature and send it at a creature in range. The target must make a CON save against your Move DC. On a failed save, the target loses half their current HP (minimum of 1 damage). This move consumes VP equal to the HP lost by the target.",
       "moveStat": "WIS/CHA",
       "vpCost": "Varies",
@@ -4561,8 +4601,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "--TRIGGER SAVING THROW ON HIT--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "After landing an attack, you may extend your noodly appendage to touch the creature hit as a bonus action. The creature is forced to make a WIS save against your move power on a hit, becoming confused and charmed if the save fails. On a fumble, the creature is stunned.",
       "moveStat": "WIS/INT/CHA",
@@ -4582,7 +4622,9 @@
       },
       "reaction": false,
       "categories": [
-        "recharge_locked"
+        "positioning",
+        "recharge_locked",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You disappear from view and reappear at an unoccupied point within range, having opened a portal between the two spots. In wild creature battles, this move can be activated to automatically count as a single success in a group DEX check to run away. The portal lingers for 3 turns. Any creature except you attempting to pass through the portal must succeed a DEX save, or be subjected to the move Crunch. Only one pair of portals may be active at any time.",
       "moveStat": "None",
@@ -4645,12 +4687,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "drain",
         "heal_target_or_aoe",
-        "stat_buff_self",
         "stat_buff_ally",
-        "field_weather",
         "recoil",
         "recharge_locked"
       ],
@@ -4673,9 +4711,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You sing an ancient song that damages creatures in range with the chance to put them asleep. Any creature in a 20ft circle, centered on you, must make a CON save against your Move DC, taking 3d10 + MOVE fairy damage on a failure, or half as much ona success. Any creature that fails the save by 5 or more is put to sleep.",
       "moveStat": "CHA/WIS",
@@ -4695,7 +4734,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You sing a hauntingly beautiful song that can be heard in a 5 mile radius. Affected creatures have to make a save against your move DC, their minds being captured by you on a failure. You then fall asleep, entering the Dreamscape with your captives.",
       "moveStat": "WIS/CHA",
@@ -4715,7 +4755,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You lay a kiss on a creature, attempting to confuse them. The target must make an CHA saving throw against your Move DC or become confused.",
       "moveStat": "WIS/CHA",
@@ -4755,7 +4796,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You create a magical contract between two willing or unwilling creatures. If either breaks an agreed condition, they take 1d12 + MOVE fairy damage, ignoring immunity but not resistance. If this move is used on unwilling creatures, they must succeed Charisma saving throws to resist the contract.",
       "moveStat": "CHA",
@@ -4775,7 +4817,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_threshold"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "stat_debuff_enemy"
       ],
       "description": "You call upon the whispers of the forest to aid you, disorienting and disheartening opponents in range. For the duration, all creatures within 50 feet of you, that have the intention to harm you, are forced to make a WIS save. On a failure, they suffer -5 to hit this turn. On a natural roll of 1, they become frightened as well. Deaf creatures are unaffected by this move.",
       "moveStat": "CHA",

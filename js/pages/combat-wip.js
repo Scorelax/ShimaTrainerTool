@@ -10,7 +10,7 @@
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
-import { pickSaveTarget } from '../utils/save-picker.js';
+import { pickSaveTarget, confirmSecondarySave } from '../utils/save-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
@@ -22,7 +22,7 @@ import {
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions,
-  setCombatStateKey, setOnCombatStateSave, setOnLogEvent,
+  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -1519,7 +1519,34 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
     }
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
+    return;
   }
+
+  // Some moves land a hit AND separately make the hit creature save against
+  // a secondary consequence (e.g. Temporal Fang: damage on the attack roll,
+  // then the hit target saves against being slowed) -- distinct from a pure
+  // save move (no attack roll at all, see _handleSaveTriggered), per the
+  // user's own explicit correction that "trigger saving throw" can't be
+  // assumed to skip the attack roll. Only reachable once the attack already
+  // landed, since a Miss never applies damage in the first place.
+  if (moveCategoriesFor(moveName).includes('TRIGGER SAVING THROW ON HIT')) {
+    await _handleSecondarySave(combatantId, targetId, moveName, computedData);
+  }
+}
+
+async function _handleSecondarySave(combatantId, targetId, moveName, computedData) {
+  const target = session?.participants?.[targetId];
+  if (!target) return;
+  const attackerName = session?.participants?.[combatantId]?.name || '?';
+  const dc = computedData.moveDC ?? 0;
+  const outcome = await confirmSecondarySave(target, target.name, { dc });
+  if (!outcome) return; // closed without declaring
+  const text = outcome.passed
+    ? `${target.name} succeeded the secondary saving throw against ${attackerName}'s ${moveName}`
+    : `${target.name} failed the secondary saving throw against ${attackerName}'s ${moveName} -- apply its effect`;
+  CombatAPI.logEvent({
+    type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name, text,
+  }).catch(() => {});
 }
 
 /** Wired into combat.js's move-popup flow as onSaveTriggered (see

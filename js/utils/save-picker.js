@@ -239,6 +239,30 @@ function _cardHtml(p) {
 }
 
 /**
+ * The "on hit" counterpart to pickSaveTarget -- for a move that already
+ * resolved an attack roll (target-picker.js) and only THEN triggers a
+ * saving throw for a secondary consequence (e.g. Temporal Fang: hits for
+ * damage, and the hit creature separately saves against being slowed).
+ * The target is already fixed (whoever the attack just hit), so this skips
+ * straight to the DC/Pass-Fail step -- no target grid, no Back button, and
+ * no damage-roll follow-up (a secondary effect here is a status/other
+ * consequence, not more damage; the primary attack already applied that).
+ * Resolves to {targetId, passed: true|false}.
+ */
+export async function confirmSecondarySave(target, targetName, { dc = 0 } = {}) {
+  _ensureDom();
+  _dc = dc;
+  _hasDamage = false;
+  _speciesName = '';
+  _selectedTargetId = target.id;
+  _showStep2(target, targetName);
+  document.getElementById('savePickerBack').style.display = 'none';
+  document.getElementById('savePickerTitle').textContent = 'Secondary Saving Throw';
+  _overlay.style.display = 'flex';
+  return new Promise((resolve) => { _resolve = resolve; });
+}
+
+/**
  * Shows the target/DC/outcome popup for a save-triggered move: pick who has
  * to save, see the Move DC, and declare Save Success or Save Fail yourself
  * (same "app shows the number, a human compares it and declares the
@@ -263,6 +287,7 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _speciesName = speciesName;
   _hasDamage = hasDamage;
   document.getElementById('savePickerAnimMedia').innerHTML = '';
+  document.getElementById('savePickerBack').style.display = '';
   _showStep1();
   const grid = document.getElementById('savePickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');

@@ -1272,7 +1272,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
+        "--TRIGGER SAVING THROW ON HIT--",
         "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You bite down with temporal force. Make an attack roll against a creature, dealing 1d10 + MOVE cosmic damage on a hit. The hit creature must succeed a Wisdom saving throw or be slowed for 1d4 rounds, moving at half speed and having disadvantage on attack rolls and saving throws. Creatures attacking a slowed target have advantage on their attack rolls."

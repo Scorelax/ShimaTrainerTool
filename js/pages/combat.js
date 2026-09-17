@@ -43,7 +43,7 @@ function loadMoveCategories() {
   }).catch(() => {}).finally(() => { _moveCategoriesLoading = false; });
 }
 
-function moveCategoriesFor(moveName) {
+export function moveCategoriesFor(moveName) {
   return _moveCategories?.[moveName] || [];
 }
 

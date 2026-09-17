@@ -73,6 +73,7 @@ function _injectStyles() {
 let _overlay = null;
 let _resolve = null;
 let _dc = 0;
+let _manualDc = false; // true when the DC isn't known ahead of time -- the human types it in (see resolveReactiveSave's fallback)
 let _damageModifier = 0;
 let _speciesName = '';
 let _hasDamage = false;
@@ -100,7 +101,11 @@ function _ensureDom() {
         </div>
         <div id="savePickerStep2" hidden>
           <div class="save-picker-dc-target" id="savePickerDcTarget"></div>
-          <div class="save-picker-dc-value">Move DC: <strong id="savePickerDcValue"></strong></div>
+          <div class="save-picker-dc-value" id="savePickerDcDisplay">Move DC: <strong id="savePickerDcValue"></strong></div>
+          <div id="savePickerDcInputWrap" hidden>
+            <label class="save-picker-roll-label" for="savePickerDcInput">Their Move DC (ask the table)</label>
+            <input type="number" id="savePickerDcInput" class="save-picker-roll-input" placeholder="Enter DC…">
+          </div>
           <div class="save-picker-outcome-actions">
             <button class="combat-use-move-btn save-picker-back" id="savePickerBack">← Back</button>
             <button class="combat-use-move-btn save-picker-pass-btn" id="savePickerPass">Save Success</button>
@@ -126,6 +131,7 @@ function _ensureDom() {
   document.getElementById('savePickerBack').addEventListener('click', _showStep1);
   document.getElementById('savePickerPass').addEventListener('click', _confirmPass);
   document.getElementById('savePickerFail').addEventListener('click', _confirmFail);
+  document.getElementById('savePickerDcInput').addEventListener('input', _updateManualDcButtons);
   document.getElementById('savePickerConfirmRoll').addEventListener('click', _confirmDamageRoll);
   document.getElementById('savePickerRollInput').addEventListener('input', _updateRollTotal);
   document.getElementById('savePickerRollInput').addEventListener('keydown', (e) => {
@@ -156,11 +162,40 @@ function _showStep2(p, name) {
   document.getElementById('savePickerDcTarget').innerHTML = `
     <div class="save-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="save-picker-dc-target-name">${_selectedTargetName}</div>`;
-  document.getElementById('savePickerDcValue').textContent = _dc;
+  document.getElementById('savePickerDcDisplay').hidden = _manualDc;
+  document.getElementById('savePickerDcInputWrap').hidden = !_manualDc;
+  if (_manualDc) {
+    const input = document.getElementById('savePickerDcInput');
+    input.value = '';
+    setTimeout(() => input.focus(), 50);
+  } else {
+    document.getElementById('savePickerDcValue').textContent = _dc;
+    document.getElementById('savePickerPass').disabled = false;
+    document.getElementById('savePickerFail').disabled = false;
+  }
+  _updateManualDcButtons();
+}
+
+/** In manual-DC mode, Pass/Fail stay disabled until a DC has actually been
+ * typed in -- there's no sensible default to fall back to (unlike every
+ * other roll in this app, this one has no auto-computed number behind it
+ * at all until the human supplies one). No-op (buttons just stay enabled)
+ * when not in manual mode. */
+function _updateManualDcButtons() {
+  if (!_manualDc) return;
+  const dc = parseInt(document.getElementById('savePickerDcInput').value, 10);
+  const disabled = Number.isNaN(dc);
+  document.getElementById('savePickerPass').disabled = disabled;
+  document.getElementById('savePickerFail').disabled = disabled;
+}
+
+function _currentDc() {
+  if (!_manualDc) return _dc;
+  return parseInt(document.getElementById('savePickerDcInput').value, 10) || 0;
 }
 
 function _confirmPass() {
-  _close({ targetId: _selectedTargetId, passed: true });
+  _close({ targetId: _selectedTargetId, passed: true, dc: _currentDc() });
 }
 
 /** Save Fail -- plays the attacker's battle animation (if one exists), then
@@ -172,7 +207,7 @@ async function _confirmFail() {
   if (_hasDamage) {
     _showStep3();
   } else {
-    _close({ targetId: _selectedTargetId, passed: false });
+    _close({ targetId: _selectedTargetId, passed: false, dc: _currentDc() });
   }
 }
 
@@ -252,6 +287,7 @@ function _cardHtml(p) {
 export async function confirmSecondarySave(target, targetName, { dc = 0 } = {}) {
   _ensureDom();
   _dc = dc;
+  _manualDc = false;
   _hasDamage = false;
   _speciesName = '';
   _selectedTargetId = target.id;
@@ -283,12 +319,54 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
 
   _ensureDom();
   _dc = dc;
+  _manualDc = false;
   _damageModifier = damageModifier;
   _speciesName = speciesName;
   _hasDamage = hasDamage;
   document.getElementById('savePickerAnimMedia').innerHTML = '';
   document.getElementById('savePickerBack').style.display = '';
   _showStep1();
+  const grid = document.getElementById('savePickerGrid');
+  grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
+  grid.querySelectorAll('[data-target-id]').forEach(card => {
+    card.addEventListener('click', () => {
+      const p = session.participants[card.dataset.targetId];
+      _selectedTargetId = card.dataset.targetId;
+      _showStep2(p, visibleToViewer(p, 'name') ? p.name : '???');
+    });
+  });
+
+  _overlay.style.display = 'flex';
+  return new Promise((resolve) => { _resolve = resolve; });
+}
+
+/**
+ * Reactive-save fallback for when auto-detect can't find/trust a recent
+ * attacker (see combat-wip.js's _handleReactiveSave) -- pick who attacked
+ * you from the full participant list, then type in their Move DC yourself
+ * (nothing computed here; ask the table). No damage-roll follow-up, same
+ * reasoning as confirmSecondarySave -- this is always the reactor's own
+ * save against a consequence that already happened, never a fresh attack.
+ * Resolves to {targetId, passed, dc} (dc is whatever was typed in), or
+ * null if closed/no one to pick.
+ */
+export async function pickManualSaveTarget(casterId, { speciesName = '' } = {}) {
+  const result = await CombatAPI.getState();
+  const session = result.status === 'success' ? result.data : null;
+  if (!session || !session.active) return null;
+
+  const participants = Object.values(session.participants).filter(p => p.id !== casterId);
+  if (!participants.length) return null;
+
+  _ensureDom();
+  _dc = 0;
+  _manualDc = true;
+  _hasDamage = false;
+  _speciesName = speciesName;
+  document.getElementById('savePickerAnimMedia').innerHTML = '';
+  document.getElementById('savePickerBack').style.display = '';
+  _showStep1();
+  document.getElementById('savePickerTitle').textContent = 'Who Attacked You?';
   const grid = document.getElementById('savePickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
   grid.querySelectorAll('[data-target-id]').forEach(card => {

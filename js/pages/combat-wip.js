@@ -10,7 +10,8 @@
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
-import { pickSaveTarget, confirmSecondarySave } from '../utils/save-picker.js';
+import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
+import { computeMoveDC } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
@@ -22,7 +23,7 @@ import {
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions,
-  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor,
+  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor, findMoveRow,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -1287,7 +1288,7 @@ function _attachMainFocusListeners(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx || !ctx.isMine) return;
 
-  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, ...ctx.cardOptions });
+  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, ...ctx.cardOptions });
 
   document.getElementById('battleList')?.addEventListener('click', (e) => {
     const reactBtn = e.target.closest('.wip-react-btn');
@@ -1604,6 +1605,48 @@ async function _handleSecondarySave(combatantId, targetId, moveName, computedDat
     : `${target.name} failed the secondary saving throw against ${attackerName}'s ${moveName} -- apply its effect`;
   CombatAPI.logEvent({
     type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name, text,
+  }).catch(() => {});
+}
+
+/** Wired into combat.js's move-popup flow as onReactiveSave -- for moves
+ * tagged REACTIVE SAVE (Wing Buffer, etc.), where the move's own user is
+ * the one who saves, against whoever attacked them, not a chosen target's
+ * own DC. Auto-detects the attacker and their DC from the shared battle
+ * log's most recent damage entry against this reactor (per the user's
+ * explicit direction), falling back to a manual "pick who attacked you and
+ * type in their DC" flow when that isn't possible -- no recent damage
+ * entry, the attacker's record predates the full-stat-block feature (e.g.
+ * a PvE freeform enemy), or the attacking move isn't in the moves dataset. */
+async function _handleReactiveSave({ combatantId, moveName }) {
+  const result = await CombatAPI.getState();
+  const freshSession = result.status === 'success' ? result.data : session;
+  const log = freshSession?.log || [];
+
+  let attacker = null;
+  let dc = null;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const entry = log[i];
+    if (entry.type !== 'damage' || entry.targetId !== combatantId) continue;
+    const candidate = freshSession.participants?.[entry.actorId];
+    if (candidate && entry.move && _hasFullStatBlock(candidate)) {
+      const moveRow = findMoveRow(entry.move);
+      if (moveRow) { attacker = candidate; dc = computeMoveDC(moveRow, candidate); }
+    }
+    break; // only ever look at the MOST RECENT damage entry against me, auto-detect or not
+  }
+
+  const outcome = dc !== null
+    ? await confirmSecondarySave(attacker, attacker.name, { dc })
+    : await pickManualSaveTarget(combatantId, {});
+  if (!outcome) return; // closed without declaring
+
+  const reactorName = freshSession?.participants?.[combatantId]?.name || '?';
+  const attackerName = (attacker || freshSession?.participants?.[outcome.targetId])?.name || '?';
+  const text = outcome.passed
+    ? `${reactorName} succeeded a reactive saving throw (DC ${outcome.dc}) against ${attackerName}'s attack using ${moveName}`
+    : `${reactorName} failed a reactive saving throw (DC ${outcome.dc}) against ${attackerName}'s attack using ${moveName} -- apply its effect manually (e.g. half damage)`;
+  CombatAPI.logEvent({
+    type: 'save', actorId: combatantId, actorName: reactorName, targetId: outcome.targetId, targetName: attackerName, text,
   }).catch(() => {});
 }
 

@@ -620,7 +620,7 @@
         "stat_buff_self",
         "counter_reaction_effect",
         "recoil",
-        "--TRIGGER SAVING THROW--"
+        "--REACTIVE SAVE--"
       ],
       "description": "You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successful hit against you triggers a Dexterity saving throw for you, against their move DC. On a successful save, you take half damage."
     },

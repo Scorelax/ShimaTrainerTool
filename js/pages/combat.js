@@ -47,6 +47,16 @@ export function moveCategoriesFor(moveName) {
   return _moveCategories?.[moveName] || [];
 }
 
+/** The raw move row [name, type, modifier, actionType, vpCost, duration,
+ * range, desc, higherLevels] for `name`, or undefined if the moves dataset
+ * hasn't loaded yet or the name isn't found -- for callers outside this
+ * file that need a move's own data (see save-picker.js's reactive-save
+ * auto-detect, which needs the attacking move's `modifier` field to
+ * compute the attacker's DC via pokemon-types.js's computeMoveDC). */
+export function findMoveRow(name) {
+  return _moveMap?.get(name);
+}
+
 // Module-level items DB cache — held items don't change during combat, so parse once
 let _itemsCache = null;
 
@@ -1646,7 +1656,7 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
-export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, ...cardOptions } = {}) {
+export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, onReactiveSave, ...cardOptions } = {}) {
   _battleState = state;
   _battleCardOptions = cardOptions; // see rerenderBattle -- every internal re-render (a move popup
   // confirming, an HP/VP adjuster click, etc.) needs to keep reusing the same per-card render
@@ -1811,7 +1821,7 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
         if (moveItem.dataset.isDiceLocked === 'true') {
           showDiceRechargePopup(moveItem.dataset.move, moveItem.dataset.combatantId, moveItem.dataset.rechargeRange, state); return;
         }
-        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered }); return;
+        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave }); return;
       }
       // Toggle expand on card click (not on controls)
       const card = e.target.closest('.combat-card');
@@ -2520,7 +2530,7 @@ function removeStatusEffect(combatantId, effectName, state) {
 // MOVE POPUP
 // ============================================================================
 
-function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered } = {}) {
+function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave } = {}) {
   if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
   const move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
@@ -2616,6 +2626,13 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
   // never both, by construction of the categorization data itself.
   const _isSaveTriggered = moveCategoriesFor(moveName).includes('TRIGGER SAVING THROW');
   const _willDeferToSavePicker = _isSaveTriggered && !!onSaveTriggered;
+  // Reactive-save moves (Wing Buffer, etc.) are the mirror image of the
+  // above: the move's OWN USER is the one who saves, against whoever
+  // attacked them -- not a chosen target's own DC. See combat-wip.js's
+  // _handleReactiveSave for the auto-detect-from-the-log logic this hands
+  // off to.
+  const _isReactiveSave = moveCategoriesFor(moveName).includes('REACTIVE SAVE');
+  const _willDeferToReactiveSave = _isReactiveSave && !!onReactiveSave;
 
   showMovePopup({
     move,
@@ -2634,7 +2651,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
-    deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker,
+    deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave,
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;
@@ -2695,7 +2712,9 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
       // for moves that actually deal damage to someone else, not self-heals
       // or pure status/utility moves, matching the same signal
       // move-popup.js's own drain/direct-heal post-use check already uses.
-      if (_willDeferToSavePicker) {
+      if (_willDeferToReactiveSave) {
+        onReactiveSave({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+      } else if (_willDeferToSavePicker) {
         onSaveTriggered({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
       } else if (onDamageResolved && computedData.damageDice && !_isDrainHeal && !_isDirectHeal) {
         onDamageResolved({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });

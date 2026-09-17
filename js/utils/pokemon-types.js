@@ -49,6 +49,26 @@ export function parseDamageDice(description, higherLevels, pokemonLevel) {
 }
 
 /**
+ * The Move DC formula in isolation (8 + highest applicable stat mod +
+ * proficiency, same as computeMoveData's own moveDC below -- deliberately
+ * NOT calling into computeMoveData for this, since that needs a full
+ * pokemonAttrs/trainerAttrs pair this caller may not have) -- for
+ * computing an ARBITRARY participant's own DC for a move they used, not
+ * just "the current combatant's" (see save-picker.js's reactive-save
+ * auto-detect, which needs the ATTACKER's DC, not the reactor's own).
+ * `stats` only needs strMod..chaMod and proficiency -- a server participant
+ * record with a full stat block (see routes_combat.py's _add_participant)
+ * already has exactly that shape.
+ */
+export function computeMoveDC(move, stats) {
+  const modMap = { STR: stats.strMod, DEX: stats.dexMod, CON: stats.conMod, INT: stats.intMod, WIS: stats.wisMod, CHA: stats.chaMod };
+  const moveModifiers = (move[2] || '').split('/').map(m => m.trim().toUpperCase());
+  const allowedMods = moveModifiers.map(m => modMap[m]).filter(v => v !== undefined);
+  const highestMod = allowedMods.length > 0 ? Math.max(...allowedMods) : 0;
+  return 8 + highestMod + (stats.proficiency || 0);
+}
+
+/**
  * Compute move attack/damage bonuses for a Pokemon using a given move.
  * Shared by combat.js (showCombatMoveDetails) and pokemon-card.js (showMoveDetails).
  *

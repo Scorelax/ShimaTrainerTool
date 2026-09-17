@@ -5831,7 +5831,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "field_weather",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
         "recharge_locked"
       ],
       "description": "Explosive projectiles rain down upon your opponents in a 10 foot radius, centered on a point within range. Any creature caught in the blast must succeed on a DEX save against your Move DC or take 4d12 + MOVE fire damage on a fail and half as much on a success. This move saps you of energy, and you may not make any attack until after the end of your next turn.",
@@ -5875,8 +5876,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "You unleash an intense and beautiful line of blue flames in a 50 foot line, 5 feet wide. All creatures caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE fire damage and being burned on a failure, or half as much without being burned on a success.",
@@ -5920,7 +5922,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "status_inflict_threshold",
+        "--POTENTIAL DAMAGE INCREASE--"
       ],
       "description": "You let out a stream of primordial purple flames at a target in range. Make a ranged attack roll, dealing 4d12 + MOVE fire damage on a hit. The target must then roll a d4. On a result of 1-2, the target suffers one level of exhaustion. With each subsequent hit to the same target during one combat, add 1d12 cosmic damage to the damage roll.",
       "moveStat": "WIS",
@@ -5941,8 +5944,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self"
+        "--GUARANTEED HIT--",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You hurl a ball of peculiar flames at a point on the ground within range. A 5ft. diameter flame that casts shadows instead of light burns 5ft. tall in this spot until the beginning of your next turn, doing 2d8 + Move fire damage to any creature occupying the space at the beginning of their turn. Additionally, the creature must succeed a WIS saving throw, or take 2d8 + MOVE dark damage as well on a failed save.",
       "moveStat": "STR/DEX",
@@ -5963,7 +5966,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
+        "recoil",
         "recharge_locked"
       ],
       "description": "Using this move drains 2d12 of the user's hit points. You create a swirling vortex of mystical flames. All creatures in a 30ft. radius must make a Dexterity saving throw. On a failure, they take 4d12 + MOVE fire damage and 3d10 fairy damage, and suffer one of the following effects: Roll a d4 to determine the effect. 1: Charmed until end of next turn 2: Burned 3: Blinded until end of next turn 4: Moved 15ft in a random direction On a successful save, they take half damage and suffer no effect. This move may be used once per long rest.",
@@ -5985,8 +5991,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "You spend one turn drawing in air, readying your attack. Next turn, you let out a stream of intense flames in a line 5 feet wide, creating an explosion with a radius of 10 feet on the first creature hit. All creatures caught in the explosion must make a CON save against your move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. If a creature fails the roll by 5 or more, it is burned.",
@@ -6029,7 +6036,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL DAMAGE INCREASE--",
         "recharge_locked"
       ],
       "description": "You spew hot magma in a 15 foot cone. Any creature caught in the blast must make a DEX saving throw against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success. If you are at full health when activating this move, double your STAB bonus when dealing damage, and roll damage with advantage.",
@@ -6071,7 +6080,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
         "recharge_locked"
       ],
       "description": "You dance and kick up a blaze, sending flames in a 15 foot circle, centered on you. Anyone caught in the blaze must make a DEX save against your Move DC, taking 2d8 + MOVE fire damage on a failure, or half as much on a success. If a creature fails the save by 5 or more, double the MOVE modifier when adding damage. This move may be used once per short rest.",
@@ -6093,7 +6103,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "Two pillars of raging hot flames explode out from you towards up to two creatures in range. The creature(s) targeted must succeed on a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success. Creatures that fail the save by 5 or more become burned.",
@@ -6136,7 +6148,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "--TRIGGER SAVING THROW ON HIT--",
         "stat_buff_ally"
       ],
       "description": "You strike out at a target in range with a burning lash, Make a melee attack on a creature, doing 2d8 + MOVE fire damage. On a successful attack, the targeted creature must make a CON save against your Move DC. On a fail, allies add +1 to any attack targeted at the creature for the duration. This modifier can be stacked if it fails multiple Fire Lash saves, up to a maximum of +5.",
@@ -6198,8 +6210,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "shield_temphp"
+        "stat_buff_self"
       ],
       "description": "Thin, wispy flames dance around you, shedding bright light in a 10-foot radius and dim light for an additional 10 feet. The flames grant resistance to cold temperatures. In addition, whenever a creature within 5 feet of you hits you with a melee attack, the shield erupts with flame. The attacker takes 2d8 fire damage.",
       "moveStat": "STR/WIS",
@@ -6240,7 +6251,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You release a fireball that explodes on contact. Choose a point in range. Any creature within 5 feet of that point must make a DEX save against your Move DC, taking 1d10 + MOVE fire damage on a hit, or half as much on a success.",
       "moveStat": "STR/DEX",
@@ -6282,8 +6294,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
         "recharge_locked"
       ],
       "description": "A wheel of flame explodes out from you in a 10 foot radius. All creature in the area must succeed on a DEX save against your Move DC, taking 1d10 + MOVE fire damage on a fail and half as much on a save. If the user is frozen, this move can still be used, thawing out the creature during the attack. This move can be used once per short rest.",
@@ -6305,8 +6317,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "You shoot a stream of flames in an 40 foot cone. All creatures caught in the cone must succeed on a DEX save against your Move DC, taking 2d8 + MOVE fire damage on a failure, or half damage on a success. Any creature that fails the save by 5 or more becomes burned.",
@@ -6350,8 +6363,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
         "fixed_special_damage",
         "recharge_locked"
       ],
@@ -6394,8 +6407,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "You exhale a wave of hot breath in a 15ft. cone. Creatures caught in the area must make a DEX save against your Move DC, taking 2d8 + MOVE fire damage on failure, or half as much on a success. If the creature fails the save by 5 or more, it is burned.",
@@ -6417,7 +6431,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "--BERRY CHECK--"
       ],
       "description": "You summon forth a burning hot flame that surrounds a creature. Make a ranged attack, dealing 1d10 + MOVE fire damage on a hit. On a hit, if the target is holding a berry, it is immediately burned to ash, becoming unusable.",
       "moveStat": "STR/DEX",
@@ -6438,8 +6452,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "Your body flares up into a fireball looking like a flaming eye, shooting a stream of fire in an 80ft. line. All creatures caught in the line must succeed on a DEX save against your Move DC or take 3d10 + MOVE fire damage and be burned on a failure, or half as much without being burned on a success.",
@@ -6460,7 +6475,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "status_inflict_auto"
       ],
       "description": "You engulf a target in intense flames. Make a ranged attack against a target, dealing 3d10 + MOVE fire damage on a hit, burning the target in the process.",
       "moveStat": "STR/DEX",
@@ -6481,6 +6497,8 @@
       "reaction": false,
       "categories": [
         "damage",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
         "positioning",
         "recharge_locked"
       ],
@@ -6503,8 +6521,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "You summon forth a plume of raging hot fire in a 10 foot radius, 40-feet tall cylinder, centered on a point within range. Creatures in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a failure and become burned, or half as much without becoming burned on a success. You may spend additional VP to gain extra height for this attack, 4VP for 1d10 extra height, to a maximum of extra height dice equal to your proficiency bonus.",
@@ -6526,7 +6545,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You stir up a maelstrom of fire in a 20ft radius, 15ft tall, centered on a point within range, that continues to rage as long as you hold your concentration. Any creature that enters this area for the first time on their turn, or is in that area at the beginning of their turn must make a CON save against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success.",
       "moveStat": "STR",
@@ -6547,6 +6567,9 @@
       "reaction": false,
       "categories": [
         "damage",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--STAT DEBUF SELF--",
         "recharge_locked"
       ],
       "description": "You summon forth a flaming meateor shower that rains down on your opponents. All creatures in a 10 foot radius, centered on a point within range, must take a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a hit, or half as much on a save. After activating this move, your next attack is rolled at disadvantage. If that attack requires a saving throw, the target has advantage.",
@@ -6567,7 +6590,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "stat_debuff_enemy"
       ],
       "description": "You summon forth a pair of mystical flames that dance around a target, dealing damage. Make a ranged attack roll against a target, dealing 3d10 + MOVE fire damage on a hit. If the target is hit with this attack, any attack roll it makes before the end of its next turn is rolled at disadvantage.",
       "moveStat": "DEX/WIS",
@@ -6588,7 +6612,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--STAT DEBUF SELF--",
         "recharge_locked"
       ],
       "description": "With a roar, flames burst from your body in a 15 foot radius, centered on you. Any creature in range must roll a DEX saving throw against your Move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. The power of the move exhausts you, and your next attack is done at disadvantage. If your next attack requires a creature saving throw, they have advantage. This move can be used once per short rest.",
@@ -6609,8 +6635,10 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "stat_buff_self",
+        "damage_vp",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "stat_debuff_enemy",
         "recharge_locked"
       ],
       "description": "You conjure a vortex of blue ethereal flames that superheats the air in a 10ft. radius, 40ft. high cylinder from a point within range. All creatures caught in the vortex are forced to make a CON save against your move DC. On a successful save, the creatures lose 4d12 + MOVE VP, and on a failure, they lose 4d12 + MOVE VP and all stat changes are removed. This move must be recharged by using Ether Pyre after its first use in a battle.",
@@ -6653,7 +6681,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "steal_disrupt"
       ],
       "description": "You breathe a small, concentrated purple flame towards a target. Make a ranged attack roll, dealing 2d8 + MOVE fire damage on a hit. The magical fire burns away one positive effect on a hostile target, or one negative effect if used on an ally.",
       "moveStat": "DEX",
@@ -6674,7 +6702,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "Searing hot flames lick out at creatures in a 10 foot circle, centered on you. Any creature in range must make a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success. If a target fails the save by 5 or more, it is burned. This move can be used once per short rest.",
@@ -6696,7 +6726,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "counter_reaction_effect"
       ],
       "description": "You set a shell trap that explodes in a 5ft radius. As a bonus action on the initial activation of this move, you set a trap on yourself. Only one trap may be set at a time. When you are hit by an attack, you can use a reaction to detonate the trap. Creatures within 5 feet of you must succeed on a DEX save against your Move DC, rolling at disadvantage, taking 3d10 + MOVE fire damage on a failure, or half as much on a success.",
       "moveStat": "STR/DEX",
@@ -6717,9 +6749,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "field_weather"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "A magic lens appears between your horns, amplifying the rays of the sun for one turn. On your next turn, the sunlight is focused into an intense and beautiful line of white light in a 50 foot line, 5 feet wide. Any creature caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. If a creature fails the save by more than 5, they are burned and blinded for three turns. In strong sunlight, this move does not need charging. In darkness, this move costs 10VP extra.",
       "moveStat": "STR/INT",
@@ -6778,7 +6810,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--",
         "recharge_locked"
       ],
       "description": "You begin to glow white hot. When you activate this move, you may immediately release the blast at 30ft radius, or continue charging. On each subsequent turn, you may use your action to release or continue charging. The blast automatically releases on Turn 3. Activation (Turn 1): 30ft radius Turn 2: 60ft radius Turn 3: 100ft radius (auto-release) While charging, creatures within the current radius must spend double movement to move away from you. When released (or if you are reduced to 0 HP while charging), all creatures in range must make a Constitution saving throw, taking 10d12 + MOVE fire damage on a failure, or half on a success. Creatures that fail are deafened for 1 minute; creatures that succeed are deafened for 3 rounds. After the explosion, make a DC 18 Constitution saving throw. On a failure, you faint and are stable. If the blast triggered from reaching 0 HP, you automatically fail this save. This move can only be used once per long rest.",
@@ -6800,8 +6834,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto",
-        "stat_buff_self"
+        "--STAT DEBUF SELF--"
       ],
       "description": "Your forehead burns like hot coals as you slam your head into a creature. Make a melee attack roll, dealing 4d12 + MOVE fire damage on a hit. After activating this move, your AC decreases by 2 until the beginning of your next turn. Until your next long rest, each use of this move after the first doubles the current AC debuff.",
       "moveStat": "STR/DEX",
@@ -6821,8 +6854,7 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "--STATUS CONDITION--"
       ],
       "description": "You scatter small burning eyes that trace a creature after a successful hit. For the duration, moves you execute may originate from the Watchful Embers. The creature affected may use their action to attempt a WIS save against your move DC to get rid of the Watchful Embers on the beginning of their turn.",
       "moveStat": "None",

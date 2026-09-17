@@ -1019,9 +1019,9 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "multi_hit",
         "--VARIABLE MOVE TYPE--",
-        "--TRIGGER SAVING THROW--"
+        "--TRIGGER SAVING THROW--",
+        "multi_hit_aoe"
       ],
       "description": "You send powerful missiles of pure energy to rain down on any creature in a 40 foot circle, centered on a point in range. All creatures caught in the area must make a DEX save against your Move DC, taking 10d12 + MOVE damage on a failure, or half as much on a success. The type of the damage depends on the kind of plate the user is holding. This move can only be used once per long rest."
     },
@@ -1058,7 +1058,7 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "multi_hit"
+        "multi_hit_aoe"
       ],
       "description": "You call down a swarm of small meteors in a 50ft radius of yourself. Make as many ranged attacks as there are targets in range, dealing 3d10 + MOVE cosmic damage on a hit."
     },
@@ -1199,7 +1199,7 @@
         "damage",
         "stat_buff_self",
         "recharge_locked",
-        "multi_hit"
+        "multi_hit_aoe"
       ],
       "description": "You unleash a roar that has the power to distort time. All creatures within range must make a WIS save against your Move DC, taking 10d12 + MOVE cosmic damage on a failure, or half as much on a success. For any creature that failed the save by 5 or more, you may immediately take another action against them. Roar of Time may not be used as one of the additional actions. This move may be used once per long rest."
     },
@@ -1219,8 +1219,8 @@
         "damage",
         "stat_buff_self",
         "recharge_locked",
-        "multi_hit",
-        "--POTENTIAL STATUS CONDITION--"
+        "--POTENTIAL STATUS CONDITION--",
+        "multi_hit_aoe"
       ],
       "description": "You release a powerful shockwave that tears through creatures and the space around them. All creatures within range must make a CON save against your Move DC, taking 10d12 + MOVE cosmic damage on a failure, or half as much on a success. Creatures that fail this save by 5 or more become uncontrollable and are sucked into the Ethereal Plane until the beginning of your next turn, appearing in the same location when they return, suffering the Blink effect for 1 minute. This move may be usedd once per long rest."
     },
@@ -1415,9 +1415,9 @@
         "damage",
         "positioning",
         "recharge_locked",
-        "multi_hit",
         "--POTENTIAL PRONE--",
-        "--MULTI TYPE DAMAGE--"
+        "--MULTI TYPE DAMAGE--",
+        "multi_hit_aoe"
       ],
       "description": "You create a massive wave of dark water in a 60-foot cone. Each creature in the area must make a Dexterity saving throw, taking 10d12 dark damage and 4d8 water damage on a failed save, or half as much on a successful one. Additionally, creatures that fail the save are pushed 30 feet away and knocked prone."
     },
@@ -1545,8 +1545,8 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "multi_hit",
-        "--TRIGGER SAVING THROW--"
+        "--TRIGGER SAVING THROW--",
+        "multi_hit_aoe"
       ],
       "description": "You swing your arms around violently, attacking anything within a 5 foot circle, centered on yourself. All creatures in range must make a DEX saving throw against your Move DC, taking 3d10 + MOVE dark damage on a failure, or half as much on a success."
     },
@@ -1601,7 +1601,7 @@
       "reaction": false,
       "categories": [
         "status_inflict_save",
-        "multi_hit"
+        "multi_hit_aoe"
       ],
       "description": "You send the minds of your opponents into a world of darkness, putting them to sleep. All creatures within 30 feet of you must make a WIS save against your Move DC, falling asleep on a failure."
     },
@@ -1748,8 +1748,8 @@
         "stat_buff_ally",
         "protect_negate",
         "recharge_locked",
-        "multi_hit",
-        "--GUARANTEED HIT--"
+        "--GUARANTEED HIT--",
+        "multi_hit_same_target"
       ],
       "description": "You send a barrage of three balls of furious energy at any creature(s) in range. Each ball automatically deals 3d10 dark damage to any creature(s) you choose. Reactions that negate damage such as Protect or Detect cannot be used, and creatures in the invulnerable stages of moves like Fly, Dig, etc. can be targeted by thiis move. After activating this move, any attacks against you, until the beginning of your next turn, are rolled at advantage. This move may be used once per short rest."
     },
@@ -2413,7 +2413,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit"
+        "multi_hit_same_target"
       ],
       "description": "You lash out at opponents in range with a vicious bite. You may attack a number of times equal to the number of heads you have, costing 3VP per attack. Make melee attack rolls for all attacks, dealing 1d10 + MOVE dragon damage with each hit. You may target the same creature multiple times."
     },
@@ -2854,8 +2854,8 @@
       "categories": [
         "damage",
         "steal_disrupt",
-        "multi_hit",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe"
       ],
       "description": "A sweeping electric charge arcs around you, stealing some of the target's energy. Force all creatures in a 15ft radius, centered on you, to make a CON save against your Move DC, taking 3d10 + MOVE electric damage on a failure. Recover hit points equal to half the total damage dealt, but no more than 5 times your level."
     },
@@ -4250,7 +4250,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit"
+        "multi_hit_same_target"
       ],
       "description": "You strike twice with two devastating kicks. Make two melee attack rolls, doing 1d6 + MOVE fighting damage on each successful hit."
     },
@@ -6461,8 +6461,7 @@
       "reaction": false,
       "categories": [
         "stat_buff_self",
-        "stat_debuff_enemy",
-        "multi_hit"
+        "stat_debuff_enemy"
       ],
       "description": "Your eyes open wide and fixate on one creature in range, casting a devastating curse. Make a ranged attack. On a hit, force the creature to attempt a WIS save against your move DC. On a failure, the creature gets -1 to AC, STR, DEX, CON, WIS, INT, and CHA, and they can't flee or be switched out for the rest of the encounter. The effect stacks for a maximum of 5 times. On a success, nothing happens."
     },
@@ -6481,8 +6480,7 @@
       },
       "reaction": false,
       "categories": [
-        "recoil",
-        "multi_hit"
+        "recoil"
       ],
       "description": "You create a dark, internal bond with an opponent. Select a target in range, who must make a WIS save against your Move DC. On a fail, if you faint during the combat, the opponent must take damage equal to twice the damage of the same type that caused you to faint."
     },
@@ -9767,9 +9765,7 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [
-        "multi_hit"
-      ],
+      "categories": [],
       "description": "You create a sphere of energy that packs a concentrated and devastating explosion. Choose a target within range and roll a d20. On a 20, the explosion goes off and all creature within 5 feet of that point faint. On any other roll, the explosion fails to go off and this move has no effect. If the target's level is 10 more than your own, this move automatically fails. This move may only be attempted once per long rest."
     },
     {
@@ -11595,8 +11591,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "multi_hit"
+        "stat_buff_self"
       ],
       "description": "You use your action to store energy for a Spit Up or Swallow move, increasing your defense. Gain one point of Stockpile. Raise your AC by 1 until you use one of those two moves. This move may be stacked a maximum of 3 times before the energy is used. As long as you have a point of Stockpile, your speed is halved, and you may only use the moves Stockpile, Spit Up or Swallow unless you drop the Stockpile points."
     },
@@ -12589,8 +12584,7 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe",
-        "multi_hit"
+        "heal_target_or_aoe"
       ],
       "description": "You extend a healing energy to remove all status effects from a target. If a status effect is healed, it also restores the user's current hit points by twice its level. This user of this move cannot target itself."
     },
@@ -14795,7 +14789,6 @@
       "categories": [
         "damage",
         "heal_target_or_aoe",
-        "multi_hit",
         "recharge_locked"
       ],
       "description": "You perform emergency maintenance on a creature or structure. Touch one target to restore 3d10 + MOVE hit points. If used on a structure or object instead, it is reinforced, gaining +5 AC and resistance to all damage types for 1 hour. This move can be used 3 times per long rest."

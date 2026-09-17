@@ -62,7 +62,19 @@ const CATS = {
   counter_reaction_effect: m => /1 reaction/i.test(m.action || '') && !/negate|block(s)?|redirect|protects?|prevent(s)? (the|an|all)?\s?(damage|attack)/i.test(text(m)),
   steal_disrupt: m => /(steal|snatch|force it to make|prevent(ing|s)? (the )?recovery|its move fails|effect fails)/i.test(text(m)),
   recoil: m => /(you take|user takes|take(s)? damage equal to|damaging it by the same amount|sacrifice(s)? health)/i.test(text(m)),
-  multi_hit: m => /(twice|two times|\d+(-\d+)? times|multiple times|hits (\d+|twice)|roll(s)? damage .{0,10}(twice|multiple))/i.test(text(m)),
+  // Split 2026-09-17 after manual review turned up systematic false
+  // positives on incidental "N times" phrasing unrelated to hitting more
+  // than once (a stacking effect capped "5 times", an item usable "3 times
+  // per long rest", etc.) -- both new patterns require actual attack-roll
+  // language, not just a number-of-times mention anywhere in the text.
+  // multi_hit_aoe: one roll/save resolves against every creature in an
+  // area at once. multi_hit_same_target: multiple SEPARATE attack rolls,
+  // each against a target chosen at the time (often but not always the
+  // same one) -- mechanically these need very different app handling (one
+  // shared roll applied to N targets vs. N independent target-pick-and-
+  // roll passes), which is the whole reason for the split.
+  multi_hit_aoe: m => /\ball creatures?\b.{0,60}\b(must (make|succeed)|takes?)\b/i.test(text(m)) && /\b(radius|cone|circle|sphere|line|area)\b/i.test(text(m)),
+  multi_hit_same_target: m => /(make (two|three|\d+) (melee|ranged)? ?attack rolls|attack (a number of times|.{0,20}times equal to)|target the same creature multiple times|make (melee|ranged)? ?attack rolls for all attacks)/i.test(text(m)),
   fixed_special_damage: m => /(regardless of|reduces? (the )?target('s)? (current )?hp to 1|the (less|more) hp .{0,10}the (stronger|more powerful)|below \d+% of (its |your )?(maximum )?health|double the damage|triple the damage)/i.test(text(m)),
   recharge_locked: m => /recharge/i.test(m.action || ''),
 };

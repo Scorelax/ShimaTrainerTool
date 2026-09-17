@@ -4839,7 +4839,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You unleash a flurry of fists on an opponent. Make a melee attack roll, doing 1d4 + MOVE fighting damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 fighting damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits.",
       "moveStat": "STR/DEX",
@@ -4859,7 +4860,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--GUARANTEED HIT--"
       ],
       "description": "You focus your aura into a concentrated blast that strikes an opponent in range. This move is guaranteed to hit for 1d10 + MOVE fighting damage, except when targeting an opponent in the invulnerable stages of Fly, Dig, Bounce, etc.",
       "moveStat": "STR/DEX/WIS",
@@ -4920,9 +4922,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "--TRIGGER SAVING THROW ON HIT--",
+        "--POTENTIAL STATUS CONDITION--",
         "positioning",
-        "fixed_special_damage",
         "recharge_locked"
       ],
       "description": "You strike with the force of a natural disaster. Make a melee attack with advantage against a single target dealing 10d12 + MOVE fighting damage. The target must make a CON save or be stunned for 1 round. Regardless of the save, the target is pushed back 30ft. Creatures Huge or larger are instead staggered, losing their reaction and having disadvantage on their next attack. This move can be used once per long rest. If this attack misses, the VP is spent, but the move is not expended and may be used again until it hits.",
@@ -4943,7 +4945,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "positioning"
       ],
       "description": "You grab and hurl the opponent across the battlefield. Make a melee attack, dealing 1d10 + MOVE fighting damage on a hit. On hit, throw the target in a direction of your choice: 30ft if your size or smaller, 15ft if one size larger, or 5ft if two or more sizes larger. If the target collides with a solid surface or another creature, both take 1d6 typeless damage.",
       "moveStat": "STR",
@@ -4963,7 +4966,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--STAT DEBUF SELF--"
       ],
       "description": "You get in close for a devastating strike, sacrificing your defenses. Make a melee attack on an opponent, dealing 3d10 + MOVE fighting damage on a hit, rolled with advantage. After activating this move, your AC is reduced by 1d4, and the target has advantage on any attack it makes against you, until the beginning of your next turn.",
       "moveStat": "STR",
@@ -5046,7 +5050,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit_combined_roll"
+        "multi_hit_same_target"
       ],
       "description": "You strike twice with two devastating kicks. Make two melee attack rolls, doing 1d6 + MOVE fighting damage on each successful hit.",
       "moveStat": "STR/DEX",
@@ -5066,7 +5070,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "drain"
       ],
       "description": "Your strike a foe with an energy-draining punch. Make a melee attack, dealing 1d10 + MOVE fighting damage on a hit, healing you for half the damage dealt.",
       "moveStat": "STR/DEX",
@@ -5106,7 +5111,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "fixed_special_damage",
+        "--GUARANTEED HIT--",
+        "--SELF FAINT--"
+      ],
       "description": "You risk everything and use your own life force to damage a creature in range. The target takes an amount of fighting damage equal to your remaining HP and VP. This damage ignores resistance and immunity to fighting type. You then faint and gain 3 levels of exhaustion.",
       "moveStat": "None",
       "vpCost": "1",
@@ -5125,7 +5134,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--VARIABLE MOVE TYPE--"
       ],
       "description": "You dive at a creature with quick reaction speed, able to change the type of attack when you reach them. Make a melee attack against a target, dealing 2d8 + MOVE flying OR fighting damage, depending on your choice. STAB can only added to this move if its type is fighting.",
       "moveStat": "STR/DEX",
@@ -5166,8 +5176,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "stat_buff_self"
+        "damage"
       ],
       "description": "When activating this move, you spend your action focusing your next attack. If you keep concentration, as an action on your next turn, make an attack roll against a creature, doing 3d12 + MOVE fighting damage on a hit. If concentration is broken, the move fails and VP is spent.",
       "moveStat": "STR/DEX",
@@ -5209,7 +5218,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "--STAT DEBUF SELF--"
       ],
       "description": "You put all your power into a strong and heavy fist attack. Make a melee attack, dealing 3d8 + MOVE fighting damage on a hit. Until the end of your next turn, you have disadvantage on all DEX saves and your speed is halved.",
       "moveStat": "STR",
@@ -5229,7 +5238,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--POTENTIAL PRONE--"
       ],
       "description": "You fiercely attack the target using your entire body. Make a melee attack, dealing 2d8 + MOVE fighting damage on a hit, and if the target is your size or smaller, it is knocked prone.",
       "moveStat": "STR",
@@ -5313,7 +5323,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "crit_range_mod",
+        "--ADVANTAGE ON ATTACK ROLL--",
+        "--SITUATIONAL USE--"
       ],
       "description": "Requires below 50% HP to activate. Make a melee attack dealing 4d12 + MOVE fighting damage. This attack has advantage and scores a critical hit on 18-20.",
       "moveStat": "STR/DEX",
@@ -5335,7 +5347,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "stat_debuff_enemy"
+        "--POTENTIAL PRONE--"
       ],
       "description": "You kick out at a creature’s lower half, dealing damage and attempting to knock it off balance. Make a melee attack, doing 1d6 + MOVE fighting damage on a hit. If the natural attack roll is 19 or 20, the target falls prone and flinches.",
       "moveStat": "STR/DEX",
@@ -5355,7 +5367,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "status_inflict_auto"
       ],
       "description": "You sweep your legs at the lower half of a creature's body. Make a melee attack roll, dealing 1d10 + MOVE fighting damage and knocking the target prone on a hit.",
       "moveStat": "STR/DEX",
@@ -5395,7 +5408,6 @@
       },
       "reaction": false,
       "categories": [
-        "shield_temphp",
         "protect_negate"
       ],
       "description": "You conjure up a ethereal, protective mat to shield you and your allies. Until the end of your next turn, any ally creature within 15 feet of you (including you) is immune to damage from damaging moves. Status-inducing moves can still affect their targets.",
@@ -5418,7 +5430,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "--SITUATIONAL USE--"
       ],
       "description": "As a bonus action, you resolve to stay in the fight until the bitter end. You gain +2 AC, STR, DEX, CON, WIS, INT, and CHA, as well as 5+ Speed for the rest of the encounter. Until the end of this encounter, you may not flee or be switched out. At the end of this round, move to the top of the initiative order. This move can only be used once per encounter.",
       "moveStat": "None",
@@ -5459,7 +5472,8 @@
       },
       "reaction": true,
       "categories": [
-        "protect_negate"
+        "protect_negate",
+        "--SITUATIONAL USE--"
       ],
       "description": "You have the ability to rush to the aid of an ally at the start of combat. If an ally in range (or you) is attacked on the very first turn of the very first round of combat, you may use your reaction to negate any damage dealt.",
       "moveStat": "None",
@@ -5500,7 +5514,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
         "fixed_special_damage"
       ],
       "description": "You unleash an all out attack that is stronger the less HP you have. Make a melee attack roll against a creature, doing 2d8 + MOVE fighting damage on a hit. If you are below 50% of your maximum health, double the damage. If you are at 25% or below of your maximum health, triple the damage. The multiplier for this attack occurs before the multiplier for resistances or vulnerabilities.",
@@ -5523,7 +5536,8 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "stat_debuff_enemy"
+        "stat_debuff_enemy",
+        "crit_range_mod"
       ],
       "description": "You strike out with a rock-crushing attack that may lower a user’s defense. Make an attack roll against a creature, doing 1d6 + MOVE fighting damage on a hit. If the natural attack roll is 19 or 20, the target’s AC decreases by 1 while it remains in battle. On rock types, this move is a critical hit on a natural attack roll of 18 or higher.",
       "moveStat": "STR",
@@ -5645,7 +5659,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "protect_negate"
+        "--BASE CRIT--"
       ],
       "description": "You strike a target with a perfectly placed blow. Make a melee attack dealing 2d8 + MOVE fighting damage on hit. This attack is always a critical hit. If the target is immune to critical hits, the attack deals normal damage instead.",
       "moveStat": "STR",
@@ -5666,7 +5680,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "status_inflict_auto",
+        "recoil"
       ],
       "description": "You attempt a forceful grapple on a target. Make a melee attack, doing 1d10 + MOVE fighting damage on a hit, but taking a quarter of the damage dealt in recoil. On a hit, the target is grappled. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a creature is grappled, this move can be activated again as a bonus action with an automatic hit, dealing 1d10 + MOVE fighting damage with a quarter of the damage dealt in typeless recoil.",
       "moveStat": "STR",
@@ -5686,7 +5701,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--STAT DEBUF SELF--"
       ],
       "description": "You strike a target with incredible power. Make a melee attack against a creature, dealing 3d10 + MOVE fighting damage on a hit. This move exhausts you; your STR and DEX ability scores are set to 10 until the end of your next turn.",
       "moveStat": "STR/DEX",
@@ -5727,8 +5743,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "stat_buff_self"
+        "damage"
       ],
       "description": "You whirl your fists with a fast attack that pushes a quick burst of wind at a creature in range. Make a ranged attack on a creature, dealing 1d10 fighting damage on a hit.",
       "moveStat": "DEX",
@@ -5749,7 +5764,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "--GUARANTEED HIT--"
       ],
       "description": "You wind up a slow but unstoppable strike. This move always goes last in the initiative order. Make an attack that automatically hits a creature in melee range, dealing 1d10 + MOVE fighting damage. If you are grappling the target, double the damage dice for this move.",
       "moveStat": "STR",
@@ -5791,7 +5807,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW ON HIT--",
+        "--POTENTIAL PRONE--"
       ],
       "description": "You strike with force that shatters the ground. Make a melee attack dealing 4d12 + MOVE fighting damage. On hit, all creatures within 10ft of the target (except you) must make a DEX save or take 2d12 ground damage and be knocked prone.",
       "moveStat": "STR/DEX",

@@ -36,6 +36,14 @@ from datetime import datetime, timezone
 from . import db, live, routes_gamedata, upstream
 from .jsutil import js_parse_int
 
+# Same os.environ-overridable, ~-expanded convention as upstream.py's other
+# *_DIR constants (SPRITE_DIR, BATTLE_ANIMATION_DIR, ...). One file per
+# battle session (see _new_log_filename), written incrementally as events
+# happen so a crash mid-battle still leaves whatever was logged up to that
+# point on disk -- not just written once at the end. Cleanup (deleting old
+# logs) is left to the user's own cron job on the Pi, not this app.
+BATTLE_LOG_DIR = os.path.expanduser(os.environ.get('BATTLE_LOG_DIR', '~/pokemon-dnd/battle-logs'))
+
 _EMPTY_STATE = {
     'active': False,
     'battleType': None,
@@ -56,11 +64,17 @@ _EMPTY_STATE = {
     # happened this session, oldest first, visible to every viewer (see
     # battle-log-popup.js) and readable by future move-logic that needs to
     # know history (e.g. "did this target already take damage this round"
-    # -- see _damage_taken_this_round below). Capped at _LOG_MAX_ENTRIES so
-    # a long fight can't grow the session blob without bound; the oldest
-    # entries are the least likely to still be relevant to "this round"
-    # queries anyway.
+    # -- see _damage_taken_this_round below). Deliberately uncapped -- a
+    # tabletop session's full log is exactly what the user wants to be able
+    # to look back through after the fact. Also mirrored to disk (see
+    # BATTLE_LOG_DIR/logFile) as each entry is appended, not just held here.
     'log': [],
+    # Filename (not full path) under BATTLE_LOG_DIR this session's log is
+    # being appended to, set once in create-session. None means "not
+    # writing to disk" (a session loaded before this feature existed, or a
+    # disk write failed and _append_log_file gave up -- see its own
+    # comment), never a reason to fail the request itself.
+    'logFile': None,
     # The battle-map screen's state -- a second, separate physical display
     # shown alongside the HP/turn screen, purely spatial (positions/terrain,
     # never HP/VP). Lives here rather than as its own session/lifecycle
@@ -96,10 +110,18 @@ def handle(conn, action, params):
         state['battleType'] = battle_type
         state['round'] = 1
         state['log'] = []
+        state['logFile'] = _new_log_filename(battle_type)
         _log_event(state, 'session-start', text=f'Battle started ({battle_type.upper()})')
         return _save_and_publish(conn, state)
 
     if action == 'end-session':
+        # Load the real current state first (not just blast _EMPTY_STATE
+        # over it) so the "Battle ended" line actually lands in this
+        # session's log file before it's reset -- otherwise the file would
+        # just stop mid-battle with no closing entry.
+        state = load_state(conn)
+        if state.get('active'):
+            _log_event(state, 'session-end', text='Battle ended')
         return _save_and_publish(conn, dict(_EMPTY_STATE))
 
     if action == 'leave-session':
@@ -281,19 +303,47 @@ def _mutate(conn, fn):
 # Battle log
 # ---------------------------------------------------------------------------
 
-_LOG_MAX_ENTRIES = 300
+def _new_log_filename(battle_type):
+    """One file per battle session, named at create-session time so every
+    event this session logs (including this very first one) lands in the
+    same file. Timestamp down to the second is enough to never collide --
+    only one session is ever active at a time."""
+    stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    return f'{stamp}-{battle_type}.jsonl'
+
+
+def _append_log_file(state, entry):
+    """Mirrors one log entry to BATTLE_LOG_DIR/<state['logFile']> as a JSON
+    Lines file (one JSON object per line -- greppable, tailable, and never
+    needs the whole file parsed just to add a line). Opened/closed fresh
+    per entry rather than held open, so this survives the server process
+    restarting mid-battle same as everything else in this module. Never
+    raises -- a disk hiccup shouldn't take down the battle itself, only the
+    (secondary, for-later-review) file copy of it."""
+    filename = state.get('logFile')
+    if not filename:
+        return
+    try:
+        os.makedirs(BATTLE_LOG_DIR, exist_ok=True)
+        with open(os.path.join(BATTLE_LOG_DIR, filename), 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry) + '\n')
+    except OSError:
+        pass
 
 
 def _log_event(state, event_type, text, actorId=None, actorName=None, targetId=None, targetName=None, **extra):
-    """Appends one entry to the shared battle log and returns it. `text` is
-    the human-readable line every viewer's log popup shows verbatim --
-    generated here (not left to the frontend) so there's one source of
-    truth for what an event says, same reasoning as everything else this
-    module computes server-side rather than trusting duplicated client
-    logic. `extra` holds whatever structured fields are useful for a given
-    event_type (amount, multiplier, moveType, vpCost, ...) for future
-    move-logic queries (see _damage_taken_this_round below) without
-    forcing every event type into one fixed shape."""
+    """Appends one entry to the shared battle log (kept in the session state
+    for the live popup, and mirrored to disk -- see _append_log_file -- for
+    looking back after the session ends) and returns it. `text` is the
+    human-readable line every viewer's log popup shows verbatim -- generated
+    here (not left to the frontend) so there's one source of truth for what
+    an event says, same reasoning as everything else this module computes
+    server-side rather than trusting duplicated client logic. `extra` holds
+    whatever structured fields are useful for a given event_type (amount,
+    multiplier, moveType, vpCost, ...) for future move-logic queries (see
+    _damage_taken_this_round below) without forcing every event type into
+    one fixed shape. Deliberately uncapped -- see the 'log' field's own
+    comment on _EMPTY_STATE."""
     entry = {
         'id': uuid.uuid4().hex[:8],
         'round': state.get('round', 0),
@@ -304,10 +354,8 @@ def _log_event(state, event_type, text, actorId=None, actorName=None, targetId=N
         'targetId': targetId, 'targetName': targetName,
         **extra,
     }
-    log = state.setdefault('log', [])
-    log.append(entry)
-    if len(log) > _LOG_MAX_ENTRIES:
-        del log[:len(log) - _LOG_MAX_ENTRIES]
+    state.setdefault('log', []).append(entry)
+    _append_log_file(state, entry)
     return entry
 
 
@@ -537,6 +585,7 @@ def _leave_session(conn, owner):
             state['board']['tokens'].pop(pid, None)
         _log_event(state, 'leave', text=f'{owner} left the battle', actorName=owner)
     if not any(p.get('owner') for p in state['participants'].values()):
+        _log_event(state, 'session-end', text='Battle ended (all players left)')
         return _save_and_publish(conn, dict(_EMPTY_STATE))
     _rebuild_turn_order(state)
     return _save_and_publish(conn, state)

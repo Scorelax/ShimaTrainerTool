@@ -52,6 +52,15 @@ _EMPTY_STATE = {
     'reactingParticipantId': None,
     'participants': {},
     'fieldEffects': [],
+    # The shared battle log -- one chronological list of everything that's
+    # happened this session, oldest first, visible to every viewer (see
+    # battle-log-popup.js) and readable by future move-logic that needs to
+    # know history (e.g. "did this target already take damage this round"
+    # -- see _damage_taken_this_round below). Capped at _LOG_MAX_ENTRIES so
+    # a long fight can't grow the session blob without bound; the oldest
+    # entries are the least likely to still be relevant to "this round"
+    # queries anyway.
+    'log': [],
     # The battle-map screen's state -- a second, separate physical display
     # shown alongside the HP/turn screen, purely spatial (positions/terrain,
     # never HP/VP). Lives here rather than as its own session/lifecycle
@@ -86,6 +95,8 @@ def handle(conn, action, params):
         state['active'] = True
         state['battleType'] = battle_type
         state['round'] = 1
+        state['log'] = []
+        _log_event(state, 'session-start', text=f'Battle started ({battle_type.upper()})')
         return _save_and_publish(conn, state)
 
     if action == 'end-session':
@@ -93,6 +104,22 @@ def handle(conn, action, params):
 
     if action == 'leave-session':
         return _leave_session(conn, params.get('owner', ''))
+
+    if action == 'log-event':
+        # Fire-and-forget entry for a mechanic that only ever happens
+        # client-side (status effects, heal-popup amounts, an attack roll
+        # declared a Miss, item use, etc. -- see module docstring's
+        # boundary on what's ported server-side vs. stays in combat.js's
+        # local engine). Trusted the same way update-stats already is: the
+        # client computes/knows the narrative, the server just stores and
+        # broadcasts it so every viewer's log agrees.
+        if not params.get('type') or not params.get('text'):
+            raise ValueError('Missing type or text')
+        return _mutate(conn, lambda s: _log_event(
+            s, params['type'], text=params['text'],
+            actorId=params.get('actorId'), actorName=params.get('actorName'),
+            targetId=params.get('targetId'), targetName=params.get('targetName'),
+        ))
 
     if action == 'add-participant':
         if not params.get('data'):
@@ -151,6 +178,7 @@ def handle(conn, action, params):
             conn, params['id'], params['targetId'], dice_roll,
             move_type=params.get('moveType', ''),
             species=params.get('species'),
+            move_name=params.get('moveName', ''),
         )
 
     if action == 'update-stats':
@@ -247,6 +275,66 @@ def _mutate(conn, fn):
         raise ValueError('No active combat session')
     fn(state)
     return _save_and_publish(conn, state)
+
+
+# ---------------------------------------------------------------------------
+# Battle log
+# ---------------------------------------------------------------------------
+
+_LOG_MAX_ENTRIES = 300
+
+
+def _log_event(state, event_type, text, actorId=None, actorName=None, targetId=None, targetName=None, **extra):
+    """Appends one entry to the shared battle log and returns it. `text` is
+    the human-readable line every viewer's log popup shows verbatim --
+    generated here (not left to the frontend) so there's one source of
+    truth for what an event says, same reasoning as everything else this
+    module computes server-side rather than trusting duplicated client
+    logic. `extra` holds whatever structured fields are useful for a given
+    event_type (amount, multiplier, moveType, vpCost, ...) for future
+    move-logic queries (see _damage_taken_this_round below) without
+    forcing every event type into one fixed shape."""
+    entry = {
+        'id': uuid.uuid4().hex[:8],
+        'round': state.get('round', 0),
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'type': event_type,
+        'text': text,
+        'actorId': actorId, 'actorName': actorName,
+        'targetId': targetId, 'targetName': targetName,
+        **extra,
+    }
+    log = state.setdefault('log', [])
+    log.append(entry)
+    if len(log) > _LOG_MAX_ENTRIES:
+        del log[:len(log) - _LOG_MAX_ENTRIES]
+    return entry
+
+
+def _damage_taken_this_round(state, pid):
+    """Total damage `pid` has taken since the current round began, read
+    straight from the shared log -- for move logic that needs to know "was
+    this target already hit this round" (e.g. a move whose effect changes
+    if the target took damage earlier in the round). Not called from
+    anywhere yet; this is the scaffolding for that per-move logic once it
+    exists, not a feature on its own."""
+    round_now = state.get('round', 0)
+    return sum(
+        entry.get('amount', 0) for entry in state.get('log', [])
+        if entry.get('round') == round_now and entry.get('type') == 'damage' and entry.get('targetId') == pid
+    )
+
+
+def _last_log_event_for(state, pid, types=None):
+    """Most recent log entry where `pid` is the actor or the target
+    (optionally restricted to `types`), or None. Same "scaffolding for
+    future move logic" status as _damage_taken_this_round above."""
+    for entry in reversed(state.get('log', [])):
+        if types is not None and entry.get('type') not in types:
+            continue
+        if entry.get('actorId') == pid or entry.get('targetId') == pid:
+            return entry
+    return None
 
 
 def _play_animation(conn, pid, species):
@@ -348,7 +436,7 @@ def _use_move(conn, pid, move_name, target_id, dice_roll, species):
 
     outcome = {}
     result = _mutate(conn, lambda s: outcome.update(
-        _apply_move(conn, s, pid, vp_cost, target_id, dice_roll, move_type)))
+        _apply_move(conn, s, pid, move_name, vp_cost, target_id, dice_roll, move_type)))
     result.update(outcome)
 
     attacker = result['data']['participants'].get(pid, {})
@@ -423,6 +511,7 @@ def _add_participant(state, data):
         'visibility': {'hp': True, 'vp': True, 'name': True},
     }
     _rebuild_turn_order(state)
+    _log_event(state, 'join', text=f"{state['participants'][pid]['name']} joined the battle", actorId=pid, actorName=state['participants'][pid]['name'])
 
 
 def _remove_participant(state, pid):
@@ -446,6 +535,7 @@ def _leave_session(conn, owner):
         for pid in [pid for pid, p in state['participants'].items() if p.get('owner') == owner]:
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
+        _log_event(state, 'leave', text=f'{owner} left the battle', actorName=owner)
     if not any(p.get('owner') for p in state['participants'].values()):
         return _save_and_publish(conn, dict(_EMPTY_STATE))
     _rebuild_turn_order(state)
@@ -535,6 +625,8 @@ def _advance_turn(state):
     next_participant = state['participants'].get(state['turnOrder'][state['turnIndex']])
     if next_participant:
         next_participant['reactionUsed'] = False
+    _log_event(state, 'turn-advance', text=f"Round {state['round']}: {next_participant['name'] if next_participant else '?'}'s turn",
+               actorId=state['turnOrder'][state['turnIndex']], actorName=next_participant['name'] if next_participant else None)
 
 
 def _reaction_start(state, pid):
@@ -553,14 +645,18 @@ def _reaction_start(state, pid):
     state['started'] = True  # see _rebuild_turn_order -- a reaction means turn order is now live
     state['reactingParticipantId'] = pid
     participant['reactionUsed'] = True
+    _log_event(state, 'reaction-start', text=f"{participant['name']} used a reaction", actorId=pid, actorName=participant['name'])
 
 
 def _reaction_end(state):
     if not state['reactingParticipantId']:
         raise ValueError('No reaction in progress')
+    reactor = state['participants'].get(state['reactingParticipantId'])
     # turnIndex was never touched during the reaction, so the floor returns
     # to exactly where the normal order left off.
     state['reactingParticipantId'] = None
+    if reactor:
+        _log_event(state, 'reaction-end', text=f"{reactor['name']}'s reaction ended", actorId=reactor['id'], actorName=reactor['name'])
 
 
 def _active_participant_id(state):
@@ -571,7 +667,7 @@ def _active_participant_id(state):
     return None
 
 
-def _apply_move(conn, state, pid, vp_cost, target_id, dice_roll, move_type):
+def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move_type):
     attacker = state['participants'].get(pid)
     if not attacker:
         raise ValueError('Unknown participant: ' + pid)
@@ -592,6 +688,8 @@ def _apply_move(conn, state, pid, vp_cost, target_id, dice_roll, move_type):
         new_vp = 0
     attacker['currentHP'] = new_hp
     attacker['currentVP'] = new_vp
+    _log_event(state, 'move-used', text=f"{attacker['name']} used {move_name} (-{vp_cost} VP)",
+               actorId=pid, actorName=attacker['name'], move=move_name, vpCost=vp_cost)
 
     outcome = {}
     if target_id:
@@ -603,10 +701,17 @@ def _apply_move(conn, state, pid, vp_cost, target_id, dice_roll, move_type):
             actual_damage = round(dice_roll * multiplier)
             target['currentHP'] -= actual_damage  # no floor, same reasoning as above
             outcome = {'multiplier': multiplier, 'damageApplied': actual_damage}
+            move_label = f' with {move_name}' if move_name else ''
+            _log_event(
+                state, 'damage',
+                text=f"{attacker['name']} hit {target['name']}{move_label} for {actual_damage} damage ({multiplier}x)",
+                actorId=pid, actorName=attacker['name'], targetId=target_id, targetName=target['name'],
+                move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier,
+            )
     return outcome
 
 
-def _apply_damage(conn, pid, target_id, dice_roll, move_type, species):
+def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name=''):
     """The other half of resolving an attack, split out from use-move: that
     action's VP cost was for a single-participant local engine (combat.js's
     own move popup, driven client-side) that already handles spending VP and
@@ -620,7 +725,7 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species):
     and apply it. Same turn-authority rule as every other on-turn action."""
     outcome = {}
     result = _mutate(conn, lambda s: outcome.update(
-        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type)))
+        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type, move_name)))
     result.update(outcome)
 
     attacker = result['data']['participants'].get(pid, {})
@@ -632,7 +737,7 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species):
     return result
 
 
-def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type):
+def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name=''):
     attacker = state['participants'].get(pid)
     if not attacker:
         raise ValueError('Unknown participant: ' + pid)
@@ -646,6 +751,13 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type):
     multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'))
     actual_damage = round(dice_roll * multiplier)
     target['currentHP'] -= actual_damage  # no floor, same reasoning as elsewhere in this module
+    move_label = f' with {move_name}' if move_name else ''
+    _log_event(
+        state, 'damage',
+        text=f"{attacker['name']} hit {target['name']}{move_label} for {actual_damage} damage ({multiplier}x)",
+        actorId=pid, actorName=attacker['name'], targetId=target_id, targetName=target['name'],
+        move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier,
+    )
     return {'multiplier': multiplier, 'damageApplied': actual_damage}
 
 

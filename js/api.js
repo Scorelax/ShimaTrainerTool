@@ -853,8 +853,16 @@ export class CombatAPI {
    * same figure combat.js's move popup already computes and shows) --
    * this endpoint only applies type effectiveness on top of it. Returns
    * {multiplier, damageApplied} alongside the usual {status, data}. */
-  static async applyDamage(id, targetId, diceRoll, moveType, species) {
-    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species }, { useCache: false });
+  static async applyDamage(id, targetId, diceRoll, moveType, species, moveName) {
+    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName }, { useCache: false });
+  }
+
+  /** Appends one entry to the shared battle log (routes_combat.py's 'log')
+   * for a mechanic that only ever happens client-side -- status effects,
+   * heal-popup amounts, an attack roll declared a Miss, etc. -- see
+   * routes_combat.py's log-event action docstring for the trust model. */
+  static async logEvent({ type, text, actorId, actorName, targetId, targetName }) {
+    return API.request('combat', 'log-event', { type, text, actorId, actorName, targetId, targetName }, { useCache: false });
   }
 
   // -- Battle map (see pi-server/app/routes_combat.py's 'board' state) --

@@ -15,12 +15,13 @@ import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprint
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
+import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions,
-  setCombatStateKey, setOnCombatStateSave,
+  setCombatStateKey, setOnCombatStateSave, setOnLogEvent,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -56,7 +57,8 @@ const WIP_CSS = `
     white-space: nowrap;
   }
   .combat-wip-title img { height: 1.6em; width: auto; }
-  .wip-map-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
+  .wip-map-btn, .wip-log-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
+  .wip-header-btn-group { display: flex; gap: 0.5rem; }
   /* justify-content:center (rather than relying on margin:auto absorbing
      whatever's left after flex-grow hits .combat-wip-body's max-width) is
      what actually centers this row reliably -- that auto-margin approach
@@ -468,6 +470,7 @@ function _enterBattleSync() {
   _battleSyncActive = true;
   setCombatStateKey(WIP_COMBAT_STATE_KEY);
   setOnCombatStateSave(_onLocalCombatStateSave);
+  setOnLogEvent((event) => CombatAPI.logEvent(event).catch(() => {}));
 }
 
 function _exitBattleSync() {
@@ -478,6 +481,7 @@ function _exitBattleSync() {
   _statsSyncPending = {};
   setCombatStateKey('combatState');
   setOnCombatStateSave(null);
+  setOnLogEvent(null);
   _focusedParticipantId = null;
   _focusManuallySet = false;
 }
@@ -999,10 +1003,13 @@ function _syncHeaderBar(state) {
   const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
   if (leftBtnEl) {
     leftBtnEl.innerHTML = state?.active
-      ? '<button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button>'
+      ? '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button><button class="combat-wip-btn-secondary wip-log-btn" id="battleLogBtn">📜 Log</button></div>'
       : '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">← Back</button>';
     document.getElementById('battleMapBtn')?.addEventListener('click', () => {
       showBattleMap(session, _currentTrainerName());
+    });
+    document.getElementById('battleLogBtn')?.addEventListener('click', () => {
+      showBattleLog(session);
     });
     document.getElementById('wipHeaderBackBtn')?.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
@@ -1345,6 +1352,7 @@ export function attachCombatWipListeners() {
       _syncTurnOrderSidebar(session);
       _syncHeaderBar(session);
       updateBattleMap(session);
+      updateBattleLog(session);
       return;
     }
 
@@ -1354,6 +1362,7 @@ export function attachCombatWipListeners() {
     _syncTurnOrderSidebar(session);
     _syncHeaderBar(session);
     updateBattleMap(session); // no-ops if the popup isn't currently open
+    updateBattleLog(session); // no-ops if the popup isn't currently open
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
 
@@ -1485,12 +1494,24 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // animation and take a damage roll. See target-picker.js.
   const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName });
   if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
-  if (!picked.hit) return; // Miss -- VP already spent when the move was confirmed, nothing else to do
+  if (!picked.hit) {
+    // Miss -- VP already spent when the move was confirmed, nothing else to
+    // do mechanically, but it still belongs in the shared log (a Miss never
+    // reaches the server otherwise -- apply-damage is only ever called on a
+    // Hit, see below).
+    const targetName = session?.participants?.[picked.targetId]?.name || '?';
+    const attackerName = session?.participants?.[combatantId]?.name || '?';
+    CombatAPI.logEvent({
+      type: 'miss', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
+      text: `${attackerName} used ${moveName} on ${targetName} -- Miss`,
+    }).catch(() => {});
+    return;
+  }
 
   const { targetId, rawRoll } = picked;
   const moveType = (move && move[1]) || '';
   try {
-    const result = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, moveName);
+    const result = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, speciesName, moveName);
     if (result.multiplier !== undefined) {
       const label = result.multiplier >= 2 ? 'Super effective!' : result.multiplier === 0 ? 'No effect!' : result.multiplier < 1 ? 'Not very effective...' : '';
       showCombatAlert(`${label ? label + ' — ' : ''}${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`, { title: 'Attack Result' });

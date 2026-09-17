@@ -314,6 +314,14 @@ export function buildPokemonCombatant(pokemonKey) {
 // behavior -- zero change for any caller that doesn't touch these setters.
 let _combatStateKey = 'combatState';
 let _onCombatStateSave = null;
+// Same additive/swappable pattern as the two above, for the shared battle
+// log (routes_combat.py's 'log' -- see combat-wip.js's battle-log-popup.js):
+// an optional hook this file calls for mechanics that only ever happen
+// locally (status effects, heal-popup amounts, item use, VP cost of a move)
+// so the log stays a complete narrative even though those mechanics
+// themselves stay client-only. Defaults to null -- the legacy page never
+// sets it, so it costs those call sites nothing.
+let _onLogEvent = null;
 
 export function setCombatStateKey(key) {
   _combatStateKey = key || 'combatState';
@@ -321,6 +329,14 @@ export function setCombatStateKey(key) {
 
 export function setOnCombatStateSave(fn) {
   _onCombatStateSave = fn || null;
+}
+
+export function setOnLogEvent(fn) {
+  _onLogEvent = fn || null;
+}
+
+function logBattleEvent(event) {
+  if (_onLogEvent) _onLogEvent(event);
 }
 
 function getCombatState() {
@@ -2134,6 +2150,7 @@ function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
     const total = diceVal + modBonus;
     combatant.currentHp = Math.min(combatant.currentHp + total, combatant.maxHp);
     showToast(`${combatant.name}: Ingrain healed ${total} HP!`, 'success');
+    logBattleEvent({ type: 'heal', actorId: combatant.id, actorName: combatant.name, text: `${combatant.name} healed ${total} HP from Ingrain` });
 
     // Sync HP to sessionStorage and API
     const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
@@ -2196,6 +2213,7 @@ function showDrainHealPopup(combatant, moveName, state) {
 
     combatant.currentHp = Math.min(combatant.currentHp + heal, combatant.maxHp);
     showToast(`${combatant.name}: ${moveName} drained ${heal} HP!`, 'success');
+    logBattleEvent({ type: 'heal', actorId: combatant.id, actorName: combatant.name, text: `${combatant.name} drained ${heal} HP from ${moveName}` });
 
     // Sync to sessionStorage and API
     const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
@@ -2272,6 +2290,7 @@ function showDirectHealPopup(combatant, moveName, healDice, moveMod, stacks, sta
     const total = (diceVal * stacks) + modBonus;
     combatant.currentHp = Math.min(combatant.currentHp + total, combatant.maxHp);
     showToast(`${combatant.name}: ${moveName} restored ${total} HP!`, 'success');
+    logBattleEvent({ type: 'heal', actorId: combatant.id, actorName: combatant.name, text: `${combatant.name} restored ${total} HP from ${moveName}` });
 
     const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
     if (pd) {
@@ -2458,6 +2477,7 @@ function addStatusEffect(combatantId, effectName, state, description = '') {
   saveCombatState(state);
   rerenderBattle(state);
   _syncStatusConditionToDb(c, state);
+  logBattleEvent({ type: 'status-applied', actorId: c.id, actorName: c.name, text: `${c.name} is now ${effectName}` });
 }
 
 function removeStatusEffect(combatantId, effectName, state) {
@@ -2467,6 +2487,7 @@ function removeStatusEffect(combatantId, effectName, state) {
   saveCombatState(state);
   rerenderBattle(state);
   _syncStatusConditionToDb(c, state);
+  logBattleEvent({ type: 'status-removed', actorId: c.id, actorName: c.name, text: `${c.name} is no longer ${effectName}` });
 }
 
 // ============================================================================
@@ -2588,6 +2609,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved 
       if (newVp < 0) { newHp = newHp + newVp; newVp = 0; } // no floor -- see handleHpVpDelta
       target.currentHp = newHp;
       target.currentVp = newVp;
+      logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)` });
 
       if (target.rechargeStates && target.rechargeStates[usedMoveName]) {
         target.rechargeStates[usedMoveName].chargesLeft =

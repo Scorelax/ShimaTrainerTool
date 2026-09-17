@@ -38,6 +38,7 @@ const _ICONS = {
   'move-used': '✨', damage: '💥', miss: '💨', heal: '💚',
   'status-applied': '🌀', 'status-removed': '✅',
   'turn-advance': '🔄', 'reaction-start': '⚡', 'reaction-end': '⚡',
+  move: '👣', placement: '📍',
 };
 
 let _overlay = null;

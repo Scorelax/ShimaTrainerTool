@@ -876,12 +876,15 @@ def _set_token_position(state, pid, col, row):
 
 
 def _move_token(state, pid, col, row):
-    if pid not in state['participants']:
+    participant = state['participants'].get(pid)
+    if not participant:
         raise ValueError('Unknown participant: ' + pid)
     if pid != _active_participant_id(state):
         raise ValueError("It's not this participant's turn")
     state['started'] = True  # see _rebuild_turn_order -- acting on-turn means turn order is now live
     state['board']['tokens'][pid] = {'col': col, 'row': row}
+    _log_event(state, 'move', text=f"{participant['name']} moved to ({col}, {row})",
+               actorId=pid, actorName=participant['name'], col=col, row=row)
 
 
 def _clear_token_position(state, pid):
@@ -905,3 +908,5 @@ def _confirm_placement(state, pid, col, row):
             raise ValueError('That square is already taken')
     state['board']['tokens'][pid] = {'col': col, 'row': row}
     participant['placed'] = True
+    _log_event(state, 'placement', text=f"{participant['name']} placed at ({col}, {row})",
+               actorId=pid, actorName=participant['name'], col=col, row=row)

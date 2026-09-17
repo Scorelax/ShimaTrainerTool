@@ -2923,7 +2923,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "The targeted creature must succeed on a Constitution saving throw or be stunned for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "CON",
@@ -2944,8 +2945,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You send down a powerful strike of lightning from the heavens, surrounding an area of the battlefield with surging electricity. Any opponent caught in a 20 foot radius, centered on a point within range, must make a DEX save against your Move DC, taking 4d12 + MOVE electric damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it becomes paralyzed. This move can be used once per long rest.",
       "moveStat": "STR/DEX",
@@ -2986,7 +2989,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "--POTENTIAL DAMAGE INCREASE--"
       ],
       "description": "You send a beam of electric energy at an opponent that has a chance to power you up. Make a ranged attack, dealing 1d6 + MOVE electric damage on a hit. If the natural attack roll is 10 or higher and the attack hits, add your proficiency bonus to the damage.",
       "moveStat": "STR/DEX",
@@ -3007,8 +3010,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You generate a cyclone charged with lightning in a 30 foot radius around yourself. All creatures in range must make a DEX save against your Move DC, taking half damage on a success and full damage on a fail. Creatures in range that are not grounded or in the invulnerable stage of Fly or Bounce take double damage from this move. Roll a d6 on the table below to determine damage. 1: 2d6+MOVE 2-3: 3d6+MOVE 4-5: 4d6+MOVE 6: 5d6+MOVE",
       "moveStat": "STR/DEX",
@@ -3029,9 +3033,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You let loose a flare of electricity in a 10 foot radius, centered on you, striking all creatures around you. Creatures in the area must make a DEX saving throw against your Move DC. On a fail, a creature takes 2d8 + MOVE electric damage. If a creature fails the save by more than 5, it is paralyzed. This move can be used once per short rest.",
       "moveStat": "DEX",
@@ -3050,7 +3055,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
+      ],
       "description": "Your body generates a strange pulsating sound that can disrupt the target's ability to attack. When you activate this move, any hostile creature within 30 feet of you must make a CON saving throw against your Move DC. On a failure, the target flinches for 1d4 rounds.",
       "moveStat": "DEX/CHA",
       "vpCost": "7",
@@ -3068,7 +3077,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_terrain"
+      ],
       "description": "You electrify the ground around you to create a static field of electricity. For 3 turns, no grounded creatures inside the area can be asleep. In addition, creatures may double their MOVE modifier on damage rolls from electric-type moves activated inside the area",
       "moveStat": "None",
       "vpCost": "7",
@@ -3087,8 +3098,9 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_self",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "--TRIGGER SAVING THROW--",
+        "steal_disrupt"
       ],
       "description": "You suddenly surge with a strange electric energy signature that transfers to your attacker. When hit by a melee attack, you may instantly use your reaction to force the attacker to make a CON save against your Move DC. On a failure, the attacking move's type is changed to electric.",
       "moveStat": "STR/DEX",
@@ -3109,7 +3121,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "fixed_special_damage"
+        "--CONDITIONAL DAMAGE--"
       ],
       "description": "You hurl an electric orb at a target in range. Make a ranged attack roll, dealing 1d10 + MOVE electric damage on a hit. Compare the target and user's highest speed type (walking, flying, etc.). If the user's speed is higher, roll the next level tier's damage dice for this move. If the user is level 17 or higher, double the damage dice.",
       "moveStat": "DEX",
@@ -3130,7 +3142,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "stat_debuff_enemy",
+        "--STATUS CONDITION--"
       ],
       "description": "You unleash an electric net of web upon a creature. Make a ranged attack roll, dealing 1d10 + MOVE electric damage on a hit, and reducing the target's speed by 5 feet. The target can use an action on its turn remove any web from its body. A target whose speed is reduced to 0 is restrained.",
       "moveStat": "STR/DEX",
@@ -3150,9 +3163,11 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
         "damage_vp",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "drain"
       ],
       "description": "You create a field of static energy in a 15 foot radius around you, draining the vitality from nearby creatures. Force all creatures in range to attempt a CON save, losing 2d8 VP on a failure and half of that on a success. Regain half of the total amount of VP drained.",
       "moveStat": "None",
@@ -3173,7 +3188,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You shoot a stream of pure electrical ether energy towards a creature in range. Force one creature to make a DEX save, taking 2d8 + MOVE electric damage and being paralyzed on a failure, half as much without being paralyzed on a success.",
       "moveStat": "STR/WIS",
@@ -3193,8 +3209,8 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_self",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "When hit by a melee attack, you may use this reaction to zap your attacker, forcing it to attempt a DEX save. On a failure, the VP cost is multiplied by 1d4.",
       "moveStat": "WIS/INT",
@@ -3215,9 +3231,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "fixed_special_damage",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL DAMAGE INCREASE--"
       ],
       "description": "You summon a gigantic lightning bolt that strikes down from the heavens in a 30 foot radius, centered on a point within range. All creatures caught in the blast must make a DEX save against your Move DC, taking 4d12 + MOVE electric damage on a failure, or half as much on a success. If Fusion Bolt or Fusion Flare was already used this round, double the damage dealt.",
       "moveStat": "STR",
@@ -3237,7 +3254,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "field_terrain"
       ],
       "description": "You disperse electric particles that charge the battlefield. Until the beginning of your next turn, any normal-type move activated within 50 feet of you is considered electric-type.",
       "moveStat": "None",
@@ -3257,7 +3274,7 @@
       },
       "reaction": false,
       "categories": [
-        "protect_negate"
+        "stat_buff_self"
       ],
       "description": "You use magnetic power within yourself to raise yourself from the ground, becoming immune to ground moves for the duration.",
       "moveStat": "None",
@@ -3277,7 +3294,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_ally",
+        "--SITUATIONAL USE--"
       ],
       "description": "You use your electric energy to manipulate magnetic fields. Until the beginning of your next turn, any creature in range with the Plus or Minus ability gains a bonus to their AC equal to your proficiency modifier, and any saving throw they are forced to make is rolled with advantage.",
       "moveStat": "None",
@@ -3297,7 +3315,9 @@
       },
       "reaction": false,
       "categories": [
-        "positioning"
+        "positioning",
+        "--TRIGGER SAVING THROW--",
+        "--SITUATIONAL USE--"
       ],
       "description": "The user emits a pulse of magnetic energy. Each creature that is steel type, wearing metal armor or holding a metal weapon within 30 feet must succeed on a Strength saving throw or either be pulled 15 feet toward the user, or pushed 15 feet away.",
       "moveStat": "STR",
@@ -3318,7 +3338,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW ON HIT--"
       ],
       "description": "You touch a creature with your electrified cheeks, sending electricity coursing through their veins. Make an attack roll against a creature. On a hit, the target takes 1d6 + MOVE electric damage and is forced to make a CON save against your Move DC, becoming paralyzed on a failure.",
       "moveStat": "DEX",
@@ -3339,9 +3359,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "steal_disrupt",
         "recharge_locked",
-        "multi_hit_aoe"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "drain"
       ],
       "description": "A sweeping electric charge arcs around you, stealing some of the target's energy. Force all creatures in a 15ft radius, centered on you, to make a CON save against your Move DC, taking 3d10 + MOVE electric damage on a failure. Recover hit points equal to half the total damage dealt, but no more than 5 times your level.",
       "moveStat": "STR",
@@ -3361,7 +3382,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_aoe",
+        "--GUARANTEED HIT--"
       ],
       "description": "A burst of electric energy glides forward, striking anything in a 15 foot cone. This move is guaranteed to hit all creatures caught in the wave for 1d4 + MOVE electric damage, unless during the invulnerable stage of Fly, Dig, Bounce, Dive, etc. moves.",
       "moveStat": "DEX",
@@ -3402,10 +3425,10 @@
       },
       "reaction": true,
       "categories": [
-        "status_inflict_threshold",
-        "crit_range_mod",
+        "protect_negate",
         "counter_reaction_effect",
-        "recoil",
+        "status_inflict_threshold",
+        "--GUARANTEED HIT--",
         "recharge_locked"
       ],
       "description": "You may use this reaction when a creature lands an attack against you, and has rolled for damage. You supercharge parts of your body, creating a force field that reflects incoming attacks. You take no damage from the triggering attack. Make an attack roll, dealing half of the damage that you would have sustained on a hit as electric damage. Of the attack you're reflecting is ranged, you roll with disadvantage. On a natural roll of 15 or higher, the opponent is paralyzed. A natural 20 will guarantee a hit, but will not be a critical hit.",
@@ -3427,8 +3450,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--VARIABLE MOVE TYPE--"
       ],
       "description": "You create strong winds that hurl electrified water droplets at an incredible speed in an 80ft. line, 5 feet wide. Announce if you intend to deal electric or water damage. All creatures caught in the line is forced to make a DEX save against your move DC, taking 2d8 MOVE + electric OR water damage on a failure. This move can only be used while it is raining.",
       "moveStat": "STR/DEX",
@@ -3449,10 +3474,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "field_weather",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "Powerful electric energy arcs out from you, hitting any creature in a 20 foot radius, centered on you. Creatures caught in the area must make a DEX save against your Move DC, taking 3d10 + MOVE electric damage on a fail, and half as much on a success. Creatures that fail the saving throw by 5 or more become paralyzed. In heavy rain or storms, you may center this move on a point within 60ft instead of on yourself.",
       "moveStat": "STR/DEX",
@@ -3534,7 +3559,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You send a wave of electric energy that surrounds a creature in range. The target must make a CON save against your Move DC or become paralyzed.",
       "moveStat": "STR/DEX",
@@ -3616,7 +3642,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "recoil"
       ],
       "description": "You rush forward in a flash of electricity with extended reach, slamming into a creature. When activating this move, you flash forward 15 feet and make a melee attack roll against a creature, dealing 2d8 + Move electric damage on a hit. On a hit, you also take a quarter of the total (rounded down) in typeless recoil damage.",
       "moveStat": "STR/DEX",
@@ -3637,7 +3664,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "recoil"
       ],
       "description": "You shroud yourself in electricity and charge at a creature. Make a melee attack, dealing 2d8 + MOVE electric damage on a hit, but taking 1/4 of the damage (rounded down) in recoil damage.",
       "moveStat": "STR",

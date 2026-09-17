@@ -1,7 +1,15 @@
-// Scratch analysis script -- categorizes DnD_moves.json into a taxonomy for
-// discussion with the user. Not part of the app; deleted once the
-// conversation about categories is settled and real handling code (if any)
-// is written properly inside pi-server/app.
+// Bootstraps a heuristic first-pass categorization for any move in
+// DnD_moves.json not already present in DnD_moves_categorized_draft.json --
+// that file is REAL APP DATA now (see upstream.py's fetch_moves and
+// routes_combat.py's list-move-categories, both of which read it directly,
+// replacing the old live Google Sheet fetch), not scratch analysis, so this
+// script is merge-only: an existing move entry (by name) is never touched,
+// overwritten, or reordered, no matter what this pass would tag it. Only
+// runs for moves genuinely missing from the file -- i.e. move types the
+// user hasn't started reviewing yet. The heuristics themselves are still
+// unreliable (see every past correction in the git log for this file) --
+// always a starting point for manual review, never trust the tags this
+// produces at face value.
 const data = require('./DnD_moves.json');
 const all = [];
 for (const t of Object.keys(data.types)) for (const m of data.types[t]) all.push({ ...m, _type: t });
@@ -90,27 +98,39 @@ const CATS = {
   recharge_locked: m => /recharge/i.test(m.action || ''),
 };
 
-const tagged = all.map(m => {
-  const cats = Object.entries(CATS).filter(([, fn]) => fn(m)).map(([k]) => k);
-  return {
-    name: m.name, type: m._type, action: m.action, range: m.range,
-    duration: parseDuration(m.duration),
-    reaction: /1 reaction/i.test(m.action || ''),
-    categories: cats,
-    description: (m.description || '').replace(/\s+/g, ' '),
-  };
-});
+const fs = require('fs');
+const path = require('path');
+const outFile = path.join(__dirname, 'DnD_moves_categorized_draft.json');
 
-const uncategorized = tagged.filter(m => m.categories.length === 0);
+const existing = fs.existsSync(outFile) ? JSON.parse(fs.readFileSync(outFile, 'utf-8')) : { moves: [] };
+const existingByName = new Map(existing.moves.map(m => [m.name, m]));
+
+const newlyTagged = all
+  .filter(m => !existingByName.has(m.name))
+  .map(m => {
+    const cats = Object.entries(CATS).filter(([, fn]) => fn(m)).map(([k]) => k);
+    return {
+      name: m.name, type: m._type, action: m.action, range: m.range,
+      duration: parseDuration(m.duration),
+      reaction: /1 reaction/i.test(m.action || ''),
+      categories: cats,
+      description: (m.description || '').replace(/\s+/g, ' '),
+      moveStat: m.moveStat || '', vpCost: m.vpCost || '', scaling: m.scaling || '',
+    };
+  });
+
+// Existing entries pass through completely untouched -- new ones (only, if
+// any) are appended after them so a diff shows purely additions.
+const merged = [...existing.moves, ...newlyTagged];
+
+const uncategorized = merged.filter(m => m.categories.length === 0);
 const counts = {};
-for (const k of Object.keys(CATS)) counts[k] = tagged.filter(m => m.categories.includes(k)).length;
+for (const k of Object.keys(CATS)) counts[k] = merged.filter(m => m.categories.includes(k)).length;
 
-console.log('TOTAL', tagged.length);
+console.log('newly added this run:', newlyTagged.length, newlyTagged.map(m => m.name));
+console.log('TOTAL', merged.length);
 console.log('UNCATEGORIZED', uncategorized.length);
 console.log(JSON.stringify(counts, null, 2));
 
-require('fs').writeFileSync(
-  require('path').join(__dirname, 'DnD_moves_categorized_draft.json'),
-  JSON.stringify({ counts, uncategorizedCount: uncategorized.length, moves: tagged }, null, 2)
-);
-console.log('wrote DnD_moves_categorized_draft.json');
+fs.writeFileSync(outFile, JSON.stringify({ counts, uncategorizedCount: uncategorized.length, moves: merged }, null, 2));
+console.log('wrote', outFile);

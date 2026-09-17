@@ -169,7 +169,7 @@ function _createPopupDOM() {
     confirmOverlay._playingAnimation = true;
     yesBtn.disabled = true;
     noBtn.disabled = true;
-    await _playBattleAnimation(overlay._speciesName);
+    if (!overlay._deferAnimation) await _playBattleAnimation(overlay._speciesName);
     confirmOverlay._playingAnimation = false;
     yesBtn.disabled = false;
     noBtn.disabled = false;
@@ -513,8 +513,9 @@ function _renderCommander(trainerData) {
  * @param {string} [params.spriteUrl]    - This Pokemon's already-resolved sprite URL (mp4 or static image), shown in the confirm popup
  * @param {string} [params.spriteAlt]    - Alt text for spriteUrl
  * @param {string} [params.speciesName]  - Species name used to look up a preloaded battle animation (see utils/battle-animation.js)
+ * @param {boolean} [params.deferAnimation] - Skip playing the battle animation here on "Yes" -- for callers (combat-wip.js's onDamageResolved flow) that show it themselves later, once a target is picked and the attack roll is confirmed a hit, instead of the instant "Use Move" is confirmed. Defaults to false (legacy behavior: plays immediately), so every other caller is unaffected.
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, spriteUrl, spriteAlt, speciesName }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, spriteUrl, spriteAlt, speciesName, deferAnimation }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -531,6 +532,7 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   popup._spriteUrl = spriteUrl || null;
   popup._spriteAlt = spriteAlt || move[0];
   popup._speciesName = speciesName || null;
+  popup._deferAnimation = !!deferAnimation;
 
   const { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice } = computedData;
   const fmtMod = v => v >= 0 ? `+${v}` : `${v}`;

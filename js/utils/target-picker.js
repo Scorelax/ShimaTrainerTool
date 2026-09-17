@@ -13,6 +13,7 @@
 import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
+import { getBattleAnimationUrl } from './battle-animation.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -58,14 +59,23 @@ function _injectStyles() {
     .target-picker-roll-actions { display: flex; gap: 0.6rem; }
     .target-picker-roll-actions .combat-use-move-btn { flex: 1; }
     .target-picker-roll-back { background: rgba(255,255,255,0.1) !important; }
+    .target-picker-hit-btn { background: linear-gradient(135deg, #4CAF50, #45A049) !important; }
+    .target-picker-miss-btn { background: linear-gradient(135deg, #EE1515, #C91010) !important; }
+    .target-picker-anim-media { width: 100%; max-height: 40vh; display: flex; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
+    .target-picker-anim-media:empty { display: none; }
+    .target-picker-anim-media img, .target-picker-anim-media video { max-width: 100%; max-height: 40vh; border-radius: 12px; object-fit: contain; }
   `;
   document.head.appendChild(style);
 }
 
 let _overlay = null;
 let _resolve = null;
-let _modifier = 0;
+let _attackModifier = 0;
+let _damageModifier = 0;
+let _speciesName = '';
 let _selectedTargetId = null;
+let _selectedTarget = null;
+let _selectedTargetName = '';
 
 function _ensureDom() {
   if (_overlay) return;
@@ -87,12 +97,24 @@ function _ensureDom() {
         </div>
         <div id="targetPickerStep2" hidden>
           <div class="target-picker-roll-target" id="targetPickerRollTarget"></div>
-          <label class="target-picker-roll-label" for="targetPickerRollInput">Raw dice roll<span id="targetPickerModifierNote"></span></label>
+          <label class="target-picker-roll-label" for="targetPickerAttackInput">Attack roll<span id="targetPickerAttackModifierNote"></span></label>
+          <input type="number" id="targetPickerAttackInput" class="target-picker-roll-input" placeholder="Enter roll…">
+          <div class="target-picker-roll-total" id="targetPickerAttackTotal"></div>
+          <div class="target-picker-roll-actions">
+            <button class="combat-use-move-btn target-picker-roll-back" id="targetPickerBack">← Back</button>
+            <button class="combat-use-move-btn target-picker-miss-btn" id="targetPickerMiss">Attack Miss</button>
+            <button class="combat-use-move-btn target-picker-hit-btn" id="targetPickerHit">Attack Hit</button>
+          </div>
+        </div>
+        <div id="targetPickerStep3" hidden>
+          <div class="target-picker-anim-media" id="targetPickerAnimMedia"></div>
+          <div class="target-picker-roll-target" id="targetPickerDamageTarget"></div>
+          <label class="target-picker-roll-label" for="targetPickerRollInput">Damage roll<span id="targetPickerModifierNote"></span></label>
           <input type="number" id="targetPickerRollInput" class="target-picker-roll-input" placeholder="Enter roll…">
           <div class="target-picker-roll-total" id="targetPickerRollTotal"></div>
           <div class="target-picker-roll-actions">
-            <button class="combat-use-move-btn target-picker-roll-back" id="targetPickerBack">← Back</button>
-            <button class="combat-use-move-btn" id="targetPickerConfirmRoll">Confirm Roll</button>
+            <button class="combat-use-move-btn target-picker-roll-back" id="targetPickerBackToAttack">← Back</button>
+            <button class="combat-use-move-btn" id="targetPickerConfirmRoll">Confirm Damage</button>
           </div>
         </div>
       </div>
@@ -104,10 +126,17 @@ function _ensureDom() {
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(null); });
   document.getElementById('targetPickerSkip').addEventListener('click', () => _close(null));
   document.getElementById('targetPickerBack').addEventListener('click', _showStep1);
-  document.getElementById('targetPickerConfirmRoll').addEventListener('click', _confirmRoll);
+  document.getElementById('targetPickerBackToAttack').addEventListener('click', _showStep2);
+  document.getElementById('targetPickerMiss').addEventListener('click', _confirmMiss);
+  document.getElementById('targetPickerHit').addEventListener('click', _confirmHit);
+  document.getElementById('targetPickerConfirmRoll').addEventListener('click', _confirmDamageRoll);
+  document.getElementById('targetPickerAttackInput').addEventListener('input', _updateAttackTotal);
+  document.getElementById('targetPickerAttackInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') _confirmHit();
+  });
   document.getElementById('targetPickerRollInput').addEventListener('input', _updateRollTotal);
   document.getElementById('targetPickerRollInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') _confirmRoll();
+    if (e.key === 'Enter') _confirmDamageRoll();
   });
 }
 
@@ -119,19 +148,86 @@ function _close(result) {
 function _showStep1() {
   document.getElementById('targetPickerStep1').hidden = false;
   document.getElementById('targetPickerStep2').hidden = true;
+  document.getElementById('targetPickerStep3').hidden = true;
   document.getElementById('targetPickerTitle').textContent = 'Choose a Target';
   _selectedTargetId = null;
+  _selectedTarget = null;
 }
 
+/** Attack-roll step -- entered fresh from a target card, or returned to via
+ * step 3's Back button (no args then, reusing the already-selected target). */
 function _showStep2(p, name) {
+  if (p) { _selectedTarget = p; _selectedTargetName = name; }
   document.getElementById('targetPickerStep1').hidden = true;
   document.getElementById('targetPickerStep2').hidden = false;
-  document.getElementById('targetPickerTitle').textContent = 'Roll Damage';
+  document.getElementById('targetPickerStep3').hidden = true;
+  document.getElementById('targetPickerTitle').textContent = 'Attack Roll';
   document.getElementById('targetPickerRollTarget').innerHTML = `
-    <div class="target-picker-portrait">${spriteMediaHtml(p.image, name)}</div>
-    <div class="target-picker-roll-target-name">${name}</div>`;
+    <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
+    <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
+  document.getElementById('targetPickerAttackModifierNote').textContent =
+    _attackModifier ? ` (${_attackModifier >= 0 ? '+' : ''}${_attackModifier} modifier added automatically)` : '';
+  const input = document.getElementById('targetPickerAttackInput');
+  input.value = '';
+  _updateAttackTotal();
+  setTimeout(() => input.focus(), 50);
+}
+
+function _updateAttackTotal() {
+  const raw = parseInt(document.getElementById('targetPickerAttackInput').value, 10);
+  const totalEl = document.getElementById('targetPickerAttackTotal');
+  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _attackModifier}</strong>`;
+}
+
+function _confirmMiss() {
+  _close({ targetId: _selectedTargetId, hit: false });
+}
+
+/** Attack Hit -- plays the attacker's battle animation (if one exists) right
+ * here, then advances to the damage-roll step. This is the animation's
+ * correct place in the flow: after a target is chosen and the attack is
+ * confirmed to land, not the instant "Use Move" is clicked (see move-popup.js,
+ * which skips its own earlier inline animation for exactly this case). */
+async function _confirmHit() {
+  await _playAnimation();
+  _showStep3();
+}
+
+async function _playAnimation() {
+  if (!_speciesName) return;
+  const url = await getBattleAnimationUrl(_speciesName);
+  if (!url) return;
+  const media = document.getElementById('targetPickerAnimMedia');
+  if (!media) return;
+  const video = document.createElement('video');
+  video.src = url;
+  video.playsInline = true;
+  video.disablePictureInPicture = true;
+  media.innerHTML = '';
+  media.appendChild(video);
+  await new Promise((resolve) => {
+    if (video.readyState >= 3) { resolve(); return; }
+    video.addEventListener('canplay', resolve, { once: true });
+    video.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, 3000);
+  });
+  try { await video.play(); } catch { return; }
+  await new Promise((resolve) => {
+    video.addEventListener('ended', resolve, { once: true });
+    video.addEventListener('error', resolve, { once: true });
+    setTimeout(resolve, 8000);
+  });
+}
+
+function _showStep3() {
+  document.getElementById('targetPickerStep2').hidden = true;
+  document.getElementById('targetPickerStep3').hidden = false;
+  document.getElementById('targetPickerTitle').textContent = 'Damage Roll';
+  document.getElementById('targetPickerDamageTarget').innerHTML = `
+    <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
+    <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
   document.getElementById('targetPickerModifierNote').textContent =
-    _modifier ? ` (${_modifier >= 0 ? '+' : ''}${_modifier} modifier added automatically)` : '';
+    _damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '';
   const input = document.getElementById('targetPickerRollInput');
   input.value = '';
   _updateRollTotal();
@@ -141,13 +237,13 @@ function _showStep2(p, name) {
 function _updateRollTotal() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   const totalEl = document.getElementById('targetPickerRollTotal');
-  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _modifier}</strong>`;
+  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier}</strong>`;
 }
 
-function _confirmRoll() {
+function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
-  _close({ targetId: _selectedTargetId, rawRoll: raw });
+  _close({ targetId: _selectedTargetId, hit: true, rawRoll: raw });
 }
 
 function _cardHtml(p) {
@@ -164,18 +260,24 @@ function _cardHtml(p) {
 }
 
 /**
- * Shows the combined target-and-roll popup: pick who it hits, then (in the
- * same popup) enter the raw table roll -- modifier is added automatically
- * and shown live as the total. Resolves to {targetId, rawRoll}, or null if
- * the player picked "No Target" / closed the popup / there's no active
- * session to target into. Safe to await unconditionally -- it resolves to
- * null with no popup shown when there's nothing to target.
+ * Shows the combined target/attack-roll/damage-roll popup: pick who it hits,
+ * then enter an attack roll (modifier added automatically, shown live) and
+ * declare Attack Hit or Attack Miss yourself -- same as this game's other
+ * rolls, the app shows the total but a human compares it to the target's AC
+ * and decides, it doesn't auto-resolve hit/miss. A Miss resolves immediately
+ * (the move's VP cost was already spent before this popup ever opened, so
+ * there's nothing left to do). A Hit plays the attacker's battle animation
+ * (if any) and moves on to a damage roll, which resolves the promise once
+ * confirmed. Resolves to {targetId, hit:false}, {targetId, hit:true,
+ * rawRoll}, or null if the player picked "No Target" / closed the popup /
+ * there's no active session to target into. Safe to await unconditionally --
+ * it resolves to null with no popup shown when there's nothing to target.
  *
  * The attacker is never offered as a target card -- the "No Target
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { modifier = 0 } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '' } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -184,7 +286,10 @@ export async function pickTarget(attackerId, { modifier = 0 } = {}) {
   if (!participants.length) return null;
 
   _ensureDom();
-  _modifier = modifier;
+  _attackModifier = attackModifier;
+  _damageModifier = damageModifier;
+  _speciesName = speciesName;
+  document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _showStep1();
   const grid = document.getElementById('targetPickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');

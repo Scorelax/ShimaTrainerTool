@@ -8,12 +8,13 @@
 // this page in two tabs and add/remove/advance a session in one -- the
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
-import { CombatAPI } from '../api.js';
+import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { pickTarget } from '../utils/target-picker.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
+import { showCombatAlert } from '../utils/combat-alert.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -120,6 +121,8 @@ const WIP_CSS = `
   }
   .wip-foreign-focus-name { font-size: 1.1rem; font-weight: 700; color: #FFD700; margin-bottom: 0.4rem; }
   .wip-foreign-focus-row { color: #cfd0e0; margin-top: 0.25rem; font-size: 0.95rem; }
+  .wip-foreign-focus-portrait { width: 140px; height: 140px; margin: 0 auto 0.8rem; }
+  .wip-foreign-focus-portrait img, .wip-foreign-focus-portrait video { width: 100%; height: 100%; object-fit: contain; }
   /* Centered both ways within the viewport, not just horizontally --
      min-height keeps it clear of the header/footer chrome so a short
      "Battle Mode" panel doesn't just sit pinned to the top of a tall page. */
@@ -278,6 +281,13 @@ let combatUpdateHandler = null;
 // local-only combat page exactly as before). This is purely local UI state
 // for *this device's* own join process -- separate from the shared
 // `session` above -- until it completes and pushes to the server.
+// Whether this device is watching the active session without owning any
+// participant in it -- set only by an explicit "Spectate" choice (see
+// _renderJoinOrSpectateChoice), never inferred, so a trainer who genuinely
+// hasn't joined yet still gets steered into the join flow by default.
+// Reset back to false whenever the session ends, so the next battle asks
+// again rather than silently spectating forever.
+let _spectating = false;
 let _joinStage = null; // null | 'setup' | 'initiative' | 'placement'
 let _joinState = null; // { combatants: [trainerCombatant, activePokemon] } while in 'initiative'
 let _placementQueue = []; // participant ids this trainer still needs to place, while in 'placement'
@@ -359,7 +369,15 @@ export async function renderCombatWip() {
 function _renderCurrentView() {
   const inJoinFlow = _joinStage === 'setup' || _joinStage === 'initiative' || _joinStage === 'placement';
 
-  if (session.active && (inJoinFlow || _needsToJoin(session))) {
+  // Needs-to-join but hasn't picked a side yet (join vs. just watch) --
+  // ask, rather than assuming everyone wants to play. Only reached once per
+  // session (picking either option moves past this: 'setup' starts
+  // inJoinFlow, Spectate sets _spectating).
+  if (session.active && !_spectating && _needsToJoin(session) && !inJoinFlow) {
+    return _renderJoinOrSpectateChoice();
+  }
+
+  if (session.active && !_spectating && inJoinFlow) {
     // Start warming the browser's cache for every available background now
     // -- Setup/Initiative give a real few seconds of "picking a Pokemon,
     // entering initiative" time, so by the time this trainer actually
@@ -373,7 +391,6 @@ function _renderCurrentView() {
     if (_joinStage === 'placement' && _placementQueue.length) {
       return renderPlacementPhase(session, _placementQueue[0]);
     }
-    _joinStage = 'setup';
     return renderSetupPhase({ showWipButton: false });
   }
 
@@ -381,6 +398,7 @@ function _renderCurrentView() {
   _joinState = null;
   _placementQueue = [];
   _hoverGhosts = {};
+  if (!session.active) _spectating = false;
 
   return `
     <div class="combat-wip-page">
@@ -393,6 +411,26 @@ function _renderCurrentView() {
       <div class="combat-wip-layout">
         <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
         <div class="combat-wip-turnorder" id="wipTurnOrder"></div>
+      </div>
+    </div>`;
+}
+
+/** Shown once, the first time this trainer sees an active session they
+ * haven't joined -- join with your own trainer/Pokémon (the existing Setup
+ * -> Initiative -> Placement -> Battle flow), or just watch (the same
+ * normal view everyone else gets, but with nothing of yours in it -- see
+ * _getDefaultFocusId's spectator fallback and _computeFocusContext's
+ * isMine:false read-only path, both already built for "focused-on-someone-
+ * else's-combatant" and now reused for "own nothing at all" too). */
+function _renderJoinOrSpectateChoice() {
+  return `
+    <div class="combat-wip-page">
+      <style>${WIP_CSS}</style>
+      <div class="combat-wip-empty">
+        <h2>${session.battleType === 'pvp' ? 'PvP' : 'PvE'} Battle in Progress</h2>
+        <p style="color:#a0a0c0;margin-bottom:1.5rem;max-width:340px;">Join in with your own trainer and Pokémon, or just watch the battle.</p>
+        <button class="combat-wip-btn-primary" id="joinChoiceJoinBtn" style="margin-bottom:0.7rem;">⚔ Join Battle</button>
+        <button class="combat-wip-btn-secondary" id="joinChoiceSpectateBtn">👁 Spectate</button>
       </div>
     </div>`;
 }
@@ -459,7 +497,36 @@ function _onLocalCombatStateSave(state) {
     if (last && last.hp === c.currentHp && last.vp === c.currentVp) return;
     _lastSyncedStats[c.id] = { hp: c.currentHp, vp: c.currentVp };
     _pushStatsSync(c.id, c.currentHp, c.currentVp);
+    _persistStatsToDb(c, c.currentHp, c.currentVp);
   });
+}
+
+/** Writes a combatant's current HP/VP through to their real trainer/Pokemon
+ * DB record (not just the ephemeral combat_session), so stats set during a
+ * battle are still there afterward -- the special-case heal popups
+ * (Ingrain/drain/direct heal) already did this themselves for their own
+ * narrow case; this is the one place that now covers every path (VP cost of
+ * a move, manual HP/VP adjusters, status-effect end-of-turn damage, and --
+ * via _syncLocalCombatState below -- damage taken from another player's
+ * attack too), same trust model as the rest of this app (client computes,
+ * server just stores). No-ops gracefully for a stand-in combatant with no
+ * real entityKey to write back to. */
+function _persistStatsToDb(combatant, hp, vp) {
+  const trainerName = _currentTrainerName();
+  if (combatant.type === 'trainer') {
+    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    if (!td.length) return;
+    td[34] = hp; td[35] = vp;
+    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    TrainerAPI.update(td).catch(e => console.error('Trainer HP/VP sync:', e));
+  } else if (combatant.entityKey) {
+    const pd = JSON.parse(sessionStorage.getItem(combatant.entityKey) || 'null');
+    if (!pd) return;
+    pd[45] = hp; pd[46] = vp;
+    sessionStorage.setItem(combatant.entityKey, JSON.stringify(pd));
+    PokemonAPI.updateLiveStats(trainerName, pd[2], 'HP', hp).catch(e => console.error('Pokemon HP sync:', e));
+    PokemonAPI.updateLiveStats(trainerName, pd[2], 'VP', vp).catch(e => console.error('Pokemon VP sync:', e));
+  }
 }
 
 // A rapid run of clicks (e.g. mashing the HP -1 button) fires several
@@ -573,6 +640,17 @@ function _syncLocalCombatState(session) {
       }
     }
     merged.id = p.id;
+    // A change here that this device didn't already know about (prior's old
+    // value differs from the server's) means someone ELSE's action moved
+    // this HP/VP -- the only realistic case being another player's
+    // apply-damage landing a hit on this combatant. That path never touches
+    // this device's own saveCombatState, so it's the one HP/VP change
+    // _onLocalCombatStateSave's DB-persist hook can never see; persist it
+    // here instead so a hit taken while it's not your turn still ends up in
+    // the real trainer/Pokemon record, not just this ephemeral session.
+    if (prior && resolved && (prior.currentHp !== p.currentHP || prior.currentVp !== p.currentVP)) {
+      _persistStatsToDb(merged, p.currentHP, p.currentVP);
+    }
     merged.currentHp = p.currentHP; merged.maxHp = p.maxHP;
     merged.currentVp = p.currentVP; merged.maxVp = p.maxVP;
     if (resolved) merged.hasStatBlock = true;
@@ -783,7 +861,7 @@ function attachPlacementListeners(state, currentId) {
   // way out of joining instead, via the same leave-session cleanup as the
   // End Battle button, and drops the trainer back on their own card.
   document.getElementById('placementBackBtn')?.addEventListener('click', async () => {
-    try { await CombatAPI.leaveSession(_currentTrainerName()); } catch (err) { alert(err.message); }
+    try { await CombatAPI.leaveSession(_currentTrainerName()); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
     sessionStorage.removeItem(WIP_COMBAT_STATE_KEY);
     _joinStage = null; _joinState = null; _placementQueue = []; _hoverGhosts = {};
     window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
@@ -797,7 +875,7 @@ function attachPlacementListeners(state, currentId) {
   if (bgSelect) {
     _populateBackgroundSelect(bgSelect, state.board.backgroundImage);
     bgSelect.addEventListener('change', () => {
-      CombatAPI.setBoardBackground(bgSelect.value).catch(err => alert(err.message));
+      CombatAPI.setBoardBackground(bgSelect.value).catch(err => showCombatAlert(err.message, { title: 'Error' }));
     });
   }
 
@@ -821,7 +899,7 @@ function attachPlacementListeners(state, currentId) {
     try {
       await CombatAPI.confirmPlacement(currentId, col, row);
     } catch (err) {
-      alert(err.message);
+      showCombatAlert(err.message, { title: 'Error' });
       // Someone else likely just took it -- drop the stale preview and let
       // the next server push (which will include their now-confirmed
       // token) redraw the grid so the real occupancy is visible again.
@@ -885,7 +963,7 @@ function renderBody(state) {
   }
 
   return `
-    ${state.battleType === 'pve' ? `
+    ${state.battleType === 'pve' && !_spectating ? `
     <div class="combat-wip-section-label">Add Freeform Enemy (DM-controlled)</div>
     <form class="combat-wip-add-form" id="addParticipantForm">
       <input type="text" name="name" placeholder="Name" required>
@@ -932,10 +1010,19 @@ function _syncHeaderBar(state) {
   }
   const endBtnEl = document.getElementById('wipHeaderEndBtn');
   if (endBtnEl) {
-    endBtnEl.innerHTML = state?.active ? '<button class="combat-wip-btn-danger" id="endSessionBtn">End Battle</button>' : '';
+    // A spectator hasn't joined anything to end -- leaving just stops
+    // watching, no session mutation at all (unlike End Battle, which
+    // removes this trainer's own participants via leaveSession).
+    endBtnEl.innerHTML = !state?.active ? '' : _spectating
+      ? '<button class="combat-wip-btn-secondary" id="stopSpectatingBtn">👁 Stop Spectating</button>'
+      : '<button class="combat-wip-btn-danger" id="endSessionBtn">End Battle</button>';
     document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
       await CombatAPI.leaveSession(_currentTrainerName());
       sessionStorage.removeItem(WIP_COMBAT_STATE_KEY);
+      window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
+    });
+    document.getElementById('stopSpectatingBtn')?.addEventListener('click', () => {
+      _spectating = false;
       window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
     });
   }
@@ -1033,7 +1120,12 @@ let _focusManuallySet = false;
 
 function _getDefaultFocusId(state) {
   const myName = _currentTrainerName();
-  return state.turnOrder.find(id => state.participants[id]?.owner === myName) || null;
+  const mine = state.turnOrder.find(id => state.participants[id]?.owner === myName);
+  // A spectator (or anyone else who owns nothing in this session) has no
+  // "own combatant" to default to -- fall back to whoever's first in turn
+  // order instead of showing nothing at all, same read-only info panel
+  // every other participant already gets for a non-owned focus.
+  return mine || state.turnOrder[0] || null;
 }
 
 function _resolveFocusId(state) {
@@ -1079,15 +1171,39 @@ function _renderForeignFocusInfo(p) {
   const showName = visibleToViewer(p, 'name');
   const showHp = visibleToViewer(p, 'hp');
   const showVp = visibleToViewer(p, 'vp');
+  const name = showName ? p.name : '???';
   const typesText = [p.type1, p.type2].filter(Boolean).join(' / ');
+  // data-focus-id marks which participant this panel is currently showing --
+  // _syncMainFocus checks it to tell "still the same focus, just updated
+  // stats" (patch in place, portrait untouched) from "focus actually
+  // switched" (full rebuild is fine, there's no video to preserve yet).
   return `
-    <div class="wip-foreign-focus">
-      <div class="wip-foreign-focus-name">${showName ? p.name : '???'}</div>
+    <div class="wip-foreign-focus" data-focus-id="${p.id}">
+      <div class="wip-foreign-focus-portrait" id="wipForeignFocusPortrait"></div>
+      <div class="wip-foreign-focus-name" id="wipForeignFocusName">${name}</div>
       ${typesText ? `<div class="wip-foreign-focus-row">${typesText}</div>` : ''}
       ${p.level ? `<div class="wip-foreign-focus-row">Level ${p.level}</div>` : ''}
-      ${showHp ? `<div class="wip-foreign-focus-row">HP: ${p.currentHP}/${p.maxHP}</div>` : ''}
-      ${showVp ? `<div class="wip-foreign-focus-row">VP: ${p.currentVP}/${p.maxVP}</div>` : ''}
+      ${showHp ? `<div class="wip-foreign-focus-row" id="wipForeignFocusHp">HP: ${p.currentHP}/${p.maxHP}</div>` : '<div id="wipForeignFocusHp" hidden></div>'}
+      ${showVp ? `<div class="wip-foreign-focus-row" id="wipForeignFocusVp">VP: ${p.currentVP}/${p.maxVP}</div>` : '<div id="wipForeignFocusVp" hidden></div>'}
     </div>`;
+}
+
+/** Patches the foreign-focus panel in place for the SAME focused
+ * participant (see the data-focus-id check in _syncMainFocus) -- text
+ * updates freely, but the portrait only rebuilds if the image URL actually
+ * changed (patchPortraitMedia), so an mp4 sprite already playing there
+ * isn't restarted by every unrelated SSE push (turn advance, another
+ * player's roll, etc.), same discipline as the turn-order sidebar. */
+function _updateForeignFocusInfo(p) {
+  const showName = visibleToViewer(p, 'name');
+  const name = showName ? p.name : '???';
+  patchPortraitMedia(document.getElementById('wipForeignFocusPortrait'), p.image, name);
+  const nameEl = document.getElementById('wipForeignFocusName');
+  if (nameEl) nameEl.textContent = name;
+  const hpEl = document.getElementById('wipForeignFocusHp');
+  if (hpEl) { hpEl.hidden = !visibleToViewer(p, 'hp'); hpEl.textContent = `HP: ${p.currentHP}/${p.maxHP}`; }
+  const vpEl = document.getElementById('wipForeignFocusVp');
+  if (vpEl) { vpEl.hidden = !visibleToViewer(p, 'vp'); vpEl.textContent = `VP: ${p.currentVP}/${p.maxVP}`; }
 }
 
 /** Builds the #wipBattlePhase HTML string -- used before the DOM exists
@@ -1110,7 +1226,7 @@ function _attachMainFocusListeners(state) {
   document.getElementById('battleList')?.addEventListener('click', (e) => {
     const reactBtn = e.target.closest('.wip-react-btn');
     if (reactBtn) {
-      if (!reactBtn.disabled) CombatAPI.reactionStart(reactBtn.dataset.combatantId).catch(err => alert(err.message));
+      if (!reactBtn.disabled) CombatAPI.reactionStart(reactBtn.dataset.combatantId).catch(err => showCombatAlert(err.message, { title: 'Error' }));
       return;
     }
     // The one extra thing this shared context needs on top of combat.js's
@@ -1143,7 +1259,15 @@ function _syncMainFocus(state) {
   if (!el) return;
   const ctx = _computeFocusContext(state);
   if (!ctx) { el.innerHTML = '<div class="combat-wip-empty"><p style="color:#a0a0c0;">No participants yet.</p></div>'; return; }
-  if (!ctx.isMine) { el.innerHTML = _renderForeignFocusInfo(ctx.p); return; }
+  if (!ctx.isMine) {
+    const existingFocus = el.querySelector('.wip-foreign-focus');
+    if (existingFocus && existingFocus.dataset.focusId === ctx.p.id) {
+      _updateForeignFocusInfo(ctx.p);
+    } else {
+      el.innerHTML = _renderForeignFocusInfo(ctx.p);
+    }
+    return;
+  }
   if (document.getElementById('battleList')) {
     setBattleCardOptions(ctx.cardOptions);
     // rerenderBattle always rebuilds the card fresh (a plain innerHTML
@@ -1199,13 +1323,17 @@ export function attachCombatWipListeners() {
     // needs to join (e.g. this device just created the session, or a
     // session just went active) -- switch into the join flow rather than
     // patching the normal-view body with something that no longer applies.
-    if (session.active && _needsToJoin(session)) {
+    // Spectators are exempt -- _needsToJoin is permanently true for them (a
+    // spectator owns nothing by definition), so without this check every
+    // single push would bounce a spectator back through _rerenderFull and
+    // undo the whole point of _syncMainFocus's patch-in-place path below.
+    if (session.active && !_spectating && _needsToJoin(session)) {
       _exitBattleSync();
       _rerenderFull();
       return;
     }
 
-    if (!session.active) _exitBattleSync();
+    if (!session.active) { _exitBattleSync(); _spectating = false; }
 
     if (session.active && document.getElementById('wipBattlePhase')) {
       // Fast path: patch things in place rather than replacing the whole
@@ -1228,6 +1356,18 @@ export function attachCombatWipListeners() {
     updateBattleMap(session); // no-ops if the popup isn't currently open
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
+
+  if (document.getElementById('joinChoiceJoinBtn')) {
+    document.getElementById('joinChoiceJoinBtn').addEventListener('click', () => {
+      _joinStage = 'setup';
+      _rerenderFull();
+    });
+    document.getElementById('joinChoiceSpectateBtn').addEventListener('click', () => {
+      _spectating = true;
+      _rerenderFull();
+    });
+    return;
+  }
 
   if (_joinStage === 'setup') {
     attachSetupListeners({
@@ -1255,7 +1395,7 @@ export function attachCombatWipListeners() {
             await CombatAPI.addParticipant(_combatantToParticipant(c));
           }
         } catch (err) {
-          alert(err.message);
+          showCombatAlert(err.message, { title: 'Error' });
         }
         // Pick up whatever the server now has (including this device's own
         // just-added participants) before deciding what's next.
@@ -1335,25 +1475,28 @@ function attachBodyListeners() {
  * up -- apply-damage on the server only ever applies type effectiveness on
  * top of whatever number it's given, it doesn't know about ability/STAB/
  * proficiency modifiers itself. */
-async function _handleDamageResolved({ combatantId, moveName, move, computedData }) {
-  const modifier = computedData.damageBonus || 0;
-  // pickTarget's own popup covers both target selection AND the roll input
-  // now (see target-picker.js) -- the move's animation (triggered by
-  // applyDamage below, once it lands server-side) only plays after this
-  // whole thing resolves, never before.
-  const picked = await pickTarget(combatantId, { modifier });
+async function _handleDamageResolved({ combatantId, moveName, move, computedData, speciesName }) {
+  const attackModifier = computedData.attackBonus || 0;
+  const damageModifier = computedData.damageBonus || 0;
+  // pickTarget's own popup now covers the whole rest of the flow: pick a
+  // target, enter the attack roll, declare Hit/Miss yourself (same as this
+  // game's other rolls -- the app shows the total, a human compares it to
+  // the target's AC), and -- only on a Hit -- play the attacker's battle
+  // animation and take a damage roll. See target-picker.js.
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName });
   if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
-  const { targetId, rawRoll } = picked;
+  if (!picked.hit) return; // Miss -- VP already spent when the move was confirmed, nothing else to do
 
+  const { targetId, rawRoll } = picked;
   const moveType = (move && move[1]) || '';
   try {
-    const result = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + modifier, moveType, moveName);
+    const result = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, moveName);
     if (result.multiplier !== undefined) {
       const label = result.multiplier >= 2 ? 'Super effective!' : result.multiplier === 0 ? 'No effect!' : result.multiplier < 1 ? 'Not very effective...' : '';
-      alert(`${label ? label + ' — ' : ''}${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`);
+      showCombatAlert(`${label ? label + ' — ' : ''}${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`, { title: 'Attack Result' });
     }
   } catch (err) {
-    alert(err.message);
+    showCombatAlert(err.message, { title: 'Error' });
   }
 }
 

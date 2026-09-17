@@ -2407,6 +2407,7 @@ function endTurnForCombatant(combatantId, state) {
     else if (se.duration - 1 > 0) remaining.push({ ...se, duration: se.duration - 1 });
   }
   c.statusEffects = remaining;
+  _syncStatusConditionToDb(c, state);
 
   // Advance to next living combatant
   const total = state.combatants.length;
@@ -2438,6 +2439,16 @@ function endTurnForCombatant(combatantId, state) {
   rerenderBattle(state);
 }
 
+function _syncStatusConditionToDb(c, state) {
+  if (c.type !== 'pokemon' || !c.entityKey) return;
+  const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || 'null');
+  if (!pd) return;
+  const trainerName = state.combatants.find(x => x.type === 'trainer')?.name || '';
+  pd[60] = c.statusEffects.map(s => s.name).join(',');
+  sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
+  PokemonAPI.updateLiveStats(trainerName, pd[2], 'StatusCondition', pd[60]).catch(e => console.error('Status sync:', e));
+}
+
 function addStatusEffect(combatantId, effectName, state, description = '') {
   const c = state.combatants.find(x => x.id === combatantId);
   if (!c || c.statusEffects.find(s => s.name === effectName)) return;
@@ -2446,6 +2457,7 @@ function addStatusEffect(combatantId, effectName, state, description = '') {
   c.statusEffects.push(entry);
   saveCombatState(state);
   rerenderBattle(state);
+  _syncStatusConditionToDb(c, state);
 }
 
 function removeStatusEffect(combatantId, effectName, state) {
@@ -2454,6 +2466,7 @@ function removeStatusEffect(combatantId, effectName, state) {
   c.statusEffects = c.statusEffects.filter(s => s.name !== effectName);
   saveCombatState(state);
   rerenderBattle(state);
+  _syncStatusConditionToDb(c, state);
 }
 
 // ============================================================================
@@ -2539,6 +2552,15 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved 
       : '';
   }
 
+  // Same "is this an offensive move that will hand off to onDamageResolved"
+  // check the onUseMove callback below uses to decide whether to actually
+  // call it -- reused here so the popup's own inline battle animation is
+  // deferred (played later, once a target/attack-roll/hit is confirmed via
+  // target-picker.js) for exactly the moves that will take that detour,
+  // and plays immediately as before for anything else (self-heals, legacy
+  // combat.js callers that never pass onDamageResolved at all).
+  const _willDeferToTargetPicker = !!onDamageResolved && !!computedData.damageDice && !_isDrainHeal && !_isDirectHeal;
+
   showMovePopup({
     move,
     computedData,
@@ -2556,6 +2578,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved 
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
+    deferAnimation: _willDeferToTargetPicker,
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;
@@ -2616,7 +2639,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved 
       // or pure status/utility moves, matching the same signal
       // move-popup.js's own drain/direct-heal post-use check already uses.
       if (onDamageResolved && computedData.damageDice && !_isDrainHeal && !_isDirectHeal) {
-        onDamageResolved({ combatantId, moveName: usedMoveName, move, computedData });
+        onDamageResolved({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
       }
     },
     onDrainHeal: () => {

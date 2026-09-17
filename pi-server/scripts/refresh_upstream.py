@@ -1,5 +1,7 @@
-"""Force-refresh the upstream snapshots (Benjakronk's pokedex, moves, items,
-pokedex config) into the SQLite database. Failures keep the previous snapshot.
+"""Force-refresh the live upstream snapshots (Benjakronk's pokedex, items,
+pokedex config) into the SQLite database. Failures keep the previous
+snapshot. Moves isn't one of these any more -- see upstream.MOVES_FILE --
+so it won't show up in the per-key report below, that's expected.
 
 Usage:
     python scripts/refresh_upstream.py [--db path/to/pokedex.db]

@@ -15,9 +15,17 @@ import httpx
 from .calculations import sanitize_string
 
 POKEMON_DATA_URL = 'https://script.google.com/macros/s/AKfycbwIT3OS2bdCv2kkDPh6IjRRirv17iPnuttlPcY47LCHBbpNPuHF_IjVq0mCt7TkkWoW/exec?action=pokemon'
-MOVE_DATA_URL = 'https://script.google.com/macros/s/AKfycbz5jkSQ1HuCpCrbg_mePsfLDaoesjCvrX_fCAhJvTC5V3IddYmtjVJnh4_2YaX37Dkj/exec?action=moves'
 ITEMS_DATA_URL = 'https://script.google.com/macros/s/AKfycbwIT3OS2bdCv2kkDPh6IjRRirv17iPnuttlPcY47LCHBbpNPuHF_IjVq0mCt7TkkWoW/exec?action=items'
 POKEDEX_CONFIG_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/pokedex_config.json'
+
+# Moves used to come from a live Google Sheet fetch here too (same shape as
+# the other *_DATA_URL constants above), until the user pointed out the
+# move list is effectively static -- new moves are basically never added --
+# so a version-controlled local file was worth more than staying live, and
+# it's also where the user's own manual move categorization already lives
+# (routes_combat.py's list-move-categories reads this exact file). See
+# fetch_moves below for the row shape this produces.
+MOVES_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_moves_categorized_draft.json')
 
 IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/'
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
@@ -105,13 +113,29 @@ def fetch_pokemon_db(conn, force=False):
 
 
 def fetch_moves(conn, force=False):
-    if not force:
-        cached = _cache_get(conn, 'moves')
-        if cached is not None:
-            return cached
-    data = _fetch_json(MOVE_DATA_URL)
-    _cache_put(conn, 'moves', data)
-    return data
+    """Reads MOVES_FILE instead of a live fetch -- see that constant's own
+    comment. `conn` and `force` only remain in the signature so every
+    existing caller (routes_combat.py's _find_move, routes_gamedata.py,
+    refresh_all's uniform fn(c, force=True) loop) keeps working unmodified;
+    neither is actually used -- there's no SQLite cache or network response
+    here to force a refresh of, since a plain file read is already cheap
+    enough to just do fresh every call (same reasoning as
+    routes_combat.py's list-move-categories, which reads this identical
+    file -- an in-progress edit on the Pi should show up on the next move
+    popup without a server restart). Returns the same [name, type,
+    modifier, actionType, vpCost, duration, range, desc, higherLevels] row
+    shape the live fetch used to, since every caller destructures it
+    positionally."""
+    try:
+        with open(MOVES_FILE, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return [
+        [m['name'], m['type'], m.get('moveStat', ''), m['action'], m.get('vpCost', ''),
+         (m.get('duration') or {}).get('raw', ''), m['range'], m['description'], m.get('scaling', '')]
+        for m in data.get('moves', [])
+    ]
 
 
 def fetch_items(conn, force=False):
@@ -184,12 +208,14 @@ def registered_pokemon_names(conn):
 
 
 def warm_upstream(conn):
-    """Force-refresh every snapshot; failures keep the previous data.
+    """Force-refresh every live snapshot; failures keep the previous data.
+    Moves isn't one of these any more -- fetch_moves reads a local file now
+    (see MOVES_FILE), nothing to refresh from network.
 
-    The four sources are fetched in parallel (each on its own SQLite
-    connection - connections aren't shareable across threads), so the wall
-    time is the slowest upstream instead of the sum of all four. The passed
-    conn is unused but kept so callers don't change."""
+    The three remaining sources are fetched in parallel (each on its own
+    SQLite connection - connections aren't shareable across threads), so
+    the wall time is the slowest upstream instead of the sum of all three.
+    The passed conn is unused but kept so callers don't change."""
     from concurrent.futures import ThreadPoolExecutor
 
     from . import db
@@ -203,7 +229,7 @@ def warm_upstream(conn):
         finally:
             c.close()
 
-    fns = (fetch_pokemon_db, fetch_moves, fetch_items, fetch_pokedex_config)
+    fns = (fetch_pokemon_db, fetch_items, fetch_pokedex_config)
     with ThreadPoolExecutor(max_workers=len(fns)) as pool:
         list(pool.map(refresh, fns))
 

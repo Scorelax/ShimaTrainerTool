@@ -896,27 +896,20 @@ def _list_backgrounds():
     return {'status': 'success', 'backgrounds': backgrounds}
 
 
-# The user's own manual move categorization (see pi-server/docs's own
-# README-shaped comment at the top of that file) -- ships with the repo like
-# DnD_moves.json itself rather than living under a runtime ~/pokemon-dnd/
-# directory, since it's versioned reference data that changes with a git
-# pull, not user-uploaded runtime content. Read fresh on every call (no
-# caching) so an in-progress editing session on the Pi is picked up on the
-# next move popup without a server restart -- this is a small file read on
-# an already-human-paced action, nowhere near worth caching.
-MOVE_CATEGORIES_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_moves_categorized_draft.json')
-
-
 def _list_move_categories():
     """{moveName: [category, ...]} for every move that's been through the
     user's manual categorization pass so far -- a move with no entry here
     just means "not categorized yet" client-side (see combat.js's
-    moveCategoriesFor), not an error. Missing/unparseable file -> empty
+    moveCategoriesFor), not an error. Reads upstream.MOVES_FILE -- the same
+    file upstream.fetch_moves itself now reads the actual move data from
+    (see that constant's own comment) -- fresh on every call (no caching)
+    so an in-progress editing session on the Pi is picked up on the next
+    move popup without a server restart. Missing/unparseable file -> empty
     dict, same reasoning: a category lookup miss should never block using
     a move, only skip whatever specialized flow that category would have
     triggered (see showCombatMoveDetails's _isSaveTriggered check)."""
     try:
-        with open(MOVE_CATEGORIES_FILE, encoding='utf-8') as f:
+        with open(upstream.MOVES_FILE, encoding='utf-8') as f:
             data = json.load(f)
     except (OSError, ValueError):
         return {'status': 'success', 'categories': {}}

@@ -1421,7 +1421,7 @@
         "--POTENTIAL STATUS CONDITION--",
         "multi_hit_aoe"
       ],
-      "description": "You release a powerful shockwave that tears through creatures and the space around them. All creatures within range must make a CON save against your Move DC, taking 10d12 + MOVE cosmic damage on a failure, or half as much on a success. Creatures that fail this save by 5 or more become uncontrollable and are sucked into the Ethereal Plane until the beginning of your next turn, appearing in the same location when they return, suffering the Blink effect for 1 minute. This move may be usedd once per long rest.",
+      "description": "You release a powerful shockwave that tears through creatures and the space around them. All creatures within range must make a CON save against your Move DC, taking 10d12 + MOVE cosmic damage on a failure, or half as much on a success. Creatures that fail this save by 5 or more become uncontrollable and are sucked into the Ethereal Plane until the beginning of your next turn, appearing in the same location when they return, suffering the Blink effect for 1 minute. This move may be used once per long rest.",
       "moveStat": "STR/WIS",
       "vpCost": "75",
       "scaling": "The damage dice for this move changes to 12d12 at level 5, 15d12 at level 10, and 20d12 at level 17."
@@ -2037,7 +2037,7 @@
         "--GUARANTEED HIT--",
         "multi_hit_choice"
       ],
-      "description": "You send a barrage of three balls of furious energy at any creature(s) in range. Each ball automatically deals 3d10 dark damage to any creature(s) you choose. Reactions that negate damage such as Protect or Detect cannot be used, and creatures in the invulnerable stages of moves like Fly, Dig, etc. can be targeted by thiis move. After activating this move, any attacks against you, until the beginning of your next turn, are rolled at advantage. This move may be used once per short rest.",
+      "description": "You send a barrage of three balls of furious energy at any creature(s) in range. Each ball automatically deals 3d10 dark damage to any creature(s) you choose. Reactions that negate damage such as Protect or Detect cannot be used, and creatures in the invulnerable stages of moves like Fly, Dig, etc. can be targeted by this move. After activating this move, any attacks against you, until the beginning of your next turn, are rolled at advantage. This move may be used once per short rest.",
       "moveStat": "STR/DEX",
       "vpCost": "50",
       "scaling": "You can fire 4 projectiles at level 5, 5 projectiles at level 10, and 6 projectiles at level 17."
@@ -3417,7 +3417,7 @@
         "stat_buff_self",
         "recharge_locked"
       ],
-      "description": "You create strong winds that hurl electrified water droplets at an incredible speed in an 80ft. line, 5 feet wide. Announce if you intend to to electric or water damage. All creatures caught in the line is forced to make a DEX save against your move DC, taking 2d8 MOVE + electric OR water damage on a failure. This move can only be used while it is raining.",
+      "description": "You create strong winds that hurl electrified water droplets at an incredible speed in an 80ft. line, 5 feet wide. Announce if you intend to deal electric or water damage. All creatures caught in the line is forced to make a DEX save against your move DC, taking 2d8 MOVE + electric OR water damage on a failure. This move can only be used while it is raining.",
       "moveStat": "STR/DEX",
       "vpCost": "10",
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
@@ -4467,7 +4467,7 @@
         "heal_self",
         "heal_target_or_aoe"
       ],
-      "description": "You grab a creature and attempt a mystical waltz that drains its vitality. Make a melee attack, grappling and restraining the creature on a hit. The target must then succeed a WIS saving throw or become charmed by you. For three turns, or until you lose concentration, you are locked in a dance that as your action drains the target of 2d8 VP each turn. You regain half of the VP drained as HP. The target may use its action to attempt to breakk free from yuor grapple on its turn, unless it is charmed. You may use your action to stop dancing on your turn. After the dance ends, the charm persists until it is broken.",
+      "description": "You grab a creature and attempt a mystical waltz that drains its vitality. Make a melee attack, grappling and restraining the creature on a hit. The target must then succeed a WIS saving throw or become charmed by you. For three turns, or until you lose concentration, you are locked in a dance that as your action drains the target of 2d8 VP each turn. You regain half of the VP drained as HP. The target may use its action to attempt to break free from your grapple on its turn, unless it is charmed. You may use your action to stop dancing on your turn. After the dance ends, the charm persists until it is broken.",
       "moveStat": "None",
       "vpCost": "15",
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
@@ -13227,7 +13227,7 @@
       },
       "reaction": false,
       "categories": [],
-      "description": "You sing a beautiful song in an attempt to put creatures to to sleep. Roll 5d8 + MOVE; the total is how many hit points of creature this move can affect. creatures within 30 feet of you are affected in ascending order of their current hit points. Starting with the creature that has the lowest current hit points, each creature affected by this move falls asleep. Subtract each creature’s hit points from the total before moving on to the creature with the next lowest hit points. A creature’s hit points must be equal to or less than the remaining total for that creature to be affected.",
+      "description": "You sing a beautiful song in an attempt to put creatures to sleep. Roll 5d8 + MOVE; the total is how many hit points of creature this move can affect. Creatures within 30 feet of you are affected in ascending order of their current hit points. Starting with the creature that has the lowest current hit points, each creature affected by this move falls asleep. Subtract each creature’s hit points from the total before moving on to the creature with the next lowest hit points. A creature’s hit points must be equal to or less than the remaining total for that creature to be affected.",
       "moveStat": "CHA",
       "vpCost": "4",
       "scaling": "The number of hit points affected changes to 7d8 at level 5, 6d12 at level 10, and 11d8 at level 17."

@@ -74,7 +74,18 @@ const CATS = {
   // shared roll applied to N targets vs. N independent target-pick-and-
   // roll passes), which is the whole reason for the split.
   multi_hit_aoe: m => /\ball creatures?\b.{0,60}\b(must (make|succeed)|takes?)\b/i.test(text(m)) && /\b(radius|cone|circle|sphere|line|area)\b/i.test(text(m)),
-  multi_hit_same_target: m => /(make (two|three|\d+) (melee|ranged)? ?attack rolls|attack (a number of times|.{0,20}times equal to)|target the same creature multiple times|make (melee|ranged)? ?attack rolls for all attacks)/i.test(text(m)),
+  // Split 2026-09-17, second pass: multi_hit_same_target further narrowed
+  // to moves with NO target-choice language at all (a d4-continue-on-3-or-4
+  // chain, e.g. Fury Attack/Rock Blast/Bullet Seed, or a fixed/rolled hit
+  // count with no "different targets" wording, e.g. Double Kick/Barrage) --
+  // multi_hit_choice pulled out for moves that explicitly let the user
+  // pick a target per hit (same or different), e.g. Hyperspace Fury,
+  // Hydra Bite, Gear Grind, Twineedle. Same reasoning as the AoE/same-
+  // target split: different UI need (no re-targeting vs. re-run the full
+  // target-picker each hit).
+  multi_hit_same_target: m => /(roll a d4.{0,20}on a result of 3 or 4|continue this process until you fail|make (two|three|\d+) (melee|ranged)? ?attack rolls)/i.test(text(m))
+    && !/(any creature\(?s?\)?( you choose)?|do not have to target the same creature|up to (two|three|\d+) targets|targets? in range)/i.test(text(m)),
+  multi_hit_choice: m => /(any creature\(?s?\)? you choose|do not have to target the same creature|may target the same creature multiple times|up to (two|three|\d+) targets)/i.test(text(m)),
   fixed_special_damage: m => /(regardless of|reduces? (the )?target('s)? (current )?hp to 1|the (less|more) hp .{0,10}the (stronger|more powerful)|below \d+% of (its |your )?(maximum )?health|double the damage|triple the damage)/i.test(text(m)),
   recharge_locked: m => /recharge/i.test(m.action || ''),
 };

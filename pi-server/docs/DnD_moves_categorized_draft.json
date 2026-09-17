@@ -297,7 +297,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--MULTI HIT--"
+        "--MULTI HIT--",
+        "multi_hit_same_target"
       ],
       "description": "You strike a creature with sharp projectiles in quick succession. Make a ranged attack roll, doing 1d4 + MOVE bug damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, another projectile hits again for an additional 1d4 bug damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -581,7 +582,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "status_inflict_threshold",
+        "multi_hit_choice"
       ],
       "description": "You fire two sharp projectiles at a creature in range. They do not have to target the same creature. Make two ranged attack rolls, dealing 1d4 + MOVE bug damage on each hit. If the natural roll of either attack is a 19 or 20, the target is poisoned."
     },
@@ -1749,7 +1751,7 @@
         "protect_negate",
         "recharge_locked",
         "--GUARANTEED HIT--",
-        "multi_hit_same_target"
+        "multi_hit_choice"
       ],
       "description": "You send a barrage of three balls of furious energy at any creature(s) in range. Each ball automatically deals 3d10 dark damage to any creature(s) you choose. Reactions that negate damage such as Protect or Detect cannot be used, and creatures in the invulnerable stages of moves like Fly, Dig, etc. can be targeted by thiis move. After activating this move, any attacks against you, until the beginning of your next turn, are rolled at advantage. This move may be used once per short rest."
     },
@@ -2395,7 +2397,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You lash out at an opponent(s) with two quick strikes. Make two melee attack rolls, dealing 1d6 + MOVE dragon damage with each hit."
     },
@@ -2413,7 +2416,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit_same_target"
+        "multi_hit_choice"
       ],
       "description": "You lash out at opponents in range with a vicious bite. You may attack a number of times equal to the number of heads you have, costing 3VP per attack. Make melee attack rolls for all attacks, dealing 1d10 + MOVE dragon damage with each hit. You may target the same creature multiple times."
     },
@@ -4814,7 +4817,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You strike out with three consecutive kicks. Make three melee attack rolls in order, doing 1d10 + MOVE fighting damage on each hit. As soon as one attack misses, the move is over."
     },
@@ -7087,7 +7091,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You fire a series of high-speed seeds at an opponent. Make a ranged attack roll, doing 1d10 + MOVE grass damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d10 grass damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -7997,7 +8002,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You rush forward to deliver a series of hard hits against a Pokémon. Make a melee attack roll, doing 1d6 + MOVE ground damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 ground damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -8283,7 +8289,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_choice"
       ],
       "description": "You gather in the natural energy of the land around you and manifest all of the power into fearsome blades of stone. Make three ranged attack rolls against any creature(s) in range, dealing 3d10 + MOVE ground damage on each successful hit."
     },
@@ -8876,7 +8883,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "Your pummel a creature in range with multiple sharp shards of ice. Make a ranged attack roll, doing 1d4 + MOVE ice damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 ice damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -9082,7 +9090,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "Make a ranged attack on a Pokémon, rolling 1d4 on a hit. You attack with a barrage of ranged strikes equal to the number shown. Each projectile deals 1d4 + MOVE normal damage."
     },
@@ -9328,7 +9337,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You strike out with a lightning fast punch. Make a melee attack roll. The target takes 1d4 + MOVE on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 normal damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -9568,7 +9578,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You reach out to slap a Pokémon with quick strikes. Make a melee attack roll, doing 1d4 + MOVE on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 normal damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -9984,7 +9995,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You reach out and unleash relentless strikes against a creature. Make a melee attack roll, doing 2d8 + MOVE normal damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 2d6 normal damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -10001,7 +10013,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You reach out and unleash relentless claw attacks against a creature. Make a melee attack roll, doing 1d4 + MOVE normal damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 normal damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -10749,7 +10762,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You slice at your opponent with blades made of sharp paper. Make two attack rolls, dealing 1d4 + MOVE normal damage on a hit. This move ignores resistances and weaknesses, but not immunity. You may use this move as a bonus action."
     },
@@ -11527,7 +11541,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You fire a series of sharp spikes at a creature in range. Make a ranged attack roll, doing 1d4 + MOVE normal damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 normal damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -11826,7 +11841,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You strike out against a creature with a quickhitting, hard tail. Make a melee attack roll, doing 1d4 + MOVE normal damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 normal damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -11952,7 +11968,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "status_inflict_auto",
+        "multi_hit_same_target"
       ],
       "description": "You thrash about wildly, doing several attacks without control. Make a melee attack roll, doing 2d8 + MOVE normal damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 2d8 normal damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of two additional hits. At the end of this attack, you become confused."
     },
@@ -14238,7 +14255,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You summon a series of rocks that fire their way towards a creature. Make a ranged attack roll, doing 1d4 + MOVE rock damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 1d4 rock damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },
@@ -14592,7 +14610,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_choice"
       ],
       "description": "You send a pair of steel gears at up to two targets in range. Make two ranged attacks, dealing 2d8 + MOVE steel damage with each hit."
     },
@@ -15635,7 +15654,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You fire a barrage of sharp shurikens at a target. Make a ranged attack roll, doing 1d4 + MOVE water damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, another shuriken strikes the target for an additional 1d4 water damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits."
     },

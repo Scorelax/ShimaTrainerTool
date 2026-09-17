@@ -9929,7 +9929,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You create a 40 foot line of freezing ice, 5 feet wide. All creatures caught in the line must succeed a DEX save or take 1d10 + MOVE ice damage. Failing by 5 or more causes a creature to freeze.",
       "moveStat": "STR/DEX",
@@ -9949,7 +9951,7 @@
       },
       "reaction": false,
       "categories": [
-        "shield_temphp"
+        "stat_buff_self"
       ],
       "description": "You use the environment to create a shield of ice around your body. Only able to be activated while it is hailing, this move can be used as a bonus action to halve all damage dealt to you for three rounds.",
       "moveStat": "None",
@@ -9970,8 +9972,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "field_weather",
-        "fixed_special_damage"
+        "--POTENTIAL DAMAGE INCREASE--"
       ],
       "description": "You send forth a heap of powerful snow to pummel an opponent. Make a ranged attack on a target, dealing 1d10 + MOVE ice damage on a hit. If the target has dealt any damage to you since the end of your last turn, double the damage you deal.",
       "moveStat": "STR",
@@ -9992,9 +9993,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "field_weather",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "Icy clouds form overhead and pelt the ground with hail and snow, centered on a point you choose within range. Each creature within a 20 foot radius must make a Dexterity saving throw against your Move DC, taking 3d10 + MOVE ice damage on a failed save, or half as much on a successful one. Targets that fail the save by 5 or more become frozen.",
       "moveStat": "STR/DEX",
@@ -10032,7 +10034,7 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_auto"
+        "--STATUS CONDITION--"
       ],
       "description": "After landing a melee attack, you may use a bonus action to activate this move. Ice cold tentacles wrap around the creature, attempting to freeze it solid. Make a melee attack roll, freezing the creature on a success. On a critical hit, this move is one hit KO.",
       "moveStat": "DEX/WIS",
@@ -10095,7 +10097,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You blow a gust of freezing cold air in a 15ft cone. Creatures caught in the cone must succeed a DEX save or take 1d10 + MOVE ice damage on a hit. Failing the save by 5 or more causes critical damage.",
       "moveStat": "CON/DEX",
@@ -10116,8 +10120,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You spend one turn drawing in air, readying your attack. Next turn, you let out a stream of intense icy energy in a line 5 feet wide, creating a blizzard with a radius of 10 feet centered on the first creature hit. All creatures caught in the blizzard must make a CON save against your move DC, taking 4d12 + MOVE ice damage on a failure, or half as much on a success. If the save is failed by 5 or more, the target is frozen.",
       "moveStat": "STR/DEX",
@@ -10137,7 +10143,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "The user creates icy restraints on a target within 30 feet. The target must succeed on a Strength saving throw or be restrained for 1 minute. At the end of each of its turns, the target can repeat the saving throw, ending the effect on itself on a success.",
       "moveStat": "STR",
@@ -10158,7 +10165,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "stat_debuff_enemy",
+        "--STATUS CONDITION--"
       ],
       "description": "You blow a wind of freezing cold air at a creature in range. Make a ranged attack roll, dealing 1d10 + MOVE ice damage on a hit. On a hit, reduce the target's speed by 5 feet. A target reduced to a speed of 0 in this manner becomes frozen. The target may use an action at any time (before becoming frozen) to warm its body, resetting its speed.",
       "moveStat": "DEX",
@@ -10178,7 +10186,6 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
         "field_weather"
       ],
       "description": "You stir up a massive hail storm in a 50 foot radius, centered on a point in range. When a non ice-type creature enters the area for the first time on their turn, or begins their turn inside the area, they take an amount of ice damage equal to half your level, rounded up. The hail storm lasts for 5 rounds.",
@@ -10199,7 +10206,7 @@
       },
       "reaction": false,
       "categories": [
-        "field_weather"
+        "steal_disrupt"
       ],
       "description": "You create a haze of light magical snow that washes over all creatures in a 30ft circle, centered on you. Any stat bonuses or modifiers, status effects, shields or other outside forces affecting the stats or abilities of a creature are removed. This includes things like Leech Seed, Focus Energy, Iron Defense, Disable, etc.",
       "moveStat": "None",
@@ -10220,7 +10227,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "--POTENTIAL DAMAGE INCREASE--"
       ],
       "description": "You summon a rock-hard ball of ice that continues to pummel a creature. When you activate this move, make a ranged attack on a target in range, doing 1d6 + MOVE ice damage on a hit. If you continue to use this move on consecutive turns, double the dice roll for damage each time you hit. The multiplier maxes out at 8x the original damage. For each consecutive use of this move, increase the VP cost by 1. The damage and VP cost reset if any of the attacks fail to damage a creature, if your speed is reduced to 0, or if you are incapacitated.",
       "moveStat": "STR/DEX",
@@ -10241,9 +10248,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You create a 80 foot line of freezing ice, 5 feet wide. All creatures caught in the line must succeed on a DEX save against your Move DC or take 2d8 + MOVE ice damage and be frozen on a failure, or half as much without being frozen on a success.",
       "moveStat": "STR/DEX",
@@ -10264,8 +10272,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "When you use this move, you charge up an intense power within your body. On your next turn’s action, if you keep your concentration, you unleash an ultracold, freezing wind in a 30 foot circle all around you. Anyone caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE ice damage on a failure, or half as much on a success. If any creature fails the save by 5 or more, it is burned.",
       "moveStat": "STR/DEX",
@@ -10348,8 +10357,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "status_inflict_auto"
+        "damage"
       ],
       "description": "You flash freeze chunks of ice and quickly hurl them at a creature. As a bonus action, you fire a shard of ice at a creature in range. Make a ranged attack roll, dealing 1d6 ice damage on a hit.",
       "moveStat": "DEX",
@@ -10369,7 +10377,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You generate a row of icicles that crash down on top of a creature in range. The target must succeed a DEX saving throw against your move DC, taking 1d10 + MOVE ice damage on a hit. If the saving throw fails by 5 or more, the target flinches.",
       "moveStat": "DEX",
@@ -10451,7 +10461,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "All ice type allies within 40ft. may use their reaction to move up to half their movement speed without provoking opportunity attacks. Each ally creates a 5ft. wide trail of extreme cold. Any creature that starts its turn inside a trail, or crosses it during, must make a Constitution saving throw, taking 2d8 + MOVE ice damage and being slowed until the end of their next turn. The trail lasts until the beginning of the user's next turn.",
       "moveStat": "DEX",
@@ -10472,8 +10484,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "field_weather"
+        "status_inflict_threshold"
       ],
       "description": "You send a blast of cold snow at a creature. Make a ranged attack roll on a creature, doing 1d6 + MOVE ice damage on a hit. If the natural attack roll is 18 or higher, the target is frozen.",
       "moveStat": "DEX",
@@ -10512,8 +10523,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "field_terrain"
+        "field_terrain",
+        "--TRIGGER SAVING THROW--",
+        "--CONDITIONAL DAMAGE--"
       ],
       "description": "You cause rapid evaporative cooling to happen around a single target in range. Make a ranged attack, dealing 2d8 + MOVE ice damage. On a hit, this move triggers different effects based on the temperature of the surrounding environment: - In hot environments: Double the dice for the damage roll. - In temperate environments: Target must succeed a Constitution saving throw or have their speed halved until the end of their next turn. - In cold environments: Creates a 10ft. radius of difficult terrain as moisture instantly freezes.",
       "moveStat": "DEX",

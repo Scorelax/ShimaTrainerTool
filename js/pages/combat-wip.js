@@ -1612,27 +1612,40 @@ async function _handleSecondarySave(combatantId, targetId, moveName, computedDat
  * tagged REACTIVE SAVE (Wing Buffer, etc.), where the move's own user is
  * the one who saves, against whoever attacked them, not a chosen target's
  * own DC. Auto-detects the attacker and their DC from the shared battle
- * log's most recent damage entry against this reactor (per the user's
- * explicit direction), falling back to a manual "pick who attacked you and
- * type in their DC" flow when that isn't possible -- no recent damage
- * entry, the attacker's record predates the full-stat-block feature (e.g.
- * a PvE freeform enemy), or the attacking move isn't in the moves dataset. */
+ * log, falling back to a manual "pick who attacked you and type in their
+ * DC" flow when that isn't possible -- no matching damage entry, the
+ * attacker's record predates the full-stat-block feature (e.g. a PvE
+ * freeform enemy), or the attacking move isn't in the moves dataset. */
 async function _handleReactiveSave({ combatantId, moveName }) {
   const result = await CombatAPI.getState();
   const freshSession = result.status === 'success' ? result.data : session;
   const log = freshSession?.log || [];
 
+  // Who I'm actually reacting to -- NOT just whoever's most recent in the
+  // log (that could be stale, e.g. a hit from several rounds ago if this
+  // reaction wasn't declared right away, or a hit from someone else
+  // entirely if another turn passed in between). Reacting only ever
+  // happens during someone ELSE's active turn (routes_combat.py's
+  // reaction-start rejects reacting on your own turn), and starting a
+  // reaction never touches turnIndex -- so turnOrder[turnIndex] still
+  // points at that participant even while reactingParticipantId now holds
+  // this device's own id. That's the actual attacker to auto-detect
+  // against: the current turn order, not the log's literal last line.
+  const activeAttackerId = freshSession.turnOrder?.[freshSession.turnIndex];
+
   let attacker = null;
   let dc = null;
-  for (let i = log.length - 1; i >= 0; i--) {
-    const entry = log[i];
-    if (entry.type !== 'damage' || entry.targetId !== combatantId) continue;
-    const candidate = freshSession.participants?.[entry.actorId];
-    if (candidate && entry.move && _hasFullStatBlock(candidate)) {
-      const moveRow = findMoveRow(entry.move);
-      if (moveRow) { attacker = candidate; dc = computeMoveDC(moveRow, candidate); }
+  if (activeAttackerId && activeAttackerId !== combatantId) {
+    for (let i = log.length - 1; i >= 0; i--) {
+      const entry = log[i];
+      if (entry.type !== 'damage' || entry.targetId !== combatantId || entry.actorId !== activeAttackerId) continue;
+      const candidate = freshSession.participants?.[activeAttackerId];
+      if (candidate && entry.move && _hasFullStatBlock(candidate)) {
+        const moveRow = findMoveRow(entry.move);
+        if (moveRow) { attacker = candidate; dc = computeMoveDC(moveRow, candidate); }
+      }
+      break; // only the most recent hit FROM the current turn holder counts
     }
-    break; // only ever look at the MOST RECENT damage entry against me, auto-detect or not
   }
 
   const outcome = dc !== null

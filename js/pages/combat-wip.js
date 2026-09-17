@@ -463,7 +463,65 @@ function _combatantToParticipant(c) {
     initiative: c.initiativeTotal,
     level: c.level,
     size: c.size || '', // map footprint -- see footprintForSize in battle-map-grid.js; trainers have no size at all, always 1x1
+    // Full stat block -- see routes_combat.py's _add_participant for why
+    // this is sent unconditionally for a trainer's own combatants (PvP has
+    // no reason to hide it) and _richCombatantFromParticipant below for
+    // where every OTHER device turns it back into a usable combatant.
+    combatantType: c.type, speciesName: c.speciesName || '',
+    ac: c.ac, baseAc: c.baseAc, critMod: c.critMod || 0,
+    proficiency: c.proficiency, stabBonusValue: c.stabBonusValue,
+    str: c.str, dex: c.dex, con: c.con, int: c.int, wis: c.wis, cha: c.cha,
+    strMod: c.strMod, dexMod: c.dexMod, conMod: c.conMod,
+    intMod: c.intMod, wisMod: c.wisMod, chaMod: c.chaMod,
+    abilities: c.abilities || '', item: c.item || '',
+    moves: c.moves || [],
+    savingThrows: c.savingThrows || '', skills: c.skills || '',
   };
+}
+
+/** The other half of _combatantToParticipant -- reconstructs a full
+ * combat.js-shaped combatant (same shape buildTrainerCombatant/
+ * buildPokemonCombatant produce) from a server participant record, for a
+ * combatant this device does NOT own. Only possible when that participant
+ * actually carries the full stat block (see routes_combat.py's
+ * _add_participant) -- a DM's freeform PvE enemy, or anything added before
+ * this existed, falls back to _standInCombatant instead (checked by the
+ * caller). rechargeStates/statusEffects/isExpanded stay at their defaults
+ * -- those are genuinely local-only, this device was never going to know
+ * another device's in-progress recharge/status state regardless of how
+ * much of the static stat block it now has. */
+function _richCombatantFromParticipant(p) {
+  const isTrainer = p.combatantType === 'trainer';
+  return {
+    id: p.id, type: p.combatantType, entityKey: null,
+    name: p.name, speciesName: p.speciesName || '',
+    image: p.image,
+    level: p.level, initiativeScore: p.initiative, initiativeRoll: 0, initiativeBonus: 0, initiativeTotal: p.initiative,
+    ac: p.ac, baseAc: p.baseAc, critMod: p.critMod || 0,
+    maxHp: p.maxHP, currentHp: p.currentHP, maxVp: p.maxVP, currentVp: p.currentVP,
+    proficiency: p.proficiency, stabBonusValue: p.stabBonusValue,
+    savingThrows: p.savingThrows || '', skills: p.skills || '',
+    str: p.str, dex: p.dex, con: p.con, int: p.int, wis: p.wis, cha: p.cha,
+    strMod: p.strMod, dexMod: p.dexMod, conMod: p.conMod,
+    intMod: p.intMod, wisMod: p.wisMod, chaMod: p.chaMod,
+    moves: p.moves || [], types: [p.type1, p.type2].filter(Boolean),
+    abilities: p.abilities || '', item: p.item || '',
+    size: p.size || '',
+    rechargeStates: {}, statusEffects: [], isExpanded: false,
+    hasStatBlock: true,
+    // Trainer combatants never carry these pokemon-only fields at all
+    // (see buildTrainerCombatant) -- stripped rather than left as
+    // meaningless undefined/empty values on a trainer's own card.
+    ...(isTrainer ? { abilities: undefined, item: undefined, stabBonusValue: undefined } : {}),
+  };
+}
+
+/** True once a participant's record actually carries the full stat block
+ * (see _add_participant) -- the specific field checked (proficiency) is
+ * never legitimately 0/falsy-but-present for a real combatant, so this
+ * can't false-negative on a genuinely-loaded block. */
+function _hasFullStatBlock(p) {
+  return p.combatantType != null && p.proficiency != null;
 }
 
 function _enterBattleSync() {

@@ -548,6 +548,34 @@ def _add_participant(state, data):
         # always 1x1 -- see footprintForSize in battle-map-grid.js, the
         # only place this is actually interpreted).
         'size': data.get('size', ''),
+        # Full stat block -- PvP only in practice (combatantToParticipant
+        # only ever sends these for a trainer's own "join as yourself"
+        # flow; a PvE freeform enemy never has them, side='enemy' stays
+        # exactly as minimal as before). The user's explicit call: no
+        # reason to hide a PvP opponent's stats from the app itself, since
+        # every human at the table already sees them on paper anyway.
+        # Lets every device compute things that need an arbitrary
+        # participant's own numbers (a move's DC, an ability check) --
+        # not just the ones it owns, unlike everything else in this
+        # participant record before now. combatantType distinguishes the
+        # trainer vs pokemon field shape (see combat.js's
+        # buildTrainerCombatant/buildPokemonCombatant, the source of
+        # truth this mirrors) since the two differ slightly (item/
+        # abilities/stabBonusValue only make sense for a pokemon).
+        # None (not present) for anything added before this existed, or a
+        # DM's freeform enemy -- see hasStatBlock in combat-wip.js's
+        # _syncLocalCombatState for how a missing block degrades.
+        'combatantType': data.get('combatantType'),
+        'speciesName': data.get('speciesName', ''),
+        'ac': data.get('ac'), 'baseAc': data.get('baseAc'), 'critMod': data.get('critMod', 0),
+        'proficiency': data.get('proficiency'), 'stabBonusValue': data.get('stabBonusValue'),
+        'str': data.get('str'), 'dex': data.get('dex'), 'con': data.get('con'),
+        'int': data.get('int'), 'wis': data.get('wis'), 'cha': data.get('cha'),
+        'strMod': data.get('strMod'), 'dexMod': data.get('dexMod'), 'conMod': data.get('conMod'),
+        'intMod': data.get('intMod'), 'wisMod': data.get('wisMod'), 'chaMod': data.get('chaMod'),
+        'abilities': data.get('abilities', ''), 'item': data.get('item', ''),
+        'moves': data.get('moves', []),
+        'savingThrows': data.get('savingThrows', ''), 'skills': data.get('skills', ''),
         # Whether this participant has been placed on the battle map through
         # the (per-player) placement step -- see confirm-placement below.
         # Only ever checked client-side against a participant's own `owner`

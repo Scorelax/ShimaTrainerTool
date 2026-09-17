@@ -2398,7 +2398,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "multi_hit_same_target"
+        "multi_hit_choice"
       ],
       "description": "You lash out at an opponent(s) with two quick strikes. Make two melee attack rolls, dealing 1d6 + MOVE dragon damage with each hit."
     },
@@ -3148,7 +3148,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "status_inflict_threshold",
+        "multi_hit_choice"
       ],
       "description": "A strong electric blast crashes down on two unique targets in range, giving them electric shock. Make two ranged attacks, dealing 3d10 + MOVE electric damage on a hit. If the natural attack roll is 18 or higher, the target flinches."
     },
@@ -3707,7 +3708,8 @@
         "damage",
         "status_inflict_save",
         "stat_debuff_enemy",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_choice"
       ],
       "description": "You hurl glowing spikes at up to three targets in range. Make three ranged attacks, dealing 3d10 + MOVE fairy damage on a hit. On a hit, the target needs to make a Constitution saving throw, or become drowsy for 1d4 minutes. While drowsy, the creature suffers disadvantage on saving throws and attack rolls, and other creatures have advantage on saving throws induced by this Pokémon. At the end of the drowsiness, the creature falls unconscious for 1d12 hours. For the duration, the creature can't be awakened by normal means unless it completes a long rest. They are, however, considered asleep, and can be damaged by Bad Dreams, Dream Eater or similar moves."
     },
@@ -8020,7 +8022,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You throw a boomerang and make two ranged attacks against a target. On each successful hit, do 1d10 + MOVE ground damage."
     },
@@ -14538,7 +14541,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "multi_hit_same_target"
       ],
       "description": "You hurl small metal objects towards a target. Make two ranged attacks, doing 1d4 steel damage on each successful hit. You may pay 25 x the damage rolled to double the damage of a hit from this move once per target per encounter."
     },
@@ -15200,7 +15204,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_same_target"
       ],
       "description": "You shoot a series of quickly moving bubbles at a target. Make three ranged attacks, doing 1d4 water damage on each successful hit."
     },

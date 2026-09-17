@@ -2627,7 +2627,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You summon forth a meteor shower that rains down on your opponents. Choose 3 points within range. Each point has a 10ft radius impact. The points can't be the same, but the impact zones can overlap. All creatures in the impact zones must make a DEX save against your Move DC, taking 4d12 + MOVE dragon damage on a hit, or half as much on a save. If a creature is in multiple impact zones, it makes a saving throw for each zone. After activating this move, your next attack is rolled at disadvantage. If that attack requires a saving throw, the target has advantage. This move may be used once per short rest.",
       "moveStat": "STR",
@@ -2648,8 +2650,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You release a powerful breath of energy in a 40 foot cone. All targets caught in the blast must make a DEX save against your Move DC, taking 2d8 + MOVE dragon damage on a fail, and half as much on a save. If an opponent fails the save by 5 or more, it is paralyzed.",
       "moveStat": "STR/DEX",
@@ -2688,7 +2692,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self"
+      ],
       "description": "You perform a mystical dance, pumping yourself up. For the duration, double your proficiency bonus when making an attack.",
       "moveStat": "None",
       "vpCost": "1",
@@ -2728,7 +2734,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You unleash a devastating flow of energy in a 100 foot long line, 5 feet wide. Each creature caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE dragon damage on a fail, and half as much on a save.",
       "moveStat": "STR",
@@ -2769,7 +2776,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--TRIGGER SAVING THROW ON HIT--",
+        "positioning"
       ],
       "description": "You whip your dragon tail at an opponent in an attempt to send them away. Make a melee attack against a target, dealing 1d10 + MOVE dragon damage and forcing it to make a CON save against your Move DC on a hit. On a failure, the target is too frightened by you to remain in battle. In trainer battles, the target must be switched out if another creature is available. In wild battles, the target must move up to half its speed away from the user, but only attempts to flee outright if it a lower level than the user.",
       "moveStat": "STR",
@@ -2850,8 +2859,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto",
-        "recharge_locked"
+        "recharge_locked",
+        "--GUARANTEED HIT--"
       ],
       "description": "You go into a rampage, doing several attacks without control for three rounds. This move automatically hits for 2d8 + MOVE dragon damage in the first round, 4d8 + MOVE dragon damage in the second round, and 8d8 + MOVE dragon damage in the third round. When this move ends, either after the third round or from breaking concentration, you become confused. This attack stops if concentration is broken, or the user becomes incapacitated.",
       "moveStat": "STR",
@@ -2870,7 +2879,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
+      ],
       "description": "The user lets out a mighty roar. All creatures within 60 feet must make a Wisdom saving throw or be frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "WIS",
       "vpCost": "8",

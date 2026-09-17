@@ -9381,8 +9381,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You strike the ground so hard that it ripples outcfrom you in a 15 foot radius. All grounded creatures caught in the area must make a DEX save against your Move DC, taking 2d8 + MOVE ground damage on a failure.",
       "moveStat": "STR",
@@ -9404,7 +9405,10 @@
       "categories": [
         "damage",
         "field_terrain",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You slam into the ground with immense force, creating tremors that break the ground in a 100ft. radius centered on you. All grounded creatures within the affected area must succeed a STR saving throw or take 10d12 + MOVE ground damage and are knocked prone. On a success, they take half damage and are not knocked prone. After doing this move, you must succeed a DC 20 CON saving throw, or become incapacitated for 1 round while recovering. The ground becomes difficult rocky terrain, and in a 15ft. radius centered on you, the ground becomes hazardous difficult terrain, dealing 2d6 typeless damage to creatures attempting to move through it. This move can be used once per long rest.",
       "moveStat": "STR",
@@ -9424,7 +9428,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "--ADVANTAGE ON ATTACK ROLL--"
       ],
       "description": "Your Pokémon burrows underground, disappearing from view before striking from underneath a foe. When you activate this move, you burrow underground and remain there until your next turn. During this time, you cannot be the target of any attack. On your next turn, make a melee attack on a creature in range, with advantage, doing 1d10 + MOVE ground damage on a successful hit. If the target has Tremorsense, the attack is not rolled with advantage.",
       "moveStat": "STR/DEX",
@@ -9445,7 +9450,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "--BASE CRIT--"
       ],
       "description": "You crash into an opponent, spinning your body like a drill. Make a melee attack, dealing 1d10 + MOVE ground damage on a hit. This attack scores a critical hit on 19s and 20s.",
       "moveStat": "STR/DEX",
@@ -9487,9 +9492,11 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
         "field_terrain",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You create a tremor in the ground in a 10 foot radius, centered on you. Each grounded creature in the area must succeed on a DEX save against your Move DC, or take 3d12 + MOVE ground damage and be knocked prone. On a success, they take half as much damage and are not knocked prone. The area becomes difficult terrain.",
       "moveStat": "STR",
@@ -9528,7 +9535,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
+      ],
       "description": "You project an ancient light, engulfing creatures in a 15 foot cone. Up to two creatures caught in the light are forced to attempt a CON save, becoming petrified on a failure.",
       "moveStat": "None",
       "vpCost": "6",
@@ -9548,8 +9559,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You gather in the natural energy of the land around you and focus it into a sudden eruption of earth in a 40ft. radius, centered on a point within range. All grounded creatures caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. Creatures that fail the save have their speed halved until the end of their next turn as the ground clings to them.",
       "moveStat": "STR",
@@ -9570,8 +9583,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You shake the ground with an earth-shattering quake. All creature in range must make a DEX save against your Move DC, taking half damage on a success and full damage on a fail. Creatures in range that are burrowed or in the invulnerable stage of Dig take double damage from this move. Roll a d100 on the table below to determine damage. 1-5: 1d4+MOVE 6-15: 1d8+MOVE 16-35: 1d10+MOVE 36-65: 1d12+MOVE 66-85: 2d6+MOVE 86-95: 2d8+MOVE 96-100: 2d12+MOVE",
       "moveStat": "STR",
@@ -9592,7 +9606,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "--TRIGGER SAVING THROW ON HIT--",
+        "--POTENTIAL DISADVANTAGE--"
       ],
       "description": "You throw a hard-packed mud ball at a creature. Make a ranged attack, dealing 1d10 + MOVE ground damage on a hit. On a hit, the target must make a CON save against your Move DC. On a failure, the target has disadvantage on its next attack roll. If activating a move that requires a save, the target(s) have advantage.",
       "moveStat": "STR/DEX",
@@ -9633,7 +9648,8 @@
       },
       "reaction": false,
       "categories": [
-        "protect_negate"
+        "stat_buff_self",
+        "stat_buff_ally"
       ],
       "description": "You cover yourself and all allies around you with thick mud, reducing the amount of electric damage taken for anyone affected. For the duration, you and any ally in range (when you initially activated this move) have resistance to electric-type attacks. If you were already resistant, you are now immune. If you were vulnerable, you now take regular damage. If you are immune to electrictype moves already, nothing happens.",
       "moveStat": "None",
@@ -9695,8 +9711,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "field_terrain"
+        "field_terrain",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "The user creates a 20-foot-radius area of quicksand centered on a point within 60 feet. The area becomes difficult terrain, and any creature that enters the area or starts its turn there must succeed on a Strength saving throw or be restrained until the end of its next turn.",
       "moveStat": "STR",
@@ -9715,7 +9732,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_terrain"
+      ],
       "description": "You imbue the ground around you with a mystical layer of natural energy, like tilling fresh soil. For three rounds, grass-type creatures double their STAB bonus when activating a grass-type move within the affected area.",
       "moveStat": "None",
       "vpCost": "3",
@@ -9734,7 +9753,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "stat_debuff_enemy"
       ],
       "description": "You kick up a cloud of sand in an attempt to blind a target in range. The target must make a CON save against your Move DC. On a fail, for the remainder of the encounter, they add -1 to all of their attack rolls. This move can be stacked for a maximum of -5 to attack rolls.",
       "moveStat": "DEX/CON",
@@ -9776,7 +9796,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You attempt to summon a wave of sand that surrounds the target. Force a creature in range to make a STR saving throw against your Move DC, taking 1d10 + MOVE ground damage and becoming restrained on a failure, or half as much without being restrained on a success. If it fails, at the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a creature is restrained, you may continue this move, as an action, to deal an automatic 1d10 + MOVE ground damage.",
       "moveStat": "STR",
@@ -9796,10 +9817,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "heal_self",
-        "stat_buff_self",
-        "field_weather"
+        "heal_self"
       ],
       "description": "You use the power of the earth around you to help heal your wounds, recovering 2d8 + MOVE hit points. If used during a Sandstorm, your MOVE modifier is doubled.",
       "moveStat": "CON",
@@ -9820,7 +9838,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "field_terrain"
+        "field_terrain",
+        "--TRIGGER SAVING THROW--"
       ],
       "description": "You scatter spikes across a 15ft radius area centered on a point within 60ft. The area becomes hazardous terrain for 1 minute. When a creature enters the area or starts its turn there, it takes 1d6 + MOVE ground damage (DEX save for half). A creature can only take this damage once per turn.",
       "moveStat": "STR/DEX",
@@ -9841,7 +9860,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "--POTENTIAL DAMAGE INCREASE--"
       ],
       "description": "Driven by frustration, you aggressively attack. Make a melee attack, dealing 2d8 + MOVE ground damage on a hit. If your last attack missed, double the dice roll for damage.",
       "moveStat": "STR",
@@ -9862,9 +9881,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "fixed_special_damage",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "You summon forth a volley of green arrows to pierce creatures in range. All creatures in a 30ft. radius, centered on a point within range, must succeed a DEX save, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. This move ignores any immunities to ground type. Any creature that fails the saving throw falls to the ground and is now grounded until the end of your next turn. Grounded creatures are susceptible to ground-based moves, regardless of their type or ability.",
       "moveStat": "DEX/WIS",
@@ -9885,8 +9905,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "recharge_locked"
+        "recharge_locked",
+        "multi_hit_aoe",
+        "--TRIGGER SAVING THROW--",
+        "--POTENTIAL STATUS CONDITION--"
       ],
       "description": "A wave of green energy courses through the battlefield in a 60 foot cone, centered on you. All creatures caught in the wave must make a DEX save against your Move DC, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. Any creature that fails the saving throw cannot flee or be switched out as long as you remain in battle.",
       "moveStat": "DEX/WIS",

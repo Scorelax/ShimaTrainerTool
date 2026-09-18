@@ -7590,7 +7590,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "trigger_saving_throw",
+        "damage_vp",
+        "drain"
       ],
       "description": "You fire a draining ray. The targeted creature must succeed a Constitution saving throw, taking 2d8 MOVE + Ghost damage on a failed save, or half as much damage on a successful one. The damage from this move affects VP. The user regains half of the damage dealt as VP.",
       "moveStat": "CON",
@@ -7631,8 +7633,9 @@
       },
       "reaction": false,
       "categories": [
-        "crit_range_mod",
-        "stat_buff_self"
+        "status_condition",
+        "situational_use",
+        "fixed_special_damage"
       ],
       "description": "Your body glows a strange blue, creating horrifying visions in the minds of a creature in range that is asleep. Make a ranged attack roll, incapacitating the creature for 1d4 + MOVE turns on a hit. The creature wakes up, but is unable to do anything for the duration. On a critical hit, the creature loses half of its remaining HP or VP.",
       "moveStat": "INT/WIS/CHA",
@@ -7652,7 +7655,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You target an opponent in range with a sinister ray of ghostly light. The target must succeed a WIS saving throw or become confused.",
       "moveStat": "None",
@@ -7672,9 +7676,13 @@
       },
       "reaction": false,
       "categories": [
+        "trigger_saving_throw",
         "damage",
-        "stat_buff_ally",
-        "recoil"
+        "recoil",
+        "status_condition",
+        "stat_buff_self",
+        "stat_debuf_self",
+        "situational_use"
       ],
       "description": "This Move has a different effect based on your Pokémon type. If you are ghost-type: You attempt to put a curse on an opponent. Force a target in range to make a WIS saving throw against your Move DC. On a fail, the target is cursed. You take 2d8 damage initially and your opponent takes 2d8 + MOVE ghost damage at the end of each of its turns for the duration. If you are any other type: You place a curse on yourself. For the duration, your STR and CON scores increase by 2, but your DEX score decreases by 4. Out of combat, the ghost curse deals damage every 10 minutes.",
       "moveStat": "INT/WIS/CHA",
@@ -7694,8 +7702,9 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_debuff_enemy"
+        "trigger_saving_throw_on_hit",
+        "stat_debuff_enemy",
+        "positioning"
       ],
       "description": "Your eyes open wide and fixate on one creature in range, casting a devastating curse. Make a ranged attack. On a hit, force the creature to attempt a WIS save against your move DC. On a failure, the creature gets -1 to AC, STR, DEX, CON, WIS, INT, and CHA, and they can't flee or be switched out for the rest of the encounter. The effect stacks for a maximum of 5 times. On a success, nothing happens.",
       "moveStat": "None",
@@ -7717,7 +7726,8 @@
       },
       "reaction": false,
       "categories": [
-        "recoil"
+        "trigger_saving_throw",
+        "fixed_special_damage"
       ],
       "description": "You create a dark, internal bond with an opponent. Select a target in range, who must make a WIS save against your Move DC. On a fail, if you faint during the combat, the opponent must take damage equal to twice the damage of the same type that caused you to faint.",
       "moveStat": "WIS/CHA",
@@ -7738,7 +7748,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "potential_status_condition",
+        "conditional_damage"
       ],
       "description": "You engulf a target in strange flames. Make a ranged attack against a target, dealing 2d8 + MOVE ghost damage on a hit, burning the target on a critical hit. This move does critical damage to burning targets.",
       "moveStat": "INT/WIS",
@@ -7759,7 +7770,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "status_inflict_auto"
       ],
       "description": "A thicket of ghostly vines shoot from your body, wrapping around a creature in range. Make a melee attack against a creature, dealing 3d10 + MOVE ghost damage on a hit. The creature is also grappled. At the beginning of each of its turns, it may use an action to attempt an escape with a STR save against your Move DC. As long as the target is grappled on your subsequent turns, this move can be activated again as a bonus action with an automatic hit, dealing 3d10 ghost damage.",
       "moveStat": "DEX/WIS",
@@ -7779,12 +7790,10 @@
       },
       "reaction": true,
       "categories": [
-        "damage",
-        "drain",
-        "heal_self",
-        "stat_buff_self",
         "counter_reaction_effect",
-        "recoil"
+        "trigger_saving_throw",
+        "damage_vp",
+        "drain"
       ],
       "description": "When you take damage from a move that reduces you to zero hit points, you may use your reaction to force the attacker to make a WIS saving throw against your Move DC. On a failure, the creature loses 3d10 VP. On the first instance of this happening in one encounter, you regain the VP drained as HP. On subsequent instances of this move being used in the same combat encounter, you must succeed a DC15 on a d20 roll for the healing to take effect.",
       "moveStat": "WIS/CHA",
@@ -7804,7 +7813,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "conditional_damage"
       ],
       "description": "You send a ghostly energy at a creature that does additional damage to those affected by status conditions. Make a ranged attack, dealing 1d10 + MOVE ghost damage on a hit. If the target is affected by a status condition, damage is rolled with advantage.",
       "moveStat": "WIS",
@@ -7846,7 +7856,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe"
       ],
       "description": "You emit a sinister ray that explodes out from you in a 100 foot line, 5 feet wide. All creatures caught in the blast must make a WIS save against your Move DC, taking 3d10 + MOVE ghost damage on a failure or half as much on a success. This attack ignores any of the creatures abilities that would affect the user's ability to hit or deal full damage.",
       "moveStat": "DEX/INT/WIS",
@@ -7866,7 +7877,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "fixed_special_damage"
       ],
       "description": "You hit a target with a wave of dark energy. Make a ranged attack against a target. On a hit, this move deals 1d10 + MOVE ghost damage, adding the user’s level to the damage.",
       "moveStat": "InT/WIS",
@@ -7887,7 +7899,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "situational_use",
         "recharge_locked"
       ],
       "description": "Choose one sleeping creature you are aware of within 600 feet. It must make a WIS save against your Move DC, taking 3d10 + MOVE ghost damage on a failure, or half as much on a success. This move does not wake the target, but will cause a long rest to fail. This move can only be used once per long rest.",
@@ -7910,7 +7923,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "stat_buff_self"
+        "status_increase_threshold"
       ],
       "description": "You stir up a gust of repulsive wind that strikes a creature in range. Make a ranged attack, dealing 1d10 + MOVE ghost damage on a hit. On a natural attack roll of 19 or 20, increase all of your ability scores by +1 for three rounds.",
       "moveStat": "WIS/DEX",
@@ -7931,7 +7944,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "protect_negate"
+        "protect_negate",
+        "advantage_on_attack_roll"
       ],
       "description": "You disappear from view and prepare to surprise your target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use your action to reappear and make a melee attack against a creature, with advantage, dealing 2d8 + MOVE ghost damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "DEX/INT/WIS",
@@ -7950,7 +7964,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You attempt to tear open a rift between the plane you currently inhabit, and the Depths of Twilight, creating a swirling portal of spectral energy. Roll a d10. The portal is stable for as many rounds as the rolled result. The gateway appears on the ground as a 10-foot diameter circular opening surrounded by wisps of shadow and ethereal mist, through which the dark, twisted landscape of the Depths of Twilight can be glimpsed. After the amount of stable turns have passed, you may attempt to keep the portal open by succeeding a DC15 arcana skill check as a bonus action, for a maximum of 10 turns.",
       "moveStat": "None",
       "vpCost": "20",
@@ -7969,7 +7985,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "protect_negate"
       ],
       "description": "You extend a sharp vine or similar appendage to whip the target with, appearing from unexpected angles. Make a ranged attack roll, doing 1d10 + MOVE ghost damage on a hit. This move is unaffected by any of the target's stat changes or protection moves/reactions.",
       "moveStat": "STR/DEX",
@@ -7989,8 +8006,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "stat_buff_self"
+        "damage"
       ],
       "description": "You use your long ethereal tentacles to strike a creature in range. Make a melee attack, dealing 1d10 + MOVE ghost damage.",
       "moveStat": "DEX/WIS",
@@ -8010,10 +8026,9 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally",
-        "stat_debuff_enemy",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "status_condition",
+        "potential_disadvantage"
       ],
       "description": "When a creature in range successfully lands an attack against you or an ally, a magical dark eye opens on your forehead, striking fear and hopelessness into the creature that hit you. The creature is frightened by you, and has disadvantage on all rolls until the end of its next turn.",
       "moveStat": "WIS/INT",
@@ -8077,8 +8092,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "You strike with a sharp claw made from shadows in range. Make a ranged attack, dealing 1d10 + MOVE ghost damage on a hit. This moves scores a critical hit on natural attack rolls of 19 and 20.",
       "moveStat": "STR/DEX",
@@ -8100,6 +8115,7 @@
       "categories": [
         "damage",
         "protect_negate",
+        "advantage_on_attack_roll",
         "recharge_locked"
       ],
       "description": "You disappear from view and prepare to surprise a target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use may your action to reappear at a point within range and make a melee attack against a creature, with advantage, dealing 4d12 + MOVE ghost damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
@@ -8120,7 +8136,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "guaranteed_hit"
       ],
       "description": "You throw a punch from the surrounding shadows, unavoidable by any creature. This move is guaranteed to hit for 2d8 + MOVE ghost damage, unless during the invulnerable stage of Fly, Dig, Bounce, Dive, etc. moves.",
       "moveStat": "DEX/WIS",
@@ -8160,8 +8177,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_debuff_enemy",
-        "steal_disrupt"
+        "stat_buff_self"
       ],
       "description": "A ghostly darkness envelops you, hiding you, masking your scent and dampening the noise you make. For the duration, gain advantage on stealth checks. Other creatures have disadvantage when attempting to locate you with a perception check using sight, smell or hearing.",
       "moveStat": "None",
@@ -8181,9 +8197,10 @@
       },
       "reaction": false,
       "categories": [
+        "trigger_saving_throw",
         "damage",
         "drain",
-        "heal_self"
+        "potential_disadvantage"
       ],
       "description": "The user attempts to drain the life force of a creature within 30 feet. The target must make a Charisma saving throw. On a failure, it takes 3d10 + MOVE ghost damage and has disadvantage on attack rolls and saving throws for 1 minute. The user regains hit points equal to half the damage dealt.",
       "moveStat": "INT/WIS/CHA",
@@ -8203,7 +8220,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The user creates ghostly chains that attempt to bind a target within 60 feet. The target must make a Dexterity saving throw. On a failure, the target is restrained and cannot teleport or leave its current plane. At the end of each of its turns, the target can repeat the saving throw, ending the effect on itself on a success.",
       "moveStat": "DEX",
@@ -8245,8 +8263,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "steal_disrupt"
+        "steal_disrupt",
+        "movement"
       ],
       "description": "You succumb to darkness and transport yourself into a creature's shadow. Immediately teleport to a point in range and make a melee attack on a creature. On hit, you steal all positive stat changes affecting the creature (increases to AC, attack rolls, damage bonuses, etc.) and deal 3d10 + MOVE ghost damage.",
       "moveStat": "DEX/WIS",
@@ -8307,7 +8325,10 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "trigger_saving_throw",
+        "damage_vp",
+        "drain"
       ],
       "description": "When hit by a targeted attack, you can spend a reaction to attempt to drain the attacker’s VP, if they are in range. Force the attacker to make a WIS save against your Move DC. On a fail, the target loses the amount of VP it spent on the move, and you gain an equal amount.",
       "moveStat": "INT/WIS",
@@ -8327,7 +8348,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You attempt to scare the spirit right out of a creature in range. Force a creature in range to make a CHA save against your Move DC. On a failure, its type is changed to Ghost for the duration.",
       "moveStat": "WIS/CHA",
@@ -8347,10 +8369,8 @@
       },
       "reaction": true,
       "categories": [
-        "shield_temphp",
-        "stat_buff_self",
-        "field_weather",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "unknown"
       ],
       "description": "Upon reaching 0 HP in combat, instead of fainting, you may use this reaction if you have enough remaining VP. A snow white flower blooms at your feet, closing around you as your body undergoes metamorphosis. For one minute, you are incapacitated. The white bloom has the grass and ghost types, begins with 2x your current max HP, 0 speed, otherwise it has the same stats as you, including your level. It replaces you on the battlefield and in the initiative order. The white bloom knows the following moves: Power Whip, Defense Curl, Wrap, and Spiky Shield. If the white bloom is destroyed before it opens, it activates the move Self-Destruct, and you disappear forever. After 1 minute, the white bloom opens to reveal your White Bloom form. Regain full HP and VP, gain proficiency with Fairy type moves and learn the move Forest Guardian. If you survive this encounter, you remain in White Bloom form.",
       "moveStat": "None",

@@ -14536,7 +14536,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "stat_debuff_enemy",
+        "potential_status_condition"
+      ],
       "description": "The targeted creature must succeed on a Dexterity saving throw. On a failed save, the target's speed is halved for 1 minute. In addition, the creature can't take reactions, and it can take either an action or a bonus action on its turn, not both. The creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "DEX",
       "vpCost": "3",
@@ -14556,7 +14560,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You create a stream of hot acid in a 30 foot cone, centered on you. Creatures caught in the cone must succeed on a DEX save, taking 3d10 + MOVE poison damage on a fail, and half as much on a success. This move bypasses Steel types' immunity to Poison.",
@@ -14577,10 +14582,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "status_inflict_save",
-        "shield_temphp",
-        "stat_buff_self"
+        "stat_buff_self",
+        "counter_reaction_effect",
+        "damage"
       ],
       "description": "You are surrounded by a shield of thick acid for the duration. During this time, your AC increases by 2, and any Pokémon that hits you with a melee attack must succeed on a CON save or take 1d6 poison damage.",
       "moveStat": "CON",
@@ -14601,7 +14605,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw_on_hit",
         "stat_debuff_enemy"
       ],
       "description": "You spit a spray of acidic fluid that works to melt away an opponent's defense. Make a ranged attack against a target, dealing 3d10 + MOVE poison damage on a hit. On a hit, the target must make a CON save against your Move DC. On a failure, the target's AC is reduced by 1 until its next long rest. This decrease may be stacked on an opponent, up to a maximum of -3 to its AC. This move bypassses Steel types' Poison imimunity.",
@@ -14623,7 +14627,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "berry_check",
         "recharge_locked"
       ],
       "description": "You must first have eaten a berry. Make a breath attack in a 15ft. cone, rolling 2d8 of MOVE poison damage on all creatures hit. Hit creatures roll a CON save. On a successful save, they take half damage.",
@@ -14645,7 +14651,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "steal_disrupt"
       ],
       "description": "You throw a clump of special mud that has the power to remove all stat changes from a target. Make a ranged attack, dealing 1d10 + MOVE poison damage on a hit. On a hit, any stat changes affecting the target since the beginning of battle are reset.",
       "moveStat": "DEX/CON",
@@ -14686,7 +14692,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "stat_debuff_enemy",
         "recharge_locked"
       ],
       "description": "The user exhales a 15-foot cone of corrosive mist. Each creature in the area must make a Constitution saving throw. On a failure, a creature takes 3d10 + MOVE poison damage and its AC is reduced by 2 for 1 minute. On a success, it takes half damage and its AC is not reduced. This move bypasses Steel types' immunity to Poison.",
@@ -14708,7 +14716,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "conditional_damage"
       ],
       "description": "You slash at an opponent with a poisonous strike. Make a melee attack, dealing 1d10 + MOVE poison damage on a hit. On a poisoned opponent, damage for this move is rolled with advantage..",
       "moveStat": "DEX",
@@ -14729,7 +14737,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "situational_use"
       ],
       "description": "You attempt to decompose a target. Make a melee attack against a target, dealing 1d8 poison damage on a hit. If the target is a plant, object, or deceased creature, the decomposition process is accelerated, and will rot completely in 4d4 days unless decomposition is stopped.",
       "moveStat": "None",
@@ -14748,7 +14756,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "situational_use"
+      ],
       "description": "You spray enzymes at an object to accelerate the decay of organic material. As an action, can weaken an organic object or structure, giving it vulnerability to physical damage for 1 minute.",
       "moveStat": "None",
       "vpCost": "1",
@@ -14766,7 +14776,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "status_inflict_auto"
+      ],
       "description": "You hurl stomach acid towards a target. Make a ranged attack. On a hit, the target is covered in the disgusting substance and cannot benefit from the effect of any of its abilities for the duration.",
       "moveStat": "DEX/CON",
       "vpCost": "3",
@@ -14806,7 +14818,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "All creatures within 15ft. must succeed a Constitution save or become poisoned.",
       "moveStat": "None",
@@ -14827,7 +14841,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "You lash forward with poisonous venom. Make a melee attack roll against a creature, dealing 1d10 + MOVE poison damage on a hit, forcing the target to make a CON save against your Move DC. On a failure, the creature is poisoned. A creature poisoned by this move takes double the normal poison damage at the end of each of its turns.",
       "moveStat": "STR/DEX",
@@ -14848,8 +14863,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You release a toxic cloud of poisonous gas in a 10 foot radius, centered on a point within range. Any creature that starts their turn in this area must succeed on a CON save against your Move DC, taking 1d6 + MOVE poison damage on a failure, or half as much on a success. Creatures that fail this save by 5 or more become poisoned.",
       "moveStat": "CON",
@@ -14890,7 +14906,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You release a cluster of poisonous spores that burst into the air above a target. The creature must succeed on a CON save against your Move DC, becoming poisoned on a fail.",
       "moveStat": "CON",
@@ -14933,7 +14950,8 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "Poisonous barbs sprout from your tail as you swing it at a creature. Make a melee attack against a creature, dealing 1d10 + MOVE poison damage on a hit. If the natural attack roll is a 19 or 20, the move scores a critical hit and the target is poisoned.",
       "moveStat": "STR/DEX",
@@ -14953,7 +14971,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You release enzymes that clear out impurities in the surrounding area. All creatures in range must succeed a CON saving throw or suffer a status condition. Roll a d4 for each creature to determine status condition: 1: Poisoned 2: Paralyzed 3: Burned 4: Asleep For 1 minute, the area is considered clean and safe from pollution hazards, and Poison type moves deal half damage.",
@@ -14974,7 +14994,8 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "heal_self"
       ],
       "description": "You extend a healing energy to remove all status effects from a target. If a status effect is healed, it also restores the user's current hit points by twice its level. This user of this move cannot target itself.",
       "moveStat": "None",
@@ -14995,7 +15016,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "You spew poisonous sludge at a target creature in range. Make a ranged attack, doing 1d10 + MOVE poison damage on a hit. The creature must make a CON save against your Move DC or become poisoned.",
       "moveStat": "DEX/CON",
@@ -15016,7 +15038,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "potential_status_condition"
       ],
       "description": "You hurl a mass of sticky sludge that may poison creatures in its blast. Make a ranged attack roll against a target. On a hit, the target takes 2d8 + MOVE poison damage and the area in a 5 foot radius around it is covered in sludge until the beginning of your next turn. Any creature that enters this area for the first time on their turn, or is in that area at the beginning of their turn must make a CON save against your Move DC or become poisoned.",
       "moveStat": "DEX/CON",
@@ -15058,10 +15080,11 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "field_weather",
-        "field_terrain"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "field_terrain",
+        "potential_status_condition",
+        "potential_disadvantage"
       ],
       "description": "You create a fog of poisonous smog in a 15 foot radius, centered on a point within range. Creatures that begin their turn in the area take 1d4 + MOVE poison damage and must succeed on a CON save against your Move DC or become poisoned. The area of smog is considered difficult terrain, and any attacks made from inside it are done at disadvantage. The smog cloud dissipates at the beginning of your next turn.",
       "moveStat": "CON",
@@ -15083,8 +15106,9 @@
       "categories": [
         "damage",
         "damage_vp",
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You eject a cloud of viral particles in a 40ft. cone. All affected creatures must succeed a DEX saving throw or take 10d12 + MOVE poison damage, half damage on a success, and must make on a CON save against your move DC. On a failed CON save, they are infected, and must lose 4d12 VP at the end of their turn. Upon reaching 0 VP, it's HP is also reduced to 0.",
       "moveStat": "STR/DEX",
@@ -15104,8 +15128,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "field_weather"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You send a downpour of potent, poisonous rain in a 5 foot radius, centered on a point within range. Targets in the area must make a CON save against your MOVE DC or become poisoned. Creatures poisoned by this move take double the normal poison damage.",
       "moveStat": "CON",
@@ -15125,9 +15150,9 @@
       },
       "reaction": true,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You quickly summon a trap of poisonous spikes around a creature that enters the battle. When a creature is switched into battle, you may use your reaction to force a creature to make a CON save against your Move DC, becoming poisoned on a failure.",
       "moveStat": "CON/DEX",
@@ -15169,10 +15194,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "protect_negate",
-        "fixed_special_damage",
+        "damage_vp",
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "Make a melee attack roll against a creature, injecting it with a medical substance containing virus DNA on a hit, dealing 4d12 + MOVE poison damage, and draining double the damage rolled in VP. Force the creature to make a CON save against your move DC. On a successful save, this move deals half damage, and the creature hit is now immune to all status conditions for 1 minute. On a failure, it is now poisoned, and takes double poison damage at the end of each turn. This move cannot be used consecutively.",
@@ -15193,6 +15217,7 @@
       },
       "reaction": false,
       "categories": [
+        "situational_use",
         "status_inflict_auto"
       ],
       "description": "After landing an attack for which you had to roll to hit, you may use this move as a bonus action to deal poison damage instead of the move's regular damage. This move always leaves the target poisoned.",
@@ -15213,8 +15238,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You drench a creature with an odd, poisonous liquid. Force a creature to make a CON save against your Move DC, becoming poisoned on a failure. If the target is already poisoned, this move automatically hits, causing the creature to now take double the base poison damage at the end of each of its turns.",
       "moveStat": "DEX/CON",
@@ -15235,7 +15260,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "The user attempts to grapple a target. On a successful grapple, the target takes 2d8 + MOVE poison damage and must make a Constitution saving throw. On a failure, the target is poisoned for 1 minute.",
       "moveStat": "STR/CON",
@@ -15256,7 +15282,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "conditional_damage"
       ],
       "description": "You attempt to drench a creature in poisonous liquid. Make a ranged attack on a creature, dealing 1d10 + MOVE poison damage on a hit. If the target is already poisoned, double the dice roll for the damage.",
       "moveStat": "DEX/CON",

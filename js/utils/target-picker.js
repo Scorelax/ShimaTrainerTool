@@ -76,6 +76,10 @@ let _speciesName = '';
 let _selectedTargetId = null;
 let _selectedTarget = null;
 let _selectedTargetName = '';
+// True for moves tagged guaranteed_hit (see combat-wip.js): the attack-roll
+// step is skipped entirely -- picking a target goes straight to the damage
+// roll, since there's nothing to roll against AC.
+let _guaranteedHit = false;
 
 function _ensureDom() {
   if (_overlay) return;
@@ -126,7 +130,7 @@ function _ensureDom() {
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(null); });
   document.getElementById('targetPickerSkip').addEventListener('click', () => _close(null));
   document.getElementById('targetPickerBack').addEventListener('click', _showStep1);
-  document.getElementById('targetPickerBackToAttack').addEventListener('click', _showStep2);
+  document.getElementById('targetPickerBackToAttack').addEventListener('click', _backFromDamage);
   document.getElementById('targetPickerMiss').addEventListener('click', _confirmMiss);
   document.getElementById('targetPickerHit').addEventListener('click', _confirmHit);
   document.getElementById('targetPickerConfirmRoll').addEventListener('click', _confirmDamageRoll);
@@ -193,6 +197,26 @@ async function _confirmHit() {
   _showStep3();
 }
 
+/** Damage step's Back button. Called with no arguments on purpose -- wiring
+ * _showStep2 straight to the click listener passed it the click event as its
+ * target. A guaranteed hit has no attack-roll step to return to, so it goes
+ * back to target selection instead. */
+function _backFromDamage() {
+  if (_guaranteedHit) _showStep1();
+  else _showStep2();
+}
+
+/** guaranteed_hit moves: no attack roll, the hit is automatic. Goes straight
+ * to the damage step for the given target, then plays the attacker's battle
+ * animation there (that step is already visible, so there's no blank or stale
+ * screen while it plays and no second target to click mid-animation). */
+function _autoHit(p, name) {
+  _selectedTarget = p;
+  _selectedTargetName = name;
+  _showStep3();
+  return _playAnimation();
+}
+
 async function _playAnimation() {
   if (!_speciesName) return;
   const url = await getBattleAnimationUrl(_speciesName);
@@ -220,6 +244,7 @@ async function _playAnimation() {
 }
 
 function _showStep3() {
+  document.getElementById('targetPickerStep1').hidden = true; // only visible here on the guaranteed-hit path
   document.getElementById('targetPickerStep2').hidden = true;
   document.getElementById('targetPickerStep3').hidden = false;
   document.getElementById('targetPickerTitle').textContent = 'Damage Roll';
@@ -273,11 +298,16 @@ function _cardHtml(p) {
  * there's no active session to target into. Safe to await unconditionally --
  * it resolves to null with no popup shown when there's nothing to target.
  *
+ * guaranteedHit (moves tagged guaranteed_hit): the Attack Roll step is
+ * skipped -- picking a target counts as a hit and goes straight to the
+ * damage roll. The result shape is unchanged. No attack roll is entered, so
+ * there's nothing to crit on either.
+ *
  * The attacker is never offered as a target card -- the "No Target
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '' } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -289,16 +319,20 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _attackModifier = attackModifier;
   _damageModifier = damageModifier;
   _speciesName = speciesName;
+  _guaranteedHit = guaranteedHit;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   document.getElementById('targetPickerBack').style.display = '';
+  document.getElementById('targetPickerBackToAttack').style.display = '';
   _showStep1();
   const grid = document.getElementById('targetPickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
   grid.querySelectorAll('[data-target-id]').forEach(card => {
     card.addEventListener('click', () => {
       const p = session.participants[card.dataset.targetId];
+      const name = visibleToViewer(p, 'name') ? p.name : '???';
       _selectedTargetId = card.dataset.targetId;
-      _showStep2(p, visibleToViewer(p, 'name') ? p.name : '???');
+      if (_guaranteedHit) _autoHit(p, name);
+      else _showStep2(p, name);
     });
   });
 
@@ -316,17 +350,22 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * combat-wip.js's _handleMultiHitAoe), where the target was already fixed
  * by the AoE target-selection step, not this popup. Same resolve shape as
  * pickTarget: {targetId, hit:false}, {targetId, hit:true, rawRoll}, or
- * null if closed.
+ * null if closed. With guaranteedHit (see pickTarget) it opens directly at
+ * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '' } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false } = {}) {
   _ensureDom();
   _attackModifier = attackModifier;
   _damageModifier = damageModifier;
   _speciesName = speciesName;
+  _guaranteedHit = guaranteedHit;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _selectedTargetId = target.id;
-  _showStep2(target, targetName);
   document.getElementById('targetPickerBack').style.display = 'none';
+  document.getElementById('targetPickerBackToAttack').style.display = guaranteedHit ? 'none' : '';
   _overlay.style.display = 'flex';
-  return new Promise((resolve) => { _resolve = resolve; });
+  const result = new Promise((resolve) => { _resolve = resolve; });
+  if (guaranteedHit) _autoHit(target, targetName);
+  else _showStep2(target, targetName);
+  return result;
 }

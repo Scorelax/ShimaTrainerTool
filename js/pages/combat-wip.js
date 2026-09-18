@@ -1553,10 +1553,16 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // game's other rolls -- the app shows the total, a human compares it to
   // the target's AC), and -- only on a Hit -- play the attacker's battle
   // animation and take a damage roll. See target-picker.js.
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName });
+  // guaranteed_hit moves (Aerial Ace, Aura Sphere, etc.) skip the attack roll
+  // entirely -- see target-picker.js -- so a low modifier can't make an
+  // automatic hit "miss". Any exception in the move's own text (e.g. "unless
+  // the target is in the invulnerable stage of Fly/Dig") stays a human call,
+  // same trust model as the rest of this flow.
+  const categories = moveCategoriesFor(moveName);
+  const guaranteedHit = categories.includes('guaranteed_hit');
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
 
-  const categories = moveCategoriesFor(moveName);
   const isSameTarget = categories.includes('multi_hit_same_target');
   const isChoice = categories.includes('multi_hit_choice');
   if (!isSameTarget && !isChoice) return;
@@ -1581,9 +1587,9 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
       const target = session?.participants?.[hitTargetId];
       if (!target) return; // target left the battle mid-chain
-      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName });
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit });
     } else {
-      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName });
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
   }
@@ -1633,7 +1639,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // user's own explicit correction that "trigger saving throw" can't be
   // assumed to skip the attack roll. Only reachable once the attack already
   // landed, since a Miss never applies damage in the first place.
-  if (moveCategoriesFor(moveName).includes('TRIGGER SAVING THROW ON HIT')) {
+  if (moveCategoriesFor(moveName).includes('trigger_saving_throw_on_hit')) {
     await _handleSecondarySave(combatantId, targetId, moveName, computedData);
   }
   return targetId;
@@ -1655,7 +1661,8 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
   const targetIds = await pickMultipleTargets(combatantId);
   if (!targetIds || !targetIds.length) return; // closed / nobody picked -- move's own cost still applied
 
-  const isSaveTriggered = moveCategoriesFor(moveName).includes('TRIGGER SAVING THROW');
+  const isSaveTriggered = moveCategoriesFor(moveName).includes('trigger_saving_throw');
+  const guaranteedHit = moveCategoriesFor(moveName).includes('guaranteed_hit');
   const attackModifier = computedData.attackBonus || 0;
   const damageModifier = computedData.damageBonus || 0;
   const dc = computedData.moveDC ?? 0;
@@ -1691,7 +1698,9 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
         }).catch(() => {});
       }
     } else {
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName });
+      // Shock Wave-style area moves: guaranteed to hit everything in the area,
+      // so each selected target goes straight to its damage roll.
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
     }
   }

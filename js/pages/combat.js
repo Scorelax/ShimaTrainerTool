@@ -27,19 +27,34 @@ let _moveMap = null; // Map<name, moveData> for O(1) lookups
 // Move-name -> category tags (see pi-server/docs/DnD_moves_categorized_draft.json
 // and routes_combat.py's list-move-categories action) -- the user's own manual
 // pass over each move's actual effect (damage/save/heal/drain/crit-range/...),
-// used here just to route a move's post-use flow to the right popup (currently
-// only 'TRIGGER SAVING THROW', see showCombatMoveDetails). null until loaded;
+// used here just to route a move's post-use flow to the right popup ('trigger_saving_throw',
+// 'reactive_save', 'guaranteed_hit', multi_hit_*, see showCombatMoveDetails). null until loaded;
 // a move with no entry (not yet categorized, or the fetch hasn't resolved yet)
 // just falls through to the existing attack-roll flow, same as before this
 // existed -- never a reason to block using a move.
 let _moveCategories = null;
 let _moveCategoriesLoading = false;
 
+// The data file's tags may still carry the manual-review decoration ("--TRIGGER
+// SAVING THROW--", "-- POTENTIAL DAMAGE INCREASE--", ...) that marked the user's
+// own suggestions apart from the original snake_case ones. Normalized here, at
+// the one place tags enter the client, to that original style so every check
+// below is a plain snake_case string no matter how the file spells it -- and
+// so stray spacing/casing typos in the data can't silently break a lookup.
+function _normalizeTag(tag) {
+  return String(tag).trim().replace(/^[\s-]+|[\s-]+$/g, '').toLowerCase().replace(/\s+/g, '_');
+}
+
 function loadMoveCategories() {
   if (_moveCategories || _moveCategoriesLoading) return;
   _moveCategoriesLoading = true;
   CombatAPI.listMoveCategories().then(result => {
-    if (result.status === 'success') _moveCategories = result.categories || {};
+    if (result.status !== 'success') return;
+    const normalized = {};
+    for (const [name, tags] of Object.entries(result.categories || {})) {
+      normalized[name] = [...new Set((tags || []).map(_normalizeTag))];
+    }
+    _moveCategories = normalized;
   }).catch(() => {}).finally(() => { _moveCategoriesLoading = false; });
 }
 
@@ -2624,14 +2639,14 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
   // priority over the target-picker detour above when both would
   // otherwise apply -- a categorized move is either one or the other,
   // never both, by construction of the categorization data itself.
-  const _isSaveTriggered = moveCategoriesFor(moveName).includes('TRIGGER SAVING THROW');
+  const _isSaveTriggered = moveCategoriesFor(moveName).includes('trigger_saving_throw');
   const _willDeferToSavePicker = _isSaveTriggered && !!onSaveTriggered;
   // Reactive-save moves (Wing Buffer, etc.) are the mirror image of the
   // above: the move's OWN USER is the one who saves, against whoever
   // attacked them -- not a chosen target's own DC. See combat-wip.js's
   // _handleReactiveSave for the auto-detect-from-the-log logic this hands
   // off to.
-  const _isReactiveSave = moveCategoriesFor(moveName).includes('REACTIVE SAVE');
+  const _isReactiveSave = moveCategoriesFor(moveName).includes('reactive_save');
   const _willDeferToReactiveSave = _isReactiveSave && !!onReactiveSave;
   // multi_hit_aoe moves (Judgment, Meteor Swarm, etc.) take priority over
   // BOTH single-target detours above -- a move can be tagged multi_hit_aoe

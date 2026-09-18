@@ -17235,8 +17235,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "crit_range_mod"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_damage_increase",
+        "potential_status_condition"
       ],
       "description": "You emit a loud chime that can be heard by all creatures in range. Affected creatures will wake up, and can't fall asleep for the duration. While tolling, creatures that begin their turn within 15ft. of you must succeed a CON save at the beginning of their turns, or take 2d8 + MOVE steel damage. Failing the save by 5 or more causes critical damage and deafness for 1 minute.",
       "moveStat": "WIS/CHA",
@@ -17256,7 +17258,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "situational_use"
       ],
       "description": "You strike with a punch that is quick as a bullet. At the beginning of a round of combat, you may announce that you are using this move, immediately jumping to the top of the initiative order for that round only. Make a melee attack on an opponent, dealing 2d8 + MOVE steel damage on a hit.",
       "moveStat": "DEX",
@@ -17299,8 +17302,10 @@
       "reaction": false,
       "categories": [
         "damage",
+        "status_inflict_auto",
         "status_inflict_threshold",
-        "stat_debuff_enemy"
+        "stat_debuff_enemy",
+        "multi_hit_same_target"
       ],
       "description": "You clamp down on a target, attempting to crush it. Make an attack roll, dealing 1d12 + MOVE steel damage on a hit. On a successful hit, the target is considered grappled. If the first attack hit, make another attack roll with advantage, dealing an additional 3d6 + MOVE steel damage on a hit. On a natural attack roll of 16 or more on the second attack, the target's AC is reduced by 1 until its next long rest. This effect stacks up to three times.",
       "moveStat": "STR",
@@ -17342,6 +17347,7 @@
       "reaction": false,
       "categories": [
         "damage",
+        "conditional_damage",
         "recharge_locked"
       ],
       "description": "While leading a formation, you command your forces to attack in unison. Make a melee attack roll against a target, dealing 1d6 + MOVE steel damage for each creature in your formation.",
@@ -17383,7 +17389,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_ally",
+        "advantage_on_attack_roll"
       ],
       "description": "You engage your gears to raise the attack of ally creatures in range with the Plus or Minus ability. While you maintain your concentration, Pokémon under the effects of Gear Up have advantage on all attack rolls.",
       "moveStat": "None",
@@ -17424,7 +17431,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "conditional_damage"
       ],
       "description": "You tackle a creature with a high-speed spin. Make a melee attack against a creature, dealing 1d6 + MOVE steel damage on a hit. If your DEX score is lower than the target's, double the dice roll for damage.",
       "moveStat": "STR/DEX",
@@ -17444,7 +17452,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "conditional_damage"
       ],
       "description": "You slam into a creature with your heavy body. Make a melee attack on a target, dealing a minimum of 1d10 + MOVE steel damage on a hit. Add an additional bonus to damage equal to your MOVE modifier for each size level you are above a creature. (Sizes, in order, are: Tiny, Small, Medium, Large, Huge, Gigantic)",
       "moveStat": "STR",
@@ -17465,8 +17474,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "conditional_damage",
+        "stat_debuff_enemy",
         "recharge_locked"
       ],
       "description": "You unleash a powerful industrial cleaning solution in a wide cone. All creatures in a 40-foot cone must make a CON save against your Move DC, taking 3d10 + MOVE steel damage on a failure, or half as much on a success. This move deals double damage to Poison-type and Steel-type Pokémon. Steel type creatures and creatures wearing metal armor that fail the save have their AC reduced by 1 for 1 minute (this effect stacks up to -3 AC). The entire area is thoroughly cleaned and sterilized.",
@@ -17550,7 +17561,7 @@
       },
       "reaction": true,
       "categories": [
-        "shield_temphp",
+        "counter_reaction_effect",
         "protect_negate"
       ],
       "description": "Your body is cloaked with a protective shield that negates all damage to you. When targeted by an attack, you may automatically avoid taking damage from this attack and any other damaging move until the beginning of your next turn. You may still suffer secondary effects. On future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful.",
@@ -17571,7 +17582,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "guaranteed_hit"
       ],
       "description": "You hurl a steel ball that seeks out a creature in range, never missing. This move is guaranteed to hit for 1d10 + MOVE steel damage, unless during the invulnerable stage of Fly, Dig, Bounce, Dive, etc. moves.",
       "moveStat": "STR/DEX",
@@ -17591,7 +17603,6 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
         "heal_target_or_aoe",
         "recharge_locked"
       ],
@@ -17613,7 +17624,9 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "damage",
+        "status_inflict_threshold"
       ],
       "description": "You lash out in retaliation with a bust of harsh metal shards. As a reaction, when you are hit with a melee attack that deals damage, make a melee attack roll against your attacker, with disadvantage. On a hit, deal the same amount of damage rolled as steel type damage back at your attacker. In the unlikely event of a natural 20, the target will suffer from bleeding wounds for 3 rounds, losing HP equal to its proficiency bonus each time it spends VP or uses its movement during this time.",
       "moveStat": "STR/DEX",
@@ -17635,7 +17648,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "stat_buff_self"
+        "status_increase_threshold"
       ],
       "description": "You strike out with sharp claws. Make a melee attack roll against a creature, doing 1d6 + MOVE steel damage on a hit. If the natural attack roll is 19 or 20, add your proficiency bonus to your next attack.",
       "moveStat": "STR",
@@ -17654,7 +17667,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "stat_debuff_enemy"
+      ],
       "description": "You emit an ear-shattering high pitched sound that only your target can hear, leaving them in a defenseless state. When activating this move, a target must make a CON saving throw against your Move DC. On a failure, all attack rolls against the target are given a +5 bonus until the end of your next turn.",
       "moveStat": "STR/DEX",
       "vpCost": "2",
@@ -17675,7 +17691,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "stat_buff_self"
+        "status_increase_threshold"
       ],
       "description": "You smash a creature with a fist as fast as a meteor strike. Make a melee attack against a creature, doing 3d10 + MOVE steel damage on a hit. If the natura attack roll is 18 or higher, your next attack has advantage.",
       "moveStat": "STR/DEX",
@@ -17696,7 +17712,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "trigger_saving_throw_on_hit",
+        "potential_disadvantage"
       ],
       "description": "You loose a damaging flash of light from your polished body. Make a ranged attack on a creature, dealing 1d10 + MOVE steel damage on a hit. On a hit, the target must make a CON save against your Move DC. On a failure, the target has disadvantage on its next attack roll.",
       "moveStat": "STR/DEX",
@@ -17716,9 +17733,8 @@
       },
       "reaction": true,
       "categories": [
-        "status_inflict_threshold",
         "counter_reaction_effect",
-        "recoil"
+        "protect_negate"
       ],
       "description": "When subject to any targeted attack with a STR or DEX move power, you may use your reaction to attempt to parry it. Make a contested roll against your opponent's Strength or Dexterity ability score. On a higher roll, you take no damage from the attack, but may still suffer other effects. On a natural roll of 19 or higher, you succeed, suffer no effects and retain your reaction this round.",
       "moveStat": "STR/DEX",
@@ -17738,8 +17754,8 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_ally",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "advantage_on_attack_roll"
       ],
       "description": "When a targeted attack would hit an ally adjacent to you, you can choose to take the damage instead. If you do, your next attack against that target has advantage.",
       "moveStat": "None",
@@ -17759,8 +17775,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally"
+        "protect_negate",
+        "field_terrain"
       ],
       "description": "You emit a strong vibration, creating a dome barrier in a 15ft. radius around you. For the duration, creatures must succeed a Strength check against your move DC in order to pass through the barrier, and ranged attacks can't pass through it. You may allow a creature to pass through, automatically succeeding the saving throw.",
       "moveStat": "STR/WIS",
@@ -17780,6 +17796,7 @@
       },
       "reaction": true,
       "categories": [
+        "counter_reaction_effect",
         "protect_negate"
       ],
       "description": "You protect a creature next to you from an incoming targeted attack by moving to block it, negating all damage and effects. On future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful, or suffer the damage and effects yourself.",
@@ -17820,7 +17837,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "guaranteed_hit"
       ],
       "description": "You pinpoint the perfect place to strike a creature with a horn as strong as steel. This move is guaranteed to hit for 1d6 + MOVE steel damage, unless during the invulnerable stage of Fly, Dig, Bounce, Dive, etc. moves.",
       "moveStat": "STR/INT",
@@ -17841,8 +17859,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
         "crit_range_mod",
+        "base_crit",
         "stat_debuff_enemy"
       ],
       "description": "You slash with a blade-like cleaning edge. Make a melee attack roll, dealing 2d8 + MOVE steel damage on a hit. This move scores a critical hit on a natural attack roll of 18 or higher. On a critical hit, the target's AC is reduced by 1 until their next long rest, stacking up to -5. This move leaves a perfectly clean streak on any surface struck.",
@@ -17884,7 +17902,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy",
         "recharge_locked"
       ],
       "description": "You slam into the target with the force of a meteor. Make a melee attack, dealing 4d12 + MOVE steel damage on a hit. This move ignores any abilities of the target creature that would decrease its ability to hit or deal full damage.",
@@ -17906,8 +17923,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "stat_debuff_enemy"
+        "trigger_saving_throw_on_hit",
+        "potential_prone",
+        "status_inflict_threshold"
       ],
       "description": "You smash into a creature with your metal fist. Make a melee attack against a creature, doing 3d10 + MOVE steel damage on a hit. On a hit, the target must succeed a STR saving throw or fall prone. If the natural attack roll is 16 or higher, the target's speed is reduced by half until the end of its next turn.",
       "moveStat": "STR",

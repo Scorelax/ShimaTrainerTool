@@ -17945,7 +17945,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "situational_use"
       ],
       "description": "You lunge at an opponent with incredible speed. At the beginning of a round of combat, you may announce that you are using this move, immediately jumping to the top of the initiative order for that round only. Make a melee attack on an opponent, dealing 2d8 + MOVE water damage on a hit.",
       "moveStat": "DEX",
@@ -17966,7 +17967,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "protect_negate"
+        "protect_negate",
+        "advantage_on_attack_roll"
       ],
       "description": "You disappear from view and prepare to surprise a target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use may your action to reappear at a point within range and make a melee attack against a creature, with advantage, dealing 4d12 + MOVE water damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "WIS/INT",
@@ -17986,9 +17988,7 @@
       },
       "reaction": false,
       "categories": [
-        "drain",
-        "heal_self",
-        "stat_buff_self"
+        "heal_self"
       ],
       "description": "You surround yourself with a veil of healing water. At the end of each of your turns, as long as you hold concentration, regain a number of hit points equal to your level.",
       "moveStat": "None",
@@ -18028,7 +18028,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "situational_use",
+        "protect_negate"
       ],
       "description": "You lunge at an opponent with incredible speed. At the beginning of a round of combat, you may announce that you are using this move, immediately jumping to the top of the initiative order for that round only. Make a melee attack on an opponent, dealing 2d8 + MOVE water damage on a hit. You partially phase out of existence. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "WIS/INT",
@@ -18049,7 +18051,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "fixed_special_damage"
+        "conditional_damage"
       ],
       "description": "You send a harsh blast of salt water at an opponent. Make a ranged attack against an opponent, dealing 1d10 + MOVE water damage on a hit. If the opponent has less than 50% of its max HP, double the damage dealt.",
       "moveStat": "STR/DEX",
@@ -18091,7 +18093,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You shoot a concentrated stream of bubbles in an 80 foot line, 5 feet wide. All Pokémon caught in the line must succeed on a DEX save against your Move DC, taking 1d10 + MOVE water damage on a failed save, and half as much on a success.",
@@ -18113,7 +18116,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "status_inflict_auto"
       ],
       "description": "You clamp down on an enemy Pokémon, attempting to deal damage and keep them in place. Make a melee attack roll. On a hit, the target takes 1d6 + MOVE water damage and is grappled and restrained. At the beginning of each of its turns, it may attempt to pry itself away with a STR save against your Move DC. As long as the target is restrained on your subsequent turns, this move can be activated again as a bonus action with an automatic hit, dealing 1d6 water damage.",
       "moveStat": "STR",
@@ -18134,7 +18137,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "You slam down onto an opponent with a heavy claw. Make a melee attack roll on a target, dealing 3d10 + MOVE water damage on a hit. This move scores a critical hit on rolls of 19 or 20.",
       "moveStat": "STR",
@@ -18154,7 +18158,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "advantage_on_attack_roll"
       ],
       "description": "When you activate this move, you dive down and disappear into the Ethereal plane. You may not be targeted by attacks in the Ethereal plane. On your next turn, as an action, you reappear and attempt to strike an opponent from below. Make a melee attack roll on an opponent in range, with advantage, doing 2d8 + MOVE water damage on a hit.",
       "moveStat": "DEX",
@@ -18175,8 +18180,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "positioning",
+        "potential_prone",
         "recharge_locked"
       ],
       "description": "You emit a powerful stream of high-speed water at creatures in an 80 foot line, 5 feet wide. All creatures caught in the blast must make a DEX saving throw against your Move DC, taking 4d12 + MOVE water damage on a failure, and half as much on a success. Creatures that fail the save also are pushed back 10 feet and fall prone. This move saps you of energy, and you may not make any attack until after the end of your next turn.",
@@ -18198,7 +18205,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You send a surge of powerful water towards creatures in a 80 foot line, 5 feet wide. All creatures caught in the blast must succeed on a DEX save against your Move DC, taking 3d10 + MOVE water damage on a failed save, and half as much on a success.",
@@ -18219,7 +18227,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "protect_negate"
       ],
       "description": "You surround yourself with a cloud of glowing ink, protecting from any status conditions for the duration. If you a condition is inflicted on you while Ink Veil is active, instead roll 3d10, regenerating that much HP and VP.",
       "moveStat": "None",
@@ -18240,7 +18249,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_disadvantage",
         "recharge_locked"
       ],
       "description": "You summon a wave of muddy water in a 30ft. cone. All creatures caught in the wave must make a CON saving throw against your move DC, dealing 2d8 + MOVE water damage on a failure, half damage on a success. If an opponent fails the save by 5 or more, it has disadvantage on its next attack.",
@@ -18262,7 +18273,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "attack_supression"
       ],
       "description": "A strange ink emanates from your body, and descends on a creature in range, making them forgetful. Make a ranged attack, dealing 3d10 + MOVE water damage on a hit. For 1d6 turns, the last move used by the creature is disabled.",
       "moveStat": "None",
@@ -18305,7 +18316,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "multi_hit_choice",
         "recharge_locked"
       ],
       "description": "Your body glows a bright and brilliant blue, sending three beams of focused light at any creature(s) in range. Make a ranged attack for each beam, dealing 4d12 + MOVE water damage on each successful hit.",
@@ -18327,7 +18338,11 @@
       "reaction": false,
       "categories": [
         "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_prone",
         "field_terrain",
+        "conditional_damage",
         "recharge_locked"
       ],
       "description": "You whip up a strong purifying vortex of water energy that clears field hazards and status conditions in the area. All creatures affected must succeed a STR saving throw or take 4d12 + MOVE water damage and be knocked prone. On a successfull save, they take half damage and are not knocked prone. For every hazard removed, and depending on the terrain, add 1d8 bonus damage of appropriate type for each element flung into the vortex (GM discretion). Additionally, all creatures affected that suffer from a status condition must succeed a CON saving throw or lose their status condition, and take double damage. If used underwater, the damage is rolled with advantage.",
@@ -18347,7 +18362,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_weather"
+      ],
       "description": "You summon a heavy rainfall that covers the battlefield for 5 rounds.",
       "moveStat": "None",
       "vpCost": "15",
@@ -18389,9 +18406,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
         "stat_buff_self",
-        "field_weather",
         "recharge_locked"
       ],
       "description": "You begin circling in the air at incredible speeds, creating a vortex of energy fed by atmospheric water for one turn. While charging this attack, your AC is temporarily increased by 5. On your next turn, the accumulated water is released all at once in a sparkling sapphire torrent in a 50 foot line. Any creature caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE water damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it is paralyzed, and frightened for three turns. During heavy rain, this move does not need charging.",
@@ -18432,7 +18450,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "potential_status_condition"
+      ],
       "description": "You fire a torrent of water at a creature with such force that it leaves lasting effects. Force a target in range to make a CON save against your Move DC. On a failure, their type changes to water for three rounds.",
       "moveStat": "STR/CON",
       "vpCost": "3",
@@ -18452,7 +18473,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You burst into song, unleashing a flurry of bubbles in a 10ft circle, centered on you. All creatures in range must make a DEX save or take 2d8 + MOVE water damage on a fail and half as much on a save. Any creature suffering from the burned condition will be cured upon touching the bubbles.",
@@ -18474,7 +18496,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You shoot out a cone of intensely hot steam from your body, immersing creatures in range. All creatures in the area must make a DEX save against your Move DC, taking 3d10 + MOVE water damage on a failure, or half as much on a success. If a target fails the save by 5 or more, it becomes burned.",
@@ -18496,6 +18520,9 @@
       "reaction": false,
       "categories": [
         "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_prone",
         "recharge_locked"
       ],
       "description": "You create a powerful wave that crashes down on creatures in a 30 foot cone. Any creature caught in the blast must make a DEX saving throw, taking 2d8 + MOVE water damage and falling prone on a failure, or half as much without falling prone on a success.",
@@ -18518,7 +18545,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "movement"
       ],
       "description": "You channel water energy to boost your movement. Gain double speed on and in water. While this effect is active, you don't provoke attacks of opportunity. If it is raining, all surfaces are considered to be water for you.",
       "moveStat": "DEX",
@@ -18620,7 +18648,8 @@
       },
       "reaction": false,
       "categories": [
-        "protect_negate"
+        "stat_buff_self",
+        "stat_buff_ally"
       ],
       "description": "You soak yourself and all allies with water, reducing the amount of fire damage taken for anyone affected. For the duration, you and any ally in range (when you initially activated this move) have resistance to fire-type attacks. If you were already resistant, you are now immune If you were vulnerable, you now take normal damage. If you are immune to fire-type moves already, nothing happens.",
       "moveStat": "None",
@@ -18641,7 +18670,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "conditional_damage",
         "recharge_locked"
       ],
       "description": "You fire a blast of water at a creature that increases in power the more healthy you are. Make a ranged attack roll against a creature, doing 4d12 + MOVE water damage on a hit if you are at or above 50% of your health. If you are below 50%, halve the total damage done.",
@@ -18663,7 +18692,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_prone",
         "recharge_locked"
       ],
       "description": "You create an intense waterfall that crashes down on creatures in a 10 foot radius, centered on a point within range. Creatures in the area must make a DEX save against your Move DC or take 2d8 + MOVE water damage and fall prone on a fail, or half as much on a save.",
@@ -18685,8 +18716,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_ally"
+        "status_inflict_auto"
       ],
       "description": "You create a wave of water that swirls around a creature in range. Make a ranged attack roll. On a hit, the target takes 1d10 + MOVE water damage and is restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. On each successive turn, if the creature is still restrained, you may use this move again (as an action) and automatically hit.",
       "moveStat": "STR",
@@ -18706,8 +18736,8 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_self",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "stat_buff_self"
       ],
       "description": "When subject to a melee or ranged attack, you can spend your reaction to increase your AC by +2 if it would cause the attack to miss.",
       "moveStat": "None",

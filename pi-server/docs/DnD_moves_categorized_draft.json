@@ -8390,7 +8390,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "drain"
       ],
       "description": "You attempt to absorb some of an enemy’s health. Make a melee attack on a Pokémon. On a hit, the Pokémon takes 1d6 + MOVE grass damage. Half the damage done is restored by the user.",
       "moveStat": "STR/DEX",
@@ -8409,7 +8410,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "heal_target_or_aoe"
+      ],
       "description": "You release a pleasant aroma that empowers your allies. All allies within a ten foot circle, centered on you, are cured of all negative status ailments.",
       "moveStat": "None",
       "vpCost": "6",
@@ -8467,7 +8470,8 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "heal_target_or_aoe"
       ],
       "description": "When a creature in range falls in battle, you may cause a cactus to grow out of it, draining its remaining life force as it sprouts 1d4 + MOVE cactus fruit. The fallen creature now has one failed death save. The cactus fruit may be picked and consumed to heal 2d4 +2 HP.",
       "moveStat": "None",
@@ -8507,8 +8511,10 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "field_terrain"
+        "field_terrain",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "Vines sprout from the ground in a 20-foot radius centered on the user. The area becomes difficult terrain, and any creature that enters the area or starts its turn there must succeed on a Dexterity saving throw or be restrained until the end of its next turn.",
       "moveStat": "DEX",
@@ -8528,8 +8534,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "protect_negate"
+        "stat_buff_self"
       ],
       "description": "You protect yourself by wrapping your body up in thick, soft cotton. For the duration, boost your AC by +2.",
       "moveStat": "None",
@@ -8549,8 +8554,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_debuff_enemy"
+        "trigger_saving_throw",
+        "stat_debuff_enemy",
+        "potential_status_condition"
       ],
       "description": "You unleash spores of thick cotton that covers the opponent. Force a target in range to make a CON save against your Move DC. On a fail, the target’s speed is reduced by 10 for the duration. If this reduction in speed causes their speed to be 0, they are restrained for the duration.",
       "moveStat": "DEX/CON",
@@ -8570,8 +8576,10 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_disadvantage",
+        "potential_status_condition"
       ],
       "description": "You release a cloud of powder that disorients and confuses creatures in a 5ft. radius within range. Any affected creature must succeed a WIS saving throw, or suffer disadvantage on their attack rolls and saving throws, and other creatures have +1 to attack rolls made against the affected creatures until the beginning of your next turn.. On a failure of 5 or more, the creature becomes confused.",
       "moveStat": "DEX",
@@ -8612,7 +8620,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You summon the energy of the forest to change the type of another creature. Force a creature in range to make a CON save against your Move DC. On a failure, its type is changed to Grass for the duration.",
       "moveStat": "CON/WIS",
@@ -8633,7 +8642,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You summon a whirlwind of jagged branches and razor sharp leaves that batter all creatures in a 10 foot radius, centered on you. All creatures caught in the area must make a DEX saving throw against your Move DC, taking 4d12 + MOVE grass damage on a failure, and half as much on a success. This move saps you of energy, and may not make any attack until after the end of your next turn.",
@@ -8676,6 +8686,7 @@
       "reaction": false,
       "categories": [
         "damage",
+        "conditional_damage",
         "status_inflict_threshold"
       ],
       "description": "You attempt to ensnare a creature with vines that sprout from the ground, causing it to trip. Make a ranged attack, dealing 1d10 + MOVE grass damage on a hit. If the targets size is Large or bigger, double the dice roll for the damage. On a natural attack roll of 19 or 20, the target falls prone.",
@@ -8716,7 +8727,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You make a shrill sound that has the chance to put a creature to sleep. The target must make a WIS save against your Move DC, falling asleep on a failure.",
       "moveStat": "CON/CHA",
@@ -8736,7 +8748,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
+        "field_terrain",
+        "heal_target_or_aoe",
+        "boosted_damage_rolls",
         "recharge_locked"
       ],
       "description": "Grass sprouts from the ground in a circle around you, coating the earth with healing energy. For 3 turns, all creatures in the affected area heal for 2d8 hit points at the end of their turn. In addition, creatures may double their MOVE modifier on damage rolls from grass-type moves activated inside the area.",
@@ -8758,7 +8772,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "drain"
       ],
       "description": "You sink your horns into a creature, draining some of their power. Make a melee attack, dealing 2d8 + MOVE grass damage on a hit. Half the damage dealt is recovered by the user (rounded down).",
       "moveStat": "STR/DEX",
@@ -8778,8 +8792,7 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self",
-        "stat_buff_self"
+        "heal_self"
       ],
       "description": "You pierce the ground with roots, absorbing natural energy and fixing you in place. At the end of each of your next three turns (including this one), heal yourself for 1d10 + MOVE hit points as a free action. During this time, you may not move or be switched out.",
       "moveStat": "CON",
@@ -8800,7 +8813,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "You attempt to slash a creature with a sharp leaf. Make a melee attack against a target, dealing 2d8 + MOVE grass damage on a hit. This attack scores a critical on 19 and 20.",
       "moveStat": "DEX",
@@ -8821,7 +8835,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "stat_debuf_self",
         "recharge_locked"
       ],
       "description": "You whip up a powerful storm of leaves in a 10 foot radius, centered on a point within range. All creatures in the area must make a DEX save against your Move DC, taking 3d10 + MOVE grass damage on a fail, or half as much on a success. After activating this move, you are sapped of energy. Your next attack deals half the normal damage, if it hits.",
@@ -8844,7 +8860,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "stat_debuff_enemy"
+        "potential_disadvantage"
       ],
       "description": "You summon forth a cyclone of harsh winds and fast moving leaves that rushes forward to strike a creature in range. Make a ranged attack roll, dealing 3d10 + MOVE grass damage on a hit. If the natural attack roll is 15 or higher, the target has disadvantage on its next attack. If the target activates a move that requires a saving throw, its target(s) have advantage on the roll.",
       "moveStat": "STR/DEX",
@@ -8884,7 +8900,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "drain",
+        "status_condition"
       ],
       "description": "You send a seed at a creature in range that implants itself in their hide. Make a ranged attack roll. On a hit, a seed implants into their skin. The target takes 1d4 grass damage at the end of each of its subsequent turns until it faints or is switched out. Half of the damage is restored by the attacker, or any other active creature the trainer has in battle, even if the original attacker faints or is returned to its Pokéball. Only one creature can be seeded by the attacker at a time.",
       "moveStat": "DEX",
@@ -8904,7 +8922,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "guaranteed_hit"
       ],
       "description": "You summon a sharp, magical leaf that strikes a creature. This move is guaranteed to hit for 1d10 + MOVE grass damage, unless during the invulnerable stage of Fly, Dig, Bounce, Dive, etc. moves.",
       "moveStat": "DEX",
@@ -8963,6 +8982,7 @@
       },
       "reaction": true,
       "categories": [
+        "counter_reaction_effect",
         "protect_negate"
       ],
       "description": "You call upon the power of nature to protect you. Whenever you sustain damage of a type you are vulnerable to, you may use this reaction to discount the extra damage. Make a ranged attack roll, redirecting the damage you avoided to a creature in range on a hit.",
@@ -9005,7 +9025,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You stir up a blizzard of sharp petals that swirl around you. Any creature in a 15ft radius, centered on you, must make a DEX save against your Move DC, taking 3d10 + MOVE grass damage on a failure, or half as much on a success.",
@@ -9027,9 +9048,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto",
-        "stat_buff_self",
-        "stat_buff_ally"
+        "status_condition"
       ],
       "description": "You dance around, releasing a flurry of sharp leaf attacks against a creature in range. Make a ranged attack roll, dealing 2d8 + MOVE grass damage on a hit. On the following turn, you may choose to use this action again to hit automatically, but if you do, you become confused at the end of your turn.",
       "moveStat": "DEX/CHA",
@@ -9070,7 +9089,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "You send a razor sharp leaf at a creature in range at tremendous speed. Make a ranged attack roll, doing 1d10 + MOVE grass damage on a hit. Razor Leaf results in a critical hit on 19s and 20s.",
       "moveStat": "STR/DEX",
@@ -9091,7 +9111,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You release decomposing spores in a 5-foot radius. Each non-decomposer creature in the area must succeed on a DC 10 Constitution saving throw or take 1d6 poison damage and be poisoned until the end of their next turn. This move can be used once per day.",
@@ -9133,6 +9155,9 @@
       "reaction": false,
       "categories": [
         "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "advantage_on_attack_roll",
         "recharge_locked"
       ],
       "description": "You release a bright shockwave from your body, damaging all creatures within 20 feet of you. Any creature in range must make a CON save against your Move DC, taking 3d10 + MOVE grass damage on a failure, or half as much on a success. Until the end of your next turn, any attack roll made against a target that failed its save is rolled at advantage. This move can be used once per short rest.",
@@ -9153,7 +9178,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You release a cluster of spores at a creature in range, attempting to put them to sleep. The target must make a CON saving throw against your Move DC or fall asleep.",
       "moveStat": "CON",
@@ -9174,8 +9200,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "field_weather"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "conditional_damage"
       ],
       "description": "When you use this move, soak in solar energy and prepare to unleash a devastating beam. On your next turn, if you keep your concentration, use an action to create a 80 foot line of solar energy, 5 feet wide. All creatures caught in the line must succeed on a DEX save or take 3d10 + MOVE grass damage on a fail and half as much on a save. If this move is used in harsh sunlight, double your MOVE modifier for damage and it can be used on the turn it is activated, without concentration.",
       "moveStat": "STR/DEX",
@@ -9196,8 +9223,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "field_weather"
+        "conditional_damage"
       ],
       "description": "When you activate this move, you use your action gathering in solar energy to prepare to strike with blades. On your next turn, if you keep your concentration. use an action to make a melee attack, dealing 3d10 + MOVE grass damage on a hit. If this move is used in harsh sunlight, double your MOVE modifier for damage and it can be used on the turn it is activated.",
       "moveStat": "STR/DEX",
@@ -9217,6 +9243,7 @@
       },
       "reaction": false,
       "categories": [
+        "heal_target_or_aoe",
         "recharge_locked"
       ],
       "description": "You summon a healing breeze in a 30ft. radius from a point within range, that restores 3d10 + MOVE hit points to all friendly creatures. This move can be used once per long rest.",
@@ -9237,9 +9264,9 @@
       },
       "reaction": true,
       "categories": [
-        "shield_temphp",
+        "counter_reaction_effect",
         "protect_negate",
-        "recoil"
+        "damage"
       ],
       "description": "You quickly raise a spiked shield to protect yourself from damage. When you are hit by a melee attack, use your reaction to ignore damage, dealing grass damage equal to your proficiency modifier to the attacker instead. On future instances of this reaction in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful. Unless the successful roll is 20, the damage you take instead drains your VP for half the damage amount.",
       "moveStat": "None",
@@ -9259,8 +9286,9 @@
       },
       "reaction": true,
       "categories": [
-        "status_inflict_save",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "When you are targeted by a melee attack, you can use your reaction to release a spore that attempts to put your attacker to sleep. The creature must make a CON save against your Move DC, falling asleep on a fail.",
       "moveStat": "DEX/CON",
@@ -9280,7 +9308,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You emit a cloud of glowing spores in a 40ft. radius around you. All creatures that are not Grass type in the cloud must make a Constitution saving throw, or suffer one of the following effects, chosen by you: Asleep, confused, paralyzed, poisoned. You may choose one effect per use of this move. For three rounds, the cloud lingers before dissipating. After succeeding the initial saving throw, all creatures ending their turn inside the cloud must make the saving throw again.",
       "moveStat": "DEX",
@@ -9301,7 +9331,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "trigger_saving_throw_on_hit",
+        "multi_type_damage"
       ],
       "description": "You hurl a barrage of hard spuds at a creature in range. Roll a ranged attack, dealing 4d12 MOVE grass damage on a hit. The creature hit must then make a CON save against your move DC, taking an equal amount of MOVE fire damage on a failure.",
       "moveStat": "STR/DEX",
@@ -9321,9 +9352,9 @@
       },
       "reaction": true,
       "categories": [
-        "damage",
-        "stat_buff_self",
-        "protect_negate"
+        "counter_reaction_effect",
+        "steal_disrupt",
+        "heal_self"
       ],
       "description": "If a creature attempts to use a move that boosts its stats, you may use your reaction to negate the increase and convert it into healing energy, recovering 1d10 + MOVE hit points. This includes critical hit bonuses, AC increases, speed, attack and damage boosts, etc.",
       "moveStat": "CON",
@@ -9343,9 +9374,9 @@
       },
       "reaction": true,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "When you are subject to a melee attack, you can use your reaction to release a spore that attempts to stun your attacker. The creature must make a CON save against your Move DC, becoming paralyzed on a fail.",
       "moveStat": "CON",
@@ -9365,8 +9396,7 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self",
-        "stat_buff_self"
+        "heal_self"
       ],
       "description": "You regenerate from the inside, healing some of your wounds. Heal yourself for 2d8 + MOVE hit points.",
       "moveStat": "CON",
@@ -9387,6 +9417,9 @@
       "reaction": false,
       "categories": [
         "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "drain",
         "recharge_locked"
       ],
       "description": "Roots erupt from the ground in a 20ft radius centered on a point within 60ft. All creatures must make a CON save, taking 4d12 + MOVE grass damage on fail, half on success. You heal for 50% of total damage dealt to all targets.",
@@ -9408,6 +9441,7 @@
       "reaction": false,
       "categories": [
         "damage",
+        "status_inflict_threshold",
         "stat_debuff_enemy"
       ],
       "description": "You attempt to land an intense kick of tropical origins on the target. Make a melee attack, dealing 3d10 + MOVE grass damage on a hit. On a natural role of 16 or more, the target adds -1 to any attack it makes for the remainder of combat. This modifier can be stacked up to a maximum of -5.",
@@ -9448,7 +9482,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "recoil"
       ],
       "description": "You slam your rough body against a creature, taking serious recoil damage. Make an attack roll against a target, dealing 2d10 + MOVE grass damage on a hit. On a hit, you also take a quarter of the damage dealt in typeless recoil damage.",
       "moveStat": "STR",
@@ -9468,8 +9503,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You shoot a bizarre seed that implants worry into another creature. The target must succeed on a CON save against your Move DC or replace the user's choice of ability with Insomnia, preventing sleep for the duration. If successfully used on a human, it will not be able to gain benefits from long resting for the duration, and will eventually provoke exhaustion.",
       "moveStat": "DEX/CHA",

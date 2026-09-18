@@ -1989,7 +1989,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "addtional_damage"
+        "additional_damage"
       ],
       "description": "You turn a creature's own power against it. Make a melee attack roll using your MOVE power. On a hit, the target takes 2d8 + MOVE dark damage using their own MOVE power.",
       "moveStat": "STR/WIS",
@@ -2501,7 +2501,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "attack_supression"
+        "attack_suppression"
       ],
       "description": "You focus in on an attack at the target’s throat. Make a melee attack, dealing 1d10 + MOVE dark damage on a hit. On hit, the target is unable to activate sound based attacks for its next 1d4 turns.",
       "moveStat": "STR/DEX",
@@ -2544,7 +2544,7 @@
       "categories": [
         "counter_reaction_effect",
         "trigger_saving_throw",
-        "attack_supression"
+        "attack_suppression"
       ],
       "description": "You send a dark energy to torment a creature in range that attacks you. When hit by a melee or ranged attack, force the target to make a WIS saving throw against your Move DC. On a failure, the target cannot use the same move that hit you on its next turn.",
       "moveStat": "DEX/WIS",
@@ -2566,7 +2566,7 @@
       "categories": [
         "damage",
         "advantage_on_attack_roll",
-        "stat_debuf_self"
+        "stat_debuff_self"
       ],
       "description": "You go all out in a flurry of dark strikes, sacrificing your defenses. Make a melee attack on an opponent, dealing 3d10 + MOVE dark damage on a hit, rolled with advantage. After activating this move, your AC is reduced by 1d4, and the target has advantage on any attack it makes against you, until the beginning of your next turn.",
       "moveStat": "DEX",
@@ -4967,7 +4967,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuf_self"
+        "stat_debuff_self"
       ],
       "description": "You get in close for a devastating strike, sacrificing your defenses. Make a melee attack on an opponent, dealing 3d10 + MOVE fighting damage on a hit, rolled with advantage. After activating this move, your AC is reduced by 1d4, and the target has advantage on any attack it makes against you, until the beginning of your next turn.",
       "moveStat": "STR",
@@ -5218,7 +5218,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuf_self"
+        "stat_debuff_self"
       ],
       "description": "You put all your power into a strong and heavy fist attack. Make a melee attack, dealing 3d8 + MOVE fighting damage on a hit. Until the end of your next turn, you have disadvantage on all DEX saves and your speed is halved.",
       "moveStat": "STR",
@@ -5702,7 +5702,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuf_self"
+        "stat_debuff_self"
       ],
       "description": "You strike a target with incredible power. Make a melee attack against a creature, dealing 3d10 + MOVE fighting damage on a hit. This move exhausts you; your STR and DEX ability scores are set to 10 until the end of your next turn.",
       "moveStat": "STR/DEX",
@@ -6569,7 +6569,7 @@
         "damage",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "stat_debuf_self",
+        "stat_debuff_self",
         "recharge_locked"
       ],
       "description": "You summon forth a flaming meateor shower that rains down on your opponents. All creatures in a 10 foot radius, centered on a point within range, must take a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a hit, or half as much on a save. After activating this move, your next attack is rolled at disadvantage. If that attack requires a saving throw, the target has advantage.",
@@ -6614,7 +6614,7 @@
         "damage",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "stat_debuf_self",
+        "stat_debuff_self",
         "recharge_locked"
       ],
       "description": "With a roar, flames burst from your body in a 15 foot radius, centered on you. Any creature in range must roll a DEX saving throw against your Move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. The power of the move exhausts you, and your next attack is done at disadvantage. If your next attack requires a creature saving throw, they have advantage. This move can be used once per short rest.",
@@ -6834,7 +6834,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuf_self"
+        "stat_debuff_self"
       ],
       "description": "Your forehead burns like hot coals as you slam your head into a creature. Make a melee attack roll, dealing 4d12 + MOVE fire damage on a hit. After activating this move, your AC decreases by 2 until the beginning of your next turn. Until your next long rest, each use of this move after the first doubles the current AC debuff.",
       "moveStat": "STR/DEX",
@@ -7406,7 +7406,7 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "stat_debuf_self"
+        "stat_debuff_self"
       ],
       "description": "You land on the ground to rest your body. Regain 2d8 + MOVE hit points, but become grounded and lose your ground-type resistance until the beginning of your next turn. You can't move after activating this move on the same turn.",
       "moveStat": "CON",
@@ -7681,7 +7681,7 @@
         "recoil",
         "status_condition",
         "stat_buff_self",
-        "stat_debuf_self",
+        "stat_debuff_self",
         "situational_use"
       ],
       "description": "This Move has a different effect based on your Pokémon type. If you are ghost-type: You attempt to put a curse on an opponent. Force a target in range to make a WIS saving throw against your Move DC. On a fail, the target is cursed. You take 2d8 damage initially and your opponent takes 2d8 + MOVE ghost damage at the end of each of its turns for the duration. If you are any other type: You place a curse on yourself. For the duration, your STR and CON scores increase by 2, but your DEX score decreases by 4. Out of combat, the ghost curse deals damage every 10 minutes.",
@@ -8837,7 +8837,7 @@
         "damage",
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "stat_debuf_self",
+        "stat_debuff_self",
         "recharge_locked"
       ],
       "description": "You whip up a powerful storm of leaves in a 10 foot radius, centered on a point within range. All creatures in the area must make a DEX save against your Move DC, taking 3d10 + MOVE grass damage on a fail, or half as much on a success. After activating this move, you are sapped of energy. Your next attack deals half the normal damage, if it hits.",
@@ -11387,7 +11387,7 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "attack_supression"
+        "attack_suppression"
       ],
       "description": "You attempt to disable a Pokémon, hindering its abilities. Choose a target in range. The target must succeed on a WIS saving throw against your Move DC. On a fail, choose one of the opponent's known moves, that you know it knows. This move is now disabled.",
       "moveStat": "CHA/WIS",
@@ -11598,7 +11598,7 @@
       "categories": [
         "counter_reaction_effect",
         "trigger_saving_throw",
-        "attack_supression"
+        "attack_suppression"
       ],
       "description": "After being targeted by a move, force a creature to make a WIS save against your Move DC as a reaction. On a fail, the target can only use the move that targeted you for its next turn.",
       "moveStat": "WIS/CHA",
@@ -13546,7 +13546,7 @@
       "reaction": false,
       "categories": [
         "stat_buff_self",
-        "stat_debuf_self"
+        "stat_debuff_self"
       ],
       "description": "You break off a piece of your shell, lowering your AC, but improving your attack. When you activate this move, lower your AC by 1, but increase your attack and damage rolls by 1 for the duration. This move cannot stack.",
       "moveStat": "None",
@@ -15549,7 +15549,7 @@
       "reaction": false,
       "categories": [
         "stat_buff_self",
-        "stat_debuf_self"
+        "stat_debuff_self"
       ],
       "description": "Your mind elevates to a new level of focus. Add +2 to you AC and any saving throw you make for the duration, but select one of your moves that is not Amnesia. You forget that move and cannot use it for the duration.",
       "moveStat": "None",
@@ -16032,7 +16032,7 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "attack_supression"
+        "attack_suppression"
       ],
       "description": "You create psychic walls within the mind of a target in range. Force the target to make a WIS saving throw against your Move DC. On a failure, the target is unable to use any Move it knows that is the same as yours for the duration.",
       "moveStat": "WIS/INT",
@@ -16527,7 +16527,7 @@
         "damage",
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "stat_debuf_self",
+        "stat_debuff_self",
         "recharge_locked"
       ],
       "description": "You send an extremely powerful wave of psychic energy at creatures in a 60 foot cone. Creatures in the wave must make a WIS save against your Move DC, taking 10d12 + MOVE psychic damage on a failure, or half as much on a success. The power of the move exhausts you, and your next attack is done at disadvantage. If your next attack requires a saving throw, affected creatures have advantage. This move can only be used once per long rest.",
@@ -18529,7 +18529,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "attack_supression"
+        "attack_suppression"
       ],
       "description": "A strange ink emanates from your body, and descends on a creature in range, making them forgetful. Make a ranged attack, dealing 3d10 + MOVE water damage on a hit. For 1d6 turns, the last move used by the creature is disabled.",
       "moveStat": "None",

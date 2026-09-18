@@ -42,7 +42,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--BASE CRIT--"
+        "base_crit"
       ],
       "description": "You summon your underlings to attack a foe. Make a ranged attack on an opponent, dealing 2d8 + MOVE bug damage on a hit. This move scores a critical hit on rolls of 19 or 20.",
       "moveStat": "STR/DEX",
@@ -84,7 +84,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--BERRY CHECK--"
+        "berry_check"
       ],
       "description": "You lash out and bite a foe. Make a melee attack against an opponent, dealing 1d10 + MOVE bug damage on a hit. If the target is holding a berry when you hit, you immediately eat it and gain its effect.",
       "moveStat": "STR/DEX",
@@ -106,7 +106,7 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "--POTENTIAL DISADVANTAGE--"
+        "potential_disadvantage"
       ],
       "description": "You vibrate your wings, creating a harsh sound that damages any creature in range. All creatures within 20 feet of you must make a CON save against your Move DC, taking 3d10 + MOVE bug damage on a fail. If an opponent fails the save by more than 5, they have disadvantage on their next attack.",
       "moveStat": "DEX/CHA",
@@ -147,7 +147,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL STAT INCREASE--"
+        "potential_stat_increase"
       ],
       "description": "You lunge at a creature with a devastating sting attack. Make a melee attack on a creature, dealing 2d8 + MOVE bug damage on a hit. If this attack causes the target to faint, double your ability modifier for attack rolls and damage on your next turn.",
       "moveStat": "STR/DEX",
@@ -168,7 +168,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--SITUATIONAL USE--"
+        "situational_use"
       ],
       "description": "You make quite the entrance, quickly attacking a creature. This attack can only be used on the first turn that the user has entered combat. Make a melee attack on a creature, doing 2d8 + MOVE bug damage on a hit. This move may go first the initiative order if you have a valid target.",
       "moveStat": "DEX",
@@ -189,7 +189,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "-- POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You unleash series of cuts against a creature that increase in strength. When you activate this move, make a melee attack on a target in range, doing 1d4 + MOVE bug damage on a hit. If you continue to use this move on consecutive turns, double the dice roll for damage and increase VP cost by 1 each time you hit. The multiplier maxes out at 8x the original damage. The damage resets if any of the attacks miss, or if you are incapacitated.",
       "moveStat": "STR/DEX",
@@ -233,7 +233,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "You summon an infestation of tiny insects to attack a creature for multiple turns. Make a ranged attack on a target. On a hit, the target takes 1d4 + MOVE bug damage and becomes infested for 1d4 rounds. An infested creature must make a CON save against your Move DC at the beginning of each of its turns, taking 1d4 + MOVE bug damage on a failed save.",
       "moveStat": "CON",
@@ -297,7 +297,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL PRONE--"
+        "potential_prone"
       ],
       "description": "You charge at a creature for a devastating horn attack. Make a melee attack roll, doing 3d10 + MOVE bug damage on a hit. If the user moves at least 20 feet towards a target before using this move, the target is forced to make a STR save against your Move DC or be knocked prone.",
       "moveStat": "STR/DEX",
@@ -320,7 +320,7 @@
         "damage",
         "status_inflict_threshold",
         "crit_range_mod",
-        "--BASE CRIT--"
+        "base_crit"
       ],
       "description": "You stab an opponent with an imposing, lance-like appendage. Make a melee attack roll against a target, dealing 2d8 + MOVE bug damage on a hit. This attack scores a critical hit on a natural attack roll of 16 or higher. On a critical hit, the target becomes frightened of you.",
       "moveStat": "STR/DEX",
@@ -341,7 +341,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--MULTI HIT--",
+        "multi_hit",
         "multi_hit_same_target"
       ],
       "description": "You strike a creature with sharp projectiles in quick succession. Make a ranged attack roll, doing 1d4 + MOVE bug damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, another projectile hits again for an additional 1d4 bug damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of four additional hits.",
@@ -384,7 +384,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--DAMAGE ACTIVATED BY FIRE MOVE--"
+        "damage_activated_by_fire_move"
       ],
       "description": "You coat a creature in an explosive powder, which will ignite if exposed to fire. The powder remains on the target until the target washes it off with water or spends 1 minute cleaning it off manually, but becomes neutralized after 1 hour. When this powder expodes, it automatically deals 3d10 fire damage to the creature coated by it. When a creature in range other than yourself activates a damaging fire-type move, you may use your reaction to release a spray of flammable powder that explodes as it hits either the user or a creature affected by the fire move. In the case of this move being used as a reaction, the target may attempt a Dexterity saving throw, taking half damage on a success.",
       "moveStat": "CON",
@@ -406,7 +406,7 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "--DAMAGE ACTIVATED BY FIRE MOVE--"
+        "damage_activated_by_fire_move"
       ],
       "description": "You emit a cloud of fine, explosive powder in a 20ft. radius around you, respecting physical boundaries, which will ignite on contact with fire. When this powder expodes, all creatures affected must succeed a Dexterity saving throw, taking 4d12 fire damage on a failed save, half as much on a success. After the initial use of this move, it will spread out by 5 feet per round until the cloud covers a 40ft. radius. The powder lingers in the air for 1 hour before it settles and becomes neutralized.",
       "moveStat": "CON",
@@ -487,7 +487,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "--STATUS INCREASE THRESHOLD--"
+        "status_increase_threshold"
       ],
       "description": "You strike a target with a battering wind of silver dust. Make a ranged attack roll against a creature, doing 2d8 + MOVE bug damage on a hit. On a natural roll of 19 or 20, all of your ability scores go up by 1 while you remain in battle. This move can be stacked for a maximum of +5 to all ability scores.",
       "moveStat": "DEX",
@@ -611,7 +611,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You call for allies to aid you in battle. 1d4 + MOVE non-evolved Pokémon of the same species appear within a 20ft. radius. Your allies go after you in the initiative order, and are half your level, rounded up. While in your natural habitat, gain advantage on the summoning roll. The allies will follow your command, but scatter after 5 rounds. If you are not in your natural habitat, the allies will appear as ethereal manifestations. This move may only be used once per short rest.",
       "moveStat": "CHA",
@@ -631,7 +631,7 @@
       },
       "reaction": false,
       "categories": [
-        "--INCREASE STAB--"
+        "increase_stab"
       ],
       "description": "Your tail emits a flash of light, boosting your attack. For the duration, double your STAB damage.",
       "moveStat": "None",
@@ -697,7 +697,7 @@
       "categories": [
         "damage",
         "positioning",
-        "--SWITCH--"
+        "switch"
       ],
       "description": "You lash out with a quick strike before you make a getaway. Make a melee attack, dealing 2d8 + MOVE bug damage on a hit. After this move is activated, if it is possible, you must either move up to half your movement speed away from your target, not provoking opportunity attacks, or your trainer must switch you out as a free action.",
       "moveStat": "DEX",
@@ -720,7 +720,7 @@
         "stat_buff_self",
         "counter_reaction_effect",
         "recoil",
-        "--REACTIVE SAVE--"
+        "reactive_save"
       ],
       "description": "You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successful hit against you triggers a Dexterity saving throw for you, against their move DC. On a successful save, you take half damage.",
       "moveStat": "None",
@@ -760,7 +760,7 @@
       },
       "reaction": false,
       "categories": [
-        "--MOVEMENT--"
+        "movement"
       ],
       "description": "You point at a creature in range, speaking an ancient blessing that temporarily grants them the ability to fly with a set of ethereal wings. Their flight speed becomes 30ft. for the duration.",
       "moveStat": "None",
@@ -780,7 +780,7 @@
       },
       "reaction": true,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You project a duplicate image of yourself 5 feet beside you. The image copies every move you make. When an enemy hits you with an attack, roll a d6. On a 1, the image absorbs half the damage. On a 2 or 3, the image absorbs half the damage, and you take damage to VP instead of HP. On a 4 or 5, the image absorbs all damage and allows you to teleport for half your movement speed to an unoccupied space. On a 6, the image absorbs all damage and shifts back into you, making your next attack deal double damage. Every time this move is used in the same encounter, its VP cost is doubled from its previous cost.",
       "moveStat": "None",
@@ -800,7 +800,7 @@
       },
       "reaction": false,
       "categories": [
-        "--REACTION--"
+        "reaction"
       ],
       "description": "You instantly teleport within 5ft of a light source that is in range. It happens so blindingly fast that creatures can't make opportunity attacks against you. This move can also be used as a reaction to dodge an incoming attack: When subject to an attack or AOE move, roll an Acrobatics check (DM's discretion), performing this move on a success.",
       "moveStat": "None",
@@ -822,7 +822,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You begin to focus your temporal energies. This requires concentration and uses your action and movement on each turn. After 10 rounds of concentration, you tear open the existing wound in time that you embody, creating a temporary portal in its space. The portal connects to either a random point in time in the same locatio, a location in the Sea of Dreams plane, or a point elsewhere in the current timeline within 10 miles. The portal remains open for 1 minute. Any creature that passes through faces the inherent dangers of temporal displacement. After using this ability, Temporis can't use it again for 7 days.",
       "moveStat": "None",
@@ -844,7 +844,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "While grounded, you recite the ancient vows of your sworn soldiers to the ground, calling forth a guard of Venomire to aid you. Roll 4d4, summoning that many Venomire around you. The Venomire guard are half of your level, and will vanish if defeated. They will target objectives set by you, but you do not control them directly. They can't be caught. This move may only be used once per encounter.",
       "moveStat": "None",
@@ -866,7 +866,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "While grounded, you recite the ancient vows of your sworn soldiers to the ground, calling forth a guard of Hadean to aid you. Roll 4d4, summoning that many Hadean minions around you. The Hadean guard are half of your level, and will vanish if defeated. They will target objectives set by you, but you do not control them directly. They can't be caught. This move may only be used once per encounter.",
       "moveStat": "None",
@@ -887,7 +887,7 @@
       "reaction": false,
       "categories": [
         "stat_buff_self",
-        "--ADVANTAGE ON SAVING THROWS--"
+        "advantage_on_saving_throws"
       ],
       "description": "You call upon a celestial force to come to your aid. For the duration, you have advantage on all saving throws and receive +2 to your INT and WIS stats.",
       "moveStat": "None",
@@ -909,7 +909,7 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "--VARIABLE MOVE TYPE--"
+        "variable_move_type"
       ],
       "description": "You tap into the elemental energy field around you, and release a powerful blast of concentrated elemental energy. All creatures caught in the line have to succeed a DEX saving throw or take 4d12 + MOVE damage. Roll a d20 to determine the damage type: 1: Bug 2: Dark 3: Dragon 4: Electric: 5: Fairy 6: Fighting 7: Fire 8: Flying 9: Ghost 10: Grass 11: Ground 12: Ice 13: Normal 14: Poison 15: Psychic 16: Rock 17: Steel 18: Water 19: Cosmic 20: Typeless",
       "moveStat": "Roll 1d6:\n1: STR\n2: DEX\n3: CON\n4: INT\n5: WIS\n6: CHA",
@@ -951,7 +951,7 @@
       },
       "reaction": false,
       "categories": [
-        "--ADVANTAGE ON SAVING THROWS--"
+        "advantage_on_saving_throws"
       ],
       "description": "You call upon a mystic force to come to your aid. For the duration, you have advantage on all saving throws.",
       "moveStat": "None",
@@ -972,7 +972,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL STATUS CONDITION--"
+        "potential_status_condition"
       ],
       "description": "You emit a wave of cosmic energy affecting all creatures in range, ignoring cover. Make a single ranged attack roll for all creatures, dealing 3d10 + MOVE cosmic damage to every creature hit. On a critical hit, all targets must succeed a CON save or suffer the Blink effect until the end of their next turn.",
       "moveStat": "WIS/CHA",
@@ -992,7 +992,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You surround yourself with a protective aura, granting immunity from status conditions and resistance from one random damage type for 1 minute. The resistance overrides your type. Re-roll your damage type resistance every round of the effect. Roll a d20: 1: Bug 2: Dark 3: Dragon 4: Electric: 5: Fairy 6: Fighting 7: Fire 8: Flying 9: Ghost 10: Grass 11: Ground 12: Ice 13: Normal 14: Poison 15: Psychic 16: Rock 17: Steel 18: Water 19: Cosmic 20: Your choice",
       "moveStat": "None",
@@ -1013,7 +1013,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL STATUS CONDITION--"
+        "potential_status_condition"
       ],
       "description": "You slash at an opponent in range. Make a melee attack roll against a target, dealing 2d8 + MOVE cosmic damage on a hit. The creature hit must succeed a Constitution saving throw or be affected by the Blink effect for 1 minute.",
       "moveStat": "DEX",
@@ -1099,8 +1099,8 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "--POTENTIAL PRONE--",
-        "--POTENTIAL STATUS CONDITION--"
+        "potential_prone",
+        "potential_status_condition"
       ],
       "description": "You emit a concentrated beam of gravitational energy at a target within range. Make a ranged attack, dealing 3d10 + MOVE psychic damage on a hit. The target must then make a STR saving throw, falling prone with movement speed halved for 1 minute on a failure. While under the effect of this move, the target can't leave the ground, flee or be switched out. Flying or hovering creatures fall to the ground on a hit, taking fall damage when appropriate.",
       "moveStat": "STR/DEX",
@@ -1120,7 +1120,7 @@
       },
       "reaction": false,
       "categories": [
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "You strengthen gravity in a 40 foot sphere, centered on you. Any creature in the area loses their flying/hovering speed, cannot use moves like Fly or Bounce, flying types lose their ground type resistance, and the Levitate ability is suppressed.",
       "moveStat": "None",
@@ -1141,7 +1141,7 @@
       "reaction": false,
       "categories": [
         "field_terrain",
-        "--POTENTIAL PRONE--"
+        "potential_prone"
       ],
       "description": "The user manipulates gravity in a 30-foot radius sphere centered on a point within 100 feet. The area becomes difficult terrain until the beginning of the user's next turn, and any creature that enters the area or starts its turn there must succeed on a Strength saving throw or be knocked prone.",
       "moveStat": "STR",
@@ -1185,8 +1185,8 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "--VARIABLE MOVE TYPE--",
-        "--TRIGGER SAVING THROW--",
+        "variable_move_type",
+        "trigger_saving_throw",
         "multi_hit_aoe"
       ],
       "description": "You send powerful missiles of pure energy to rain down on any creature in a 40 foot circle, centered on a point in range. All creatures caught in the area must make a DEX save against your Move DC, taking 10d12 + MOVE damage on a failure, or half as much on a success. The type of the damage depends on the kind of plate the user is holding. This move can only be used once per long rest.",
@@ -1207,8 +1207,8 @@
       },
       "reaction": false,
       "categories": [
-        "--SELF FAINT--",
-        "--FULLY HEAL NEW POKEMON--"
+        "self_faint",
+        "fully_heal_new_pokemon"
       ],
       "description": "You sacrifice yourself for another one of your trainer's Pokémon. When activating this move, the user faints, but the next creature released by its trainer is fully healed and cured of any status effects.",
       "moveStat": "None",
@@ -1251,7 +1251,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--VARIABLE MOVE TYPE--"
+        "variable_move_type"
       ],
       "description": "You channel the power to change the world in an immense barrage of energy. Make a ranged attack roll against a target within range, dealing 4d12 + MOVE damage on hit. The damage type changes to be super effective against the target.",
       "moveStat": "Any",
@@ -1271,7 +1271,7 @@
       },
       "reaction": false,
       "categories": [
-        "--MOVEMENT--"
+        "movement"
       ],
       "description": "You temporarily phase out of this plane of existence, becoming partially incorporeal. You may move up to 30ft. through solid matter. You may not end your turn inside solid matter. While phasing, you will not trigger opportunity attacks.",
       "moveStat": "None",
@@ -1291,7 +1291,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "For 1 minute, all probability within the area becomes wildly unstable. Any time a creature rolls a d20 within the area, they must roll twice and use the result chosen by Jirachi. Additionally, seemingly impossible events may occur (weapons transforming into flowers, gravity briefly reversing, etc.) at the GM's discretion. Jirachi can end this effect early as a bonus action.",
       "moveStat": "None",
@@ -1311,7 +1311,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "This move can only be activated while Black Hole is active. A new star begins forming at your core. For the next 3 turns, you regain 3d10 HP at the start of each turn. While this effect is active, you are invisible within the Black Hole. When this effect ends (or if Black Hole ends early), the darkness ignites. You regain additional HP equal to your level × 3. All creatures still inside Black Hole are pushed to the edge and must make a CON save or be blinded for 1 minute by the brilliant light. The Black Hole then ends. If you are reduced to 0 HP while this effect is active, the effect ends immediately with no final burst.",
       "moveStat": "CON",
@@ -1331,7 +1331,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "Reality becomes distorted around you in a 60ft. radius sphere. When creatures enter the distortion zone, they must succeed a Wisdom saving throw or become confused. For the duration, all creatures within the distortion must succeed a Dexterity saving throw against your move DC in order to use movement. All attack rolls against you are done with disadvantage, and yoou have advantage on saving throws while the distortion zone is active.",
       "moveStat": "WIS/CHA",
@@ -1351,7 +1351,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You attempt to manipulate the nature of ether energy in a target. Unless the target is willing, it must succeed a Wisdom saving throw against your move DC or become a random type for 1d4 turns, until the end of its last turn with the effect. Roll a d20: 1: Bug 2: Dark 3: Dragon 4: Electric: 5: Fairy 6: Fighting 7: Fire 8: Flying 9: Ghost 10: Grass 11: Ground 12: Ice 13: Normal 14: Poison 15: Psychic 16: Rock 17: Steel 18: Water 19: Cosmic 20: Your choice",
       "moveStat": "WIS",
@@ -1418,7 +1418,7 @@
         "damage",
         "stat_buff_self",
         "recharge_locked",
-        "--POTENTIAL STATUS CONDITION--",
+        "potential_status_condition",
         "multi_hit_aoe"
       ],
       "description": "You release a powerful shockwave that tears through creatures and the space around them. All creatures within range must make a CON save against your Move DC, taking 10d12 + MOVE cosmic damage on a failure, or half as much on a success. Creatures that fail this save by 5 or more become uncontrollable and are sucked into the Ethereal Plane until the beginning of your next turn, appearing in the same location when they return, suffering the Blink effect for 1 minute. This move may be used once per long rest.",
@@ -1439,7 +1439,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You absorb all light in an 80ft. radius. All creatures dependent on sight in the area are considered blind for the next round. On your next turn, you release a bright flash of cosmic energy in an 60ft. cone. All creatures hit must succeed a Dexterity saving throw or suffer 4d12 + MOVE cosmic damage and be blinded for 1 minute. On a successful save, they take half damage and are not blinded. The lighting in the area returns to normal after the release of energy.",
       "moveStat": "CON",
@@ -1459,7 +1459,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You call down a barrage of stellar energy in a 15ft. radius, 100ft. tall cylinder, centered on a point within range. All creatures within the area must succeed a Strength saving throw against your move DC, or take 10d12 + MOVE cosmic damage and be knocked prone. Creatures that fail the save are also blinded until the end of their next turn from the brilliant light. Creatures within 60ft of the impact (but outside the radius) must make a CON save or be blinded for 1 round. On a success, they take half damage and are not knocked prone. Flying or otherwise ungrounded creatures must make an additional Constitution saving throw with the same DC, falling to the ground on a failed save. The blast ignores shields and barriers, and will not be hindered by moves like Protect, though such moves may be used to gain advantage on the saving throw. The impact creates a 15ft radius crater. The area becomes difficult terrain and is 10ft lower than the surrounding ground. Creatures in the crater have disadvantage on ranged attacks against creatures outside it. This move may be used once per long rest.",
       "moveStat": "STR/WIS",
@@ -1480,8 +1480,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "You bite down with temporal force. Make an attack roll against a creature, dealing 1d10 + MOVE cosmic damage on a hit. The hit creature must succeed a Wisdom saving throw or be slowed for 1d4 rounds, moving at half speed and having disadvantage on attack rolls and saving throws. Creatures attacking a slowed target have advantage on their attack rolls.",
       "moveStat": "DEX/WIS",
@@ -1501,7 +1501,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You briefly alter the flow of time. Choose one creature within 60 feet. If the target is willing, it can immediately take an extra action. If it's unwilling, it must succeed on a Wisdom saving throw or lose its next action.",
       "moveStat": "WIS",
@@ -1521,7 +1521,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You momentarily tear open a rift in space that creates a portal that lasts for 1 + MOVE rounds. First roll 1d4 to determine rift size. Then roll a d100, with the outcome determining where the portal leads. Attempting to open a gateway to a specific location affects possible outcomes. The GM will provide you the necessary information after this. This move can only be used once per long rest.",
       "moveStat": "WIS/CHA",
@@ -1562,8 +1562,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--LETHAL FAINT--"
+        "trigger_saving_throw",
+        "lethal_faint"
       ],
       "description": "If the target is a creature, it must succeed on a Dexterity saving throw or take 4d12 MOVE + Dark damage. If this damage reduces the creature to 0 hit points, it dies.",
       "moveStat": "DEX",
@@ -1583,7 +1583,7 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "The targeted creature must succeed on a Wisdom saving throw or be frightened for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "WIS",
@@ -1647,8 +1647,8 @@
         "damage",
         "positioning",
         "recharge_locked",
-        "--POTENTIAL PRONE--",
-        "--MULTI TYPE DAMAGE--",
+        "potential_prone",
+        "multi_type_damage",
         "multi_hit_aoe"
       ],
       "description": "You create a massive wave of dark water in a 60-foot cone. Each creature in the area must make a Dexterity saving throw, taking 10d12 dark damage and 4d8 water damage on a failed save, or half as much on a successful one. Additionally, creatures that fail the save are pushed 30 feet away and knocked prone.",
@@ -1713,7 +1713,7 @@
       "reaction": false,
       "categories": [
         "steal_disrupt",
-        "--POTENTIAL STAT INCREASE--"
+        "potential_stat_increase"
       ],
       "description": "The user attempts to steal beneficial effects from a target within 30 feet. The target must succeed on a Charisma saving throw or lose all beneficial effects currently affecting it. The user gains the effects of one of these spells or effects (user's choice) for the remainder of their duration.",
       "moveStat": "CHA",
@@ -1734,8 +1734,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--CONDITIONAL DAMAGE--",
-        "--POTENTIAL DISADVANTAGE--"
+        "conditional_damage",
+        "potential_disadvantage"
       ],
       "description": "You exploit a creature's vulnerable position. Make a melee attack, dealing 1d6 + MOVE dark damage on hit. Add 1d6 for each allied creature adjacent to the target (max +4d6). If the target is completely surrounded (no empty adjacent squares), it has disadvantage on its next attack.",
       "moveStat": "STR",
@@ -1776,7 +1776,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "This move can only be activated after surviving Supernova. As a bonus action, an area in a 100ft square centered on you becomes shrouded in complete darkness for 1 minute. Creatures outside the sphere can't see or hear what's happening inside unless they have truesight. Creatures within the sphere are blind and deaf while inside. Creatures that start their turn inside the sphere take 2d8 + MOVE dark damage (no save). A creature inside the sphere must use its action to attempt to escape, making a WIS save against your Move DC. On success, it finds the edge and may use any remaining movement to exit. On failure, it moves in a random direction.",
       "moveStat": "None",
@@ -1798,7 +1798,7 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "multi_hit_aoe"
       ],
       "description": "You swing your arms around violently, attacking anything within a 5 foot circle, centered on yourself. All creatures in range must make a DEX saving throw against your Move DC, taking 3d10 + MOVE dark damage on a failure, or half as much on a success.",
@@ -1883,8 +1883,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--CANNOT USE ITEM--"
+        "trigger_saving_throw",
+        "cannot_use_item"
       ],
       "description": "You surround a creature in range with a dark aura. Force a creature to make a WIS save against your Move DC. On a failure, the target cannot gain the effect of any held item or trainer item given to it for the duration.",
       "moveStat": "WIS",
@@ -1905,7 +1905,7 @@
       "reaction": false,
       "categories": [
         "stat_debuff_enemy",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You fake a creature out with superficial tears, lowering their defenses. When activating this move, a target must make a WIS saving throw against your Move DC. On a failure, all attack rolls against the target are given a +5 bonus until the end of your next turn.",
       "moveStat": "WIS/CHA",
@@ -1926,7 +1926,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--ADVANTAGE ON ATTACK ROLL--"
+        "advantage_on_attack_roll"
       ],
       "description": "You bring a creature close and hit it with a sucker punch. Make a melee attack on a creature, always with advantage, doing 1d10 + MOVE dark damage on a hit.",
       "moveStat": "STR/DEX/CHA",
@@ -1947,7 +1947,7 @@
       "reaction": false,
       "categories": [
         "status_inflict_auto",
-        "--BOOSTED ATTACK ROLLS--"
+        "boosted_attack_rolls"
       ],
       "description": "You send mixed signals to a creature. Select a target in range. They become confused, but during this confusion, they double their proficiency bonus when making attack rolls.",
       "moveStat": "None",
@@ -1968,7 +1968,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--REMOVE ITEM--"
+        "remove_item"
       ],
       "description": "Make a ranged attack, dealing 2d6 + MOVE dark damage on hit. The item is consumed. The GM may rule additional effects based on the item thrown.",
       "moveStat": "STR/DEX",
@@ -1989,7 +1989,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--ADDTIONAL DAMAGE--"
+        "addtional_damage"
       ],
       "description": "You turn a creature's own power against it. Make a melee attack roll using your MOVE power. On a hit, the target takes 2d8 + MOVE dark damage using their own MOVE power.",
       "moveStat": "STR/WIS",
@@ -2009,8 +2009,8 @@
       },
       "reaction": false,
       "categories": [
-        "--BOOSTED ATTACK ROLLS--",
-        "--BOOSTED DAMAGE ROLLS--"
+        "boosted_attack_rolls",
+        "boosted_damage_rolls"
       ],
       "description": "You sharpen your claws to increase the power of your attacks. For the duration, add an additional +1 to your attack and damage rolls. This move may be stacked to a maximum of +3 to attack and damage rolls.",
       "moveStat": "None",
@@ -2034,7 +2034,7 @@
         "stat_buff_ally",
         "protect_negate",
         "recharge_locked",
-        "--GUARANTEED HIT--",
+        "guaranteed_hit",
         "multi_hit_choice"
       ],
       "description": "You send a barrage of three balls of furious energy at any creature(s) in range. Each ball automatically deals 3d10 dark damage to any creature(s) you choose. Reactions that negate damage such as Protect or Detect cannot be used, and creatures in the invulnerable stages of moves like Fly, Dig, etc. can be targeted by this move. After activating this move, any attacks against you, until the beginning of your next turn, are rolled at advantage. This move may be used once per short rest.",
@@ -2055,7 +2055,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "A hostile creature within range is forced to succeed a Charisma saving throw, or be charmed by you for 1 hour. The charmed creature considers you their closest friend and ally for the duration, and will do everything in its power to not harm you, and to further your goals. It still maintains loyalty towards others, turning hostile towards friends only if they threaten you. The charm will be broken if you inflict damage on the charmed creature, or if you lose concentration.",
       "moveStat": "CHA",
@@ -2076,7 +2076,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--REMOVE ITEM ON TARGET--"
+        "remove_item_on_target"
       ],
       "description": "You attempt to rid a creature of their held item for the rest of battle. Make a melee attack roll against a target. On a hit, deal 1d10 + MOVE dark damage and any held item of the target falls to the ground somewhere in the vicinity.",
       "moveStat": "DEX",
@@ -2097,8 +2097,8 @@
       "reaction": false,
       "categories": [
         "stat_buff_ally",
-        "--STATUS CONDITION--",
-        "--SELF FAINT--"
+        "status_condition",
+        "self_faint"
       ],
       "description": "You sacrifice your life force to leave a lasting mark on a target. When you activate this move, you touch a creature and drop to 0 hit points. As a result, the target is incapacitated for 2 rounds. All attacks against it have advantage, it automatically fails all STR and DEX saving throws, and it cannot attack, move, flee, or be switched out.",
       "moveStat": "None",
@@ -2118,7 +2118,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "Your eyes light up with an eerie glow to attract the attention of all creatures within 50ft. that can see your eyes. Choose a direction to be facing. Make a Wisdom or Charisma roll. All affected creatures that can see your eyes must succeed a WIS saving throw against your roll, or become focused on you for the duration. While focused, a creature has disadvantage on perception checks to detect other creatures, and is placed at the bottom of the initiative order. While focused, a creature can't move further away from you than 50ft.",
       "moveStat": "WIS/CHA",
@@ -2139,7 +2139,7 @@
       "reaction": false,
       "categories": [
         "stat_debuff_enemy",
-        "--ADVANTAGE ON ATTACK ROLL--"
+        "advantage_on_attack_roll"
       ],
       "description": "You stimulate your brain with nasty thoughts. For the duration, you have advantage on any attacks with the Wisdom move power. If the attack requires a Wisdom saving throw, the target has disadvantage.",
       "moveStat": "None",
@@ -2183,7 +2183,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "--BASE CRIT--"
+        "base_crit"
       ],
       "description": "You slash out at a creature with dark power. Make a melee attack, dealing 2d8 + MOVE dark damage on a hit. This attack scores a critical hit on natural attack rolls of 19 or 20.",
       "moveStat": "STR/DEX",
@@ -2224,7 +2224,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You deliver a brutal parting threat. Force a creature in range to make a WIS save against your Move DC. On a failure, the targets nervousness causes it to deal half damage when using a damaging moves for one minute. They may use their action to attempt to overcome their nervousness by making a WIS saving throw against your move DC. You may then move up to 30ft without provoking opportunity attacks and take a free Hide action, or switch out.",
       "moveStat": "CHA",
@@ -2245,7 +2245,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "-- POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You strike hard in retaliation. Make a melee attack, dealing 1d6 + MOVE dark damage on a hit. If the target damaged you earlier this round, double the dice roll for the damage of this attack.",
       "moveStat": "STR/DEX",
@@ -2266,7 +2266,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "-- POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You boast your strength and attack a target. Make a melee attack, doing 1d4 + MOVE dark damage on a hit. For each positive stat change affecting the user, add an additional damage dice (Focus Energy, Harden, etc.).",
       "moveStat": "STR/DEX",
@@ -2287,7 +2287,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "-- POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You send dark energy to punish a creature. Make a ranged attack against a creature, dealing 1d10 + MOVE dark damage on a hit. If the target is currently under the influence of a move or ability that boosts its attack, damage, or AC, increase the damage by 1d10 for each effect.",
       "moveStat": "STR/WIS",
@@ -2329,8 +2329,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "-- POTENTIAL INITIATIVE LOWERING --"
+        "trigger_saving_throw",
+        "potential_initiative_lowering"
       ],
       "description": "You send dark energy at a creature in range, reducing their will to fight. The target must make a WIS save against your Move DC. On a failure, it must move to the bottom of the initiative order for this round only. Targets that have already taken their turn in this round are unaffected.",
       "moveStat": "STR/WIS",
@@ -2351,8 +2351,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL DISADVANTAGE--"
+        "trigger_saving_throw",
+        "potential_disadvantage"
       ],
       "description": "You release a harsh growl at a creature, damaging their willpower. Force a creature to make a WIS save against your Move DC. On a failure, the target takes 1d10 + MOVE dark damage. If you are the target of its next attack, the attack is rolled at disadvantage.",
       "moveStat": "WIS/CHA",
@@ -2374,7 +2374,7 @@
       "categories": [
         "counter_reaction_effect",
         "steal_disrupt",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You call upon dark energy to steal an effect from a creature. When a creature in range activates a move with a positive effect on itself (curing negative status effect, boosting stats, healing, etc.), force it to make a WIS save against your Move DC. On a failure, you gain the positive effect and the target's move fails.",
       "moveStat": "DEX",
@@ -2394,7 +2394,7 @@
       },
       "reaction": true,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "When a Cosmic type move is activated within range, you may nullify all non-damaging effects from this and other Cosmic moves activated within range for one round, and for the duration count Cosmic type damage as Normal damage.",
       "moveStat": "WIS/CHA",
@@ -2435,9 +2435,9 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--REMOVE ITEM--",
-        "--REMOVE ITEM ON TARGET--"
+        "trigger_saving_throw",
+        "remove_item",
+        "remove_item_on_target"
       ],
       "description": "Your hands move with incredible speed as you attempt to switch held items with a creature. Force a creature to make a DEX save against your Move DC. On a failure, you take their held item and replace it with your own. If you do not have a held item, you simply take theirs without replacement.",
       "moveStat": "DEX",
@@ -2457,8 +2457,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--STATUS CONDITION--"
+        "trigger_saving_throw",
+        "status_condition"
       ],
       "description": "You taunt a creature to only attack you with damaging attacks. Choose a target in range and force it to make a WIS saving throw against your Move DC. On a failure, the target can only use damaging attacks that target you for the duration.",
       "moveStat": "WIS/CHA",
@@ -2480,7 +2480,7 @@
       "categories": [
         "damage",
         "steal_disrupt",
-        "--REMOVE ITEM ON TARGET--"
+        "remove_item_on_target"
       ],
       "description": "You lash out with a quick attack that may steal a creature’s held item. Make a melee attack against a creature, doing 2d8 + MOVE dark damage on a hit. If the user does not have an item held, the target must make a DEX save against your Move DC or have their item stolen by the user.",
       "moveStat": "DEX",
@@ -2501,7 +2501,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--ATTACK SUPRESSION--"
+        "attack_supression"
       ],
       "description": "You focus in on an attack at the target’s throat. Make a melee attack, dealing 1d10 + MOVE dark damage on a hit. On hit, the target is unable to activate sound based attacks for its next 1d4 turns.",
       "moveStat": "STR/DEX",
@@ -2521,7 +2521,7 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "stat_debuff_enemy"
       ],
       "description": "You unleash a dark energy that has the power to reverse the stat changes of a creature. Force a creature in range to make a CHA save against your Move DC. On a failure, any stat changes (-1 to attack, +2 to AC, etc.) currently affecting the target have the opposite effect.",
@@ -2543,8 +2543,8 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "--TRIGGER SAVING THROW--",
-        "--ATTACK SUPRESSION--"
+        "trigger_saving_throw",
+        "attack_supression"
       ],
       "description": "You send a dark energy to torment a creature in range that attacks you. When hit by a melee or ranged attack, force the target to make a WIS saving throw against your Move DC. On a failure, the target cannot use the same move that hit you on its next turn.",
       "moveStat": "DEX/WIS",
@@ -2565,8 +2565,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--ADVANTAGE ON ATTACK ROLL--",
-        "--STAT DEBUF SELF--"
+        "advantage_on_attack_roll",
+        "stat_debuf_self"
       ],
       "description": "You go all out in a flurry of dark strikes, sacrificing your defenses. Make a melee attack on an opponent, dealing 3d10 + MOVE dark damage on a hit, rolled with advantage. After activating this move, your AC is reduced by 1d4, and the target has advantage on any attack it makes against you, until the beginning of your next turn.",
       "moveStat": "DEX",
@@ -2586,7 +2586,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "Requires Reality Bend to be active. You attempt to pull in creatures in a 60ft. cone in front of you. All creatures within range must make a Wisdom saving throw with disadvantage, taking 3d10 + MOVE dark damage on a hit as well as being pulled 15ft. towards you. On a successful save, they take half damage and are not pulled towards you. Creatures that come within yoour melee range as a result of being pulled in, take double damage. You heal for half of all damage dealt.",
       "moveStat": "WIS",
@@ -2606,7 +2606,7 @@
       },
       "reaction": false,
       "categories": [
-        "--UNKNOWN--"
+        "unknown"
       ],
       "description": "You focus a surge of darkness to overpower your opponent. A rift in reality opens up beneath a creature in range, erupting with dark force. The creature must succeed a DEX saving throw, taking 4d12 + MOVE dark damage and 3d10 cosmic damage on a failure, half as much on a success. Large or smaller creatures must then succeed a Strength save or be flung up to 30 feet, landing prone. Protect or similar moves will not negate this move, but will reduce damage by half and automatically succeed the saving throw.",
       "moveStat": "STR/WIS",
@@ -2629,7 +2629,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You summon forth a meteor shower that rains down on your opponents. Choose 3 points within range. Each point has a 10ft radius impact. The points can't be the same, but the impact zones can overlap. All creatures in the impact zones must make a DEX save against your Move DC, taking 4d12 + MOVE dragon damage on a hit, or half as much on a save. If a creature is in multiple impact zones, it makes a saving throw for each zone. After activating this move, your next attack is rolled at disadvantage. If that attack requires a saving throw, the target has advantage. This move may be used once per short rest.",
       "moveStat": "STR",
@@ -2652,8 +2652,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You release a powerful breath of energy in a 40 foot cone. All targets caught in the blast must make a DEX save against your Move DC, taking 2d8 + MOVE dragon damage on a fail, and half as much on a save. If an opponent fails the save by 5 or more, it is paralyzed.",
       "moveStat": "STR/DEX",
@@ -2735,7 +2735,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You unleash a devastating flow of energy in a 100 foot long line, 5 feet wide. Each creature caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE dragon damage on a fail, and half as much on a save.",
       "moveStat": "STR",
@@ -2777,7 +2777,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW ON HIT--",
+        "trigger_saving_throw_on_hit",
         "positioning"
       ],
       "description": "You whip your dragon tail at an opponent in an attempt to send them away. Make a melee attack against a target, dealing 1d10 + MOVE dragon damage and forcing it to make a CON save against your Move DC on a hit. On a failure, the target is too frightened by you to remain in battle. In trainer battles, the target must be switched out if another creature is available. In wild battles, the target must move up to half its speed away from the user, but only attempts to flee outright if it a lower level than the user.",
@@ -2860,7 +2860,7 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "--GUARANTEED HIT--"
+        "guaranteed_hit"
       ],
       "description": "You go into a rampage, doing several attacks without control for three rounds. This move automatically hits for 2d8 + MOVE dragon damage in the first round, 4d8 + MOVE dragon damage in the second round, and 8d8 + MOVE dragon damage in the third round. When this move ends, either after the third round or from breaking concentration, you become confused. This attack stops if concentration is broken, or the user becomes incapacitated.",
       "moveStat": "STR",
@@ -2881,8 +2881,8 @@
       "reaction": false,
       "categories": [
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The user lets out a mighty roar. All creatures within 60 feet must make a Wisdom saving throw or be frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "WIS",
@@ -2923,8 +2923,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The targeted creature must succeed on a Constitution saving throw or be stunned for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "CON",
@@ -2947,8 +2947,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You send down a powerful strike of lightning from the heavens, surrounding an area of the battlefield with surging electricity. Any opponent caught in a 20 foot radius, centered on a point within range, must make a DEX save against your Move DC, taking 4d12 + MOVE electric damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it becomes paralyzed. This move can be used once per long rest.",
       "moveStat": "STR/DEX",
@@ -2989,7 +2989,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You send a beam of electric energy at an opponent that has a chance to power you up. Make a ranged attack, dealing 1d6 + MOVE electric damage on a hit. If the natural attack roll is 10 or higher and the attack hits, add your proficiency bonus to the damage.",
       "moveStat": "STR/DEX",
@@ -3012,7 +3012,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You generate a cyclone charged with lightning in a 30 foot radius around yourself. All creatures in range must make a DEX save against your Move DC, taking half damage on a success and full damage on a fail. Creatures in range that are not grounded or in the invulnerable stage of Fly or Bounce take double damage from this move. Roll a d6 on the table below to determine damage. 1: 2d6+MOVE 2-3: 3d6+MOVE 4-5: 4d6+MOVE 6: 5d6+MOVE",
       "moveStat": "STR/DEX",
@@ -3035,8 +3035,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You let loose a flare of electricity in a 10 foot radius, centered on you, striking all creatures around you. Creatures in the area must make a DEX saving throw against your Move DC. On a fail, a creature takes 2d8 + MOVE electric damage. If a creature fails the save by more than 5, it is paralyzed. This move can be used once per short rest.",
       "moveStat": "DEX",
@@ -3057,8 +3057,8 @@
       "reaction": false,
       "categories": [
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "Your body generates a strange pulsating sound that can disrupt the target's ability to attack. When you activate this move, any hostile creature within 30 feet of you must make a CON saving throw against your Move DC. On a failure, the target flinches for 1d4 rounds.",
       "moveStat": "DEX/CHA",
@@ -3099,7 +3099,7 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "steal_disrupt"
       ],
       "description": "You suddenly surge with a strange electric energy signature that transfers to your attacker. When hit by a melee attack, you may instantly use your reaction to force the attacker to make a CON save against your Move DC. On a failure, the attacking move's type is changed to electric.",
@@ -3121,7 +3121,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--CONDITIONAL DAMAGE--"
+        "conditional_damage"
       ],
       "description": "You hurl an electric orb at a target in range. Make a ranged attack roll, dealing 1d10 + MOVE electric damage on a hit. Compare the target and user's highest speed type (walking, flying, etc.). If the user's speed is higher, roll the next level tier's damage dice for this move. If the user is level 17 or higher, double the damage dice.",
       "moveStat": "DEX",
@@ -3143,7 +3143,7 @@
       "categories": [
         "damage",
         "stat_debuff_enemy",
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "You unleash an electric net of web upon a creature. Make a ranged attack roll, dealing 1d10 + MOVE electric damage on a hit, and reducing the target's speed by 5 feet. The target can use an action on its turn remove any web from its body. A target whose speed is reduced to 0 is restrained.",
       "moveStat": "STR/DEX",
@@ -3166,7 +3166,7 @@
         "damage_vp",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "drain"
       ],
       "description": "You create a field of static energy in a 15 foot radius around you, draining the vitality from nearby creatures. Force all creatures in range to attempt a CON save, losing 2d8 VP on a failure and half of that on a success. Regain half of the total amount of VP drained.",
@@ -3188,8 +3188,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You shoot a stream of pure electrical ether energy towards a creature in range. Force one creature to make a DEX save, taking 2d8 + MOVE electric damage and being paralyzed on a failure, half as much without being paralyzed on a success.",
       "moveStat": "STR/WIS",
@@ -3210,7 +3210,7 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "When hit by a melee attack, you may use this reaction to zap your attacker, forcing it to attempt a DEX save. On a failure, the VP cost is multiplied by 1d4.",
       "moveStat": "WIS/INT",
@@ -3233,8 +3233,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL DAMAGE INCREASE--"
+        "trigger_saving_throw",
+        "potential_damage_increase"
       ],
       "description": "You summon a gigantic lightning bolt that strikes down from the heavens in a 30 foot radius, centered on a point within range. All creatures caught in the blast must make a DEX save against your Move DC, taking 4d12 + MOVE electric damage on a failure, or half as much on a success. If Fusion Bolt or Fusion Flare was already used this round, double the damage dealt.",
       "moveStat": "STR",
@@ -3295,7 +3295,7 @@
       "reaction": false,
       "categories": [
         "stat_buff_ally",
-        "--SITUATIONAL USE--"
+        "situational_use"
       ],
       "description": "You use your electric energy to manipulate magnetic fields. Until the beginning of your next turn, any creature in range with the Plus or Minus ability gains a bonus to their AC equal to your proficiency modifier, and any saving throw they are forced to make is rolled with advantage.",
       "moveStat": "None",
@@ -3316,8 +3316,8 @@
       "reaction": false,
       "categories": [
         "positioning",
-        "--TRIGGER SAVING THROW--",
-        "--SITUATIONAL USE--"
+        "trigger_saving_throw",
+        "situational_use"
       ],
       "description": "The user emits a pulse of magnetic energy. Each creature that is steel type, wearing metal armor or holding a metal weapon within 30 feet must succeed on a Strength saving throw or either be pulled 15 feet toward the user, or pushed 15 feet away.",
       "moveStat": "STR",
@@ -3338,7 +3338,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW ON HIT--"
+        "trigger_saving_throw_on_hit"
       ],
       "description": "You touch a creature with your electrified cheeks, sending electricity coursing through their veins. Make an attack roll against a creature. On a hit, the target takes 1d6 + MOVE electric damage and is forced to make a CON save against your Move DC, becoming paralyzed on a failure.",
       "moveStat": "DEX",
@@ -3361,7 +3361,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "drain"
       ],
       "description": "A sweeping electric charge arcs around you, stealing some of the target's energy. Force all creatures in a 15ft radius, centered on you, to make a CON save against your Move DC, taking 3d10 + MOVE electric damage on a failure. Recover hit points equal to half the total damage dealt, but no more than 5 times your level.",
@@ -3384,7 +3384,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--GUARANTEED HIT--"
+        "guaranteed_hit"
       ],
       "description": "A burst of electric energy glides forward, striking anything in a 15 foot cone. This move is guaranteed to hit all creatures caught in the wave for 1d4 + MOVE electric damage, unless during the invulnerable stage of Fly, Dig, Bounce, Dive, etc. moves.",
       "moveStat": "DEX",
@@ -3428,7 +3428,7 @@
         "protect_negate",
         "counter_reaction_effect",
         "status_inflict_threshold",
-        "--GUARANTEED HIT--",
+        "guaranteed_hit",
         "recharge_locked"
       ],
       "description": "You may use this reaction when a creature lands an attack against you, and has rolled for damage. You supercharge parts of your body, creating a force field that reflects incoming attacks. You take no damage from the triggering attack. Make an attack roll, dealing half of the damage that you would have sustained on a hit as electric damage. Of the attack you're reflecting is ranged, you roll with disadvantage. On a natural roll of 15 or higher, the opponent is paralyzed. A natural 20 will guarantee a hit, but will not be a critical hit.",
@@ -3452,8 +3452,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--VARIABLE MOVE TYPE--"
+        "trigger_saving_throw",
+        "variable_move_type"
       ],
       "description": "You create strong winds that hurl electrified water droplets at an incredible speed in an 80ft. line, 5 feet wide. Announce if you intend to deal electric or water damage. All creatures caught in the line is forced to make a DEX save against your move DC, taking 2d8 MOVE + electric OR water damage on a failure. This move can only be used while it is raining.",
       "moveStat": "STR/DEX",
@@ -3476,8 +3476,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "Powerful electric energy arcs out from you, hitting any creature in a 20 foot radius, centered on you. Creatures caught in the area must make a DEX save against your Move DC, taking 3d10 + MOVE electric damage on a fail, and half as much on a success. Creatures that fail the saving throw by 5 or more become paralyzed. In heavy rain or storms, you may center this move on a point within 60ft instead of on yourself.",
       "moveStat": "STR/DEX",
@@ -3559,8 +3559,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You send a wave of electric energy that surrounds a creature in range. The target must make a CON save against your Move DC or become paralyzed.",
       "moveStat": "STR/DEX",
@@ -3727,8 +3727,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The targeted creature must succeed on a Wisdom saving throw or be charmed by the beholder for 1 hour, or until the beholder harms the creature.",
       "moveStat": "WIS",
@@ -3749,8 +3749,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--LETHAL FAINT--"
+        "trigger_saving_throw",
+        "lethal_faint"
       ],
       "description": "You emit a thin, extremely high energy beam at a target. If the target is a creature, it must succeed on a Dexterity saving throw or take 4d12 MOVE + Fairy damage. If this damage reduces the creature to 0 hit points, its body becomes a pile of fine gray dust.",
       "moveStat": "DEX",
@@ -3792,7 +3792,7 @@
       "reaction": false,
       "categories": [
         "stat_buff_self",
-        "--SITUATIONAL USE--"
+        "situational_use"
       ],
       "description": "You channel energy from ancient artifacts to enhance your combat prowess. If an ancient artifact is within range and you know it is there, add double your proficiency bonus to attack and damage rolls.",
       "moveStat": "None",
@@ -3833,7 +3833,7 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "stat_debuff_enemy"
       ],
       "description": "You attempt to charm an opponent, sharply decreasing its attack. A target you choose in range must make a WIS save against your Move DC. On a fail, the target adds -2 to all attacks against you for the duration.",
@@ -3854,8 +3854,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You attempt to charm a humanoid you can see within range. It must make a Wisdom saving throw, and does so with advantage if you or your companions are fighting it. If it fails the saving throw, it is charmed by you until the spell ends or until you or your companions do anything harmful to it. The charmed creature regards you as a friendly acquaintance. When the spell ends, the creature knows it was charmed by you.",
       "moveStat": "None",
@@ -3920,9 +3920,9 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
-        "--VARIABLE MOVE TYPE--"
+        "trigger_saving_throw",
+        "potential_status_condition",
+        "variable_move_type"
       ],
       "description": "You may only use while your current hit points are above 75% of your maximum. Your form transforms into pure ether for an instant as you let out a massive burst of energy. All creatures in a 60ft. radius must succeed a Charisma saving throw, or take 4d12 + MOVE damage of any type, and be stunned for one round. The type of damage is determined by you. This move does not benefit from STAB even if your type aligns with the type of damage dealt. On a successful save, they take half damage and are not stunned. This move costs VP equal to your current HP. After using this move, you drop to 1 hit point and are not able to use attack moves or be recalled until the end of your next turn. This move may be used once per long rest.",
       "moveStat": "CHA",
@@ -3945,7 +3945,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You emit a powerful flash that damages all creatures in range. Creatures within 20 feet of you must make a CON save against your Move DC, taking 2d8 + MOVE fairy damage on a failure, or half as much on a success.",
       "moveStat": "DEX/CHA",
@@ -3966,8 +3966,8 @@
       "reaction": false,
       "categories": [
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The user creates a dazzling display of lights. All creatures within a 30-foot cone must succeed on a Constitution saving throw or be blinded until the end of the user's next turn.",
       "moveStat": "CON",
@@ -4008,7 +4008,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--GUARANTEED HIT--"
+        "guaranteed_hit"
       ],
       "description": "You let out a charming cry, dealing emotional damage to any opponent in range that can hear you. This move automatically hits for 1d4 + MOVE fairy damage unless a creature is in the invulnerable stages of Fly, Dig, Bounce, etc.",
       "moveStat": "CHA",
@@ -4111,8 +4111,8 @@
       "reaction": false,
       "categories": [
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL DISADVANTAGE--"
+        "trigger_saving_throw",
+        "potential_disadvantage"
       ],
       "description": "You release a cloud of shimmering scales in a 15ft. cone. All affected creatures must succeed a DEX saving throw or have disadvantage on their attack rolls until the end of their next turn.",
       "moveStat": "DEX",
@@ -4154,7 +4154,7 @@
       },
       "reaction": false,
       "categories": [
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "You smell the aroma of a creature within melee range, sending you into a ravenous frenzy. Make a melee attack, grappling and restraining the creature on a hit. On your next turn, if you kept your concentration, you swallow the creature whole. While inside you, the creature is incapacitated. If you faint, you regurgitate all swallowed creatures from this encounter. This move only works on creatures smaller than you.",
       "moveStat": "STR/DEX/CON",
@@ -4177,8 +4177,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You unleash a beam of energy in a 80 foot line, 5 feet wide. All creatures in its path must make a DEX save against your Move DC, taking 3d10 + MOVE fairy damage on a failure, or half as much on a success. Creatures failing the save by 5 or more are blinded until the end of their next turn. After activating this move, your next attack is rolled at disadvantage. If the next attack requires a saving throw, the target(s) gain advantage.",
       "moveStat": "WIS/CHA",
@@ -4219,7 +4219,7 @@
       "reaction": false,
       "categories": [
         "stat_buff_ally",
-        "--SITUATIONAL USE--"
+        "situational_use"
       ],
       "description": "Large flowers sprout from any grass-type allies in range, boosting their defense. For one minute, as long as you keep your concentration, grass-type allies in a 15 foot circle, centered on you, gain +2 to their AC.",
       "moveStat": "None",
@@ -4240,7 +4240,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL STAT INCREASE--"
+        "potential_stat_increase"
       ],
       "description": "You lash out with the power of the forest. Make a ranged attack roll against a creature, doing 3d10 + MOVE fairy damage on a hit. On a natural attack roll of 15 or higher, all of your ability scores go up by 1 while you remain in battle. This move can be stacked for a maximum of +5 to all ability scores.",
       "moveStat": "STR/DEX/WIS",
@@ -4300,7 +4300,7 @@
       },
       "reaction": false,
       "categories": [
-        "--SITUATIONAL USE--"
+        "situational_use"
       ],
       "description": "You turn your held item into gold, increasing its value but otherwise making it unusable in battle. The value of your item is up to the DM's discretion.",
       "moveStat": "None",
@@ -4324,7 +4324,7 @@
         "heal_target_or_aoe",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You exhale a cone of shimmering energy that damages enemies and heals allies. All affected hostile creatures must succeed a WIS saving throw or take 3d10 + MOVE fairy damage. Allied creatures caught in the blast heal for half the amount rolled + MOVE.",
       "moveStat": "WIS/CHA",
@@ -4367,7 +4367,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "recoil"
       ],
       "description": "You draw forth a powerful natural essence, concentrating it into a beam of light 80ft long and 5 feet wide. All creatures caught in the blast must make DEX saving throw against your Move DC, taking 4d12 + MOVE fairy damage on a failure, or half as much on a success. The user takes recoil damage equal to half the damage rolled.",
@@ -4391,8 +4391,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_choice",
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "You hurl glowing spikes at up to three targets in range. Make three ranged attacks, dealing 3d10 + MOVE fairy damage on a hit. On a hit, the target needs to make a Constitution saving throw, or become drowsy for 1d4 minutes. While drowsy, the creature suffers disadvantage on saving throws and attack rolls, and other creatures have advantage on saving throws induced by this Pokémon. At the end of the drowsiness, the creature falls unconscious for 1d12 hours. For the duration, the creature can't be awakened by normal means unless it completes a long rest. They are, however, considered asleep, and can be damaged by Bad Dreams, Dream Eater or similar moves.",
       "moveStat": "STR/DEX/WIS",
@@ -4414,8 +4414,8 @@
       "categories": [
         "counter_reaction_effect",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL DISADVANTAGE--"
+        "trigger_saving_throw",
+        "potential_disadvantage"
       ],
       "description": "When you are the target of an attack, you may use your reaction to emit a mesmerizing light pattern in a 30ft. radius. All creatures in range must make a Wisdom saving throw, suffering disadvantage on attack rolls against you until the beginning of your next turn. Then, roll a d10. On a 9 or 10, you regain your reaction.",
       "moveStat": "WIS",
@@ -4435,7 +4435,7 @@
       },
       "reaction": false,
       "categories": [
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "A sinister, yet weirdly tangy, marinara mist descends on a creature in range. Make a ranged attack roll, gaining temporary control of the creature's senses on a hit. At the start of the creature's turn, you announce how you confuse its senses and how it responds. The red mist dissipates after 1 minute, or if the affected creature is healed of all status conditions by any means.",
       "moveStat": "None",
@@ -4456,8 +4456,8 @@
       "reaction": false,
       "categories": [
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The user performs a captivating dance. All creatures within 30 feet that can see the user must succeed on a Wisdom saving throw or be charmed for 1 minute. While charmed, the creature's speed is zero. The creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "WIS",
@@ -4539,8 +4539,8 @@
       "reaction": false,
       "categories": [
         "drain",
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "You grab a creature and attempt a mystical waltz that drains its vitality. Make a melee attack, grappling and restraining the creature on a hit. The target must then succeed a WIS saving throw or become charmed by you. For three turns, or until you lose concentration, you are locked in a dance that as your action drains the target of 2d8 VP each turn. You regain half of the VP drained as HP. The target may use its action to attempt to break free from your grapple on its turn, unless it is charmed. You may use your action to stop dancing on your turn. After the dance ends, the charm persists until it is broken.",
       "moveStat": "None",
@@ -4580,7 +4580,7 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "fixed_special_damage"
       ],
       "description": "You harness all the power of nature and send it at a creature in range. The target must make a CON save against your Move DC. On a failed save, the target loses half their current HP (minimum of 1 damage). This move consumes VP equal to the HP lost by the target.",
@@ -4601,8 +4601,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "After landing an attack, you may extend your noodly appendage to touch the creature hit as a bonus action. The creature is forced to make a WIS save against your move power on a hit, becoming confused and charmed if the save fails. On a fumble, the creature is stunned.",
       "moveStat": "WIS/INT/CHA",
@@ -4624,7 +4624,7 @@
       "categories": [
         "positioning",
         "recharge_locked",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You disappear from view and reappear at an unoccupied point within range, having opened a portal between the two spots. In wild creature battles, this move can be activated to automatically count as a single success in a group DEX check to run away. The portal lingers for 3 turns. Any creature except you attempting to pass through the portal must succeed a DEX save, or be subjected to the move Crunch. Only one pair of portals may be active at any time.",
       "moveStat": "None",
@@ -4713,8 +4713,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You sing an ancient song that damages creatures in range with the chance to put them asleep. Any creature in a 20ft circle, centered on you, must make a CON save against your Move DC, taking 3d10 + MOVE fairy damage on a failure, or half as much ona success. Any creature that fails the save by 5 or more is put to sleep.",
       "moveStat": "CHA/WIS",
@@ -4734,8 +4734,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You sing a hauntingly beautiful song that can be heard in a 5 mile radius. Affected creatures have to make a save against your move DC, their minds being captured by you on a failure. You then fall asleep, entering the Dreamscape with your captives.",
       "moveStat": "WIS/CHA",
@@ -4755,8 +4755,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You lay a kiss on a creature, attempting to confuse them. The target must make an CHA saving throw against your Move DC or become confused.",
       "moveStat": "WIS/CHA",
@@ -4797,7 +4797,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You create a magical contract between two willing or unwilling creatures. If either breaks an agreed condition, they take 1d12 + MOVE fairy damage, ignoring immunity but not resistance. If this move is used on unwilling creatures, they must succeed Charisma saving throws to resist the contract.",
       "moveStat": "CHA",
@@ -4818,7 +4818,7 @@
       "reaction": false,
       "categories": [
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "stat_debuff_enemy"
       ],
       "description": "You call upon the whispers of the forest to aid you, disorienting and disheartening opponents in range. For the duration, all creatures within 50 feet of you, that have the intention to harm you, are forced to make a WIS save. On a failure, they suffer -5 to hit this turn. On a natural roll of 1, they become frightened as well. Deaf creatures are unaffected by this move.",
@@ -4861,7 +4861,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--GUARANTEED HIT--"
+        "guaranteed_hit"
       ],
       "description": "You focus your aura into a concentrated blast that strikes an opponent in range. This move is guaranteed to hit for 1d10 + MOVE fighting damage, except when targeting an opponent in the invulnerable stages of Fly, Dig, Bounce, etc.",
       "moveStat": "STR/DEX/WIS",
@@ -4922,8 +4922,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition",
         "positioning",
         "recharge_locked"
       ],
@@ -4967,7 +4967,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--STAT DEBUF SELF--"
+        "stat_debuf_self"
       ],
       "description": "You get in close for a devastating strike, sacrificing your defenses. Make a melee attack on an opponent, dealing 3d10 + MOVE fighting damage on a hit, rolled with advantage. After activating this move, your AC is reduced by 1d4, and the target has advantage on any attack it makes against you, until the beginning of your next turn.",
       "moveStat": "STR",
@@ -5113,8 +5113,8 @@
       "reaction": false,
       "categories": [
         "fixed_special_damage",
-        "--GUARANTEED HIT--",
-        "--SELF FAINT--"
+        "guaranteed_hit",
+        "self_faint"
       ],
       "description": "You risk everything and use your own life force to damage a creature in range. The target takes an amount of fighting damage equal to your remaining HP and VP. This damage ignores resistance and immunity to fighting type. You then faint and gain 3 levels of exhaustion.",
       "moveStat": "None",
@@ -5135,7 +5135,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--VARIABLE MOVE TYPE--"
+        "variable_move_type"
       ],
       "description": "You dive at a creature with quick reaction speed, able to change the type of attack when you reach them. Make a melee attack against a target, dealing 2d8 + MOVE flying OR fighting damage, depending on your choice. STAB can only added to this move if its type is fighting.",
       "moveStat": "STR/DEX",
@@ -5218,7 +5218,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--STAT DEBUF SELF--"
+        "stat_debuf_self"
       ],
       "description": "You put all your power into a strong and heavy fist attack. Make a melee attack, dealing 3d8 + MOVE fighting damage on a hit. Until the end of your next turn, you have disadvantage on all DEX saves and your speed is halved.",
       "moveStat": "STR",
@@ -5239,7 +5239,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL PRONE--"
+        "potential_prone"
       ],
       "description": "You fiercely attack the target using your entire body. Make a melee attack, dealing 2d8 + MOVE fighting damage on a hit, and if the target is your size or smaller, it is knocked prone.",
       "moveStat": "STR",
@@ -5324,8 +5324,8 @@
       "categories": [
         "damage",
         "crit_range_mod",
-        "--ADVANTAGE ON ATTACK ROLL--",
-        "--SITUATIONAL USE--"
+        "advantage_on_attack_roll",
+        "situational_use"
       ],
       "description": "Requires below 50% HP to activate. Make a melee attack dealing 4d12 + MOVE fighting damage. This attack has advantage and scores a critical hit on 18-20.",
       "moveStat": "STR/DEX",
@@ -5347,7 +5347,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "--POTENTIAL PRONE--"
+        "potential_prone"
       ],
       "description": "You kick out at a creature’s lower half, dealing damage and attempting to knock it off balance. Make a melee attack, doing 1d6 + MOVE fighting damage on a hit. If the natural attack roll is 19 or 20, the target falls prone and flinches.",
       "moveStat": "STR/DEX",
@@ -5431,7 +5431,7 @@
       "reaction": false,
       "categories": [
         "stat_buff_self",
-        "--SITUATIONAL USE--"
+        "situational_use"
       ],
       "description": "As a bonus action, you resolve to stay in the fight until the bitter end. You gain +2 AC, STR, DEX, CON, WIS, INT, and CHA, as well as 5+ Speed for the rest of the encounter. Until the end of this encounter, you may not flee or be switched out. At the end of this round, move to the top of the initiative order. This move can only be used once per encounter.",
       "moveStat": "None",
@@ -5473,7 +5473,7 @@
       "reaction": true,
       "categories": [
         "protect_negate",
-        "--SITUATIONAL USE--"
+        "situational_use"
       ],
       "description": "You have the ability to rush to the aid of an ally at the start of combat. If an ally in range (or you) is attacked on the very first turn of the very first round of combat, you may use your reaction to negate any damage dealt.",
       "moveStat": "None",
@@ -5659,7 +5659,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--BASE CRIT--"
+        "base_crit"
       ],
       "description": "You strike a target with a perfectly placed blow. Make a melee attack dealing 2d8 + MOVE fighting damage on hit. This attack is always a critical hit. If the target is immune to critical hits, the attack deals normal damage instead.",
       "moveStat": "STR",
@@ -5702,7 +5702,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--STAT DEBUF SELF--"
+        "stat_debuf_self"
       ],
       "description": "You strike a target with incredible power. Make a melee attack against a creature, dealing 3d10 + MOVE fighting damage on a hit. This move exhausts you; your STR and DEX ability scores are set to 10 until the end of your next turn.",
       "moveStat": "STR/DEX",
@@ -5765,7 +5765,7 @@
       "categories": [
         "damage",
         "fixed_special_damage",
-        "--GUARANTEED HIT--"
+        "guaranteed_hit"
       ],
       "description": "You wind up a slow but unstoppable strike. This move always goes last in the initiative order. Make an attack that automatically hits a creature in melee range, dealing 1d10 + MOVE fighting damage. If you are grappling the target, double the damage dice for this move.",
       "moveStat": "STR",
@@ -5809,8 +5809,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL PRONE--"
+        "trigger_saving_throw_on_hit",
+        "potential_prone"
       ],
       "description": "You strike with force that shatters the ground. Make a melee attack dealing 4d12 + MOVE fighting damage. On hit, all creatures within 10ft of the target (except you) must make a DEX save or take 2d12 ground damage and be knocked prone.",
       "moveStat": "STR/DEX",
@@ -5832,7 +5832,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "recharge_locked"
       ],
       "description": "Explosive projectiles rain down upon your opponents in a 10 foot radius, centered on a point within range. Any creature caught in the blast must succeed on a DEX save against your Move DC or take 4d12 + MOVE fire damage on a fail and half as much on a success. This move saps you of energy, and you may not make any attack until after the end of your next turn.",
@@ -5877,8 +5877,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You unleash an intense and beautiful line of blue flames in a 50 foot line, 5 feet wide. All creatures caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE fire damage and being burned on a failure, or half as much without being burned on a success.",
@@ -5923,7 +5923,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "--POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You let out a stream of primordial purple flames at a target in range. Make a ranged attack roll, dealing 4d12 + MOVE fire damage on a hit. The target must then roll a d4. On a result of 1-2, the target suffers one level of exhaustion. With each subsequent hit to the same target during one combat, add 1d12 cosmic damage to the damage roll.",
       "moveStat": "WIS",
@@ -5944,8 +5944,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--GUARANTEED HIT--",
-        "--TRIGGER SAVING THROW--"
+        "guaranteed_hit",
+        "trigger_saving_throw"
       ],
       "description": "You hurl a ball of peculiar flames at a point on the ground within range. A 5ft. diameter flame that casts shadows instead of light burns 5ft. tall in this spot until the beginning of your next turn, doing 2d8 + Move fire damage to any creature occupying the space at the beginning of their turn. Additionally, the creature must succeed a WIS saving throw, or take 2d8 + MOVE dark damage as well on a failed save.",
       "moveStat": "STR/DEX",
@@ -5967,8 +5967,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recoil",
         "recharge_locked"
       ],
@@ -5992,8 +5992,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You spend one turn drawing in air, readying your attack. Next turn, you let out a stream of intense flames in a line 5 feet wide, creating an explosion with a radius of 10 feet on the first creature hit. All creatures caught in the explosion must make a CON save against your move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. If a creature fails the roll by 5 or more, it is burned.",
@@ -6037,8 +6037,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL DAMAGE INCREASE--",
+        "trigger_saving_throw",
+        "potential_damage_increase",
         "recharge_locked"
       ],
       "description": "You spew hot magma in a 15 foot cone. Any creature caught in the blast must make a DEX saving throw against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success. If you are at full health when activating this move, double your STAB bonus when dealing damage, and roll damage with advantage.",
@@ -6081,7 +6081,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "recharge_locked"
       ],
       "description": "You dance and kick up a blaze, sending flames in a 15 foot circle, centered on you. Anyone caught in the blaze must make a DEX save against your Move DC, taking 2d8 + MOVE fire damage on a failure, or half as much on a success. If a creature fails the save by 5 or more, double the MOVE modifier when adding damage. This move may be used once per short rest.",
@@ -6104,8 +6104,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "Two pillars of raging hot flames explode out from you towards up to two creatures in range. The creature(s) targeted must succeed on a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success. Creatures that fail the save by 5 or more become burned.",
@@ -6148,7 +6148,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW ON HIT--",
+        "trigger_saving_throw_on_hit",
         "stat_buff_ally"
       ],
       "description": "You strike out at a target in range with a burning lash, Make a melee attack on a creature, doing 2d8 + MOVE fire damage. On a successful attack, the targeted creature must make a CON save against your Move DC. On a fail, allies add +1 to any attack targeted at the creature for the duration. This modifier can be stacked if it fails multiple Fire Lash saves, up to a maximum of +5.",
@@ -6252,7 +6252,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You release a fireball that explodes on contact. Choose a point in range. Any creature within 5 feet of that point must make a DEX save against your Move DC, taking 1d10 + MOVE fire damage on a hit, or half as much on a success.",
       "moveStat": "STR/DEX",
@@ -6295,7 +6295,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "recharge_locked"
       ],
       "description": "A wheel of flame explodes out from you in a 10 foot radius. All creature in the area must succeed on a DEX save against your Move DC, taking 1d10 + MOVE fire damage on a fail and half as much on a save. If the user is frozen, this move can still be used, thawing out the creature during the attack. This move can be used once per short rest.",
@@ -6318,8 +6318,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You shoot a stream of flames in an 40 foot cone. All creatures caught in the cone must succeed on a DEX save against your Move DC, taking 2d8 + MOVE fire damage on a failure, or half damage on a success. Any creature that fails the save by 5 or more becomes burned.",
@@ -6364,7 +6364,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "fixed_special_damage",
         "recharge_locked"
       ],
@@ -6408,8 +6408,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You exhale a wave of hot breath in a 15ft. cone. Creatures caught in the area must make a DEX save against your Move DC, taking 2d8 + MOVE fire damage on failure, or half as much on a success. If the creature fails the save by 5 or more, it is burned.",
@@ -6431,7 +6431,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--BERRY CHECK--"
+        "berry_check"
       ],
       "description": "You summon forth a burning hot flame that surrounds a creature. Make a ranged attack, dealing 1d10 + MOVE fire damage on a hit. On a hit, if the target is holding a berry, it is immediately burned to ash, becoming unusable.",
       "moveStat": "STR/DEX",
@@ -6453,8 +6453,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "Your body flares up into a fireball looking like a flaming eye, shooting a stream of fire in an 80ft. line. All creatures caught in the line must succeed on a DEX save against your Move DC or take 3d10 + MOVE fire damage and be burned on a failure, or half as much without being burned on a success.",
@@ -6498,7 +6498,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "positioning",
         "recharge_locked"
       ],
@@ -6522,8 +6522,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You summon forth a plume of raging hot fire in a 10 foot radius, 40-feet tall cylinder, centered on a point within range. Creatures in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a failure and become burned, or half as much without becoming burned on a success. You may spend additional VP to gain extra height for this attack, 4VP for 1d10 extra height, to a maximum of extra height dice equal to your proficiency bonus.",
@@ -6546,7 +6546,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You stir up a maelstrom of fire in a 20ft radius, 15ft tall, centered on a point within range, that continues to rage as long as you hold your concentration. Any creature that enters this area for the first time on their turn, or is in that area at the beginning of their turn must make a CON save against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success.",
       "moveStat": "STR",
@@ -6568,8 +6568,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--STAT DEBUF SELF--",
+        "trigger_saving_throw",
+        "stat_debuf_self",
         "recharge_locked"
       ],
       "description": "You summon forth a flaming meateor shower that rains down on your opponents. All creatures in a 10 foot radius, centered on a point within range, must take a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a hit, or half as much on a save. After activating this move, your next attack is rolled at disadvantage. If that attack requires a saving throw, the target has advantage.",
@@ -6613,8 +6613,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--STAT DEBUF SELF--",
+        "trigger_saving_throw",
+        "stat_debuf_self",
         "recharge_locked"
       ],
       "description": "With a roar, flames burst from your body in a 15 foot radius, centered on you. Any creature in range must roll a DEX saving throw against your Move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. The power of the move exhausts you, and your next attack is done at disadvantage. If your next attack requires a creature saving throw, they have advantage. This move can be used once per short rest.",
@@ -6637,7 +6637,7 @@
       "categories": [
         "damage_vp",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "stat_debuff_enemy",
         "recharge_locked"
       ],
@@ -6703,8 +6703,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "Searing hot flames lick out at creatures in a 10 foot circle, centered on you. Any creature in range must make a DEX save against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success. If a target fails the save by 5 or more, it is burned. This move can be used once per short rest.",
@@ -6727,7 +6727,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "counter_reaction_effect"
       ],
       "description": "You set a shell trap that explodes in a 5ft radius. As a bonus action on the initial activation of this move, you set a trap on yourself. Only one trap may be set at a time. When you are hit by an attack, you can use a reaction to detonate the trap. Creatures within 5 feet of you must succeed on a DEX save against your Move DC, rolling at disadvantage, taking 3d10 + MOVE fire damage on a failure, or half as much on a success.",
@@ -6750,8 +6750,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "A magic lens appears between your horns, amplifying the rays of the sun for one turn. On your next turn, the sunlight is focused into an intense and beautiful line of white light in a 50 foot line, 5 feet wide. Any creature caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. If a creature fails the save by more than 5, they are burned and blinded for three turns. In strong sunlight, this move does not need charging. In darkness, this move costs 10VP extra.",
       "moveStat": "STR/INT",
@@ -6811,8 +6811,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You begin to glow white hot. When you activate this move, you may immediately release the blast at 30ft radius, or continue charging. On each subsequent turn, you may use your action to release or continue charging. The blast automatically releases on Turn 3. Activation (Turn 1): 30ft radius Turn 2: 60ft radius Turn 3: 100ft radius (auto-release) While charging, creatures within the current radius must spend double movement to move away from you. When released (or if you are reduced to 0 HP while charging), all creatures in range must make a Constitution saving throw, taking 10d12 + MOVE fire damage on a failure, or half on a success. Creatures that fail are deafened for 1 minute; creatures that succeed are deafened for 3 rounds. After the explosion, make a DC 18 Constitution saving throw. On a failure, you faint and are stable. If the blast triggered from reaching 0 HP, you automatically fail this save. This move can only be used once per long rest.",
@@ -6834,7 +6834,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--STAT DEBUF SELF--"
+        "stat_debuf_self"
       ],
       "description": "Your forehead burns like hot coals as you slam your head into a creature. Make a melee attack roll, dealing 4d12 + MOVE fire damage on a hit. After activating this move, your AC decreases by 2 until the beginning of your next turn. Until your next long rest, each use of this move after the first doubles the current AC debuff.",
       "moveStat": "STR/DEX",
@@ -6854,7 +6854,7 @@
       },
       "reaction": false,
       "categories": [
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "You scatter small burning eyes that trace a creature after a successful hit. For the duration, moves you execute may originate from the Watchful Embers. The creature affected may use their action to attempt a WIS save against your move DC to get rid of the Watchful Embers on the beginning of their turn.",
       "moveStat": "None",
@@ -6915,7 +6915,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--GUARANTEED HIT--"
+        "guaranteed_hit"
       ],
       "description": "You dive at an opponent with such speed that it is impossible for them to avoid. This move is guaranteed to hit for 1d10 + MOVE flying damage, unless during the invulnerable stage of Fly, Dig, Bounce, Dive, etc. moves.",
       "moveStat": "DEX",
@@ -6957,7 +6957,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "recharge_locked"
       ],
       "description": "You shoot out a powerful vortex of air that shreds through opponents. All creatures caught in a 50 foot line, 5 feet wide, must make a DEX save against your Move DC, taking 2d8 + MOVE flying damage on a fail, and half as much on a save.",
@@ -7022,8 +7022,8 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition",
         "recoil"
       ],
       "description": "You may fly up to 30ft without provoking attacks of opportunity as part of your movement this turn. Then, drop towards a creature in range. Make an attack roll against your target, dealing 3d10 + MOVE flying or ground damage on a hit. On a natural attack roll of 19 or higher, the target must succeed a Dexterity saving throw or have their AC reduced by 2 until the end of their next turn. This effect triggers on lower numbers, and the saving throw DC is increased by 1 for every 10ft. of height above 10ft. dropped during the attack. On a natural 20 attack roll, this move does maximum damage and the saving throw always fails. On a miss, you take fall damage appropriate to the height dropped.",
@@ -7150,8 +7150,8 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "--ADVANTAGE ON ATTACK ROLL--",
-        "--POTENTIAL PRONE--",
+        "advantage_on_attack_roll",
+        "potential_prone",
         "recharge_locked"
       ],
       "description": "While in the air, you dive at a creature in range, ignoring your flying speed and any opportunity attacks you may incur. Make a melee attack roll, doing 3d10 + MOVE flying damage on a hit. You always have advantage when using this move. On a natural roll of 19 or 20, the target is knocked prone.",
@@ -7172,7 +7172,7 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "stat_debuff_enemy"
       ],
       "description": "You distract a creature in range with a beautiful dance. The target must make a WIS saving throw against your Move DC. On a fail, the target cannot add proficiency to its attack rolls for the duration.",
@@ -7195,7 +7195,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "recharge_locked"
       ],
       "description": "You let loose a flurry of razor sharp feathers in a 15 foot cone. All creatures caught in the flurry are forced to make a DEX save against your move DC, taking 2d8 + MOVE flying damage on a failure, and half as much on a success.",
@@ -7218,7 +7218,7 @@
       "categories": [
         "damage",
         "protect_negate",
-        "--ADVANTAGE ON ATTACK ROLL--"
+        "advantage_on_attack_roll"
       ],
       "description": "You fly high into the air to prepare for a dive bomb attack. When you activate this move, you flap your wings and disappear into the Ethereal plane above you. You cannot be targeted by attacks while you are in the Ethereal plane. On your next turn, you use your action to reappear and make a diving melee attack on a creature in range, with advantage, dealing 2d8 + MOVE flying damage on a successful hit.",
       "moveStat": "STR/DEX",
@@ -7302,8 +7302,8 @@
       "categories": [
         "stat_buff_self",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--",
+        "trigger_saving_throw",
+        "potential_status_condition",
         "recoil",
         "recharge_locked"
       ],
@@ -7385,7 +7385,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--BERRY CHECK--"
+        "berry_check"
       ],
       "description": "You peck at a target, attempting to grab their held berry. Make a melee attack on a creature, dealing 1d10 + MOVE flying damage on a hit. On a hit, if the target is holding a berry, you swallow it immediately and gain its effect.",
       "moveStat": "DEX",
@@ -7406,7 +7406,7 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "--STAT DEBUF SELF--"
+        "stat_debuf_self"
       ],
       "description": "You land on the ground to rest your body. Regain 2d8 + MOVE hit points, but become grounded and lose your ground-type resistance until the beginning of your next turn. You can't move after activating this move on the same turn.",
       "moveStat": "CON",
@@ -7427,7 +7427,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "stat_debuff_enemy"
       ],
       "description": "When you use this move, you flap your wings menacingly and prepare to strike a creature within range. On your next turn’s action, if you keep your concentration, you dive at a creature in range, ignoring your flying speed and any opportunity attacks you may incur. Your target is forced to succeed a DEX save, taking 3d10 + MOVE flying damage and have disadvantage on attacks against you until the end of its next turn on a failure, half as much on a success.",
@@ -9590,7 +9590,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You strike the ground so hard that it ripples outcfrom you in a 15 foot radius. All grounded creatures caught in the area must make a DEX save against your Move DC, taking 2d8 + MOVE ground damage on a failure.",
       "moveStat": "STR",
@@ -9614,8 +9614,8 @@
         "field_terrain",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You slam into the ground with immense force, creating tremors that break the ground in a 100ft. radius centered on you. All grounded creatures within the affected area must succeed a STR saving throw or take 10d12 + MOVE ground damage and are knocked prone. On a success, they take half damage and are not knocked prone. After doing this move, you must succeed a DC 20 CON saving throw, or become incapacitated for 1 round while recovering. The ground becomes difficult rocky terrain, and in a 15ft. radius centered on you, the ground becomes hazardous difficult terrain, dealing 2d6 typeless damage to creatures attempting to move through it. This move can be used once per long rest.",
       "moveStat": "STR",
@@ -9636,7 +9636,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--ADVANTAGE ON ATTACK ROLL--"
+        "advantage_on_attack_roll"
       ],
       "description": "Your Pokémon burrows underground, disappearing from view before striking from underneath a foe. When you activate this move, you burrow underground and remain there until your next turn. During this time, you cannot be the target of any attack. On your next turn, make a melee attack on a creature in range, with advantage, doing 1d10 + MOVE ground damage on a successful hit. If the target has Tremorsense, the attack is not rolled with advantage.",
       "moveStat": "STR/DEX",
@@ -9657,7 +9657,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--BASE CRIT--"
+        "base_crit"
       ],
       "description": "You crash into an opponent, spinning your body like a drill. Make a melee attack, dealing 1d10 + MOVE ground damage on a hit. This attack scores a critical hit on 19s and 20s.",
       "moveStat": "STR/DEX",
@@ -9702,8 +9702,8 @@
         "field_terrain",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You create a tremor in the ground in a 10 foot radius, centered on you. Each grounded creature in the area must succeed on a DEX save against your Move DC, or take 3d12 + MOVE ground damage and be knocked prone. On a success, they take half as much damage and are not knocked prone. The area becomes difficult terrain.",
       "moveStat": "STR",
@@ -9744,8 +9744,8 @@
       "reaction": false,
       "categories": [
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You project an ancient light, engulfing creatures in a 15 foot cone. Up to two creatures caught in the light are forced to attempt a CON save, becoming petrified on a failure.",
       "moveStat": "None",
@@ -9768,8 +9768,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You gather in the natural energy of the land around you and focus it into a sudden eruption of earth in a 40ft. radius, centered on a point within range. All grounded creatures caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. Creatures that fail the save have their speed halved until the end of their next turn as the ground clings to them.",
       "moveStat": "STR",
@@ -9792,7 +9792,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You shake the ground with an earth-shattering quake. All creature in range must make a DEX save against your Move DC, taking half damage on a success and full damage on a fail. Creatures in range that are burrowed or in the invulnerable stage of Dig take double damage from this move. Roll a d100 on the table below to determine damage. 1-5: 1d4+MOVE 6-15: 1d8+MOVE 16-35: 1d10+MOVE 36-65: 1d12+MOVE 66-85: 2d6+MOVE 86-95: 2d8+MOVE 96-100: 2d12+MOVE",
       "moveStat": "STR",
@@ -9813,8 +9813,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL DISADVANTAGE--"
+        "trigger_saving_throw_on_hit",
+        "potential_disadvantage"
       ],
       "description": "You throw a hard-packed mud ball at a creature. Make a ranged attack, dealing 1d10 + MOVE ground damage on a hit. On a hit, the target must make a CON save against your Move DC. On a failure, the target has disadvantage on its next attack roll. If activating a move that requires a save, the target(s) have advantage.",
       "moveStat": "STR/DEX",
@@ -9919,8 +9919,8 @@
       "reaction": false,
       "categories": [
         "field_terrain",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The user creates a 20-foot-radius area of quicksand centered on a point within 60 feet. The area becomes difficult terrain, and any creature that enters the area or starts its turn there must succeed on a Strength saving throw or be restrained until the end of its next turn.",
       "moveStat": "STR",
@@ -9960,7 +9960,7 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
+        "trigger_saving_throw",
         "stat_debuff_enemy"
       ],
       "description": "You kick up a cloud of sand in an attempt to blind a target in range. The target must make a CON save against your Move DC. On a fail, for the remainder of the encounter, they add -1 to all of their attack rolls. This move can be stacked for a maximum of -5 to attack rolls.",
@@ -10003,8 +10003,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You attempt to summon a wave of sand that surrounds the target. Force a creature in range to make a STR saving throw against your Move DC, taking 1d10 + MOVE ground damage and becoming restrained on a failure, or half as much without being restrained on a success. If it fails, at the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a creature is restrained, you may continue this move, as an action, to deal an automatic 1d10 + MOVE ground damage.",
       "moveStat": "STR",
@@ -10046,7 +10046,7 @@
       "categories": [
         "damage",
         "field_terrain",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You scatter spikes across a 15ft radius area centered on a point within 60ft. The area becomes hazardous terrain for 1 minute. When a creature enters the area or starts its turn there, it takes 1d6 + MOVE ground damage (DEX save for half). A creature can only take this damage once per turn.",
       "moveStat": "STR/DEX",
@@ -10067,7 +10067,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "Driven by frustration, you aggressively attack. Make a melee attack, dealing 2d8 + MOVE ground damage on a hit. If your last attack missed, double the dice roll for damage.",
       "moveStat": "STR",
@@ -10090,8 +10090,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You summon forth a volley of green arrows to pierce creatures in range. All creatures in a 30ft. radius, centered on a point within range, must succeed a DEX save, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. This move ignores any immunities to ground type. Any creature that fails the saving throw falls to the ground and is now grounded until the end of your next turn. Grounded creatures are susceptible to ground-based moves, regardless of their type or ability.",
       "moveStat": "DEX/WIS",
@@ -10114,8 +10114,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "A wave of green energy courses through the battlefield in a 60 foot cone, centered on you. All creatures caught in the wave must make a DEX save against your Move DC, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. Any creature that fails the saving throw cannot flee or be switched out as long as you remain in battle.",
       "moveStat": "DEX/WIS",
@@ -10137,8 +10137,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You create a 40 foot line of freezing ice, 5 feet wide. All creatures caught in the line must succeed a DEX save or take 1d10 + MOVE ice damage. Failing by 5 or more causes a creature to freeze.",
       "moveStat": "STR/DEX",
@@ -10179,7 +10179,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You send forth a heap of powerful snow to pummel an opponent. Make a ranged attack on a target, dealing 1d10 + MOVE ice damage on a hit. If the target has dealt any damage to you since the end of your last turn, double the damage you deal.",
       "moveStat": "STR",
@@ -10202,8 +10202,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "Icy clouds form overhead and pelt the ground with hail and snow, centered on a point you choose within range. Each creature within a 20 foot radius must make a Dexterity saving throw against your Move DC, taking 3d10 + MOVE ice damage on a failed save, or half as much on a successful one. Targets that fail the save by 5 or more become frozen.",
       "moveStat": "STR/DEX",
@@ -10241,7 +10241,7 @@
       },
       "reaction": false,
       "categories": [
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "After landing a melee attack, you may use a bonus action to activate this move. Ice cold tentacles wrap around the creature, attempting to freeze it solid. Make a melee attack roll, freezing the creature on a success. On a critical hit, this move is one hit KO.",
       "moveStat": "DEX/WIS",
@@ -10306,7 +10306,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You blow a gust of freezing cold air in a 15ft cone. Creatures caught in the cone must succeed a DEX save or take 1d10 + MOVE ice damage on a hit. Failing the save by 5 or more causes critical damage.",
       "moveStat": "CON/DEX",
@@ -10329,8 +10329,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You spend one turn drawing in air, readying your attack. Next turn, you let out a stream of intense icy energy in a line 5 feet wide, creating a blizzard with a radius of 10 feet centered on the first creature hit. All creatures caught in the blizzard must make a CON save against your move DC, taking 4d12 + MOVE ice damage on a failure, or half as much on a success. If the save is failed by 5 or more, the target is frozen.",
       "moveStat": "STR/DEX",
@@ -10350,8 +10350,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The user creates icy restraints on a target within 30 feet. The target must succeed on a Strength saving throw or be restrained for 1 minute. At the end of each of its turns, the target can repeat the saving throw, ending the effect on itself on a success.",
       "moveStat": "STR",
@@ -10373,7 +10373,7 @@
       "categories": [
         "damage",
         "stat_debuff_enemy",
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "You blow a wind of freezing cold air at a creature in range. Make a ranged attack roll, dealing 1d10 + MOVE ice damage on a hit. On a hit, reduce the target's speed by 5 feet. A target reduced to a speed of 0 in this manner becomes frozen. The target may use an action at any time (before becoming frozen) to warm its body, resetting its speed.",
       "moveStat": "DEX",
@@ -10434,7 +10434,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You summon a rock-hard ball of ice that continues to pummel a creature. When you activate this move, make a ranged attack on a target in range, doing 1d6 + MOVE ice damage on a hit. If you continue to use this move on consecutive turns, double the dice roll for damage each time you hit. The multiplier maxes out at 8x the original damage. For each consecutive use of this move, increase the VP cost by 1. The damage and VP cost reset if any of the attacks fail to damage a creature, if your speed is reduced to 0, or if you are incapacitated.",
       "moveStat": "STR/DEX",
@@ -10457,8 +10457,8 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You create a 80 foot line of freezing ice, 5 feet wide. All creatures caught in the line must succeed on a DEX save against your Move DC or take 2d8 + MOVE ice damage and be frozen on a failure, or half as much without being frozen on a success.",
       "moveStat": "STR/DEX",
@@ -10480,8 +10480,8 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "When you use this move, you charge up an intense power within your body. On your next turn’s action, if you keep your concentration, you unleash an ultracold, freezing wind in a 30 foot circle all around you. Anyone caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE ice damage on a failure, or half as much on a success. If any creature fails the save by 5 or more, it is burned.",
       "moveStat": "STR/DEX",
@@ -10585,8 +10585,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You generate a row of icicles that crash down on top of a creature in range. The target must succeed a DEX saving throw against your move DC, taking 1d10 + MOVE ice damage on a hit. If the saving throw fails by 5 or more, the target flinches.",
       "moveStat": "DEX",
@@ -10669,8 +10669,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "All ice type allies within 40ft. may use their reaction to move up to half their movement speed without provoking opportunity attacks. Each ally creates a 5ft. wide trail of extreme cold. Any creature that starts its turn inside a trail, or crosses it during, must make a Constitution saving throw, taking 2d8 + MOVE ice damage and being slowed until the end of their next turn. The trail lasts until the beginning of the user's next turn.",
       "moveStat": "DEX",
@@ -10731,8 +10731,8 @@
       "categories": [
         "damage",
         "field_terrain",
-        "--TRIGGER SAVING THROW--",
-        "--CONDITIONAL DAMAGE--"
+        "trigger_saving_throw",
+        "conditional_damage"
       ],
       "description": "You cause rapid evaporative cooling to happen around a single target in range. Make a ranged attack, dealing 2d8 + MOVE ice damage. On a hit, this move triggers different effects based on the temperature of the surrounding environment: - In hot environments: Double the dice for the damage roll. - In temperate environments: Target must succeed a Constitution saving throw or have their speed halved until the end of their next turn. - In cold environments: Creates a 10ft. radius of difficult terrain as moisture instantly freezes.",
       "moveStat": "DEX",
@@ -17068,8 +17068,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The targeted creature must make a Dexterity saving throw. On a failed save, the creature begins to turn to stone and is restrained. It must repeat the saving throw at the end of its next turn. On a success, the effect ends. On a failure, the creature is petrified for 1 minute.",
       "moveStat": "DEX",
@@ -17090,7 +17090,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL STAT INCREASE--"
+        "potential_stat_increase"
       ],
       "description": "You lash out with unknown inner power. Make a melee attack roll against a creature, doing 1d10 + MOVE rock damage on a hit. On a natural attack roll of 19 or 20, all of your ability scores go up by 1 while you remain in battle. This move can be stacked for a maximum of +5 to all ability scores.",
       "moveStat": "STR/DEX/WIS",
@@ -17113,7 +17113,7 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "You hurl a cloud of sharp crystals that damages all creatures in range. Creatures within 20 feet of you must make a CON save against your Move DC, taking 2d8 + MOVE rock damage on a failure, or half as much on a success.",
       "moveStat": "STR/DEX",
@@ -17154,8 +17154,8 @@
       },
       "reaction": false,
       "categories": [
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The user fixes its gaze on one creature within 30 feet. The target must succeed on a Constitution saving throw or be restrained as it begins to turn to stone. At the end of its next turn, the target must repeat the saving throw. On a success, the effect ends. On a failure, the creature is petrified for 1 minute.",
       "moveStat": "CON",
@@ -17237,8 +17237,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "Large boulders appear above a target creature in range, crashing down on top of it. The target must make a DEX save against your Move DC, taking 3d10 + MOVE rock damage and falling prone on a failed save, and half as much without falling prone on a success. Creatures that succeed the save by 5 or more dodge the attack entirely. The target gains advantage on the saving throw if this move is used consecutively.",
       "moveStat": "STR",
@@ -17279,8 +17279,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You summon a collection of boulders that attempt to surround a target. Force a creature in range to make a STR saving throw against your Move DC, taking 1d10 + MOVE rock damage and becoming restrained on a failure, or half as much without being restrained on a success. If it fails, at the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a creature is restrained, you may continue this move, as an action, to deal an automatic 1d10 + MOVE rock damage.",
       "moveStat": "STR",
@@ -17302,7 +17302,7 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "--STATUS CONDITION--"
+        "status_condition"
       ],
       "description": "You summon a huge boulder and launch it at a target in range. Make a ranged attack, dealing 4d12 + MOVE rock damage and be knocked prone on a hit. If this move hits, any creature standing within 5ft. of the target must succeed a DEX saving throw or take half of the damage rolled and be knocked prone. This move saps you of energy, and you may not make any attack until after the end of your next turn.",
       "moveStat": "STR",
@@ -17323,7 +17323,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--POTENTIAL DAMAGE INCREASE--"
+        "potential_damage_increase"
       ],
       "description": "You roll into a target, repeatedly making attacks with increasing strength. Make a melee attack on a creature, dealing 1d6 + MOVE rock damage on a hit. If you use this move on your turn in consecutive rounds, double the dice on each successful attack for a maximum of 5 attacks, in which case the damage would reset. For each consecutive use of this move, increase the VP cost by 1. The damage and VP cost reset if any of the attacks fail to damage a creature, if your speed is reduced to 0, or if you are incapacitated.",
       "moveStat": "STR",
@@ -17364,8 +17364,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--STATUS CONDITION--",
-        "--CONDITIONAL DAMAGE--"
+        "status_condition",
+        "conditional_damage"
       ],
       "description": "You throw a solid piece of stone at a creature in an attempt to bring them to the ground. Make a ranged attack, dealing 1d10 + MOVE rock damage on a hit. On a hit, the target is knocked prone, losing any flying speed and immunity to ground-type moves until the end of your next turn. If the target was in the air, it falls to the ground, taking 1d6 fall damage per 10 feet fallen, to a maximum of 20d6.",
       "moveStat": "STR",
@@ -17407,7 +17407,7 @@
       "categories": [
         "damage",
         "multi_hit_aoe",
-        "--TRIGGER SAVING THROW--"
+        "trigger_saving_throw"
       ],
       "description": "The earth moves beneath a target’s feet as sharp stone pierce through the ground underneath them. Creatures in a 10 foot radius centered on a point you choose in range must make a DEX save against your MOVE DC, taking 2d8 + MOVE rock damage on a fail, or half as much on a save.",
       "moveStat": "STR",
@@ -17428,8 +17428,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "--TRIGGER SAVING THROW ON HIT--",
-        "--POTENTIAL STATUS CONDITION--"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "You bite down on an opponent in an attempt to swallow it. Make a melee attack against a creature, doing 3d10 + MOVE rock damage on a hit. If the creature is smaller than you, it has to make a DEX save against your move DC. On a failure, you swallow it, and it is considered grappled and restrained. At the start of the swallowed creature's turns, it takes 1d12 rock damage. On its turn, it may attempt to free itself by succeeding a STR contest against your CON, with disadvantage. If you lose half or more of your current HP in a single turn while having swallowed a creature, you must succeed a DC15 CON save, or have to spit out the swallowed creature.",
       "moveStat": "STR/DEX",

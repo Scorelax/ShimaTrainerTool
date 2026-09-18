@@ -10752,7 +10752,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "The targeted creature must succeed on a Wisdom saving throw or fall asleep and remain unconscious for 1 minute. The target awakens if it takes damage or another creature takes an action to wake it. This ray has no effect on Steel- and Ghost-types.",
       "moveStat": "WIS",
@@ -10772,7 +10773,6 @@
       },
       "reaction": false,
       "categories": [
-        "crit_range_mod",
         "stat_buff_self"
       ],
       "description": "You apply pressure to different stress points on your body, boosting a random ability for the duration. When activating this move, roll a d6 and gain the following boost based on the result. When activated on subsequent turns, any previous effect ends. 1: +1 to attack rolls. 2: +2 to damage rolls. 3: +10 temporary HP. 4: +1 to saving throws. 5: Critical Hit range +1 6: +1 to Armor Class",
@@ -10792,7 +10792,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "As a bonus action, choose an ally or opponent in range that has not yet taken its turn in the current round. The target must immediately take its turn now, and return to normal initiative order in the next round.",
       "moveStat": "None",
       "vpCost": "4",
@@ -10810,7 +10812,9 @@
         "varies": true
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You call upon the help of another active Pokémon in your party. When activating this Move, another player may immediately take an action in place of your own, if you have not already taken an action this turn.",
       "moveStat": "None",
       "vpCost": "2",
@@ -10829,9 +10833,9 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_self",
-        "stat_debuff_enemy",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "trigger_saving_throw",
+        "stat_debuff_enemy"
       ],
       "description": "As a reaction, when dealt damage by an attack, you may force the attacker to make a WIS save against your Move DC. On a fail, the creature must roll the damage again and use the lower result.",
       "moveStat": "CHA",
@@ -10872,7 +10876,7 @@
       },
       "reaction": false,
       "categories": [
-        "positioning"
+        "switch"
       ],
       "description": "As a bonus action, you may switch a Pokémon out with another Pokémon, passing along all negative status effects or stat changes to the new Pokémon. This includes existing substitutes, critical hit bonuses, AC increases, etc.",
       "moveStat": "None",
@@ -10935,7 +10939,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "damage",
+        "conditional_damage"
+      ],
       "description": "You embrace the damage done to you, waiting for your time to strike. Use your attack action to activate this move, and keep track of all damage done to you before your next turn. On your next turn, you lash out at an enemy with a normal ranged attack, striking them for double the amount of damage you took on a successful hit. At 10th Level, you can choose to hold Bide for a second turn for the chance to add additional damage to the attack.",
       "moveStat": "STR/DEX",
       "vpCost": "1",
@@ -10955,7 +10962,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "status_inflict_auto"
       ],
       "description": "You attempt to grapple a target into submission. Make a melee attack roll. On a hit, the target takes 1d4 + MOVE normal damage and is grappled and restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a Pokémon is grappled, you may continue this move, as a bonus action, to do an automatic 1d4 normal damage without having to make an attack roll.",
       "moveStat": "STR",
@@ -10975,7 +10982,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "The user emits an intense burst of light. All creatures within a 30-foot cone must succeed on a Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "CON",
@@ -10995,8 +11004,8 @@
       },
       "reaction": true,
       "categories": [
-        "positioning",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "positioning"
       ],
       "description": "If an opponent within range attempts to flee or switch out, you may use your reaction to stop it dead in its tracks, keeping this from happening.",
       "moveStat": "None",
@@ -11016,7 +11025,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "trigger_saving_throw_on_hit",
+        "potential_prone"
       ],
       "description": "You thrust yourself towards an opponent in an attempt to crush them with your physical size. Make a melee attack on a target. On a hit, the target takes 2d8 + MOVE normal damage, and must succeed on a STR saving throw against your Move DC or be knocked prone.",
       "moveStat": "STR",
@@ -11037,6 +11048,9 @@
       "reaction": false,
       "categories": [
         "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You generate a powerful shock wave. Any opponent caught in a 40 foot radius, centered on you, must make a CON save against your Move DC, taking 3d10 + MOVE normal damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it becomes deafened for 1 minute.",
@@ -11057,7 +11071,8 @@
       },
       "reaction": false,
       "categories": [
-        "field_terrain"
+        "stat_buff_self",
+        "situational_use"
       ],
       "description": "You blend in with your surroundings, taking on a new type for resistances/vulnerabilities/immunities. The type is dependent on the terrain, and up to the DMs discretion. (Ex: Forest = Grass, Beach = Water, Desert = Ground/Fire, Mountain = Rock, etc.)",
       "moveStat": "None",
@@ -11077,9 +11092,9 @@
       },
       "reaction": true,
       "categories": [
-        "status_inflict_save",
         "counter_reaction_effect",
-        "steal_disrupt"
+        "trigger_saving_throw",
+        "protect_negate"
       ],
       "description": "You attempt to charm an opponent into pulling its punches. When hit by an attack from an opponent, you may use a reaction to force it to make a WIS save against your Move DC. On a failure, the attack does not hit.",
       "moveStat": "WIS/CHA",
@@ -11099,8 +11114,8 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_ally",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "advantage_on_attack_roll"
       ],
       "description": "On a successful takedown of an opponent by an ally within 5ft. of you, you may use one reaction to cheer on your ally. Both of you gain advantage on your next attack roll.",
       "moveStat": "None",
@@ -11161,7 +11176,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You whisper an untold secret into the mind of an opponent in range. The target must make a WIS save against your Move DC, becoming confused on a failure.",
       "moveStat": "WIS/CHA",
@@ -11182,7 +11198,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "status_inflict_auto"
       ],
       "description": "You wrap yourself around an enemy Pokémon, trying to squeeze the life from them. Make a melee attack roll. On a hit, the target takes 1d10 + MOVE normal damage and is grappled and restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. As long as the target is restrained on your subsequent turns, this move can be activated again as a bonus action with an automatic hit, dealing 1d10 normal damage.",
       "moveStat": "STR",
@@ -11201,7 +11217,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self"
+      ],
       "description": "Your Pokémon takes on a new type for resistances/vulnerabilities/immunities, equal to one of the types of a move it currently knows for the duration.",
       "moveStat": "None",
       "vpCost": "3",
@@ -11220,9 +11238,8 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_self",
-        "protect_negate",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "stat_buff_self"
       ],
       "description": "After taking damage from an attack, You may use your reaction to change your Pokémon type to one of your choice that is resistant or immune to the type of move used against you for the duration.",
       "moveStat": "None",
@@ -11241,7 +11258,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You mimic a target that acted just before you. When activating this move, you use the identical move of the creature whose turn came immediately before yours.",
       "moveStat": "None",
       "vpCost": "5",
@@ -11261,7 +11280,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "steal_disrupt"
+        "steal_disrupt",
+        "remove_item_on_target"
       ],
       "description": "You strike out with quick and sticky hands. Make a melee attack roll against an opponent, doing 1d10 + MOVE normal damage on a hit. On a successful attack, you steal the opponents held item if you are not currently holding one.",
       "moveStat": "DEX",
@@ -11282,7 +11302,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "status_inflict_threshold",
+        "status_increase_threshold"
       ],
       "description": "You strike out with powerful claws. Make a melee attack roll against an opponent, doing 2d8 + MOVE normal damage on a hit. If the natural attack roll is 15 or more, your next attack on the same target gets an additional +1 to hit.",
       "moveStat": "STR",
@@ -11302,7 +11323,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "conditional_damage"
       ],
       "description": "You clasp your hands around an opponent for a crushing blow. Make a melee attack against a target, dealing 2d10 + MOVE normal damage on a hit. If the target is above 50% of its maximum health, add your proficiency bonus to the damage roll.",
       "moveStat": "STR",
@@ -11323,8 +11345,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "You lash out at an enemy with vine or claw or blade. Make a melee roll on an enemy, doing 1d6 + MOVE on a successful hit. This move scores a critical hit on a natural attack roll of 19 or more.",
       "moveStat": "STR/DEX",
@@ -11363,7 +11385,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "attack_supression"
+      ],
       "description": "You attempt to disable a Pokémon, hindering its abilities. Choose a target in range. The target must succeed on a WIS saving throw against your Move DC. On a fail, choose one of the opponent's known moves, that you know it knows. This move is now disabled.",
       "moveStat": "CHA/WIS",
       "vpCost": "3",
@@ -11403,7 +11428,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_combined_roll"
       ],
       "description": "You lash out quickly with two strikes. Make two melee attacks, dealing 1d10 + MOVE on each hit.",
       "moveStat": "STR/DEX",
@@ -11443,7 +11469,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You create a duplicate image of yourself, 5 feet beside you. The image copies every move you make. When an enemy hits you with an attack, roll a d4. On a 3 or 4, the image takes all the damage for you and disappears. Enemies with Truesight bypass the effect of this move.",
       "moveStat": "None",
       "vpCost": "6",
@@ -11462,7 +11490,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "recoil"
       ],
       "description": "You commit a massive attack against an opponent. Make a melee attack against a target, doing 3d8 + MOVE normal damage on a hit, but taking a quarter of the total damage (rounded down) in recoil.",
       "moveStat": "STR/DEX",
@@ -11482,7 +11511,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "potential_damage_increase"
       ],
       "description": "You release a shout that echoes across the battlefield towards an opponent. Make a ranged attack, dealing 3d10 + MOVE normal damage on a hit. Until the beginning of your next turn, if any other creature in range uses this move, they may double their damage dice on a hit. This multiplier can continue to stack to a maximum of 8x the damage dice, resetting if any of the attacks miss.",
       "moveStat": "WIS/CHA",
@@ -11502,7 +11532,10 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "The user lets out a piercing screech. Each creature within 30 feet must make a Constitution saving throw. On a failure, a creature takes 2d6 + MOVE normal damage and is deafened for 1 minute. On a success, it takes half damage and isn't deafened.",
       "moveStat": "CON",
@@ -11542,7 +11575,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "stat_buff_self",
+        "potential_damage_increase"
       ],
       "description": "The user channels elemental energy. Roll a d20 to determine the energy type. The user gains resistance to that damage type for 1 minute and their next damaging move deals an extra 2d6 damage of that type.",
       "moveStat": "None",
@@ -11562,7 +11596,9 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "trigger_saving_throw",
+        "attack_supression"
       ],
       "description": "After being targeted by a move, force a creature to make a WIS save against your Move DC as a reaction. On a fail, the target can only use the move that targeted you for its next turn.",
       "moveStat": "WIS/CHA",
@@ -11582,7 +11618,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_debuff_enemy"
+        "trigger_saving_throw",
+        "fixed_special_damage"
       ],
       "description": "When you activate this move, select a creature in range. the target must make a WIS saving throw against your Move DC. On a failure, the target’s current HP reduced to be equal to your own. This move can not be used in the first round of combat.",
       "moveStat": "WIS/CON",
@@ -11602,7 +11639,8 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "protect_negate"
       ],
       "description": "When damaged by an attack that would otherwise cause you to faint, you may instead fall to 1HP on the first instance of this reaction. On future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful.",
       "moveStat": "None",
@@ -11621,7 +11659,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self",
+        "stat_buff_ally",
+        "advantage_on_saving_throws"
+      ],
       "description": "You enter a formation with 5 creatures of large size or smaller, that each are within 5 feet of the next. While in formation, all creatures gain advantage on Strength saves, and AC is increased by 2. To maintain formation, everyone's movement is held until the Formation Leader moves the entire formation, unless an individual wants to break it. This effect will not stack. The formation breaks if a gap is created between individuals.",
       "moveStat": "None",
       "vpCost": "5",
@@ -11639,7 +11681,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "steal_disrupt"
+      ],
       "description": "You dance with a strange rhythm that causes a creature to mimic you. Choose a target in range and force them to make a WIS save against your Move DC. On a failure, choose one of their abilities to replace with one of your own for the duration.",
       "moveStat": "WIS/CHA",
       "vpCost": "3",
@@ -11657,7 +11702,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "lethal_faint"
+      ],
       "description": "You create a sphere of energy that packs a concentrated and devastating explosion. Choose a target within range and roll a d20. On a 20, the explosion goes off and all creature within 5 feet of that point faint. On any other roll, the explosion fails to go off and this move has no effect. If the target's level is 10 more than your own, this move automatically fails. This move may only be attempted once per long rest.",
       "moveStat": "None",
       "vpCost": "20",
@@ -11676,7 +11723,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "movement"
       ],
       "description": "You rush to attack with incredible speed. As a bonus action, you can immediately move up to 15ft and make a melee attack against a creature in range without taking an attack of opportunity, doing 2d8 normal damage on a hit. After a successful hit you may move up to 15ft without incurring opportunity attacks.",
       "moveStat": "DEX",
@@ -11695,7 +11743,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You unleash up to three eye rays. Roll a d6 to determine VP cost, and how many eye ray attacks you can perform. 1-2: One ray 3-4: Two rays 5-6: Three rays The rays are fired at random (reroll duplicates).",
       "moveStat": "None",
       "vpCost": "5 + 1d6",
@@ -11715,7 +11765,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "conditional_damage"
       ],
       "description": "You strike out at a creature with revenge. Make a melee attack roll against a target, dealing 2d8 + MOVE normal damage on a hit. If you are poisoned, paralyzed, or burned, double the dice for the damage.",
       "moveStat": "STR/DEX",
@@ -11735,7 +11785,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "situational_use",
+        "status_inflict_auto"
       ],
       "description": "This move goes first in the initiative order, and is only usable in the first round you are in a combat. You will need to announce it at the beginning of the round. Make a melee attack on a creature, doing 2d8 + MOVE normal damage on a hit, causing the target to flinch.",
       "moveStat": "STR/DEX",
@@ -11756,8 +11808,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_ally",
-        "stat_debuff_enemy"
+        "fixed_special_damage"
       ],
       "description": "You swipe at a creature but hold back power slightly. Make a melee attack against a creature, doing 2d8 + MOVE normal damage on a hit. If this attack would normally cause a creature to faint, it is reduced to 1HP instead. On a critical hit, the target becomes dazed, reducing capture DC by 20 until the beginning of your next turn.",
       "moveStat": "STR/DEX",
@@ -11776,7 +11827,10 @@
         "varies": false
       },
       "reaction": true,
-      "categories": [],
+      "categories": [
+        "counter_reaction_effect",
+        "protect_negate"
+      ],
       "description": "When a creature you are targeting declares it will use Protect, Detect, or similar protective move in response, you may use your reaction to activate Feint. Your attack bypasses the protection and resolves normally, and the target gets half the VP for the protection move refunded.",
       "moveStat": "DEX",
       "vpCost": "10",
@@ -11796,8 +11850,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "fixed_special_damage"
+        "conditional_damage"
       ],
       "description": "You flail about with a wild strike that increases in power the more injured you are. Make a melee attack roll against a creature, doing 1d10 + MOVE normal damage on a hit. If you are below 50% of your maximum health, double the damage. If you are at 10% or below of your maximum health, triple the damage. The multiplier for this attack occurs before the multiplier for resistances or vulnerabilities.",
       "moveStat": "STR/DEX",
@@ -11817,8 +11870,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You emit an immense flash of light in a 20 foot radius circle, centered on you. Creatures in the area must make a CON save against your Move DC. On a fail, they are blinded until the end of their next turn. Outside of combat, this move can be used to light a dim area.",
       "moveStat": "CON",
@@ -11838,7 +11892,8 @@
       },
       "reaction": false,
       "categories": [
-        "crit_range_mod"
+        "crit_range_mod",
+        "stat_buff_self"
       ],
       "description": "You sacrifice your action to focus in on the energy inside you. For the duration, increase your critical range by 1 (From 20 to 19+ , from 19+ to 18+, etc.). This move is stackable up to a maximum of +5 to the critical hit range (15+).",
       "moveStat": "None",
@@ -11857,7 +11912,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
+      ],
       "description": "You entice all enemies to attack you. All enemies within must succeed a WIS saving throw, or their ranged and melee attacks must target you until the beginning of your next turn.",
       "moveStat": "CHA",
       "vpCost": "1",
@@ -11875,7 +11934,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self"
+      ],
       "description": "You grant yourself a brief but incredible sixth sense. On the next ghost-, normal-, or fighting-type move you activate, ignore any immunities of the target creature(s) granted by their Pokémon type. If the target’s secondary type gives it vulnerability or resistance to the attack, it follows the secondary type for that effect.",
       "moveStat": "None",
       "vpCost": "4",
@@ -11895,7 +11956,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "conditional_damage"
       ],
       "description": "You lash out at a creature, venting your frustration at your trainer. Make a melee attack roll against a creature, doing 1d10 + MOVE normal damage on a hit When you make this attack, add an additional bonus to hit and damage equal to the number of levels you are below zero on the Loyalty Chart.",
       "moveStat": "STR",
@@ -11958,7 +12019,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
         "recharge_locked"
       ],
       "description": "You charge at a creature with every ounce of your power. Make a melee attack, dealing 4d12 + MOVE normal damage on a hit. You can't use this move consecutively.",
@@ -11979,8 +12039,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You stare into the depths of a creature’s eyes with intense ferocity. The creature must make a WIS saving throw against your Move DC or become paralyzed. A creature that succeeds on this saving throw is unaffected by future attempts during this combat.",
       "moveStat": "WIS/CHA",
@@ -11999,7 +12059,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "stat_debuff_enemy"
+      ],
       "description": "You target a creature with an intimidating growl. The creature must make a WIS save against your Move DC. On a fail, it adds -1 to any attack it makes for the duration. This modifier can be stacked if it fails multiple growl saves, up to a maximum of -5.",
       "moveStat": "CHA/STR",
       "vpCost": "1",
@@ -12017,7 +12080,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self",
+        "stat_buff_ally"
+      ],
       "description": "You increase the size of a target. When you use this move, a creature in range (or you) grows slightly larger, gaining the ability to add a d4 to any attack roll or saving throw for the duration.",
       "moveStat": "None",
       "vpCost": "1",
@@ -12035,7 +12101,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "lethal_faint"
+      ],
       "description": "You are filled with an incredible rage, grabbing the head of a target creature in an attempt to squeeze the life from it. Roll a d20. On a 20, you instantly cause the creature to faint. On any other roll, this move has no effect. If the target's level is 10 more than your own, this move automatically fails.",
       "moveStat": "None",
       "vpCost": "8",
@@ -12072,7 +12140,6 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
         "stat_buff_self"
       ],
       "description": "You increase your defense, able to reduce incoming damage. After activating this move, reduce any damage dealt to you by 1d4 + MOVE until the beginning of your next turn.",
@@ -12094,7 +12161,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "recoil"
       ],
       "description": "You lower your head and charge at a creature. Make a melee attack. On a hit, you deal 3d8 + MOVE normal damage, taking a quarter of the total damage (rounded down) in typeless recoil.",
       "moveStat": "STR",
@@ -12134,7 +12201,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "heal_target_or_aoe"
+      ],
       "description": "You ring a bell that chimes beautifully across the battlefield. All active allied creature in a 60ft circle, centered on you, are healed of their negative status effects.",
       "moveStat": "None",
       "vpCost": "10",
@@ -12153,7 +12222,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_ally"
       ],
       "description": "You can use a bonus action on your turn to choose one ally other than yourself within 60 feet of you who can hear you. That ally can add a d6 to one ability check, attack roll, or saving throw it makes within the next 10 minutes, before the result of the roll is called by the DM. An ally being helped can only have one d6 available at a time.",
       "moveStat": "None",
@@ -12174,8 +12243,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto",
-        "stat_buff_self"
+        "variable_move_type"
       ],
       "description": "You unleash a wave of force of unknown power at a creature in range. Make a ranged attack on a creature, doing 1d10 + MOVE damage of a random type. Roll a d20 to determine which type of damage is dealt. 1: Normal 2: Fire 3: Water 4: Electric 5: Grass 6: Ice 7: Fighting 8: Poison 9: Ground 10: Flying 11: Psychic 12: Bug 13: Rock 14: Ghost 15: Dragon 16: Dark 17: Steel 18: Fairy 19: Cosmic 20: Your choice",
       "moveStat": "Any",
@@ -12195,7 +12263,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "fixed_special_damage"
       ],
       "description": "You lash out with force, but contain your strike to a glancing blow, leaving a creature conscious. Make a melee attack on a target, dealing 1d6 + MOVE normal damage on a hit. This attack will always leave its target with 1 hp if it would otherwise cause the target to faint.",
       "moveStat": "DEX",
@@ -12215,8 +12284,8 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_ally",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "stat_buff_ally"
       ],
       "description": "If you are within melee range of an ally, you grasp its hand to spread happiness. Use this reaction when an ally is attacking to add +1 to its attack rolls, or when it is targeted by an attack to add +1 to its AC. This reaction can be used only before the result of either attack roll (by ally or creature) is called.",
       "moveStat": "None",
@@ -12236,7 +12305,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "potential_prone"
       ],
       "description": "You strike at a target with your horn. Make a melee attack, doing 1d10 + MOVE normal damage on a hit. If you moved 20 feet or more towards a target on this turn, force a creature to make a STR save against your Move DC or be knocked prone.",
       "moveStat": "STR",
@@ -12255,7 +12325,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "lethal_faint"
+      ],
       "description": "You attempt to drill your horn through a target creature with tremendous strength. Roll a d20. On a 20, the creature is impaled and immediately faints. On any other roll, you miss and this move fails. If the target's level is 10 more than your own, this move automatically fails.",
       "moveStat": "None",
       "vpCost": "8",
@@ -12273,7 +12345,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self",
+        "boosted_attack_rolls"
+      ],
       "description": "You increase your adrenaline with a menacing howl. For the duration, add +1 to any attack roll you make. This move can be stacked for a maximum of +5.",
       "moveStat": "None",
       "vpCost": "1",
@@ -12293,6 +12368,9 @@
       "reaction": false,
       "categories": [
         "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_prone",
         "recharge_locked"
       ],
       "description": "You unleash a concentrated beam of pure energy in a 80 foot line, 5ft wide. Any creature caught in the line must succeed on a DEX save or take 4d12 + MOVE normal damage and fall prone on a fail, or half as much without falling prone on a save. The damage from this move ignores resistance, but not immunity.",
@@ -12315,7 +12393,8 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "You lash out at a creature with a quick fang attack. Make a melee attack roll, doing 1d10 + MOVE normal damage on a hit. Hyper Fang scores a critical hit on 19 and 20. If the natural attack roll is 18 or more, the target flinches.",
       "moveStat": "STR/DEX",
@@ -12336,7 +12415,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You release a loud and startling sound that discourages and intimidates your enemies. All enemies within range must succeed a WIS save, suffering 2d8 + MOVE normal damage on a failure, half as much on a success.",
@@ -12357,11 +12437,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
         "stat_buff_self",
-        "stat_buff_ally",
-        "protect_negate",
-        "recoil"
+        "potential_damage_increase"
       ],
       "description": "You set your mind to protect your allies and strike back against your enemies. A dark purple aura surrounds you. For the duration, every time you take a hit for an ally that deals damage to you, add 1d6 bonus typeless damage to your next attack. This effect can stack up to five times.",
       "moveStat": "None",
@@ -12381,7 +12458,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "crit_range_mod"
       ],
       "description": "When activating this move, you spend your action concentrating intensely. If you keep your concentration, your first attack on your next turn always results in a critical hit.",
       "moveStat": "None",
@@ -12401,7 +12479,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "situational_use"
       ],
       "description": "You lash out an a creature with a furious strike. This move can only be activated when four other known moves by a user have been activated in the same combat, and the user has less than half of its maximum HP or VP left. If the user is switched out, this rule resets. Make a melee attack, dealing 3d12 + MOVE normal damage on a hit.",
       "moveStat": "STR/DEX",
@@ -12421,7 +12500,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "stat_debuff_enemy"
       ],
       "description": "You stare down a target, reducing its will. The creature must make a WIS save against your Move DC. On a fail, allies may add +1 to any attack they target it with for the duration. This modifier can be stacked if it fails multiple leer saves, up to a maximum of +5.",
       "moveStat": "WIS/CHA",
@@ -12440,7 +12520,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self"
+      ],
       "description": "You hone in on your target, ready to strike. When this move is activated, a single attack roll you make next turn is guaranteed to hit. You may roll to see if you crit or cause an effect from a high roll. This move does not affect one-shot moves like Fissure, Guillotine, etc.",
       "moveStat": "None",
       "vpCost": "10",
@@ -12459,7 +12541,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You blow a kiss to a creature, attempting to put the target to sleep. The target must make a CHA save against your Move DC, falling asleep on a failure.",
       "moveStat": "CHA/WIS",
@@ -12479,8 +12562,8 @@
       },
       "reaction": true,
       "categories": [
-        "crit_range_mod",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "protect_negate"
       ],
       "description": "When a creature scores a critical hit on you, you may use your reaction to quickly recite a magical incantation that treats the attack like a normal hit, preventing the extra damage.",
       "moveStat": "None",
@@ -12501,7 +12584,7 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "fixed_special_damage"
+        "unknown"
       ],
       "description": "When targeted by a move that isn't Fake Out or Sucker Punch, you may use your reaction to copy the target's move against it before it makes the attack. If the attack requires a roll, you have disadvantage. On a hit, double the damage dice for the move. The damage/effect tier for the move is based off of your level, not the target's.",
       "moveStat": "None",
@@ -12521,7 +12604,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "positioning"
       ],
       "description": "You flash an intimidating look at a target, attempting to freeze them in fear. Force a target in range to make a WIS save against your Move DC. On a fail, the target cannot flee or be switched out for 3 rounds.",
       "moveStat": "STR/CHA",
@@ -12580,7 +12664,9 @@
         "varies": true
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You summon a move at random to inflict against a creature. When you use this move, roll a d100. The resulting number is the TM number for the move you make. If the move is unable to be completed because of positioning, range, etc., Metronome fails.",
       "moveStat": "Varies",
       "vpCost": "1",
@@ -12599,9 +12685,7 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe",
-        "stat_buff_self",
-        "stat_buff_ally"
+        "heal_target_or_aoe"
       ],
       "description": "You create a tasty drink that heals your or an ally’s wounds. The recipient gains 2d6 + MOVE hit points.",
       "moveStat": "CON",
@@ -12620,7 +12704,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You copy another creature's movements, learning its ways in battle. When used, this move is temporarily replaced by your choice of one of the target's moves. The target can be an ally. The user can select any of the target's moves to copy for the duration.",
       "moveStat": "None",
       "vpCost": "10",
@@ -12638,7 +12724,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self"
+      ],
       "description": "You sense the motives and moves of a creature around you. When this move is activated, a single attack roll you make next turn is guaranteed to hit. You may roll to see if you crit or cause an effect from a high roll. This move does not affect one-shot moves like Fissure, Guillotine, etc.",
       "moveStat": "None",
       "vpCost": "2",
@@ -12677,7 +12765,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "trigger_saving_throw_on_hit",
+        "potential_disadvantage"
       ],
       "description": "You whip a target with your tail, covering them in slippery suds. Make a melee attack roll, dealing 1d10 + MOVE normal damage on a hit. The target must then succeed a DEX saving throw, or become slippery, having disadvantage on its next attack.",
       "moveStat": "STR/DEX",
@@ -12717,7 +12807,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "variable_move_type"
       ],
       "description": "You strike out with inner power, depending on your primary type. Make a melee attack on a target, dealing 2d8 + MOVE damage of your current primary type.",
       "moveStat": "STR/DEX",
@@ -12738,8 +12829,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto",
-        "stat_buff_self"
+        "variable_move_type",
+        "berry_check"
       ],
       "description": "You draw in power from your held berry, releasing it into a ranged attack. Make a ranged attack, dealing 2d8 + MOVE damage on a hit. The type is dependant on what berry you are holding, according to the chart below: Normal - Chilan Fire - Cherri, Occa Water - Chesto, Passho Electric - Pecha, Wacan Grass - Rawst, Rindo Ice - Aspear, Yache Fighting - Leppa, Chople Poison - Oran, Kebia Ground - Persim, Shucca Flying - Lum, Coba Psychic - Sitrus, Payapa Bug - Tanga Rock - Charti Ghost - Kasib Dragon - Haban Dark - Colbur Steel - Babiri, Razz Fairy - Roseli",
       "moveStat": "STR/DEX",
@@ -12759,7 +12850,7 @@
       },
       "reaction": false,
       "categories": [
-        "field_terrain"
+        "unknown"
       ],
       "description": "You call upon the powers of nature nearby and activate a move based on the terrain. The DM gets final say on what move you activate, but here are example terrain types: Cities/Roads/Buildings: Swift Sandy areas: Earthquake Volcanoes/Lava areas: Fire Blast Caves, Dark areas: Shadow Ball Rocky terrain, Mountains: Rock Slide Fields, Plains: Stun Spore Forests, Tall Grasslands: Razor Leaf Ponds/Swamps: Bubble Beam At sea: Surf Underwater: Hydro Pump",
       "moveStat": "Varies",
@@ -12779,7 +12870,8 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "potential_disadvantage"
       ],
       "description": "You let out a stunning roar that intimidates a target. When targeted by an attack, use this reaction to impose disadvantage on the attack roll",
       "moveStat": "STR/CHA",
@@ -12798,7 +12890,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_debuff_enemy"
+      ],
       "description": "When you activate this move, choose a target in range. For the duration, the target cannot activate any move that would increase its AC. If it has already activated such a move, the effect ends immediately. In addition, for the duration, no creature in range has immunity to your Ghost, Normal, or Fighting-type moves.",
       "moveStat": "None",
       "vpCost": "3",
@@ -12837,7 +12931,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "fixed_special_damage"
+      ],
       "description": "You split pain from your injuries with your attacker. Target a creature in range, forcing them to make a CON save against your Move DC. On a fail, both you and your attacker change your current health points to the average of the two. If this causes either creature to go above maximum health, they take their maximum health instead.",
       "moveStat": "CON/CHA",
       "vpCost": "10",
@@ -12876,7 +12973,9 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You perform a song with devastating consequences to creatures that hear it. All creatures in range (including you) must make a CON saving throw against your Move DC. For any that fail, they faint in 3 rounds, on their turn, unless fleeing or switched out by their trainer before the end of the three rounds.",
       "moveStat": "CHA",
@@ -12896,7 +12995,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_debuff_enemy"
+        "trigger_saving_throw",
+        "potential_disadvantage"
       ],
       "description": "You convince a creature that you mean it no harm. Force a creature to make a CHA saving throw against your Move DC. On a failure, any attack the target makes on its next turn is rolled at disadvantage. If the target activates a move that requires a saving throw, you have advantage on the roll.",
       "moveStat": "CHA",
@@ -12937,7 +13037,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "heal_target_or_aoe"
       ],
       "description": "You send a booby-trapped gift to a creature. Make a ranged attack on a creature in range. On a hit, the present explodes, doing 1d6 + MOVE normal damage. If the natural attack roll is 2 or lower, however, regardless if it hits, the present provides the target with 1d6 + MOVE hit points instead.",
       "moveStat": "DEX/CHA",
@@ -12958,7 +13058,7 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "recoil"
+        "protect_negate"
       ],
       "description": "You sense incoming danger and are able to quickly avoid it. When targeted by a move (before the attack roll), or forced to make a saving throw, you may automatically avoid the damage/effects on the first instance of this reaction. On future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful. Unless the successful roll is 20, the damage you take instead drains your VP for half the damage amount.",
       "moveStat": "None",
@@ -12978,7 +13078,7 @@
       },
       "reaction": false,
       "categories": [
-        "field_weather"
+        "steal_disrupt"
       ],
       "description": "You sync up with a creature, copying any positive or negative stat changes affecting them due to weather or moves this combat.",
       "moveStat": "None",
@@ -12998,7 +13098,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "movement"
       ],
       "description": "You lash out with a quick unarmed strike at a creature in range. As a bonus action, you can immediately move up to 10ft and make a melee attack against a creature in range without taking an attack of opportunity, doing 1d6 normal damage on a hit.",
       "moveStat": "DEX",
@@ -13017,7 +13118,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self"
+      ],
       "description": "You go into a fit of rage, attacking with relentless fury. While you are raging, you gain +1 on all damage rolls (only once per move), have resistance to normal damage, and have advantage on all Strength checks. Your rage ends if you are incapacitated or if you have not attacked a hostile target since your last turn, or taken any damage since then.",
       "moveStat": "STR",
       "vpCost": "5",
@@ -13037,9 +13140,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "stat_buff_ally",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You strike out with an incredibly fast spinning move. All creatures within melee range must make a DEX save against your Move DC, taking 1d10 + MOVE normal damage on a failure, or half as much on a success. In addition, this move automatically frees the user from Leech Seed or anything causing it to be grappled or restrained. It is removed from these statuses before the saving throw is made.",
@@ -13061,6 +13163,8 @@
       "reaction": false,
       "categories": [
         "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "stat_buff_self"
       ],
       "description": "When you use this move, strong winds begin to circle around you, granting +2 to AC. On your next turn, if you keep your concentration, you release those winds as an action in a 20 foot radius, centered on you. Each creature in the area must make a DEX save against your Move DC, taking 2d6 + MOVE normal damage on a fail, or half as much on a success.",
@@ -13082,7 +13186,6 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "stat_buff_self",
         "recharge_locked"
       ],
       "description": "You retreat from the fray to regain your composure. Gain 2d4 + MOVE VP. This move can only be used in combat, when no enemies are within melee range, and can only be used once per long rest.",
@@ -13103,7 +13206,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "situational_use"
       ],
       "description": "You summon a previously discarded item back into your hands. If you used a consumable held item any time within the last 5 turns, you can activate this move to take advantage of the same effect one last time. This move may not be used in the same round the held item was used.",
       "moveStat": "None",
@@ -13123,8 +13226,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "recoil"
+        "stat_buff_self"
       ],
       "description": "Your body flashes into a mirror for just a moment. When it returns to normal, you take on the type of a creature in range.",
       "moveStat": "None",
@@ -13144,7 +13246,7 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_auto"
+        "heal_self"
       ],
       "description": "A wave of healing energy washes over you, curing poison, paralysis, and burn.",
       "moveStat": "None",
@@ -13164,8 +13266,9 @@
       },
       "reaction": true,
       "categories": [
+        "counter_reaction_effect",
         "damage",
-        "counter_reaction_effect"
+        "movement"
       ],
       "description": "You rush to avenge a fallen ally. When a creature causes an ally to faint, you may move up to your speed to immediately rush forward and make a melee attack roll on the target, dealing 3d10 + MOVE normal damage on a hit.",
       "moveStat": "STR/DEX",
@@ -13186,7 +13289,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "conditional_damage"
       ],
       "description": "You lash out at a creature, in hopes it will please your trainer. Make a melee attack roll against a creature, doing 1d10 + MOVE on a hit. When you make this attack, add an additional bonus to hit and damage equal to the number of levels you are above zero on the Loyalty Chart.",
       "moveStat": "STR",
@@ -13206,7 +13309,9 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "positioning"
       ],
       "description": "You release an intimidating roar at all creatures within 15 feet of you. Creatures affected that are not your ally must make a CHA save against your Move DC. On a fail, the creature must immediately Disengage as a free action and move up to its speed in a straight line away from the user, or until met by an impeding force. Moving out of an opponent's melee range will trigger an Attack of Opportunity.",
       "moveStat": "STR/CHA",
@@ -13248,7 +13353,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "potential_damage_increase"
       ],
       "description": "You attack a creature's mind with a harsh song. Select a target in range and force them to make a WIS save against your Move DC. On a failure, the target takes 1d10 + MOVE normal damage. If an ally in range also knows this move, they can join in the song as a reaction to add an additional damage dice.",
       "moveStat": "WIS/CHA",
@@ -13268,7 +13374,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_auto",
+        "protect_negate",
+        "stat_buff_self",
         "stat_buff_ally"
       ],
       "description": "You boost defenses for you and all allies in range. For the duration, any ally within range is protected from new negative status conditions oof the following types: asleep, burned, confused, frozen, paralyzed, petrified, poisoned or slowed.",
@@ -13289,7 +13396,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You put on your scariest face, attempting to paralyze a creature with fear. Force a target in range to make a WIS save against your Move DC. On a fail, the target is paralyzed.",
       "moveStat": "STR/CHA",
@@ -13329,7 +13437,9 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "stat_debuff_enemy"
       ],
       "description": "You let out a horrible screech at creatures in a 20 foot radius, centered on you, distracting them and opening up their defenses. The creatures must make a WIS save against your Move DC. On a fail, allies add +1 to any attack they target an affected creature with for the duration. This modifier can be stacked if a creature fails multiple screech saves, up to a maximum of +5.",
       "moveStat": "CON/CHA",
@@ -13348,7 +13458,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "heal_target_or_aoe"
+      ],
       "description": "You carefully clean away harmful substances from yourself or an ally. Touch one creature to remove one condition affecting it. The condition is successfully removed if you keep yourr concentration until the beginning of your next turn, and you are still within touching range of the target. This move can be used on yourself.",
       "moveStat": "None",
       "vpCost": "5",
@@ -13389,8 +13501,10 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "self_faint",
+        "conditional_damage"
       ],
       "description": "You release a massive explosion in a 30 foot radius, fainting immediately after the attack. Creatures in the area must make a DEX save against your Move DC. If your creature has at least half its hit points left, anyone in range takes 4d12 + MOVE normal damage on a fail, or half as much on a success. If your creature has less than half of its hitpoints left, the damage is halved for a failed save, and quartered for a success. After using this move, the creature must succeed death saving throws to survive. It can be stabilized normally, with medicine checks, restoratives or other means, but it will not regain health when given potions. After becoming stable, the creature will have to recover for 1d8 days in order to fullly heal.",
       "moveStat": "STR",
@@ -13410,7 +13524,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "boosted_attack_rolls"
       ],
       "description": "You collect your focus, sharpening your combat skills. You may add 1d4 to all attack rolls for the duration.",
       "moveStat": "None",
@@ -13430,7 +13545,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "stat_debuf_self"
       ],
       "description": "You break off a piece of your shell, lowering your AC, but improving your attack. When you activate this move, lower your AC by 1, but increase your attack and damage rolls by 1 for the duration. This move cannot stack.",
       "moveStat": "None",
@@ -13449,7 +13565,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "steal_disrupt"
+      ],
       "description": "You use a mysterious psychic energy to change a target's ability to Simple. Force a target in range to make a WIS saving throw against your Move DC. On a failure, choose one of the target's abilities and change it to Simple for the duration.",
       "moveStat": "WIS/INT",
       "vpCost": "3",
@@ -13467,7 +13586,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "multi_hit_aoe",
+        "potential_status_condition",
+        "unknown"
+      ],
       "description": "You sing a beautiful song in an attempt to put creatures to sleep. Roll 5d8 + MOVE; the total is how many hit points of creature this move can affect. Creatures within 30 feet of you are affected in ascending order of their current hit points. Starting with the creature that has the lowest current hit points, each creature affected by this move falls asleep. Subtract each creature’s hit points from the total before moving on to the creature with the next lowest hit points. A creature’s hit points must be equal to or less than the remaining total for that creature to be affected.",
       "moveStat": "CHA",
       "vpCost": "4",
@@ -13486,7 +13609,8 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "unknown"
       ],
       "description": "When any move is activated within sight of you, use a reaction to copy it to your move list, replacing it with one instance of Sketch in your current move list permanently. Sketch may not be used to copy a Signature or Legendary-only Move.",
       "moveStat": "None",
@@ -13506,7 +13630,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "trigger_saving_throw_on_hit",
+        "potential_prone"
       ],
       "description": "When you use this move, you lower your head and prepare to strike a target within range. On your next turn’s action, if you keep your concentration, you charge at a creature in range, ignoring your walking speed and any opportunity attacks you may incur. Make a melee attack roll, doing 3d10 + MOVE normal damage on a hit. A creature hit with this attack must succeed on a STR saving throw against your Move DC or be knocked prone.",
       "moveStat": "STR",
@@ -13527,8 +13653,7 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "stat_buff_self",
-        "positioning"
+        "status_condition"
       ],
       "description": "You give yourself a break, healing your wounds. When you activate this move, you become incapacitated immediately and through your next two turns. Your trainer may not switch you out during this time. At the end of the second turn, regain half of your maximum hit points and become stable once again.",
       "moveStat": "None",
@@ -13569,7 +13694,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "You slash out at a creature in range. Make a melee attack, doing 2d8 + MOVE normal damage on a hit. Slash results in a critical hit on 19s and 20s.",
       "moveStat": "STR/DEX",
@@ -13588,7 +13714,9 @@
         "varies": true
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "This move can only be used if you are asleep. While asleep, activate a random move from your move list (not Sleep Talk) that has a move time of 1 action.",
       "moveStat": "Varies",
       "vpCost": "3",
@@ -13608,7 +13736,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto"
+        "conditional_damage"
       ],
       "description": "You procure a handful of strong smelling salt, damaging a creature's senses. Make a ranged attack against a target, dealing 1d10 + MOVE normal damage on a hit. If the target is paralyzed, double the dice roll for the damage.",
       "moveStat": "CON",
@@ -13628,7 +13756,10 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
+        "field_terrain"
       ],
       "description": "You conjure a line of smoke on the battlefield, 60 feet long and 5 feet thick, that extends in any direction from a point within range. The area on either side is obscured and imposes disadvantage on any ranged attacks made by a creature targeting another on the opposite side. Any creature inside the wall of smoke, when it is conjured, must make a CON save against your Move DC or become blinded for the duration. A blinded creature can repeat the save at the beginning of its turns to remove the effect on a success.",
       "moveStat": "CON",
@@ -13648,7 +13779,10 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_aoe",
+        "guaranteed_hit",
+        "situational_use"
       ],
       "description": "While you are asleep, you may activate this move to create a harsh noise that damages all creature within range for 1d8 + MOVE normal damage.",
       "moveStat": "STR/WIS",
@@ -13689,8 +13823,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "conditional_damage",
         "recharge_locked"
       ],
       "description": "You spray a cone of powerful cleaning solution. All creatures in a 30-foot cone must make a CON save against your Move DC, taking 1d10 + MOVE normal damage on a failure, or half as much on a success. This move deals double damage to Poison-type Pokémon. All surfaces in the affected area are thoroughly cleaned.",
@@ -13711,7 +13846,10 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "fixed_special_damage"
       ],
       "description": "You unleash a deafening sound that harms creature in a 20 foot circle, centered on you. Creatures in range must make a CON save against your Move DC, taking 20 flat normal damage on a fail, or half as much on a success.",
       "moveStat": "STR/DEX",
@@ -13752,7 +13890,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "conditional_damage"
       ],
       "description": "The power of energy stored by Stockpile is released against a target. Make a ranged attack against a creature, dealing a base 1d6 + Move normal damage on a hit. The dice roll is doubled if two rounds of energy were Stockpiled. The dice roll is tripled if three rounds of energy were Stockpiled.",
       "moveStat": "CON/DEX",
@@ -13771,7 +13910,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "movement"
+      ],
       "description": "You flail around on the ground, doing no damage and looking ridiculous, but you can leap up to 50 feet in the air.",
       "moveStat": "None",
       "vpCost": "1",
@@ -13789,7 +13930,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "stat_debuff_enemy"
+      ],
       "description": "You shine a bright light on a creature in range that follows them around the battlefield. The target must make a DEX save against your Move DC. On a fail, attacks against that creature have advantage for the duration.",
       "moveStat": "DEX/CHA",
       "vpCost": "3",
@@ -13849,7 +13993,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "positioning"
       ],
       "description": "You strike out at a creature with brute strength. Make a melee attack roll, doing 2d8 + MOVE normal damage on a hit. On a hit, you may also choose to push the creature 5 feet away.",
       "moveStat": "STR",
@@ -13868,7 +14013,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "damage"
+      ],
       "description": "This move is known by all Pokémon, and can be used at any time. You lash out with an unarmed strike, or use an improvised weapon up close or at range to damage a creature. Make a melee or ranged attack roll, doing damage equal to 2 + MOVE typeless damage on a hit.",
       "moveStat": "STR/DEX",
       "vpCost": "0",
@@ -13886,7 +14033,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self",
+        "advantage_on_attack_roll"
+      ],
       "description": "You study a target within 50 feet. For one minute, you have advantage on any ability checks or attack rolls against that target.",
       "moveStat": "None",
       "vpCost": "5",
@@ -13905,8 +14055,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "recoil"
+        "unknown"
       ],
       "description": "You create a duplicate of yourself that copies a quarter of your current HP (rounded down). This substitute moves with you, has an AC of 1 and takes all damage and status ailments you would normally take until it is destroyed. The substiture cannot be healed, and it does not take self-inflicted statuses. If the damage done is enough to destroy the substitute, you take the remaining damage. In future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the move to be successful.",
       "moveStat": "None",
@@ -13926,7 +14075,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "fixed_special_damage"
       ],
       "description": "You lash out with an incredible fang attack. Make a melee attack, doing 1d6 + MOVE normal damage on a hit. This move ignores resistance, but not immunity. On critical hits, instead of rolling for damage, you may choose to do damage equal to half the target’s current HP. Once per long rest, before making the attack roll, you may declare this attack will deal damage equal to half the target's current HP on a hit instead of rolling damage.",
       "moveStat": "STR",
@@ -13946,7 +14096,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You emit a high pitched screech heard only by the target. Choose a target in range. The target must pass a WIS saving throw against your Move DC or become confused.",
       "moveStat": "DEX/WIS",
@@ -13966,7 +14117,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition",
+        "boosted_attack_rolls"
       ],
       "description": "Force a target in range to make a WIS save against your Move DC. On a fail, the target is confused, but it adds +2 to its attack rolls while confused.",
       "moveStat": "WIS/CHA",
@@ -13986,8 +14139,7 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self",
-        "stat_buff_self"
+        "heal_self"
       ],
       "description": "You absorb your Stockpiled energy to heal your wounds. When activated after using Stockpile, regain a base 1d6 + Move hit points. The dice roll is doubled if two rounds of energy were Stockpiled. The dice roll is tripled if three rounds of energy were Stockpiled.",
       "moveStat": "CON",
@@ -14006,7 +14158,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "advantage_on_attack_roll"
+      ],
       "description": "You release a sweet smell directed at a target in range. The target must make a CHA save against your Move DC. On a fail, you have advantage on your next two attacks against that target.",
       "moveStat": "CON/CHA",
       "vpCost": "2",
@@ -14025,7 +14180,9 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "multi_hit_choice",
+        "guaranteed_hit"
       ],
       "description": "You fire two projectiles at any creature you choose in range. They do not have to target the same creature. Each hit for 1d8 normal damage. This move also targets creature during the invulnerable stages of Dig, Fly, Bounce, etc.",
       "moveStat": "None",
@@ -14045,6 +14202,7 @@
       },
       "reaction": false,
       "categories": [
+        "stat_buff_self",
         "damage"
       ],
       "description": "When you activate this move, a sword appears and dances around you, increasing your AC by 1. As a bonus action on a future turn, you may drop concentration to release this sword and roll a ranged attack at a target within 30 feet of you, dealing 2d6 + MOVE normal damage on a hit.",
@@ -14106,7 +14264,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "stat_debuff_enemy"
       ],
       "description": "You shake your tail at a target, distracting it and opening up its defenses. The creature must make a WIS save against your Move DC. On a fail, allies add +1 to any attack they target it with for the duration. This modifier can be stacked if it fails multiple tail whip saves, up to a maximum of +5.",
       "moveStat": "CHA/DEX",
@@ -14127,7 +14286,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "recoil"
       ],
       "description": "You sacrifice your own position to take down a creature. Roll a melee attack roll. On a hit, you deal 2d8 + MOVE normal damage, taking a quarter of the total damage (rounded down) in typeless recoil.",
       "moveStat": "STR",
@@ -14147,7 +14306,9 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "stat_debuff_enemy"
       ],
       "description": "You fill your eyes with tears to make all creatures in range lose their combative spirit. All creatures in range must make a CHA save against your Move DC. On a fail, they add -1 to any attack they makes for the duration. This modifier can be stacked if an affected creature fails multiple Tearful Look saves, up to a maximum of -5.",
       "moveStat": "WIS/CHA",
@@ -14168,8 +14329,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "variable_move_type",
         "recharge_locked"
       ],
       "description": "You fire a powerful beam of pure light. The line is 80 feet long and 5 feet wide, and all creatues caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE damage on a failure, or half as much on a success. The damage type is dependant on the Drive the user holds. (Burn Drive - Fire, Chill Drive - Ice, Douse Drive - Water, Shock Drive - Electric)",
@@ -14190,8 +14352,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You start to perform a difficult dance, confusing all creatures in range. Creatures in a 20 foot circle around you must make a WIS save against your Move DC, becoming confused on a fail.",
       "moveStat": "WIS/CHA",
@@ -14212,6 +14375,7 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
+        "protect_negate",
         "recharge_locked"
       ],
       "description": "While leading a formation, you command your forces to brace for an incoming attack. All creatures that are part of your formation may automatically avoid any damage from the attack this move is a reaction to, and then take half damage from all other attacks until the beginning of your next turn. However, the damage they deal is also halved, and they are rooted together with you until the beginning of your next turn.",
@@ -14233,8 +14397,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_auto",
-        "multi_hit_same_target"
+        "multi_hit_same_target",
+        "status_condition"
       ],
       "description": "You thrash about wildly, doing several attacks without control. Make a melee attack roll, doing 2d8 + MOVE normal damage on a hit. After successfully hitting a target, roll a d4. On a result of 3 or 4, you may immediately hit again for an additional 2d8 normal damage. Continue this process until you fail to roll a 3 or 4 on the d4 roll, up to a maximum of two additional hits. At the end of this attack, you become confused.",
       "moveStat": "STR",
@@ -14253,7 +14417,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "potential_status_condition",
+        "situational_use"
+      ],
       "description": "You turn your melee attack into a playful tickle. As a bonus action at the end of a turn in which you used a melee attack, force a creature to make a CON saving throw against your Move DC. On a failure, the target flinches.",
       "moveStat": "DEX",
       "vpCost": "2",
@@ -14271,7 +14439,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You attempt to morph into a near-exact copy of a creature in range. For the duration, you copy the target's type, ability scores, skills, speeds, senses, abilities, and current moves. You retain your own feats, level, and HP (Changed CON does not impact your HP).",
       "moveStat": "None",
       "vpCost": "2",
@@ -14291,7 +14461,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You strike with a simultaneous three-beam attack. Each creature in a 30 foot cone, centered on you, must make a DEX save against your Move DC, taking 2d8 + MOVE normal damage on a fail, and half as much on a success. Targets that fail the save by 5 or more must roll a d4, gaining the status condition as follows: 1. The target becomes burned. 2. The target becomes frozen. 3. The target becomes paralyzed. 4. Must reroll until any number other than 4 appears.",
@@ -14313,7 +14485,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "conditional_damage"
       ],
       "description": "You strike out with a blast of energy that increases in strength the more energy has been spent. Make a ranged attack, dealing 2d8 + MOVE normal damage on a hit. Increase the damage by your Move modifier for every 10VP that has been expended from the total, before the move was activated, up to a maximum of +10.",
       "moveStat": "STR/DEX",
@@ -14334,7 +14506,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You cause an uproar on the battlefield in a 30 foot circle, centered on you, for three rounds of combat. During the uproar, you cannot use any other Move, and any creature in range wakes and is prevented from falling asleep. (This include creatures that would purposefully fall asleep using moves like Rest) In addition, creatures must make a CON save against your Move DC at the start of each turn. On a fail, the target takes 2d8 + MOVE normal damage.",
@@ -14356,8 +14529,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_ally"
+        "status_inflict_auto"
       ],
       "description": "You crush a creature with a forceful, gripping attack. Make a melee attack, doing 1d10 + MOVE normal damage on a hit, grappling the target. On each successive turn, if the creature is still grappled, you may use this move again (as an action) and automatically hit. A creature may attempt to excape the grapple at the beginning of its turns with a STR save against your Move DC.",
       "moveStat": "STR",
@@ -14378,7 +14550,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "field_weather"
+        "variable_move_type"
       ],
       "description": "You send a powerful ball of energy that changes type based on the surrounding weather, dealing 1d10 + MOVE damage of that type. Harsh Sunlight: Fire Rain: Water Sandstorm: Rock Hail or Snow: Ice Foggy: Fairy Cloudy: Normal",
       "moveStat": "STR/DEX",
@@ -14399,7 +14571,9 @@
       "reaction": false,
       "categories": [
         "stat_buff_self",
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_prone"
       ],
       "description": "You create a whirlwind of spinning air around you, increasing your AC by +2 until the beginning of your next turn. When you activate this move, any creature within 5 feet of you must succeed on a STR saving throw against your Move DC or fall prone. In wild creature battles, this move can be activated to automatically count as a single success in a group DEX check to run away.",
       "moveStat": "DEX",
@@ -14420,6 +14594,9 @@
       "reaction": false,
       "categories": [
         "damage",
+        "multi_hit_aoe",
+        "trigger_saving_throw_on_hit",
+        "potential_prone",
         "recharge_locked"
       ],
       "description": "You make a sweeping slash attack, hitting up to three targets within reach. Make a single attack roll for all targets, dealing 3d10 + MOVE normal damage on a hit. Each creature hit must also succeed a Strength saving throw, or fall prone.",
@@ -14459,7 +14636,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self",
+        "boosted_attack_rolls"
+      ],
       "description": "You get your adrenaline pumping and go into a frenzy. While worked up, you add +2 to all attack rolls. Your worked up status ends if you are incapacitated or if you have not attacked a hostile target since your last turn, or taken any damage since then.",
       "moveStat": "None",
       "vpCost": "4",
@@ -14479,7 +14659,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "status_inflict_auto"
       ],
       "description": "You attempt to grapple a target into submission. Make a melee attack roll. On a hit, the target takes 1d4 + MOVE normal damage and is grappled. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. As long as the target is grappled on your subsequent turns, this move can be activated again as a bonus action with an automatic hit, dealing 1d4 normal damage.",
       "moveStat": "STR/DEX",
@@ -14499,7 +14679,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "conditional_damage"
       ],
       "description": "You wrap your hands around the target and squeeze hard. Make a melee attack against a creature, dealing 3d8 + MOVE normal damage on a hit. If the target has 50% or more of its maximum HP, double your move modifier for the damage roll.",
       "moveStat": "STR",
@@ -14518,7 +14699,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "status_condition"
+      ],
       "description": "You release a big yawn that causes a creature to become very drowsy. Choose a target in range. If that target is still in the battle at the end of its next turn, it falls asleep.",
       "moveStat": "None",
       "vpCost": "2",

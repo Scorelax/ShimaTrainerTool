@@ -15302,7 +15302,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition",
+        "positioning"
       ],
       "description": "If the target is a creature, it must succeed on a Strength saving throw or the beholder moves it up to 30 feet in any direction. It is restrained by the ray's telekinetic grip until the start of the beholder's next turn or until the beholder is incapacitated.",
       "moveStat": "STR",
@@ -15322,7 +15324,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "movement"
       ],
       "description": "You hone your abilities and feel a surge of speed course through your veins. Increase your movement speed by 20 feet for the duration. Applicable to any movement type the Pokémon has.",
       "moveStat": "None",
@@ -15342,7 +15345,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "movement"
       ],
       "description": "You use a strange psychic power to teleport yourself and one willing creature in range, switching places on the battlefield.",
       "moveStat": "None",
@@ -15362,7 +15365,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "stat_debuf_self"
       ],
       "description": "Your mind elevates to a new level of focus. Add +2 to you AC and any saving throw you make for the duration, but select one of your moves that is not Amnesia. You forget that move and cannot use it for the duration.",
       "moveStat": "None",
@@ -15383,6 +15387,7 @@
       "reaction": false,
       "categories": [
         "damage",
+        "conditional_damage",
         "recharge_locked"
       ],
       "description": "You channel the knowledge you have gained from the current battle into a psychic blast. Make a ranged attack against one target, dealing 1d6 + MOVE psychic damage. For every type of move you have witnessed so far during this battle, add 1d6 to the damage dice, for a maximum of 6d6.",
@@ -15403,7 +15408,8 @@
       },
       "reaction": false,
       "categories": [
-        "shield_temphp"
+        "stat_buff_self",
+        "stat_buff_ally"
       ],
       "description": "You create a transparent shield of psychic energy. While active, the barrier grants +2 to AC for you and any companions within 5 feet of you for the duration.",
       "moveStat": "None",
@@ -15423,7 +15429,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "situational_use"
       ],
       "description": "You attempt to suppress strong emotions in a group of creatures. Each creature in a 20-foot-radius sphere centered on a point you choose within range must make a Charisma saving throw; a creature can choose to fail this saving throw if it wishes. If a creature fails its saving throw, choose one of the following two effects. You can suppress any effect causing a target to be charmed or frightened. When this spell ends, any suppressed effect resumes, provided that its duration has not expired in the meantime. Alternatively, you can make a target indifferent about creatures of your choice that it is hostile toward. This indifference ends if the target is attacked or harmed by, or if it witnesses any of its friends being harmed. When the effect ends, the creature becomes hostile again, unless the DM rules otherwise.",
       "moveStat": "WIS/CHA",
@@ -15443,7 +15451,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "stat_buff_self",
+        "increase_stab"
       ],
       "description": "You clear your mind of all distractions. For the duration, double your STAB bonus when dealing damage of your type.",
       "moveStat": "None",
@@ -15484,9 +15493,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally",
-        "field_weather",
-        "recoil"
+        "field_weather"
       ],
       "description": "You take control of the weather within 5 miles of you for the duration. You must be outdoors to use this move. When you use this move, you change the current weather conditions, which are determined by the GM based on the climate and season. You can change precipitation, temperature, and wind. It takes 1d4 × 10 minutes for the new conditions to take effect. Once they do so, you can change the conditions again. When the spell ends, the weather gradually returns to normal.",
       "moveStat": "None",
@@ -15505,9 +15512,7 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [
-        "protect_negate"
-      ],
+      "categories": [],
       "description": "A 60-foot-radius sphere of light spreads out from a point you choose within range. The sphere is bright light and sheds dim light for an additional 60 feet. If you chose a point on an object you are holding or one that isn't being worn or carried, the light shines from the object and moves with it. Completely covering the affected object with an opaque object, such as a bowl or a helm, blocks the light.",
       "moveStat": "None",
       "vpCost": "20",
@@ -15527,7 +15532,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "heal_target_or_aoe"
+        "drain",
+        "situational_use"
       ],
       "description": "You tap into a sleeping Pokémon’s dreams, sucking from its energy pool. Instantly inflict 2d8 + MOVE psychic damage on a sleeping target in range, regaining half as many hitpoints to yourself.",
       "moveStat": "WIS",
@@ -15548,7 +15554,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition"
       ],
       "description": "You bite at a creature with psychic energy. Make a melee attack, dealing 2d8 + MOVE psychic damage on a hit. On a hit, the target must succeed a WIS saving throw against your move DC, or become drowsy. On a fail of 5 or more, the creature immediately falls asleep.",
       "moveStat": "WIS",
@@ -15568,7 +15575,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "unknown"
       ],
       "description": "You reach into the Sea of Dreams to manifest something from the target's subconscious mind. This could be their greatest fear (dealing 10d12 Psychic damage and potentially causing fear), their deepest desire (creating a temporary beneficial illusion), or a memory made tangible (summoning a spectral ally or recreating a lost item for 1 hour). The manifestation lasts for a time, and has appropriate statistics determined by the GM.",
       "moveStat": "WIS",
@@ -15588,7 +15596,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "situational_use"
       ],
       "description": "You send a wave of mental energy, overwhelming a sleeping creature's mind. Make a ranged attack roll, dealing 2d8 + MOVE psychic damage on a hit. A creature hit by this move fails to wake up from this and subsequent attacks until the end of its next turn.",
       "moveStat": "WIS/CHA",
@@ -15608,9 +15617,10 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "status_inflict_save",
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "potential_status_condition",
+        "situational_use",
+        "damage"
       ],
       "description": "You call upon energy from the Sea of Dreams to trap a sleeping creature. Your target must succeed a Wisdom saving throw against your move DC or be trapped in the condition of sleep for 1 minute without the ability to wake up by any means. After the effect ends, the sleep condition continues like normally. Upon waking up, the creature affected gains one point of exhaustion, and takes 5d4 psychic damage.",
       "moveStat": "WIS",
@@ -15651,7 +15661,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "situational_use"
       ],
       "description": "You save an attack to unleash at a later time. When you activate this move, you may choose to attack on this turn, or delay the attack. You may use the attack as a free action at any time during the next three rounds. When you make the attack, make a ranged attack roll, dealing 3d10 + MOVE psychic damage on a hit.",
       "moveStat": "INT/WIS",
@@ -15670,7 +15681,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "stat_buff_self"
+      ],
       "description": "You use your psychic power to change your defense to match the target's the best you can. Force a creature in range to make a CHA save against your Move DC. On a failure, for the duration, your AC changes to become an average of your current AC and the target's, rounded down.",
       "moveStat": "WIS/INT",
       "vpCost": "2",
@@ -15689,7 +15703,8 @@
       },
       "reaction": false,
       "categories": [
-        "positioning"
+        "trigger_saving_throw",
+        "steal_disrupt"
       ],
       "description": "You use your psychic power to swap defenses with a creature. Force a creature in range to make a CHA save against your Move DC. On a failure, switch armor class with the target for the duration.",
       "moveStat": "WIS/INT",
@@ -15730,7 +15745,6 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self",
         "heal_target_or_aoe"
       ],
       "description": "You emit a healing pulse that restores a target's HP. Choose a target in range (cannot be yourself). The target regains 4d4 + MOVE hit points.",
@@ -15751,7 +15765,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_faint",
+        "fully_heal_new_pokemon"
       ],
       "description": "You sacrifice yourself for another one of your trainer's Pokémon. When activating this move, the user faints, but the next conscious creature released by its trainer is healed of all status effects and recovers an amount of HP equal to what the user lost by fainting.",
       "moveStat": "None",
@@ -15790,7 +15805,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "steal_disrupt"
+      ],
       "description": "Force a creature in range to make a CHA save against your Move DC. On a failure, you employ your psychic power to swap any changes in ability modifiers, AC, attack changes, damage boosts, etc. that are currently in affect on you or the target.",
       "moveStat": "WIS/INT",
       "vpCost": "3",
@@ -15809,7 +15827,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You attempt to put the target to sleep. The target must make a WIS save against your Move DC, falling asleep on a failure.",
       "moveStat": "WIS/INT",
@@ -15828,7 +15847,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "attack_supression"
+      ],
       "description": "You create psychic walls within the mind of a target in range. Force the target to make a WIS saving throw against your Move DC. On a failure, the target is unable to use any Move it knows that is the same as yours for the duration.",
       "moveStat": "WIS/INT",
       "vpCost": "4",
@@ -15846,7 +15868,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "unknown"
+      ],
       "description": "You instruct a creature to act again. As an action, choose a target in range. The target must immediately repeat the move they used in their last action or bonus action, without spending the VP.",
       "moveStat": "WIS",
       "vpCost": "Varies",
@@ -15864,7 +15888,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self",
+        "movement"
+      ],
       "description": "You move with incredible speed. Increase your walking, flying, or swimming speed by 20 if it is greater than 0, and add +2 to AC when targeted by ranged attacks for the duration. This move cannot be stacked.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
@@ -15904,9 +15931,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_self",
-        "stat_debuff_enemy",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
         "recharge_locked"
       ],
       "description": "You create a blinding bright light that damages creature's eyes and may lower their defense. Creatures in range must make a CON save against your Move DC, taking 4d12 + MOVE psychic damage on a failure, or half as much on a success. For creatures that fail by 5 or more, they are blinded until the end of your next turn.",
@@ -15946,7 +15973,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "cannot_use_item",
+        "field_terrain"
+      ],
       "description": "You employ your psychic power to suppress the effect of all held items in a 50 foot circle, centered on you.",
       "moveStat": "None",
       "vpCost": "5",
@@ -15964,7 +15994,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "stat_buff_self",
+        "boosted_attack_rolls"
+      ],
       "description": "You become one with your inner self. For the duration, double your proficiency bonus when it comes to attack rolls and saving throws.",
       "moveStat": "None",
       "vpCost": "3",
@@ -15983,9 +16016,10 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_debuff_enemy",
-        "field_weather"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition",
+        "field_terrain"
       ],
       "description": "The user creates a 20-foot-radius sphere of psychic fog centered on a point within 120 feet. The fog spreads around corners, and its area is heavily obscured. Each creature in the fog when it appears must make an Intelligence saving throw. On a failure, the creature is stunned for 1 round and has disadvantage on Intelligence and Wisdom checks for 1 minute.",
       "moveStat": "INT",
@@ -16005,7 +16039,7 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
+        "trigger_saving_throw",
         "stat_debuff_enemy"
       ],
       "description": "You flash your eyes at the target, stunning them briefly and lowering their defenses. When activating this move, choose a target in range and force them to make a WIS save against your Move DC. On a failure, any modifiers to their AC are reset, and if they are Dark or Ghost-type, their immunities are relinquished for the duration. If, when losing immunity, the target’s secondary type gives it vulnerability or resistance to an attack of that type, it follows the secondary type for that effect.",
@@ -16026,8 +16060,8 @@
       },
       "reaction": true,
       "categories": [
-        "damage",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "damage"
       ],
       "description": "When subject to a ranged attack, you can attempt to decrease the damage and send some back at the attacker in range. Using this reaction, the damage is decreased by 1d6 + MOVE. If this causes the damage to fall below zero, the attack is deflected and you may make a ranged attack roll to send it back at the attacker for 1d6 + MOVE psychic damage.",
       "moveStat": "CON/WIS",
@@ -16049,7 +16083,7 @@
       "categories": [
         "damage",
         "status_inflict_threshold",
-        "stat_debuff_enemy",
+        "potential_disadvantage",
         "recharge_locked"
       ],
       "description": "You fire an explosive ball of damaging mist at a creature in range. Make a ranged attack against a target, doing 4d12 + MOVE psychic damage on a hit. If the natural attack roll is higher than 10, the target has disadvantage on any attack it makes before the end of its next turn. This move can't be used consecutively.",
@@ -16070,7 +16104,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You send a puff of mystical pollen that spreads out in a 5 foot radius from a point in range. All cratures in the circle are forced to make a WIS save. On a failure, they suffer a status condition. Determine the status condition by rolling a d20: 1: Sleep 2: Blind 3: Burn 4: Charm 5: Confuse 6: Deafen 7: Flinch 8: Frighten 9: Freeze 10: Grapple 11: Incapacitate 12: Invisible 13: Paralyze 14: Petrify 15: Poison 16: Prone 17: Restrain 18: Stun 19: Reroll 20: You decide",
       "moveStat": "None",
@@ -16090,8 +16126,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw_on_hit",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "Your eyes glow purple, staring into the souls of all creatures in range. Make a ranged attack. On a hit, force all creatures in range to attempt a WIS save against your move DC, confusing them on a failure.",
       "moveStat": "None",
@@ -16112,7 +16149,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "A pillar of light erupts from the ground in a 20ft radius, 80ft high cylinder centered on a point in range. Any creature caught in the blast must make a DEX save against your Move DC, taking 4d12 + MOVE psychic damage on a fails save, or half as much on a success.",
@@ -16132,7 +16170,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "stat_buff_self"
+      ],
       "description": "You use your psychic power to change your offense to match the target's the best you can. Force a creature in range to make a CHA save against your Move DC. On a failure, choose either your STR, DEX, or WIS. For the duration, replace the chosen ability score with the average of your current score and the target's score.",
       "moveStat": "INT/WIS",
       "vpCost": "2",
@@ -16151,7 +16192,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "steal_disrupt"
       ],
       "description": "As a bonus action, force a creature in range to make a WIS save against your Move DC. On a failure, you employ your psychic power to swap a single ability score with a creature until the end of their next turn, for purposes of attack and damage rolls.",
       "moveStat": "WIS/INT",
@@ -16171,8 +16213,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "positioning"
+        "stat_buff_self"
       ],
       "description": "You employ your psychic power to switch your own attack and defense. Until the end of your next turn, switch your AC with an ability score of your choice (Constitution not included)",
       "moveStat": "None",
@@ -16193,6 +16234,8 @@
       "reaction": false,
       "categories": [
         "damage",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
         "recharge_locked"
       ],
       "description": "You use the power of a prism to fire a collection of dangerous lasers in a 60 foot line, 5ft wide. All creatures caught in the line must succeed a DEX save or take 3d10d6 + MOVE psychic damage on a fail, and half as much on a save.",
@@ -16214,7 +16257,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You send a beam of invisible, psychic energy at a target in range. The target must make a WIS saving throw against your Move DC, taking 1d10 + MOVE psychic damage and becoming confused on a fail, and half as much without becoming confused on a save.",
       "moveStat": "DEX/INT/WIS",
@@ -16255,7 +16299,8 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "steal_disrupt"
       ],
       "description": "You materialize a set of large fangs that bite at a creature with psychic energy. Make a ranged attack, dealing 2d8 + MOVE psychic damage on a hit. On a hit, this move automatically ends a creature’s Light Screen, and bypasses Reflect with no effect.",
       "moveStat": "STR/WIS",
@@ -16275,7 +16320,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "field_terrain",
+        "boosted_damage_rolls"
       ],
       "description": "Psychic energy emerges from the ground in a 40ft, centered on you. Begininng at the end of your turn, for three rounds, all grounded creatures in the affected area are unable to use bonus actions. Grounded creatures are those that do not have a flying speed or Levitate, Magnet Rise, or similar ability. In addition, creatures may double their MOVE modifier on damage rolls from psychic-type moves activated inside the area.",
       "moveStat": "None",
@@ -16296,7 +16342,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "stat_debuf_self",
         "recharge_locked"
       ],
       "description": "You send an extremely powerful wave of psychic energy at creatures in a 60 foot cone. Creatures in the wave must make a WIS save against your Move DC, taking 10d12 + MOVE psychic damage on a failure, or half as much on a success. The power of the move exhausts you, and your next attack is done at disadvantage. If your next attack requires a saving throw, affected creatures have advantage. This move can only be used once per long rest.",
@@ -16318,8 +16366,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_save",
-        "stat_buff_ally"
+        "status_inflict_auto"
       ],
       "description": "You create a psychic wave that swirls around a creature in range, attempting to restrain it. Make a ranged attack. On a hit, the target takes 3d10 + MOVE psychic damage and is restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. On each successive turn, if the creature is still restrained, you may use this move again (as an action) and automatically hit.",
       "moveStat": "INT/WIS",
@@ -16340,8 +16387,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
-        "crit_range_mod"
+        "crit_range_mod",
+        "base_crit"
       ],
       "description": "You tear at a target with blades formed by psychic power. Make a ranged attack on a creature, dealing 1d10 + MOVE psychic damage on a hit. This move scores a critical hit on natural rolls of 19 or 20.",
       "moveStat": "DEX/WIS",
@@ -16361,7 +16408,8 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally"
+        "trigger_saving_throw",
+        "steal_disrupt"
       ],
       "description": "You employ your psychic power to transfer a status condition to someone else. Choose a willing ally (or yourself) and a creature in range. Force the target to make a WIS save against your Move DC. On a failure, a status affecting the ally (or you) is transferred to the target instead.",
       "moveStat": "WIS/INT",
@@ -16421,8 +16469,9 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "potential_status_condition"
       ],
       "description": "You emit a wave of psychic energy in a 40 foot line, 5 feet wide. Each creature caught in the wave must make a WIS save against your Move DC, becoming confused on a fail.",
       "moveStat": "INT/WIS",
@@ -16442,6 +16491,7 @@
       },
       "reaction": false,
       "categories": [
+        "unknown",
         "recharge_locked"
       ],
       "description": "You record one ability used by a creature within 30 feet during the last round.",
@@ -16483,7 +16533,7 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "stat_buff_self"
+        "status_condition"
       ],
       "description": "You put yourself to sleep, but recover 4d6 + MOVE hit points in the process.",
       "moveStat": "WIS/CHA",
@@ -16502,7 +16552,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "steal_disrupt"
+      ],
       "description": "You attempt to copy a creature's abilities for the duration. Select a target in range and force them to make a WIS saving throw against your Move DC. On a failure, replace one of your own current abilities with one of theirs.",
       "moveStat": "WIS",
       "vpCost": "3",
@@ -16521,6 +16574,8 @@
       },
       "reaction": false,
       "categories": [
+        "stat_buff_self",
+        "stat_buff_ally",
         "protect_negate"
       ],
       "description": "A glowing barrier of hieroglyphic text surrounds you in a 15 foot radius, protecting you and any creatures within the barrier from damage and status conditions. For the duration, the AC of you and all allied creatures inside the barrier is increased by 2, and you are immune to all incoming status conditions.",
@@ -16541,7 +16596,8 @@
       },
       "reaction": false,
       "categories": [
-        "positioning"
+        "trigger_saving_throw",
+        "steal_disrupt"
       ],
       "description": "You attempt to swap abilities with a creature for the duration. Select a target in range and force them to make a WIS saving throw against your Move DC. On a failure, choose which abilities to switch for the duration.",
       "moveStat": "WIS",
@@ -16561,7 +16617,8 @@
       },
       "reaction": false,
       "categories": [
-        "positioning"
+        "trigger_saving_throw",
+        "steal_disrupt"
       ],
       "description": "You use your psychic power to swap speed with a creature. Force a creature in range to make a CHA save against your Move DC. On a failure, switch speed with the target for the duration.",
       "moveStat": "INT/WIS",
@@ -16602,8 +16659,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
-        "stat_buff_ally"
+        "conditional_damage"
       ],
       "description": "You use your psychic energy to attack with stored power. Make a ranged attack, dealing 1d10 + MOVE psychic damage on a hit. Add an additional damage dice for each bonus applied to any of your attack, damage, or AC stats. (For example, if you or an ally has activated moves that are currently boosting your AC, attack, and damage rolls by +1, add three additional damage dice.",
       "moveStat": "STR/WIS",
@@ -16624,7 +16680,9 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "multi_hit_aoe",
+        "situational_use"
       ],
       "description": "You emit a strange soundwave that only damages creatures that share a type with you. Any creature within a 20ft circle that shares at least one of your types must make a CON save against your Move DC, taking 3d10 + MOVE psychic damage on a failure, or half as much on a success.",
       "moveStat": "WIS/CHA",
@@ -16644,8 +16702,8 @@
       },
       "reaction": false,
       "categories": [
-        "status_inflict_save",
-        "stat_buff_self"
+        "trigger_saving_throw",
+        "potential_status_condition"
       ],
       "description": "You use your psychic power to attempt to hold a creature above the ground, making it vulnerable to attacks. Force a creature in range to make a CON save against your Move DC. On a failure, the creature is grappled and restrained for the duration, unable to release itself as long as you hold your concentration. While grappled, the creature is considered Raised.",
       "moveStat": "WIS/INT",
@@ -16682,7 +16740,9 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "movement"
+      ],
       "description": "You disappear from view and reappear at an unoccupied point within range. In wild creature battles, this move can be activated to automatically count as a single success in a group DEX check to run away. You may spend 20VP instead of 5 to use this move as a bonus action instead.",
       "moveStat": "None",
       "vpCost": "5",
@@ -16718,7 +16778,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "remove_item",
+        "remove_item_on_target"
+      ],
       "description": "You move quickly to attempt to swap held items with a creature. Make a melee attack roll against a creature, swapping held items with them on a hit.",
       "moveStat": "WIS",
       "vpCost": "2",
@@ -16736,7 +16799,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_terrain",
+        "unknown"
+      ],
       "description": "The world around you seems to spin for a moment, and the whole battlefield is hit with a bizarre feeling. Starting at the beginning of the next round of combat after you activate this move, the initiative order is permanently reversed.",
       "moveStat": "None",
       "vpCost": "10",
@@ -16754,7 +16820,11 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "trigger_saving_throw",
+        "potential_status_condition",
+        "stat_debuff_enemy"
+      ],
       "description": "The user releases a wave of disorienting psychic energy. Target creature must make a Wisdom saving throw or become incapacitated for 1 round and have its speed halved for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the speed reduction on a success.",
       "moveStat": "WIS",
       "vpCost": "7",
@@ -16772,7 +16842,10 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_terrain",
+        "unknown"
+      ],
       "description": "You create a bizarre vibe in the air in a 50ft circle, centered on you. For the duration, all WIS saves become CON saves and all CON saves become WIS saves.",
       "moveStat": "None",
       "vpCost": "5",

@@ -62,21 +62,19 @@ const WIP_CSS = `
   .combat-wip-title img { height: 1.6em; width: auto; }
   .wip-map-btn, .wip-log-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
   .wip-header-btn-group { display: flex; gap: 0.5rem; }
-  /* justify-content:center (rather than relying on margin:auto absorbing
-     whatever's left after flex-grow hits .combat-wip-body's max-width) is
-     what actually centers this row reliably -- that auto-margin approach
-     looked right on paper but kept coming out still hugging the sidebar
-     in practice. */
-  .combat-wip-layout { display: flex; align-items: flex-start; justify-content: center; gap: 1rem; padding: 0 1rem; }
-  .combat-wip-body { flex: 0 1 700px; min-width: 0; padding: 1.5rem 0 3rem; }
+  /* The turn order is a strip ABOVE the info box, not a column beside it, so
+     on a phone the info box gets the full width instead of what's left after
+     the portraits. The portraits wrap onto extra rows once there are more
+     than fit on one line, which keeps every participant visible. */
+  .combat-wip-layout { display: flex; flex-direction: column; align-items: center; padding: 0 1rem; }
+  .combat-wip-body { width: 100%; max-width: 700px; min-width: 0; padding: 1.5rem 0 3rem; }
   .combat-wip-turnorder {
-    flex: 0 0 42px; display: flex; flex-direction: column; gap: 0.4rem;
-    padding: 1.5rem 0 3rem; position: sticky; top: 0;
+    display: flex; flex-flow: row wrap; justify-content: center; gap: 0.6rem 0.5rem;
+    width: 100%; max-width: 700px; padding: 0.75rem 0 0;
   }
   /* No participants yet (empty/setup screen) leaves this with zero
-     children -- collapse it out of the row entirely instead of still
-     reserving 42px+gap next to nothing, which was its own small but real
-     contributor to .combat-wip-body not reading as centered. */
+     children -- collapse it instead of still reserving its padding above
+     nothing. */
   .combat-wip-turnorder:empty { display: none; }
   .wip-turn-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
   .wip-turn-portrait {
@@ -91,13 +89,15 @@ const WIP_CSS = `
      of being clipped into its corner. */
   .wip-turn-portrait-media { width: 100%; height: 100%; border-radius: 6px; overflow: hidden; }
   .wip-turn-portrait-media img, .wip-turn-portrait-media video { width: 100%; height: 100%; object-fit: contain; }
-  /* One dot per available reaction, stacked outside the portrait's left
-     edge (not clipped into it) so a boss with multiple reactions can just
-     get more .wip-turn-reaction-dot children here later. Green = available,
-     grey = used/unavailable. */
+  /* One dot per available reaction, sitting on the portrait's top-right
+     corner (partly outside it, not clipped into it) so a boss with multiple
+     reactions can just get more .wip-turn-reaction-dot children here later --
+     they grow leftwards from the corner. (Beside the portrait, as it was in
+     the old vertical column, it would land on the neighbouring portrait in
+     this horizontal strip.) Green = available, grey = used/unavailable. */
   .wip-turn-reaction {
-    position: absolute; top: 50%; right: calc(100% + 3px); transform: translateY(-50%);
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    position: absolute; top: -4px; right: -4px;
+    display: flex; flex-direction: row; align-items: center; gap: 3px;
   }
   .wip-turn-reaction-dot {
     width: 9px; height: 9px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 0 2px #14141f;
@@ -414,8 +414,8 @@ function _renderCurrentView() {
         <div id="wipHeaderEndBtn"></div>
       </div>
       <div class="combat-wip-layout">
-        <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
         <div class="combat-wip-turnorder" id="wipTurnOrder"></div>
+        <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
       </div>
     </div>`;
 }
@@ -1097,7 +1097,8 @@ function _syncHeaderBar(state) {
 }
 
 // ---------------------------------------------------------------------------
-// Turn-order sidebar -- a compact column, in turn order, of every
+// Turn-order strip -- a compact row above the info box (wrapping onto extra
+// rows when there are many), in turn order, of every
 // participant's portrait (including DM-controlled enemies in PvE), the
 // current turn/reaction holder framed in gold, a reaction-availability dot
 // (outside the portrait's left edge) per portrait, and a lighter blue frame
@@ -1185,6 +1186,27 @@ function _setFocus(id) {
 
 let _focusedParticipantId = null;
 let _focusManuallySet = false;
+// Which participant combat.js's button handlers (HP/VP, stats, moves, End
+// Turn's local half...) are currently attached for. Those handlers look their
+// combatant up in the state object they were attached with, so they only work
+// for THAT participant -- showing a different one of the viewer's own
+// combatants needs a fresh attach, not just a re-render (see _syncMainFocus).
+let _attachedFocusId = null;
+
+/** The viewer's own next combatant in turn order after `fromId`, wrapping
+ * round to the start of the order. Returns `fromId` itself when it's the only
+ * one they own, and null if `fromId` isn't in the turn order at all. */
+function _nextOwnedAfter(state, fromId) {
+  const myName = _currentTrainerName();
+  const order = state.turnOrder;
+  const start = order.indexOf(fromId);
+  if (start === -1) return null;
+  for (let step = 1; step <= order.length; step++) {
+    const id = order[(start + step) % order.length];
+    if (state.participants[id]?.owner === myName) return id;
+  }
+  return null;
+}
 
 function _getDefaultFocusId(state) {
   const myName = _currentTrainerName();
@@ -1290,6 +1312,7 @@ function _attachMainFocusListeners(state) {
   if (!ctx || !ctx.isMine) return;
 
   attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, onMultiHitAoe: _handleMultiHitAoe, ...ctx.cardOptions });
+  _attachedFocusId = ctx.p.id;
 
   document.getElementById('battleList')?.addEventListener('click', (e) => {
     const reactBtn = e.target.closest('.wip-react-btn');
@@ -1305,12 +1328,27 @@ function _attachMainFocusListeners(state) {
     // a normal turn both resolve to this same button (see
     // _computeFocusContext's activeTurnIndex), so it has to mean "give up
     // the floor" either way: reactionEnd while reacting, advanceTurn otherwise.
-    if (!e.target.closest('.end-turn-btn')) return;
+    const endBtn = e.target.closest('.end-turn-btn');
+    if (!endBtn) return;
     if (session.reactingParticipantId) {
       CombatAPI.reactionEnd().catch(() => {});
-    } else {
-      CombatAPI.advanceTurn().catch(() => {});
+      return;
     }
+
+    // Ending a real turn also moves the info box on to this viewer's own next
+    // combatant (trainer or Pokémon, wrapping round the turn order), so the
+    // next thing they see is whoever they'll be playing next. Only once the
+    // server accepted the advance, so a rejected End Turn doesn't move focus.
+    // Skipped for a combatant with Ingrain: combat.js finishes that End Turn
+    // later, behind its heal popup, by redrawing THIS combatant's card --
+    // which would land on top of the new focus.
+    const endingId = endBtn.dataset.combatantId;
+    const nextId = _nextOwnedAfter(session, endingId);
+    const endingHasIngrain = ctx.filteredState.combatants[0]?.statusEffects
+      ?.some(se => se.name === 'Ingrain' && se.duration > 0);
+    CombatAPI.advanceTurn()
+      .then(() => { if (nextId && nextId !== endingId && !endingHasIngrain) _setFocus(nextId); })
+      .catch(() => {});
   });
 }
 
@@ -1336,7 +1374,13 @@ function _syncMainFocus(state) {
     }
     return;
   }
-  if (document.getElementById('battleList')) {
+  // Patch in place only while still showing the SAME combatant combat.js's
+  // handlers were attached for. Switching to a different one of the viewer's
+  // own (a sidebar click, or End Turn moving on to their next combatant) falls
+  // through to the full rebuild + re-attach below instead -- otherwise the new
+  // card would render but its buttons would look themselves up in the old
+  // combatant's state and quietly do nothing.
+  if (document.getElementById('battleList') && _attachedFocusId === ctx.p.id) {
     setBattleCardOptions(ctx.cardOptions);
     // rerenderBattle always rebuilds the card fresh (a plain innerHTML
     // replace shared with the legacy multi-card page, which this doesn't

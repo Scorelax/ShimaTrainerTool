@@ -846,6 +846,14 @@ export class CombatAPI {
     return API.request('combat', 'update-stats', { id, currentHP, currentVP }, { useCache: false });
   }
 
+  /** Reports a combatant's manual stat edits (AC, ability scores + modifiers, crit
+   * modifier) so every other player's popups use them -- BASE values, without the
+   * live status deltas (see routes_combat.py's update-base-stats and
+   * utils/stat-sync.js). */
+  static async updateBaseStats(id, stats) {
+    return API.request('combat', 'update-base-stats', { id, stats: JSON.stringify(stats) }, { useCache: false });
+  }
+
   /** Puts a live effect (condition / stat modifier / advantage-disadvantage) on
    * a participant -- `status` is a move-effects entry (see move-effects-schema.md,
    * built by move-effects.js's buildStatusSpec) with rounds durations already

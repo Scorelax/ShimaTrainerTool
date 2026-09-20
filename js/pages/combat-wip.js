@@ -21,6 +21,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
+import { createBaseStatSync } from '../utils/stat-sync.js';
 import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, reapplyStatDeltas, effectiveStats } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -346,6 +347,10 @@ let _myPokemonKey = null;
 const WIP_COMBAT_STATE_KEY = 'wipCombatState';
 let _battleSyncActive = false;
 let _myParticipantIds = new Set();
+// Manual stat edits (AC, ability scores + modifiers, crit modifier) made on this device's own
+// cards, pushed to the server so every other player's popups read the same values -- see
+// stat-sync.js. The card's numbers include live status effects; what's sent is the base.
+const _baseStatSync = createBaseStatSync((id, stats) => CombatAPI.updateBaseStats(id, stats));
 let _lastSyncedStats = {}; // participantId -> {hp, vp} last pushed to the server, to dedupe redundant pushes
 
 function _needsToJoin(state) {
@@ -550,6 +555,7 @@ function _exitBattleSync() {
   _battleSyncActive = false;
   _myParticipantIds = new Set();
   _lastSyncedStats = {};
+  _baseStatSync.reset();
   _statsSyncInFlight = {};
   _statsSyncPending = {};
   setCombatStateKey('combatState');
@@ -568,6 +574,7 @@ function _exitBattleSync() {
  * (status effects, stat adjusters, isExpanded toggles) don't spam the
  * server with no-op requests. */
 function _onLocalCombatStateSave(state) {
+  _baseStatSync.onSave(state.combatants, id => _myParticipantIds.has(id));
   state.combatants.forEach(c => {
     if (!_myParticipantIds.has(c.id)) return;
     const last = _lastSyncedStats[c.id];

@@ -76,6 +76,15 @@ removed status gives its points back; the card shows a small +/- next to each mo
 moves by the change in its `floor((score-10)/2)` step. Server-record calculations (a reactive save's Move DC) use
 `effectiveStats`.
 
+**Scores vs modifiers.** Only the *score* is buffed; the modifier is always derived from it in steps of 2 from 10
+(`floor((score-10)/2)`), so a +1 to all abilities moves a modifier — and a Move DC (`8 + proficiency + modifier`) — only
+where the score crosses a step (DEX 11→12 gains +1, 10→11 doesn't).
+
+**Manual edits are shared.** The Modify Stats buttons (AC, scores, modifiers, crit modifier) only touch the owner's card, so
+they're pushed to the server (`update-base-stats`, `utils/stat-sync.js`) as **base** values — the card's numbers minus the live
+status deltas. Every reader (target AC hint, a saver's modifier, an attacker's Move DC and crit range) adds the participant's
+`statuses` on top itself (`effectiveStats`), so nothing is counted twice.
+
 Not applied yet: `speed` (and conditions' own effects) — deliberately left for when the condition rules are written.
 
 ## Not covered yet

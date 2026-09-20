@@ -219,6 +219,12 @@ def handle(conn, action, params):
             raise ValueError('Missing targetId or statusId')
         return _mutate(conn, lambda s: _use_status(s, params['targetId'], params['statusId']))
 
+    if action == 'update-base-stats':
+        if not params.get('id') or not params.get('stats'):
+            raise ValueError('Missing participant id or stats')
+        stats = json.loads(params['stats'])
+        return _mutate(conn, lambda s: _update_base_stats(s, params['id'], stats))
+
     if action == 'update-stats':
         if not params.get('id'):
             raise ValueError('Missing participant id')
@@ -665,6 +671,32 @@ def _update_stats(state, pid, current_hp, current_vp):
         participant['currentHP'] = current_hp
     if current_vp is not None:
         participant['currentVP'] = current_vp
+
+
+_BASE_STAT_KEYS = ('ac', 'str', 'dex', 'con', 'int', 'wis', 'cha',
+                   'strMod', 'dexMod', 'conMod', 'intMod', 'wisMod', 'chaMod', 'critMod')
+
+
+def _update_base_stats(state, pid, stats):
+    """Client-authoritative sync for a combatant's MANUAL stat edits (the Modify
+    Stats buttons on its card: AC, ability scores and modifiers, crit modifier),
+    which otherwise only ever touch that player's local card. Every other client
+    reads these off the participant record -- a target's AC for the hit/miss hint,
+    a saver's modifier, an attacker's Move DC and crit range -- so they have to
+    follow. These are BASE values: the live status deltas (AC -1 from Crunch...)
+    are NOT baked in, because every reader adds the participant's `statuses` on
+    top itself; storing the buffed numbers here would count each effect twice.
+    Same trust model as update-stats."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    for key in _BASE_STAT_KEYS:
+        if key not in stats:
+            continue
+        value = js_parse_int(stats[key])
+        if value is None:
+            raise ValueError(f'{key} must be a number')
+        participant[key] = value
 
 
 def _set_visibility(state, pid, field, visible):

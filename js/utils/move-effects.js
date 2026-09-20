@@ -233,6 +233,26 @@ export function reapplyStatDeltas(c, prev, next) {
   return c;
 }
 
+/** The values other players should see for a LOCAL combatant: its AC, ability scores and
+ * modifiers with the live status deltas taken back out (`appliedStatMods`), plus its crit
+ * modifier. Their popups add the live statuses on top themselves (effectiveStats /
+ * attackRollContext), so sending the card's already-buffed numbers would count every
+ * effect twice. Only finite numbers are included. */
+export function baseStats(c) {
+  const applied = c.appliedStatMods || {};
+  const out = {};
+  if (Number.isFinite(c.ac)) out.ac = c.ac - (applied.ac || 0);
+  for (const k of _SCORE_KEYS) {
+    if (!Number.isFinite(c[k])) continue;
+    const baseScore = c[k] - (applied[k] || 0);
+    out[k] = baseScore;
+    const modKey = `${k}Mod`;
+    if (Number.isFinite(c[modKey])) out[modKey] = c[modKey] - (_STEP(c[k]) - _STEP(baseScore));
+  }
+  if (Number.isFinite(c.critMod)) out.critMod = c.critMod;
+  return out;
+}
+
 /** A copy of a SERVER participant record with its live stat statuses applied to AC,
  * ability scores and their modifiers -- for anything computed from the record (a Move
  * DC, a target's AC) rather than from a card. Records without a stat block pass through. */

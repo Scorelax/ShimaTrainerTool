@@ -21,7 +21,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, reapplyStatDeltas, effectiveStats } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -746,7 +746,14 @@ function _syncLocalCombatState(session) {
     }
     merged.currentHp = p.currentHP; merged.maxHp = p.maxHP;
     merged.currentVp = p.currentVP; merged.maxVp = p.maxVP;
-    if (resolved) merged.hasStatBlock = true;
+    if (resolved) {
+      merged.hasStatBlock = true;
+      // Live stat statuses (AC -1, all abilities +1, ...) move the card's CURRENT AC and ability
+      // scores/modifiers -- the same values the Modify Stats buttons edit, and the ones the move
+      // popup reads for attack bonus, damage bonus and Move DC -- so a buff or debuff shows up
+      // everywhere at once. Only the change since the last sync is applied, so manual edits stay.
+      reapplyStatDeltas(merged, merged.appliedStatMods, statDeltas(p));
+    }
     // This IS the server's current value -- prime the dedupe cache with it
     // so the very next local save (even one unrelated to HP/VP) doesn't
     // get misread as a new change and echoed straight back.
@@ -1976,7 +1983,7 @@ async function _handleReactiveSave({ combatantId, moveName }) {
       const candidate = freshSession.participants?.[activeAttackerId];
       if (candidate && entry.move && _hasFullStatBlock(candidate)) {
         const moveRow = findMoveRow(entry.move);
-        if (moveRow) { attacker = candidate; dc = computeMoveDC(moveRow, candidate); }
+        if (moveRow) { attacker = candidate; dc = computeMoveDC(moveRow, effectiveStats(candidate)); }
       }
       break; // only the most recent hit FROM the current turn holder counts
     }

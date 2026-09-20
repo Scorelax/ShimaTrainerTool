@@ -847,6 +847,13 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
 
   const typeBadges = c.types.map(t => `<span class="type-badge type-${t.toLowerCase()}">${t}</span>`).join('');
 
+  // Values a live status (AC -1, all abilities +1...) is currently shifting -- see combat-wip.js's
+  // _syncLocalCombatState. Shown as a small +/- next to the number so it's clear why it differs.
+  const sm = c.appliedStatMods || {};
+  const modTag = (key) => (sm[key]
+    ? `<sup class="stat-mod-tag ${sm[key] > 0 ? 'up' : 'down'}" title="From live effects">${sm[key] > 0 ? '+' : ''}${sm[key]}</sup>`
+    : '');
+
   const KNOWN_STATUSES = ['Poison','Burn','Confusion','Paralysis','Sleep','Freeze'];
   const statusBadges = c.statusEffects.map(se => {
     const dur = se.duration === -1 ? '' : ` (${se.duration})`;
@@ -878,7 +885,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
               : `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>`}
           </div>
           <div class="combat-card-stats-group">
-            ${c.hasStatBlock === false ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong></div>`}
+            ${c.hasStatBlock === false ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}</div>`}
             <div class="combat-card-stats-row">
               <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>
                 <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
@@ -890,13 +897,13 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
           </div>
           ${c.hasStatBlock === false ? '' : `
           <div class="combat-card-stats-row combat-mods-row">
-            <span>STR ${c.str}<small>(${formatMod(c.strMod)})</small></span>
-            <span>DEX ${c.dex}<small>(${formatMod(c.dexMod)})</small></span>
-            <span>CON ${c.con}<small>(${formatMod(c.conMod)})</small></span>
+            <span>STR ${c.str}<small>(${formatMod(c.strMod)})</small>${modTag('str')}</span>
+            <span>DEX ${c.dex}<small>(${formatMod(c.dexMod)})</small>${modTag('dex')}</span>
+            <span>CON ${c.con}<small>(${formatMod(c.conMod)})</small>${modTag('con')}</span>
             ${compactWip ? `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>` : ''}
-            <span>INT ${c.int}<small>(${formatMod(c.intMod)})</small></span>
-            <span>WIS ${c.wis}<small>(${formatMod(c.wisMod)})</small></span>
-            <span>CHA ${c.cha}<small>(${formatMod(c.chaMod)})</small></span>
+            <span>INT ${c.int}<small>(${formatMod(c.intMod)})</small>${modTag('int')}</span>
+            <span>WIS ${c.wis}<small>(${formatMod(c.wisMod)})</small>${modTag('wis')}</span>
+            <span>CHA ${c.cha}<small>(${formatMod(c.chaMod)})</small>${modTag('cha')}</span>
           </div>`}
         </div>
       </div>
@@ -1238,6 +1245,9 @@ function getCombatCSS() {
     .combat-initiative-badge { margin-left: auto; font-size: 0.72rem; color: #FFD700; font-weight: 600; }
     .combat-card-stats-group { background: rgba(255,255,255,0.04); border-radius: 6px; padding: 0.2rem 0.45rem; margin-bottom: 0.2rem; }
     .combat-card-ac-line { font-size: 0.76rem; color: #c0c0c0; margin-bottom: 0.18rem; }
+    .stat-mod-tag { font-size: 0.62rem; font-weight: 800; margin-left: 2px; }
+    .stat-mod-tag.up { color: #2ecc71; }
+    .stat-mod-tag.down { color: #e74c3c; }
     .combat-card-stats-row { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.82rem; }
     .combat-mods-row { display: grid; grid-template-columns: repeat(3, 1fr); font-size: 0.78rem; color: #c0c0c0; gap: 0.25rem 0.3rem; }
     .combat-mods-row small { color: #888; margin-left: 1px; }

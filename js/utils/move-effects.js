@@ -194,14 +194,64 @@ export function attackRollContext(attacker, target) {
   return _finish(ctx, adv, dis);
 }
 
+const _STEP = (score) => Math.floor((score - 10) / 2);
+const _SCORE_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+/** What a participant's live stat statuses currently add to AC and each ability score:
+ * {ac, str, dex, con, int, wis, cha} (0 where nothing applies). all_abilities counts
+ * for all six; stacks multiply; `set` (speed) and `proficiency` amounts don't belong here. */
+export function statDeltas(participant) {
+  const d = { ac: 0, str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+  for (const s of participant?.statuses || []) {
+    if (s.kind !== 'stat' || typeof s.amount !== 'number') continue;
+    const amount = s.amount * _stackCount(s);
+    if (s.stat === 'ac') d.ac += amount;
+    else if (s.stat === 'all_abilities') _SCORE_KEYS.forEach(k => { d[k] += amount; });
+    else if (_SCORE_KEYS.includes(s.stat)) d[s.stat] += amount;
+  }
+  return d;
+}
+
+/** Moves a LOCAL combatant's AC / ability scores (the card's current values, which the
+ * Modify Stats buttons also edit) from the status deltas last applied (`prev`) to `next`,
+ * so manual edits stay and a removed status gives its points back. An ability's modifier
+ * moves by the change in its floor((score-10)/2) step -- a sheet-provided modifier that
+ * differs from the formula keeps its offset. Records `next` as `appliedStatMods` (the card
+ * shows it). Mutates and returns `c`. */
+export function reapplyStatDeltas(c, prev, next) {
+  for (const key of ['ac', ..._SCORE_KEYS]) {
+    const d = (next[key] || 0) - (prev?.[key] || 0);
+    if (!d || !Number.isFinite(c[key])) continue;
+    const old = c[key];
+    c[key] = old + d;
+    if (key !== 'ac') {
+      const modKey = `${key}Mod`;
+      c[modKey] = (Number(c[modKey]) || 0) + _STEP(c[key]) - _STEP(old);
+    }
+  }
+  c.appliedStatMods = { ...next };
+  return c;
+}
+
+/** A copy of a SERVER participant record with its live stat statuses applied to AC,
+ * ability scores and their modifiers -- for anything computed from the record (a Move
+ * DC, a target's AC) rather than from a card. Records without a stat block pass through. */
+export function effectiveStats(participant) {
+  const d = statDeltas(participant);
+  const out = { ...participant };
+  if (Number.isFinite(out.ac)) out.ac += d.ac;
+  for (const k of _SCORE_KEYS) {
+    if (!d[k] || !Number.isFinite(out[k])) continue;
+    const modKey = `${k}Mod`;
+    out[modKey] = (Number(out[modKey]) || 0) + _STEP(out[k] + d[k]) - _STEP(out[k]);
+    out[k] += d[k];
+  }
+  return out;
+}
+
 /** The score change an ability gets from `saver`'s stat statuses (its own stat or all_abilities). */
 function _abilityScoreDelta(saver, ability) {
-  const key = String(ability || '').toLowerCase();
-  let delta = 0;
-  for (const s of saver?.statuses || []) {
-    if (s.kind === 'stat' && (s.stat === key || s.stat === 'all_abilities')) delta += _statAmount(s, saver);
-  }
-  return delta;
+  return statDeltas(saver)[String(ability || '').toLowerCase()] || 0;
 }
 
 /** Modifiers for `saver`'s saving throw (`ability` "STR".."CHA" or null) against a

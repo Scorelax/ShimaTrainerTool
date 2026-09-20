@@ -66,8 +66,17 @@ The dice are rolled at the table, so the popups only *show* what applies and fol
 | the move's user: `roll` on `saves_against_its_moves` | advantage/disadvantage for the saver (Night Daze) |
 
 Advantage and disadvantage from different sources cancel to a normal roll (both are still listed). A status with a `uses`
-end is used up (`use-status`) when the roll is confirmed — not when a popup is cancelled. `speed` and ability-score
-changes on attack/damage/Move DC are not applied anywhere yet.
+end is used up (`use-status`) when the roll is confirmed — not when a popup is cancelled.
+
+**Stat statuses on the card.** `stat` statuses on AC and the six ability scores (incl. `all_abilities`) move the
+combatant card's *current* AC / scores — the same values the Modify Stats buttons edit — so the card, the move popup's
+attack bonus, damage bonus and Move DC all follow (`statDeltas` / `reapplyStatDeltas` in `move-effects.js`, applied in
+`combat-wip.js`'s `_syncLocalCombatState`). Only the change since the last sync is applied, so manual edits stay and a
+removed status gives its points back; the card shows a small +/- next to each modified value. An ability's modifier
+moves by the change in its `floor((score-10)/2)` step. Server-record calculations (a reactive save's Move DC) use
+`effectiveStats`.
+
+Not applied yet: `speed` (and conditions' own effects) — deliberately left for when the condition rules are written.
 
 ## Not covered yet
 The other stat/advantage moves in the file (`stat_buff_self`, `stat_buff_ally`, `stat_debuff_enemy`,

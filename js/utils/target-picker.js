@@ -14,6 +14,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
+import { attackRollContext, rollModeText } from './move-effects.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -61,6 +62,12 @@ function _injectStyles() {
     .target-picker-roll-back { background: rgba(255,255,255,0.1) !important; }
     .target-picker-hit-btn { background: linear-gradient(135deg, #4CAF50, #45A049) !important; }
     .target-picker-miss-btn { background: linear-gradient(135deg, #EE1515, #C91010) !important; }
+    .target-picker-roll-notes { font-size: 0.82rem; margin-bottom: 0.8rem; line-height: 1.35; }
+    .target-picker-roll-notes:empty { display: none; }
+    .target-picker-roll-notes .mode { font-weight: 800; }
+    .target-picker-roll-notes .mode.advantage { color: #2ecc71; }
+    .target-picker-roll-notes .mode.disadvantage { color: #e74c3c; }
+    .target-picker-roll-notes .note { color: #a0a0c0; }
     .target-picker-anim-media { width: 100%; max-height: 40vh; display: flex; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
     .target-picker-anim-media:empty { display: none; }
     .target-picker-anim-media img, .target-picker-anim-media video { max-width: 100%; max-height: 40vh; border-radius: 12px; object-fit: contain; }
@@ -84,6 +91,25 @@ let _guaranteedHit = false;
 // clicked and handed back with the result so the caller can tell which
 // natural-roll / crit effects triggered (null on a guaranteed hit: nothing rolled).
 let _attackRoll = null;
+// Live statuses that change this roll (see move-effects.js's attackRollContext): the attacker
+// and the chosen target's participant records, and what they add up to for the selected target.
+let _attacker = null;
+let _atkCtx = null;
+
+/** The attack modifier actually in force: the move's own plus any live attack-roll status. */
+function _effectiveAttackMod() { return _attackModifier + (_atkCtx?.attackBonus || 0); }
+
+/** Uses up every "next attack/roll" status that shaped this roll -- called once the roll is confirmed. */
+function _consume(ctx) {
+  for (const c of ctx?.consume || []) CombatAPI.useStatus(c.holderId, c.statusId).catch(() => {});
+}
+
+function _notesHtml(ctx) {
+  if (!ctx) return '';
+  const mode = rollModeText(ctx.mode);
+  const lines = ctx.notes.map(n => `<div class="note">${n}</div>`).join('');
+  return `${mode ? `<div class="mode ${ctx.mode}">${mode}</div>` : ''}${lines}`;
+}
 
 function _ensureDom() {
   if (_overlay) return;
@@ -105,6 +131,7 @@ function _ensureDom() {
         </div>
         <div id="targetPickerStep2" hidden>
           <div class="target-picker-roll-target" id="targetPickerRollTarget"></div>
+          <div class="target-picker-roll-notes" id="targetPickerRollNotes"></div>
           <label class="target-picker-roll-label" for="targetPickerAttackInput">Attack roll<span id="targetPickerAttackModifierNote"></span></label>
           <input type="number" id="targetPickerAttackInput" class="target-picker-roll-input" placeholder="Enter roll…">
           <div class="target-picker-roll-total" id="targetPickerAttackTotal"></div>
@@ -173,8 +200,11 @@ function _showStep2(p, name) {
   document.getElementById('targetPickerRollTarget').innerHTML = `
     <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
+  _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget);
+  document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
+  const mod = _effectiveAttackMod();
   document.getElementById('targetPickerAttackModifierNote').textContent =
-    _attackModifier ? ` (${_attackModifier >= 0 ? '+' : ''}${_attackModifier} modifier added automatically)` : '';
+    mod ? ` (${mod >= 0 ? '+' : ''}${mod} modifier added automatically)` : '';
   const input = document.getElementById('targetPickerAttackInput');
   input.value = '';
   _updateAttackTotal();
@@ -190,17 +220,20 @@ function _updateAttackTotal() {
   const raw = _currentAttackRoll();
   const totalEl = document.getElementById('targetPickerAttackTotal');
   if (raw === null) { totalEl.innerHTML = ''; return; }
-  const total = raw + _attackModifier;
+  const total = raw + _effectiveAttackMod();
   // A hint only -- a human still declares Hit or Miss (the target may have
   // circumstances the stored AC doesn't know about).
-  const ac = _selectedTarget?.ac;
+  const baseAc = _selectedTarget?.ac;
+  const ac = baseAc != null ? baseAc + (_atkCtx?.acDelta || 0) : null;
   const hint = ac != null ? ` <span style="font-size:0.8rem;">vs AC ${ac} — ${total >= ac ? 'hits' : 'misses'}</span>` : '';
   totalEl.innerHTML = `Total: <strong>${total}</strong>${hint}`;
 }
 
 function _confirmMiss() {
   const attackRoll = _currentAttackRoll();
-  _close({ targetId: _selectedTargetId, hit: false, attackRoll });
+  const rollMode = _atkCtx?.mode || 'normal';
+  _consume(_atkCtx);
+  _close({ targetId: _selectedTargetId, hit: false, attackRoll, rollMode });
 }
 
 /** Attack Hit -- plays the attacker's battle animation (if one exists) right
@@ -229,6 +262,7 @@ function _backFromDamage() {
  * screen while it plays and no second target to click mid-animation). */
 function _autoHit(p, name) {
   _attackRoll = null;
+  _atkCtx = null; // nothing is rolled, so no roll modifiers apply
   _selectedTarget = p;
   _selectedTargetName = name;
   _showStep3();
@@ -286,10 +320,13 @@ function _updateRollTotal() {
 function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
-  _close({
+  const result = {
     targetId: _selectedTargetId, hit: true, rawRoll: raw,
-    attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _attackModifier,
-  });
+    attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _effectiveAttackMod(),
+    rollMode: _atkCtx?.mode || 'normal',
+  };
+  _consume(_atkCtx);
+  _close(result);
 }
 
 function _cardHtml(p) {
@@ -318,7 +355,11 @@ function _cardHtml(p) {
  * rawRoll, attackRoll, attackTotal}, or null if the player picked "No Target" /
  * closed the popup / there's no active session to target into. attackRoll is
  * the natural d20 that was typed in (also on a miss; null on a guaranteed hit),
- * attackTotal that plus the attack modifier. Safe to await unconditionally --
+ * attackTotal that plus the attack modifier and any live attack-roll status.
+ * The popup also shows what live statuses do to this roll (advantage/disadvantage,
+ * attack-roll and target-AC changes -- `attacker` gives pickTargetAgain the
+ * attacker's record; pickTarget reads it from the session) and uses up any
+ * "next attack" effect once the roll is confirmed; rollMode reports the net mode. Safe to await unconditionally --
  * it resolves to null with no popup shown when there's nothing to target.
  *
  * guaranteedHit (moves tagged guaranteed_hit): the Attack Roll step is
@@ -339,6 +380,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   if (!participants.length) return null;
 
   _ensureDom();
+  _attacker = session.participants[attackerId] || null;
   _attackModifier = attackModifier;
   _damageModifier = damageModifier;
   _speciesName = speciesName;
@@ -376,8 +418,9 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * null if closed. With guaranteedHit (see pickTarget) it opens directly at
  * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null } = {}) {
   _ensureDom();
+  _attacker = attacker;
   _attackModifier = attackModifier;
   _damageModifier = damageModifier;
   _speciesName = speciesName;

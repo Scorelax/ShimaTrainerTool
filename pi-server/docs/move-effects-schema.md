@@ -55,6 +55,20 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 - stat — `stat_buff_<stat>` / `stat_debuff_<stat>` / `potential_stat_…`
 - roll — `advantage_<on>` / `disadvantage_<on>` / `potential_…`
 
+## How live modifiers are applied (`js/utils/move-effects.js`, shown by the attack / save popups)
+The dice are rolled at the table, so the popups only *show* what applies and fold numbers into totals.
+
+| status on… | effect |
+|---|---|
+| the attacker: `roll` on `attack_rolls` / `all_rolls`, `stat` `attack_rolls` | advantage/disadvantage banner; bonus added to the attack total |
+| the target: `roll` on `attacks_against`, `stat` `ac` | advantage/disadvantage banner; AC changed in the hit/miss hint |
+| the saver: `roll` on `saving_throws` / `all_rolls`, `stat` `saving_throws`, ability or `all_abilities` stat | advantage/disadvantage banner; save modifier changed (an ability-score change moves the modifier by the difference of `floor((score-10)/2)`; needs the score on the sheet) |
+| the move's user: `roll` on `saves_against_its_moves` | advantage/disadvantage for the saver (Night Daze) |
+
+Advantage and disadvantage from different sources cancel to a normal roll (both are still listed). A status with a `uses`
+end is used up (`use-status`) when the roll is confirmed — not when a popup is cancelled. `speed` and ability-score
+changes on attack/damage/Move DC are not applied anywhere yet.
+
 ## Not covered yet
 The other stat/advantage moves in the file (`stat_buff_self`, `stat_buff_ally`, `stat_debuff_enemy`,
 `potential_disadvantage`, `advantage_on_attack_roll`, …) still use their old flat tags and have no

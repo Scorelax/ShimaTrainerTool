@@ -1682,7 +1682,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
       const target = session?.participants?.[hitTargetId];
       if (!target) return; // target left the battle mid-chain
-      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit });
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId] });
     } else {
       nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit });
     }
@@ -1731,7 +1731,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
   const waiting = target && !ctx.save ? verdicts.find(v => v.verdict === 'needs_save') : null;
   if (waiting) {
     const outcome = await confirmSecondarySave(target, target.name, {
-      dc, ability: waiting.effect.when.ability || null, title: 'Saving Throw',
+      dc, ability: waiting.effect.when.ability || null, title: 'Saving Throw', moveUser: attacker,
     });
     // Closing without declaring counts as no save result: nothing that hinges on one is offered.
     ctx = { ...ctx, save: outcome ? { passed: outcome.passed, failBy: outcome.failBy ?? null } : { passed: true, failBy: null } };
@@ -1885,7 +1885,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
     if (!target) continue;
 
     if (isSaveTriggered) {
-      const outcome = await confirmSecondarySave(target, target.name, { dc, hasDamage, damageModifier, speciesName, ability: _saveAbilityFor(moveName) });
+      const outcome = await confirmSecondarySave(target, target.name, { dc, hasDamage, damageModifier, speciesName, ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId] });
       if (!outcome) continue; // closed for this target -- move on to the next one
       const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
       if (outcome.passed) {
@@ -1917,7 +1917,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
       // so each selected target goes straight to its damage roll.
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit });
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId] });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
     }
   }
@@ -1928,7 +1928,7 @@ async function _handleSecondarySave(combatantId, targetId, moveName, computedDat
   if (!target) return null;
   const attackerName = session?.participants?.[combatantId]?.name || '?';
   const dc = computedData.moveDC ?? 0;
-  const outcome = await confirmSecondarySave(target, target.name, { dc, ability: _saveAbilityFor(moveName) });
+  const outcome = await confirmSecondarySave(target, target.name, { dc, ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId] });
   if (!outcome) return null; // closed without declaring
   // Effects are offered (and applied) right after this returns, so the log no
   // longer tells someone to apply it by hand when the move has structured effects.
@@ -2066,6 +2066,7 @@ async function _rollStatusSave(holder, status, title) {
   if (!saveEnd) return null;
   const outcome = await confirmSecondarySave(holder, holder.name, {
     dc: status.dc || 0, ability: saveEnd.ability, title: title || `${statusLabel(status)} — saving throw`,
+    moveUser: status.sourceId ? session?.participants?.[status.sourceId] : null,
   });
   if (!outcome) return null;
   const note = _saveRollNote(outcome);

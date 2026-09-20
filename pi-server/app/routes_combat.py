@@ -911,7 +911,7 @@ def _list_move_categories():
 
     Also returns `effects`: {moveName: [effect, ...]} for the moves that have a
     structured `effects` list (which condition a move applies and what triggers
-    it -- schema in pi-server/docs/build_move_effects.py's header). Same
+    it -- schema in pi-server/docs/move-effects-schema.md). Same
     miss-is-not-an-error rule: no entry just means "no structured effects"."""
     try:
         with open(upstream.MOVES_FILE, encoding='utf-8') as f:

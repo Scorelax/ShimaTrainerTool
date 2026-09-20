@@ -233,16 +233,21 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_condition_other"
+        "status_condition_infested"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "infested",
           "when": {
             "type": "on_hit"
           },
-          "label": "infested",
-          "duration": "for 1d4 rounds",
+          "ends": [
+            {
+              "type": "rounds",
+              "dice": "1d4"
+            }
+          ],
           "note": "CON save at the start of each of its turns, taking 1d4 + MOVE bug damage on a failure"
         }
       ],
@@ -286,8 +291,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_disadvantage_attack_rolls",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "natural_roll",
+            "min": 15
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "its next attack"
+        }
       ],
       "description": "You make a lunge at the target, attacking with full force. Make a melee attack, doing 1d10 + MOVE Bug damage on a hit. If the natural attack roll is 15 or more, the target has disadvantage on its next attack.",
       "moveStat": "DEX",
@@ -312,6 +335,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -345,6 +369,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "crit"
@@ -498,6 +523,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -524,8 +550,29 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "self_potential_stat_buff_all_abilities",
         "status_increase_threshold"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "all_abilities",
+          "amount": 1,
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "target": "self",
+          "stacks": {
+            "max": 5
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "while you remain in battle; stacks to +5"
+        }
       ],
       "description": "You strike a target with a battering wind of silver dust. Make a ranged attack roll against a creature, doing 2d8 + MOVE bug damage on a hit. On a natural roll of 19 or 20, all of your ability scores go up by 1 while you remain in battle. This move can be stacked for a maximum of +5 to all ability scores.",
       "moveStat": "DEX",
@@ -549,11 +596,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true,
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "action"
+            }
+          ],
           "note": "also cannot flee or be switched out; escapes with an action and a STR save"
         }
       ],
@@ -580,6 +634,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -610,11 +665,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You quickly fire a sticky web at a creature entering the battle. When a creature is switched into battle, you may use your reaction to make a ranged attack on the creature. On a hit, the target is restrained The creature may make a STR save against your Move DC at the beginning of each of its turns to escape the web.",
@@ -640,6 +702,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "special"
@@ -732,6 +795,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "save_fail",
@@ -763,6 +827,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "natural_roll",
@@ -1065,18 +1130,24 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_status_condition_other"
+        "potential_status_condition_blink"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "blink",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "requires": "crit"
           },
-          "label": "Blink",
-          "duration": "until the end of their next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "You emit a wave of cosmic energy affecting all creatures in range, ignoring cover. Make a single ranged attack roll for all creatures, dealing 3d10 + MOVE cosmic damage to every creature hit. On a critical hit, all targets must succeed a CON save or suffer the Blink effect until the end of their next turn.",
@@ -1118,18 +1189,23 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_status_condition_other"
+        "potential_status_condition_blink"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "blink",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "requires": "hit"
           },
-          "label": "Blink",
-          "duration": "for 1 minute"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
         }
       ],
       "description": "You slash at an opponent in range. Make a melee attack roll against a target, dealing 2d8 + MOVE cosmic damage on a hit. The creature hit must succeed a Constitution saving throw or be affected by the Blink effect for 1 minute.",
@@ -1192,29 +1268,40 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_status_condition_other",
+        "potential_status_condition_removed_from_reality",
         "potential_status_condition_stunned",
         "stat_debuff_enemy",
         "recharge_locked"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "removed_from_reality",
           "when": {
             "type": "save_fail",
             "ability": "CHA"
           },
-          "label": "removed from reality",
-          "duration": "for 1d4 rounds",
+          "ends": [
+            {
+              "type": "rounds",
+              "dice": "1d4"
+            }
+          ],
           "note": "save is made with disadvantage (legendary creatures and beings with strong planar connections have advantage); cannot be affected by anything while gone"
         },
         {
+          "kind": "condition",
           "apply": "stunned",
           "when": {
             "type": "save_fail",
             "ability": "CHA"
           },
-          "duration": "for 1 round",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ],
           "note": "when the creature returns"
         }
       ],
@@ -1243,6 +1330,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -1250,12 +1338,18 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "slowed",
           "when": {
             "type": "save_fail",
             "ability": "STR"
           },
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "movement speed halved"
         }
       ],
@@ -1277,15 +1371,15 @@
       },
       "reaction": false,
       "categories": [
-        "status_condition_other"
+        "status_condition_grounded"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "grounded",
           "when": {
             "type": "always"
           },
-          "label": "grounded",
           "note": "every creature in the 40 ft sphere loses its flying/hovering speed; Levitate is suppressed"
         }
       ],
@@ -1312,6 +1406,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -1492,12 +1587,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "creatures still inside Black Hole when the star ignites"
         }
       ],
@@ -1524,12 +1625,21 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for the duration",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
           "note": "when a creature enters the distortion zone"
         }
       ],
@@ -1618,19 +1728,24 @@
         "damage",
         "stat_buff_self",
         "recharge_locked",
-        "potential_status_condition_other",
+        "potential_status_condition_blink",
         "multi_hit_aoe"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "blink",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "failBy": 5
           },
-          "label": "Blink",
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "first sucked into the Ethereal Plane until the beginning of your next turn"
         }
       ],
@@ -1658,20 +1773,32 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "always"
           },
-          "duration": "for the next round",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ],
           "note": "creatures dependent on sight in the 80 ft area"
         },
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "on the flash released on your next turn"
         }
       ],
@@ -1699,6 +1826,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -1706,20 +1834,33 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "STR"
           },
-          "duration": "until the end of their next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         },
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1 round",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ],
           "note": "creatures within 60 ft of the impact but outside the radius"
         }
       ],
@@ -1747,13 +1888,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "slowed",
           "when": {
             "type": "save_fail",
             "ability": "WIS",
             "requires": "hit"
           },
-          "duration": "for 1d4 rounds"
+          "ends": [
+            {
+              "type": "rounds",
+              "dice": "1d4"
+            }
+          ]
         }
       ],
       "description": "You bite down with temporal force. Make an attack roll against a creature, dealing 1d10 + MOVE cosmic damage on a hit. The hit creature must succeed a Wisdom saving throw or be slowed for 1d4 rounds, moving at half speed and having disadvantage on attack rolls and saving throws. Creatures attacking a slowed target have advantage on their attack rolls.",
@@ -1861,13 +2008,23 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for 1 minute",
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "WIS",
+              "timing": "end_of_turn"
+            }
+          ]
         }
       ],
       "description": "The targeted creature must succeed on a Wisdom saving throw or be frightened for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
@@ -1893,6 +2050,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -1922,11 +2080,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true,
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ],
           "note": "needs a second successful melee attack roll (bonus action) after landing a melee attack; breaks free with a STR save on its turn"
         }
       ],
@@ -1957,6 +2122,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -1988,6 +2154,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "natural_roll",
@@ -2082,6 +2249,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -2151,8 +2319,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_ac",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 18
+          },
+          "stacks": {
+            "max": 5
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "for the remainder of combat"
+        }
       ],
       "description": "You unleash a powerful blow that has a chance to temporarily lower a target’s defense. Make a melee attack against a target, doing 2d8 + MOVE dark damage on a hit. On a natural attack roll of 18 or higher, the target’s AC is decreased by 1 for the remainder of combat. This decrease may be stacked, up to a maximum of -5 to AC.",
       "moveStat": "STR/DEX",
@@ -2177,6 +2365,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -2207,6 +2396,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -2300,6 +2490,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "always"
@@ -2418,12 +2609,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "charmed",
           "when": {
             "type": "save_fail",
             "ability": "CHA"
           },
-          "duration": "for 1 hour",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 600
+            }
+          ],
           "note": "broken if you damage the charmed creature or lose concentration"
         }
       ],
@@ -2472,11 +2669,17 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "incapacitated",
           "when": {
             "type": "always"
           },
-          "duration": "for 2 rounds"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 2
+            }
+          ]
         }
       ],
       "description": "You sacrifice your life force to leave a lasting mark on a target. When you activate this move, you touch a creature and drop to 0 hit points. As a result, the target is incapacitated for 2 rounds. All attacks against it have advantage, it automatically fails all STR and DEX saving throws, and it cannot attack, move, flee, or be switched out.",
@@ -2539,8 +2742,43 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_disadvantage_attack_rolls",
+        "potential_advantage_saves_against_its_moves",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "natural_roll",
+            "min": 13
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "its next attack"
+        },
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "saves_against_its_moves",
+          "when": {
+            "type": "natural_roll",
+            "min": 13
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "if it activates a move that requires a saving throw, its targets have advantage"
+        }
       ],
       "description": "A pitch black shockwave of dark energy rushes towards a target. Make a ranged attack roll, dealing 2d8 + MOVE dark damage on a hit. If the natural attack roll is 13 or more, the target rolls its next attack with disadvantage. If it activates a move that requires a saving throw, the target(s) have advantage on the roll.",
       "moveStat": "DEX/WIS",
@@ -2836,17 +3074,25 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "potential_status_condition_other"
+        "potential_status_condition_taunted"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "taunted",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "label": "taunted",
-          "duration": "for the duration",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
           "note": "can only use damaging attacks that target you"
         }
       ],
@@ -3001,6 +3247,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -3058,6 +3305,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -3171,6 +3419,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -3203,6 +3452,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "save_fail",
@@ -3297,6 +3547,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "special"
@@ -3329,13 +3580,23 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for 1 minute",
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "WIS",
+              "timing": "end_of_turn"
+            }
+          ]
         }
       ],
       "description": "The user lets out a mighty roar. All creatures within 60 feet must make a Wisdom saving throw or be frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
@@ -3361,6 +3622,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -3391,13 +3653,23 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "stunned",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1 minute",
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "CON",
+              "timing": "end_of_turn"
+            }
+          ]
         }
       ],
       "description": "The targeted creature must succeed on a Constitution saving throw or be stunned for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
@@ -3426,6 +3698,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -3524,6 +3797,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -3556,12 +3830,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1d4 rounds"
+          "ends": [
+            {
+              "type": "rounds",
+              "dice": "1d4"
+            }
+          ]
         }
       ],
       "description": "Your body generates a strange pulsating sound that can disrupt the target's ability to attack. When you activate this move, any hostile creature within 30 feet of you must make a CON saving throw against your Move DC. On a failure, the target flinches for 1d4 rounds.",
@@ -3651,6 +3931,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "special"
@@ -3706,6 +3987,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -3865,6 +4147,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -3942,6 +4225,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -3975,6 +4259,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -4032,6 +4317,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -4064,6 +4350,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -4071,6 +4358,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -4101,6 +4389,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -4151,6 +4440,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -4181,6 +4471,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -4294,6 +4585,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -4325,6 +4617,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -4355,12 +4648,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "charmed",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for 1 hour"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 600
+            }
+          ]
         }
       ],
       "description": "The targeted creature must succeed on a Wisdom saving throw or be charmed by the beholder for 1 hour, or until the beholder harms the creature.",
@@ -4492,6 +4791,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "charmed",
           "when": {
             "type": "save_fail",
@@ -4568,12 +4868,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "stunned",
           "when": {
             "type": "save_fail",
             "ability": "CHA"
           },
-          "duration": "for one round"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ]
         }
       ],
       "description": "You may only use while your current hit points are above 75% of your maximum. Your form transforms into pure ether for an instant as you let out a massive burst of energy. All creatures in a 60ft. radius must succeed a Charisma saving throw, or take 4d12 + MOVE damage of any type, and be stunned for one round. The type of damage is determined by you. This move does not benefit from STAB even if your type aligns with the type of damage dealt. On a successful save, they take half damage and are not stunned. This move costs VP equal to your current HP. After using this move, you drop to 1 hit point and are not able to use attack moves or be recalled until the end of your next turn. This move may be used once per long rest.",
@@ -4623,12 +4929,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "until the end of the user's next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "The user creates a dazzling display of lights. All creatures within a 30-foot cone must succeed on a Constitution saving throw or be blinded until the end of the user's next turn.",
@@ -4822,18 +5135,21 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           }
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           }
         },
         {
+          "kind": "condition",
           "apply": "incapacitated",
           "when": {
             "type": "special"
@@ -4867,13 +5183,20 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "DEX",
             "failBy": 5
           },
-          "duration": "until the end of their next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "You unleash a beam of energy in a 80 foot line, 5 feet wide. All creatures in its path must make a DEX save against your Move DC, taking 3d10 + MOVE fairy damage on a failure, or half as much on a success. Creatures failing the save by 5 or more are blinded until the end of their next turn. After activating this move, your next attack is rolled at disadvantage. If the next attack requires a saving throw, the target(s) gain advantage.",
@@ -5088,27 +5411,40 @@
         "recharge_locked",
         "multi_hit_choice",
         "trigger_saving_throw_on_hit",
-        "potential_status_condition_other",
+        "potential_status_condition_drowsy",
         "potential_status_condition_unconscious"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "drowsy",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "requires": "hit"
           },
-          "label": "drowsy",
-          "duration": "for 1d4 minutes",
+          "ends": [
+            {
+              "type": "rounds",
+              "dice": "1d4",
+              "unit": "minute"
+            }
+          ],
           "note": "disadvantage on saving throws and attack rolls; others have advantage on saves induced by this Pokémon"
         },
         {
+          "kind": "condition",
           "apply": "unconscious",
           "when": {
             "type": "special"
           },
-          "duration": "for 1d12 hours",
+          "ends": [
+            {
+              "type": "rounds",
+              "dice": "1d12",
+              "unit": "hour"
+            }
+          ],
           "note": "when the drowsiness ends; cannot be woken by normal means unless it completes a long rest; counts as asleep"
         }
       ],
@@ -5153,16 +5489,21 @@
       },
       "reaction": false,
       "categories": [
-        "status_condition_other"
+        "status_condition_controlled_senses"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "controlled_senses",
           "when": {
             "type": "on_hit"
           },
-          "label": "controlled senses",
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "you announce how you confuse its senses each turn; ends early if it is healed of all status conditions"
         }
       ],
@@ -5190,13 +5531,23 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "charmed",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for 1 minute",
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "WIS",
+              "timing": "end_of_turn"
+            }
+          ]
         }
       ],
       "description": "The user performs a captivating dance. All creatures within 30 feet that can see the user must succeed on a Wisdom saving throw or be charmed for 1 minute. While charmed, the creature's speed is zero. The creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
@@ -5238,7 +5589,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "potential_disadvantage_attack_rolls"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "natural_roll",
+            "min": 15
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "its next attack"
+        }
       ],
       "description": "You summon forth a powerful moonbeam that strikes a creature. Make a ranged attack on a target in range, dealing 2d8 + MOVE fairy damage on a hit. On a natural attack roll of 15 or more, the target has disadvantage on its next attack.",
       "moveStat": "DEX/CHA",
@@ -5286,18 +5655,21 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           }
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           }
         },
         {
+          "kind": "condition",
           "apply": "charmed",
           "when": {
             "type": "save_fail",
@@ -5373,6 +5745,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -5381,6 +5754,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "charmed",
           "when": {
             "type": "save_fail",
@@ -5389,6 +5763,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "stunned",
           "when": {
             "type": "special"
@@ -5396,6 +5771,7 @@
           "note": "on a fumble"
         },
         {
+          "kind": "condition",
           "apply": "petrified",
           "when": {
             "type": "special"
@@ -5448,12 +5824,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "natural_roll",
             "min": 17
           },
-          "duration": "until the end of its next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "You send a burst of light energy at a creature in range. Make a ranged attack roll, dealing 1d10 + MOVE fairy damage on a hit. On a natural attack roll of 17 or higher, the target is blinded until the end of its next turn.",
@@ -5475,8 +5858,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_attack_rolls",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "stacks": {
+            "max": 5
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "for the remainder of combat"
+        }
       ],
       "description": "You fake a creature out with a playful attack that quickly becomes too rough. Make a melee attack against a creature, dealing 1d10 + MOVE fairy damage on a hit. On natural attack rolls of 19 or 20, the target adds -1 to any attack it makes for the remainder of combat. This effect can be stacked to a maximum of -5 to hit.",
       "moveStat": "DEX/CHA",
@@ -5527,6 +5930,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -5554,19 +5958,20 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "potential_status_condition_other",
+        "potential_status_condition_mind_captured",
         "self_status_condition_asleep"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "mind_captured",
           "when": {
             "type": "save_fail"
           },
-          "label": "mind captured",
           "note": "you then fall asleep, entering the Dreamscape with your captives"
         },
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "always"
@@ -5597,6 +6002,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -5670,6 +6076,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "special"
@@ -5785,13 +6192,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "stunned",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "requires": "hit"
           },
-          "duration": "for 1 round"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ]
         }
       ],
       "description": "You strike with the force of a natural disaster. Make a melee attack with advantage against a single target dealing 10d12 + MOVE fighting damage. The target must make a CON save or be stunned for 1 round. Regardless of the save, the target is pushed back 30ft. Creatures Huge or larger are instead staggered, losing their reaction and having disadvantage on their next attack. This move can be used once per long rest. If this attack misses, the VP is spent, but the move is not expended and may be used again until it hits.",
@@ -5963,6 +6376,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "on_hit"
@@ -5994,6 +6408,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "exhaustion",
           "when": {
             "type": "always"
@@ -6042,7 +6457,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "potential_advantage_attacks_against"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "the next attack against the target"
+        }
       ],
       "description": "You heighten your focus and unleash it upon a creature. Make a ranged attack, dealing 2d8 + MOVE fighting damage on a hit. On a natural attack roll of 19 or 20, the next attack against the target is rolled at advantage.",
       "moveStat": "STR/DEX/WIS",
@@ -6087,6 +6520,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -6138,6 +6572,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "on_hit"
@@ -6169,6 +6604,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "special"
@@ -6201,6 +6637,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "special"
@@ -6277,6 +6714,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "natural_roll",
@@ -6284,6 +6722,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -6314,6 +6753,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "on_hit"
@@ -6485,9 +6925,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_ac",
         "stat_debuff_enemy",
         "crit_range_mod"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "while it remains in battle"
+        }
       ],
       "description": "You strike out with a rock-crushing attack that may lower a user’s defense. Make an attack roll against a creature, doing 1d6 + MOVE fighting damage on a hit. If the natural attack roll is 19 or 20, the target’s AC decreases by 1 while it remains in battle. On rock types, this move is a critical hit on a natural attack roll of 18 or higher.",
       "moveStat": "STR",
@@ -6512,6 +6969,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -6644,11 +7102,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You attempt a forceful grapple on a target. Make a melee attack, doing 1d10 + MOVE fighting damage on a hit, but taking a quarter of the damage dealt in recoil. On a hit, the target is grappled. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a creature is grappled, this move can be activated again as a bonus action with an automatic hit, dealing 1d10 + MOVE fighting damage with a quarter of the damage dealt in typeless recoil.",
@@ -6782,6 +7247,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -6837,6 +7303,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -6870,6 +7337,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -6923,6 +7391,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "exhaustion",
           "when": {
             "type": "special"
@@ -6976,25 +7445,33 @@
         "potential_status_condition_charmed",
         "potential_status_condition_burned",
         "potential_status_condition_blinded",
-        "potential_status_condition_other",
+        "potential_status_condition_forced_movement",
         "recoil",
         "recharge_locked"
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "charmed",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ],
           "choice": {
             "kind": "random",
             "die": "d4",
             "roll": 1
-          },
-          "duration": "until end of next turn"
+          }
         },
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -7007,25 +7484,37 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ],
           "choice": {
             "kind": "random",
             "die": "d4",
             "roll": 3
-          },
-          "duration": "until end of next turn"
+          }
         },
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "forced_movement",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "label": "moved 15 ft in a random direction",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
           "choice": {
             "kind": "random",
             "die": "d4",
@@ -7059,6 +7548,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -7090,6 +7580,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -7190,6 +7681,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -7222,6 +7714,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -7229,6 +7722,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -7301,6 +7795,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -7440,6 +7935,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -7472,6 +7968,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -7549,6 +8046,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -7604,6 +8102,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -7634,6 +8133,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "on_hit"
@@ -7690,6 +8190,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -7835,6 +8336,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -7889,6 +8391,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -7946,22 +8449,34 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
             "ability": "DEX",
             "failBy": 6
           },
-          "duration": "for three turns"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
         },
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "DEX",
             "failBy": 6
           },
-          "duration": "for three turns"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
         }
       ],
       "description": "A magic lens appears between your horns, amplifying the rays of the sun for one turn. On your next turn, the sunlight is focused into an intense and beautiful line of white light in a 50 foot line, 5 feet wide. Any creature caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. If a creature fails the save by more than 5, they are burned and blinded for three turns. In strong sunlight, this move does not need charging. In darkness, this move costs 10VP extra.",
@@ -8028,12 +8543,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "deafened",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "creatures that succeed are deafened for 3 rounds instead"
         }
       ],
@@ -8076,17 +8597,26 @@
       },
       "reaction": false,
       "categories": [
-        "status_condition_other"
+        "status_condition_watchful_embers"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "watchful_embers",
           "when": {
             "type": "on_hit"
           },
-          "label": "watchful embers",
-          "duration": "for the duration",
-          "saveEnds": true,
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            },
+            {
+              "type": "save",
+              "ability": "WIS",
+              "timing": "start_of_turn"
+            }
+          ],
           "note": "WIS save at the start of its turn to get rid of them; your moves may originate from them"
         }
       ],
@@ -8112,6 +8642,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "on_hit"
@@ -8246,6 +8777,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -8273,9 +8805,32 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_ac",
         "trigger_saving_throw_on_hit",
         "recoil"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -2,
+          "when": {
+            "type": "save_fail",
+            "ability": "DEX",
+            "requires": {
+              "type": "natural_roll",
+              "min": 19
+            }
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ],
+          "note": "the save DC is +1 per 10 ft of height above 10 ft dropped; on a natural 20 the save always fails"
+        }
       ],
       "description": "You may fly up to 30ft without provoking attacks of opportunity as part of your movement this turn. Then, drop towards a creature in range. Make an attack roll against your target, dealing 3d10 + MOVE flying or ground damage on a hit. On a natural attack roll of 19 or higher, the target must succeed a Dexterity saving throw or have their AC reduced by 2 until the end of their next turn. This effect triggers on lower numbers, and the saving throw DC is increased by 1 for every 10ft. of height above 10ft. dropped during the attack. On a natural 20 attack roll, this move does maximum damage and the saving throw always fails. On a miss, you take fall damage appropriate to the height dropped.",
       "moveStat": "STR",
@@ -8300,6 +8855,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -8351,6 +8907,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -8424,6 +8981,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "natural_roll",
@@ -8561,6 +9119,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -8595,12 +9154,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "deafened",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1 minute"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
         }
       ],
       "description": "ou channel all of your energy into flying at a breakneck speed. For this turn, multiply your flying speed by 1d4 + MOVE. You can't be targeted or trigger attacks of opportunity while in hypersonic flight. All creatures you pass within 10ft of must make a CON save or become deafened for 1 minute. Your next melee attack this turn deals additional damage based on the distance traveled (1d6 per 10ft, max +10d6). You take recoil damage equal to half the bonus damage dealt. Attacking while in hypersonic flight ends the effect. This move may only be used once per long rest.",
@@ -8749,11 +9314,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "action"
+            }
+          ]
         }
       ],
       "description": "You reach out in an attempt to lift a creature up in the air for a slamming attack. When you activate this move, make a melee attack roll. On a hit, the target is grappled. The target may use its next action to attempt a STR save against your Move DC to get free. If it does not succeed, and you maintain your concentration, you may use your action on your next turn to lift the creature into the air, slamming it to the ground for 2d8 + MOVE flying damage.",
@@ -8922,6 +9494,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -8953,11 +9526,17 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "incapacitated",
           "when": {
             "type": "on_hit"
           },
-          "duration": "for 1d4 + MOVE turns",
+          "ends": [
+            {
+              "type": "rounds",
+              "dice": "1d4 + MOVE"
+            }
+          ],
           "note": "the target must be asleep; it wakes up but cannot act; on a critical hit it also loses half its remaining HP or VP"
         }
       ],
@@ -8984,6 +9563,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -9012,20 +9592,28 @@
         "trigger_saving_throw",
         "damage",
         "recoil",
-        "potential_status_condition_other",
+        "potential_status_condition_cursed",
         "stat_buff_self",
         "stat_debuff_self",
         "situational_use"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "cursed",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "label": "cursed",
-          "duration": "for the duration",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
           "note": "Ghost-type users only; you take 2d8 at first, the target takes 2d8 + MOVE ghost damage at the end of each of its turns"
         }
       ],
@@ -9098,6 +9686,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "crit"
@@ -9127,11 +9716,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "A thicket of ghostly vines shoot from your body, wrapping around a creature in range. Make a melee attack against a creature, dealing 3d10 + MOVE ghost damage on a hit. The creature is also grappled. At the beginning of each of its turns, it may use an action to attempt an escape with a STR save against your Move DC. As long as the target is grappled on your subsequent turns, this move can be activated again as a bonus action with an automatic hit, dealing 3d10 ghost damage.",
@@ -9201,6 +9797,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -9293,8 +9890,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "self_potential_stat_buff_all_abilities",
         "status_increase_threshold"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "all_abilities",
+          "amount": 1,
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        }
       ],
       "description": "You stir up a gust of repulsive wind that strikes a creature in range. Make a ranged attack, dealing 1d10 + MOVE ghost damage on a hit. On a natural attack roll of 19 or 20, increase all of your ability scores by +1 for three rounds.",
       "moveStat": "WIS/DEX",
@@ -9403,11 +10018,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "special"
           },
-          "duration": "until the end of its next turn",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ],
           "note": "reaction: when a creature in range lands an attack against you or an ally; it also has disadvantage on all rolls"
         }
       ],
@@ -9451,8 +10073,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_ac",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 18
+          },
+          "stacks": {
+            "max": 5
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "while it remains in battle"
+        }
       ],
       "description": "You strike out with a bone-infused with a wayward spirt. Make a melee attack, dealing 2d8 + MOVE ghost damage on a hit. On a natural attack roll of 18 or higher, the target’s AC is decreased by 1 while it remains in battle. This decrease may be stacked up to a maximum of -5 to AC.",
       "moveStat": "STR/WIS",
@@ -9606,12 +10248,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "DEX",
+              "timing": "end_of_turn"
+            }
+          ]
         }
       ],
       "description": "The user creates ghostly chains that attempt to bind a target within 60 feet. The target must make a Dexterity saving throw. On a failure, the target is restrained and cannot teleport or leave its current plane. At the end of each of its turns, the target can repeat the saving throw, ending the effect on itself on a success.",
@@ -9740,17 +10389,23 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "potential_status_condition_other"
+        "potential_status_condition_type_changed"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "type_changed",
+          "value": "Ghost",
           "when": {
             "type": "save_fail",
             "ability": "CHA"
           },
-          "label": "type changed to Ghost",
-          "duration": "for the duration"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
         }
       ],
       "description": "You attempt to scare the spirit right out of a creature in range. Force a creature in range to make a CHA save against your Move DC. On a failure, its type is changed to Ghost for the duration.",
@@ -9777,12 +10432,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "incapacitated",
           "when": {
             "type": "special"
           },
           "target": "self",
-          "duration": "for one minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "reaction at 0 HP; the white bloom replaces you"
         }
       ],
@@ -9932,12 +10593,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "duration": "until the end of its next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "Vines sprout from the ground in a 20-foot radius centered on the user. The area becomes difficult terrain, and any creature that enters the area or starts its turn there must succeed on a Dexterity saving throw or be restrained until the end of its next turn.",
@@ -9984,11 +10652,17 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "special"
           },
-          "duration": "for the duration",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "only if the failed CON save's speed reduction (-10 ft) brings its speed to 0"
         }
       ],
@@ -10013,21 +10687,28 @@
         "trigger_saving_throw",
         "multi_hit_aoe",
         "potential_disadvantage",
-        "potential_status_condition_other",
+        "potential_status_condition_disoriented",
         "potential_status_condition_confused"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "disoriented",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "label": "disoriented",
-          "duration": "until the beginning of your next turn",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "start"
+            }
+          ],
           "note": "disadvantage on attack rolls and saving throws; other creatures have +1 to attack rolls against it"
         },
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -10055,7 +10736,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "potential_advantage_attacks_against"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "the next attack against the target"
+        }
       ],
       "description": "You draw in power from nature in a concentrated ball that you send towards a creature. Make a ranged attack, dealing 2d8 + MOVE grass damage on a hit. On a natural attack roll of 19 or 20, the next attack against the target is rolled at advantage.",
       "moveStat": "DEX",
@@ -10076,17 +10775,23 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "potential_status_condition_other"
+        "potential_status_condition_type_changed"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "type_changed",
+          "value": "Grass",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "label": "type changed to Grass",
-          "duration": "for the duration"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
         }
       ],
       "description": "You summon the energy of the forest to change the type of another creature. Force a creature in range to make a CON save against your Move DC. On a failure, its type is changed to Grass for the duration.",
@@ -10157,6 +10862,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "natural_roll",
@@ -10207,6 +10913,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -10343,8 +11050,43 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_disadvantage_attack_rolls",
+        "potential_advantage_saves_against_its_moves",
         "potential_disadvantage"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "natural_roll",
+            "min": 15
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "its next attack"
+        },
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "saves_against_its_moves",
+          "when": {
+            "type": "natural_roll",
+            "min": 15
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "if it activates a move that requires a saving throw, its targets have advantage"
+        }
       ],
       "description": "You summon forth a cyclone of harsh winds and fast moving leaves that rushes forward to strike a creature in range. Make a ranged attack roll, dealing 3d10 + MOVE grass damage on a hit. If the natural attack roll is 15 or higher, the target has disadvantage on its next attack. If the target activates a move that requires a saving throw, its target(s) have advantage on the roll.",
       "moveStat": "STR/DEX",
@@ -10386,16 +11128,21 @@
       "categories": [
         "damage",
         "drain",
-        "status_condition_other"
+        "status_condition_seeded"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "seeded",
           "when": {
             "type": "on_hit"
           },
-          "label": "seeded",
-          "duration": "until it faints or is switched out",
+          "ends": [
+            {
+              "type": "other",
+              "text": "until it faints or is switched out"
+            }
+          ],
           "note": "1d4 grass damage at the end of each of its turns; half is restored to the attacker"
         }
       ],
@@ -10503,6 +11250,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -10556,6 +11304,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "special"
@@ -10632,12 +11381,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "until the end of their next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "You release decomposing spores in a 5-foot radius. Each non-decomposer creature in the area must succeed on a DC 10 Constitution saving throw or take 1d6 poison damage and be poisoned until the end of their next turn. This move can be used once per day.",
@@ -10707,6 +11463,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -10825,6 +11582,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -10859,6 +11617,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -10869,6 +11628,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -10879,6 +11639,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -10889,6 +11650,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -10967,6 +11729,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -11037,8 +11800,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_attack_rolls",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 16
+          },
+          "stacks": {
+            "max": 5
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "for the remainder of combat"
+        }
       ],
       "description": "You attempt to land an intense kick of tropical origins on the target. Make a melee attack, dealing 3d10 + MOVE grass damage on a hit. On a natural role of 16 or more, the target adds -1 to any attack it makes for the remainder of combat. This modifier can be stacked up to a maximum of -5.",
       "moveStat": "STR/DEX",
@@ -11100,17 +11883,22 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "potential_status_condition_other"
+        "potential_status_condition_insomnia"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "insomnia",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "label": "insomnia",
-          "duration": "for the duration",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 14400
+            }
+          ],
           "note": "replaces the user's choice of ability; prevents sleep; on humans, no long-rest benefits and eventually exhaustion"
         }
       ],
@@ -11137,6 +11925,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -11237,6 +12026,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -11244,13 +12034,19 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "incapacitated",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
           "target": "self",
-          "duration": "for 1 round",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ],
           "note": "DC 20 CON save the user makes after using the move"
         }
       ],
@@ -11319,6 +12115,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -11353,6 +12150,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -11404,6 +12202,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "petrified",
           "when": {
             "type": "save_fail",
@@ -11437,12 +12236,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "slowed",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "duration": "until the end of their next turn",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ],
           "note": "speed halved"
         }
       ],
@@ -11510,7 +12316,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "potential_stat_debuff_speed"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "set": 0,
+          "when": {
+            "type": "natural_roll",
+            "min": 16
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        }
       ],
       "description": "You fire a glob of mud at a creature, dealing damage with a chance to hinder the target's movement. Make a ranged attack against a creature in range, dealing 1d6 + MOVE ground damage on a hit. If the natural attack roll is higher than 15, the target's speed becomes 0 until the end of its next turn.",
       "moveStat": "DEX",
@@ -11599,12 +12423,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
             "ability": "STR"
           },
-          "duration": "until the end of its next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "The user creates a 20-foot-radius area of quicksand centered on a point within 60 feet. The area becomes difficult terrain, and any creature that enters the area or starts its turn there must succeed on a Strength saving throw or be restrained until the end of its next turn.",
@@ -11693,12 +12524,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
             "ability": "STR"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You attempt to summon a wave of sand that surrounds the target. Force a creature in range to make a STR saving throw against your Move DC, taking 1d10 + MOVE ground damage and becoming restrained on a failure, or half as much without being restrained on a success. If it fails, at the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a creature is restrained, you may continue this move, as an action, to deal an automatic 1d10 + MOVE ground damage.",
@@ -11786,17 +12624,23 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "potential_status_condition_other"
+        "potential_status_condition_grounded"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "grounded",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "label": "grounded",
-          "duration": "until the end of your next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "You summon forth a volley of green arrows to pierce creatures in range. All creatures in a 30ft. radius, centered on a point within range, must succeed a DEX save, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. This move ignores any immunities to ground type. Any creature that fails the saving throw falls to the ground and is now grounded until the end of your next turn. Grounded creatures are susceptible to ground-based moves, regardless of their type or ability.",
@@ -11821,17 +12665,21 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "potential_status_condition_other"
+        "potential_status_condition_trapped"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "trapped",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "label": "cannot flee or be switched out",
-          "duration": "as long as you remain in battle"
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ]
         }
       ],
       "description": "A wave of green energy courses through the battlefield in a 60 foot cone, centered on you. All creatures caught in the wave must make a DEX save against your Move DC, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. Any creature that fails the saving throw cannot flee or be switched out as long as you remain in battle.",
@@ -11859,6 +12707,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "save_fail",
@@ -11934,6 +12783,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "save_fail",
@@ -11982,6 +12832,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "on_hit"
@@ -12011,6 +12862,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -12041,6 +12893,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "natural_roll",
@@ -12097,6 +12950,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "save_fail",
@@ -12128,13 +12982,23 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
             "ability": "STR"
           },
-          "duration": "for 1 minute",
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "end_of_turn"
+            }
+          ]
         }
       ],
       "description": "The user creates icy restraints on a target within 30 feet. The target must succeed on a Strength saving throw or be restrained for 1 minute. At the end of each of its turns, the target can repeat the saving throw, ending the effect on itself on a success.",
@@ -12161,6 +13025,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "special"
@@ -12255,6 +13120,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "save_fail",
@@ -12287,6 +13153,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -12319,6 +13186,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "natural_roll",
@@ -12326,6 +13194,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -12377,6 +13246,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "natural_roll",
@@ -12428,6 +13298,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "save_fail",
@@ -12480,6 +13351,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "natural_roll",
@@ -12531,12 +13403,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "slowed",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "until the end of their next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "All ice type allies within 40ft. may use their reaction to move up to half their movement speed without provoking opportunity attacks. Each ally creates a 5ft. wide trail of extreme cold. Any creature that starts its turn inside a trail, or crosses it during, must make a Constitution saving throw, taking 2d8 + MOVE ice damage and being slowed until the end of their next turn. The trail lasts until the beginning of the user's next turn.",
@@ -12562,6 +13441,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "natural_roll",
@@ -12613,13 +13493,20 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "slowed",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "requires": "hit"
           },
-          "duration": "until the end of their next turn",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ],
           "note": "temperate environments only; speed halved"
         }
       ],
@@ -12646,12 +13533,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "unconscious for the duration; wakes if it takes damage or another creature wakes it; no effect on Steel- and Ghost-types"
         }
       ],
@@ -12867,18 +13760,32 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You attempt to grapple a target into submission. Make a melee attack roll. On a hit, the target takes 1d4 + MOVE normal damage and is grappled and restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a Pokémon is grappled, you may continue this move, as a bonus action, to do an automatic 1d4 normal damage without having to make an attack roll.",
@@ -12905,13 +13812,23 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1 minute",
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "CON",
+              "timing": "end_of_turn"
+            }
+          ]
         }
       ],
       "description": "The user emits an intense burst of light. All creatures within a 30-foot cone must succeed on a Constitution saving throw or be blinded for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
@@ -12959,6 +13876,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -12993,13 +13911,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "deafened",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "failBy": 6
           },
-          "duration": "for 1 minute"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
         }
       ],
       "description": "You generate a powerful shock wave. Any opponent caught in a 40 foot radius, centered on you, must make a CON save against your Move DC, taking 3d10 + MOVE normal damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it becomes deafened for 1 minute.",
@@ -13130,6 +14054,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -13161,18 +14086,32 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You wrap yourself around an enemy Pokémon, trying to squeeze the life from them. Make a melee attack roll. On a hit, the target takes 1d10 + MOVE normal damage and is grappled and restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. As long as the target is restrained on your subsequent turns, this move can be activated again as a bonus action with an automatic hit, dealing 1d10 normal damage.",
@@ -13277,8 +14216,27 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "self_potential_stat_buff_attack_rolls",
         "status_increase_threshold"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": 1,
+          "when": {
+            "type": "natural_roll",
+            "min": 15
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "your next attack on the same target"
+        }
       ],
       "description": "You strike out with powerful claws. Make a melee attack roll against an opponent, doing 2d8 + MOVE normal damage on a hit. If the natural attack roll is 15 or more, your next attack on the same target gets an additional +1 to hit.",
       "moveStat": "STR",
@@ -13387,6 +14345,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -13524,12 +14483,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "deafened",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1 minute"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
         }
       ],
       "description": "The user lets out a piercing screech. Each creature within 30 feet must make a Constitution saving throw. On a failure, a creature takes 2d6 + MOVE normal damage and is deafened for 1 minute. On a success, it takes half damage and isn't deafened.",
@@ -13786,6 +14751,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "on_hit"
@@ -13879,12 +14845,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "until the end of their next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "You emit an immense flash of light in a 20 foot radius circle, centered on you. Creatures in the area must make a CON save against your Move DC. On a fail, they are blinded until the end of their next turn. Outside of combat, this move can be used to light a dim area.",
@@ -13928,17 +14901,23 @@
       "categories": [
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "potential_status_condition_other"
+        "potential_status_condition_taunted"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "taunted",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "label": "taunted",
-          "duration": "until the beginning of your next turn",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "start"
+            }
+          ],
           "note": "all enemies in range; their attacks must target you"
         }
       ],
@@ -14069,6 +15048,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -14220,6 +15200,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "natural_roll",
@@ -14353,6 +15334,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -14428,6 +15410,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -14460,6 +15443,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -14617,6 +15601,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -15055,16 +16040,16 @@
       "categories": [
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "potential_status_condition_other"
+        "potential_status_condition_perish_song"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "perish_song",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "label": "perish song",
           "note": "includes the user; faints in 3 rounds, on its turn, unless it flees or is switched out first"
         }
       ],
@@ -15427,6 +16412,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -15501,6 +16487,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -15598,6 +16585,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "natural_roll",
@@ -15610,6 +16598,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -15622,6 +16611,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -15634,6 +16624,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "natural_roll",
@@ -15646,6 +16637,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "natural_roll",
@@ -15658,6 +16650,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "natural_roll",
@@ -15781,6 +16774,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "special"
@@ -15833,6 +16827,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -15864,12 +16859,20 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "incapacitated",
           "when": {
             "type": "always"
           },
           "target": "self",
-          "duration": "until the end of your next two turns",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 2
+            }
+          ],
           "note": "immediately and through your next two turns"
         }
       ],
@@ -15981,13 +16984,26 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for the duration",
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            },
+            {
+              "type": "save",
+              "ability": "CON",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You conjure a line of smoke on the battlefield, 60 feet long and 5 feet thick, that extends in any direction from a point within range. The area on either side is obscured and imposes disadvantage on any ranged attacks made by a creature targeting another on the opposite side. Any creature inside the wall of smoke, when it is conjured, must make a CON save against your Move DC or become blinded for the duration. A blinded creature can repeat the save at the beginning of its turns to remove the effect on a success.",
@@ -16206,6 +17222,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -16339,6 +17356,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -16370,6 +17388,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -16615,6 +17634,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -16668,6 +17688,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "always"
@@ -16699,6 +17720,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "save_fail",
@@ -16754,6 +17776,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -16768,6 +17791,7 @@
           "note": "a roll of 4 is rerolled"
         },
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "save_fail",
@@ -16782,6 +17806,7 @@
           "note": "a roll of 4 is rerolled"
         },
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -16863,11 +17888,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You crush a creature with a forceful, gripping attack. Make a melee attack, doing 1d10 + MOVE normal damage on a hit, grappling the target. On each successive turn, if the creature is still grappled, you may use this move again (as an action) and automatically hit. A creature may attempt to excape the grapple at the beginning of its turns with a STR save against your Move DC.",
@@ -16916,6 +17948,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -16949,6 +17982,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -17021,11 +18055,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You attempt to grapple a target into submission. Make a melee attack roll. On a hit, the target takes 1d4 + MOVE normal damage and is grappled. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. As long as the target is grappled on your subsequent turns, this move can be activated again as a bonus action with an automatic hit, dealing 1d4 normal damage.",
@@ -17071,6 +18112,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "special"
@@ -17102,13 +18144,23 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "slowed",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "duration": "for 1 minute",
-          "saveEnds": true,
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "DEX",
+              "timing": "end_of_turn"
+            }
+          ],
           "note": "speed halved; cannot take reactions; one action or bonus action per turn, not both"
         }
       ],
@@ -17348,16 +18400,21 @@
       },
       "reaction": false,
       "categories": [
-        "status_condition_other"
+        "status_condition_abilities_suppressed"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "abilities_suppressed",
           "when": {
             "type": "on_hit"
           },
-          "label": "abilities suppressed",
-          "duration": "for the duration"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
         }
       ],
       "description": "You hurl stomach acid towards a target. Make a ranged attack. On a hit, the target is covered in the disgusting substance and cannot benefit from the effect of any of its abilities for the duration.",
@@ -17383,6 +18440,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "natural_roll",
@@ -17414,6 +18472,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17445,6 +18504,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17478,6 +18538,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17509,6 +18570,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "natural_roll",
@@ -17539,6 +18601,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17569,6 +18632,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "natural_roll",
@@ -17601,6 +18665,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "natural_roll",
@@ -17636,6 +18701,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17648,6 +18714,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -17660,6 +18727,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -17672,6 +18740,7 @@
           }
         },
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -17729,6 +18798,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17760,6 +18830,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17790,6 +18861,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "natural_roll",
@@ -17824,6 +18896,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17853,16 +18926,16 @@
         "damage_vp",
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "potential_status_condition_other"
+        "potential_status_condition_infected"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "infected",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "label": "infected",
           "note": "a further CON save after the DEX save; loses 4d12 VP at the end of its turn; at 0 VP its HP also drops to 0"
         }
       ],
@@ -17890,6 +18963,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17921,6 +18995,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -17952,6 +19027,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "on_hit"
@@ -17959,6 +19035,7 @@
           "note": "while the threads make contact with the target; speed also -10 ft, stackable (the poison itself does not stack)"
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "special"
@@ -17992,6 +19069,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -18023,6 +19101,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "always"
@@ -18052,6 +19131,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -18083,13 +19163,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "requires": "hit"
           },
-          "duration": "for 1 minute"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
         }
       ],
       "description": "The user attempts to grapple a target. On a successful grapple, the target takes 2d8 + MOVE poison damage and must make a Constitution saving throw. On a failure, the target is poisoned for 1 minute.",
@@ -18137,12 +19223,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
             "ability": "STR"
           },
-          "duration": "until the start of the beholder's next turn",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "start"
+            }
+          ],
           "note": "the beholder also moves it up to 30 ft in any direction"
         }
       ],
@@ -18317,6 +19410,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -18408,6 +19502,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -18483,12 +19578,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "cannot be woken by any means; afterwards it sleeps on normally, gains one level of exhaustion on waking and takes 5d4 psychic damage"
         }
       ],
@@ -18515,6 +19616,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -18711,6 +19813,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -18826,13 +19929,20 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "failBy": 5
           },
-          "duration": "until the end of your next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "You create a blinding bright light that damages creature's eyes and may lower their defense. Creatures in range must make a CON save against your Move DC, taking 4d12 + MOVE psychic damage on a failure, or half as much on a success. For creatures that fail by 5 or more, they are blinded until the end of your next turn.",
@@ -18922,12 +20032,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "stunned",
           "when": {
             "type": "save_fail",
             "ability": "INT"
           },
-          "duration": "for 1 round"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ]
         }
       ],
       "description": "The user creates a 20-foot-radius sphere of psychic fog centered on a point within 120 feet. The fog spreads around corners, and its area is heavily obscured. Each creature in the fog when it appears must make an Intelligence saving throw. On a failure, the creature is stunned for 1 round and has disadvantage on Intelligence and Wisdom checks for 1 minute.",
@@ -18991,9 +20107,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_disadvantage_attack_rolls",
         "potential_disadvantage",
         "recharge_locked"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "natural_roll",
+            "min": 11
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ],
+          "note": "any attack it makes before the end of its next turn"
+        }
       ],
       "description": "You fire an explosive ball of damaging mist at a creature in range. Make a ranged attack against a target, doing 4d12 + MOVE psychic damage on a hit. If the natural attack roll is higher than 10, the target has disadvantage on any attack it makes before the end of its next turn. This move can't be used consecutively.",
       "moveStat": "DEX/WIS",
@@ -19026,7 +20161,7 @@
         "potential_status_condition_frozen",
         "potential_status_condition_grappled",
         "potential_status_condition_incapacitated",
-        "potential_status_condition_other",
+        "potential_status_condition_invisible",
         "potential_status_condition_paralyzed",
         "potential_status_condition_petrified",
         "potential_status_condition_poisoned",
@@ -19036,6 +20171,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "save_fail",
@@ -19049,6 +20185,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "blinded",
           "when": {
             "type": "save_fail",
@@ -19062,6 +20199,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -19075,6 +20213,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "charmed",
           "when": {
             "type": "save_fail",
@@ -19088,6 +20227,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -19101,6 +20241,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "deafened",
           "when": {
             "type": "save_fail",
@@ -19114,6 +20255,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "save_fail",
@@ -19127,6 +20269,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "save_fail",
@@ -19140,6 +20283,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "frozen",
           "when": {
             "type": "save_fail",
@@ -19153,6 +20297,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "save_fail",
@@ -19166,6 +20311,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "incapacitated",
           "when": {
             "type": "save_fail",
@@ -19179,12 +20325,12 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "invisible",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "label": "invisible",
           "choice": {
             "kind": "random",
             "die": "d20",
@@ -19193,6 +20339,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
@@ -19206,6 +20353,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "petrified",
           "when": {
             "type": "save_fail",
@@ -19219,6 +20367,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "poisoned",
           "when": {
             "type": "save_fail",
@@ -19232,6 +20381,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -19245,6 +20395,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
@@ -19258,6 +20409,7 @@
           "note": "a roll of 19 rerolls; on a 20 the user chooses the condition"
         },
         {
+          "kind": "condition",
           "apply": "stunned",
           "when": {
             "type": "save_fail",
@@ -19295,6 +20447,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -19435,6 +20588,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -19465,6 +20619,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -19561,11 +20716,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You create a psychic wave that swirls around a creature in range, attempting to restrain it. Make a ranged attack. On a hit, the target takes 3d10 + MOVE psychic damage and is restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. On each successive turn, if the creature is still restrained, you may use this move again (as an action) and automatically hit.",
@@ -19675,6 +20837,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "save_fail",
@@ -19746,6 +20909,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "asleep",
           "when": {
             "type": "always"
@@ -19926,20 +21090,38 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for the duration"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            },
+            {
+              "type": "concentration"
+            }
+          ]
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for the duration"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            },
+            {
+              "type": "concentration"
+            }
+          ]
         }
       ],
       "description": "You use your psychic power to attempt to hold a creature above the ground, making it vulnerable to attacks. Force a creature in range to make a CON save against your Move DC. On a failure, the creature is grappled and restrained for the duration, unable to release itself as long as you hold your concentration. While grappled, the creature is considered Raised.",
@@ -20065,21 +21247,37 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "incapacitated",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for 1 round"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ]
         },
         {
+          "kind": "condition",
           "apply": "slowed",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
           },
-          "duration": "for 1 minute",
-          "saveEnds": true,
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "save",
+              "ability": "WIS",
+              "timing": "end_of_turn"
+            }
+          ],
           "note": "speed halved"
         }
       ],
@@ -20127,6 +21325,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -20158,6 +21357,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
@@ -20166,12 +21366,18 @@
           "note": "begins to turn to stone"
         },
         {
+          "kind": "condition",
           "apply": "petrified",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
           },
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "after the restrained stage: must repeat the save at the end of its next turn"
         }
       ],
@@ -20264,6 +21470,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
@@ -20272,12 +21479,18 @@
           "note": "begins to turn to stone"
         },
         {
+          "kind": "condition",
           "apply": "petrified",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "duration": "for 1 minute",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
           "note": "follows the restrained stage"
         }
       ],
@@ -20366,6 +21579,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -20417,12 +21631,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
             "ability": "STR"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You summon a collection of boulders that attempt to surround a target. Force a creature in range to make a STR saving throw against your Move DC, taking 1d10 + MOVE rock damage and becoming restrained on a failure, or half as much without being restrained on a success. If it fails, at the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. While a creature is restrained, you may continue this move, as an action, to deal an automatic 1d10 + MOVE rock damage.",
@@ -20450,12 +21671,14 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "on_hit"
           }
         },
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -20529,6 +21752,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "on_hit"
@@ -20603,6 +21827,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "save_fail",
@@ -20612,6 +21837,7 @@
           "note": "only if the target is smaller than you; it is swallowed"
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "save_fail",
@@ -20688,13 +21914,19 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "deafened",
           "when": {
             "type": "save_fail",
             "ability": "CON",
             "failBy": 5
           },
-          "duration": "for 1 minute"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
         }
       ],
       "description": "You emit a loud chime that can be heard by all creatures in range. Affected creatures will wake up, and can't fall asleep for the duration. While tolling, creatures that begin their turn within 15ft. of you must succeed a CON save at the beginning of their turns, or take 2d8 + MOVE steel damage. Failing the save by 5 or more causes critical damage and deafness for 1 minute.",
@@ -20760,15 +21992,35 @@
       "categories": [
         "damage",
         "status_condition_grappled",
+        "potential_stat_debuff_ac",
         "stat_debuff_enemy",
         "multi_hit_same_target"
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           }
+        },
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 16
+          },
+          "stacks": {
+            "max": 3
+          },
+          "ends": [
+            {
+              "type": "long_rest"
+            }
+          ],
+          "note": "on the second attack only"
         }
       ],
       "description": "You clamp down on a target, attempting to crush it. Make an attack roll, dealing 1d12 + MOVE steel damage on a hit. On a successful hit, the target is considered grappled. If the first attack hit, make another attack roll with advantage, dealing an additional 3d6 + MOVE steel damage on a hit. On a natural attack roll of 16 or more on the second attack, the target's AC is reduced by 1 until its next long rest. This effect stacks up to three times.",
@@ -20790,7 +22042,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold"
+        "potential_advantage_attacks_against"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "the next attack against the target"
+        }
       ],
       "description": "You gather energy from the light around you and send a concentrated beam towards a creature in range. Make a ranged attack, dealing 2d8 + MOVE steel damage on a hit. On a natural attack roll of 19 or 20, the next attack against the target is rolled at advantage.",
       "moveStat": "STR/DEX",
@@ -20987,6 +22257,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "flinched",
           "when": {
             "type": "natural_roll",
@@ -21013,8 +22284,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_ac",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "for the rest of combat"
+        }
       ],
       "description": "You swing your tail out, attempting to crush a creature. Make an attack roll on a creature in range, doing 2d8 + MOVE steel damage on a hit. If the natural attack roll is a 19 or 20, the target’s AC is decreased by 1 for the rest of combat.",
       "moveStat": "STR",
@@ -21099,17 +22387,22 @@
       "categories": [
         "counter_reaction_effect",
         "damage",
-        "potential_status_condition_other"
+        "potential_status_condition_bleeding"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "bleeding",
           "when": {
             "type": "natural_roll",
             "min": 20
           },
-          "label": "bleeding wounds",
-          "duration": "for 3 rounds",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ],
           "note": "loses HP equal to its proficiency bonus each time it spends VP or uses its movement"
         }
       ],
@@ -21132,8 +22425,27 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "self_potential_stat_buff_attack_rolls",
         "status_increase_threshold"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": "proficiency",
+          "when": {
+            "type": "natural_roll",
+            "min": 19
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "add your proficiency bonus to your next attack"
+        }
       ],
       "description": "You strike out with sharp claws. Make a melee attack roll against a creature, doing 1d6 + MOVE steel damage on a hit. If the natural attack roll is 19 or 20, add your proficiency bonus to your next attack.",
       "moveStat": "STR",
@@ -21175,8 +22487,27 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "self_potential_advantage_attack_rolls",
         "status_increase_threshold"
+      ],
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "natural_roll",
+            "min": 18
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "your next attack"
+        }
       ],
       "description": "You smash a creature with a fist as fast as a meteor strike. Make a melee attack against a creature, doing 3d10 + MOVE steel damage on a hit. If the natura attack roll is 18 or higher, your next attack has advantage.",
       "moveStat": "STR/DEX",
@@ -21413,6 +22744,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -21615,12 +22947,14 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "grappled",
           "when": {
             "type": "on_hit"
           }
         },
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
@@ -21697,6 +23031,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -21812,8 +23147,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_attack_rolls",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 18
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "for the remainder of this combat"
+        }
       ],
       "description": "You send a blast of ink towards your creatures. Make a ranged attack roll, doing 1d10 + MOVE water damage on a hit. If the natural attack roll is 18 or more, the target must add -1 to attack rolls for the remainder of this combat.",
       "moveStat": "STR/DEX",
@@ -21865,6 +23217,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -21911,8 +23264,27 @@
       "reaction": false,
       "categories": [
         "damage",
-        "status_inflict_threshold",
+        "potential_stat_debuff_ac",
         "stat_debuff_enemy"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -1,
+          "when": {
+            "type": "natural_roll",
+            "min": 18
+          },
+          "stacks": {
+            "max": 5
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ]
+        }
       ],
       "description": "You strike a creature with a razor sharp shell. Make a melee attack on a creature, dealing 1d10 + MOVE water damage on a hit. On natural attack rolls of 18 or higher, lower the creatures AC by 1. This decrease may be stacked, up to a maximum of -5 to AC.",
       "moveStat": "STR/DEX",
@@ -21942,22 +23314,34 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "paralyzed",
           "when": {
             "type": "save_fail",
             "ability": "DEX",
             "failBy": 6
           },
-          "duration": "for three turns"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
         },
         {
+          "kind": "condition",
           "apply": "frightened",
           "when": {
             "type": "save_fail",
             "ability": "DEX",
             "failBy": 6
           },
-          "duration": "for three turns"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
         }
       ],
       "description": "You begin circling in the air at incredible speeds, creating a vortex of energy fed by atmospheric water for one turn. While charging this attack, your AC is temporarily increased by 5. On your next turn, the accumulated water is released all at once in a sparkling sapphire torrent in a 50 foot line. Any creature caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE water damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it is paralyzed, and frightened for three turns. During heavy rain, this move does not need charging.",
@@ -21983,6 +23367,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "natural_roll",
@@ -22009,17 +23394,23 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "potential_status_condition_other"
+        "potential_status_condition_type_changed"
       ],
       "effects": [
         {
-          "apply": "other",
+          "kind": "condition",
+          "apply": "type_changed",
+          "value": "Water",
           "when": {
             "type": "save_fail",
             "ability": "CON"
           },
-          "label": "type changed to Water",
-          "duration": "for three rounds"
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
         }
       ],
       "description": "You fire a torrent of water at a creature with such force that it leaves lasting effects. Force a target in range to make a CON save against your Move DC. On a failure, their type changes to water for three rounds.",
@@ -22071,6 +23462,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "burned",
           "when": {
             "type": "save_fail",
@@ -22105,6 +23497,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -22198,6 +23591,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "confused",
           "when": {
             "type": "natural_roll",
@@ -22295,6 +23689,7 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "prone",
           "when": {
             "type": "save_fail",
@@ -22325,11 +23720,18 @@
       ],
       "effects": [
         {
+          "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
           },
-          "saveEnds": true
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You create a wave of water that swirls around a creature in range. Make a ranged attack roll. On a hit, the target takes 1d10 + MOVE water damage and is restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. On each successive turn, if the creature is still restrained, you may use this move again (as an action) and automatically hit.",

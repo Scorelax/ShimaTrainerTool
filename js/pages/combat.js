@@ -35,7 +35,7 @@ let _moveMap = null; // Map<name, moveData> for O(1) lookups
 let _moveCategories = null;
 let _moveCategoriesLoading = false;
 // Move-name -> structured effects (same response as the categories; schema in
-// pi-server/docs/build_move_effects.py). {} until loaded, and for a move with no
+// pi-server/docs/move-effects-schema.md). {} until loaded, and for a move with no
 // entry -- callers treat "no effects" as "nothing to offer", never an error.
 let _moveEffects = {};
 
@@ -67,9 +67,9 @@ export function moveCategoriesFor(moveName) {
   return _moveCategories?.[moveName] || [];
 }
 
-/** The structured status effects for `moveName` -- [{apply, when, target?,
- * duration?, saveEnds?, label?, choice?, note?}, ...], [] when the move has none
- * (or the data hasn't loaded yet). */
+/** The structured effects for `moveName` -- [{kind, apply|stat|roll, when,
+ * target?, ends?, choice?, note?}, ...] (see move-effects-schema.md), [] when the
+ * move has none (or the data hasn't loaded yet). */
 export function moveEffectsFor(moveName) {
   return _moveEffects[moveName] || [];
 }

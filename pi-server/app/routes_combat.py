@@ -203,6 +203,22 @@ def handle(conn, action, params):
             move_name=params.get('moveName', ''),
         )
 
+    if action == 'apply-status':
+        if not params.get('targetId') or not params.get('status'):
+            raise ValueError('Missing targetId or status')
+        spec = json.loads(params['status'])
+        return _mutate(conn, lambda s: _apply_status(s, params['targetId'], spec))
+
+    if action == 'remove-status':
+        if not params.get('targetId') or not params.get('statusId'):
+            raise ValueError('Missing targetId or statusId')
+        return _mutate(conn, lambda s: _remove_status(s, params['targetId'], params['statusId'], params.get('reason', '')))
+
+    if action == 'use-status':
+        if not params.get('targetId') or not params.get('statusId'):
+            raise ValueError('Missing targetId or statusId')
+        return _mutate(conn, lambda s: _use_status(s, params['targetId'], params['statusId']))
+
     if action == 'update-stats':
         if not params.get('id'):
             raise ValueError('Missing participant id')
@@ -585,6 +601,11 @@ def _add_participant(state, data):
         'placed': False,
         'status': status,
         'reactionUsed': False,
+        # Live effects on this participant (conditions, stat modifiers,
+        # advantage/disadvantage) -- see the status section below and
+        # move-effects-schema.md. Older participants may lack the key;
+        # every reader goes through _statuses_of.
+        'statuses': [],
         # Meaningful for side='enemy' only -- allies are always fully visible
         # to their own team. DM toggles these per-enemy from the DM module.
         'visibility': {'hp': True, 'vp': True, 'name': True},
@@ -696,8 +717,10 @@ def _advance_turn(state):
     if not state['turnOrder']:
         return
     state['started'] = True
+    ending_id = state['turnOrder'][state['turnIndex']] if state['turnIndex'] < len(state['turnOrder']) else None
     state['turnIndex'] = (state['turnIndex'] + 1) % len(state['turnOrder'])
-    if state['turnIndex'] == 0:
+    new_round = state['turnIndex'] == 0
+    if new_round:
         state['round'] += 1
     # Only the combatant whose normal turn is now starting gets their
     # reaction refreshed -- "usable again once their next turn comes up",
@@ -707,6 +730,14 @@ def _advance_turn(state):
         next_participant['reactionUsed'] = False
     _log_event(state, 'turn-advance', text=f"Round {state['round']}: {next_participant['name'] if next_participant else '?'}'s turn",
                actorId=state['turnOrder'][state['turnIndex']], actorName=next_participant['name'] if next_participant else None)
+    # Effects that end on a turn boundary or a round count (see the status
+    # section) -- after the log line, so "wore off" entries read as happening
+    # in the new turn/round.
+    if ending_id:
+        _expire_statuses_on_turn_point(state, ending_id, 'end')
+    if new_round:
+        _expire_statuses_by_round(state)
+    _expire_statuses_on_turn_point(state, state['turnOrder'][state['turnIndex']], 'start')
 
 
 def _reaction_start(state, pid):
@@ -745,6 +776,189 @@ def _active_participant_id(state):
     if state['turnOrder']:
         return state['turnOrder'][state['turnIndex']]
     return None
+
+
+# ---------------------------------------------------------------------------
+# Statuses -- live effects on a participant: conditions, stat modifiers,
+# advantage/disadvantage. The shape is a move's `effects` entry (see
+# pi-server/docs/move-effects-schema.md) minus `when`/`choice` (those only
+# decide WHETHER it gets applied, which the client works out from the rolls it
+# recorded), plus who applied it and the runtime state of each `ends` entry.
+# Any ONE ends entry firing removes the status. Nothing here rolls dice or
+# decides a save -- humans do that at the table; the server only stores what
+# they report and expires what the turn/round counters say has run out.
+# ---------------------------------------------------------------------------
+
+_STATUS_KINDS = ('condition', 'stat', 'roll')
+_END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'long_rest', 'uses', 'instant', 'other')
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'stat', 'amount', 'set', 'roll', 'on', 'note')
+
+
+def _statuses_of(participant):
+    return participant.setdefault('statuses', [])
+
+
+def _status_label(s):
+    """Human-readable name for a stored/incoming status, used in the log."""
+    kind = s.get('kind')
+    if kind == 'condition':
+        if s.get('apply') == 'type_changed' and s.get('value'):
+            return f"type changed to {s['value']}"
+        return (s.get('apply') or '').replace('_', ' ')
+    if kind == 'stat':
+        stat = (s.get('stat') or '').replace('_', ' ')
+        if 'set' in s:
+            return f"{stat} set to {s['set']}"
+        amount = s.get('amount')
+        if amount == 'proficiency':
+            return f'{stat} +proficiency bonus'
+        if isinstance(amount, int):
+            return f"{stat} {amount * s.get('stacks', 1):+d}"
+        return stat
+    return f"{s.get('roll')} on {(s.get('on') or '').replace('_', ' ')}"
+
+
+def _same_status(a, b):
+    """Re-applying the same effect from the same source's same move refreshes
+    (or stacks) it rather than piling up duplicates."""
+    keys = ('kind', 'apply', 'value', 'stat', 'roll', 'on', 'sourceId', 'moveName')
+    return all(a.get(k) == b.get(k) for k in keys)
+
+
+def _prime_end(e, state, holder_id, source_id):
+    """One incoming ends entry -> its stored form, with the runtime bookkeeping
+    each type needs."""
+    e = dict(e)
+    kind = e['type']
+    if kind == 'rounds':
+        n = js_parse_int(e.get('n'))
+        if n and n > 0:
+            e['n'] = n
+            e['expiresRound'] = state['round'] + n
+        else:
+            # Dice never got rolled, so there's nothing to schedule: keep it as
+            # a reminder the holder's table removes by hand.
+            unit = e.get('unit', 'round')
+            return {'type': 'other', 'text': f"{e.get('dice', 'unrolled duration')} {unit}s"}
+    elif kind == 'until_turn':
+        e['count'] = max(1, js_parse_int(e.get('count')) or 1)
+        who = source_id if e.get('whose') == 'source' else holder_id
+        # "The end of their next turn", applied during their own turn, means the
+        # following one -- so this turn's end doesn't count.
+        e['skip'] = e.get('point') == 'end' and who is not None and who == _active_participant_id(state)
+    elif kind == 'uses':
+        e['left'] = max(1, js_parse_int(e.get('n')) or 1)
+    return e
+
+
+def _apply_status(state, target_id, spec):
+    target = state['participants'].get(target_id)
+    if not target:
+        raise ValueError('Unknown participant: ' + target_id)
+    if spec.get('kind') not in _STATUS_KINDS:
+        raise ValueError('status kind must be condition, stat or roll')
+    raw_ends = spec.get('ends') or []
+    for e in raw_ends:
+        if not isinstance(e, dict) or e.get('type') not in _END_TYPES:
+            raise ValueError('Unknown status end: ' + json.dumps(e))
+
+    source_id = spec.get('sourceId') or None
+    source = state['participants'].get(source_id) if source_id else None
+    source_name = source['name'] if source else spec.get('sourceName')
+    move_name = spec.get('moveName', '')
+    new = {k: spec[k] for k in _STATUS_FIELDS if k in spec}
+    new.update({'sourceId': source_id, 'sourceName': source_name, 'moveName': move_name})
+    from_text = f" (from {source_name}'s {move_name})" if source_name and move_name else ''
+
+    if any(e['type'] == 'instant' for e in raw_ends):
+        # Announced, never stored (e.g. a forced 15 ft move).
+        _log_event(state, 'status-apply', text=f"{target['name']}: {_status_label(new)}{from_text}",
+                   actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
+        return
+
+    new['dc'] = js_parse_int(spec.get('dc'))
+    new['appliedRound'] = state['round']
+    new['ends'] = [_prime_end(e, state, target_id, source_id) for e in raw_ends]
+
+    statuses = _statuses_of(target)
+    existing = next((s for s in statuses if _same_status(s, new)), None)
+    new['id'] = existing['id'] if existing else uuid.uuid4().hex[:8]
+    stack_max = js_parse_int((spec.get('stacks') or {}).get('max')) if spec.get('kind') == 'stat' else None
+    verb = 'is now'
+    if stack_max:
+        new['stackMax'] = stack_max
+        new['stacks'] = min(stack_max, (existing.get('stacks', 1) if existing else 0) + 1)
+        if new['stacks'] > 1:
+            verb = f"stacked to x{new['stacks']}:"
+    if existing:
+        statuses[statuses.index(existing)] = new
+    else:
+        statuses.append(new)
+    _log_event(state, 'status-apply', text=f"{target['name']} {verb} {_status_label(new)}{from_text}",
+               actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
+
+
+def _find_status(state, target_id, status_id):
+    target = state['participants'].get(target_id)
+    if not target:
+        raise ValueError('Unknown participant: ' + target_id)
+    for s in _statuses_of(target):
+        if s['id'] == status_id:
+            return target, s
+    raise ValueError('Unknown status: ' + status_id)
+
+
+def _remove_status(state, target_id, status_id, reason=''):
+    target, s = _find_status(state, target_id, status_id)
+    _statuses_of(target).remove(s)
+    _log_event(state, 'status-remove', text=f"{target['name']}: {_status_label(s)} ended" + (f' ({reason})' if reason else ''),
+               targetId=target_id, targetName=target['name'])
+
+
+def _use_status(state, target_id, status_id):
+    """Consumes one use of a `uses` end (an advantage/disadvantage or bonus that
+    lasts "the next attack"); the status goes away once a uses entry runs out."""
+    target, s = _find_status(state, target_id, status_id)
+    for e in s.get('ends', []):
+        if e.get('type') == 'uses' and e.get('left', 0) > 0:
+            e['left'] -= 1
+            if e['left'] <= 0:
+                _remove_status(state, target_id, status_id, 'used up')
+            return
+    raise ValueError('That status has no uses left')
+
+
+def _expire_status(state, participant, s, why):
+    _statuses_of(participant).remove(s)
+    _log_event(state, 'status-expire', text=f"{participant['name']}: {_status_label(s)} wore off ({why})",
+               targetId=participant['id'], targetName=participant['name'])
+
+
+def _expire_statuses_on_turn_point(state, pid, point):
+    """A turn just ended/started for `pid`: fire every until_turn end waiting on it."""
+    for p in state['participants'].values():
+        for s in list(_statuses_of(p)):
+            for e in s.get('ends', []):
+                if e.get('type') != 'until_turn' or e.get('point') != point:
+                    continue
+                who = s.get('sourceId') if e.get('whose') == 'source' else p['id']
+                if who != pid:
+                    continue
+                if e.get('skip'):
+                    e['skip'] = False
+                    continue
+                e['count'] = e.get('count', 1) - 1
+                if e['count'] <= 0:
+                    _expire_status(state, p, s, f'{point} of the turn')
+                    break
+
+
+def _expire_statuses_by_round(state):
+    for p in state['participants'].values():
+        for s in list(_statuses_of(p)):
+            if any(e.get('type') == 'rounds' and e.get('expiresRound') is not None
+                   and state['round'] >= e['expiresRound'] for e in s.get('ends', [])):
+                _expire_status(state, p, s, 'duration over')
 
 
 def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move_type):

@@ -34,6 +34,10 @@ let _moveMap = null; // Map<name, moveData> for O(1) lookups
 // existed -- never a reason to block using a move.
 let _moveCategories = null;
 let _moveCategoriesLoading = false;
+// Move-name -> structured effects (same response as the categories; schema in
+// pi-server/docs/build_move_effects.py). {} until loaded, and for a move with no
+// entry -- callers treat "no effects" as "nothing to offer", never an error.
+let _moveEffects = {};
 
 // The data file's tags may still carry the manual-review decoration ("--TRIGGER
 // SAVING THROW--", "-- POTENTIAL DAMAGE INCREASE--", ...) that marked the user's
@@ -55,11 +59,19 @@ function loadMoveCategories() {
       normalized[name] = [...new Set((tags || []).map(_normalizeTag))];
     }
     _moveCategories = normalized;
+    _moveEffects = result.effects || {};
   }).catch(() => {}).finally(() => { _moveCategoriesLoading = false; });
 }
 
 export function moveCategoriesFor(moveName) {
   return _moveCategories?.[moveName] || [];
+}
+
+/** The structured status effects for `moveName` -- [{apply, when, target?,
+ * duration?, saveEnds?, label?, choice?, note?}, ...], [] when the move has none
+ * (or the data hasn't loaded yet). */
+export function moveEffectsFor(moveName) {
+  return _moveEffects[moveName] || [];
 }
 
 /** The raw move row [name, type, modifier, actionType, vpCost, duration,

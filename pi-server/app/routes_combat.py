@@ -907,14 +907,21 @@ def _list_move_categories():
     move popup without a server restart. Missing/unparseable file -> empty
     dict, same reasoning: a category lookup miss should never block using
     a move, only skip whatever specialized flow that category would have
-    triggered (see showCombatMoveDetails's _isSaveTriggered check)."""
+    triggered (see showCombatMoveDetails's _isSaveTriggered check).
+
+    Also returns `effects`: {moveName: [effect, ...]} for the moves that have a
+    structured `effects` list (which condition a move applies and what triggers
+    it -- schema in pi-server/docs/build_move_effects.py's header). Same
+    miss-is-not-an-error rule: no entry just means "no structured effects"."""
     try:
         with open(upstream.MOVES_FILE, encoding='utf-8') as f:
             data = json.load(f)
     except (OSError, ValueError):
-        return {'status': 'success', 'categories': {}}
-    categories = {m['name']: m.get('categories', []) for m in data.get('moves', [])}
-    return {'status': 'success', 'categories': categories}
+        return {'status': 'success', 'categories': {}, 'effects': {}}
+    moves = data.get('moves', [])
+    categories = {m['name']: m.get('categories', []) for m in moves}
+    effects = {m['name']: m['effects'] for m in moves if m.get('effects')}
+    return {'status': 'success', 'categories': categories, 'effects': effects}
 
 
 def _set_board_background(state, url):

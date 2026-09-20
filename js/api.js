@@ -914,8 +914,9 @@ export class CombatAPI {
     return API.request('combat', 'list-backgrounds', {}, { useCache: false });
   }
 
-  /** {status, categories: {moveName: [category, ...]}} -- the user's own
-   * manual move categorization (see routes_combat.py's list-move-categories
+  /** {status, categories: {moveName: [category, ...]}, effects: {moveName:
+   * [effect, ...]}} -- the user's own manual move categorization plus the
+   * structured status effects (see routes_combat.py's list-move-categories
    * action). Cacheable -- the file only changes between deploys, not
    * within a single page session. */
   static async listMoveCategories() {

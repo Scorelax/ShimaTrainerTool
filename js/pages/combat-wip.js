@@ -21,7 +21,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -1392,7 +1392,9 @@ function _attachMainFocusListeners(state) {
     const nextId = _nextOwnedAfter(session, endingId);
     const endingHasIngrain = ctx.filteredState.combatants[0]?.statusEffects
       ?.some(se => se.name === 'Ingrain' && se.duration > 0);
-    CombatAPI.advanceTurn()
+    // Effects that end on a repeat save at the end of this turn get their save prompt first.
+    _promptTurnSaves(endingId, 'end_of_turn')
+      .then(() => CombatAPI.advanceTurn())
       .then(() => { if (nextId && nextId !== endingId && !endingHasIngrain) _setFocus(nextId); })
       .catch(() => {});
   });
@@ -1505,6 +1507,7 @@ export function attachCombatWipListeners() {
       _syncHeaderBar(session);
       updateBattleMap(session);
       updateBattleLog(session);
+      _maybePromptStartOfTurnSaves(session);
       return;
     }
 
@@ -1515,6 +1518,7 @@ export function attachCombatWipListeners() {
     _syncHeaderBar(session);
     updateBattleMap(session); // no-ops if the popup isn't currently open
     updateBattleLog(session); // no-ops if the popup isn't currently open
+    _maybePromptStartOfTurnSaves(session);
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
 
@@ -2074,6 +2078,51 @@ async function _rollStatusSave(holder, status, title) {
     }).catch(() => {});
   }
   return outcome;
+}
+
+let _promptingSaves = false;
+
+/** Prompts `participantId`'s saving throw for every status that ends on a repeat save at
+ * `timing` (start_of_turn / end_of_turn), one after the other. Closing a popup skips that
+ * one for now; a failed save leaves the status until the next turn point, a pass removes it. */
+async function _promptTurnSaves(participantId, timing) {
+  const holder = session?.participants?.[participantId];
+  if (!holder) return;
+  const label = timing === 'start_of_turn' ? 'start of turn' : 'end of turn';
+  for (const due of pendingTurnSaves(holder, timing)) {
+    // Fresh lookup each time: an earlier prompt (or the server) may already have ended it.
+    const status = (session?.participants?.[participantId]?.statuses || []).find(st => st.id === due.id);
+    if (!status) continue;
+    try {
+      await _rollStatusSave(session.participants[participantId], status, `${statusLabel(status)} — ${label} save`);
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
+}
+
+const WIP_SAVE_PROMPT_KEY = 'combatWipLastSavePrompt';
+
+/** A push just landed: if it's now the turn of one of THIS device's participants and it
+ * hasn't been prompted yet, run its start-of-turn saves. Remembered per battle/round/turn in
+ * sessionStorage so a repeated push or a page refresh mid-turn doesn't ask twice. Participants
+ * nobody owns (a DM's enemies) aren't prompted here -- anyone can roll their save from the
+ * status badge. */
+async function _maybePromptStartOfTurnSaves(state) {
+  if (_promptingSaves || !state?.active || !state.started) return;
+  const activeId = state.turnOrder?.[state.turnIndex];
+  const p = activeId ? state.participants?.[activeId] : null;
+  if (!p || !p.owner || p.owner !== _currentTrainerName()) return;
+  const key = `${state.logFile}:${state.round}:${state.turnIndex}:${activeId}`;
+  if (sessionStorage.getItem(WIP_SAVE_PROMPT_KEY) === key) return;
+  sessionStorage.setItem(WIP_SAVE_PROMPT_KEY, key);
+  if (!pendingTurnSaves(p, 'start_of_turn').length) return;
+  _promptingSaves = true;
+  try {
+    await _promptTurnSaves(activeId, 'start_of_turn');
+  } finally {
+    _promptingSaves = false;
+  }
 }
 
 /** A status badge was clicked (own card or another participant's panel). */

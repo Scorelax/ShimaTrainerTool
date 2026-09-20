@@ -131,6 +131,15 @@ export function describeEnd(e) {
   }
 }
 
+/** The holder's statuses that end on a repeat saving throw at `timing`
+ * ('start_of_turn' | 'end_of_turn') -- what to prompt for when that turn point
+ * comes up. 'action' saves are never prompted (the holder chooses to spend the
+ * action; the badge's detail popup has the button). */
+export function pendingTurnSaves(participant, timing) {
+  return (participant?.statuses || []).filter(s =>
+    (s.ends || []).some(e => e.type === 'save' && e.timing === timing));
+}
+
 /** describeEnds for a STORED status: a rounds end shows how many are left in the
  * current `round` ("3 rounds left"), the rest read as in describeEnd. */
 export function describeStatusEnds(status, round) {

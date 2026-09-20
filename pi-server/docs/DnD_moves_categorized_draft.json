@@ -1487,7 +1487,19 @@
       },
       "reaction": false,
       "categories": [
-        "unknown"
+        "unknown",
+        "potential_status_condition_blinded"
+      ],
+      "effects": [
+        {
+          "apply": "blinded",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "duration": "for 1 minute",
+          "note": "creatures still inside Black Hole when the star ignites"
+        }
       ],
       "description": "This move can only be activated while Black Hole is active. A new star begins forming at your core. For the next 3 turns, you regain 3d10 HP at the start of each turn. While this effect is active, you are invisible within the Black Hole. When this effect ends (or if Black Hole ends early), the darkness ignites. You regain additional HP equal to your level × 3. All creatures still inside Black Hole are pushed to the edge and must make a CON save or be blinded for 1 minute by the brilliant light. The Black Hole then ends. If you are reduced to 0 HP while this effect is active, the effect ends immediately with no final burst.",
       "moveStat": "CON",
@@ -1507,7 +1519,19 @@
       },
       "reaction": false,
       "categories": [
-        "unknown"
+        "unknown",
+        "potential_status_condition_confused"
+      ],
+      "effects": [
+        {
+          "apply": "confused",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "duration": "for the duration",
+          "note": "when a creature enters the distortion zone"
+        }
       ],
       "description": "Reality becomes distorted around you in a 60ft. radius sphere. When creatures enter the distortion zone, they must succeed a Wisdom saving throw or become confused. For the duration, all creatures within the distortion must succeed a Dexterity saving throw against your move DC in order to use movement. All attack rolls against you are done with disadvantage, and yoou have advantage on saving throws while the distortion zone is active.",
       "moveStat": "WIS/CHA",
@@ -1628,7 +1652,28 @@
       },
       "reaction": false,
       "categories": [
-        "unknown"
+        "unknown",
+        "status_condition_blinded",
+        "potential_status_condition_blinded"
+      ],
+      "effects": [
+        {
+          "apply": "blinded",
+          "when": {
+            "type": "always"
+          },
+          "duration": "for the next round",
+          "note": "creatures dependent on sight in the 80 ft area"
+        },
+        {
+          "apply": "blinded",
+          "when": {
+            "type": "save_fail",
+            "ability": "DEX"
+          },
+          "duration": "for 1 minute",
+          "note": "on the flash released on your next turn"
+        }
       ],
       "description": "You absorb all light in an 80ft. radius. All creatures dependent on sight in the area are considered blind for the next round. On your next turn, you release a bright flash of cosmic energy in an 60ft. cone. All creatures hit must succeed a Dexterity saving throw or suffer 4d12 + MOVE cosmic damage and be blinded for 1 minute. On a successful save, they take half damage and are not blinded. The lighting in the area returns to normal after the release of energy.",
       "moveStat": "CON",
@@ -1648,7 +1693,35 @@
       },
       "reaction": false,
       "categories": [
-        "unknown"
+        "unknown",
+        "potential_status_condition_prone",
+        "potential_status_condition_blinded"
+      ],
+      "effects": [
+        {
+          "apply": "prone",
+          "when": {
+            "type": "save_fail",
+            "ability": "STR"
+          }
+        },
+        {
+          "apply": "blinded",
+          "when": {
+            "type": "save_fail",
+            "ability": "STR"
+          },
+          "duration": "until the end of their next turn"
+        },
+        {
+          "apply": "blinded",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "duration": "for 1 round",
+          "note": "creatures within 60 ft of the impact but outside the radius"
+        }
       ],
       "description": "You call down a barrage of stellar energy in a 15ft. radius, 100ft. tall cylinder, centered on a point within range. All creatures within the area must succeed a Strength saving throw against your move DC, or take 10d12 + MOVE cosmic damage and be knocked prone. Creatures that fail the save are also blinded until the end of their next turn from the brilliant light. Creatures within 60ft of the impact (but outside the radius) must make a CON save or be blinded for 1 round. On a success, they take half damage and are not knocked prone. Flying or otherwise ungrounded creatures must make an additional Constitution saving throw with the same DC, falling to the ground on a failed save. The blast ignores shields and barriers, and will not be hindered by moves like Protect, though such moves may be used to gain advantage on the saving throw. The impact creates a 15ft radius crater. The area becomes difficult terrain and is 10ft lower than the surrounding ground. Creatures in the crater have disadvantage on ranged attacks against creatures outside it. This move may be used once per long rest.",
       "moveStat": "STR/WIS",
@@ -1783,7 +1856,19 @@
       },
       "reaction": false,
       "categories": [
-        "trigger_saving_throw"
+        "trigger_saving_throw",
+        "potential_status_condition_frightened"
+      ],
+      "effects": [
+        {
+          "apply": "frightened",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "duration": "for 1 minute",
+          "saveEnds": true
+        }
       ],
       "description": "The targeted creature must succeed on a Wisdom saving throw or be frightened for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "WIS",
@@ -2328,7 +2413,19 @@
       },
       "reaction": false,
       "categories": [
-        "unknown"
+        "unknown",
+        "potential_status_condition_charmed"
+      ],
+      "effects": [
+        {
+          "apply": "charmed",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "duration": "for 1 hour",
+          "note": "broken if you damage the charmed creature or lose concentration"
+        }
       ],
       "description": "A hostile creature within range is forced to succeed a Charisma saving throw, or be charmed by you for 1 hour. The charmed creature considers you their closest friend and ally for the duration, and will do everything in its power to not harm you, and to further your goals. It still maintains loyalty towards others, turning hostile towards friends only if they threaten you. The charm will be broken if you inflict damage on the charmed creature, or if you lose concentration.",
       "moveStat": "CHA",
@@ -2899,7 +2996,18 @@
       },
       "reaction": false,
       "categories": [
-        "unknown"
+        "unknown",
+        "potential_status_condition_prone"
+      ],
+      "effects": [
+        {
+          "apply": "prone",
+          "when": {
+            "type": "save_fail",
+            "ability": "STR"
+          },
+          "note": "Large or smaller creatures only; also flung up to 30 ft"
+        }
       ],
       "description": "You focus a surge of darkness to overpower your opponent. A rift in reality opens up beneath a creature in range, erupting with dark force. The creature must succeed a DEX saving throw, taking 4d12 + MOVE dark damage and 3d10 cosmic damage on a failure, half as much on a success. Large or smaller creatures must then succeed a Strength save or be flung up to 30 feet, landing prone. Protect or similar moves will not negate this move, but will reduce damage by half and automatically succeed the saving throw.",
       "moveStat": "STR/WIS",
@@ -3090,7 +3198,19 @@
       "categories": [
         "damage",
         "trigger_saving_throw_on_hit",
-        "positioning"
+        "positioning",
+        "potential_status_condition_frightened"
+      ],
+      "effects": [
+        {
+          "apply": "frightened",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON",
+            "requires": "hit"
+          },
+          "note": "too frightened to remain in battle: switched out in trainer battles, moves away in wild battles"
+        }
       ],
       "description": "You whip your dragon tail at an opponent in an attempt to send them away. Make a melee attack against a target, dealing 1d10 + MOVE dragon damage and forcing it to make a CON save against your Move DC on a hit. On a failure, the target is too frightened by you to remain in battle. In trainer battles, the target must be switched out if another creature is available. In wild battles, the target must move up to half its speed away from the user, but only attempts to flee outright if it a lower level than the user.",
       "moveStat": "STR",
@@ -3172,7 +3292,18 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "guaranteed_hit"
+        "guaranteed_hit",
+        "self_potential_status_condition_confused"
+      ],
+      "effects": [
+        {
+          "apply": "confused",
+          "when": {
+            "type": "special"
+          },
+          "target": "self",
+          "note": "when the move ends, after the third round or on broken concentration"
+        }
       ],
       "description": "You go into a rampage, doing several attacks without control for three rounds. This move automatically hits for 2d8 + MOVE dragon damage in the first round, 4d8 + MOVE dragon damage in the second round, and 8d8 + MOVE dragon damage in the third round. When this move ends, either after the third round or from breaking concentration, you become confused. This attack stops if concentration is broken, or the user becomes incapacitated.",
       "moveStat": "STR",
@@ -3729,7 +3860,18 @@
       "reaction": false,
       "categories": [
         "damage",
-        "trigger_saving_throw_on_hit"
+        "trigger_saving_throw_on_hit",
+        "potential_status_condition_paralyzed"
+      ],
+      "effects": [
+        {
+          "apply": "paralyzed",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON",
+            "requires": "hit"
+          }
+        }
       ],
       "description": "You touch a creature with your electrified cheeks, sending electricity coursing through their veins. Make an attack roll against a creature. On a hit, the target takes 1d6 + MOVE electric damage and is forced to make a CON save against your Move DC, becoming paralyzed on a failure.",
       "moveStat": "DEX",
@@ -5523,7 +5665,17 @@
       "categories": [
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "stat_debuff_enemy"
+        "stat_debuff_enemy",
+        "potential_status_condition_frightened"
+      ],
+      "effects": [
+        {
+          "apply": "frightened",
+          "when": {
+            "type": "special"
+          },
+          "note": "on a natural roll of 1 on the WIS save"
+        }
       ],
       "description": "You call upon the whispers of the forest to aid you, disorienting and disheartening opponents in range. For the duration, all creatures within 50 feet of you, that have the intention to harm you, are forced to make a WIS save. On a failure, they suffer -5 to hit this turn. On a natural roll of 1, they become frightened as well. Deaf creatures are unaffected by this move.",
       "moveStat": "CHA",
@@ -5837,7 +5989,18 @@
       "categories": [
         "fixed_special_damage",
         "guaranteed_hit",
-        "self_faint"
+        "self_faint",
+        "self_status_condition_exhaustion"
+      ],
+      "effects": [
+        {
+          "apply": "exhaustion",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "note": "3 levels; the user also faints"
+        }
       ],
       "description": "You risk everything and use your own life force to damage a creature in range. The target takes an amount of fighting damage equal to your remaining HP and VP. This damage ignores resistance and immunity to fighting type. You then faint and gain 3 levels of exhaustion.",
       "moveStat": "None",
@@ -6001,7 +6164,18 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_potential_status_condition_prone"
+      ],
+      "effects": [
+        {
+          "apply": "prone",
+          "when": {
+            "type": "special"
+          },
+          "target": "self",
+          "note": "on a miss"
+        }
       ],
       "description": "You leap into the air to deliver a strong kick to a target. Make a melee attack, doing 5d10 + MOVE fighting damage on a hit. On a miss, you take damage equal to half the maximum damage of this move and fall prone.",
       "moveStat": "STR/DEX",
@@ -6022,7 +6196,18 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_potential_status_condition_prone"
+      ],
+      "effects": [
+        {
+          "apply": "prone",
+          "when": {
+            "type": "special"
+          },
+          "target": "self",
+          "note": "on a miss"
+        }
       ],
       "description": "You leap into the air to deliver a strong kick to a creature. Make a melee attack against, doing 4d8 + MOVE fighting damage on a hit. On a miss, you take damage equal to half the maximum damage of this move and fall prone.",
       "moveStat": "STR/DEX",
@@ -9587,7 +9772,19 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "unknown"
+        "unknown",
+        "self_potential_status_condition_incapacitated"
+      ],
+      "effects": [
+        {
+          "apply": "incapacitated",
+          "when": {
+            "type": "special"
+          },
+          "target": "self",
+          "duration": "for one minute",
+          "note": "reaction at 0 HP; the white bloom replaces you"
+        }
       ],
       "description": "Upon reaching 0 HP in combat, instead of fainting, you may use this reaction if you have enough remaining VP. A snow white flower blooms at your feet, closing around you as your body undergoes metamorphosis. For one minute, you are incapacitated. The white bloom has the grass and ghost types, begins with 2x your current max HP, 0 speed, otherwise it has the same stats as you, including your level. It replaces you on the battlefield and in the initiative order. The white bloom knows the following moves: Power Whip, Defense Curl, Wrap, and Spiky Shield. If the white bloom is destroyed before it opens, it activates the move Self-Destruct, and you disappear forever. After 1 minute, the white bloom opens to reveal your White Bloom form. Regain full HP and VP, gain proficiency with Fairy type moves and learn the move Forest Guardian. If you survive this encounter, you remain in White Bloom form.",
       "moveStat": "None",
@@ -12411,7 +12608,20 @@
         "damage",
         "field_terrain",
         "trigger_saving_throw",
-        "conditional_damage"
+        "conditional_damage",
+        "potential_status_condition_slowed"
+      ],
+      "effects": [
+        {
+          "apply": "slowed",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON",
+            "requires": "hit"
+          },
+          "duration": "until the end of their next turn",
+          "note": "temperate environments only; speed halved"
+        }
       ],
       "description": "You cause rapid evaporative cooling to happen around a single target in range. Make a ranged attack, dealing 2d8 + MOVE ice damage. On a hit, this move triggers different effects based on the temperature of the surrounding environment: - In hot environments: Double the dice for the damage roll. - In temperate environments: Target must succeed a Constitution saving throw or have their speed halved until the end of their next turn. - In cold environments: Creates a 10ft. radius of difficult terrain as moisture instantly freezes.",
       "moveStat": "DEX",

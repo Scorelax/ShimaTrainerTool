@@ -436,6 +436,38 @@ OVERRIDES = {
     'Night Slash': [],
 }
 
+# Moves the old tagging pass missed entirely (no retired tag) that genuinely apply a
+# condition. Found by running the parser over every move without `effects`; the other
+# ~26 hits there were cures/immunities ("Safeguard", "Refresh"), damage bonuses against a
+# condition ("Facade", "Smelling Salts") or wake-ups, which are not effects.
+ADDITIONAL_TARGETS = {
+    'Protostar': [E('blinded', SAVE('CON'), duration='for 1 minute',
+                    note='creatures still inside Black Hole when the star ignites')],
+    'Reality Bend': [E('confused', SAVE('WIS'), duration='for the duration', note='when a creature enters the distortion zone')],
+    'Star Drain': [E('blinded', ALWAYS, duration='for the next round', note='creatures dependent on sight in the 80 ft area'),
+                   E('blinded', SAVE('DEX'), duration='for 1 minute', note='on the flash released on your next turn')],
+    'Starfall': [E('prone', SAVE('STR')),
+                 E('blinded', SAVE('STR'), duration='until the end of their next turn'),
+                 E('blinded', SAVE('CON'), duration='for 1 round', note='creatures within 60 ft of the impact but outside the radius')],
+    '3. Fear Ray': [E('frightened', SAVE('WIS'), duration='for 1 minute', saveEnds=True)],
+    'Imperial Decree': [E('charmed', SAVE('CHA'), duration='for 1 hour',
+                          note='broken if you damage the charmed creature or lose concentration')],
+    'Void Eruption': [E('prone', SAVE('STR'), note='Large or smaller creatures only; also flung up to 30 ft')],
+    'Dragon Tail': [E('frightened', SAVE('CON', requires='hit'),
+                      note='too frightened to remain in battle: switched out in trainer battles, moves away in wild battles')],
+    'Outrage': [E('confused', SPECIAL(), target='self', note='when the move ends, after the third round or on broken concentration')],
+    'Nuzzle': [E('paralyzed', SAVE('CON', requires='hit'))],
+    'Whispering Winds': [E('frightened', SPECIAL(), note='on a natural roll of 1 on the WIS save')],
+    'High Jump Kick': [E('prone', SPECIAL(), target='self', note='on a miss')],
+    'Jump Kick': [E('prone', SPECIAL(), target='self', note='on a miss')],
+    'Thermal Shock': [E('slowed', SAVE('CON', requires='hit'), duration='until the end of their next turn',
+                        note='temperate environments only; speed halved')],
+    'Final Gambit': [E('exhaustion', ALWAYS, target='self', note='3 levels; the user also faints')],
+    'White Bloom': [E('incapacitated', SPECIAL(), target='self', duration='for one minute',
+                      note='reaction at 0 HP; the white bloom replaces you')],
+}
+OVERRIDES.update(ADDITIONAL_TARGETS)
+
 # Moves whose retired `status_inflict_threshold` tag really meant "natural-roll secondary
 # effect that is not a condition" (AC/attack modifiers, advantage, ability boosts, speed 0).
 # They keep that one tag until the effects schema grows a stat-modifier form.
@@ -483,7 +515,9 @@ def main():
     raw = FILE.read_text(encoding='utf-8')
     data = json.loads(raw)
     moves = data['moves']
-    targets = [m for m in moves if RETIRED & set(m['categories'])]
+    targets = [m for m in moves
+               if (RETIRED & set(m['categories']) or m['name'] in ADDITIONAL_TARGETS)
+               and not m.get('effects')]
     results = {}
     report = defaultdict(list)
     for m in targets:

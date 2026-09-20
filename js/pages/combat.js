@@ -1683,7 +1683,7 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
-export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, ...cardOptions } = {}) {
+export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, ...cardOptions } = {}) {
   _battleState = state;
   _battleCardOptions = cardOptions; // see rerenderBattle -- every internal re-render (a move popup
   // confirming, an HP/VP adjuster click, etc.) needs to keep reusing the same per-card render
@@ -1848,7 +1848,7 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
         if (moveItem.dataset.isDiceLocked === 'true') {
           showDiceRechargePopup(moveItem.dataset.move, moveItem.dataset.combatantId, moveItem.dataset.rechargeRange, state); return;
         }
-        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe }); return;
+        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly }); return;
       }
       // Toggle expand on card click (not on controls)
       const card = e.target.closest('.combat-card');
@@ -2557,7 +2557,7 @@ function removeStatusEffect(combatantId, effectName, state) {
 // MOVE POPUP
 // ============================================================================
 
-function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe } = {}) {
+function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly } = {}) {
   if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
   const move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
@@ -2757,6 +2757,10 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
         onSaveTriggered({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
       } else if (onDamageResolved && computedData.damageDice && !_isDrainHeal && !_isDirectHeal) {
         onDamageResolved({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+      } else if (onEffectsOnly && moveEffectsFor(usedMoveName).length) {
+        // Nothing above took it (no damage, not save/AoE-tagged) but the move has
+        // structured effects -- Slack Off, Rest, Yawn, Gravity... (combat-wip.js only).
+        onEffectsOnly({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
       }
     },
     onDrainHeal: () => {

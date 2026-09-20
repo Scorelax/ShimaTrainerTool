@@ -19,12 +19,14 @@ import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
+import { showEffectsPopup } from '../utils/effects-popup.js';
+import { evaluateEffect, buildStatusSpec, critThreshold } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions,
-  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor, findMoveRow,
+  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor, moveEffectsFor, findMoveRow,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -1311,7 +1313,7 @@ function _attachMainFocusListeners(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx || !ctx.isMine) return;
 
-  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, onMultiHitAoe: _handleMultiHitAoe, ...ctx.cardOptions });
+  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, onMultiHitAoe: _handleMultiHitAoe, onEffectsOnly: _handleEffectsOnly, ...ctx.cardOptions });
   _attachedFocusId = ctx.p.id;
 
   document.getElementById('battleList')?.addEventListener('click', (e) => {
@@ -1639,6 +1641,97 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   }
 }
 
+/** " (rolled 12 vs DC 15)" for a save outcome that carried a roll, else "". */
+function _saveRollNote(outcome) {
+  if (!outcome || outcome.saveTotal === null || outcome.saveTotal === undefined) return '';
+  return outcome.dc ? ` (rolled ${outcome.saveTotal} vs DC ${outcome.dc})` : ` (rolled ${outcome.saveTotal})`;
+}
+
+/** The ability of the first save-based effect on `moveName` ("WIS", ...), so the
+ * save popup can add the target's modifier for it. null when the move has none. */
+function _saveAbilityFor(moveName) {
+  return moveEffectsFor(moveName).find(e => e.when?.type === 'save_fail')?.when.ability || null;
+}
+
+/** After an attack or save resolves: works out which of the move's structured
+ * effects (moveEffectsFor) it triggered from what the flow recorded -- `ctx` =
+ * {hit, attackRoll (natural d20 or null), crit, guaranteedHit, save: {passed,
+ * failBy} | null} -- lists them in a popup for the player to confirm, and puts the
+ * confirmed ones on the shared session (apply-status). An effect that hinges on a
+ * save nobody has rolled yet (a move whose text says "make a CON save or ..."
+ * without being tagged trigger_saving_throw*) gets its save asked for here.
+ * `targetId` null offers only the user's own (target:'self') effects; includeSelf
+ * false offers only the target's (for a loop that already offered self once). */
+async function _offerMoveEffects({ attackerId, targetId = null, moveName, computedData, ctx, includeSelf = true }) {
+  const effects = moveEffectsFor(moveName);
+  if (!effects.length) return;
+  const attacker = session?.participants?.[attackerId];
+  const target = targetId ? session?.participants?.[targetId] : null;
+  const dc = computedData?.moveDC ?? 0;
+  const mine = effects.filter(e => (e.target === 'self' ? includeSelf : !!target));
+
+  const verdictsFor = (c) => mine.map(effect => {
+    let verdict = evaluateEffect(effect, c);
+    // A self-inflicted effect that rides on a save (the user's own DC 20 CON save
+    // after Devastating Tremors) isn't rolled anywhere in this flow -- a human's call.
+    if (effect.target === 'self' && verdict === 'needs_save') verdict = 'manual';
+    return { effect, verdict };
+  });
+
+  let verdicts = verdictsFor(ctx);
+  const waiting = target && !ctx.save ? verdicts.find(v => v.verdict === 'needs_save') : null;
+  if (waiting) {
+    const outcome = await confirmSecondarySave(target, target.name, {
+      dc, ability: waiting.effect.when.ability || null, title: 'Saving Throw',
+    });
+    // Closing without declaring counts as no save result: nothing that hinges on one is offered.
+    ctx = { ...ctx, save: outcome ? { passed: outcome.passed, failBy: outcome.failBy ?? null } : { passed: true, failBy: null } };
+    if (outcome) {
+      const attackerName = attacker?.name || '?';
+      CombatAPI.logEvent({
+        type: 'save', actorId: attackerId, actorName: attackerName, targetId, targetName: target.name,
+        text: `${target.name} ${outcome.passed ? 'succeeded' : 'failed'} the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}`,
+      }).catch(() => {});
+    }
+    verdicts = verdictsFor(ctx);
+  }
+
+  const offer = verdicts.filter(v => v.verdict === 'yes' || v.verdict === 'manual');
+  if (!offer.length) return;
+  const sections = [];
+  const selfEntries = offer.filter(v => v.effect.target === 'self');
+  const targetEntries = offer.filter(v => v.effect.target !== 'self');
+  if (selfEntries.length) sections.push({ targetId: attackerId, targetName: `${attacker?.name || 'User'} (the user)`, entries: selfEntries });
+  if (targetEntries.length) sections.push({ targetId, targetName: target?.name || '?', entries: targetEntries });
+
+  const picks = await showEffectsPopup({ title: `${moveName} — effects`, sections });
+  if (!picks || !picks.length) return;
+  for (const pick of picks) {
+    const spec = buildStatusSpec(pick.effect, { sourceId: attackerId, sourceName: attacker?.name, moveName, dc, ends: pick.ends });
+    try {
+      await CombatAPI.applyStatus(pick.targetId, spec);
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
+}
+
+/** Wired into combat.js's move-popup flow as onEffectsOnly -- for a move that has
+ * structured effects but none of the other handlers took it (no damage, not save-
+ * or AoE-tagged): Slack Off, Rest, Yawn, Gravity... The user's own effects are
+ * offered straight away; if it also affects others, pick who (multi-target-picker),
+ * then offer each target's effects (asking for their save when one hinges on it). */
+async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
+  const ctx = { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: null };
+  await _offerMoveEffects({ attackerId: combatantId, moveName, computedData, ctx });
+  if (!moveEffectsFor(moveName).some(e => e.target !== 'self')) return;
+  const targetIds = await pickMultipleTargets(combatantId);
+  if (!targetIds || !targetIds.length) return;
+  for (const targetId of targetIds) {
+    await _offerMoveEffects({ attackerId: combatantId, targetId, moveName, computedData, ctx, includeSelf: false });
+  }
+}
+
 /** Resolves ONE already-picked hit ({targetId, hit, rawRoll} from
  * pickTarget/pickTargetAgain, or null if closed without picking): logs a
  * Miss, or applies damage (auto-logged server-side) and runs the ON HIT
@@ -1659,6 +1752,11 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
       type: 'miss', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
       text: `${attackerName} used ${moveName} on ${targetName} -- Miss`,
     }).catch(() => {});
+    // A miss can still trigger effects that don't need a hit (High Jump Kick's self-prone).
+    await _offerMoveEffects({
+      attackerId: combatantId, targetId: picked.targetId, moveName, computedData,
+      ctx: { hit: false, attackRoll: picked.attackRoll ?? null, crit: false },
+    });
     return null;
   }
 
@@ -1683,9 +1781,28 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // user's own explicit correction that "trigger saving throw" can't be
   // assumed to skip the attack roll. Only reachable once the attack already
   // landed, since a Miss never applies damage in the first place.
-  if (moveCategoriesFor(moveName).includes('trigger_saving_throw_on_hit')) {
-    await _handleSecondarySave(combatantId, targetId, moveName, computedData);
+  const categories = moveCategoriesFor(moveName);
+  let save = null;
+  if (categories.includes('trigger_saving_throw_on_hit')) {
+    const outcome = await _handleSecondarySave(combatantId, targetId, moveName, computedData);
+    // Closed without declaring = no save result (nothing that hinges on one gets offered).
+    save = { passed: outcome ? outcome.passed : true, failBy: outcome?.failBy ?? null };
   }
+
+  // What the recorded rolls say this hit triggered: natural-roll thresholds, a crit,
+  // the secondary save's failure margin, plain on-hit effects.
+  const attackRoll = picked.attackRoll ?? null;
+  const guaranteedHit = categories.includes('guaranteed_hit');
+  const attacker = session?.participants?.[combatantId];
+  let crit = false; // a guaranteed hit has no roll to crit on
+  if (!guaranteedHit) {
+    // undefined (not false) when the roll wasn't entered, so a crit-only effect asks a human.
+    crit = attackRoll === null ? undefined : attackRoll >= critThreshold(attacker?.critMod, categories.includes('base_crit'));
+  }
+  await _offerMoveEffects({
+    attackerId: combatantId, targetId, moveName, computedData,
+    ctx: { hit: true, attackRoll, guaranteedHit, crit, save },
+  });
   return targetId;
 }
 
@@ -1719,12 +1836,13 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
     if (!target) continue;
 
     if (isSaveTriggered) {
-      const outcome = await confirmSecondarySave(target, target.name, { dc, hasDamage, damageModifier, speciesName });
+      const outcome = await confirmSecondarySave(target, target.name, { dc, hasDamage, damageModifier, speciesName, ability: _saveAbilityFor(moveName) });
       if (!outcome) continue; // closed for this target -- move on to the next one
+      const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
       if (outcome.passed) {
         CombatAPI.logEvent({
           type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}`,
+          text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}`,
         }).catch(() => {});
       } else if (outcome.rawRoll !== undefined) {
         try {
@@ -1738,9 +1856,15 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
       } else {
         CombatAPI.logEvent({
           type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} failed the saving throw against ${attackerName}'s ${moveName} -- apply its effect`,
+          text: `${target.name} failed the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}${applyHint}`,
         }).catch(() => {});
       }
+      // Everyone in the area was hit by the blast; the save's result decides which effects land.
+      await _offerMoveEffects({
+        attackerId: combatantId, targetId, moveName, computedData,
+        ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed: outcome.passed, failBy: outcome.failBy ?? null } },
+        includeSelf: targetId === targetIds[0], // the user's own effects only once per use
+      });
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
       // so each selected target goes straight to its damage roll.
@@ -1752,17 +1876,21 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
 
 async function _handleSecondarySave(combatantId, targetId, moveName, computedData) {
   const target = session?.participants?.[targetId];
-  if (!target) return;
+  if (!target) return null;
   const attackerName = session?.participants?.[combatantId]?.name || '?';
   const dc = computedData.moveDC ?? 0;
-  const outcome = await confirmSecondarySave(target, target.name, { dc });
-  if (!outcome) return; // closed without declaring
+  const outcome = await confirmSecondarySave(target, target.name, { dc, ability: _saveAbilityFor(moveName) });
+  if (!outcome) return null; // closed without declaring
+  // Effects are offered (and applied) right after this returns, so the log no
+  // longer tells someone to apply it by hand when the move has structured effects.
+  const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
   const text = outcome.passed
-    ? `${target.name} succeeded the secondary saving throw against ${attackerName}'s ${moveName}`
-    : `${target.name} failed the secondary saving throw against ${attackerName}'s ${moveName} -- apply its effect`;
+    ? `${target.name} succeeded the secondary saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}`
+    : `${target.name} failed the secondary saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}${applyHint}`;
   CombatAPI.logEvent({
     type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name, text,
   }).catch(() => {});
+  return outcome; // {passed, failBy, ...} -- _resolveOneHit decides which effects that triggered
 }
 
 /** Wired into combat.js's move-popup flow as onReactiveSave -- for moves
@@ -1828,38 +1956,45 @@ async function _handleReactiveSave({ combatantId, moveName }) {
  * declare Save Success/Fail themselves, same "app shows the number, a
  * human compares it" pattern as everywhere else in this flow.
  *
- * Status/other non-damage consequences of a failed save are deliberately
- * NOT applied here -- addStatusEffect only ever touches the LOCAL device's
- * own combat state (see combat.js), so this device has no way to mark a
- * status on a Pokemon it doesn't own. Instead this logs what happened so
- * the affected player can apply it to their own card themselves, the same
- * way they already do for every other status effect in this tool. */
+ * Status/other non-damage consequences of a failed save are offered through
+ * _offerMoveEffects (structured move effects -> apply-status on the shared
+ * session, so it lands on whoever's Pokemon it is, on whichever device). A move
+ * without structured effects yet is still just logged. */
 async function _handleSaveTriggered({ combatantId, moveName, move, computedData, speciesName }) {
   const dc = computedData.moveDC ?? 0;
   const damageModifier = computedData.damageBonus || 0;
   const hasDamage = !!computedData.damageDice;
-  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage });
+  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName) });
   if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
 
   const attackerName = session?.participants?.[combatantId]?.name || '?';
   const targetName = session?.participants?.[picked.targetId]?.name || '?';
+  const rollNote = _saveRollNote(picked);
+  // No attack roll on a pure save move -- the save's result alone decides which effects land.
+  const offerEffects = () => _offerMoveEffects({
+    attackerId: combatantId, targetId: picked.targetId, moveName, computedData,
+    ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed: picked.passed, failBy: picked.failBy ?? null } },
+  });
 
   if (picked.passed) {
     CombatAPI.logEvent({
       type: 'save', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
-      text: `${targetName} succeeded the saving throw against ${attackerName}'s ${moveName}`,
+      text: `${targetName} succeeded the saving throw against ${attackerName}'s ${moveName}${rollNote}`,
     }).catch(() => {});
+    await offerEffects();
     return;
   }
 
   if (picked.rawRoll === undefined) {
-    // No damage component -- purely a status/other effect (Taunt, Torment,
-    // Fear Ray, ...). Nothing for this device to apply server-side; log it
-    // so whoever owns the target's device knows to add the effect.
+    // No damage component -- purely a status/other effect (Taunt, Torment, Fear Ray, ...).
+    // Moves with structured effects get them offered below; anything else is still
+    // just logged so the table knows to apply it by hand.
+    const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
     CombatAPI.logEvent({
       type: 'save', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
-      text: `${targetName} failed the saving throw against ${attackerName}'s ${moveName} -- apply its effect`,
+      text: `${targetName} failed the saving throw against ${attackerName}'s ${moveName}${rollNote}${applyHint}`,
     }).catch(() => {});
+    await offerEffects();
     return;
   }
 
@@ -1872,6 +2007,7 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }
+  await offerEffects();
 }
 
 function _currentTrainerName() {

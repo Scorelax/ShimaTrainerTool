@@ -852,10 +852,14 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
     const dur = se.duration === -1 ? '' : ` (${se.duration})`;
     const isCustom = !KNOWN_STATUSES.includes(se.name);
     const cls = isCustom ? 'status-custom' : `status-${se.name.toLowerCase()}`;
+    // Set only for effects the shared combat put there (see combat-wip.js's
+    // _statusToBadge): clicking one opens its detail popup instead of the legacy
+    // local remove, because the server owns it.
+    const sid = se.serverStatusId ? ` data-server-status-id="${se.serverStatusId}"` : '';
     if (isCustom && se.description) {
-      return `<span class="status-badge status-custom status-custom-expanded" data-combatant-id="${c.id}" data-effect="${se.name}"><span class="status-custom-name">${se.name}${dur}</span><span class="status-custom-desc">${se.description}</span></span>`;
+      return `<span class="status-badge status-custom status-custom-expanded" data-combatant-id="${c.id}" data-effect="${se.name}"${sid}><span class="status-custom-name">${se.name}${dur}</span><span class="status-custom-desc">${se.description}</span></span>`;
     }
-    return `<span class="status-badge ${cls}" data-combatant-id="${c.id}" data-effect="${se.name}">${se.name}${dur}</span>`;
+    return `<span class="status-badge ${cls}" data-combatant-id="${c.id}" data-effect="${se.name}"${sid}>${se.name}${dur}</span>`;
   }).join('');
 
   const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges, { compactWip }) : '';
@@ -1822,6 +1826,7 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
       }
       if (e.target.closest('.status-badge')) {
         const badge = e.target.closest('.status-badge');
+        if (badge.dataset.serverStatusId) return; // shared status -- combat-wip.js's own handler opens its detail popup
         removeStatusEffect(badge.dataset.combatantId, badge.dataset.effect, state); return;
       }
       if (e.target.closest('.combat-trainer-hpvp-btn')) {
@@ -2457,6 +2462,10 @@ function showTrainerHpVpPopup(combatant, state) {
   popup.style.display = 'flex';
 }
 
+// The six conditions this page has always handled itself (end-of-turn damage / reminders,
+// their own badge colors). Shared statuses for the matching conditions borrow these names.
+const LEGACY_STATUS_NAMES = ['Poison', 'Burn', 'Confusion', 'Paralysis', 'Sleep', 'Freeze'];
+
 function endTurnForCombatant(combatantId, state) {
   const c = state.combatants.find(x => x.id === combatantId);
   if (!c) return;
@@ -2465,6 +2474,12 @@ function endTurnForCombatant(combatantId, state) {
   for (const se of c.statusEffects) {
     if (se.name === 'Ingrain') {
       // Duration managed by the end-turn intercept; preserve as-is (already decremented or removed there)
+      remaining.push(se);
+      continue;
+    }
+    if (se.serverStatusId && !LEGACY_STATUS_NAMES.includes(se.name)) {
+      // Shared-combat effects (AC -1, Restrained, ...) are shown as badges and expired by the
+      // server; a reminder toast on every end of turn would just be noise.
       remaining.push(se);
       continue;
     }
@@ -2526,7 +2541,7 @@ function _syncStatusConditionToDb(c, state) {
   const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || 'null');
   if (!pd) return;
   const trainerName = state.combatants.find(x => x.type === 'trainer')?.name || '';
-  pd[60] = c.statusEffects.map(s => s.name).join(',');
+  pd[60] = c.statusEffects.filter(s => !s.serverStatusId).map(s => s.name).join(',');
   sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
   PokemonAPI.updateLiveStats(trainerName, pd[2], 'StatusCondition', pd[60]).catch(e => console.error('Status sync:', e));
 }

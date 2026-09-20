@@ -20,7 +20,8 @@ import { visibleToViewer } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
-import { evaluateEffect, buildStatusSpec, critThreshold } from '../utils/move-effects.js';
+import { showStatusDetail } from '../utils/status-popup.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -105,6 +106,13 @@ const WIP_CSS = `
     width: 9px; height: 9px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 0 2px #14141f;
   }
   .wip-turn-reaction.used .wip-turn-reaction-dot { background: #6b6b6b; }
+  /* How many live effects (conditions, stat changes, advantage...) this participant has,
+     on the portrait's bottom-right corner -- hidden at zero. */
+  .wip-turn-status-count {
+    position: absolute; bottom: -4px; right: -4px; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box;
+    border-radius: 7px; background: #9b59b6; color: #fff; font-size: 0.6rem; font-weight: 700; line-height: 14px;
+    text-align: center; box-shadow: 0 0 0 2px #14141f;
+  }
   .wip-turn-name {
     font-size: 0.55rem; font-weight: 600; margin-top: 0.15rem; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42px;
@@ -128,6 +136,8 @@ const WIP_CSS = `
   }
   .wip-foreign-focus-name { font-size: 1.1rem; font-weight: 700; color: #FFD700; margin-bottom: 0.4rem; }
   .wip-foreign-focus-row { color: #cfd0e0; margin-top: 0.25rem; font-size: 0.95rem; }
+  .wip-foreign-focus-statuses { display: flex; flex-wrap: wrap; gap: 0.3rem; justify-content: center; margin-top: 0.6rem; }
+  .wip-foreign-focus-statuses .status-badge { cursor: pointer; }
   .wip-foreign-focus-portrait { width: 140px; height: 140px; margin: 0 auto 0.8rem; }
   .wip-foreign-focus-portrait img, .wip-foreign-focus-portrait video { width: 100%; height: 100%; object-fit: contain; }
   /* Centered both ways within the viewport, not just horizontally --
@@ -675,6 +685,16 @@ function _standInCombatant(p) {
  * combatants keep their FULL prior local object (recharge states, status
  * effects, Stockpile stacks, expand state) across pushes, with only HP/VP
  * overlaid fresh from the server both directions. */
+// Shared conditions that match a status combat.js has always handled itself (end-of-turn
+// damage / reminders, its own badge colors) borrow that name so they inherit it.
+const LEGACY_BADGE_NAMES = { poisoned: 'Poison', burned: 'Burn', confused: 'Confusion', paralyzed: 'Paralysis', asleep: 'Sleep', frozen: 'Freeze' };
+
+/** A shared status as combat.js's local statusEffects entry (see renderCombatCard). */
+function _statusToBadge(st, round) {
+  const name = (st.kind === 'condition' && LEGACY_BADGE_NAMES[st.apply]) || statusLabel(st);
+  return { name, description: describeStatusEnds(st, round), duration: -1, serverStatusId: st.id };
+}
+
 function _syncLocalCombatState(session) {
   _enterBattleSync();
 
@@ -707,6 +727,12 @@ function _syncLocalCombatState(session) {
       }
     }
     merged.id = p.id;
+    // The shared session owns the effects the shared combat applied; hand-added local
+    // badges (combat.js's add-status buttons) are kept, the shared ones re-derived.
+    merged.statusEffects = [
+      ...(merged.statusEffects || []).filter(se => !se.serverStatusId),
+      ...(p.statuses || []).map(st => _statusToBadge(st, session.round)),
+    ];
     // A change here that this device didn't already know about (prior's old
     // value differs from the server's) means someone ELSE's action moved
     // this HP/VP -- the only realistic case being another player's
@@ -1141,6 +1167,7 @@ function _syncTurnOrderSidebar(state) {
           <div class="wip-turn-portrait">
             <div class="wip-turn-portrait-media" data-portrait-id="${id}"></div>
             <div class="wip-turn-reaction"><div class="wip-turn-reaction-dot"></div></div>
+            <div class="wip-turn-status-count" style="display:none"></div>
           </div>
           <div class="wip-turn-name"></div>
         </div>`;
@@ -1160,6 +1187,14 @@ function _syncTurnOrderSidebar(state) {
     const reactionEl = node.querySelector('.wip-turn-reaction');
     reactionEl.style.display = p.status === 'participating' ? 'flex' : 'none';
     reactionEl.classList.toggle('used', !!p.reactionUsed);
+
+    const statuses = p.statuses || [];
+    const countEl = node.querySelector('.wip-turn-status-count');
+    if (countEl) {
+      countEl.style.display = statuses.length ? '' : 'none';
+      countEl.textContent = statuses.length;
+      countEl.title = statuses.map(st => statusLabel(st)).join(', ');
+    }
 
     if (el.children[index] !== node) el.insertBefore(node, el.children[index] || null);
   });
@@ -1277,7 +1312,14 @@ function _renderForeignFocusInfo(p) {
       ${p.level ? `<div class="wip-foreign-focus-row">Level ${p.level}</div>` : ''}
       ${showHp ? `<div class="wip-foreign-focus-row" id="wipForeignFocusHp">HP: ${p.currentHP}/${p.maxHP}</div>` : '<div id="wipForeignFocusHp" hidden></div>'}
       ${showVp ? `<div class="wip-foreign-focus-row" id="wipForeignFocusVp">VP: ${p.currentVP}/${p.maxVP}</div>` : '<div id="wipForeignFocusVp" hidden></div>'}
+      <div class="wip-foreign-focus-statuses" id="wipForeignFocusStatuses">${_statusBadgesHtml(p)}</div>
     </div>`;
+}
+
+/** Clickable badges for a participant's live effects (the read-only counterpart to the
+ * ones combat.js draws on the viewer's own card) -- click opens the detail popup. */
+function _statusBadgesHtml(p) {
+  return (p.statuses || []).map(st => `<span class="status-badge status-custom status-custom-expanded" data-combatant-id="${p.id}" data-server-status-id="${st.id}" data-effect="${statusLabel(st)}"><span class="status-custom-name">${statusLabel(st)}</span><span class="status-custom-desc">${describeStatusEnds(st, session?.round)}</span></span>`).join('');
 }
 
 /** Patches the foreign-focus panel in place for the SAME focused
@@ -1296,6 +1338,8 @@ function _updateForeignFocusInfo(p) {
   if (hpEl) { hpEl.hidden = !visibleToViewer(p, 'hp'); hpEl.textContent = `HP: ${p.currentHP}/${p.maxHP}`; }
   const vpEl = document.getElementById('wipForeignFocusVp');
   if (vpEl) { vpEl.hidden = !visibleToViewer(p, 'vp'); vpEl.textContent = `VP: ${p.currentVP}/${p.maxVP}`; }
+  const statusEl = document.getElementById('wipForeignFocusStatuses');
+  if (statusEl) statusEl.innerHTML = _statusBadgesHtml(p);
 }
 
 /** Builds the #wipBattlePhase HTML string -- used before the DOM exists
@@ -1413,6 +1457,7 @@ function _syncMainFocus(state) {
 }
 
 export function attachCombatWipListeners() {
+  _bindStatusBadgeClicks();
   // Re-render in place on every live combat push (see live-updates.js) --
   // while mid-setup/initiative this only updates the background `session`
   // var (nothing about *your own* roll needs another player's action
@@ -2008,6 +2053,56 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
     showCombatAlert(err.message, { title: 'Error' });
   }
   await offerEffects();
+}
+
+/** The holder rolls the saving throw a status ends on (its Move DC, the save's
+ * ability); a pass removes it. Returns the outcome, or null if closed. */
+async function _rollStatusSave(holder, status, title) {
+  const saveEnd = (status.ends || []).find(e => e.type === 'save');
+  if (!saveEnd) return null;
+  const outcome = await confirmSecondarySave(holder, holder.name, {
+    dc: status.dc || 0, ability: saveEnd.ability, title: title || `${statusLabel(status)} — saving throw`,
+  });
+  if (!outcome) return null;
+  const note = _saveRollNote(outcome);
+  if (outcome.passed) {
+    await CombatAPI.removeStatus(holder.id, status.id, `passed the ${saveEnd.ability} save${note}`);
+  } else {
+    CombatAPI.logEvent({
+      type: 'save', actorId: holder.id, actorName: holder.name,
+      text: `${holder.name} failed the ${saveEnd.ability} save against ${statusLabel(status)}${note}`,
+    }).catch(() => {});
+  }
+  return outcome;
+}
+
+/** A status badge was clicked (own card or another participant's panel). */
+async function _openStatusDetail(holderId, statusId) {
+  const holder = session?.participants?.[holderId];
+  const status = (holder?.statuses || []).find(st => st.id === statusId);
+  if (!holder || !status) return;
+  const action = await showStatusDetail(holder.name, status, session.round);
+  if (!action) return;
+  try {
+    if (action === 'remove') await CombatAPI.removeStatus(holderId, statusId, 'removed by hand');
+    else if (action === 'use') await CombatAPI.useStatus(holderId, statusId);
+    else if (action === 'save') await _rollStatusSave(holder, status);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+let _statusClickHandler = null;
+
+/** One delegated listener for every shared-status badge on the page. */
+function _bindStatusBadgeClicks() {
+  if (_statusClickHandler) document.removeEventListener('click', _statusClickHandler);
+  _statusClickHandler = (e) => {
+    const badge = e.target.closest?.('.status-badge[data-server-status-id]');
+    if (!badge) return;
+    _openStatusDetail(badge.dataset.combatantId, badge.dataset.serverStatusId);
+  };
+  document.addEventListener('click', _statusClickHandler);
 }
 
 function _currentTrainerName() {

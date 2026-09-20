@@ -131,6 +131,20 @@ export function describeEnd(e) {
   }
 }
 
+/** describeEnds for a STORED status: a rounds end shows how many are left in the
+ * current `round` ("3 rounds left"), the rest read as in describeEnd. */
+export function describeStatusEnds(status, round) {
+  const ends = status.ends || [];
+  if (!ends.length) return 'until removed';
+  return ends.map(e => {
+    if (e.type === 'rounds' && e.expiresRound != null && round != null) {
+      const left = Math.max(0, e.expiresRound - round);
+      return `${left} round${left === 1 ? '' : 's'} left`;
+    }
+    return describeEnd(e);
+  }).join(', or ');
+}
+
 /** "10 rounds, or WIS save (end of its turn)" -- or 'until removed' when the
  * move text states no end (the holder's table removes it by hand). */
 export function describeEnds(ends) {

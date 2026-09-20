@@ -846,6 +846,25 @@ export class CombatAPI {
     return API.request('combat', 'update-stats', { id, currentHP, currentVP }, { useCache: false });
   }
 
+  /** Puts a live effect (condition / stat modifier / advantage-disadvantage) on
+   * a participant -- `status` is a move-effects entry (see move-effects-schema.md,
+   * built by move-effects.js's buildStatusSpec) with rounds durations already
+   * rolled to an `n`. Re-applying the same effect from the same move refreshes or
+   * stacks it; the server expires it from its `ends`. See routes_combat.py. */
+  static async applyStatus(targetId, status) {
+    return API.request('combat', 'apply-status', { targetId, status: JSON.stringify(status) }, { useCache: false });
+  }
+
+  /** Removes one live effect by its id (a passed save, a manual cure...). */
+  static async removeStatus(targetId, statusId, reason = '') {
+    return API.request('combat', 'remove-status', { targetId, statusId, reason }, { useCache: false });
+  }
+
+  /** Consumes one use of an effect that lasts "the next attack"/"next roll". */
+  static async useStatus(targetId, statusId) {
+    return API.request('combat', 'use-status', { targetId, statusId }, { useCache: false });
+  }
+
   /** Resolves an attack against a chosen target -- the other half of
    * use-move, split out so it doesn't double-deduct VP that combat.js's own
    * local move-popup flow (synced via updateStats) already spent. diceRoll

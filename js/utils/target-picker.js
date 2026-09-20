@@ -80,6 +80,10 @@ let _selectedTargetName = '';
 // step is skipped entirely -- picking a target goes straight to the damage
 // roll, since there's nothing to roll against AC.
 let _guaranteedHit = false;
+// The natural d20 typed into the Attack Roll step, captured when Hit/Miss is
+// clicked and handed back with the result so the caller can tell which
+// natural-roll / crit effects triggered (null on a guaranteed hit: nothing rolled).
+let _attackRoll = null;
 
 function _ensureDom() {
   if (_overlay) return;
@@ -177,14 +181,26 @@ function _showStep2(p, name) {
   setTimeout(() => input.focus(), 50);
 }
 
-function _updateAttackTotal() {
+function _currentAttackRoll() {
   const raw = parseInt(document.getElementById('targetPickerAttackInput').value, 10);
+  return Number.isNaN(raw) ? null : raw;
+}
+
+function _updateAttackTotal() {
+  const raw = _currentAttackRoll();
   const totalEl = document.getElementById('targetPickerAttackTotal');
-  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _attackModifier}</strong>`;
+  if (raw === null) { totalEl.innerHTML = ''; return; }
+  const total = raw + _attackModifier;
+  // A hint only -- a human still declares Hit or Miss (the target may have
+  // circumstances the stored AC doesn't know about).
+  const ac = _selectedTarget?.ac;
+  const hint = ac != null ? ` <span style="font-size:0.8rem;">vs AC ${ac} — ${total >= ac ? 'hits' : 'misses'}</span>` : '';
+  totalEl.innerHTML = `Total: <strong>${total}</strong>${hint}`;
 }
 
 function _confirmMiss() {
-  _close({ targetId: _selectedTargetId, hit: false });
+  const attackRoll = _currentAttackRoll();
+  _close({ targetId: _selectedTargetId, hit: false, attackRoll });
 }
 
 /** Attack Hit -- plays the attacker's battle animation (if one exists) right
@@ -193,6 +209,7 @@ function _confirmMiss() {
  * confirmed to land, not the instant "Use Move" is clicked (see move-popup.js,
  * which skips its own earlier inline animation for exactly this case). */
 async function _confirmHit() {
+  _attackRoll = _currentAttackRoll(); // read before the animation -- step 2 stays mounted but don't rely on it
   await _playAnimation();
   _showStep3();
 }
@@ -211,6 +228,7 @@ function _backFromDamage() {
  * animation there (that step is already visible, so there's no blank or stale
  * screen while it plays and no second target to click mid-animation). */
 function _autoHit(p, name) {
+  _attackRoll = null;
   _selectedTarget = p;
   _selectedTargetName = name;
   _showStep3();
@@ -268,7 +286,10 @@ function _updateRollTotal() {
 function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
-  _close({ targetId: _selectedTargetId, hit: true, rawRoll: raw });
+  _close({
+    targetId: _selectedTargetId, hit: true, rawRoll: raw,
+    attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _attackModifier,
+  });
 }
 
 function _cardHtml(p) {
@@ -294,8 +315,10 @@ function _cardHtml(p) {
  * there's nothing left to do). A Hit plays the attacker's battle animation
  * (if any) and moves on to a damage roll, which resolves the promise once
  * confirmed. Resolves to {targetId, hit:false}, {targetId, hit:true,
- * rawRoll}, or null if the player picked "No Target" / closed the popup /
- * there's no active session to target into. Safe to await unconditionally --
+ * rawRoll, attackRoll, attackTotal}, or null if the player picked "No Target" /
+ * closed the popup / there's no active session to target into. attackRoll is
+ * the natural d20 that was typed in (also on a miss; null on a guaranteed hit),
+ * attackTotal that plus the attack modifier. Safe to await unconditionally --
  * it resolves to null with no popup shown when there's nothing to target.
  *
  * guaranteedHit (moves tagged guaranteed_hit): the Attack Roll step is

@@ -18,6 +18,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
+import { saveModifierFor } from './move-effects.js';
 
 function _injectStyles() {
   if (document.getElementById('save-picker-styles')) return;
@@ -66,12 +67,16 @@ function _injectStyles() {
     }
     .save-picker-roll-total { text-align: center; font-size: 0.9rem; color: #a0a0c0; margin-bottom: 1rem; min-height: 1.3em; }
     .save-picker-roll-total strong { color: #FFD700; font-size: 1.2rem; }
+    .save-picker-suggested { outline: 3px solid #FFD700; outline-offset: 2px; }
   `;
   document.head.appendChild(style);
 }
 
 let _overlay = null;
 let _resolve = null;
+let _saveAbility = null;   // "STR".."CHA" when the caller knows which save this is (drives the auto modifier)
+let _saveModifier = null;  // the target's save modifier for that ability, null when their sheet has no data
+let _pendingSave = null;   // {saveRoll, saveTotal, failBy} captured when Save Success/Fail is clicked
 let _dc = 0;
 let _manualDc = false; // true when the DC isn't known ahead of time -- the human types it in (see resolveReactiveSave's fallback)
 let _damageModifier = 0;
@@ -106,6 +111,9 @@ function _ensureDom() {
             <label class="save-picker-roll-label" for="savePickerDcInput">Their Move DC (ask the table)</label>
             <input type="number" id="savePickerDcInput" class="save-picker-roll-input" placeholder="Enter DC…">
           </div>
+          <label class="save-picker-roll-label" for="savePickerSaveInput" id="savePickerSaveLabel">Saving throw roll</label>
+          <input type="number" id="savePickerSaveInput" class="save-picker-roll-input" placeholder="Enter their roll (optional)…">
+          <div class="save-picker-roll-total" id="savePickerSaveTotal"></div>
           <div class="save-picker-outcome-actions">
             <button class="combat-use-move-btn save-picker-back" id="savePickerBack">← Back</button>
             <button class="combat-use-move-btn save-picker-pass-btn" id="savePickerPass">Save Success</button>
@@ -132,6 +140,8 @@ function _ensureDom() {
   document.getElementById('savePickerPass').addEventListener('click', _confirmPass);
   document.getElementById('savePickerFail').addEventListener('click', _confirmFail);
   document.getElementById('savePickerDcInput').addEventListener('input', _updateManualDcButtons);
+  document.getElementById('savePickerDcInput').addEventListener('input', _updateSaveTotal);
+  document.getElementById('savePickerSaveInput').addEventListener('input', _updateSaveTotal);
   document.getElementById('savePickerConfirmRoll').addEventListener('click', _confirmDamageRoll);
   document.getElementById('savePickerRollInput').addEventListener('input', _updateRollTotal);
   document.getElementById('savePickerRollInput').addEventListener('keydown', (e) => {
@@ -159,6 +169,14 @@ function _showStep2(p, name) {
   document.getElementById('savePickerStep2').hidden = false;
   document.getElementById('savePickerStep3').hidden = true;
   document.getElementById('savePickerTitle').textContent = 'Saving Throw';
+  _saveModifier = saveModifierFor(_selectedTarget, _saveAbility);
+  const abilityText = _saveAbility ? ` (${_saveAbility})` : '';
+  const modText = _saveModifier === null
+    ? (_saveAbility ? ' — no ability data, enter the total' : '')
+    : ` (${_saveModifier >= 0 ? '+' : ''}${_saveModifier} modifier added automatically)`;
+  document.getElementById('savePickerSaveLabel').textContent = `Saving throw roll${abilityText}${modText}`;
+  document.getElementById('savePickerSaveInput').value = '';
+  _updateSaveTotal();
   document.getElementById('savePickerDcTarget').innerHTML = `
     <div class="save-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="save-picker-dc-target-name">${_selectedTargetName}</div>`;
@@ -194,8 +212,44 @@ function _currentDc() {
   return parseInt(document.getElementById('savePickerDcInput').value, 10) || 0;
 }
 
+/** The typed save roll (null when none was entered). */
+function _currentSaveRoll() {
+  const raw = parseInt(document.getElementById('savePickerSaveInput').value, 10);
+  return Number.isNaN(raw) ? null : raw;
+}
+
+/** Live "Total X vs DC Y -- fails by Z" line, and an outline on whichever of
+ * Save Success/Save Fail the roll says. Only a suggestion: a human still
+ * clicks one (advantage, a reroll, a circumstance the sheet doesn't know). */
+function _updateSaveTotal() {
+  const totalEl = document.getElementById('savePickerSaveTotal');
+  const passBtn = document.getElementById('savePickerPass');
+  const failBtn = document.getElementById('savePickerFail');
+  passBtn.classList.remove('save-picker-suggested');
+  failBtn.classList.remove('save-picker-suggested');
+  const raw = _currentSaveRoll();
+  const dc = _currentDc();
+  if (raw === null) { totalEl.innerHTML = ''; return; }
+  const total = raw + (_saveModifier || 0);
+  if (!dc) { totalEl.innerHTML = `Total: <strong>${total}</strong>`; return; }
+  const passed = total >= dc;
+  (passed ? passBtn : failBtn).classList.add('save-picker-suggested');
+  totalEl.innerHTML = `Total: <strong>${total}</strong> vs DC ${dc} — ${passed ? 'passes' : `fails by ${dc - total}`}`;
+}
+
+/** {saveRoll, saveTotal, failBy} for the current inputs. failBy is how far the
+ * total fell short of the DC (0 if a human declared a fail the roll doesn't
+ * show), or null on a pass / when no roll was entered. */
+function _captureSave(passed) {
+  const raw = _currentSaveRoll();
+  if (raw === null) return { saveRoll: null, saveTotal: null, failBy: null };
+  const total = raw + (_saveModifier || 0);
+  const dc = _currentDc();
+  return { saveRoll: raw, saveTotal: total, failBy: passed || !dc ? null : Math.max(0, dc - total) };
+}
+
 function _confirmPass() {
-  _close({ targetId: _selectedTargetId, passed: true, dc: _currentDc() });
+  _close({ targetId: _selectedTargetId, passed: true, dc: _currentDc(), ..._captureSave(true) });
 }
 
 /** Save Fail -- plays the attacker's battle animation (if one exists), then
@@ -203,11 +257,12 @@ function _confirmPass() {
  * immediately (pure status/effect moves -- see combat-wip.js's
  * _handleSaveTriggered for how those get logged instead). */
 async function _confirmFail() {
+  _pendingSave = { ..._captureSave(false), dc: _currentDc() }; // read before the animation / damage step
   await _playAnimation();
   if (_hasDamage) {
     _showStep3();
   } else {
-    _close({ targetId: _selectedTargetId, passed: false, dc: _currentDc() });
+    _close({ targetId: _selectedTargetId, passed: false, ..._pendingSave });
   }
 }
 
@@ -261,7 +316,7 @@ function _updateRollTotal() {
 function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('savePickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
-  _close({ targetId: _selectedTargetId, passed: false, rawRoll: raw });
+  _close({ targetId: _selectedTargetId, passed: false, rawRoll: raw, ...(_pendingSave || {}) });
 }
 
 function _cardHtml(p) {
@@ -284,19 +339,24 @@ function _cardHtml(p) {
  * DOES still need its own damage roll on a Fail -- hence hasDamage/
  * damageModifier/speciesName being plumbed through same as pickSaveTarget
  * itself). Resolves to {targetId, passed:true}, {targetId, passed:false}
- * (no damage component), or {targetId, passed:false, rawRoll} (has one).
+ * (no damage component), or {targetId, passed:false, rawRoll} (has one) --
+ * each also carrying dc and, when a save roll was typed in, {saveRoll,
+ * saveTotal, failBy} (failBy null on a pass). `ability` (STR..CHA) makes the
+ * target's save modifier auto-add; `title` replaces the popup heading.
  */
-export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '' } = {}) {
+export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw' } = {}) {
   _ensureDom();
   _dc = dc;
   _manualDc = false;
   _hasDamage = hasDamage;
   _damageModifier = damageModifier;
   _speciesName = speciesName;
+  _saveAbility = ability;
+  _pendingSave = null;
   _selectedTargetId = target.id;
   _showStep2(target, targetName);
   document.getElementById('savePickerBack').style.display = 'none';
-  document.getElementById('savePickerTitle').textContent = 'Secondary Saving Throw';
+  document.getElementById('savePickerTitle').textContent = title;
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });
 }
@@ -312,7 +372,7 @@ export async function confirmSecondarySave(target, targetName, { dc = 0, hasDama
  * {targetId, passed:true}, {targetId, passed:false} (no damage component),
  * {targetId, passed:false, rawRoll} (has one), or null if closed/no target.
  */
-export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false } = {}) {
+export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -326,6 +386,8 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _damageModifier = damageModifier;
   _speciesName = speciesName;
   _hasDamage = hasDamage;
+  _saveAbility = ability;
+  _pendingSave = null;
   document.getElementById('savePickerAnimMedia').innerHTML = '';
   document.getElementById('savePickerBack').style.display = '';
   _showStep1();
@@ -365,6 +427,8 @@ export async function pickManualSaveTarget(casterId, { speciesName = '' } = {}) 
   _dc = 0;
   _manualDc = true;
   _hasDamage = false;
+  _saveAbility = null;
+  _pendingSave = null;
   _speciesName = speciesName;
   document.getElementById('savePickerAnimMedia').innerHTML = '';
   document.getElementById('savePickerBack').style.display = '';

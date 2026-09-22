@@ -127,7 +127,61 @@ function _createPopupDOM() {
     if (e.target === overlay) overlay.style.display = 'none';
   });
 
+  /** Actually uses the move -- VP deduction (onUseMove), the battle animation
+   * (unless deferred to later, see deferAnimation), and the shared post-use
+   * drain/direct-heal checks. Shared by the confirm popup's Yes button and,
+   * for callers that opt into skipConfirm (see showMovePopup's own doc), the
+   * Use Move button itself. Guarded against a double-fire with
+   * `overlay._usingMove` -- set here and NOT reset afterward (deliberately;
+   * this popup is done once a move's been used from it), only reset back to
+   * false by showMovePopup itself opening a fresh move. Without that, a
+   * deferAnimation:true call (skipConfirm's main case: nothing here actually
+   * awaits anything, so the whole function runs synchronously start to
+   * finish) would already have reset its own guard before a same-tick second
+   * click even lands. */
+  async function _performUseMove() {
+    if (overlay._usingMove) return;
+    overlay._usingMove = true;
+    const btn = document.getElementById('useCombatMoveBtn');
+    const moveName = btn.dataset.moveName;
+    const vpCost = parseInt(btn.dataset.vpCost) || 0;
+
+    if (!overlay._deferAnimation) await _playBattleAnimation(overlay._speciesName);
+
+    if (overlay._onUseMove) overlay._onUseMove(moveName, vpCost);
+    confirmOverlay.style.display = 'none';
+    overlay.style.display = 'none';
+
+    // ── Shared post-use checks (add new move-effect rules here) ──
+    const move = overlay._currentMove;
+    if (move) {
+      const fullDesc = (move[7] || '') + ' ' + (move[8] || '');
+      // Drain: restore half of damage dealt to user
+      if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullDesc)) {
+        if (overlay._onDrainHeal) overlay._onDrainHeal();
+      }
+      // Direct heal: "regain a base X hit points"
+      if (/regain\s+a\s+base\s+.*?\s+hit\s+points/i.test(fullDesc)) {
+        if (overlay._onDirectHeal) overlay._onDirectHeal();
+      }
+    }
+  }
+
   document.getElementById('useCombatMoveBtn').addEventListener('click', () => {
+    // skipConfirm callers (combat-wip.js -- see showMovePopup's own doc on
+    // the option): clicking Use Move IS using it, no extra "are you sure"
+    // step with its own VP-cost readout the move popup already showed.
+    // Disabled immediately (not just _performUseMove's own _usingMove flag,
+    // in case something ever calls it directly) so a same-tick double
+    // click/tap -- disabling a button blocks even a same-tick second .click()
+    // in real browsers, same protection the confirm popup's Yes/No already
+    // relied on -- can't double-fire onUseMove.
+    if (overlay._skipConfirm) {
+      document.getElementById('useCombatMoveBtn').disabled = true;
+      _performUseMove();
+      return;
+    }
+
     const btn = document.getElementById('useCombatMoveBtn');
     document.getElementById('combatConfirmText').textContent =
       `Use ${btn.dataset.moveName} (${btn.dataset.vpCost} VP)?`;
@@ -160,37 +214,15 @@ function _createPopupDOM() {
 
   document.getElementById('confirmCombatMoveYes').addEventListener('click', async () => {
     if (confirmOverlay._playingAnimation) return;
-    const btn = document.getElementById('useCombatMoveBtn');
-    const moveName = btn.dataset.moveName;
-    const vpCost = parseInt(btn.dataset.vpCost) || 0;
-
     const yesBtn = document.getElementById('confirmCombatMoveYes');
     const noBtn = document.getElementById('confirmCombatMoveNo');
     confirmOverlay._playingAnimation = true;
     yesBtn.disabled = true;
     noBtn.disabled = true;
-    if (!overlay._deferAnimation) await _playBattleAnimation(overlay._speciesName);
+    await _performUseMove();
     confirmOverlay._playingAnimation = false;
     yesBtn.disabled = false;
     noBtn.disabled = false;
-
-    if (overlay._onUseMove) overlay._onUseMove(moveName, vpCost);
-    confirmOverlay.style.display = 'none';
-    overlay.style.display = 'none';
-
-    // ── Shared post-use checks (add new move-effect rules here) ──
-    const move = overlay._currentMove;
-    if (move) {
-      const fullDesc = (move[7] || '') + ' ' + (move[8] || '');
-      // Drain: restore half of damage dealt to user
-      if (/the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(fullDesc)) {
-        if (overlay._onDrainHeal) overlay._onDrainHeal();
-      }
-      // Direct heal: "regain a base X hit points"
-      if (/regain\s+a\s+base\s+.*?\s+hit\s+points/i.test(fullDesc)) {
-        if (overlay._onDirectHeal) overlay._onDirectHeal();
-      }
-    }
   });
 }
 
@@ -514,8 +546,9 @@ function _renderCommander(trainerData) {
  * @param {string} [params.spriteAlt]    - Alt text for spriteUrl
  * @param {string} [params.speciesName]  - Species name used to look up a preloaded battle animation (see utils/battle-animation.js)
  * @param {boolean} [params.deferAnimation] - Skip playing the battle animation here on "Yes" -- for callers (combat-wip.js's onDamageResolved flow) that show it themselves later, once a target is picked and the attack roll is confirmed a hit, instead of the instant "Use Move" is confirmed. Defaults to false (legacy behavior: plays immediately), so every other caller is unaffected.
+ * @param {boolean} [params.skipConfirm] - Skip the separate "Use MoveName (N VP)? Yes/No" confirm popup entirely -- clicking Use Move directly uses it (the same VP cost is already shown in this popup's own grid, so that confirm step was just a second click for no new information). Defaults to false (legacy behavior: confirm popup shown), so only callers that opt in (combat-wip.js) are affected -- pokemon-card.js's own semi-permanent VP/HP deduction keeps the confirm step.
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, spriteUrl, spriteAlt, speciesName, deferAnimation }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, spriteUrl, spriteAlt, speciesName, deferAnimation, skipConfirm }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -533,6 +566,8 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   popup._spriteAlt = spriteAlt || move[0];
   popup._speciesName = speciesName || null;
   popup._deferAnimation = !!deferAnimation;
+  popup._skipConfirm = !!skipConfirm;
+  popup._usingMove = false; // fresh move, fresh guard -- see _performUseMove's own comment on why this never resets itself
 
   const { attackBonus, damageBonus, attackBreakdown, damageBreakdown, damageDice } = computedData;
   const fmtMod = v => v >= 0 ? `+${v}` : `${v}`;

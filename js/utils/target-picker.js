@@ -137,8 +137,10 @@ function _ensureDom() {
           <div class="target-picker-roll-total" id="targetPickerAttackTotal"></div>
           <div class="target-picker-roll-actions">
             <button class="combat-use-move-btn target-picker-roll-back" id="targetPickerBack">← Back</button>
-            <button class="combat-use-move-btn target-picker-miss-btn" id="targetPickerMiss">Attack Miss</button>
-            <button class="combat-use-move-btn target-picker-hit-btn" id="targetPickerHit">Attack Hit</button>
+            <!-- No Attack Miss button for now -- see _confirmMiss's own comment: until the
+                 reaction system exists to actually contest a hit, every attack just resolves,
+                 same as it will once a reaction phase can (or can't) intervene here instead. -->
+            <button class="combat-use-move-btn target-picker-hit-btn" id="targetPickerHit">Attack</button>
           </div>
         </div>
         <div id="targetPickerStep3" hidden>
@@ -162,7 +164,6 @@ function _ensureDom() {
   document.getElementById('targetPickerSkip').addEventListener('click', () => _close(null));
   document.getElementById('targetPickerBack').addEventListener('click', _showStep1);
   document.getElementById('targetPickerBackToAttack').addEventListener('click', _backFromDamage);
-  document.getElementById('targetPickerMiss').addEventListener('click', _confirmMiss);
   document.getElementById('targetPickerHit').addEventListener('click', _confirmHit);
   document.getElementById('targetPickerConfirmRoll').addEventListener('click', _confirmDamageRoll);
   document.getElementById('targetPickerAttackInput').addEventListener('input', _updateAttackTotal);
@@ -227,6 +228,14 @@ function _updateAttackTotal() {
   totalEl.innerHTML = `Total: <strong>${raw + _effectiveAttackMod()}</strong>`;
 }
 
+/** Not wired to a button right now (2026-09-22, at the user's own direction) --
+ * every attack just resolves as a hit until there's a real reaction system to
+ * actually contest one, closer to what the eventual flow will look like (a
+ * reaction either intervenes or it doesn't; there's no manual "declare a
+ * miss" step either way). Left in place, still fully wired through the
+ * result shape and combat-wip.js's Miss handling, for whenever a button
+ * needs to call it again -- a manual override, or a real "declare miss"
+ * step if the reaction system ends up wanting one after all. */
 function _confirmMiss() {
   const attackRoll = _currentAttackRoll();
   const rollMode = _atkCtx?.mode || 'normal';

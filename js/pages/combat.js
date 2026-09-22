@@ -2620,6 +2620,11 @@ function removeStatusEffect(combatantId, effectName, state) {
 // ============================================================================
 
 function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly } = {}) {
+  // Only combat-wip.js's shared-combat flow ever passes any of these (see
+  // _attachMainFocusListeners) -- the legacy page's own attachCombatListeners()
+  // calls attachBattleListeners(state) with none of them, so this stays false
+  // there and that page's own confirm-popup step is unaffected.
+  const _isSharedCombat = !!(onDamageResolved || onSaveTriggered || onReactiveSave || onMultiHitAoe || onEffectsOnly);
   if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
   const move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
@@ -2751,6 +2756,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
     deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave || _willDeferToMultiHitAoe,
+    skipConfirm: _isSharedCombat,
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;

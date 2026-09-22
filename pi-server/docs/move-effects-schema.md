@@ -8,10 +8,11 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ```jsonc
 {
-  "kind": "condition" | "stat" | "roll",
+  "kind": "condition" | "stat" | "roll" | "temp_hp",
   // condition:  "apply": "<name>", optional "value" (type_changed → "Ghost")
   // stat:       "stat": "<stat>", "amount": -1 | "proficiency" | {"dice": "1d4"}  OR  "set": 0, optional "stacks": {"max": 5}
   // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>"
+  // temp_hp:    "amount": 10 -- a bonus-HP pool, see its own section below
   "when":   { "type": ... },        // what triggers it — see below
   "target": "self",                 // only present when the USER is affected (default: the target)
   "ends":   [ ... ],                // how it stops — any ONE entry ending it removes it
@@ -19,6 +20,23 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
   "note":   "free text for anything the fields can't carry"
 }
 ```
+
+**`choice`** groups sibling effects (same `choice.kind`/`die` and identical `when`) into one pick in
+the effects popup instead of offering them as independent checkboxes (`groupEffects` /
+`effects-popup.js`): `"chosen"` is a plain radio pick (Bulk Up: attack OR AC); `"random"` with a
+`die` and each option's own `roll` is a "type in what you rolled" table that auto-selects the
+matching row (Acupressure's d6 table). Every sibling needs the *same* `choice.kind`/`die`/`when`
+to end up in one group — a different `kind` (e.g. a `stat` row next to a `temp_hp` row) is fine,
+the grouping never looks at that field.
+
+**`temp_hp`** (Acupressure's "roll a 3: +10 temporary HP") is a real bonus-HP pool, not a stat --
+`amount` is its starting size, and the server tracks how much is left as `remaining` on the stored
+status (js/utils/move-effects.js's `tempHpRemaining` sums it up for display: a small light-blue
+"+N" tag next to the HP number, same convention as a live stat buff's tag). Incoming damage drains
+this pool FIRST (`routes_combat.py`'s `_absorb_temp_hp`, called from both damage-application paths)
+before touching real HP; the status is removed once it empties. Re-applying the same source's same
+move (Acupressure rerolled) replaces the pool outright (the existing non-stacking status path —
+matches "any previous effect ends", never partial-carries-over or adds).
 
 ## `when`
 | type | meaning |
@@ -143,3 +161,8 @@ buffs (Focus Energy done above; Laser Focus deferred, needs `set`). The other ~3
 new effect kinds entirely, or already work through a separate, older mechanism (e.g. move-popup.js's
 description-regex drain/direct-heal detection) that isn't part of this schema. Main-game statuses (burned,
 poisoned, paralyzed, …) have no `ends`: their removal rules live in the rulebook, not the move text.
+
+*(Update, same week: `set`-based effects, a "choose which stat" mechanic, and temp-HP are no longer
+gaps — see their own sections above. Laser Focus and Guard Split are both done; Power Trick/Power
+Split still wait on a "one choice, two paired effects" extension. This paragraph is left as the
+original scoping snapshot otherwise — treat the two lists above as current, this one as history.)*

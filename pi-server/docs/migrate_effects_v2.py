@@ -230,6 +230,8 @@ def tag_for(e):
         buff = (e.get('amount') == 'proficiency' or isinstance(e.get('amount'), dict)
                 or (isinstance(e.get('amount'), (int, float)) and e['amount'] > 0))
         base = f"stat_{'buff' if buff else 'debuff'}_{e['stat']}"
+    elif e['kind'] == 'temp_hp':
+        base = 'temp_hp'
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

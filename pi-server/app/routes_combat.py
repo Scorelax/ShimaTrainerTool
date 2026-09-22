@@ -821,7 +821,7 @@ def _active_participant_id(state):
 # they report and expires what the turn/round counters say has run out.
 # ---------------------------------------------------------------------------
 
-_STATUS_KINDS = ('condition', 'stat', 'roll')
+_STATUS_KINDS = ('condition', 'stat', 'roll', 'temp_hp')
 _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'long_rest', 'uses', 'instant', 'other')
 _STATUS_FIELDS = ('kind', 'apply', 'value', 'stat', 'amount', 'set', 'roll', 'on', 'note')
 
@@ -847,6 +847,9 @@ def _status_label(s):
         if isinstance(amount, int):
             return f"{stat} {amount * s.get('stacks', 1):+d}"
         return stat
+    if kind == 'temp_hp':
+        remaining = s.get('remaining')
+        return f"{remaining} temporary HP" if remaining is not None else 'temporary HP'
     return f"{s.get('roll')} on {(s.get('on') or '').replace('_', ' ')}"
 
 
@@ -915,6 +918,11 @@ def _apply_status(state, target_id, spec):
     statuses = _statuses_of(target)
     existing = next((s for s in statuses if _same_status(s, new)), None)
     new['id'] = existing['id'] if existing else uuid.uuid4().hex[:8]
+    if spec.get('kind') == 'temp_hp':
+        # A fresh pool, full size -- re-applying the same source's same move (Acupressure
+        # re-rolled) REPLACES it outright via the existing/statuses[...] = new swap below,
+        # same as any other non-stacking status; nothing here carries a partial pool over.
+        new['remaining'] = js_parse_int(spec.get('amount')) or 0
     stack_max = js_parse_int((spec.get('stacks') or {}).get('max')) if spec.get('kind') == 'stat' else None
     verb = 'is now'
     if stack_max:
@@ -985,6 +993,33 @@ def _expire_statuses_on_turn_point(state, pid, point):
                     break
 
 
+def _absorb_temp_hp(state, target, amount):
+    """Drains `amount` of incoming damage from any active `temp_hp` status on
+    `target` before it reaches real HP (standard temp-HP absorption order),
+    removing the status once its pool empties. Returns the leftover still owed
+    to currentHP (0 if the pool covered it all, `amount` unchanged if there's
+    no active pool or amount isn't positive -- healing/0-damage never touches it)."""
+    remaining = amount
+    if remaining <= 0:
+        return remaining
+    for s in list(_statuses_of(target)):
+        if remaining <= 0:
+            break
+        if s.get('kind') != 'temp_hp':
+            continue
+        pool = s.get('remaining', 0)
+        if pool <= 0:
+            continue
+        absorbed = min(pool, remaining)
+        s['remaining'] = pool - absorbed
+        remaining -= absorbed
+        _log_event(state, 'status-absorb', text=f"{target['name']}'s temporary HP absorbed {absorbed} damage",
+                   targetId=target['id'], targetName=target['name'])
+        if s['remaining'] <= 0:
+            _remove_status(state, target['id'], s['id'], 'absorbed')
+    return remaining
+
+
 def _expire_statuses_by_round(state):
     for p in state['participants'].values():
         for s in list(_statuses_of(p)):
@@ -1025,7 +1060,8 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
         if dice_roll:
             multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'))
             actual_damage = round(dice_roll * multiplier)
-            target['currentHP'] -= actual_damage  # no floor, same reasoning as above
+            leftover = _absorb_temp_hp(state, target, actual_damage)
+            target['currentHP'] -= leftover  # no floor, same reasoning as above
             outcome = {'multiplier': multiplier, 'damageApplied': actual_damage}
             move_label = f' with {move_name}' if move_name else ''
             _log_event(
@@ -1076,7 +1112,8 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
 
     multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'))
     actual_damage = round(dice_roll * multiplier)
-    target['currentHP'] -= actual_damage  # no floor, same reasoning as elsewhere in this module
+    leftover = _absorb_temp_hp(state, target, actual_damage)
+    target['currentHP'] -= leftover  # no floor, same reasoning as elsewhere in this module
     move_label = f' with {move_name}' if move_name else ''
     _log_event(
         state, 'damage',

@@ -22,7 +22,7 @@ import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, tempHpRemaining } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -771,6 +771,10 @@ function _syncLocalCombatState(session) {
     }
     merged.currentHp = p.currentHP; merged.maxHp = p.maxHP;
     merged.currentVp = p.currentVP; merged.maxVp = p.maxVP;
+    // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
+    // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
+    // damage lands, there's no "manual edit" to preserve.
+    merged.tempHp = tempHpRemaining(p);
     if (resolved) {
       merged.hasStatBlock = true;
       // Live stat statuses (AC -1, all abilities +1, ...) move the card's CURRENT AC and ability
@@ -1355,6 +1359,7 @@ function _foreignCombatantView(p) {
     id: p.id, type: p.combatantType, name: p.name, image: p.image, level: p.level,
     types: [p.type1, p.type2].filter(Boolean),
     currentHp: p.currentHP, maxHp: p.maxHP, currentVp: p.currentVP, maxVp: p.maxVP,
+    tempHp: tempHpRemaining(p),
     ac: eff.ac, baseAc: p.baseAc, critMod: eff.critMod || 0,
     str: eff.str, dex: eff.dex, con: eff.con, int: eff.int, wis: eff.wis, cha: eff.cha,
     strMod: eff.strMod, dexMod: eff.dexMod, conMod: eff.conMod,

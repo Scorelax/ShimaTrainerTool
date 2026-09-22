@@ -897,7 +897,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
           <div class="combat-card-stats-group">
             ${c.hasStatBlock === false ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}</div>`}
             <div class="combat-card-stats-row">
-              <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>
+              <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>${c.tempHp ? `<sup class="temp-hp-tag" title="Temporary HP -- absorbs damage before real HP">+${c.tempHp}</sup>` : ''}
                 <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
               </span>
               <span class="stat-bar-wrap">VP: <strong>${c.currentVp}/${c.maxVp}</strong>
@@ -1290,6 +1290,7 @@ function getCombatCSS() {
     .stat-mod-tag { font-size: 0.62rem; font-weight: 800; margin-left: 2px; }
     .stat-mod-tag.up { color: #2ecc71; }
     .stat-mod-tag.down { color: #e74c3c; }
+    .temp-hp-tag { font-size: 0.62rem; font-weight: 800; margin-left: 2px; color: #6ec6ff; }
     .combat-card-stats-row { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.82rem; }
     .combat-mods-row { display: grid; grid-template-columns: repeat(3, 1fr); font-size: 0.78rem; color: #c0c0c0; gap: 0.25rem 0.3rem; }
     .combat-mods-row small { color: #888; margin-left: 1px; }

@@ -95,6 +95,9 @@ export function statusLabel(s) {
     if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value}`;
     return _title(String(s.apply || '').replace(/_/g, ' '));
   }
+  if (s.kind === 'temp_hp') {
+    return s.remaining !== undefined ? `${s.remaining} temporary HP left` : 'Temporary HP';
+  }
   if (s.kind === 'stat') {
     const stat = s.stat === 'ac' ? 'AC'
       : s.stat === 'crit' ? 'Crit range'
@@ -436,6 +439,19 @@ export function rollModeText(mode) {
   if (mode === 'advantage') return 'Roll with ADVANTAGE — roll twice, keep the higher';
   if (mode === 'disadvantage') return 'Roll with DISADVANTAGE — roll twice, keep the lower';
   return '';
+}
+
+/** How much temporary HP `participant` currently has (Acupressure's roll-of-3):
+ * summed across any active `temp_hp` statuses (0 if none). This pool absorbs
+ * incoming damage before real HP server-side (routes_combat.py's
+ * _absorb_temp_hp) -- `remaining` is authoritative, never re-derived from
+ * `amount` here, since it shrinks as damage lands. Shown next to the HP number
+ * as a small light-blue "+N" tag (combat.js's renderCombatCard), the same
+ * convention as a live stat buff's tag. */
+export function tempHpRemaining(participant) {
+  return (participant?.statuses || [])
+    .filter(s => s.kind === 'temp_hp')
+    .reduce((sum, s) => sum + (Number(s.remaining) || 0), 0);
 }
 
 /** The status id of an active "next attack auto-crits" flag (Laser Focus) on

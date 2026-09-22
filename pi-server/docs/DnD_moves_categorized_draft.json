@@ -6668,12 +6668,63 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_attack_rolls",
+        "self_stat_buff_ac"
       ],
       "description": "You pump yourself up, increasing your adrenaline. For the next minute, choose to add +1 to your attack rolls OR +1 to AC. This move can be stacked to a maximum of +5 for either choice.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "choice": {
+            "kind": "chosen"
+          },
+          "stacks": {
+            "max": 5
+          }
+        },
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "choice": {
+            "kind": "chosen"
+          },
+          "stacks": {
+            "max": 5
+          }
+        }
+      ]
     },
     {
       "name": "Cataclysm Punch",
@@ -14366,12 +14417,138 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_attack_rolls",
+        "self_stat_buff_damage_rolls",
+        "self_temp_hp",
+        "self_stat_buff_saving_throws",
+        "self_stat_buff_crit",
+        "self_stat_buff_ac"
       ],
       "description": "You apply pressure to different stress points on your body, boosting a random ability for the duration. When activating this move, roll a d6 and gain the following boost based on the result. When activated on subsequent turns, any previous effect ends. 1: +1 to attack rolls. 2: +2 to damage rolls. 3: +10 temporary HP. 4: +1 to saving throws. 5: Critical Hit range +1 6: +1 to Armor Class",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "choice": {
+            "kind": "random",
+            "die": "d6",
+            "roll": 1
+          },
+          "stat": "attack_rolls",
+          "amount": 1
+        },
+        {
+          "kind": "stat",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "choice": {
+            "kind": "random",
+            "die": "d6",
+            "roll": 2
+          },
+          "stat": "damage_rolls",
+          "amount": 2
+        },
+        {
+          "kind": "temp_hp",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "choice": {
+            "kind": "random",
+            "die": "d6",
+            "roll": 3
+          },
+          "amount": 10
+        },
+        {
+          "kind": "stat",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "choice": {
+            "kind": "random",
+            "die": "d6",
+            "roll": 4
+          },
+          "stat": "saving_throws",
+          "amount": 1
+        },
+        {
+          "kind": "stat",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "choice": {
+            "kind": "random",
+            "die": "d6",
+            "roll": 5
+          },
+          "stat": "crit",
+          "amount": 1
+        },
+        {
+          "kind": "stat",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "choice": {
+            "kind": "random",
+            "die": "d6",
+            "roll": 6
+          },
+          "stat": "ac",
+          "amount": 1
+        }
+      ]
     },
     {
       "name": "After You",

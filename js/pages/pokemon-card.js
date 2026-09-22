@@ -3951,37 +3951,22 @@ export function attachPokemonCardListeners() {
       return;
     }
 
-    // Store original state for rollback
+    // Party membership lives on the POKEMON's own record (pokemonData[38] -- which
+    // slot number, or '' for none), never on trainerData -- trainerData[26] is only
+    // ever a single number (party capacity), passed to the API as info, same pattern
+    // my-pokemon.js's own party toggle already uses correctly. This used to scan
+    // trainerData[26..31] as six separate slot-name cells and write this Pokemon's
+    // species name straight into whichever one was empty -- but those same indices
+    // ARE the trainer's own ability modifiers (27=STR, 28=DEX, 29=CON, 30=INT,
+    // 31=WIS -- see edit-trainer.js), so an empty party slot landing on, say, 27
+    // silently overwrote the trainer's STR modifier with a Pokemon's name. Real,
+    // user-reported bug (2026-09-22) -- fixed by not touching trainerData at all.
     const originalPokemonSlot = pokemonData[38];
-    const originalTrainerSlots = [trainerData[26], trainerData[27], trainerData[28], trainerData[29], trainerData[30], trainerData[31]];
 
-    // Optimistic update - update sessionStorage immediately
-    if (isChecked) {
-      // Find first empty slot for optimistic update
-      let slotIndex = -1;
-      for (let i = 26; i <= 31; i++) {
-        if (!trainerData[i] || trainerData[i] === '') {
-          slotIndex = i;
-          trainerData[i] = pokemonData[2];
-          pokemonData[38] = (i - 25).toString();
-          break;
-        }
-      }
-    } else {
-      // Remove from party slot
-      pokemonData[38] = '';
-      for (let i = 26; i <= 31; i++) {
-        if (trainerData[i] === pokemonData[2]) {
-          trainerData[i] = '';
-          break;
-        }
-      }
-    }
-
-    // Update sessionStorage immediately for instant UI feedback
+    // Optimistic update -- a placeholder slot number just for instant UI feedback;
+    // the server's response.slot below is what's actually authoritative.
+    pokemonData[38] = isChecked ? '1' : '';
     sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
-    sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-    sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
 
     // Now make the API call
     try {
@@ -3996,29 +3981,13 @@ export function attachPokemonCardListeners() {
       if (response.status === 'success') {
         // Update with actual slot from server if adding
         if (isChecked && response.slot) {
-          const slotIndex = 26 + parseInt(response.slot) - 1;
-          // Clear any incorrect optimistic placement
-          for (let i = 26; i <= 31; i++) {
-            if (trainerData[i] === pokemonData[2]) {
-              trainerData[i] = '';
-            }
-          }
-          // Set correct slot
-          trainerData[slotIndex] = pokemonData[2];
           pokemonData[38] = response.slot;
           sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
-          sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-          sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
         }
       } else {
         // Rollback on failure
         pokemonData[38] = originalPokemonSlot;
-        for (let i = 0; i < 6; i++) {
-          trainerData[26 + i] = originalTrainerSlots[i];
-        }
         sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
-        sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-        sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
         e.target.checked = !isChecked;
         showError(response.message || 'Failed to update active party status');
       }
@@ -4026,12 +3995,7 @@ export function attachPokemonCardListeners() {
       console.error('Error updating active party:', error);
       // Rollback on error
       pokemonData[38] = originalPokemonSlot;
-      for (let i = 0; i < 6; i++) {
-        trainerData[26 + i] = originalTrainerSlots[i];
-      }
       sessionStorage.setItem(`pokemon_${pokemonName.toLowerCase()}`, JSON.stringify(pokemonData));
-      sessionStorage.setItem(`trainer_${trainerData[1].toLowerCase()}`, JSON.stringify(trainerData));
-      sessionStorage.setItem('trainerData', JSON.stringify(trainerData));
       e.target.checked = !isChecked;
       showError('Failed to update active party status');
     }

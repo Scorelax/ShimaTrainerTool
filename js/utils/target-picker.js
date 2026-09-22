@@ -265,10 +265,9 @@ function _confirmMiss() {
  * never has to declare Hit or Miss by hand; falls back to _confirmMiss's manual pair
  * when it isn't (see _showStep2). A miss closes the popup right away -- nothing left to
  * roll. A hit shows the damage-roll step immediately (so there's no waiting before the
- * next input is ready) and starts the attacker's battle animation there without
- * waiting for it -- the video element only exists in step 3's markup, so playing it
- * beforehand both delays the popup and leaves it already ended (a still frame) by the
- * time the player actually sees it. */
+ * next input is ready), with the attacker's regular sprite looping there while the
+ * roll is entered -- the one-shot battle animation only plays once the damage roll is
+ * actually confirmed (see _confirmDamageRoll/_playAnimation). */
 function _confirmAttack() {
   const attackRoll = _currentAttackRoll();
   if (attackRoll === null) return;
@@ -279,7 +278,6 @@ function _confirmAttack() {
     return;
   }
   _showStep3();
-  _playAnimation();
 }
 
 /** Damage step's Back button. Called with no arguments on purpose -- wiring
@@ -292,18 +290,23 @@ function _backFromDamage() {
 }
 
 /** guaranteed_hit moves: no attack roll, the hit is automatic. Goes straight
- * to the damage step for the given target, then plays the attacker's battle
- * animation there (that step is already visible, so there's no blank or stale
- * screen while it plays and no second target to click mid-animation). */
+ * to the damage step for the given target (see _showStep3 for what shows
+ * there while the roll is being entered). */
 function _autoHit(p, name) {
   _attackRoll = null;
   _atkCtx = null; // nothing is rolled, so no roll modifiers apply
   _selectedTarget = p;
   _selectedTargetName = name;
   _showStep3();
-  return _playAnimation();
 }
 
+/** Plays the attacker's one-shot battle animation over the damage step's media
+ * area, replacing the looping idle sprite _showStep3 put there -- called only
+ * once the damage roll is actually confirmed (see _confirmDamageRoll), so it's
+ * the last thing the player sees before the popup closes, not something
+ * competing for their attention while they're still entering a roll. No-ops
+ * (leaves the idle sprite as the last thing shown) when the species has no
+ * registered battle animation. */
 async function _playAnimation() {
   if (!_speciesName) return;
   const url = await getBattleAnimationUrl(_speciesName);
@@ -338,11 +341,18 @@ function _showStep3() {
   document.getElementById('targetPickerDamageTarget').innerHTML = `
     <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
+  // The attacker's own regular (looping) sprite -- not the one-shot battle-animation
+  // clip, which only plays once the roll is confirmed (see _playAnimation/
+  // _confirmDamageRoll). _attacker is populated by both pickTarget and
+  // pickTargetAgain's callers, so this is available on every path that reaches here.
+  document.getElementById('targetPickerAnimMedia').innerHTML =
+    spriteMediaHtml(_attacker?.image, _attacker?.name || 'Attacker');
   document.getElementById('targetPickerModifierNote').textContent =
     _damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '';
   const input = document.getElementById('targetPickerRollInput');
   input.value = '';
   _updateRollTotal();
+  document.getElementById('targetPickerConfirmRoll').disabled = false;
   setTimeout(() => input.focus(), 50);
 }
 
@@ -352,15 +362,25 @@ function _updateRollTotal() {
   totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier}</strong>`;
 }
 
-function _confirmDamageRoll() {
+/** Confirm Damage -- plays the one-shot attack animation (see _playAnimation)
+ * before closing, so it's the last thing shown, then closes. Disables the
+ * button first (re-entrancy guard: a second click landing mid-animation would
+ * otherwise both replay the animation and double-consume any "next roll"
+ * status) -- no need to re-enable it after, _showStep3 already does that
+ * fresh for the next time this step is reached. */
+async function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
+  const btn = document.getElementById('targetPickerConfirmRoll');
+  if (btn.disabled) return;
+  btn.disabled = true;
   const result = {
     targetId: _selectedTargetId, hit: true, rawRoll: raw,
     attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _effectiveAttackMod(),
     rollMode: _atkCtx?.mode || 'normal',
   };
   _consume(_atkCtx);
+  await _playAnimation();
   _close(result);
 }
 
@@ -388,9 +408,10 @@ function _cardHtml(p) {
  * back to a human declaring Hit/Miss themselves (see _confirmMiss) only when
  * the target's AC isn't known at all (a DM's freeform PvE enemy). A Miss
  * resolves immediately (the move's VP cost was already spent before this
- * popup ever opened, so there's nothing left to do). A Hit plays the
- * attacker's battle animation (if any) and moves on to a damage roll, which
- * resolves the promise once confirmed. Resolves to {targetId, hit:false},
+ * popup ever opened, so there's nothing left to do). A Hit moves on to a
+ * damage roll (the attacker's regular sprite loops there; a one-shot battle
+ * animation, if any, plays once the roll is confirmed), which resolves the
+ * promise once confirmed. Resolves to {targetId, hit:false},
  * {targetId, hit:true, rawRoll, attackRoll, attackTotal}, or null if the
  * player picked "No Target" / closed the popup / there's no active session
  * to target into. attackRoll is the natural d20 that was typed in (also on a

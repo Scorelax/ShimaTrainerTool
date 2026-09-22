@@ -1879,12 +1879,10 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
       type: 'miss', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
       text: `${attackerName} used ${moveName} on ${targetName} -- Miss`,
     }).catch(() => {});
-    // The app resolved this against the target's AC itself now (see target-picker.js's
-    // _confirmAttack) -- a Hit already gets an implicit "you hit, now roll damage" signal
-    // from the damage popup that follows, but nothing else happens on a Miss, so it needs
-    // its own explicit "you were told" moment.
-    showCombatAlert(`${attackerName}'s ${moveName} missed ${targetName}!`, { title: 'Attack Result' });
-    // A miss can still trigger effects that don't need a hit (High Jump Kick's self-prone).
+    // No popup here (see the user's own call: the players already know how a Miss reads,
+    // it's right there in the shared battle log -- a modal for every routine result is
+    // noise, not help). A miss can still trigger effects that don't need a hit (High Jump
+    // Kick's self-prone).
     await _offerMoveEffects({
       attackerId: combatantId, targetId: picked.targetId, moveName, computedData,
       ctx: { hit: false, attackRoll: picked.attackRoll ?? null, crit: false },
@@ -1896,11 +1894,10 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   const damageModifier = computedData.damageBonus || 0;
   const moveType = (move && move[1]) || '';
   try {
-    const result = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, speciesName, moveName);
-    if (result.multiplier !== undefined) {
-      const label = result.multiplier >= 2 ? 'Super effective!' : result.multiplier === 0 ? 'No effect!' : result.multiplier < 1 ? 'Not very effective...' : '';
-      showCombatAlert(`${label ? label + ' — ' : ''}${result.multiplier}× effectiveness -- ${result.damageApplied} damage applied`, { title: 'Attack Result' });
-    }
+    // No "N damage applied" popup -- it's already in the shared battle log
+    // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
+    // every damage application here); see the user's own "less tooltip noise" call.
+    await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, speciesName, moveName);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
     return null;
@@ -1978,10 +1975,9 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
         }).catch(() => {});
       } else if (outcome.rawRoll !== undefined) {
         try {
-          const result = await CombatAPI.applyDamage(combatantId, targetId, outcome.rawRoll + damageModifier, moveType, speciesName, moveName);
-          if (result.multiplier !== undefined) {
-            showCombatAlert(`${target.name} failed the save -- ${result.damageApplied} damage applied`, { title: 'Save Result' });
-          }
+          // No "N damage applied" popup here either -- see _resolveOneHit's own note;
+          // doubly true in a loop over several AoE targets, one popup per target.
+          await CombatAPI.applyDamage(combatantId, targetId, outcome.rawRoll + damageModifier, moveType, speciesName, moveName);
         } catch (err) {
           showCombatAlert(err.message, { title: 'Error' });
         }
@@ -2132,10 +2128,8 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
 
   const moveType = (move && move[1]) || '';
   try {
-    const result = await CombatAPI.applyDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
-    if (result.multiplier !== undefined) {
-      showCombatAlert(`${targetName} failed the save -- ${result.damageApplied} damage applied`, { title: 'Save Result' });
-    }
+    // No "N damage applied" popup -- see _resolveOneHit's own note on why.
+    await CombatAPI.applyDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }

@@ -189,8 +189,12 @@ function parseKnownMoves(str) {
 /**
  * Build the KnownMoves string to save back to the database.
  * Only includes SR/LR moves — DICE-type recharge moves are combat-only and not persisted.
+ * Exported so combat-wip.js can persist a recharge-locked move's spent state through to
+ * the DB itself (see its own _persistRechargeStates) -- this app's only OTHER place that
+ * does this is endCombat below, which is legacy-combat-only (fires off its own End
+ * Combat button), so the shared tool needs its own hook onto the same string format.
  */
-function buildKnownMovesString(rechargeStates) {
+export function buildKnownMovesString(rechargeStates) {
   return Object.entries(rechargeStates)
     .filter(([, s]) => s.type !== 'DICE')
     .map(([name, s]) => `${name}(${s.chargesLeft})(${s.type})`)

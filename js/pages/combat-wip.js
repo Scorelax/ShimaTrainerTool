@@ -29,6 +29,7 @@ import {
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
   setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor, moveEffectsFor, findMoveRow,
+  buildKnownMovesString,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -362,6 +363,7 @@ let _myParticipantIds = new Set();
 // stat-sync.js. The card's numbers include live status effects; what's sent is the base.
 const _baseStatSync = createBaseStatSync((id, stats) => CombatAPI.updateBaseStats(id, stats));
 let _lastSyncedStats = {}; // participantId -> {hp, vp} last pushed to the server, to dedupe redundant pushes
+let _lastSyncedRecharge = {}; // combatantId -> KnownMoves string last written to the DB, same dedupe reasoning
 
 function _needsToJoin(state) {
   const name = _currentTrainerName();
@@ -568,6 +570,7 @@ function _exitBattleSync() {
   _battleSyncActive = false;
   _myParticipantIds = new Set();
   _lastSyncedStats = {};
+  _lastSyncedRecharge = {};
   _baseStatSync.reset();
   _statsSyncInFlight = {};
   _statsSyncPending = {};
@@ -585,7 +588,9 @@ function _exitBattleSync() {
  * push the result up so every other client (and the display screen) sees
  * it too. Deduped against the last value actually sent so unrelated saves
  * (status effects, stat adjusters, isExpanded toggles) don't spam the
- * server with no-op requests. */
+ * server with no-op requests. Also persists a recharge-locked move's spent
+ * charge (Roar of Time, Overheat, ...) through to the DB -- see
+ * _persistRechargeStates, same reasoning as HP/VP just below. */
 function _onLocalCombatStateSave(state) {
   _baseStatSync.onSave(state.combatants, id => _myParticipantIds.has(id));
   state.combatants.forEach(c => {
@@ -595,6 +600,35 @@ function _onLocalCombatStateSave(state) {
     _lastSyncedStats[c.id] = { hp: c.currentHp, vp: c.currentVp };
     _pushStatsSync(c.id, c.currentHp, c.currentVp);
     _persistStatsToDb(c, c.currentHp, c.currentVp);
+  });
+  _persistRechargeStates(state);
+}
+
+/** Writes a Pokemon's recharge-locked moves (rechargeStates -- "used this
+ * short/long rest", see combat.js's buildPokemonCombatant/parseRecharge)
+ * through to its real DB record (the same KnownMoves field, same
+ * buildKnownMovesString format) -- combat.js's own endCombat does this for
+ * the legacy flow, but that's tied to its own End Combat button and never
+ * runs for a shared session. Without this, a once-per-rest move correctly
+ * locks for the rest of THIS session (rechargeStates itself already tracks
+ * fine, initialized by buildPokemonCombatant and decremented by the shared
+ * move-use flow -- see move-effects-schema.md's own note on this) but
+ * silently comes back fresh the next time this Pokemon enters ANY battle,
+ * since the database was never actually told it was spent. Deduped against
+ * the last string actually written, same pattern as HP/VP. Trainers don't
+ * have recharge-locked moves in this game (Pokemon-only, same as
+ * buildPokemonCombatant's own rechargeStates handling). */
+function _persistRechargeStates(state) {
+  state.combatants.forEach(c => {
+    if (c.type !== 'pokemon' || !c.entityKey || !_myParticipantIds.has(c.id)) return;
+    const knownMovesStr = buildKnownMovesString(c.rechargeStates || {});
+    if (_lastSyncedRecharge[c.id] === knownMovesStr) return;
+    _lastSyncedRecharge[c.id] = knownMovesStr;
+    const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || 'null');
+    if (!pd) return;
+    pd[59] = knownMovesStr;
+    sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
+    PokemonAPI.update(pd).catch(e => console.error('Pokemon KnownMoves sync:', e));
   });
 }
 

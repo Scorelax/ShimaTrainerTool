@@ -1640,7 +1640,13 @@ export function attachSetupListeners({ backRoute = 'trainer-card', onStart } = {
     window.dispatchEvent(new CustomEvent('navigate', { detail: { route: backRoute } }));
   });
 
+  // TEMPORARY (2026-09-22, user's own request for tonight's session) -- the button
+  // stays visible, just does nothing, so the legacy combat flow below it is what
+  // actually runs. Flip back to false (or delete this line) to restore the WIP
+  // button's redirect once the shared combat tool is wanted again.
+  const WIP_BUTTON_DISABLED = true;
   document.getElementById('combatWipBtn')?.addEventListener('click', () => {
+    if (WIP_BUTTON_DISABLED) return;
     window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat-wip' } }));
   });
 

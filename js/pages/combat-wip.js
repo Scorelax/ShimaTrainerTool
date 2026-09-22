@@ -149,6 +149,10 @@ const WIP_CSS = `
     min-height: 60vh; text-align: center; padding: 3rem 1rem;
   }
   .combat-wip-empty h2 { color: #FFD700; margin-bottom: 1.25rem; }
+  /* _renderJoinOrSpectateChoice's own top bar -- that screen bypasses the shared
+     header entirely (no session-in-progress chrome makes sense before a decision
+     is even made), so its one way out gets its own minimal strip instead. */
+  .combat-wip-join-choice-topbar { padding: 0.8rem 1rem 0; }
   .combat-wip-btn-primary, .combat-wip-btn-danger, .combat-wip-btn-secondary {
     border: none; border-radius: 6px; padding: 0.6rem 1.2rem; font-size: 0.95rem;
     font-weight: 600; cursor: pointer; color: #fff;
@@ -307,6 +311,11 @@ let combatUpdateHandler = null;
 // Reset back to false whenever the session ends, so the next battle asks
 // again rather than silently spectating forever.
 let _spectating = false;
+// True from the moment THIS device's own Create Battle click fires until the
+// live push echoing that exact creation is consumed (see combatUpdateHandler) --
+// the one case where auto-switching into the join flow on a live push is
+// actually wanted, since the player just asked for it themselves.
+let _justCreatedSession = false;
 let _joinStage = null; // null | 'setup' | 'initiative' | 'placement'
 let _joinState = null; // { combatants: [trainerCombatant, activePokemon] } while in 'initiative'
 let _placementQueue = []; // participant ids this trainer still needs to place, while in 'placement'
@@ -449,6 +458,9 @@ function _renderJoinOrSpectateChoice() {
   return `
     <div class="combat-wip-page">
       <style>${WIP_CSS}</style>
+      <div class="combat-wip-join-choice-topbar">
+        <button class="combat-wip-btn-secondary" id="joinChoiceBackBtn">← Back</button>
+      </div>
       <div class="combat-wip-empty">
         <h2>${session.battleType === 'pvp' ? 'PvP' : 'PvE'} Battle in Progress</h2>
         <p style="color:#a0a0c0;margin-bottom:1.5rem;max-width:340px;">Join in with your own trainer and Pokémon, or just watch the battle.</p>
@@ -1559,16 +1571,27 @@ export function attachCombatWipListeners() {
     if (_joinStage) return;
 
     // Not already mid-join-flow, but the fresh session says this trainer
-    // needs to join (e.g. this device just created the session, or a
-    // session just went active) -- switch into the join flow rather than
-    // patching the normal-view body with something that no longer applies.
-    // Spectators are exempt -- _needsToJoin is permanently true for them (a
-    // spectator owns nothing by definition), so without this check every
-    // single push would bounce a spectator back through _rerenderFull and
-    // undo the whole point of _syncMainFocus's patch-in-place path below.
+    // needs to join. Only actually switch views for it when THIS device is
+    // the one that just clicked Create Battle (_justCreatedSession, set by
+    // that button's own handler, below) -- otherwise every trainer who
+    // happens to have this page open gets yanked into a forced "Join or
+    // Spectate" decision the instant ANY other trainer starts a battle,
+    // which is exactly the auto-join bug the user reported: nobody should be
+    // pulled into anything by someone else's action. `session` above is
+    // still kept current regardless, so navigating into this page fresh
+    // (renderCombatWip) picks up the right state on its own, same as always
+    // -- this only guards the *live, unprompted* switch. Spectators are
+    // exempt from the whole check -- _needsToJoin is permanently true for
+    // them (a spectator owns nothing by definition), so without this check
+    // every single push would bounce a spectator back through _rerenderFull
+    // and undo the whole point of _syncMainFocus's patch-in-place path below.
     if (session.active && !_spectating && _needsToJoin(session)) {
-      _exitBattleSync();
-      _rerenderFull();
+      const isMyOwnCreation = _justCreatedSession;
+      _justCreatedSession = false; // consumed either way -- only ever applies to the first push after Create Battle
+      if (isMyOwnCreation) {
+        _exitBattleSync();
+        _rerenderFull();
+      }
       return;
     }
 
@@ -1608,6 +1631,12 @@ export function attachCombatWipListeners() {
     document.getElementById('joinChoiceSpectateBtn').addEventListener('click', () => {
       _spectating = true;
       _rerenderFull();
+    });
+    // Leaves without deciding either way -- this trainer still owns nothing in
+    // the session and isn't spectating, so it's simply not shown again until
+    // they navigate back into this page themselves.
+    document.getElementById('joinChoiceBackBtn').addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
     });
     return;
   }
@@ -1669,7 +1698,16 @@ export function attachCombatWipListeners() {
 function attachBodyListeners() {
   document.getElementById('createSessionBtn')?.addEventListener('click', async () => {
     const battleType = document.querySelector('input[name="battleType"]:checked')?.value || 'pve';
-    await CombatAPI.createSession(battleType);
+    // See _justCreatedSession's own comment -- flags this device (and only this
+    // one) to actually act on the live push this creates, rather than sitting
+    // here doing nothing until the player happens to navigate back in.
+    _justCreatedSession = true;
+    try {
+      await CombatAPI.createSession(battleType);
+    } catch (err) {
+      _justCreatedSession = false;
+      showCombatAlert(err.message, { title: 'Error' });
+    }
   });
 
   // Always synced, even for the empty state -- it's what puts the Back

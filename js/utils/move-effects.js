@@ -288,8 +288,15 @@ export function reapplyStatDeltas(c, prev, next) {
     const hasOverride = key in nextSet;
     if (hasOverride) {
       if (!hadOverride) {
-        c._preSetBase[key] = c[field]; // snapshot: base + every delta already applied so far
-        if (!_FLAT_KEYS.includes(key)) c._preSetBaseMod[key] = c[modKey];
+        // Snapshot the TRUE pre-override base to restore to later -- not just c[field]
+        // as it stands right now, which could still carry an ordinary delta that's
+        // ALSO ending this exact same round (e.g. a +2 AC buff expiring the same round
+        // Guard Split's set-override begins): apply that delta's own arrival/departure
+        // first, so the snapshot reflects reality instead of resurrecting a delta that
+        // actually left at the same moment the override arrived.
+        const deltaAdjusted = c[field] + (next[key] || 0) - (prev?.[key] || 0);
+        c._preSetBase[key] = deltaAdjusted;
+        if (!_FLAT_KEYS.includes(key)) c._preSetBaseMod[key] = c[modKey] + _STEP(deltaAdjusted) - _STEP(c[field]);
       }
       c[field] = nextSet[key];
       if (!_FLAT_KEYS.includes(key)) c[modKey] = _STEP(c[field]);

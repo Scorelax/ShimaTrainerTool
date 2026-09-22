@@ -7,6 +7,25 @@ const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-poke
 const SPLASH_API_URL = 'https://api.github.com/repos/Benjakronk/shima-pokedex/contents/images/splashes';
 const FALLBACK_SPLASH_COUNT = 50; // Fallback if API call fails
 
+// Both the splash-list fetches below and the <img> preload need a hard timeout --
+// without one, a stalled connection (a flaky Tailscale hop to the pi-server, a slow
+// GitHub response) leaves the promise neither resolved nor rejected, forever. That's
+// silent and easy to miss: continue-journey.js's own preload-while-the-player-picks-a-
+// trainer call (see attachContinueJourneyListeners) just never finishes, so the
+// fullscreen loading background stays on the CSS default (TitleScreen.png) instead of
+// a real splash -- and the LATER, blocking `await selectAndPreloadSplashImage()` in the
+// actual login flow hangs on the exact same call, freezing the progress bar at "Loading
+// splash images..." with no error ever shown (a restart just gets a fresh connection
+// attempt that happens to succeed). Matches api.js's own AbortController pattern.
+const SPLASH_LIST_TIMEOUT = 8000;   // a tiny JSON filename list -- shouldn't legitimately take long
+const IMAGE_PRELOAD_TIMEOUT = 8000; // resolves anyway on timeout, same as it already does on a real load error
+
+function _fetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+}
+
 // Same backend detection as api.js: anything not github.io is the pi-server,
 // which mirrors the splash images locally (much faster than GitHub raw)
 const SPLASH_FROM_PI_SERVER = window.location.protocol.startsWith('http')
@@ -25,7 +44,7 @@ async function getSplashList() {
 
   if (SPLASH_FROM_PI_SERVER) {
     try {
-      const response = await fetch(`${window.location.origin}/api?route=game-data&action=splash-list`);
+      const response = await _fetchWithTimeout(`${window.location.origin}/api?route=game-data&action=splash-list`, SPLASH_LIST_TIMEOUT);
       const data = await response.json();
       if (data.status === 'success' && data.splashFiles.length > 0) {
         const result = {
@@ -44,7 +63,7 @@ async function getSplashList() {
   }
 
   try {
-    const response = await fetch(SPLASH_API_URL);
+    const response = await _fetchWithTimeout(SPLASH_API_URL, SPLASH_LIST_TIMEOUT);
     if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
     const files = await response.json();
 
@@ -74,19 +93,33 @@ async function getSplashList() {
 }
 
 /**
- * Preload a single image URL
+ * Preload a single image URL. Always resolves within IMAGE_PRELOAD_TIMEOUT --
+ * a stalled load (connection drops mid-download without ever firing a hard
+ * error) gets the same "give up and use the URL anyway" treatment as a real
+ * onerror, rather than leaving the caller waiting forever.
  */
 function preloadImage(url) {
   return new Promise((resolve) => {
     const img = new Image();
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(url);
+    };
     img.onload = () => {
       console.log('[Splash] Image preloaded successfully');
-      resolve(url);
+      finish();
     };
     img.onerror = () => {
       console.log('[Splash] Image failed to load, using splash anyway');
-      resolve(url);
+      finish();
     };
+    const timer = setTimeout(() => {
+      console.log('[Splash] Image preload timed out, using splash anyway');
+      finish();
+    }, IMAGE_PRELOAD_TIMEOUT);
     img.src = url;
   });
 }

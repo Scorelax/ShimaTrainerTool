@@ -155,7 +155,7 @@ function _ensureDom() {
 
   document.getElementById('bmapSetGridBtn').addEventListener('click', async () => {
     const cols = parseInt(document.getElementById('bmapCols').value, 10) || 10;
-    const rows = parseInt(document.getElementById('bmapRows').value, 10) || 8;
+    const rows = parseInt(document.getElementById('bmapRows').value, 10) || 12; // matches routes_combat.py's own default
     try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { alert(err.message); }
   });
 }

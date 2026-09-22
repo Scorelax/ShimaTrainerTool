@@ -84,7 +84,7 @@ _EMPTY_STATE = {
     # 'cave'/'zone' template is additive, not a breaking change.
     'board': {
         'templateType': 'grid',
-        'grid': {'cols': 10, 'rows': 16},  # portrait by default -- matches the table display's orientation
+        'grid': {'cols': 10, 'rows': 12},  # portrait by default -- matches the table display's orientation
         'cells': {},   # "col,row" -> {'terrain': '<freeform DM-typed label>'}
         'tokens': {},  # participantId -> {'col': int, 'row': int}
         # Chosen from list-backgrounds (see upstream.BATTLE_IMAGE_DIR), or

@@ -20889,12 +20889,35 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "stat_buff_self"
+        "self_potential_stat_debuff_ac"
       ],
       "description": "You use your psychic power to change your defense to match the target's the best you can. Force a creature in range to make a CHA save against your Move DC. On a failure, for the duration, your AC changes to become an average of your current AC and the target's, rounded down.",
       "moveStat": "WIS/INT",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "set": {
+            "avgWithTarget": "ac"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Guard Swap",

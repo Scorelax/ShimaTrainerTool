@@ -1937,7 +1937,17 @@ function _resolveSetValue(setSpec, attacker, target) {
  * structured effects but none of the other handlers took it (no damage, not save-
  * or AoE-tagged): Slack Off, Rest, Yawn, Gravity... The user's own effects are
  * offered straight away; if it also affects others, pick who (multi-target-picker),
- * then offer each target's effects (asking for their save when one hinges on it). */
+ * then offer each target's effects (asking for their save when one hinges on it).
+ *
+ * A self effect gated on an ENEMY's save (Guard Split: "your AC becomes the average
+ * of yours and the target's, on their failed CHA save") doesn't belong to this
+ * handler at all, even though its buff is self-only -- it needs a SAVE target
+ * (who has to save, see the DC, roll it), not the ally multi-target picker below,
+ * which is what routes it to _handleSaveTriggered instead (its own
+ * trigger_saving_throw tag, same as any other save-triggered move) -- see that
+ * handler's own pickSaveTarget call. If a future move needed this same self+enemy-
+ * save shape WITHOUT that tag, this handler would need the same treatment -- check
+ * before assuming it just works. */
 async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
   const ctx = { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: null };
   await _offerMoveEffects({ attackerId: combatantId, moveName, computedData, ctx });

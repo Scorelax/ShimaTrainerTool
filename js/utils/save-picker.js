@@ -273,16 +273,20 @@ function _confirmPass() {
   _close({ targetId: _selectedTargetId, passed: true, dc: _currentDc(), rollMode: _saveCtx?.mode || 'normal', ..._captureSave(true) });
 }
 
-/** Save Fail -- plays the attacker's battle animation (if one exists), then
- * either asks for a damage roll (moves with a damage component) or resolves
- * immediately (pure status/effect moves -- see combat-wip.js's
- * _handleSaveTriggered for how those get logged instead). */
-async function _confirmFail() {
-  _pendingSave = { ..._captureSave(false), dc: _currentDc(), rollMode: _saveCtx?.mode || 'normal' }; // read before the animation / damage step
+/** Save Fail -- for a move with a damage component, shows the damage-roll step
+ * immediately and starts the attacker's battle animation there without waiting
+ * for it (same reasoning as target-picker.js's _confirmHit: the video element
+ * only exists in step 3's markup, so playing it first both delays the popup and
+ * leaves it already ended, a still frame, by the time step 3 appears). A pure
+ * status/effect move (no damage) has no step 3 to play it in at all, so it just
+ * closes right away -- see combat-wip.js's _handleSaveTriggered for how those
+ * get logged instead. */
+function _confirmFail() {
+  _pendingSave = { ..._captureSave(false), dc: _currentDc(), rollMode: _saveCtx?.mode || 'normal' };
   _consume();
-  await _playAnimation();
   if (_hasDamage) {
     _showStep3();
+    _playAnimation();
   } else {
     _close({ targetId: _selectedTargetId, passed: false, ..._pendingSave });
   }

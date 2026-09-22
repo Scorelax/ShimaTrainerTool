@@ -840,7 +840,7 @@ export function renderBattlePhase(state, cardOptions = {}) {
 // COMBAT CARD
 // ============================================================================
 
-export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom } = {}) {
+export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom, readOnly } = {}) {
   const fainted = c.currentHp <= 0;
   const hpPct = c.maxHp > 0 ? Math.round((c.currentHp / c.maxHp) * 100) : 0;
   const vpPct = c.maxVp > 0 ? Math.round((c.currentVp / c.maxVp) * 100) : 0;
@@ -869,18 +869,21 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
     return `<span class="status-badge ${cls}" data-combatant-id="${c.id}" data-effect="${se.name}"${sid}>${se.name}${dur}</span>`;
   }).join('');
 
-  const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges, { compactWip }) : '';
+  const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges, { compactWip, readOnly }) : '';
 
   return `
     <div class="combat-card ${isActive ? 'combat-card--active' : ''} ${fainted ? 'combat-card--fainted' : ''}" data-combatant-id="${c.id}" id="card_${c.id}">
       <div class="combat-card-main">
-        ${spriteMediaHtml(c.image, c.name, 'combat-card-img')}
+        <div class="combat-card-portrait-col">
+          ${spriteMediaHtml(c.image, c.name, 'combat-card-img')}
+          ${compactWip ? `<span class="combat-initiative-badge combat-initiative-badge--under-portrait">Init ${c.initiativeTotal}</span>` : ''}
+        </div>
         <div class="combat-card-body">
           <div class="combat-card-name-row">
             <span class="combat-card-name ${fainted ? 'fainted-name' : ''}">${c.name}</span>
             <span class="combat-card-level">Lv ${c.level}</span>
             ${typeBadges}
-            ${compactWip
+            ${readOnly ? '' : compactWip
               ? `<button class="wip-react-btn" data-combatant-id="${c.id}" ${canReact ? '' : 'disabled'}>⚡ Reaction</button>`
               : `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>`}
           </div>
@@ -900,7 +903,6 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
             <span>STR ${c.str}<small>(${formatMod(c.strMod)})</small>${modTag('str')}</span>
             <span>DEX ${c.dex}<small>(${formatMod(c.dexMod)})</small>${modTag('dex')}</span>
             <span>CON ${c.con}<small>(${formatMod(c.conMod)})</small>${modTag('con')}</span>
-            ${compactWip ? `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>` : ''}
             <span>INT ${c.int}<small>(${formatMod(c.intMod)})</small>${modTag('int')}</span>
             <span>WIS ${c.wis}<small>(${formatMod(c.wisMod)})</small>${modTag('wis')}</span>
             <span>CHA ${c.cha}<small>(${formatMod(c.chaMod)})</small>${modTag('cha')}</span>
@@ -909,10 +911,10 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
       </div>
       <div class="combat-card-footer">
         <div class="combat-status-badges">${statusBadges}</div>
-        ${isActive && !endTurnAtBottom ? `<button class="end-turn-btn" data-combatant-id="${c.id}">End Turn</button>` : '<div></div>'}
+        ${isActive && !readOnly && !endTurnAtBottom ? `<button class="end-turn-btn" data-combatant-id="${c.id}">End Turn</button>` : '<div></div>'}
       </div>
       ${expandedHTML}
-      ${isActive && endTurnAtBottom ? `<button class="end-turn-btn combat-end-turn-bottom" data-combatant-id="${c.id}">End Turn</button>` : ''}
+      ${isActive && !readOnly && endTurnAtBottom ? `<button class="end-turn-btn combat-end-turn-bottom" data-combatant-id="${c.id}">End Turn</button>` : ''}
     </div>`;
 }
 
@@ -935,7 +937,7 @@ function renderItemForCombat(itemName) {
   return `<strong>${itemName}</strong>${desc ? `<span class="item-desc">: ${desc}</span>` : ''}`;
 }
 
-function renderExpandedSection(c, statusBadges, { compactWip } = {}) {
+function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
   // --- Feats section (both) ---
   const featsSection = c.feats ? `
     <div class="expanded-feats-section">
@@ -955,7 +957,9 @@ function renderExpandedSection(c, statusBadges, { compactWip } = {}) {
     ingrainLocked
       ? `<button class="combat-trainer-action-btn combat-switch-open-btn" disabled title="Cannot switch: a Pokémon is rooted by Ingrain" style="opacity:0.4;cursor:not-allowed;">⇄ Switch Pokémon</button>`
       : `<button class="combat-trainer-action-btn combat-switch-open-btn">⇄ Switch Pokémon</button>`;
-  const trainerActionsSection = c.type === 'trainer' ? `
+  // Own-actions only (open your own bag/buffs, switch YOUR bench) -- meaningless
+  // for a participant that isn't the viewer's own, so skipped in readOnly.
+  const trainerActionsSection = c.type === 'trainer' && !readOnly ? `
     <div class="expanded-trainer-actions">
       <button class="combat-trainer-action-btn combat-inv-open-btn" data-combatant-id="${c.id}"><img src="assets/Bag.png" alt="Bag" class="combat-inv-icon"> Inventory</button>
       <button class="combat-trainer-action-btn combat-buffs-open-btn" data-combatant-id="${c.id}">✨ Trainer Buffs</button>
@@ -1014,7 +1018,16 @@ function renderExpandedSection(c, statusBadges, { compactWip } = {}) {
         <span class="hpvp-max"></span>
         <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="crit" data-delta="1">+</button>
       </div>` : '';
-  const hpvpSection = `
+  // HP/VP/AC/ability scores are all already visible on the base (non-expanded)
+  // card at all times, so a readOnly viewer loses nothing but the edit widgets
+  // themselves by skipping this -- except crit modifier, which only lives here,
+  // so that alone gets a plain informational line.
+  const hpvpSection = readOnly
+    ? (c.type === 'pokemon' ? `
+    <div class="expanded-hpvp-section">
+      <div class="hpvp-adjust-row"><span class="hpvp-stat-label">Crit Modifier</span><span>${formatMod(c.critMod || 0)}</span></div>
+    </div>` : '')
+    : `
     <div class="expanded-hpvp-section">
       <div class="expanded-section-label">Adjust Stats</div>
       <div class="hpvp-hpvp-wrapper">
@@ -1064,7 +1077,9 @@ function renderExpandedSection(c, statusBadges, { compactWip } = {}) {
       </div>
     </div>`).join('');
 
-  const statSection = `
+  // Purely an editing widget -- the same scores + modifiers it edits are already
+  // shown in the base card's mods row, so readOnly just drops it, no info lost.
+  const statSection = readOnly ? '' : `
     <div class="expanded-stats-adj-section">
       <div class="expanded-section-label">Modify Stats</div>
       <div class="stat-adjust-grid">
@@ -1079,7 +1094,18 @@ function renderExpandedSection(c, statusBadges, { compactWip } = {}) {
     .map(eff => `<button class="add-status-btn" data-combatant-id="${c.id}" data-effect="${eff}">${eff}</button>`)
     .join('');
 
-  const statusSection = `
+  // Badges themselves already show in the footer regardless of readOnly (every
+  // shared status is clickable for its own detail popup, ownership aside -- see
+  // combat-wip.js's global _bindStatusBadgeClicks); this section is only the
+  // ADD-a-status controls, plus the hint, so readOnly keeps the hint (when
+  // there's something to tap) and drops everything else.
+  const statusSection = readOnly
+    ? (statusBadges ? `
+    <div class="expanded-status-section">
+      <div class="expanded-section-label">Status Effects</div>
+      <div class="status-remove-hint">Tap a badge to remove it</div>
+    </div>` : '')
+    : `
     <div class="expanded-status-section">
       <div class="expanded-section-label">Status Effects</div>
       <div class="add-status-btns">
@@ -1110,13 +1136,18 @@ function renderExpandedSection(c, statusBadges, { compactWip } = {}) {
             else chargeText = ` (${rs.chargesLeft}/${rs.maxCharges} ${rs.type})`;
           }
           const isDiceLocked = isDice && isLocked;
+          const label = `${moveName}${chargeText}`;
+          // No move-use flow wired for a foreign card (see readOnly, above) --
+          // a plain row instead of a clickable button, so it doesn't look like
+          // it's supposed to do something on click.
+          if (readOnly) return `<div class="combat-move-row"><div class="combat-move-item combat-move-item--display">${label}</div></div>`;
           return `<div class="combat-move-row">
             <button class="combat-move-item ${isLocked ? 'move-locked' : ''} ${isDiceLocked ? 'move-dice-locked' : ''}"
               data-move="${moveName}" data-combatant-id="${c.id}"
               data-is-dice-locked="${isDiceLocked ? 'true' : ''}"
               data-recharge-range="${isDice ? (rs.range || '') : ''}"
               ${isLocked && !isDice ? 'disabled' : ''}
-            >${moveName}${chargeText}</button></div>`;
+            >${label}</button></div>`;
         }).join('')}
       </div>
     </div>` : '';
@@ -1236,6 +1267,9 @@ function getCombatCSS() {
     .combat-card--active { border: 2px solid #FFD700; box-shadow: 0 0 12px rgba(255,215,0,0.4); }
     .combat-card--fainted { opacity: 0.5; filter: grayscale(0.6); }
     .combat-card-main { display: flex; gap: 0.7rem; padding: 0.7rem; cursor: pointer; }
+    /* Portrait + (compactWip only) Init badge, stacked directly under the image --
+       not a stats-row entry, so it never pushes STR/DEX/CON/INT/WIS/CHA around. */
+    .combat-card-portrait-col { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; flex-shrink: 0; }
     .combat-card-img { width: 60px; height: 60px; object-fit: contain; flex-shrink: 0; border-radius: 8px; background: rgba(255,255,255,0.04); }
     .combat-card-body { flex: 1; min-width: 0; }
     .combat-card-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.35rem; }
@@ -1243,6 +1277,7 @@ function getCombatCSS() {
     .fainted-name { text-decoration: line-through; color: #888; }
     .combat-card-level { font-size: 0.78rem; color: #aaa; }
     .combat-initiative-badge { margin-left: auto; font-size: 0.72rem; color: #FFD700; font-weight: 600; }
+    .combat-initiative-badge--under-portrait { margin-left: 0; font-size: 0.62rem; white-space: nowrap; }
     .combat-card-stats-group { background: rgba(255,255,255,0.04); border-radius: 6px; padding: 0.2rem 0.45rem; margin-bottom: 0.2rem; }
     .combat-card-ac-line { font-size: 0.76rem; color: #c0c0c0; margin-bottom: 0.18rem; }
     .stat-mod-tag { font-size: 0.62rem; font-weight: 800; margin-left: 2px; }
@@ -1328,6 +1363,8 @@ function getCombatCSS() {
     .combat-move-item.move-locked { opacity: 0.4; cursor: not-allowed; background: #555 !important; color: #999 !important; }
     .combat-move-item.move-dice-locked { opacity: 0.7; cursor: pointer; background: rgba(255,165,0,0.15) !important; color: #FFA500 !important; border: 1px solid rgba(255,165,0,0.5) !important; }
     .combat-move-item.move-dice-locked:active { transform: scale(0.95); }
+    .combat-move-item--display { cursor: default; }
+    .combat-move-item--display:active { transform: none; }
 
     /* MOVE POPUP */
     .combat-popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }

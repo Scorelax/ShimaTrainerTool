@@ -220,13 +220,11 @@ function _updateAttackTotal() {
   const raw = _currentAttackRoll();
   const totalEl = document.getElementById('targetPickerAttackTotal');
   if (raw === null) { totalEl.innerHTML = ''; return; }
-  const total = raw + _effectiveAttackMod();
-  // A hint only -- a human still declares Hit or Miss (the target may have
-  // circumstances the stored AC doesn't know about).
-  const baseAc = _selectedTarget?.ac;
-  const ac = baseAc != null ? baseAc + (_atkCtx?.acDelta || 0) : null;
-  const hint = ac != null ? ` <span style="font-size:0.8rem;">vs AC ${ac} — ${total >= ac ? 'hits' : 'misses'}</span>` : '';
-  totalEl.innerHTML = `Total: <strong>${total}</strong>${hint}`;
+  // No AC shown here on purpose -- the human enters their own roll and declares
+  // Hit/Miss themselves (eventually replaced by the target's own reaction phase,
+  // once moves are fully tagged for that); this popup isn't meant to reveal the
+  // target's AC or resolve the comparison for them.
+  totalEl.innerHTML = `Total: <strong>${raw + _effectiveAttackMod()}</strong>`;
 }
 
 function _confirmMiss() {
@@ -236,15 +234,20 @@ function _confirmMiss() {
   _close({ targetId: _selectedTargetId, hit: false, attackRoll, rollMode });
 }
 
-/** Attack Hit -- plays the attacker's battle animation (if one exists) right
- * here, then advances to the damage-roll step. This is the animation's
- * correct place in the flow: after a target is chosen and the attack is
- * confirmed to land, not the instant "Use Move" is clicked (see move-popup.js,
- * which skips its own earlier inline animation for exactly this case). */
-async function _confirmHit() {
-  _attackRoll = _currentAttackRoll(); // read before the animation -- step 2 stays mounted but don't rely on it
-  await _playAnimation();
+/** Attack Hit -- shows the damage-roll step immediately (so there's no
+ * waiting before the next input is ready) and starts the attacker's battle
+ * animation there without waiting for it. This IS the animation's correct
+ * place in the flow -- after a target is chosen and the attack is confirmed
+ * to land, not the instant "Use Move" is clicked (see move-popup.js, which
+ * skips its own earlier inline animation for exactly this case) -- it just
+ * has to play concurrently with, not before, step 3 becoming visible: the
+ * video element only exists in step 3's markup, so playing it beforehand
+ * both delays the popup and leaves the video already ended (showing a still
+ * frame) by the time the player actually sees it. */
+function _confirmHit() {
+  _attackRoll = _currentAttackRoll();
   _showStep3();
+  _playAnimation();
 }
 
 /** Damage step's Back button. Called with no arguments on purpose -- wiring

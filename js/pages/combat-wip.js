@@ -27,7 +27,7 @@ import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
-  renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions,
+  renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
   setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor, moveEffectsFor, findMoveRow,
 } from './combat.js';
 
@@ -204,11 +204,12 @@ const WIP_CSS = `
   /* A bit more room for the single focused card's portrait -- there's
      nothing else competing for that space anymore. */
   #wipBattlePhase .combat-card-img { width: 100px; height: 100px; }
-  /* Init moves into the read-only mods row (to the left of INT) instead of
-     the name row (see renderCombatCard's compactWip option) -- the badge's
-     own margin-left:auto (meant to push it to the far right of a flex row)
-     would instead just misalign it within its own grid cell here. */
-  #wipBattlePhase .combat-mods-row .combat-initiative-badge { margin-left: 0; }
+  /* A PvP opponent's read-only card (see _renderForeignFocusFull) reuses
+     combat.js's own card styling wholesale -- centered and width-capped like
+     the old minimal .wip-foreign-focus panel it replaces, rather than
+     stretching edge to edge the way the viewer's own (always the sole card
+     shown) does. */
+  .wip-foreign-focus-full { max-width: 420px; margin: 0 auto; }
   /* Damage/HP-VP Calculator stacks below the HP+VP rows instead of beside
      them (its own single-line text, set by the same compactWip option,
      needs the extra width that frees up). */
@@ -1237,6 +1238,12 @@ function _setFocus(id) {
 
 let _focusedParticipantId = null;
 let _focusManuallySet = false;
+// Which foreign (PvP opponent) participant currently has its read-only card
+// expanded -- see _foreignCombatantView / the click handler in
+// _bindStatusBadgeClicks. Not persisted; resets to collapsed whenever focus
+// moves to a different participant, same as the "mine" side never remembering
+// isExpanded across a fresh focus either.
+let _foreignExpandedId = null;
 // Which participant combat.js's button handlers (HP/VP, stats, moves, End
 // Turn's local half...) are currently attached for. Those handlers look their
 // combatant up in the state object they were attached with, so they only work
@@ -1308,6 +1315,58 @@ function _computeFocusContext(state) {
   return { p, isMine: true, filteredState, cardOptions };
 }
 
+/** The full read-only card view for a PvP opponent's participant -- same field
+ * shape combat.js's renderCombatCard/renderExpandedSection read for "mine"
+ * (see _syncLocalCombatState), built straight off the server record instead of
+ * a persisted local mirror (there's nothing to persist for a combatant this
+ * device doesn't own). The server already sends a PvP participant's full stat
+ * block (see routes_combat.py's _add_participant: "no reason to hide a PvP
+ * opponent's stats from the app itself, since every human at the table
+ * already sees them on paper anyway") -- this is that data finally reaching
+ * the screen, with the same live-status deltas (effectiveStats/statDeltas)
+ * and base-stat sync (stat-sync.js) the viewer's own card already gets, so an
+ * opponent's manual AC edit or an active Crunch shows up here exactly like it
+ * would on their own screen. A PvE freeform enemy has none of this
+ * (hasStatBlock stays false, same degrade as _standInCombatant) -- callers
+ * only use this for battleType 'pvp' (see _renderMainFocusHtml/_syncMainFocus),
+ * where there's no DM fog-of-war to preserve (see routes_combat.py's `status`
+ * module docstring's "PvP-only in practice" and the user's own call that PvP
+ * has no DM intervention). */
+function _foreignCombatantView(p) {
+  const eff = effectiveStats(p);
+  return {
+    id: p.id, type: p.combatantType, name: p.name, image: p.image, level: p.level,
+    types: [p.type1, p.type2].filter(Boolean),
+    currentHp: p.currentHP, maxHp: p.maxHP, currentVp: p.currentVP, maxVp: p.maxVP,
+    ac: eff.ac, baseAc: p.baseAc, critMod: eff.critMod || 0,
+    str: eff.str, dex: eff.dex, con: eff.con, int: eff.int, wis: eff.wis, cha: eff.cha,
+    strMod: eff.strMod, dexMod: eff.dexMod, conMod: eff.conMod,
+    intMod: eff.intMod, wisMod: eff.wisMod, chaMod: eff.chaMod,
+    proficiency: p.proficiency, abilities: p.abilities, item: p.item,
+    savingThrows: p.savingThrows, skills: p.skills, size: p.size,
+    moves: p.moves || [], rechargeStates: {}, // this device doesn't track another player's recharge state
+    initiativeTotal: p.initiative,
+    statusEffects: (p.statuses || []).map(st => _statusToBadge(st, session?.round)),
+    appliedStatMods: statDeltas(p),
+    hasStatBlock: p.combatantType != null && p.proficiency != null,
+    isExpanded: _foreignExpandedId === p.id,
+  };
+}
+
+/** data-focus-id (read by the expand-toggle click handler in
+ * _bindStatusBadgeClicks) marks which participant this card is currently
+ * showing. No attempt to preserve mp4 playback position across a rebuild
+ * (unlike the "mine" path below) -- there's no button state to lose either,
+ * this is read-only, so a restarted sprite on every push is an acceptable
+ * trade for not needing a second copy of that logic. */
+function _renderForeignFocusFull(p) {
+  return `<div class="wip-foreign-focus-full" data-focus-id="${p.id}">${renderCombatCard(_foreignCombatantView(p), false, { compactWip: true, readOnly: true })}</div>`;
+}
+
+/** PvE's minimal foreign panel (name/type/level/HP/VP/statuses only, respecting
+ * DM-controlled visibility -- see visibleToViewer) -- kept exactly as it was
+ * for PvE fog-of-war; _renderForeignFocusFull above is the PvP-only upgrade to
+ * the full card, gated in _renderMainFocusHtml/_syncMainFocus by battleType. */
 function _renderForeignFocusInfo(p) {
   const showName = visibleToViewer(p, 'name');
   const showHp = visibleToViewer(p, 'hp');
@@ -1341,7 +1400,8 @@ function _statusBadgesHtml(p) {
  * updates freely, but the portrait only rebuilds if the image URL actually
  * changed (patchPortraitMedia), so an mp4 sprite already playing there
  * isn't restarted by every unrelated SSE push (turn advance, another
- * player's roll, etc.), same discipline as the turn-order sidebar. */
+ * player's roll, etc.), same discipline as the turn-order sidebar. PvE only
+ * -- see _renderForeignFocusInfo. */
 function _updateForeignFocusInfo(p) {
   const showName = visibleToViewer(p, 'name');
   const name = showName ? p.name : '???';
@@ -1363,7 +1423,7 @@ function _updateForeignFocusInfo(p) {
 function _renderMainFocusHtml(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx) return '<div class="combat-wip-empty"><p style="color:#a0a0c0;">No participants yet.</p></div>';
-  if (!ctx.isMine) return _renderForeignFocusInfo(ctx.p);
+  if (!ctx.isMine) return state.battleType === 'pvp' ? _renderForeignFocusFull(ctx.p) : _renderForeignFocusInfo(ctx.p);
   return renderBattlePhase(ctx.filteredState, ctx.cardOptions);
 }
 
@@ -1428,6 +1488,10 @@ function _syncMainFocus(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx) { el.innerHTML = '<div class="combat-wip-empty"><p style="color:#a0a0c0;">No participants yet.</p></div>'; return; }
   if (!ctx.isMine) {
+    if (state.battleType === 'pvp') {
+      el.innerHTML = _renderForeignFocusFull(ctx.p); // always a full rebuild -- see its own comment
+      return;
+    }
     const existingFocus = el.querySelector('.wip-foreign-focus');
     if (existingFocus && existingFocus.dataset.focusId === ctx.p.id) {
       _updateForeignFocusInfo(ctx.p);
@@ -2158,13 +2222,22 @@ async function _openStatusDetail(holderId, statusId) {
 
 let _statusClickHandler = null;
 
-/** One delegated listener for every shared-status badge on the page. */
+/** One delegated listener for every shared-status badge on the page, plus the
+ * expand/collapse toggle for a PvP opponent's read-only card (see
+ * _renderForeignFocusFull) -- that card has no attachBattleListeners of its
+ * own (nothing on it is actionable), so its one interactive bit lives here
+ * instead of duplicating a whole click-handling setup just for this. */
 function _bindStatusBadgeClicks() {
   if (_statusClickHandler) document.removeEventListener('click', _statusClickHandler);
   _statusClickHandler = (e) => {
     const badge = e.target.closest?.('.status-badge[data-server-status-id]');
-    if (!badge) return;
-    _openStatusDetail(badge.dataset.combatantId, badge.dataset.serverStatusId);
+    if (badge) { _openStatusDetail(badge.dataset.combatantId, badge.dataset.serverStatusId); return; }
+    const foreignMain = e.target.closest?.('.wip-foreign-focus-full .combat-card-main');
+    if (!foreignMain) return;
+    const id = foreignMain.closest('.wip-foreign-focus-full')?.dataset.focusId;
+    _foreignExpandedId = _foreignExpandedId === id ? null : id;
+    const el = document.getElementById('wipBattlePhase');
+    if (el && session) el.innerHTML = _renderMainFocusHtml(session);
   };
   document.addEventListener('click', _statusClickHandler);
 }

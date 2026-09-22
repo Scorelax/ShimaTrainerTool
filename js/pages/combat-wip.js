@@ -1879,6 +1879,11 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
       type: 'miss', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
       text: `${attackerName} used ${moveName} on ${targetName} -- Miss`,
     }).catch(() => {});
+    // The app resolved this against the target's AC itself now (see target-picker.js's
+    // _confirmAttack) -- a Hit already gets an implicit "you hit, now roll damage" signal
+    // from the damage popup that follows, but nothing else happens on a Miss, so it needs
+    // its own explicit "you were told" moment.
+    showCombatAlert(`${attackerName}'s ${moveName} missed ${targetName}!`, { title: 'Attack Result' });
     // A miss can still trigger effects that don't need a hit (High Jump Kick's self-prone).
     await _offerMoveEffects({
       attackerId: combatantId, targetId: picked.targetId, moveName, computedData,

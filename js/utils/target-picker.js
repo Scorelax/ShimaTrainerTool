@@ -87,9 +87,10 @@ let _selectedTargetName = '';
 // step is skipped entirely -- picking a target goes straight to the damage
 // roll, since there's nothing to roll against AC.
 let _guaranteedHit = false;
-// The natural d20 typed into the Attack Roll step, captured when Hit/Miss is
-// clicked and handed back with the result so the caller can tell which
-// natural-roll / crit effects triggered (null on a guaranteed hit: nothing rolled).
+// The natural d20 typed into the Attack Roll step, captured when the attack is
+// resolved (see _confirmAttack) and handed back with the result so the caller
+// can tell which natural-roll / crit effects triggered (null on a guaranteed
+// hit: nothing rolled).
 let _attackRoll = null;
 // Live statuses that change this roll (see move-effects.js's attackRollContext): the attacker
 // and the chosen target's participant records, and what they add up to for the selected target.
@@ -137,9 +138,10 @@ function _ensureDom() {
           <div class="target-picker-roll-total" id="targetPickerAttackTotal"></div>
           <div class="target-picker-roll-actions">
             <button class="combat-use-move-btn target-picker-roll-back" id="targetPickerBack">← Back</button>
-            <!-- No Attack Miss button for now -- see _confirmMiss's own comment: until the
-                 reaction system exists to actually contest a hit, every attack just resolves,
-                 same as it will once a reaction phase can (or can't) intervene here instead. -->
+            <!-- Only shown when the target's AC isn't known at all (a DM's freeform PvE
+                 enemy) -- see _showStep2's own comment: the app resolves the attack itself
+                 whenever it can, this is the fallback for when it genuinely can't. -->
+            <button class="combat-use-move-btn target-picker-miss-btn" id="targetPickerMiss" hidden>Attack Miss</button>
             <button class="combat-use-move-btn target-picker-hit-btn" id="targetPickerHit">Attack</button>
           </div>
         </div>
@@ -164,11 +166,12 @@ function _ensureDom() {
   document.getElementById('targetPickerSkip').addEventListener('click', () => _close(null));
   document.getElementById('targetPickerBack').addEventListener('click', _showStep1);
   document.getElementById('targetPickerBackToAttack').addEventListener('click', _backFromDamage);
-  document.getElementById('targetPickerHit').addEventListener('click', _confirmHit);
+  document.getElementById('targetPickerMiss').addEventListener('click', _confirmMiss);
+  document.getElementById('targetPickerHit').addEventListener('click', _confirmAttack);
   document.getElementById('targetPickerConfirmRoll').addEventListener('click', _confirmDamageRoll);
   document.getElementById('targetPickerAttackInput').addEventListener('input', _updateAttackTotal);
   document.getElementById('targetPickerAttackInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') _confirmHit();
+    if (e.key === 'Enter') _confirmAttack();
   });
   document.getElementById('targetPickerRollInput').addEventListener('input', _updateRollTotal);
   document.getElementById('targetPickerRollInput').addEventListener('keydown', (e) => {
@@ -206,6 +209,18 @@ function _showStep2(p, name) {
   const mod = _effectiveAttackMod();
   document.getElementById('targetPickerAttackModifierNote').textContent =
     mod ? ` (${mod >= 0 ? '+' : ''}${mod} modifier added automatically)` : '';
+  // The app resolves the attack itself whenever the target's AC is on record (every
+  // PvP participant, and any PvE stat-blocked one -- see routes_combat.py's own "no
+  // reason to hide a PvP opponent's stats from the app itself" stance) -- the human
+  // enters their roll, clicks Attack, and is told hit or miss; the AC number itself is
+  // never shown (see _confirmAttack). Only a DM's freeform enemy with no AC on file at
+  // all falls back to the human declaring it themselves, same two-button choice as
+  // before. There's no reaction system yet to actually contest a resolved hit (see
+  // combat-wip.js's own note on that) -- once one exists, it slots in between the roll
+  // and the outcome, here.
+  const acUnknown = _effectiveTargetAc() === null;
+  document.getElementById('targetPickerMiss').hidden = !acUnknown;
+  document.getElementById('targetPickerHit').textContent = acUnknown ? 'Attack Hit' : 'Attack';
   const input = document.getElementById('targetPickerAttackInput');
   input.value = '';
   _updateAttackTotal();
@@ -217,25 +232,27 @@ function _currentAttackRoll() {
   return Number.isNaN(raw) ? null : raw;
 }
 
+/** The target's current AC (base + any live status delta, e.g. Crunch), or null when
+ * none is on record at all (a DM's freeform PvE enemy) and the app has nothing to
+ * resolve an attack against. Never shown to the human -- see _showStep2/_confirmAttack. */
+function _effectiveTargetAc() {
+  const base = _selectedTarget?.ac;
+  if (!Number.isFinite(base)) return null;
+  return base + (_atkCtx?.acDelta || 0);
+}
+
 function _updateAttackTotal() {
   const raw = _currentAttackRoll();
   const totalEl = document.getElementById('targetPickerAttackTotal');
   if (raw === null) { totalEl.innerHTML = ''; return; }
-  // No AC shown here on purpose -- the human enters their own roll and declares
-  // Hit/Miss themselves (eventually replaced by the target's own reaction phase,
-  // once moves are fully tagged for that); this popup isn't meant to reveal the
-  // target's AC or resolve the comparison for them.
+  // No AC shown here on purpose, even though the app itself knows it and uses it to
+  // resolve the attack -- see _showStep2/_confirmAttack.
   totalEl.innerHTML = `Total: <strong>${raw + _effectiveAttackMod()}</strong>`;
 }
 
-/** Not wired to a button right now (2026-09-22, at the user's own direction) --
- * every attack just resolves as a hit until there's a real reaction system to
- * actually contest one, closer to what the eventual flow will look like (a
- * reaction either intervenes or it doesn't; there's no manual "declare a
- * miss" step either way). Left in place, still fully wired through the
- * result shape and combat-wip.js's Miss handling, for whenever a button
- * needs to call it again -- a manual override, or a real "declare miss"
- * step if the reaction system ends up wanting one after all. */
+/** Only reachable when the target's AC is unknown and _showStep2 fell back to the
+ * two-button choice (see its own comment) -- the human declares a miss themselves,
+ * same as the app would have on a failed AC comparison. */
 function _confirmMiss() {
   const attackRoll = _currentAttackRoll();
   const rollMode = _atkCtx?.mode || 'normal';
@@ -243,18 +260,24 @@ function _confirmMiss() {
   _close({ targetId: _selectedTargetId, hit: false, attackRoll, rollMode });
 }
 
-/** Attack Hit -- shows the damage-roll step immediately (so there's no
- * waiting before the next input is ready) and starts the attacker's battle
- * animation there without waiting for it. This IS the animation's correct
- * place in the flow -- after a target is chosen and the attack is confirmed
- * to land, not the instant "Use Move" is clicked (see move-popup.js, which
- * skips its own earlier inline animation for exactly this case) -- it just
- * has to play concurrently with, not before, step 3 becoming visible: the
- * video element only exists in step 3's markup, so playing it beforehand
- * both delays the popup and leaves the video already ended (showing a still
- * frame) by the time the player actually sees it. */
-function _confirmHit() {
-  _attackRoll = _currentAttackRoll();
+/** Attack button (or Enter) -- resolves the roll against the target's AC itself
+ * (roll + modifiers >= AC, live status deltas included) when it's known, so the human
+ * never has to declare Hit or Miss by hand; falls back to _confirmMiss's manual pair
+ * when it isn't (see _showStep2). A miss closes the popup right away -- nothing left to
+ * roll. A hit shows the damage-roll step immediately (so there's no waiting before the
+ * next input is ready) and starts the attacker's battle animation there without
+ * waiting for it -- the video element only exists in step 3's markup, so playing it
+ * beforehand both delays the popup and leaves it already ended (a still frame) by the
+ * time the player actually sees it. */
+function _confirmAttack() {
+  const attackRoll = _currentAttackRoll();
+  if (attackRoll === null) return;
+  _attackRoll = attackRoll;
+  const targetAc = _effectiveTargetAc();
+  if (targetAc !== null && attackRoll + _effectiveAttackMod() < targetAc) {
+    _confirmMiss();
+    return;
+  }
   _showStep3();
   _playAnimation();
 }
@@ -356,18 +379,23 @@ function _cardHtml(p) {
 
 /**
  * Shows the combined target/attack-roll/damage-roll popup: pick who it hits,
- * then enter an attack roll (modifier added automatically, shown live) and
- * declare Attack Hit or Attack Miss yourself -- same as this game's other
- * rolls, the app shows the total but a human compares it to the target's AC
- * and decides, it doesn't auto-resolve hit/miss. A Miss resolves immediately
- * (the move's VP cost was already spent before this popup ever opened, so
- * there's nothing left to do). A Hit plays the attacker's battle animation
- * (if any) and moves on to a damage roll, which resolves the promise once
- * confirmed. Resolves to {targetId, hit:false}, {targetId, hit:true,
- * rawRoll, attackRoll, attackTotal}, or null if the player picked "No Target" /
- * closed the popup / there's no active session to target into. attackRoll is
- * the natural d20 that was typed in (also on a miss; null on a guaranteed hit),
- * attackTotal that plus the attack modifier and any live attack-roll status.
+ * then enter an attack roll (modifier added automatically, shown live). The
+ * app itself resolves Hit or Miss from there (roll + modifiers vs. the
+ * target's AC, live status deltas included) -- the AC number is never shown,
+ * only the outcome, same as the user's own described flow (enter a roll,
+ * click Attack, get told hit or miss; a reaction system will eventually slot
+ * in between those two steps, once one exists -- see combat-wip.js). Falls
+ * back to a human declaring Hit/Miss themselves (see _confirmMiss) only when
+ * the target's AC isn't known at all (a DM's freeform PvE enemy). A Miss
+ * resolves immediately (the move's VP cost was already spent before this
+ * popup ever opened, so there's nothing left to do). A Hit plays the
+ * attacker's battle animation (if any) and moves on to a damage roll, which
+ * resolves the promise once confirmed. Resolves to {targetId, hit:false},
+ * {targetId, hit:true, rawRoll, attackRoll, attackTotal}, or null if the
+ * player picked "No Target" / closed the popup / there's no active session
+ * to target into. attackRoll is the natural d20 that was typed in (also on a
+ * miss; null on a guaranteed hit), attackTotal that plus the attack modifier
+ * and any live attack-roll status.
  * The popup also shows what live statuses do to this roll (advantage/disadvantage,
  * attack-roll and target-AC changes -- `attacker` gives pickTargetAgain the
  * attacker's record; pickTarget reads it from the session) and uses up any

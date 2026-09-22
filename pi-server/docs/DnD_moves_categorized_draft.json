@@ -4966,13 +4966,49 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally"
+        "self_stat_buff_saving_throws",
+        "stat_buff_saving_throws"
       ],
       "description": "You release an aroma that inspires your allies. When you activate this move, you and any ally within 5 feet of you may add a d4 to any saving throw they make for the duration.",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": "The bonus dice roll for this move changes to a\n1d6 at level 10."
+      "scaling": "The bonus dice roll for this move changes to a\n1d6 at level 10.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "saving_throws",
+          "amount": {
+            "dice": "1d4"
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "saving_throws",
+          "amount": {
+            "dice": "1d4"
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "note": "each ally within 5ft when cast"
+        }
+      ]
     },
     {
       "name": "Artifact Light",
@@ -15843,13 +15879,55 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally"
+        "self_stat_buff_attack_rolls_or_saving_throws",
+        "stat_buff_attack_rolls_or_saving_throws"
       ],
       "description": "You increase the size of a target. When you use this move, a creature in range (or you) grows slightly larger, gaining the ability to add a d4 to any attack roll or saving throw for the duration.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": "The dice to add increases to 1d6 at level 10."
+      "scaling": "The dice to add increases to 1d6 at level 10.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls_or_saving_throws",
+          "amount": {
+            "dice": "1d4"
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "attack_rolls_or_saving_throws",
+          "amount": {
+            "dice": "1d4"
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "OR one ally in range, instead of yourself"
+        }
+      ]
     },
     {
       "name": "Guillotine",
@@ -15994,12 +16072,35 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally"
+        "stat_buff_attack_rolls_or_saving_throws"
       ],
       "description": "You can use a bonus action on your turn to choose one ally other than yourself within 60 feet of you who can hear you. That ally can add a d6 to one ability check, attack roll, or saving throw it makes within the next 10 minutes, before the result of the roll is called by the DM. An ally being helped can only have one d6 available at a time.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": "The helping dice for this move changes to d8 at level 5, d10 at level 10, and d12 at level 17."
+      "scaling": "The helping dice for this move changes to d8 at level 5, d10 at level 10, and d12 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls_or_saving_throws",
+          "amount": {
+            "dice": "1d6"
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 100
+            },
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "also usable on an ability check -- no ability-check roll popup in this tool to attach it to"
+        }
+      ]
     },
     {
       "name": "Hidden Power",
@@ -17548,13 +17649,34 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "boosted_attack_rolls"
+        "self_stat_buff_attack_rolls"
       ],
       "description": "You collect your focus, sharpening your combat skills. You may add 1d4 to all attack rolls for the duration.",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": "The dice roll for this move changes to 1d6 at level 10."
+      "scaling": "The dice roll for this move changes to 1d6 at level 10.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": {
+            "dice": "1d4"
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Shell Smash",

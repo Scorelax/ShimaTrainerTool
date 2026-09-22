@@ -224,7 +224,11 @@ def tag_for(e):
     if e['kind'] == 'condition':
         base = f"status_condition_{e['apply']}"
     elif e['kind'] == 'stat':
-        buff = e.get('amount') == 'proficiency' or (isinstance(e.get('amount'), (int, float)) and e['amount'] > 0)
+        # A dice amount ({dice: "1d4"}, see move-effects-schema.md) is always an opt-in
+        # bonus the player chooses to spend, never a debuff someone would choose against
+        # themselves -- counts as a buff same as a positive flat number or proficiency.
+        buff = (e.get('amount') == 'proficiency' or isinstance(e.get('amount'), dict)
+                or (isinstance(e.get('amount'), (int, float)) and e['amount'] > 0))
         base = f"stat_{'buff' if buff else 'debuff'}_{e['stat']}"
     else:
         base = f"{e['roll']}_{e['on']}"

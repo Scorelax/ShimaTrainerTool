@@ -10,7 +10,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 {
   "kind": "condition" | "stat" | "roll",
   // condition:  "apply": "<name>", optional "value" (type_changed → "Ghost")
-  // stat:       "stat": "<stat>", "amount": -1 | "proficiency"  OR  "set": 0, optional "stacks": {"max": 5}
+  // stat:       "stat": "<stat>", "amount": -1 | "proficiency" | {"dice": "1d4"}  OR  "set": 0, optional "stacks": {"max": 5}
   // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>"
   "when":   { "type": ... },        // what triggers it — see below
   "target": "self",                 // only present when the USER is affected (default: the target)
@@ -45,7 +45,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ## Vocabularies
 - **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement`.
-- **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field)
+- **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities attack_rolls_or_saving_throws` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field). `attack_rolls_or_saving_throws` is a single bonus eligible for either roll type (Growth, Helping Hand) -- spending it on one consumes it for both.
 - **roll `on`**: `attack_rolls` (the holder's own) · `attacks_against` (rolls made against the holder) · `saving_throws` (the holder's) · `saves_against_its_moves` · `ability_checks` · `all_rolls`
 
 ## Derived tags
@@ -84,6 +84,27 @@ where the score crosses a step (DEX 11→12 gains +1, 10→11 doesn't).
 they're pushed to the server (`update-base-stats`, `utils/stat-sync.js`) as **base** values — the card's numbers minus the live
 status deltas. Every reader (target AC hint, a saver's modifier, an attacker's Move DC and crit range) adds the participant's
 `statuses` on top itself (`effectiveStats`), so nothing is counted twice.
+
+**Dice-based bonuses (`amount: {dice: "1d4"}`).** Sharpen/Growth/Aromatic Mist/Helping
+Hand-style moves ("you may add 1d4 to..."): the bonus is rolled at the table when the
+player actually chooses to spend it, not folded into every roll automatically like a
+flat number or `'proficiency'` (`statDeltas`/`attackRollContext`/`saveRollContext`
+skip it entirely — see `move-effects.js`'s `_isDiceAmount`). `diceBonusOptionsFor
+(participant, rollType)` lists what's available for an `'attack_rolls'` or
+`'saving_throws'` roll; the target-picker's attack-roll step and the save-picker's
+save-roll step each show a button per option ("Add Sharpen (+1d4)"), which expands to
+a small inline input for what was rolled, folds it into the total shown, and — only
+if the status has a `uses` end (Helping Hand) — consumes it once the roll is
+confirmed. No `uses` end (Sharpen/Growth/Aromatic Mist) means it just stays available
+for the rest of its duration, offered again next time an eligible roll comes up; the
+player is never forced to spend it on the first opportunity.
+
+**Concentration grouping.** Any status whose `ends` includes `{type:'concentration'}`
+(`isConcentration`) is pulled into one "🧠 Concentration" badge on the card/focus panel
+instead of showing as its own separate badge, so every concentration effect currently
+being maintained reads as one umbrella at a glance — each one underneath is still its
+own clickable badge (same detail popup, same use-status wiring), this is display
+grouping only, no schema change.
 
 Not applied yet: `speed` (and conditions' own effects) — deliberately left for when the condition rules are written.
 Also not applied yet: `set` on a `stat` effect (see the schema block above) — `statusLabel` displays it, but

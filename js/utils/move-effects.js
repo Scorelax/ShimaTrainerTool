@@ -96,9 +96,13 @@ export function statusLabel(s) {
     return _title(String(s.apply || '').replace(/_/g, ' '));
   }
   if (s.kind === 'stat') {
-    const stat = s.stat === 'ac' ? 'AC' : s.stat === 'crit' ? 'Crit range' : _title(String(s.stat || '').replace(/_/g, ' '));
+    const stat = s.stat === 'ac' ? 'AC'
+      : s.stat === 'crit' ? 'Crit range'
+      : s.stat === 'attack_rolls_or_saving_throws' ? 'an attack roll or saving throw'
+      : _title(String(s.stat || '').replace(/_/g, ' '));
     if (s.set !== undefined) return `${stat} set to ${s.set}`;
     if (s.amount === 'proficiency') return `${stat} + proficiency`;
+    if (s.amount && typeof s.amount === 'object' && s.amount.dice) return `Add ${s.amount.dice} to ${stat}`;
     if (typeof s.amount === 'number') {
       const total = s.amount * (s.stacks || 1);
       return `${stat} ${total >= 0 ? '+' : '-'}${Math.abs(total)}`;
@@ -144,7 +148,19 @@ const _stackCount = (s) => s.stacks || 1;
 const _hasUses = (s) => (s.ends || []).some(e => e.type === 'uses');
 const _sourceText = (s) => `${statusLabel(s)} from ${s.moveName || 'an effect'}`;
 
-/** A stat status's numeric amount (stacks applied); 'proficiency' = the holder's bonus. */
+/** Does the participant have to actively choose to spend this bonus (rolled at the
+ * table when they use it), rather than it being folded into every roll automatically?
+ * `amount: {dice: "1d4"}` in place of a flat number or 'proficiency' (Sharpen, Growth,
+ * Aromatic Mist, Helping Hand) -- see diceBonusOptionsFor. */
+const _isDiceAmount = (s) => !!(s.amount && typeof s.amount === 'object' && s.amount.dice);
+
+/** True for a status that ends with concentration -- the badge UI groups these
+ * together under one "Concentration" umbrella instead of showing each separately. */
+export const isConcentration = (s) => (s?.ends || []).some(e => e.type === 'concentration');
+
+/** A stat status's numeric amount (stacks applied); 'proficiency' = the holder's bonus.
+ * A dice-based amount (see _isDiceAmount) never contributes here -- it's spent by
+ * choice through the roll popup's own button, not automatic. */
 function _statAmount(s, holder) {
   if (s.amount === 'proficiency') return Number(holder?.proficiency) || 0;
   return typeof s.amount === 'number' ? s.amount * _stackCount(s) : 0;
@@ -175,7 +191,7 @@ export function attackRollContext(attacker, target) {
   };
   for (const s of attacker?.statuses || []) {
     if (s.kind === 'roll' && (s.on === 'attack_rolls' || s.on === 'all_rolls')) take(s, attacker, s.roll === 'advantage' ? adv : dis);
-    if (s.kind === 'stat' && s.stat === 'attack_rolls') {
+    if (s.kind === 'stat' && s.stat === 'attack_rolls' && !_isDiceAmount(s)) {
       const a = _statAmount(s, attacker);
       ctx.attackBonus += a;
       ctx.notes.push(_sourceText(s));
@@ -302,7 +318,7 @@ export function saveRollContext(saver, moveUser, ability) {
   };
   for (const s of saver?.statuses || []) {
     if (s.kind === 'roll' && (s.on === 'saving_throws' || s.on === 'all_rolls')) take(s, saver, s.roll === 'advantage' ? adv : dis);
-    if (s.kind === 'stat' && s.stat === 'saving_throws') {
+    if (s.kind === 'stat' && s.stat === 'saving_throws' && !_isDiceAmount(s)) {
       const a = _statAmount(s, saver);
       ctx.modifierDelta += a;
       ctx.notes.push(_sourceText(s));
@@ -323,6 +339,22 @@ export function saveRollContext(saver, moveUser, ability) {
     if (s.kind === 'roll' && s.on === 'saves_against_its_moves') take(s, moveUser, s.roll === 'advantage' ? adv : dis);
   }
   return _finish(ctx, adv, dis);
+}
+
+/** `holder`'s dice-based stat bonuses (amount: {dice}) that apply to `rollType`
+ * ('attack_rolls' | 'saving_throws') -- unlike a flat/proficiency amount these are
+ * never automatic (see _isDiceAmount): the picker offers a button per option, the
+ * player rolls the die themselves and types the result in, and only then is it
+ * added to the total. `stat: 'attack_rolls_or_saving_throws'` (Growth, Helping
+ * Hand) is eligible for either roll type from the SAME status -- using it on one
+ * consumes it for both. `consumable` mirrors the status's own `ends` (a `uses` end
+ * means the picker should call use-status once it's actually spent; no `uses` means
+ * it stays available -- Sharpen/Growth/Aromatic Mist last for their own duration
+ * and can be used again on a later roll). */
+export function diceBonusOptionsFor(holder, rollType) {
+  return (holder?.statuses || [])
+    .filter(s => s.kind === 'stat' && _isDiceAmount(s) && (s.stat === rollType || s.stat === 'attack_rolls_or_saving_throws'))
+    .map(s => ({ statusId: s.id, holderId: holder.id, moveName: s.moveName || 'Effect', dice: s.amount.dice, consumable: _hasUses(s) }));
 }
 
 /** "Roll with ADVANTAGE (roll twice, keep the higher)" etc., or '' for a normal roll. */

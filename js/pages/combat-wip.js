@@ -22,7 +22,7 @@ import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, reapplyStatDeltas, effectiveStats } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, reapplyStatDeltas, effectiveStats, isConcentration } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -709,10 +709,15 @@ function _standInCombatant(p) {
 // damage / reminders, its own badge colors) borrow that name so they inherit it.
 const LEGACY_BADGE_NAMES = { poisoned: 'Poison', burned: 'Burn', confused: 'Confusion', paralyzed: 'Paralysis', asleep: 'Sleep', frozen: 'Freeze' };
 
-/** A shared status as combat.js's local statusEffects entry (see renderCombatCard). */
+/** A shared status as combat.js's local statusEffects entry (see renderCombatCard).
+ * `concentration` (true when the status ends with concentration -- see move-effects.js's
+ * isConcentration) is what renderCombatCard groups on: several concentration effects
+ * (Sharpen's attack bonus, a future concentration move alongside it, ...) show together
+ * under one "Concentration" umbrella instead of as separate badges, while each stays its
+ * own clickable entry underneath (same detail popup, same use-status wiring). */
 function _statusToBadge(st, round) {
   const name = (st.kind === 'condition' && LEGACY_BADGE_NAMES[st.apply]) || statusLabel(st);
-  return { name, description: describeStatusEnds(st, round), duration: -1, serverStatusId: st.id };
+  return { name, description: describeStatusEnds(st, round), duration: -1, serverStatusId: st.id, concentration: isConcentration(st) };
 }
 
 function _syncLocalCombatState(session) {
@@ -1401,10 +1406,26 @@ function _renderForeignFocusInfo(p) {
     </div>`;
 }
 
+/** One status as a clickable badge -- click opens the detail popup. Shared by
+ * _statusBadgesHtml's grouped and ungrouped rows. */
+function _statusBadgeHtml(p, st) {
+  return `<span class="status-badge status-custom status-custom-expanded" data-combatant-id="${p.id}" data-server-status-id="${st.id}" data-effect="${statusLabel(st)}"><span class="status-custom-name">${statusLabel(st)}</span><span class="status-custom-desc">${describeStatusEnds(st, session?.round)}</span></span>`;
+}
+
 /** Clickable badges for a participant's live effects (the read-only counterpart to the
- * ones combat.js draws on the viewer's own card) -- click opens the detail popup. */
+ * ones combat.js draws on the viewer's own card) -- click opens the detail popup.
+ * Concentration effects (see isConcentration) are pulled into one "Concentration"
+ * group instead of showing as separate badges, mirroring renderCombatCard's own
+ * grouping -- each one is still individually clickable inside it. */
 function _statusBadgesHtml(p) {
-  return (p.statuses || []).map(st => `<span class="status-badge status-custom status-custom-expanded" data-combatant-id="${p.id}" data-server-status-id="${st.id}" data-effect="${statusLabel(st)}"><span class="status-custom-name">${statusLabel(st)}</span><span class="status-custom-desc">${describeStatusEnds(st, session?.round)}</span></span>`).join('');
+  const statuses = p.statuses || [];
+  const conc = statuses.filter(isConcentration);
+  const rest = statuses.filter(st => !isConcentration(st));
+  const restHtml = rest.map(st => _statusBadgeHtml(p, st)).join('');
+  const concHtml = conc.length
+    ? `<span class="status-concentration-group"><span class="status-concentration-group-label">🧠 Concentration</span>${conc.map(st => _statusBadgeHtml(p, st)).join('')}</span>`
+    : '';
+  return restHtml + concHtml;
 }
 
 /** Patches the foreign-focus panel in place for the SAME focused

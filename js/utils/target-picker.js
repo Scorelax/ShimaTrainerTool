@@ -14,7 +14,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { attackRollContext, rollModeText } from './move-effects.js';
+import { attackRollContext, rollModeText, diceBonusOptionsFor } from './move-effects.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -71,6 +71,13 @@ function _injectStyles() {
     .target-picker-anim-media { width: 100%; max-height: 40vh; display: flex; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
     .target-picker-anim-media:empty { display: none; }
     .target-picker-anim-media img, .target-picker-anim-media video { max-width: 100%; max-height: 40vh; border-radius: 12px; object-fit: contain; }
+    .target-picker-dice-row { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.7rem; }
+    .target-picker-dice-row:empty { display: none; margin: 0; }
+    .target-picker-dice-btn { background: rgba(255,215,0,0.14) !important; border: 1px solid rgba(255,215,0,0.5) !important; color: #FFD700 !important; font-size: 0.85rem !important; padding: 0.5rem !important; }
+    .target-picker-dice-input-row { display: flex; gap: 0.4rem; }
+    .target-picker-dice-input-row input { flex: 1; box-sizing: border-box; background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; padding: 0.5rem 0.6rem; font-size: 0.95rem; }
+    .target-picker-dice-input-row button { flex-shrink: 0; padding: 0 0.9rem; }
+    .target-picker-dice-used { font-size: 0.82rem; color: #2ecc71; padding: 0.5rem; text-align: center; background: rgba(46,204,113,0.1); border-radius: 8px; }
   `;
   document.head.appendChild(style);
 }
@@ -96,13 +103,71 @@ let _attackRoll = null;
 // and the chosen target's participant records, and what they add up to for the selected target.
 let _attacker = null;
 let _atkCtx = null;
+// Dice-based bonuses (Sharpen, Growth, Helping Hand -- see diceBonusOptionsFor) the
+// attacker chose to spend on THIS attack roll: the running total they've added in,
+// and which of those statuses still need use-status called once the roll is
+// confirmed (only the ones with a `uses` end -- see _onDiceBonusSubmit).
+let _diceBonusExtra = 0;
+let _diceBonusConsume = [];
 
-/** The attack modifier actually in force: the move's own plus any live attack-roll status. */
-function _effectiveAttackMod() { return _attackModifier + (_atkCtx?.attackBonus || 0); }
+/** The attack modifier actually in force: the move's own plus any live attack-roll status
+ * plus any dice bonus the player chose to add in on this roll. */
+function _effectiveAttackMod() { return _attackModifier + (_atkCtx?.attackBonus || 0) + _diceBonusExtra; }
 
-/** Uses up every "next attack/roll" status that shaped this roll -- called once the roll is confirmed. */
+/** Renders the "Add <Move> (+1d4)" button row for the attacker's dice-based bonuses
+ * eligible for an attack roll (empty/hidden when there are none). Clicking a button
+ * swaps it for an inline "type what you rolled" input (see _onDiceBonusSubmit) rather
+ * than a native prompt(), matching every other roll in this popup. */
+function _renderDiceRow() {
+  const row = document.getElementById('targetPickerDiceRow');
+  const options = _guaranteedHit ? [] : diceBonusOptionsFor(_attacker, 'attack_rolls');
+  row.innerHTML = options.map(o => `
+    <button type="button" class="combat-use-move-btn target-picker-dice-btn" data-status-id="${o.statusId}" data-dice="${o.dice}" data-move="${o.moveName}" data-consumable="${o.consumable}">
+      Add ${o.moveName} (+${o.dice})
+    </button>`).join('');
+  row.querySelectorAll('[data-status-id]').forEach(btn => {
+    btn.addEventListener('click', () => _openDiceBonusInput(btn));
+  });
+}
+
+/** Swaps a dice-bonus button for an inline number input + confirm, matching the
+ * roll-input styling already used throughout this popup. */
+function _openDiceBonusInput(btn) {
+  const { statusId, dice, move, consumable } = btn.dataset;
+  const wrap = document.createElement('div');
+  wrap.className = 'target-picker-dice-input-row';
+  wrap.innerHTML = `<input type="number" placeholder="Rolled ${dice}…"><button type="button" class="combat-use-move-btn">Add</button>`;
+  btn.replaceWith(wrap);
+  const input = wrap.querySelector('input');
+  const submit = () => _onDiceBonusSubmit(wrap, input, { statusId, dice, move, consumable: consumable === 'true' });
+  wrap.querySelector('button').addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  input.focus();
+}
+
+/** Folds a confirmed dice-bonus roll into the attack total, queues its status for
+ * use-status IF it's a one-time bonus (Helping Hand), and replaces the input with a
+ * plain "used" line -- staying-available bonuses (Sharpen/Growth) just show what was
+ * added, still there next time this row is rendered fresh (a later attack roll). */
+function _onDiceBonusSubmit(wrap, input, { statusId, dice, move, consumable }) {
+  const raw = parseInt(input.value, 10);
+  if (Number.isNaN(raw)) return;
+  _diceBonusExtra += raw;
+  if (consumable) _diceBonusConsume.push({ holderId: _attacker?.id, statusId });
+  const used = document.createElement('div');
+  used.className = 'target-picker-dice-used';
+  used.textContent = `${move}: +${raw} (rolled ${dice}) added`;
+  wrap.replaceWith(used);
+  _updateAttackTotal();
+}
+
+/** Uses up every "next attack/roll" status that shaped this roll, plus any dice
+ * bonus the player chose to spend on it (see _onDiceBonusSubmit) -- called once
+ * the roll is confirmed. */
 function _consume(ctx) {
   for (const c of ctx?.consume || []) CombatAPI.useStatus(c.holderId, c.statusId).catch(() => {});
+  for (const c of _diceBonusConsume) CombatAPI.useStatus(c.holderId, c.statusId).catch(() => {});
+  _diceBonusConsume = [];
 }
 
 function _notesHtml(ctx) {
@@ -133,6 +198,7 @@ function _ensureDom() {
         <div id="targetPickerStep2" hidden>
           <div class="target-picker-roll-target" id="targetPickerRollTarget"></div>
           <div class="target-picker-roll-notes" id="targetPickerRollNotes"></div>
+          <div class="target-picker-dice-row" id="targetPickerDiceRow"></div>
           <label class="target-picker-roll-label" for="targetPickerAttackInput">Attack roll<span id="targetPickerAttackModifierNote"></span></label>
           <input type="number" id="targetPickerAttackInput" class="target-picker-roll-input" placeholder="Enter roll…">
           <div class="target-picker-roll-total" id="targetPickerAttackTotal"></div>
@@ -206,6 +272,9 @@ function _showStep2(p, name) {
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
   _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget);
   document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
+  _diceBonusExtra = 0;
+  _diceBonusConsume = [];
+  _renderDiceRow();
   const mod = _effectiveAttackMod();
   document.getElementById('targetPickerAttackModifierNote').textContent =
     mod ? ` (${mod >= 0 ? '+' : ''}${mod} modifier added automatically)` : '';
@@ -295,6 +364,8 @@ function _backFromDamage() {
 function _autoHit(p, name) {
   _attackRoll = null;
   _atkCtx = null; // nothing is rolled, so no roll modifiers apply
+  _diceBonusExtra = 0; // no attack-roll step to offer a dice bonus on -- clear any stale value
+  _diceBonusConsume = [];
   _selectedTarget = p;
   _selectedTargetName = name;
   _showStep3();

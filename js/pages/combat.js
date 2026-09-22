@@ -855,7 +855,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
     : '');
 
   const KNOWN_STATUSES = ['Poison','Burn','Confusion','Paralysis','Sleep','Freeze'];
-  const statusBadges = c.statusEffects.map(se => {
+  const _badgeHtml = (se) => {
     const dur = se.duration === -1 ? '' : ` (${se.duration})`;
     const isCustom = !KNOWN_STATUSES.includes(se.name);
     const cls = isCustom ? 'status-custom' : `status-${se.name.toLowerCase()}`;
@@ -867,7 +867,14 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
       return `<span class="status-badge status-custom status-custom-expanded" data-combatant-id="${c.id}" data-effect="${se.name}"${sid}><span class="status-custom-name">${se.name}${dur}</span><span class="status-custom-desc">${se.description}</span></span>`;
     }
     return `<span class="status-badge ${cls}" data-combatant-id="${c.id}" data-effect="${se.name}"${sid}>${se.name}${dur}</span>`;
-  }).join('');
+  };
+  // Concentration effects (se.concentration -- see combat-wip.js's _statusToBadge)
+  // group under one "Concentration" umbrella instead of showing as separate badges,
+  // each still its own clickable entry underneath.
+  const concEffects = c.statusEffects.filter(se => se.concentration);
+  const otherEffects = c.statusEffects.filter(se => !se.concentration);
+  const statusBadges = otherEffects.map(_badgeHtml).join('')
+    + (concEffects.length ? `<span class="status-concentration-group"><span class="status-concentration-group-label">🧠 Concentration</span>${concEffects.map(_badgeHtml).join('')}</span>` : '');
 
   const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges, { compactWip, readOnly }) : '';
 
@@ -1354,6 +1361,11 @@ function getCombatCSS() {
     .status-custom-name { font-size: 0.72rem; font-weight: 700; }
     .status-custom-desc { font-size: 0.63rem; font-weight: 400; opacity: 0.9; }
     .status-remove-hint { font-size: 0.68rem; color: #888; }
+    /* Groups every currently-active concentration effect (Sharpen's dice bonus, and
+       any future concentration move alongside it) under one labeled umbrella instead
+       of listing each as its own separate badge -- each stays individually clickable. */
+    .status-concentration-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 3px 8px 3px 6px; border-radius: 12px; background: rgba(80,120,220,0.18); border: 1px solid rgba(120,150,255,0.4); }
+    .status-concentration-group-label { font-size: 0.68rem; font-weight: 700; color: #a8c0ff; margin-right: 2px; }
 
     /* Moves */
     .expanded-moves-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }

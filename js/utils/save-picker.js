@@ -18,7 +18,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { saveModifierFor, saveRollContext, rollModeText } from './move-effects.js';
+import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor } from './move-effects.js';
 
 function _injectStyles() {
   if (document.getElementById('save-picker-styles')) return;
@@ -74,6 +74,13 @@ function _injectStyles() {
     .save-picker-roll-notes .mode.advantage { color: #2ecc71; }
     .save-picker-roll-notes .mode.disadvantage { color: #e74c3c; }
     .save-picker-roll-notes .note { color: #a0a0c0; }
+    .save-picker-dice-row { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.7rem; }
+    .save-picker-dice-row:empty { display: none; margin: 0; }
+    .save-picker-dice-btn { background: rgba(255,215,0,0.14) !important; border: 1px solid rgba(255,215,0,0.5) !important; color: #FFD700 !important; font-size: 0.85rem !important; padding: 0.5rem !important; }
+    .save-picker-dice-input-row { display: flex; gap: 0.4rem; }
+    .save-picker-dice-input-row input { flex: 1; box-sizing: border-box; background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; border-radius: 6px; padding: 0.5rem 0.6rem; font-size: 0.95rem; }
+    .save-picker-dice-input-row button { flex-shrink: 0; padding: 0 0.9rem; }
+    .save-picker-dice-used { font-size: 0.82rem; color: #2ecc71; padding: 0.5rem; text-align: center; background: rgba(46,204,113,0.1); border-radius: 8px; }
   `;
   document.head.appendChild(style);
 }
@@ -84,6 +91,12 @@ let _saveAbility = null;   // "STR".."CHA" when the caller knows which save this
 let _saveModifier = null;  // the target's save modifier for that ability, null when their sheet has no data
 let _moveUser = null;      // the participant whose move this is (their "saves against its moves" statuses apply)
 let _saveCtx = null;       // live-status modifiers for the selected target's save (see move-effects.js's saveRollContext)
+// Dice-based bonuses (Growth, Aromatic Mist, Helping Hand -- see diceBonusOptionsFor)
+// the saver chose to spend on THIS save: the running total added in, and which of
+// those statuses still need use-status once the save is declared (only the ones with
+// a `uses` end -- see _onDiceBonusSubmit).
+let _diceBonusExtra = 0;
+let _diceBonusConsume = [];
 let _pendingSave = null;   // {saveRoll, saveTotal, failBy} captured when Save Success/Fail is clicked
 let _dc = 0;
 let _manualDc = false; // true when the DC isn't known ahead of time -- the human types it in (see resolveReactiveSave's fallback)
@@ -120,6 +133,7 @@ function _ensureDom() {
             <input type="number" id="savePickerDcInput" class="save-picker-roll-input" placeholder="Enter DC…">
           </div>
           <div class="save-picker-roll-notes" id="savePickerRollNotes"></div>
+          <div class="save-picker-dice-row" id="savePickerDiceRow"></div>
           <label class="save-picker-roll-label" for="savePickerSaveInput" id="savePickerSaveLabel">Saving throw roll</label>
           <input type="number" id="savePickerSaveInput" class="save-picker-roll-input" placeholder="Enter their roll (optional)…">
           <div class="save-picker-roll-total" id="savePickerSaveTotal"></div>
@@ -182,6 +196,9 @@ function _showStep2(p, name) {
   const baseModifier = saveModifierFor(_selectedTarget, _saveAbility);
   // Live changes only mean something on top of a known modifier; with no sheet data the human types the total.
   _saveModifier = baseModifier === null ? null : baseModifier + _saveCtx.modifierDelta;
+  _diceBonusExtra = 0;
+  _diceBonusConsume = [];
+  _renderDiceRow();
   const modeText = rollModeText(_saveCtx.mode);
   document.getElementById('savePickerRollNotes').innerHTML =
     `${modeText ? `<div class="mode ${_saveCtx.mode}">${modeText}</div>` : ''}${_saveCtx.notes.map(n => `<div class="note">${n}</div>`).join('')}`;
@@ -207,6 +224,52 @@ function _showStep2(p, name) {
     document.getElementById('savePickerFail').disabled = false;
   }
   _updateManualDcButtons();
+}
+
+/** Renders the "Add <Move> (+1d4)" button row for the saver's dice-based bonuses
+ * eligible for a saving throw (see move-effects.js's diceBonusOptionsFor); empty when
+ * there are none. Mirrors target-picker.js's own version for the attack roll. */
+function _renderDiceRow() {
+  const row = document.getElementById('savePickerDiceRow');
+  const options = diceBonusOptionsFor(_selectedTarget, 'saving_throws');
+  row.innerHTML = options.map(o => `
+    <button type="button" class="combat-use-move-btn save-picker-dice-btn" data-status-id="${o.statusId}" data-dice="${o.dice}" data-move="${o.moveName}" data-consumable="${o.consumable}">
+      Add ${o.moveName} (+${o.dice})
+    </button>`).join('');
+  row.querySelectorAll('[data-status-id]').forEach(btn => {
+    btn.addEventListener('click', () => _openDiceBonusInput(btn));
+  });
+}
+
+/** Swaps a dice-bonus button for an inline number input + confirm, matching the
+ * roll-input styling already used throughout this popup. */
+function _openDiceBonusInput(btn) {
+  const { statusId, dice, move, consumable } = btn.dataset;
+  const wrap = document.createElement('div');
+  wrap.className = 'save-picker-dice-input-row';
+  wrap.innerHTML = `<input type="number" placeholder="Rolled ${dice}…"><button type="button" class="combat-use-move-btn">Add</button>`;
+  btn.replaceWith(wrap);
+  const input = wrap.querySelector('input');
+  const submit = () => _onDiceBonusSubmit(wrap, input, { statusId, dice, move, consumable: consumable === 'true' });
+  wrap.querySelector('button').addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  input.focus();
+}
+
+/** Folds a confirmed dice-bonus roll into the save total, queues its status for
+ * use-status IF it's a one-time bonus (Helping Hand), and replaces the input with a
+ * plain "used" line -- staying-available bonuses (Growth/Aromatic Mist) just show
+ * what was added, still there next time this row is rendered fresh. */
+function _onDiceBonusSubmit(wrap, input, { statusId, dice, move, consumable }) {
+  const raw = parseInt(input.value, 10);
+  if (Number.isNaN(raw)) return;
+  _diceBonusExtra += raw;
+  if (consumable) _diceBonusConsume.push({ holderId: _selectedTarget?.id, statusId });
+  const used = document.createElement('div');
+  used.className = 'save-picker-dice-used';
+  used.textContent = `${move}: +${raw} (rolled ${dice}) added`;
+  wrap.replaceWith(used);
+  _updateSaveTotal();
 }
 
 /** In manual-DC mode, Pass/Fail stay disabled until a DC has actually been
@@ -245,7 +308,7 @@ function _updateSaveTotal() {
   const raw = _currentSaveRoll();
   const dc = _currentDc();
   if (raw === null) { totalEl.innerHTML = ''; return; }
-  const total = raw + (_saveModifier || 0);
+  const total = raw + (_saveModifier || 0) + _diceBonusExtra;
   if (!dc) { totalEl.innerHTML = `Total: <strong>${total}</strong>`; return; }
   const passed = total >= dc;
   (passed ? passBtn : failBtn).classList.add('save-picker-suggested');
@@ -258,14 +321,18 @@ function _updateSaveTotal() {
 function _captureSave(passed) {
   const raw = _currentSaveRoll();
   if (raw === null) return { saveRoll: null, saveTotal: null, failBy: null };
-  const total = raw + (_saveModifier || 0);
+  const total = raw + (_saveModifier || 0) + _diceBonusExtra;
   const dc = _currentDc();
   return { saveRoll: raw, saveTotal: total, failBy: passed || !dc ? null : Math.max(0, dc - total) };
 }
 
-/** Uses up every "next roll" status that shaped this save -- called once Success/Fail is chosen. */
+/** Uses up every "next roll" status that shaped this save, plus any dice bonus the
+ * player chose to spend on it (see _onDiceBonusSubmit) -- called once Success/Fail
+ * is chosen. */
 function _consume() {
   for (const c of _saveCtx?.consume || []) CombatAPI.useStatus(c.holderId, c.statusId).catch(() => {});
+  for (const c of _diceBonusConsume) CombatAPI.useStatus(c.holderId, c.statusId).catch(() => {});
+  _diceBonusConsume = [];
 }
 
 function _confirmPass() {

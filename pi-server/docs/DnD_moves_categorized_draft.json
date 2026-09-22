@@ -4342,12 +4342,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_granted_immunity"
       ],
       "description": "You use magnetic power within yourself to raise yourself from the ground, becoming immune to ground moves for the duration.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "granted_immunity",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "value": "Ground",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Magnetic Flux",
@@ -13167,13 +13187,45 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally"
+        "self_status_condition_resistance_upgrade",
+        "status_condition_resistance_upgrade"
       ],
       "description": "You cover yourself and all allies around you with thick mud, reducing the amount of electric damage taken for anyone affected. For the duration, you and any ally in range (when you initially activated this move) have resistance to electric-type attacks. If you were already resistant, you are now immune. If you were vulnerable, you now take regular damage. If you are immune to electrictype moves already, nothing happens.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "resistance_upgrade",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "value": "Electric",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "resistance_upgrade",
+          "when": {
+            "type": "always"
+          },
+          "value": "Electric",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "note": "each ally in range when cast"
+        }
+      ]
     },
     {
       "name": "Mud-Slap",
@@ -14921,13 +14973,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_status_condition_type_changed",
         "situational_use"
       ],
       "description": "You blend in with your surroundings, taking on a new type for resistances/vulnerabilities/immunities. The type is dependent on the terrain, and up to the DMs discretion. (Ex: Forest = Grass, Beach = Water, Desert = Ground/Fire, Mountain = Rock, etc.)",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "type_changed",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Captivate",
@@ -15109,12 +15180,28 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_type_changed"
       ],
       "description": "Your Pokémon takes on a new type for resistances/vulnerabilities/immunities, equal to one of the types of a move it currently knows for the duration.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "type_changed",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Conversion 2",
@@ -15512,13 +15599,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_status_condition_resistance_upgrade",
         "potential_damage_increase"
       ],
       "description": "The user channels elemental energy. Roll a d20 to determine the energy type. The user gains resistance to that damage type for 1 minute and their next damaging move deals an extra 2d6 damage of that type.",
       "moveStat": "None",
       "vpCost": "8",
-      "scaling": "Extra damage: 3d6 at level 5, 4d6 at level 10, 5d6 at level 17"
+      "scaling": "Extra damage: 3d6 at level 5, 4d6 at level 10, 5d6 at level 17",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "resistance_upgrade",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Encore",
@@ -17455,12 +17561,31 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_type_changed"
       ],
       "description": "Your body flashes into a mirror for just a moment. When it returns to normal, you take on the type of a creature in range.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "type_changed",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Refresh",
@@ -19492,14 +19617,34 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_stat_buff_ac",
         "counter_reaction_effect",
         "damage"
       ],
       "description": "You are surrounded by a shield of thick acid for the duration. During this time, your AC increases by 2, and any Pokémon that hits you with a melee attack must succeed on a CON save or take 1d6 poison damage.",
       "moveStat": "CON",
       "vpCost": "5",
-      "scaling": "The damage dice roll for this move changes to\n2d6 at level 10."
+      "scaling": "The damage dice roll for this move changes to\n2d6 at level 10.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Acid Spray",
@@ -23785,12 +23930,47 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_ac",
+        "self_status_condition_resistance_upgrade"
       ],
       "description": "Your body temporarily becomes solid as steel plate. Until your next turn, you gain + 6 to your AC and have resistance to all types of damage. If you were vulnerable, you now take regular damage. If you were already resistant, you become immune.",
       "moveStat": "None",
       "vpCost": "6",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 6,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "resistance_upgrade",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "value": "all",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Iron Head",

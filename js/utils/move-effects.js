@@ -92,7 +92,9 @@ function _title(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
  * the amount. */
 export function statusLabel(s) {
   if (s.kind === 'condition') {
-    if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value}`;
+    if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value2 ? `${s.value}/${s.value2}` : s.value}`;
+    if (s.apply === 'resistance_upgrade') return `Resistance upgraded (${s.value === 'all' ? 'all types' : s.value || ''})`;
+    if (s.apply === 'granted_immunity') return `Immune to ${s.value || ''}`;
     return _title(String(s.apply || '').replace(/_/g, ' '));
   }
   if (s.kind === 'temp_hp') {
@@ -500,7 +502,7 @@ export function describeEnds(ends) {
  * the caller already resolved rolled durations (a {dice} entry given an `n`). */
 export function buildStatusSpec(effect, { sourceId, sourceName, moveName, dc, ends }) {
   const spec = { kind: effect.kind, sourceId, sourceName, moveName, dc, ends: ends || effect.ends || [] };
-  for (const k of ['apply', 'value', 'stat', 'amount', 'set', 'roll', 'on', 'note']) {
+  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note']) {
     if (effect[k] !== undefined) spec[k] = effect[k];
   }
   if (effect.stacks) spec.stacks = effect.stacks;

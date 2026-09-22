@@ -473,14 +473,44 @@ def _clamp_type_multiplier(raw):
     return 1
 
 
-def _type_multiplier(conn, attack_type, defend_type1, defend_type2):
+# One-step-better order for an escalating resistance grant (Iron Defense, Mud
+# Sport): vulnerable -> normal -> resistant -> immune, never worse, never more
+# than one step regardless of how favorable the matchup already was.
+_MULT_LADDER = (2, 1, 0.5, 0)
+
+
+def _bump_one_step_better(mult):
+    try:
+        idx = _MULT_LADDER.index(mult)
+    except ValueError:
+        idx = 1  # an unrecognized value is treated as normal before bumping
+    return _MULT_LADDER[min(idx + 1, len(_MULT_LADDER) - 1)]
+
+
+def _type_multiplier(conn, attack_type, defend_type1, defend_type2, target=None):
     """Reuses game-data/type-effectiveness's own chart lookup (routes_gamedata
     .calculate_type_effectiveness), which returns one multiplier per
     attacking type in type_chart_attack's order -- this just also resolves
     that order to find attack_type's position, then clamps it to this game's
     four-outcome ruleset (see _clamp_type_multiplier). Defaults to 1
     (neutral) whenever any type is missing/unrecognized, same as an untyped
-    participant or an off-chart move should behave."""
+    participant or an off-chart move should behave.
+
+    `target` (the defending participant, optional -- only the two live combat
+    callers have one to pass) layers three live `condition` statuses on top:
+    `type_changed` (Camouflage/Conversion/Reflect Type) swaps in a different
+    defend_type1/2 entirely before the chart lookup even runs; `granted_immunity`
+    (Magnet Rise: "immune to ground moves", flat, ignores the actual matchup) forces
+    0 outright when its `value` matches attack_type; `resistance_upgrade` (Iron
+    Defense's `value:"all"`, Mud Sport's `value:"Electric"`) bumps the RESULT one
+    step better (_bump_one_step_better) when it applies, on top of whatever the
+    chart already said -- several sources each bump their own step, compounding."""
+    statuses = (target or {}).get('statuses', []) if target else []
+    for s in statuses:
+        if s.get('kind') == 'condition' and s.get('apply') == 'type_changed' and s.get('value'):
+            defend_type1 = s['value']
+            defend_type2 = s.get('value2')
+            break
     if not attack_type or not defend_type1:
         return 1
     values = routes_gamedata.calculate_type_effectiveness(conn, defend_type1, defend_type2)
@@ -493,7 +523,17 @@ def _type_multiplier(conn, attack_type, defend_type1, defend_type2):
     except ValueError:
         return 1
     raw = values[idx] if idx < len(values) else 1
-    return _clamp_type_multiplier(raw)
+    result = _clamp_type_multiplier(raw)
+    for s in statuses:
+        if s.get('kind') != 'condition':
+            continue
+        if s.get('apply') == 'granted_immunity' and str(s.get('value') or '').upper() == str(attack_type).upper():
+            return 0
+        if s.get('apply') == 'resistance_upgrade':
+            v = s.get('value')
+            if v == 'all' or (v and str(v).upper() == str(attack_type).upper()):
+                result = _bump_one_step_better(result)
+    return result
 
 
 def _use_move(conn, pid, move_name, target_id, dice_roll, species):
@@ -823,7 +863,9 @@ def _active_participant_id(state):
 
 _STATUS_KINDS = ('condition', 'stat', 'roll', 'temp_hp')
 _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'long_rest', 'uses', 'instant', 'other')
-_STATUS_FIELDS = ('kind', 'apply', 'value', 'stat', 'amount', 'set', 'roll', 'on', 'note')
+# value2: a type_changed condition's optional second type (Reflect Type copying a
+# dual-type creature) -- every other condition/kind only ever uses `value`.
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note')
 
 
 def _statuses_of(participant):
@@ -835,7 +877,13 @@ def _status_label(s):
     kind = s.get('kind')
     if kind == 'condition':
         if s.get('apply') == 'type_changed' and s.get('value'):
-            return f"type changed to {s['value']}"
+            types = s['value'] + (f"/{s['value2']}" if s.get('value2') else '')
+            return f"type changed to {types}"
+        if s.get('apply') == 'resistance_upgrade':
+            scope = 'all types' if s.get('value') == 'all' else (s.get('value') or '')
+            return f"resistance upgraded ({scope})"
+        if s.get('apply') == 'granted_immunity':
+            return f"immune to {s.get('value') or ''}"
         return (s.get('apply') or '').replace('_', ' ')
     if kind == 'stat':
         stat = (s.get('stat') or '').replace('_', ' ')
@@ -1058,7 +1106,7 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
         if not target:
             raise ValueError('Unknown target: ' + target_id)
         if dice_roll:
-            multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'))
+            multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target)
             actual_damage = round(dice_roll * multiplier)
             leftover = _absorb_temp_hp(state, target, actual_damage)
             target['currentHP'] -= leftover  # no floor, same reasoning as above
@@ -1110,7 +1158,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         raise ValueError('Unknown target: ' + target_id)
     state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
 
-    multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'))
+    multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target)
     actual_damage = round(dice_roll * multiplier)
     leftover = _absorb_temp_hp(state, target, actual_damage)
     target['currentHP'] -= leftover  # no floor, same reasoning as elsewhere in this module

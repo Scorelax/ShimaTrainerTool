@@ -8,17 +8,23 @@ export const SPECIALIZATION_TO_TYPE = {
   'Team Player': 'Normal', 'Ice Skater': 'Ice'
 };
 
+const TYPE_COLORS = {
+  "Normal": "#A8A878", "Fighting": "#e68c2e", "Flying": "#A890F0",
+  "Poison": "#A040A0", "Ground": "#A67C52", "Rock": "#a85d16",
+  "Bug": "#A8B820", "Ghost": "#705898", "Steel": "#bdbdbd",
+  "Fire": "#f02e07", "Water": "#1E90FF", "Grass": "#32CD32",
+  "Electric": "#FFD700", "Psychic": "#F85888", "Ice": "#58c8ed",
+  "Dragon": "#280dd4", "Dark": "#282729", "Fairy": "#ed919f",
+  "Cosmic": "#120077"
+};
+
+/** Every type name the game uses, in the same order getMoveTypeColor's own table
+ * defines them -- shared source for anything that needs the full list (e.g.
+ * effects-popup.js's type-choice dropdown for Camouflage/Conversion/Reflect Type). */
+export const POKEMON_TYPES = Object.keys(TYPE_COLORS);
+
 export function getMoveTypeColor(moveType) {
-  const colors = {
-    "Normal": "#A8A878", "Fighting": "#e68c2e", "Flying": "#A890F0",
-    "Poison": "#A040A0", "Ground": "#A67C52", "Rock": "#a85d16",
-    "Bug": "#A8B820", "Ghost": "#705898", "Steel": "#bdbdbd",
-    "Fire": "#f02e07", "Water": "#1E90FF", "Grass": "#32CD32",
-    "Electric": "#FFD700", "Psychic": "#F85888", "Ice": "#58c8ed",
-    "Dragon": "#280dd4", "Dark": "#282729", "Fairy": "#ed919f",
-    "Cosmic": "#120077"
-  };
-  return colors[moveType] || "#ffffff";
+  return TYPE_COLORS[moveType] || "#ffffff";
 }
 
 export function getTextColorForBackground(bgColor) {

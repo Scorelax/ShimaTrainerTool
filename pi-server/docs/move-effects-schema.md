@@ -62,7 +62,7 @@ matches "any previous effect ends", never partial-carries-over or adds).
 | `{type:"other", text}` | anything else — shown, removed manually |
 
 ## Vocabularies
-- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit`. `guaranteed_next_crit` (Laser Focus) is a standalone flag, not a stat/roll effect — see `guaranteedCritStatusId` below.
+- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit`. `guaranteed_next_crit` (Laser Focus) is a standalone flag, not a stat/roll effect — see `guaranteedCritStatusId` below. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below.
 - **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities attack_rolls_or_saving_throws` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field). `attack_rolls_or_saving_throws` is a single bonus eligible for either roll type (Growth, Helping Hand) -- spending it on one consumes it for both.
 - **roll `on`**: `attack_rolls` (the holder's own) · `attacks_against` (rolls made against the holder) · `saving_throws` (the holder's) · `saves_against_its_moves` · `ability_checks` · `all_rolls`
 
@@ -142,6 +142,30 @@ it's stored as the same plain number as everything else. Superpower needed nothi
 the literal; Power Trick (swap AC with an ability score) and Power Split (replace a
 CHOSEN score with an average) both also need a "player picks which stat" mechanic that
 doesn't exist yet — held for that category rather than guessed here.
+
+**Type matchups** (`_type_multiplier` in routes_combat.py — the server, since damage
+resolution already lives there). Three condition names, checked against the DEFENDING
+participant's live statuses right before/around the existing type-chart lookup:
+- `type_changed` (`value`, optional `value2` — Camouflage, Conversion, Reflect Type)
+  swaps in a different type1/type2 BEFORE the chart lookup runs, as if the holder
+  actually were that type for the rest of the calculation.
+- `resistance_upgrade` (`value`: a type name, or `"all"` — Iron Defense's `"all"` +6 AC,
+  Mud Sport's `"Electric"`, Elemental Surge's rolled type) bumps the RESULT one step
+  better (`_bump_one_step_better`: vulnerable → normal → resistant → immune) than
+  whatever the chart already said — never a flat override, and several sources each
+  bump their own step, compounding.
+- `granted_immunity` (`value`: a type name — Magnet Rise's `"Ground"`) forces the
+  result to 0 outright for that type, ignoring the actual matchup entirely (unlike
+  `resistance_upgrade`, there's no baseline to escalate from).
+
+A move whose own text doesn't specify a concrete type (Camouflage/Conversion/Reflect
+Type's `type_changed`, Elemental Surge's `resistance_upgrade` — "roll a d20" with no
+table given for what each result means) ships with `value` unset; effects-popup.js
+shows a dropdown of every game type right there in the popup (`_needsTypeChoice`/
+`_typeChoiceInput`, reusing `pokemon-types.js`'s `POKEMON_TYPES` list) and that's what
+gets sent. `type_changed` gets a second dropdown too ("single type" by default) for
+Reflect Type's dual-type case; `resistance_upgrade` only ever grants against one type
+here, so it doesn't.
 
 Not applied yet: `speed` (and conditions' own effects) — deliberately left for when the condition rules are written.
 

@@ -7670,12 +7670,47 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_self"
+        "self_stat_debuff_str",
+        "self_stat_debuff_dex"
       ],
       "description": "You strike a target with incredible power. Make a melee attack against a creature, dealing 3d10 + MOVE fighting damage on a hit. This move exhausts you; your STR and DEX ability scores are set to 10 until the end of your next turn.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "str",
+          "when": {
+            "type": "always"
+          },
+          "set": 10,
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "dex",
+          "when": {
+            "type": "always"
+          },
+          "set": 10,
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Triple Kick",
@@ -16362,13 +16397,31 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "crit_range_mod"
+        "self_status_condition_guaranteed_next_crit"
       ],
       "description": "When activating this move, you spend your action concentrating intensely. If you keep your concentration, your first attack on your next turn always results in a critical hit.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "guaranteed_next_crit",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            },
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Last Resort",

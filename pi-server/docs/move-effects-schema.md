@@ -44,7 +44,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 | `{type:"other", text}` | anything else — shown, removed manually |
 
 ## Vocabularies
-- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement`.
+- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit`. `guaranteed_next_crit` (Laser Focus) is a standalone flag, not a stat/roll effect — see `guaranteedCritStatusId` below.
 - **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities attack_rolls_or_saving_throws` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field). `attack_rolls_or_saving_throws` is a single bonus eligible for either roll type (Growth, Helping Hand) -- spending it on one consumes it for both.
 - **roll `on`**: `attack_rolls` (the holder's own) · `attacks_against` (rolls made against the holder) · `saving_throws` (the holder's) · `saves_against_its_moves` · `ability_checks` · `all_rolls`
 
@@ -106,11 +106,26 @@ being maintained reads as one umbrella at a glance — each one underneath is st
 own clickable badge (same detail popup, same use-status wiring), this is display
 grouping only, no schema change.
 
+**`set` on a `stat` effect** (Superpower's "STR and DEX set to 10", Guard Split's AC
+averaged with the target) FORCES the field to an exact value instead of shifting it by
+an amount — `statSetOverrides(participant)` reads it (parallel to `statDeltas`, never
+combined with it), and `reapplyStatDeltas`/`baseStats`/`effectiveStats` all have a
+dedicated path for it: while active the card/record shows exactly that number, no
+matter what any delta on the same field would otherwise add up to; the pre-override
+value (and a score's modifier, preserving any sheet offset) is snapshotted the instant
+the override starts and restored the instant it ends, with that round's own delta (if
+any) applied on top of the restored value, same as normal. The number itself is always
+resolved to a plain literal ONCE, at apply time — never a live formula re-evaluated
+later. A literal (`set: 10`) needs nothing further; a sentinel object is resolved by
+combat-wip.js's `_offerMoveEffects` right before the status is sent: `{avgWithTarget:
+"ac"}` (Guard Split) reads the caster's and the chosen target's CURRENT effective value
+and floors the average, applied to the caster (`target: 'self'`) — from that point on
+it's stored as the same plain number as everything else. Superpower needed nothing but
+the literal; Power Trick (swap AC with an ability score) and Power Split (replace a
+CHOSEN score with an average) both also need a "player picks which stat" mechanic that
+doesn't exist yet — held for that category rather than guessed here.
+
 Not applied yet: `speed` (and conditions' own effects) — deliberately left for when the condition rules are written.
-Also not applied yet: `set` on a `stat` effect (see the schema block above) — `statusLabel` displays it, but
-`statDeltas`/`reapplyStatDeltas`/`baseStats`/`effectiveStats` only read `amount`, so a `set` effect shows the
-right badge text but doesn't actually move the card's number yet (found while scoping the moves below that
-need it, e.g. Superpower's "STR and DEX set to 10").
 
 ## Not covered yet (2026-09-22 scoping pass over the ~597 remaining moves)
 Of the moves still on their old flat tags, only a subset (~172) are stat/advantage moves that fit this schema

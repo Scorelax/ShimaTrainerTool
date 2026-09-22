@@ -220,8 +220,8 @@ const _FLAT_FIELD = { ac: 'ac', crit: 'critMod' };
 
 /** What a participant's live stat statuses currently add to AC, crit modifier, and each
  * ability score: {ac, crit, str, dex, con, int, wis, cha} (0 where nothing applies).
- * all_abilities counts for all six; stacks multiply; `set` (speed) and `proficiency`
- * amounts don't belong here. */
+ * all_abilities counts for all six; stacks multiply; a `set` effect has no `amount` at
+ * all (see statSetOverrides) so it's already skipped here by construction. */
 export function statDeltas(participant) {
   const d = { ac: 0, crit: 0, str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
   for (const s of participant?.statuses || []) {
@@ -234,22 +234,76 @@ export function statDeltas(participant) {
   return d;
 }
 
+/** What a participant's live stat statuses currently FORCE to an exact value via `set`
+ * (Superpower's "STR and DEX set to 10", Guard Split's AC averaged with the target,
+ * Power Trick's AC<->score swap): {key: value}, only present for a field an active
+ * override actually targets. Unlike statDeltas these REPLACE the field instead of
+ * shifting it (see reapplyStatDeltas/effectiveStats). The number is resolved once, at
+ * apply time (see combat-wip.js's _resolveSetOverrides) -- Guard Split's "average with
+ * the target" is never re-derived here, this just reads whatever concrete number the
+ * status was given when it was applied. Last status in the list wins if more than one
+ * targets the same field (rare -- matches a newer status visually replacing an older
+ * badge everywhere else in this schema). */
+export function statSetOverrides(participant) {
+  const out = {};
+  for (const s of participant?.statuses || []) {
+    if (s.kind !== 'stat' || s.set === undefined) continue;
+    if (_FLAT_KEYS.includes(s.stat) || _SCORE_KEYS.includes(s.stat)) out[s.stat] = s.set;
+  }
+  return out;
+}
+
 /** Moves a LOCAL combatant's AC / crit modifier / ability scores (the card's current
  * values, which the Modify Stats buttons also edit) from the status deltas last applied
  * (`prev`) to `next`, so manual edits stay and a removed status gives its points back. An
  * ability's modifier moves by the change in its floor((score-10)/2) step -- a sheet-
  * provided modifier that differs from the formula keeps its offset; AC/crit apply
  * directly, no derived field to update. Records `next` as `appliedStatMods` (the card
- * shows it). Mutates and returns `c`. */
+ * shows it). Mutates and returns `c`.
+ *
+ * `next.set` (and `prev.set`, both from statSetOverrides) carry any active `set`
+ * overrides alongside the ordinary additive deltas -- a field under one gets FORCED to
+ * that exact value instead of shifted, with the true pre-override value (and, for a
+ * score, its modifier) snapshotted onto `c._preSetBase`/`_preSetBaseMod` the moment the
+ * override starts and restored -- then the round's own delta applied on top of THAT --
+ * the moment it ends. A plain statDeltas() result with no `.set` at all behaves exactly
+ * as before (every existing caller). */
 export function reapplyStatDeltas(c, prev, next) {
+  const prevSet = prev?.set || {};
+  const nextSet = next.set || {};
+  if (Object.keys(nextSet).length || Object.keys(prevSet).length) {
+    c._preSetBase = c._preSetBase || {};
+    c._preSetBaseMod = c._preSetBaseMod || {};
+  }
   for (const key of [..._FLAT_KEYS, ..._SCORE_KEYS]) {
-    const d = (next[key] || 0) - (prev?.[key] || 0);
     const field = _FLAT_FIELD[key] || key;
-    if (!d || !Number.isFinite(c[field])) continue;
-    const old = c[field];
+    if (!Number.isFinite(c[field])) continue;
+    const modKey = `${key}Mod`;
+    const hadOverride = key in prevSet;
+    const hasOverride = key in nextSet;
+    if (hasOverride) {
+      if (!hadOverride) {
+        c._preSetBase[key] = c[field]; // snapshot: base + every delta already applied so far
+        if (!_FLAT_KEYS.includes(key)) c._preSetBaseMod[key] = c[modKey];
+      }
+      c[field] = nextSet[key];
+      if (!_FLAT_KEYS.includes(key)) c[modKey] = _STEP(c[field]);
+      continue;
+    }
+    let old = c[field];
+    if (hadOverride) {
+      // override just ended -- restore the pre-override base/mod, then this round's own
+      // delta (if any) still applies on top of that, same as the normal path below.
+      c[field] = c._preSetBase[key];
+      if (!_FLAT_KEYS.includes(key)) c[modKey] = c._preSetBaseMod[key];
+      old = c[field];
+      delete c._preSetBase[key];
+      delete c._preSetBaseMod[key];
+    }
+    const d = (next[key] || 0) - (hadOverride ? 0 : (prev?.[key] || 0));
+    if (!d) continue;
     c[field] = old + d;
     if (!_FLAT_KEYS.includes(key)) {
-      const modKey = `${key}Mod`;
       c[modKey] = (Number(c[modKey]) || 0) + _STEP(c[field]) - _STEP(old);
     }
   }
@@ -261,19 +315,30 @@ export function reapplyStatDeltas(c, prev, next) {
  * ability scores and modifiers, with the live status deltas taken back out
  * (`appliedStatMods`). Their popups add the live statuses on top themselves
  * (effectiveStats / attackRollContext), so sending the card's already-buffed numbers
- * would count every effect twice. Only finite numbers are included. */
+ * would count every effect twice. Only finite numbers are included. A field currently
+ * under a `set` override (see reapplyStatDeltas) reports the snapshotted pre-override
+ * value instead of doing delta subtraction -- other clients apply the same override
+ * themselves from the shared status list (statSetOverrides), so sending the forced
+ * number here would double it up rather than cancel out. */
 export function baseStats(c) {
   const applied = c.appliedStatMods || {};
+  const appliedSet = applied.set || {};
   const out = {};
   for (const key of _FLAT_KEYS) {
     const field = _FLAT_FIELD[key];
-    if (Number.isFinite(c[field])) out[field] = c[field] - (applied[key] || 0);
+    if (!Number.isFinite(c[field])) continue;
+    out[field] = key in appliedSet ? (c._preSetBase?.[key] ?? c[field]) : c[field] - (applied[key] || 0);
   }
   for (const k of _SCORE_KEYS) {
     if (!Number.isFinite(c[k])) continue;
+    const modKey = `${k}Mod`;
+    if (k in appliedSet) {
+      out[k] = c._preSetBase?.[k] ?? c[k];
+      if (Number.isFinite(c[modKey])) out[modKey] = c._preSetBaseMod?.[k] ?? c[modKey];
+      continue;
+    }
     const baseScore = c[k] - (applied[k] || 0);
     out[k] = baseScore;
-    const modKey = `${k}Mod`;
     if (Number.isFinite(c[modKey])) out[modKey] = c[modKey] - (_STEP(c[k]) - _STEP(baseScore));
   }
   return out;
@@ -282,17 +347,26 @@ export function baseStats(c) {
 /** A copy of a SERVER participant record with its live stat statuses applied to AC, crit
  * modifier, ability scores and their modifiers -- for anything computed from the record
  * (a Move DC, a target's AC, whether a roll crits) rather than from a card. Records
- * without a stat block pass through. */
+ * without a stat block pass through. A field under a `set` override (statSetOverrides)
+ * is forced to that exact value -- overriding any delta on the same field entirely,
+ * rather than adding to it -- with a score's modifier recomputed straight from the
+ * formula (no offset to preserve here, there's no "prior" value in a snapshot-free
+ * read like this one). */
 export function effectiveStats(participant) {
   const d = statDeltas(participant);
+  const setOv = statSetOverrides(participant);
   const out = { ...participant };
   for (const key of _FLAT_KEYS) {
     const field = _FLAT_FIELD[key];
-    if (d[key] && Number.isFinite(out[field])) out[field] += d[key];
+    if (!Number.isFinite(out[field])) continue;
+    if (key in setOv) { out[field] = setOv[key]; continue; }
+    if (d[key]) out[field] += d[key];
   }
   for (const k of _SCORE_KEYS) {
-    if (!d[k] || !Number.isFinite(out[k])) continue;
+    if (!Number.isFinite(out[k])) continue;
     const modKey = `${k}Mod`;
+    if (k in setOv) { out[k] = setOv[k]; out[modKey] = _STEP(setOv[k]); continue; }
+    if (!d[k]) continue;
     out[modKey] = (Number(out[modKey]) || 0) + _STEP(out[k] + d[k]) - _STEP(out[k]);
     out[k] += d[k];
   }
@@ -362,6 +436,18 @@ export function rollModeText(mode) {
   if (mode === 'advantage') return 'Roll with ADVANTAGE — roll twice, keep the higher';
   if (mode === 'disadvantage') return 'Roll with DISADVANTAGE — roll twice, keep the lower';
   return '';
+}
+
+/** The status id of an active "next attack auto-crits" flag (Laser Focus) on
+ * `participant`, or null -- a small standalone condition, not a stat/roll effect:
+ * "your first attack on your next turn always results in a critical hit" overrides
+ * the normal crit-threshold roll AND the hit/miss check itself (the attack is
+ * guaranteed to land, not just guaranteed to crit IF it lands) for exactly one
+ * attack, so this doesn't fit statDeltas/statSetOverrides at all. Consumed
+ * (use-status) once that attack is actually resolved -- see combat-wip.js's
+ * _handleDamageResolved/_resolveOneHit. */
+export function guaranteedCritStatusId(participant) {
+  return (participant?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'guaranteed_next_crit')?.id || null;
 }
 
 /** The holder's statuses that end on a repeat saving throw at `timing`

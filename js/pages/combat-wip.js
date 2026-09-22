@@ -22,7 +22,7 @@ import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, reapplyStatDeltas, effectiveStats, isConcentration } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -777,7 +777,7 @@ function _syncLocalCombatState(session) {
       // scores/modifiers -- the same values the Modify Stats buttons edit, and the ones the move
       // popup reads for attack bonus, damage bonus and Move DC -- so a buff or debuff shows up
       // everywhere at once. Only the change since the last sync is applied, so manual edits stay.
-      reapplyStatDeltas(merged, merged.appliedStatMods, statDeltas(p));
+      reapplyStatDeltas(merged, merged.appliedStatMods, { ...statDeltas(p), set: statSetOverrides(p) });
     }
     // This IS the server's current value -- prime the dedupe cache with it
     // so the very next local save (even one unrelated to HP/VP) doesn't
@@ -1364,7 +1364,7 @@ function _foreignCombatantView(p) {
     moves: p.moves || [], rechargeStates: {}, // this device doesn't track another player's recharge state
     initiativeTotal: p.initiative,
     statusEffects: (p.statuses || []).map(st => _statusToBadge(st, session?.round)),
-    appliedStatMods: statDeltas(p),
+    appliedStatMods: { ...statDeltas(p), set: statSetOverrides(p) },
     hasStatBlock: p.combatantType != null && p.proficiency != null,
     isExpanded: _foreignExpandedId === p.id,
   };
@@ -1791,7 +1791,10 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // the target is in the invulnerable stage of Fly/Dig") stays a human call,
   // same trust model as the rest of this flow.
   const categories = moveCategoriesFor(moveName);
-  const guaranteedHit = categories.includes('guaranteed_hit');
+  // Laser Focus ("your first attack ... always results in a critical hit") also
+  // skips the attack roll -- the move guarantees a hit, not just a crit conditional
+  // on one -- see _resolveOneHit for where the crit itself gets forced and consumed.
+  const guaranteedHit = categories.includes('guaranteed_hit') || !!guaranteedCritStatusId(session?.participants?.[combatantId]);
   const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
 
@@ -1893,13 +1896,41 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
   const picks = await showEffectsPopup({ title: `${moveName} — effects`, sections });
   if (!picks || !picks.length) return;
   for (const pick of picks) {
-    const spec = buildStatusSpec(pick.effect, { sourceId: attackerId, sourceName: attacker?.name, moveName, dc, ends: pick.ends });
+    let effect = pick.effect;
+    if (effect.set !== undefined && typeof effect.set === 'object') {
+      const resolved = _resolveSetValue(effect.set, attacker, target);
+      if (resolved === null) {
+        showCombatAlert(`Couldn't resolve ${moveName}'s effect (missing stat data) -- skipped`, { title: 'Error' });
+        continue;
+      }
+      effect = { ...effect, set: resolved };
+    }
+    const spec = buildStatusSpec(effect, { sourceId: attackerId, sourceName: attacker?.name, moveName, dc, ends: pick.ends });
     try {
       await CombatAPI.applyStatus(pick.targetId, spec);
     } catch (err) {
       showCombatAlert(err.message, { title: 'Error' });
     }
   }
+}
+
+/** Resolves a `set` effect's sentinel formula (see move-effects-schema.md) against the
+ * currently-known attacker/target into a plain number, once, right before the status is
+ * applied -- from that point on it's stored as a concrete value like any other `set`
+ * effect (move-effects.js's statSetOverrides never re-derives it). `{avgWithTarget:
+ * "ac"}` (Guard Split) reads each participant's CURRENT effective value (their own live
+ * statuses already folded in via effectiveStats) and floors the average. Returns null
+ * when it can't be resolved (no target, or the target has no stat block) -- the caller
+ * skips applying that pick rather than send a bad number. */
+function _resolveSetValue(setSpec, attacker, target) {
+  if (setSpec.avgWithTarget) {
+    const field = setSpec.avgWithTarget;
+    const a = attacker ? effectiveStats(attacker)[field] : null;
+    const t = target ? effectiveStats(target)[field] : null;
+    if (!Number.isFinite(a) || !Number.isFinite(t)) return null;
+    return Math.floor((a + t) / 2);
+  }
+  return null;
 }
 
 /** Wired into combat.js's move-popup flow as onEffectsOnly -- for a move that has
@@ -1988,6 +2019,14 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     // effectiveStats, not the raw record -- a live crit-range status (Focus Energy) has to
     // actually change whether this roll counts, not just show up as a number on the card.
     crit = attackRoll === null ? undefined : attackRoll >= critThreshold(effectiveStats(attacker).critMod, categories.includes('base_crit'));
+  }
+  // Laser Focus overrides whatever the roll says (there may be no roll at all, see
+  // guaranteedHit above) and is spent the moment this attack actually resolves --
+  // hit or miss was never in question, but the crit itself only happens once.
+  const laserFocusId = guaranteedCritStatusId(attacker);
+  if (laserFocusId) {
+    crit = true;
+    CombatAPI.useStatus(combatantId, laserFocusId).catch(() => {});
   }
   await _offerMoveEffects({
     attackerId: combatantId, targetId, moveName, computedData,

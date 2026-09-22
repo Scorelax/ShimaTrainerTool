@@ -45,7 +45,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ## Vocabularies
 - **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement`.
-- **stat**: `ac speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities`
+- **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field)
 - **roll `on`**: `attack_rolls` (the holder's own) · `attacks_against` (rolls made against the holder) · `saving_throws` (the holder's) · `saves_against_its_moves` · `ability_checks` · `all_rolls`
 
 ## Derived tags
@@ -86,9 +86,24 @@ status deltas. Every reader (target AC hint, a saver's modifier, an attacker's M
 `statuses` on top itself (`effectiveStats`), so nothing is counted twice.
 
 Not applied yet: `speed` (and conditions' own effects) — deliberately left for when the condition rules are written.
+Also not applied yet: `set` on a `stat` effect (see the schema block above) — `statusLabel` displays it, but
+`statDeltas`/`reapplyStatDeltas`/`baseStats`/`effectiveStats` only read `amount`, so a `set` effect shows the
+right badge text but doesn't actually move the card's number yet (found while scoping the moves below that
+need it, e.g. Superpower's "STR and DEX set to 10").
 
-## Not covered yet
-The other stat/advantage moves in the file (`stat_buff_self`, `stat_buff_ally`, `stat_debuff_enemy`,
-`potential_disadvantage`, `advantage_on_attack_roll`, …) still use their old flat tags and have no
-`effects`. Main-game statuses (burned, poisoned, paralyzed, …) have no `ends`: their removal rules
-live in the rulebook, not the move text.
+## Not covered yet (2026-09-22 scoping pass over the ~597 remaining moves)
+Of the moves still on their old flat tags, only a subset (~172) are stat/advantage moves that fit this schema
+at all (`stat_buff_self/ally`, `stat_debuff_enemy/self`, `advantage_on_attack_roll`, `potential_disadvantage`,
+`crit_range_mod`, `boosted_attack_rolls`, `boosted_damage_rolls`, `advantage_on_saving_throws`,
+`potential_stat_increase`, `increase_stab`) — and even most of those need something this schema doesn't have
+yet: reaction-triggered effects (Attract, Noble Roar, Celebrate, …), once-per-rest resource tracking
+(Roar of Time, Overheat, …), `set`-based stat effects (see above), a "choose which stat" mechanic (Power
+Trick, Guard Split), type-changing, resistance/immunity, temp-HP/shields, and VP-cost modifiers. `crit_range_mod`
+alone split into two unrelated things: ten moves whose own fixed "crits on 19-20" is already fully handled by
+the existing `base_crit` tag (no `effects` needed at all), and Focus Energy/Laser Focus, genuine live crit-range
+buffs (Focus Energy done above; Laser Focus deferred, needs `set`). The other ~380 moves (`counter_reaction_effect`,
+`protect_negate`, `heal_self`/`heal_target_or_aoe`, `drain`, `positioning`, `field_terrain`/`field_weather`,
+`recoil`, `attack_suppression`, `shield_temphp`, cumulative-damage-on-consecutive-turns like Rollout/Ice Ball) need
+new effect kinds entirely, or already work through a separate, older mechanism (e.g. move-popup.js's
+description-regex drain/direct-heal detection) that isn't part of this schema. Main-game statuses (burned,
+poisoned, paralyzed, …) have no `ends`: their removal rules live in the rulebook, not the move text.

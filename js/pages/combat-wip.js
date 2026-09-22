@@ -1964,7 +1964,9 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   let crit = false; // a guaranteed hit has no roll to crit on
   if (!guaranteedHit) {
     // undefined (not false) when the roll wasn't entered, so a crit-only effect asks a human.
-    crit = attackRoll === null ? undefined : attackRoll >= critThreshold(attacker?.critMod, categories.includes('base_crit'));
+    // effectiveStats, not the raw record -- a live crit-range status (Focus Energy) has to
+    // actually change whether this roll counts, not just show up as a number on the card.
+    crit = attackRoll === null ? undefined : attackRoll >= critThreshold(effectiveStats(attacker).critMod, categories.includes('base_crit'));
   }
   await _offerMoveEffects({
     attackerId: combatantId, targetId, moveName, computedData,

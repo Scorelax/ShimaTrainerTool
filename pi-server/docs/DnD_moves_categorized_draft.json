@@ -14878,8 +14878,27 @@
       },
       "reaction": false,
       "categories": [
-        "crit_range_mod",
-        "stat_buff_self"
+        "self_stat_buff_crit"
+      ],
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "crit",
+          "amount": 1,
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        }
       ],
       "description": "You sacrifice your action to focus in on the energy inside you. For the duration, increase your critical range by 1 (From 20 to 19+ , from 19+ to 18+, etc.). This move is stackable up to a maximum of +5 to the critical hit range (15+).",
       "moveStat": "None",

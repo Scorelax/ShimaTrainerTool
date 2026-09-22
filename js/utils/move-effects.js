@@ -96,7 +96,7 @@ export function statusLabel(s) {
     return _title(String(s.apply || '').replace(/_/g, ' '));
   }
   if (s.kind === 'stat') {
-    const stat = s.stat === 'ac' ? 'AC' : _title(String(s.stat || '').replace(/_/g, ' '));
+    const stat = s.stat === 'ac' ? 'AC' : s.stat === 'crit' ? 'Crit range' : _title(String(s.stat || '').replace(/_/g, ' '));
     if (s.set !== undefined) return `${stat} set to ${s.set}`;
     if (s.amount === 'proficiency') return `${stat} + proficiency`;
     if (typeof s.amount === 'number') {
@@ -197,51 +197,62 @@ export function attackRollContext(attacker, target) {
 const _STEP = (score) => Math.floor((score - 10) / 2);
 const _SCORE_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
-/** What a participant's live stat statuses currently add to AC and each ability score:
- * {ac, str, dex, con, int, wis, cha} (0 where nothing applies). all_abilities counts
- * for all six; stacks multiply; `set` (speed) and `proficiency` amounts don't belong here. */
+// AC and crit modifier both apply as a flat delta straight to the field -- unlike an
+// ability score, neither one has a separately-derived modifier to also update.
+const _FLAT_KEYS = ['ac', 'crit'];
+const _FLAT_FIELD = { ac: 'ac', crit: 'critMod' };
+
+/** What a participant's live stat statuses currently add to AC, crit modifier, and each
+ * ability score: {ac, crit, str, dex, con, int, wis, cha} (0 where nothing applies).
+ * all_abilities counts for all six; stacks multiply; `set` (speed) and `proficiency`
+ * amounts don't belong here. */
 export function statDeltas(participant) {
-  const d = { ac: 0, str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+  const d = { ac: 0, crit: 0, str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
   for (const s of participant?.statuses || []) {
     if (s.kind !== 'stat' || typeof s.amount !== 'number') continue;
     const amount = s.amount * _stackCount(s);
-    if (s.stat === 'ac') d.ac += amount;
+    if (s.stat === 'ac' || s.stat === 'crit') d[s.stat] += amount;
     else if (s.stat === 'all_abilities') _SCORE_KEYS.forEach(k => { d[k] += amount; });
     else if (_SCORE_KEYS.includes(s.stat)) d[s.stat] += amount;
   }
   return d;
 }
 
-/** Moves a LOCAL combatant's AC / ability scores (the card's current values, which the
- * Modify Stats buttons also edit) from the status deltas last applied (`prev`) to `next`,
- * so manual edits stay and a removed status gives its points back. An ability's modifier
- * moves by the change in its floor((score-10)/2) step -- a sheet-provided modifier that
- * differs from the formula keeps its offset. Records `next` as `appliedStatMods` (the card
+/** Moves a LOCAL combatant's AC / crit modifier / ability scores (the card's current
+ * values, which the Modify Stats buttons also edit) from the status deltas last applied
+ * (`prev`) to `next`, so manual edits stay and a removed status gives its points back. An
+ * ability's modifier moves by the change in its floor((score-10)/2) step -- a sheet-
+ * provided modifier that differs from the formula keeps its offset; AC/crit apply
+ * directly, no derived field to update. Records `next` as `appliedStatMods` (the card
  * shows it). Mutates and returns `c`. */
 export function reapplyStatDeltas(c, prev, next) {
-  for (const key of ['ac', ..._SCORE_KEYS]) {
+  for (const key of [..._FLAT_KEYS, ..._SCORE_KEYS]) {
     const d = (next[key] || 0) - (prev?.[key] || 0);
-    if (!d || !Number.isFinite(c[key])) continue;
-    const old = c[key];
-    c[key] = old + d;
-    if (key !== 'ac') {
+    const field = _FLAT_FIELD[key] || key;
+    if (!d || !Number.isFinite(c[field])) continue;
+    const old = c[field];
+    c[field] = old + d;
+    if (!_FLAT_KEYS.includes(key)) {
       const modKey = `${key}Mod`;
-      c[modKey] = (Number(c[modKey]) || 0) + _STEP(c[key]) - _STEP(old);
+      c[modKey] = (Number(c[modKey]) || 0) + _STEP(c[field]) - _STEP(old);
     }
   }
   c.appliedStatMods = { ...next };
   return c;
 }
 
-/** The values other players should see for a LOCAL combatant: its AC, ability scores and
- * modifiers with the live status deltas taken back out (`appliedStatMods`), plus its crit
- * modifier. Their popups add the live statuses on top themselves (effectiveStats /
- * attackRollContext), so sending the card's already-buffed numbers would count every
- * effect twice. Only finite numbers are included. */
+/** The values other players should see for a LOCAL combatant: its AC, crit modifier,
+ * ability scores and modifiers, with the live status deltas taken back out
+ * (`appliedStatMods`). Their popups add the live statuses on top themselves
+ * (effectiveStats / attackRollContext), so sending the card's already-buffed numbers
+ * would count every effect twice. Only finite numbers are included. */
 export function baseStats(c) {
   const applied = c.appliedStatMods || {};
   const out = {};
-  if (Number.isFinite(c.ac)) out.ac = c.ac - (applied.ac || 0);
+  for (const key of _FLAT_KEYS) {
+    const field = _FLAT_FIELD[key];
+    if (Number.isFinite(c[field])) out[field] = c[field] - (applied[key] || 0);
+  }
   for (const k of _SCORE_KEYS) {
     if (!Number.isFinite(c[k])) continue;
     const baseScore = c[k] - (applied[k] || 0);
@@ -249,17 +260,20 @@ export function baseStats(c) {
     const modKey = `${k}Mod`;
     if (Number.isFinite(c[modKey])) out[modKey] = c[modKey] - (_STEP(c[k]) - _STEP(baseScore));
   }
-  if (Number.isFinite(c.critMod)) out.critMod = c.critMod;
   return out;
 }
 
-/** A copy of a SERVER participant record with its live stat statuses applied to AC,
- * ability scores and their modifiers -- for anything computed from the record (a Move
- * DC, a target's AC) rather than from a card. Records without a stat block pass through. */
+/** A copy of a SERVER participant record with its live stat statuses applied to AC, crit
+ * modifier, ability scores and their modifiers -- for anything computed from the record
+ * (a Move DC, a target's AC, whether a roll crits) rather than from a card. Records
+ * without a stat block pass through. */
 export function effectiveStats(participant) {
   const d = statDeltas(participant);
   const out = { ...participant };
-  if (Number.isFinite(out.ac)) out.ac += d.ac;
+  for (const key of _FLAT_KEYS) {
+    const field = _FLAT_FIELD[key];
+    if (d[key] && Number.isFinite(out[field])) out[field] += d[key];
+  }
   for (const k of _SCORE_KEYS) {
     if (!d[k] || !Number.isFinite(out[k])) continue;
     const modKey = `${k}Mod`;

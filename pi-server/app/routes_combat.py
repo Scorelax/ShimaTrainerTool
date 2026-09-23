@@ -947,7 +947,15 @@ def _grid_distance_ft(state, id_a, id_b):
     return max(abs(a['col'] - b['col']), abs(a['row'] - b['row'])) * _FT_PER_SQUARE
 
 
-def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id):
+def _has_block_attack_effect(move_data):
+    """True if this move's own effects include a `block_attack` (Protect,
+    King's Shield, ...) -- see move-effects-schema.md's own section. What
+    `ignoresProtect` (below) actually filters against: it never blocks a
+    reaction move for any OTHER reason, only a block_attack one."""
+    return any(e.get('kind') == 'block_attack' for e in (move_data.get('effects') or []))
+
+
+def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attacking_move_name=None):
     """{participantId: [moveName, ...]} for every OTHER participant (never the
     attacker themselves) who knows at least one move flagged with this exact
     `trigger` ('targeted' | 'damaged') and is within that move's own
@@ -961,8 +969,19 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id):
     token on the map (see _grid_distance_ft) never qualifies for a
     range-gated move, even range 0 -- an anchor with no token can't be
     "distance 0 from itself" reliably either, so this errs toward excluding
-    rather than guessing."""
+    rather than guessing.
+
+    `attacking_move_name` (the move whose OWN attack opened this window --
+    always known for 'targeted', which is exactly the family this matters
+    for) is checked for `ignoresProtect` (Aqua Phase, Fly, Hyperspace Hole,
+    ... -- "Protect and Detect reactions may not be used when hit by this
+    attack"): when set, a candidate's block_attack move (Protect, King's
+    Shield, ...) is skipped entirely -- not the whole participant, they may
+    still have some OTHER eligible reaction move that isn't Protect-family
+    and stays perfectly usable against an ignoresProtect attack."""
     moves_by_name = {m['name']: m for m in moves_data.get('moves', [])}
+    attacking_move = moves_by_name.get(attacking_move_name) if attacking_move_name else None
+    ignores_protect = bool(attacking_move and attacking_move.get('ignoresProtect'))
     result = {}
     for pid, p in state['participants'].items():
         if pid == exclude_id or p.get('status') != 'participating':
@@ -970,6 +989,8 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id):
         for move_name in (p.get('moves') or []):
             m = moves_by_name.get(move_name)
             if not m or m.get('reactionTrigger') != trigger:
+                continue
+            if ignores_protect and _has_block_attack_effect(m):
                 continue
             dist = _grid_distance_ft(state, pid, anchor_id)
             if dist is None or dist > (m.get('reactionRange') or 0):
@@ -983,7 +1004,7 @@ def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name):
         raise ValueError('A reaction window is already open')
     if anchor_id not in state['participants']:
         raise ValueError('Unknown anchor participant: ' + anchor_id)
-    eligible = _eligible_reactors(state, _load_move_data_file(), trigger, anchor_id, attacker_id)
+    eligible = _eligible_reactors(state, _load_move_data_file(), trigger, anchor_id, attacker_id, move_name)
     if not eligible:
         return {'opened': False}  # nothing to wait for -- caller's flow proceeds immediately
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)

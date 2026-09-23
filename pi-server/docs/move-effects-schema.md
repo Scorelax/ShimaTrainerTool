@@ -90,20 +90,41 @@ the floor and applying the effect to themselves (`target: "self"`), and `_block_
 reads the ORIGINAL anchor/attacker off the window itself, not off the blocker -- so the right
 attack gets cancelled regardless of who actually blocked it.
 
-**Deliberately left manual, same partial-implementation precedent as everywhere else in this
-schema:** every Protect-family move's own escalating "roll over 15 on a d20" cost after the
+**Parry** ("make a contested roll... on a higher roll, you take no damage") reuses `block_attack`
+as-is rather than needing its own mechanism -- it just isn't auto-offered. `when: {type:
+"special"}` (the vocab's own catch-all for "the human judges this entirely", `note` carrying the
+contested-roll text) makes `evaluateEffect` return `'manual'` instead of `'yes'`, so the popup
+shows it unchecked: the player only ticks it after actually declaring they won the roll, same
+"the app shows the structure, a human supplies the outcome" trust model as every other roll in
+this app that has no digital dice behind it. No new code, just this one `when` value used for
+the first time on a `block_attack` effect.
+
+**`ignoresProtect`** (top-level, alongside `reactionTrigger`/`reactionRange`) is the other half of
+"Protect and Detect reactions may not be used when hit by this attack" (Aqua Phase, Fly,
+Hyperspace Hole, Phantom Force, Phantom Tendril, Shadow Force, Astral Jet). `_eligible_reactors`
+(`routes_combat.py`) now takes the ATTACKING move's own name and, when it carries this flag,
+drops any candidate reaction move that has its own `block_attack` effect from the eligible set --
+not the whole participant, who may still have some other eligible reaction that isn't
+Protect-family. Feint is deliberately NOT one of these: it's the attacker reacting to the
+DEFENDER's own declared Protect ("a reaction to a reaction"), a shape this app's turn-authority
+model (one floor-holder at a time) doesn't support, so it stays unmigrated.
+
+**Still deliberately left manual, same partial-implementation precedent as everywhere else in
+this schema:** every Protect-family move's own escalating "roll over 15 on a d20" cost after the
 first use in an encounter (no resource-tracking mechanism for that yet); King's Shield's own
 "blocks ALL damage until your next turn", not just the one attack that opened the window (that's
 a genuinely different, persisting "immune to damage" status this kind doesn't model, only the
 immediate block); Quick Guard's "first round of combat only" gate (already `situational_use`-
-tagged). Everything else under `protect_negate` needs its own separate thing: custom math on
-top of blocking (Wide Guard halves instead of negating, Spiky Shield reflects damage back,
-Nature's Embrace redirects it, Parry is a contested roll, none of that math exists), a third
-reaction TIMING neither `targeted` nor `damaged` covers (Lucky Chant needs to intercept after the
-attack roll is known but before damage), or bypassing Protect specifically (Feint, Phantom
-Tendril, Hyperspace Hole, the vanish-family's "Protect can't be used" clause) -- meaningless
-until Protect itself has a real mechanism, which it now does, but "ignore an incoming
-`block_attack`" isn't wired up on the attacking side yet.
+tagged). Everything else under `protect_negate` still needs its own separate thing: custom math
+on top of blocking (Wide Guard halves instead of negating -- and needs a reaction window inside
+an AoE resolution, which `_handleMultiHitAoe` doesn't open at all yet; Spiky Shield reflects
+damage back, needing a "deal damage" effect kind that doesn't exist anywhere in this schema; Nature's
+Embrace redirects the avoided damage into a brand new attack roll against a different target, a
+full reactive mini-attack-flow, not a status), or a third reaction TIMING neither `targeted` nor
+`damaged` covers (Lucky Chant needs to intercept after the attack roll -- and whether it was a
+crit -- is known, but before damage; crit itself isn't even determined until combat-wip.js's
+`_resolveOneHit`, well after target-picker.js's own attack-roll step has already closed, so this
+needs real restructuring, not just a new window).
 
 **`prevent_faint`** (Endure's "instead fall to 1 HP") is `reroll_damage`'s own retroactive-
 correction shape, not `block_attack`'s -- it fires on the `'damaged'` family (the damage already

@@ -1,6 +1,6 @@
 # Moves still without structured `effects`
 
-_Generated 2026-09-24 (updated after migrate_effects_v20.py) against DnD_moves_categorized_draft.json -- 888 moves total, 454 with no `effects` array yet.
+_Generated 2026-09-24 (updated after migrate_effects_v21.py) against DnD_moves_categorized_draft.json -- 888 moves total, 453 with no `effects` array yet.
  See move-effects-schema.md for the schema itself and its own "Not covered yet" section for the gap-by-gap reasoning._
 
 
@@ -50,9 +50,9 @@ What remains here is genuinely blocked on something -- movement speed (deferred)
 - **Wing Buffer** (stat_buff_self) -- You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successfu
 - **Wing Command** (stat_buff_ally) -- You spread your wings in a majestic display, inspiring allies close by. All allies within range that can see you receive a bonus to their at
 
-## 2. Needs a new effect kind / mechanism (149)
+## 2. Needs a new effect kind / mechanism (148)
 
-`protect_negate` now has TWO real core mechanisms (`block_attack`, `prevent_faint` -- see move-effects-schema.md) covering Protect/King's Shield/Shield Guardian/Quick Guard/Endure. What remains under that tag below each needs something further on top (custom math, a third reaction timing, or bypassing Protect specifically) -- see that same schema doc section for the per-move list.
+`protect_negate` now covers Protect/King's Shield/Shield Guardian/Quick Guard/Endure/Parry, plus `ignoresProtect` on the seven moves that bypass it -- see move-effects-schema.md's `block_attack` section. What remains under that tag below (Wide Guard, Spiky Shield, Nature's Embrace, Lucky Chant, Feint) each needs its own separate mechanism on top -- see that same section for the per-move reasoning.
 
 
 ### conditional_damage (25) -- damage that changes based on a condition (target HP, a status, terrain, ...)
@@ -107,7 +107,7 @@ What remains here is genuinely blocked on something -- movement speed (deferred)
 - Strength Sap
 - Thief
 
-### protect_negate (21) -- blocks/negates an incoming effect (Protect-family) -- core mechanisms now exist, see above
+### protect_negate (20) -- blocks/negates an incoming effect (Protect-family) -- core mechanisms now exist, see above
 - Aqua Phase
 - Astral Jet
 - Captivate
@@ -120,7 +120,6 @@ What remains here is genuinely blocked on something -- movement speed (deferred)
 - Mat Block
 - Mist
 - Nature's Embrace
-- Parry
 - Phantom Force
 - Phantom Tendril
 - Safeguard

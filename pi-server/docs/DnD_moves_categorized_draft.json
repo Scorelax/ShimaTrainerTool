@@ -1645,7 +1645,8 @@
       "description": "You create a portal that allows you to instantly teleport to a creature in range and strike out with a melee attack. This move is guaranteed to hit for 2d8 + MOVE cosmic damage. Reactions that negate damage such as Protect or Detect cannot be used.",
       "moveStat": "STR/DEX",
       "vpCost": "12",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "ignoresProtect": true
     },
     {
       "name": "Judgment",
@@ -10241,7 +10242,8 @@
       "description": "You fly high into the air to prepare for a dive bomb attack. When you activate this move, you flap your wings and disappear into the Ethereal plane above you. You cannot be targeted by attacks while you are in the Ethereal plane. On your next turn, you use your action to reappear and make a diving melee attack on a creature in range, with advantage, dealing 2d8 + MOVE flying damage on a successful hit.",
       "moveStat": "STR/DEX",
       "vpCost": "10",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "ignoresProtect": true
     },
     {
       "name": "Gust",
@@ -11332,7 +11334,8 @@
       "description": "You disappear from view and prepare to surprise your target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use your action to reappear and make a melee attack against a creature, with advantage, dealing 2d8 + MOVE ghost damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "DEX/INT/WIS",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "ignoresProtect": true
     },
     {
       "name": "Phantom Gate",
@@ -11373,7 +11376,8 @@
       "description": "You extend a sharp vine or similar appendage to whip the target with, appearing from unexpected angles. Make a ranged attack roll, doing 1d10 + MOVE ghost damage on a hit. This move is unaffected by any of the target's stat changes or protection moves/reactions.",
       "moveStat": "STR/DEX",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "ignoresProtect": true
     },
     {
       "name": "Phantom Tentacles",
@@ -11555,7 +11559,8 @@
       "description": "You disappear from view and prepare to surprise a target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use may your action to reappear at a point within range and make a melee attack against a creature, with advantage, dealing 4d12 + MOVE ghost damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "DEX/WIS",
       "vpCost": "30",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "ignoresProtect": true
     },
     {
       "name": "Shadow Punch",
@@ -25902,12 +25907,30 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "protect_negate"
+        "protect_negate",
+        "self_potential_block_attack"
       ],
       "description": "When subject to any targeted attack with a STR or DEX move power, you may use your reaction to attempt to parry it. Make a contested roll against your opponent's Strength or Dexterity ability score. On a higher roll, you take no damage from the attack, but may still suffer other effects. On a natural roll of 19 or higher, you succeed, suffer no effects and retain your reaction this round.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The treshold for retaining your reaction drops to 18 at level 5, 17 at level 10 and 16 at level 17."
+      "scaling": "The treshold for retaining your reaction drops to 18 at level 5, 17 at level 10 and 16 at level 17.",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "block_attack",
+          "when": {
+            "type": "special"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Only if you already won the contested STR/DEX roll (natural 19-20 always succeeds)."
+        }
+      ]
     },
     {
       "name": "Sentinel Strike",
@@ -26234,7 +26257,8 @@
       "description": "You disappear from view and prepare to surprise a target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use may your action to reappear at a point within range and make a melee attack against a creature, with advantage, dealing 4d12 + MOVE water damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "WIS/INT",
       "vpCost": "35",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "ignoresProtect": true
     },
     {
       "name": "Aqua Ring",
@@ -26315,7 +26339,8 @@
       "description": "You lunge at an opponent with incredible speed. At the beginning of a round of combat, you may announce that you are using this move, immediately jumping to the top of the initiative order for that round only. Make a melee attack on an opponent, dealing 2d8 + MOVE water damage on a hit. You partially phase out of existence. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "WIS/INT",
       "vpCost": "12",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "ignoresProtect": true
     },
     {
       "name": "Brine",

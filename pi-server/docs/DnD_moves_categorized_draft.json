@@ -12161,7 +12161,8 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "self_heal"
+        "self_heal",
+        "self_status_condition_trapped"
       ],
       "description": "You pierce the ground with roots, absorbing natural energy and fixing you in place. At the end of each of your next three turns (including this one), heal yourself for 1d10 + MOVE hit points as a free action. During this time, you may not move or be switched out.",
       "moveStat": "CON",
@@ -12185,6 +12186,21 @@
               "n": 3
             }
           ]
+        },
+        {
+          "kind": "condition",
+          "apply": "trapped",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ],
+          "note": "Also covers this move's own \"cannot be switched out\" -- trapped already means exactly that. Movement is enforced server-side (_move_token); switching isn't, since the shared system has no switch-Pokemon mechanic of its own yet."
         }
       ]
     },

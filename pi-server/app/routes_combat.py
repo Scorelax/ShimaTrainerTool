@@ -1381,8 +1381,11 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
 #   - move-token (_move_token): a player moving their own token during
 #     combat. Turn-gated exactly like use-move -- only whoever currently
 #     has the floor (active turn, or mid-reaction) can move, and only
-#     themselves. Range/distance limits and terrain-blocking are explicit
-#     future work; this only enforces whose turn it is.
+#     themselves. Also rejected outright for a mover with a condition in
+#     _MOVEMENT_BLOCKING_CONDITIONS (Ingrain's "may not move" -- see its
+#     own `trapped` condition effect). Range/distance limits and terrain-
+#     blocking are still explicit future work -- this only enforces whose
+#     turn it is and whether they can act at all.
 # ---------------------------------------------------------------------------
 
 def _set_board_template(state, cols, rows):
@@ -1472,12 +1475,27 @@ def _set_token_position(state, pid, col, row):
     state['board']['tokens'][pid] = {'col': col, 'row': row}
 
 
+# Conditions that block voluntary movement entirely, checked below -- a
+# small, deliberately explicit allowlist rather than every condition that
+# SOUNDS like it should stop someone (most still have no mechanical
+# enforcement at all, see move-effects-schema.md's own "Not applied yet"
+# note -- this is the first). 'trapped' is the one this app already gives
+# that exact meaning ("cannot flee or be switched out" -- see
+# migrate_effects_v2.py's OTHER_TO_CONDITION), used by Ingrain and
+# Thousand Waves alike.
+_MOVEMENT_BLOCKING_CONDITIONS = {'trapped'}
+
+
 def _move_token(state, pid, col, row):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
     if pid != _active_participant_id(state):
         raise ValueError("It's not this participant's turn")
+    blocking = next((s for s in _statuses_of(participant)
+                      if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
+    if blocking:
+        raise ValueError(f"{participant['name']} is {blocking['apply']} and can't move")
     state['started'] = True  # see _rebuild_turn_order -- acting on-turn means turn order is now live
     state['board']['tokens'][pid] = {'col': col, 'row': row}
     _log_event(state, 'move', text=f"{participant['name']} moved to ({col}, {row})",

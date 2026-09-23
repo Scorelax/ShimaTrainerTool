@@ -242,7 +242,15 @@ gets sent. `type_changed` gets a second dropdown too ("single type" by default) 
 Reflect Type's dual-type case; `resistance_upgrade` only ever grants against one type
 here, so it doesn't.
 
-Not applied yet: `speed` (and conditions' own effects) — deliberately left for when the condition rules are written.
+Not applied yet: `speed` (and conditions' own effects), with ONE exception -- `trapped` now actually
+blocks movement: `routes_combat.py`'s `_move_token` (the shared system's only player-driven token
+move, see its own module comment) rejects outright for a mover carrying any condition in
+`_MOVEMENT_BLOCKING_CONDITIONS` (just `trapped` so far -- Ingrain, Thousand Waves). Everything
+else about movement/positioning stays exactly as unbuilt as before: no distance/speed limits, no
+terrain-blocking, and no shared switch-Pokemon mechanic at all (`trapped`'s own "cannot be
+switched out" half is still only enforced by the legacy combat.js engine's own separate,
+Ingrain-specific check) — deliberately scoped this narrow (migrate_effects_v14.py) rather than
+opening the full movement/positioning category (~20 moves) or a distance/terrain rules pass.
 
 ## Not covered yet (2026-09-22 scoping pass over the ~597 remaining moves)
 Of the moves still on their old flat tags, only a subset (~172) are stat/advantage moves that fit this schema

@@ -14657,14 +14657,29 @@
       "categories": [
         "counter_reaction_effect",
         "trigger_saving_throw",
-        "stat_debuff_enemy"
+        "stat_debuff_enemy",
+        "potential_reroll_damage"
       ],
       "description": "As a reaction, when dealt damage by an attack, you may force the attacker to make a WIS save against your Move DC. On a fail, the creature must roll the damage again and use the lower result.",
       "moveStat": "CHA",
       "vpCost": "2",
       "scaling": "",
       "reactionTrigger": "damaged",
-      "reactionRange": 0
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "reroll_damage",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Barrage",

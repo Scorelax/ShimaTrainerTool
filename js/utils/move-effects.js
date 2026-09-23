@@ -100,6 +100,9 @@ export function statusLabel(s) {
   if (s.kind === 'temp_hp') {
     return s.remaining !== undefined ? `${s.remaining} temporary HP left` : 'Temporary HP';
   }
+  if (s.kind === 'reroll_damage') {
+    return 'Reroll their damage, take the lower';
+  }
   if (s.kind === 'stat') {
     const stat = s.stat === 'ac' ? 'AC'
       : s.stat === 'crit' ? 'Crit range'

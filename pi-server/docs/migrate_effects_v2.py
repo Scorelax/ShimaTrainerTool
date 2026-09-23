@@ -232,6 +232,8 @@ def tag_for(e):
         base = f"stat_{'buff' if buff else 'debuff'}_{e['stat']}"
     elif e['kind'] == 'temp_hp':
         base = 'temp_hp'
+    elif e['kind'] == 'reroll_damage':
+        base = 'reroll_damage'
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

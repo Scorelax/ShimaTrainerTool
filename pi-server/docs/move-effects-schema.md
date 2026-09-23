@@ -8,11 +8,12 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ```jsonc
 {
-  "kind": "condition" | "stat" | "roll" | "temp_hp",
+  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage",
   // condition:  "apply": "<name>", optional "value" (type_changed → "Ghost")
   // stat:       "stat": "<stat>", "amount": -1 | "proficiency" | {"dice": "1d4"}  OR  "set": 0, optional "stacks": {"max": 5}
   // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>"
   // temp_hp:    "amount": 10 -- a bonus-HP pool, see its own section below
+  // reroll_damage: no extra fields -- see its own section below
   "when":   { "type": ... },        // what triggers it — see below
   "target": "self",                 // only present when the USER is affected (default: the target)
   "ends":   [ ... ],                // how it stops — any ONE entry ending it removes it
@@ -37,6 +38,20 @@ this pool FIRST (`routes_combat.py`'s `_absorb_temp_hp`, called from both damage
 before touching real HP; the status is removed once it empties. Re-applying the same source's same
 move (Acupressure rerolled) replaces the pool outright (the existing non-stacking status path —
 matches "any previous effect ends", never partial-carries-over or adds).
+
+**`reroll_damage`** (Attract's "force the attacker to reroll their damage and take the lower
+result") is a one-shot correction against an ALREADY-APPLIED damage log entry, never a stored
+status — it ships with `ends: [{type:"instant"}]` (the same "announced, never stored" vocabulary
+entry `forced_movement` uses) and no other fields; `target` is left unset, same as every other
+effect, since it applies to whoever the `save_fail` resolved against (the attacker, not the
+move's own user). `combat-wip.js`'s `_offerMoveEffects` special-cases this kind instead of
+routing it through `apply-status`: it walks the shared log backwards for the most recent
+`damage` entry from that attacker to the reactor, prompts a new roll
+(`utils/reroll-damage-popup.js`), takes the lower of the two, and — if that's less than what
+was already applied — refunds the reactor's HP by the difference via `update-stats`, the same
+client-authoritative correction the Modify Stats buttons already use for HP (no new server
+action). No log entry to find (a freeform PvE hit, or the window opened too late) just tells the
+table to compare by hand, same fallback tone as every other "can't auto-detect" spot in this app.
 
 ## `when`
 | type | meaning |
@@ -72,6 +87,7 @@ matches "any previous effect ends", never partial-carries-over or adds).
 - conditions — `status_condition_<c>` / `potential_status_condition_<c>`
 - stat — `stat_buff_<stat>` / `stat_debuff_<stat>` / `potential_stat_…`
 - roll — `advantage_<on>` / `disadvantage_<on>` / `potential_…`
+- reroll_damage — `reroll_damage` / `potential_reroll_damage` (always the latter in practice — it only ever rides on a `save_fail`)
 
 ## How live modifiers are applied (`js/utils/move-effects.js`, shown by the attack / save popups)
 The dice are rolled at the table, so the popups only *show* what applies and fold numbers into totals.
@@ -190,3 +206,9 @@ poisoned, paralyzed, …) have no `ends`: their removal rules live in the rulebo
 gaps — see their own sections above. Laser Focus and Guard Split are both done; Power Trick/Power
 Split still wait on a "one choice, two paired effects" extension. This paragraph is left as the
 original scoping snapshot otherwise — treat the two lists above as current, this one as history.)*
+
+*(Update, 2026-09-23: reaction-triggered effects are no longer a gap either — the reaction-window
+mechanism (see its own module docstring in routes_combat.py) plus the new `reroll_damage` kind
+above cover Noble Roar, Sentinel Strike, and Attract, all three fully wired end to end. Celebrate,
+Withdraw, Baby-Doll Eyes, Hold Hands, Luminous Veil, Conversion 2, and Skyward Soar are still on
+their old flat tags — next in line, not blocked on anything new.)*

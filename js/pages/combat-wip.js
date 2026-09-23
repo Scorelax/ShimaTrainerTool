@@ -22,6 +22,7 @@ import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
 import { waitForDamagedReactions } from '../utils/reaction-wait-overlay.js';
+import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, tempHpRemaining } from '../utils/move-effects.js';
@@ -1940,6 +1941,14 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
   if (!picks || !picks.length) return;
   for (const pick of picks) {
     let effect = pick.effect;
+    if (effect.kind === 'reroll_damage') {
+      // Not a status -- a one-shot correction against a damage entry that
+      // already happened. pick.targetId here is whoever the save_fail
+      // resolved against (Attract's attacker); attackerId (closure) is
+      // Attract's own caster, the one whose HP gets refunded.
+      await _handleRerollDamage({ reactorId: attackerId, attackerId: pick.targetId, moveName });
+      continue;
+    }
     if (effect.set !== undefined && typeof effect.set === 'object') {
       const resolved = _resolveSetValue(effect.set, attacker, target);
       if (resolved === null) {
@@ -1974,6 +1983,59 @@ function _resolveSetValue(setSpec, attacker, target) {
     return Math.floor((a + t) / 2);
   }
   return null;
+}
+
+/** Attract's own effect (see move-effects-schema.md's `reroll_damage` section):
+ * `attackerId` just failed the WIS save Attract forced, so they reroll the
+ * damage they already dealt to `reactorId` (Attract's own caster) and take
+ * the lower result -- a correction against an already-applied log entry,
+ * never a stored status, so this runs instead of _offerMoveEffects's normal
+ * apply-status loop (see its own call site).
+ *
+ * Finds the most recent 'damage' log entry FROM attackerId TO reactorId --
+ * reliable here because a reaction only ever answers the attack that just
+ * happened (routes_combat.py's reaction window is anchored on that specific
+ * hit), same trust as _handleReactiveSave's own log lookback. No matching
+ * entry (a freeform PvE hit predating the full log, or the window closing
+ * late) just tells the table to compare the two rolls by hand -- same
+ * "can't auto-detect" fallback tone used everywhere else in this app. */
+async function _handleRerollDamage({ reactorId, attackerId, moveName }) {
+  const reactor = session?.participants?.[reactorId];
+  const attacker = session?.participants?.[attackerId];
+  if (!reactor || !attacker) return;
+
+  const log = session?.log || [];
+  let original = null;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const entry = log[i];
+    if (entry.type === 'damage' && entry.actorId === attackerId && entry.targetId === reactorId) { original = entry; break; }
+  }
+  if (!original || !Number.isFinite(original.amount)) {
+    showCombatAlert(`Couldn't find ${attacker.name}'s damage roll to reroll -- compare it with the table by hand.`, { title: moveName });
+    return;
+  }
+
+  const rerolled = await promptRerollDamage({ originalAmount: original.amount, attackerName: attacker.name, targetName: reactor.name });
+  if (rerolled === null || Number.isNaN(rerolled)) return; // closed without declaring
+
+  const finalAmount = Math.min(original.amount, rerolled);
+  const refund = original.amount - finalAmount;
+  const text = refund > 0
+    ? `${attacker.name} rerolled ${moveName}'s damage (was ${original.amount}, now ${rerolled}) -- ${reactor.name} recovers ${refund} HP`
+    : `${attacker.name} rerolled ${moveName}'s damage (was ${original.amount}, now ${rerolled}) -- not lower, nothing changes`;
+  CombatAPI.logEvent({
+    type: 'save', actorId: reactorId, actorName: reactor.name, targetId: attackerId, targetName: attacker.name, text,
+  }).catch(() => {});
+
+  if (refund > 0) {
+    const maxHp = Number.isFinite(reactor.maxHP) ? reactor.maxHP : Infinity;
+    const newHp = Math.min(maxHp, reactor.currentHP + refund);
+    try {
+      await CombatAPI.updateStats(reactorId, { currentHP: newHp });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
 }
 
 /** Wired into combat.js's move-popup flow as onEffectsOnly -- for a move that has

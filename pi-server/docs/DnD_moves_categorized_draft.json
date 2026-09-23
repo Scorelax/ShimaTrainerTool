@@ -243,12 +243,31 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self"
+        "heal_self",
+        "self_heal"
       ],
       "description": "You summon forth your underlings to heal your wounds. Regain 4d4 + MOVE hit points.",
       "moveStat": "CON",
       "vpCost": "5",
-      "scaling": "The healing dice roll for this move changes to 3d6 at level 5, 5d6 at level 10, and 8d6 at level 17."
+      "scaling": "The healing dice roll for this move changes to 3d6 at level 5, 5d6 at level 10, and 8d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "4d4",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        }
+      ]
     },
     {
       "name": "Infestation",
@@ -304,12 +323,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "You attempt to suck away some of a creature’s life force. Make a melee attack roll, doing 1d10 + MOVE bug damage on a hit. Half of the damage done is restored to the user.",
       "moveStat": "DEX",
       "vpCost": "3",
-      "scaling": "The damage dice roll for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice roll for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Lunge",
@@ -1851,12 +1888,47 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "self_heal",
+        "heal"
       ],
       "description": "You reverse time to close wounds and recover the hit points of a creature in range. The target regains 1d6 + MOVE hit points.",
       "moveStat": "WIS/CHA",
       "vpCost": "6",
-      "scaling": "The dice roll for healing increases to 2d6 at level 5, 4d6 at level 10, and 6d6 at level 17."
+      "scaling": "The dice roll for healing increases to 2d6 at level 5, 4d6 at level 10, and 6d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "1d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        },
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "1d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Roar of Time",
@@ -5455,12 +5527,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "You attempt to zap the target's energy with a kiss. Make a melee attack roll on an opponent, dealing 1d6 + MOVE fairy damage on a hit. The user is then healed for half the damage dealt.",
       "moveStat": "DEX/CHA",
       "vpCost": "1",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Dream Mend",
@@ -5475,12 +5565,30 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "heal"
       ],
       "description": "You touch a sleeping creature, causing their sleep to rapidly restore their health for 3d10 + MOVE. The creature wakes up at the end of their next turn, fully refreshed.",
       "moveStat": "WIS",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "3d10",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Fairy Lock",
@@ -6185,12 +6293,31 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self"
+        "heal_self",
+        "self_heal"
       ],
       "description": "A ray of moonlight shines upon you, basking you in healing light. The user gains 2d6 + MOVE hit points.",
       "moveStat": "WIS/CHA",
       "vpCost": "5",
-      "scaling": "The dice roll for healing changes to 3d6 at level 5, 5d6 at level 10, and 8d6 at level 17."
+      "scaling": "The dice roll for healing changes to 3d6 at level 5, 5d6 at level 10, and 8d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        }
+      ]
     },
     {
       "name": "Moonlight Waltz",
@@ -6980,12 +7107,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "Your strike a foe with an energy-draining punch. Make a melee attack, dealing 1d10 + MOVE fighting damage on a hit, healing you for half the damage dealt.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Dynamic Punch",
@@ -10004,12 +10149,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "You extend your wings and use a dark beam of energy to absorb the target's life force. Make a ranged attack against a creature, dealing 3d10 + MOVE flying damage on a hit, recovering your own hit points by the amount of damage dealt.",
       "moveStat": "STR/DEX",
       "vpCost": "18",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 1.0
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Peck",
@@ -10066,12 +10229,30 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "stat_debuff_self"
+        "self_heal"
       ],
       "description": "You land on the ground to rest your body. Regain 2d8 + MOVE hit points, but become grounded and lose your ground-type resistance until the beginning of your next turn. You can't move after activating this move on the same turn.",
       "moveStat": "CON",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d8",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        }
+      ]
     },
     {
       "name": "Sky Attack",
@@ -11058,12 +11239,62 @@
         "trigger_saving_throw",
         "damage",
         "drain",
-        "potential_disadvantage"
+        "self_potential_heal",
+        "potential_disadvantage_attack_rolls",
+        "potential_disadvantage_saving_throws"
       ],
       "description": "The user attempts to drain the life force of a creature within 30 feet. The target must make a Charisma saving throw. On a failure, it takes 3d10 + MOVE ghost damage and has disadvantage on attack rolls and saving throws for 1 minute. The user regains hit points equal to half the damage dealt.",
       "moveStat": "INT/WIS/CHA",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "saving_throws",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Spectral Chains",
@@ -11301,12 +11532,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "You attempt to absorb some of an enemy’s health. Make a melee attack on a Pokémon. On a hit, the Pokémon takes 1d6 + MOVE grass damage. Half the damage done is restored by the user.",
       "moveStat": "STR/DEX",
       "vpCost": "1",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Aromatherapy",
@@ -11691,12 +11940,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "You attempt to drain the life force of a target. Make a ranged attack on a target, doing 2d8 + MOVE grass damage on a hit. Half of the damage dealt is restored to the user.",
       "moveStat": "STR/DEX",
       "vpCost": "9",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Grass Knot",
@@ -11818,12 +12085,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "You sink your horns into a creature, draining some of their power. Make a melee attack, dealing 2d8 + MOVE grass damage on a hit. Half the damage dealt is recovered by the user (rounded down).",
       "moveStat": "STR/DEX",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Ingrain",
@@ -12041,12 +12326,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "You attempt to drain the life force of a target. Make a ranged attack on a target, doing 1d10 + MOVE grass damage on a hit. Half of the damage dealt is restored to the user.",
       "moveStat": "STR/DEX",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Mycological Network",
@@ -12628,12 +12931,31 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self"
+        "heal_self",
+        "self_heal"
       ],
       "description": "You regenerate from the inside, healing some of your wounds. Heal yourself for 2d8 + MOVE hit points.",
       "moveStat": "CON",
       "vpCost": "10",
-      "scaling": "The healing dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The healing dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d8",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        }
+      ]
     },
     {
       "name": "Tera Drain",
@@ -13533,12 +13855,31 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self"
+        "heal_self",
+        "self_heal"
       ],
       "description": "You use the power of the earth around you to help heal your wounds, recovering 2d8 + MOVE hit points. If used during a Sandstorm, your MOVE modifier is doubled.",
       "moveStat": "CON",
       "vpCost": "3",
-      "scaling": "The damage dice roll for this move changes to 2d10 at level 5, 3d10 at level 10, and 4d12 at level 17."
+      "scaling": "The damage dice roll for this move changes to 2d10 at level 5, 3d10 at level 10, and 4d12 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d8",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        }
+      ]
     },
     {
       "name": "Spikes",
@@ -17135,12 +17476,47 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "self_heal",
+        "heal"
       ],
       "description": "You create a tasty drink that heals your or an ally’s wounds. The recipient gains 2d6 + MOVE hit points.",
       "moveStat": "CON",
       "vpCost": "8",
-      "scaling": "The dice roll for this move changes to 3d6 at\nlevel 5, 5d6 at level 10, and 8d6 at level 17."
+      "scaling": "The dice roll for this move changes to 3d6 at\nlevel 5, 5d6 at level 10, and 8d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        },
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Mimic",
@@ -17274,12 +17650,31 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self"
+        "heal_self",
+        "self_heal"
       ],
       "description": "A ray of sunlight shines upon you, basking you in healing light. The user gains 2d6 + MOVE hit points.",
       "moveStat": "WIS/CHA",
       "vpCost": "5",
-      "scaling": "The healing dice roll for this move changes to 3d6 at level 5, 4d6 at level 10, and 5d6 at level 17."
+      "scaling": "The healing dice roll for this move changes to 3d6 at level 5, 4d6 at level 10, and 5d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        }
+      ]
     },
     {
       "name": "Multi-Attack",
@@ -18565,12 +18960,30 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "heal"
       ],
       "description": "Heal a creature in range for 2d6 + MOVE hitpoints.",
       "moveStat": "CON/CHA",
       "vpCost": "5",
-      "scaling": "The dice roll for healing changes to 4d6 at level 5, 6d6 at level 10, and 8d6 at level 17."
+      "scaling": "The dice roll for healing changes to 4d6 at level 5, 6d6 at level 10, and 8d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Solvent Spray",
@@ -21221,12 +21634,30 @@
       "categories": [
         "damage",
         "drain",
-        "situational_use"
+        "situational_use",
+        "self_heal"
       ],
       "description": "You tap into a sleeping Pokémon’s dreams, sucking from its energy pool. Instantly inflict 2d8 + MOVE psychic damage on a sleeping target in range, regaining half as many hitpoints to yourself.",
       "moveStat": "WIS",
       "vpCost": "10",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Dream Fang",
@@ -21494,12 +21925,30 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "heal"
       ],
       "description": "You emit a healing pulse that restores a target's HP. Choose a target in range (cannot be yourself). The target regains 4d4 + MOVE hit points.",
       "moveStat": "CON/WIS",
       "vpCost": "10",
-      "scaling": "The healing dice roll for this move changes to 2d12 at level 5, 4d8 at level 10, and 8d6 at level 17."
+      "scaling": "The healing dice roll for this move changes to 2d12 at level 5, 4d8 at level 10, and 8d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "4d4",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Healing Wish",

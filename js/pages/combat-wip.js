@@ -12,7 +12,7 @@ import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { pickTarget, pickTargetAgain } from '../utils/target-picker.js';
 import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
-import { computeMoveDC } from '../utils/pokemon-types.js';
+import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
@@ -23,6 +23,7 @@ import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
 import { waitForDamagedReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
+import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, tempHpRemaining } from '../utils/move-effects.js';
@@ -1949,6 +1950,24 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleRerollDamage({ reactorId: attackerId, attackerId: pick.targetId, moveName });
       continue;
     }
+    if (effect.kind === 'heal') {
+      // Not a status either -- an immediate HP change. pick.targetId is
+      // whoever gets healed (attackerId itself for a target:self effect,
+      // see the section-building above); ctx.damageDealt only matters for
+      // a fractionOfDamage amount (drain moves).
+      await _handleApplyHeal({
+        targetId: pick.targetId, effect, moveName,
+        casterId: attackerId, casterName: attacker?.name,
+        // Deliberately NOT computedData.damageBonus -- that bakes in STAB/Ace
+        // Trainer/Type Master/held-item bonuses a heal's "+MOVE" text was
+        // never talking about. See bestMoveStatModifier's own docstring.
+        moveModBonus: effect.amount?.moveMod && attacker
+          ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker)
+          : 0,
+        damageDealt: ctx.damageDealt,
+      });
+      continue;
+    }
     if (effect.set !== undefined && typeof effect.set === 'object') {
       const resolved = _resolveSetValue(effect.set, attacker, target);
       if (resolved === null) {
@@ -2038,6 +2057,55 @@ async function _handleRerollDamage({ reactorId, attackerId, moveName }) {
   }
 }
 
+/** A `heal` effect (see move-effects-schema.md's own section): not a status,
+ * an immediate HP change, so this runs instead of _offerMoveEffects's normal
+ * apply-status loop (see its own call site). Two `amount` shapes:
+ *   - `{dice}` (`moveModBonus` already includes the caller's own moveMod
+ *     resolution): opens utils/heal-popup.js for the roll.
+ *   - `{fractionOfDamage}`: no roll -- computed straight from `damageDealt`,
+ *     the damage this same move-use just applied (threaded through from
+ *     whichever damage-application call site actually hit; see the schema
+ *     doc for which ones do). No damageDealt to work with (a drain effect
+ *     offered outside a hit, or the one call site that doesn't thread it
+ *     yet) just tells the table to apply it by hand, same fallback tone as
+ *     every other "can't auto-detect" spot in this app. */
+async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterName, moveModBonus, damageDealt }) {
+  const target = session?.participants?.[targetId];
+  if (!target) return;
+
+  let amount, note;
+  if (effect.amount?.fractionOfDamage) {
+    if (!Number.isFinite(damageDealt)) {
+      showCombatAlert(`Couldn't find ${moveName}'s damage dealt to compute the heal -- apply it manually.`, { title: moveName });
+      return;
+    }
+    amount = Math.floor(effect.amount.fractionOfDamage * damageDealt);
+    note = `${Math.round(effect.amount.fractionOfDamage * 100)}% of ${damageDealt} damage dealt`;
+  } else if (effect.amount?.dice) {
+    const rolled = await promptHealRoll({ dice: effect.amount.dice, moveModBonus, targetName: target.name, moveName });
+    if (rolled === null) return; // closed without entering one
+    amount = rolled;
+    note = `${effect.amount.dice}${moveModBonus ? ` + ${moveModBonus}` : ''}`;
+  } else {
+    return;
+  }
+  if (amount <= 0) return;
+
+  const maxHp = Number.isFinite(target.maxHP) ? target.maxHP : Infinity;
+  const newHp = Math.min(maxHp, target.currentHP + amount);
+  const actualHealed = newHp - target.currentHP;
+  try {
+    await CombatAPI.updateStats(targetId, { currentHP: newHp });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  CombatAPI.logEvent({
+    type: 'heal', actorId: casterId, actorName: casterName || '?', targetId, targetName: target.name,
+    text: `${target.name} healed ${actualHealed} HP from ${casterName || '?'}'s ${moveName} (${note})`,
+  }).catch(() => {});
+}
+
 /** Wired into combat.js's move-popup flow as onEffectsOnly -- for a move that has
  * structured effects but none of the other handlers took it (no damage, not save-
  * or AoE-tagged): Slack Off, Rest, Yawn, Gravity... The user's own effects are
@@ -2098,11 +2166,16 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   const { targetId, rawRoll } = picked;
   const damageModifier = computedData.damageBonus || 0;
   const moveType = (move && move[1]) || '';
+  let damageDealt;
   try {
     // No "N damage applied" popup -- it's already in the shared battle log
     // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
     // every damage application here); see the user's own "less tooltip noise" call.
-    await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, speciesName, moveName);
+    // damageApplied (post type-multiplier) is captured for a `heal` effect's own
+    // fractionOfDamage amount (Absorb, Drain Punch, ...) -- see _offerMoveEffects's
+    // own apply loop.
+    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, speciesName, moveName);
+    damageDealt = dmgResult?.damageApplied;
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
     return null;
@@ -2148,7 +2221,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   }
   await _offerMoveEffects({
     attackerId: combatantId, targetId, moveName, computedData,
-    ctx: { hit: true, attackRoll, guaranteedHit, crit, save },
+    ctx: { hit: true, attackRoll, guaranteedHit, crit, save, damageDealt },
   });
   return targetId;
 }
@@ -2318,9 +2391,11 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   const targetName = session?.participants?.[picked.targetId]?.name || '?';
   const rollNote = _saveRollNote(picked);
   // No attack roll on a pure save move -- the save's result alone decides which effects land.
-  const offerEffects = () => _offerMoveEffects({
+  // `extra` carries damageDealt through for the one branch below that actually applies
+  // damage (a `heal` effect's fractionOfDamage amount needs it -- Soul Drain).
+  const offerEffects = (extra = {}) => _offerMoveEffects({
     attackerId: combatantId, targetId: picked.targetId, moveName, computedData,
-    ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed: picked.passed, failBy: picked.failBy ?? null } },
+    ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed: picked.passed, failBy: picked.failBy ?? null }, ...extra },
   });
 
   if (picked.passed) {
@@ -2346,14 +2421,16 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   }
 
   const moveType = (move && move[1]) || '';
+  let damageDealt;
   try {
     // No "N damage applied" popup -- see _resolveOneHit's own note on why.
-    await CombatAPI.applyDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
+    const dmgResult = await CombatAPI.applyDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
+    damageDealt = dmgResult?.damageApplied;
     await waitForDamagedReactions(picked.targetId, combatantId, moveName);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }
-  await offerEffects();
+  await offerEffects({ damageDealt });
 }
 
 /** The holder rolls the saving throw a status ends on (its Move DC, the save's

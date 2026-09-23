@@ -55,6 +55,24 @@ export function parseDamageDice(description, higherLevels, pokemonLevel) {
 }
 
 /**
+ * The best of a move's allowed stat modifiers ("STR/CHA" -> whichever of the
+ * two is higher), in isolation -- factored out of computeMoveDC below since
+ * a `heal` effect's `moveMod` (see move-effects-schema.md) needs this exact
+ * figure too, and NOTHING else computeMoveData folds in: no STAB, no Ace
+ * Trainer/Type Master bonuses, no held-item bonus -- those are damage-
+ * specific mechanics a heal's "+MOVE" text was never talking about (the old
+ * combat.js heal popups already drew this same line, resolving their own
+ * moveMod via a plain per-stat switch with no such extras). `stats` only
+ * needs strMod..chaMod -- a server participant record already has that.
+ */
+export function bestMoveStatModifier(move, stats) {
+  const modMap = { STR: stats.strMod, DEX: stats.dexMod, CON: stats.conMod, INT: stats.intMod, WIS: stats.wisMod, CHA: stats.chaMod };
+  const moveModifiers = (move[2] || '').split('/').map(m => m.trim().toUpperCase());
+  const allowedMods = moveModifiers.map(m => modMap[m]).filter(v => v !== undefined);
+  return allowedMods.length > 0 ? Math.max(...allowedMods) : 0;
+}
+
+/**
  * The Move DC formula in isolation (8 + highest applicable stat mod +
  * proficiency, same as computeMoveData's own moveDC below -- deliberately
  * NOT calling into computeMoveData for this, since that needs a full
@@ -67,11 +85,7 @@ export function parseDamageDice(description, higherLevels, pokemonLevel) {
  * already has exactly that shape.
  */
 export function computeMoveDC(move, stats) {
-  const modMap = { STR: stats.strMod, DEX: stats.dexMod, CON: stats.conMod, INT: stats.intMod, WIS: stats.wisMod, CHA: stats.chaMod };
-  const moveModifiers = (move[2] || '').split('/').map(m => m.trim().toUpperCase());
-  const allowedMods = moveModifiers.map(m => modMap[m]).filter(v => v !== undefined);
-  const highestMod = allowedMods.length > 0 ? Math.max(...allowedMods) : 0;
-  return 8 + highestMod + (stats.proficiency || 0);
+  return 8 + bestMoveStatModifier(move, stats) + (stats.proficiency || 0);
 }
 
 /**

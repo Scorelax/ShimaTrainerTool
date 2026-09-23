@@ -1,10 +1,10 @@
 # Moves still without structured `effects`
 
-_Generated 2026-09-23 against DnD_moves_categorized_draft.json -- 888 moves total, 518 with no `effects` array yet.
+_Generated 2026-09-23 (updated after migrate_effects_v12.py) against DnD_moves_categorized_draft.json -- 888 moves total, 497 with no `effects` array yet.
  See move-effects-schema.md for the schema itself and its own "Not covered yet" section for the gap-by-gap reasoning._
 
 
-## 1. Fits the schema already, just not migrated yet (93)
+## 1. Fits the schema already, just not migrated yet (91)
 
 Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar etc. already use. No new mechanism needed, purely a matter of writing the OVERRIDES entries.
 
@@ -75,7 +75,6 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - **Rage** (stat_buff_self) -- You go into a fit of rage, attacking with relentless fury. While you are raging, you gain +1 on all damage rolls (only once per move), have 
 - **Razor Leaf** (crit_range_mod) -- You send a razor sharp leaf at a creature in range at tremendous speed. Make a ranged attack roll, doing 1d10 + MOVE grass damage on a hit. 
 - **Roar of Time** (stat_buff_self) -- You unleash a roar that has the power to distort time. All creatures within range must make a WIS save against your Move DC, taking 10d12 + 
-- **Roost** (stat_debuff_self) -- You land on the ground to rest your body. Regain 2d8 + MOVE hit points, but become grounded and lose your ground-type resistance until the b
 - **Royal Guard** (stat_buff_self, stat_buff_ally) -- A glowing barrier of hieroglyphic text surrounds you in a 15 foot radius, protecting you and any creatures within the barrier from damage an
 - **Safeguard** (stat_buff_self, stat_buff_ally) -- You boost defenses for you and all allies in range. For the duration, any ally within range is protected from new negative status conditions
 - **Sand Lance** (stat_debuff_enemy) -- You slam your reinforced horn through defenses. Make a melee attack dealing 3d10 + MOVE ground damage. This attack ignores resistance to Gro
@@ -86,7 +85,6 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - **Silent Approach** (stat_buff_self) -- A ghostly darkness envelops you, hiding you, masking your scent and dampening the noise you make. For the duration, gain advantage on stealt
 - **Sky Attack** (stat_debuff_enemy) -- When you use this move, you flap your wings menacingly and prepare to strike a creature within range. On your next turn’s action, if you kee
 - **Slash** (crit_range_mod) -- You slash out at a creature in range. Make a melee attack, doing 2d8 + MOVE normal damage on a hit. Slash results in a critical hit on 19s a
-- **Soul Drain** (potential_disadvantage) -- The user attempts to drain the life force of a creature within 30 feet. The target must make a Charisma saving throw. On a failure, it takes
 - **Spirit Growth** (stat_buff_self) -- You channel a strong determination from deep within your mind. For the duration, all moves drawing on WIS for move power cost half their nor
 - **Stockpile** (stat_buff_self) -- You use your action to store energy for a Spit Up or Swallow move, increasing your defense. Gain one point of Stockpile. Raise your AC by 1 
 - **Study** (stat_buff_self, advantage_on_attack_roll) -- You study a target within 50 feet. For one minute, you have advantage on any ability checks or attack rolls against that target.
@@ -102,7 +100,9 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - **Wing Buffer** (stat_buff_self) -- You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successfu
 - **Wing Command** (stat_buff_ally) -- You spread your wings in a majestic display, inspiring allies close by. All allies within range that can see you receive a bonus to their at
 
-## 2. Needs a new effect kind / mechanism (176)
+## 2. Needs a new effect kind / mechanism (157)
+
+`drain`/`heal_self`/`heal_target_or_aoe` no longer appear here for the 21 moves migrate_effects_v12.py covered (the new `heal` kind) -- see its own module docstring for exactly which ones, and why the rest of those three tags are still listed below.
 
 
 ### conditional_damage (25) -- damage that changes based on a condition (target HP, a status, terrain, ...)
@@ -180,58 +180,6 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - Testudo Formation
 - Wide Guard
 
-### heal_target_or_aoe (17) -- heals someone other than (or in addition to) the user
-- Aromatherapy
-- Cactus Bloom
-- Dream Mend
-- Floral Healing
-- Harmony Breath
-- Heal Bell
-- Heal Pulse
-- Maintenance
-- Milk Drink
-- Pollen Puff
-- Present
-- Purify
-- Recover
-- Scrub Down
-- Soft-Boiled
-- Soothing Breeze
-- Wish
-
-### drain (15) -- heals the user for a portion of damage dealt
-- 5. Enervation Ray
-- Absorb
-- Drain Punch
-- Draining Kiss
-- Dream Eater
-- Energize
-- Giga Drain
-- Grudge
-- Horn Leech
-- Leech Life
-- Mega Drain
-- Oblivion Wing
-- Parabolic Charge
-- Spite
-- Tera Drain
-
-### heal_self (14) -- heals the user
-- Aqua Ring
-- Burning Glance
-- Heal Order
-- Ingrain
-- Moonlight
-- Morning Sun
-- Purify
-- Recompose
-- Recover
-- Refresh
-- Shore Up
-- Strength Sap
-- Swallow
-- Synthesis
-
 ### potential_damage_increase (13) -- damage that scales on a condition not yet modeled
 - Avalanche
 - Charge Beam
@@ -262,6 +210,20 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - U-turn
 - Volt Switch
 
+### heal_target_or_aoe (12) -- heals someone other than (or in addition to) the user
+- Aromatherapy
+- Cactus Bloom
+- Floral Healing
+- Harmony Breath
+- Heal Bell
+- Maintenance
+- Pollen Puff
+- Present
+- Purify
+- Scrub Down
+- Soothing Breeze
+- Wish
+
 ### field_terrain (12) -- sets/uses a terrain effect
 - Convergence
 - Electric Terrain
@@ -287,6 +249,16 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - Splash
 - Teleport
 
+### heal_self (8) -- heals the user
+- Aqua Ring
+- Burning Glance
+- Ingrain
+- Purify
+- Recompose
+- Refresh
+- Strength Sap
+- Swallow
+
 ### attack_suppression (6) -- stops the target from attacking
 - Disable
 - Encore
@@ -294,6 +266,14 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - Oblivion Ink
 - Throat Chop
 - Torment
+
+### drain (6) -- heals the user for a portion of damage dealt
+- 5. Enervation Ray
+- Energize
+- Grudge
+- Parabolic Charge
+- Spite
+- Tera Drain
 
 ### lethal_faint (5) -- special behavior when the move would faint the target
 - 10. Death Ray
@@ -353,4 +333,4 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 
 ## 4. Pure mechanical shape -- correctly has no `effects`, nothing to do (217)
 
-Plain damage / save-for-damage / multi-hit / recharge moves with no secondary effect to encode. Listed only so this file accounts for all 518 -- not a backlog.
+Plain damage / save-for-damage / multi-hit / recharge moves with no secondary effect to encode. Listed only so this file accounts for all remaining moves -- not a backlog.

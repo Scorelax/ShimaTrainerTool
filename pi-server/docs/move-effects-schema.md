@@ -8,12 +8,13 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ```jsonc
 {
-  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage",
+  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal",
   // condition:  "apply": "<name>", optional "value" (type_changed → "Ghost")
   // stat:       "stat": "<stat>", "amount": -1 | "proficiency" | {"dice": "1d4"}  OR  "set": 0, optional "stacks": {"max": 5}
   // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>"
   // temp_hp:    "amount": 10 -- a bonus-HP pool, see its own section below
   // reroll_damage: no extra fields -- see its own section below
+  // heal:       "amount": {"dice": "2d6", "moveMod": true} | {"fractionOfDamage": 0.5} -- see its own section below
   "when":   { "type": ... },        // what triggers it — see below
   "target": "self",                 // only present when the USER is affected (default: the target)
   "ends":   [ ... ],                // how it stops — any ONE entry ending it removes it
@@ -53,6 +54,34 @@ client-authoritative correction the Modify Stats buttons already use for HP (no 
 action). No log entry to find (a freeform PvE hit, or the window opened too late) just tells the
 table to compare by hand, same fallback tone as every other "can't auto-detect" spot in this app.
 
+**`heal`** restores HP -- also never a stored status (`ends: [{type:"instant"}]`, same as
+`reroll_damage` above), since there's nothing to hold onto after the number is applied. Two
+`amount` shapes:
+- `{dice: "2d6"}`, optionally `moveMod: true` -- a one-off roll the human enters, same "the app
+  shows the structure, a human supplies the number" pattern as every other roll in this app.
+  `moveMod: true` adds `computedData.damageBonus` (the move's own already-computed STAB/stat/item
+  bonus figure -- reused as-is, not recalculated, since a heal move's "+MOVE" text means the exact
+  same modifier a damage move's "+MOVE" does).
+- `{fractionOfDamage: 0.5}` -- a drain move's "heal for half the damage dealt": no roll needed,
+  the amount is computed straight from the damage that was JUST applied (`Math.floor(fraction *
+  damageDealt)`). `1.0` for a full-damage drain (Oblivion Wing).
+
+`target` follows the usual convention: `self` for a move that only ever heals its own user
+(unset, no picker), left unset for one that heals someone else (`_handleEffectsOnly`'s
+multi-target picker, same self+ally split Baby-Doll Eyes/Celebrate already use) -- a move that
+can heal EITHER (Recover, Milk Drink) ships as two separate `heal` effects, one of each, not a
+`choice` group (both are independently useful, not mutually exclusive picks).
+
+`combat-wip.js`'s `_offerMoveEffects` special-cases this kind exactly like `reroll_damage`:
+dice amounts open `utils/heal-popup.js` for the roll, fraction amounts read `ctx.damageDealt`
+(threaded through from whichever damage-application call site actually hit -- `_resolveOneHit`
+and `_handleSaveTriggered`'s damage branch both capture `apply-damage`'s own `damageApplied`
+return value for this; `_handleMultiHitAoe`'s own damage branch does NOT yet, so a
+`fractionOfDamage` effect on a multi-target AoE move won't compute correctly until that's
+wired too -- none of the moves migrated so far need it). Either way, the result clamps to the
+target's `maxHP` and applies through `update-stats`, same client-authoritative HP correction
+`reroll_damage`'s own refund already uses.
+
 ## `when`
 | type | meaning |
 |---|---|
@@ -88,6 +117,7 @@ table to compare by hand, same fallback tone as every other "can't auto-detect" 
 - stat — `stat_buff_<stat>` / `stat_debuff_<stat>` / `potential_stat_…`
 - roll — `advantage_<on>` / `disadvantage_<on>` / `potential_…`
 - reroll_damage — `reroll_damage` / `potential_reroll_damage` (always the latter in practice — it only ever rides on a `save_fail`)
+- heal — `heal` / `self_heal` (an `on_hit`-gated drain counts as guaranteed, same as any other `on_hit` effect — never gets a `potential_` prefix)
 
 ## How live modifiers are applied (`js/utils/move-effects.js`, shown by the attack / save popups)
 The dice are rolled at the table, so the popups only *show* what applies and fold numbers into totals.

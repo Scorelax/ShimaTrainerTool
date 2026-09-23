@@ -103,6 +103,11 @@ export function statusLabel(s) {
   if (s.kind === 'reroll_damage') {
     return 'Reroll their damage, take the lower';
   }
+  if (s.kind === 'heal') {
+    if (s.amount?.fractionOfDamage) return `Heal ${Math.round(s.amount.fractionOfDamage * 100)}% of damage dealt`;
+    if (s.amount?.dice) return `Heal ${s.amount.dice}${s.amount.moveMod ? ' + MOVE' : ''}`;
+    return 'Heal';
+  }
   if (s.kind === 'stat') {
     const stat = s.stat === 'ac' ? 'AC'
       : s.stat === 'crit' ? 'Crit range'

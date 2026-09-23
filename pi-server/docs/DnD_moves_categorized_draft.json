@@ -2878,7 +2878,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_ally",
+        "self_advantage_attacks_against",
         "protect_negate",
         "recharge_locked",
         "guaranteed_hit",
@@ -2887,7 +2887,25 @@
       "description": "You send a barrage of three balls of furious energy at any creature(s) in range. Each ball automatically deals 3d10 dark damage to any creature(s) you choose. Reactions that negate damage such as Protect or Detect cannot be used, and creatures in the invulnerable stages of moves like Fly, Dig, etc. can be targeted by this move. After activating this move, any attacks against you, until the beginning of your next turn, are rolled at advantage. This move may be used once per short rest.",
       "moveStat": "STR/DEX",
       "vpCost": "50",
-      "scaling": "You can fire 4 projectiles at level 5, 5 projectiles at level 10, and 6 projectiles at level 17."
+      "scaling": "You can fire 4 projectiles at level 5, 5 projectiles at level 10, and 6 projectiles at level 17.",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Imperial Decree",
@@ -3517,13 +3535,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "advantage_on_attack_roll",
-        "stat_debuff_self"
+        "self_advantage_attacks_against"
       ],
       "description": "You go all out in a flurry of dark strikes, sacrificing your defenses. Make a melee attack on an opponent, dealing 3d10 + MOVE dark damage on a hit, rolled with advantage. After activating this move, your AC is reduced by 1d4, and the target has advantage on any attack it makes against you, until the beginning of your next turn.",
       "moveStat": "DEX",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Void Consumption",
@@ -4061,12 +4096,28 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_ac"
       ],
       "description": "Electricity surges through your body, charging up for your next attack. Until your next turn, boost your AC by 2. On your next turn, double your STAB bonus when dealing damage of your type.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Charge Beam",
@@ -4454,13 +4505,46 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally",
+        "stat_buff_ac",
+        "advantage_saving_throws",
         "situational_use"
       ],
       "description": "You use your electric energy to manipulate magnetic fields. Until the beginning of your next turn, any creature in range with the Plus or Minus ability gains a bonus to their AC equal to your proficiency modifier, and any saving throw they are forced to make is rolled with advantage.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": "proficiency",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "saving_throws",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Magnetic Pulse",
@@ -7040,12 +7124,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_self"
+        "self_advantage_attacks_against"
       ],
       "description": "You get in close for a devastating strike, sacrificing your defenses. Make a melee attack on an opponent, dealing 3d10 + MOVE fighting damage on a hit, rolled with advantage. After activating this move, your AC is reduced by 1d4, and the target has advantage on any attack it makes against you, until the beginning of your next turn.",
       "moveStat": "STR",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Counter",
@@ -7476,7 +7578,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "base_crit"
       ],
       "description": "You extend a hand towards a target creature for a savage karate chop. Make a melee attack roll, doing 1d6 + MOVE fighting damage on a hit. Karate Chop scores a critical hit on 19s and 20s.",
       "moveStat": "STR/DEX",
@@ -7497,14 +7599,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod",
-        "advantage_on_attack_roll",
+        "self_stat_buff_crit",
         "situational_use"
       ],
       "description": "Requires below 50% HP to activate. Make a melee attack dealing 4d12 + MOVE fighting damage. This attack has advantage and scores a critical hit on 18-20.",
       "moveStat": "STR/DEX",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "crit",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Low Kick",
@@ -8507,12 +8625,45 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_ac",
+        "self_status_condition_granted_immunity"
       ],
       "description": "Ethereal blue flames flare up around you and cover your body. For the duration, gain 5+ to your AC, and water moves evaporate when they hit you.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 5,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "granted_immunity",
+          "when": {
+            "type": "always"
+          },
+          "value": "Water",
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Fiery Dance",
@@ -9558,12 +9709,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_self"
+        "self_stat_debuff_ac"
       ],
       "description": "Your forehead burns like hot coals as you slam your head into a creature. Make a melee attack roll, dealing 4d12 + MOVE fire damage on a hit. After activating this move, your AC decreases by 2 until the beginning of your next turn. Until your next long rest, each use of this move after the first doubles the current AC debuff.",
       "moveStat": "STR/DEX",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Watchful Embers",
@@ -9733,7 +9902,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "base_crit"
       ],
       "description": "You create a gust of razor-like wind to slash an opponent. Make a ranged attack against an opponent, doing 2d8 + MOVE flying damage on a hit. This move scores a critical hit on 19 and 20.",
       "moveStat": "DEX",
@@ -9935,7 +10104,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod"
+        "base_crit"
       ],
       "description": "You hammer down on an enemy with a peck attack. Make a melee attack roll on a target, doing 1d10 + MOVE flying damage on a successful hit. Drill Peck scores a critical hit on 19s and 20s.",
       "moveStat": "STR/DEX",
@@ -10306,12 +10475,30 @@
       "categories": [
         "damage",
         "trigger_saving_throw",
-        "stat_debuff_enemy"
+        "potential_disadvantage_attacks_against"
       ],
       "description": "When you use this move, you flap your wings menacingly and prepare to strike a creature within range. On your next turn’s action, if you keep your concentration, you dive at a creature in range, ignoring your flying speed and any opportunity attacks you may incur. Your target is forced to succeed a DEX save, taking 3d10 + MOVE flying damage and have disadvantage on attacks against you until the end of its next turn on a failure, half as much on a success.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "save_fail",
+            "ability": "DEX"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Sky Drop",
@@ -10672,13 +10859,154 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw_on_hit",
-        "stat_debuff_enemy",
+        "potential_stat_debuff_ac",
+        "potential_stat_debuff_str",
+        "potential_stat_debuff_dex",
+        "potential_stat_debuff_con",
+        "potential_stat_debuff_wis",
+        "potential_stat_debuff_int",
+        "potential_stat_debuff_cha",
+        "potential_status_condition_trapped",
         "positioning"
       ],
       "description": "Your eyes open wide and fixate on one creature in range, casting a devastating curse. Make a ranged attack. On a hit, force the creature to attempt a WIS save against your move DC. On a failure, the creature gets -1 to AC, STR, DEX, CON, WIS, INT, and CHA, and they can't flee or be switched out for the rest of the encounter. The effect stacks for a maximum of 5 times. On a success, nothing happens.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": "At level 10, the stat debuff increases to -2, and at level 17 it increases to -3."
+      "scaling": "At level 10, the stat debuff increases to -2, and at level 17 it increases to -3.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -1,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        },
+        {
+          "kind": "stat",
+          "stat": "str",
+          "amount": -1,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        },
+        {
+          "kind": "stat",
+          "stat": "dex",
+          "amount": -1,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        },
+        {
+          "kind": "stat",
+          "stat": "con",
+          "amount": -1,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        },
+        {
+          "kind": "stat",
+          "stat": "wis",
+          "amount": -1,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        },
+        {
+          "kind": "stat",
+          "stat": "int",
+          "amount": -1,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        },
+        {
+          "kind": "stat",
+          "stat": "cha",
+          "amount": -1,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        },
+        {
+          "kind": "condition",
+          "apply": "trapped",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Destiny Bond",
@@ -11168,7 +11496,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod",
         "base_crit"
       ],
       "description": "You strike with a sharp claw made from shadows in range. Make a ranged attack, dealing 1d10 + MOVE ghost damage on a hit. This moves scores a critical hit on natural attack rolls of 19 and 20.",
@@ -11687,12 +12014,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_ac"
       ],
       "description": "You sprout a canopy of sap-filled leaves that surround you on all sides. Increase your AC by 1. This increase may be stacked, to a maximum of +5. Attacks against you of a type you are vulnerable to remove any bonus AC you have stacked up with this move on a hit.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        }
+      ]
     },
     {
       "name": "Constricting Vines",
@@ -12218,7 +12565,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod",
         "base_crit"
       ],
       "description": "You attempt to slash a creature with a sharp leaf. Make a melee attack against a target, dealing 2d8 + MOVE grass damage on a hit. This attack scores a critical on 19 and 20.",
@@ -12584,7 +12930,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod",
         "base_crit"
       ],
       "description": "You send a razor sharp leaf at a creature in range at tremendous speed. Make a ranged attack roll, doing 1d10 + MOVE grass damage on a hit. Razor Leaf results in a critical hit on 19s and 20s.",
@@ -13906,12 +14251,29 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "stat_debuff_ac"
       ],
       "description": "You slam your reinforced horn through defenses. Make a melee attack dealing 3d10 + MOVE ground damage. This attack ignores resistance to Ground damage. On hit, the target's AC is reduced by 2 until the end of your next turn.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -2,
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Sand Tomb",
@@ -15261,13 +15623,29 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_stat_buff_str",
         "recoil"
       ],
       "description": "You sacrifice health for attack. When using this move, take damage equal to half your maximum, but increase your Strength score by 10 while you remain in battle. After activating this move, you are not affected by potions for the remainder of the encounter.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "str",
+          "amount": 10,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Bestow",
@@ -15933,7 +16311,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod",
         "base_crit"
       ],
       "description": "You lash out at an enemy with vine or claw or blade. Make a melee roll on an enemy, doing 1d6 + MOVE on a successful hit. This move scores a critical hit on a natural attack roll of 19 or more.",
@@ -15954,12 +16331,47 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_ac",
+        "self_status_condition_resistance_upgrade"
       ],
       "description": "You curl up into a tight ball, increasing your defensive stance. Until your next turn, you gain + 4 to your AC and have resistance to normal attacks.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 4,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "resistance_upgrade",
+          "when": {
+            "type": "always"
+          },
+          "value": "Normal",
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Disable",
@@ -16294,14 +16706,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally",
-        "advantage_on_saving_throws"
+        "self_stat_buff_ac",
+        "stat_buff_ac"
       ],
       "description": "You enter a formation with 5 creatures of large size or smaller, that each are within 5 feet of the next. While in formation, all creatures gain advantage on Strength saves, and AC is increased by 2. To maintain formation, everyone's movement is held until the Formation Leader moves the entire formation, unless an individual wants to break it. This effect will not stack. The formation breaks if a gap is created between individuals.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self"
+        },
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          }
+        }
+      ]
     },
     {
       "name": "Entraintment",
@@ -16768,12 +17198,31 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "stat_debuff_enemy"
+        "potential_stat_debuff_attack_rolls"
       ],
       "description": "You target a creature with an intimidating growl. The creature must make a WIS save against your Move DC. On a fail, it adds -1 to any attack it makes for the duration. This modifier can be stacked if it fails multiple growl saves, up to a maximum of -5.",
       "moveStat": "CHA/STR",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": -1,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        }
+      ]
     },
     {
       "name": "Growth",
@@ -17178,13 +17627,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "boosted_attack_rolls"
+        "self_stat_buff_attack_rolls"
       ],
       "description": "You increase your adrenaline with a menacing howl. For the duration, add +1 to any attack roll you make. This move can be stacked for a maximum of +5.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "stacks": {
+            "max": 5
+          }
+        }
+      ]
     },
     {
       "name": "Hyper Beam",
@@ -18018,12 +18486,29 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "potential_disadvantage"
+        "potential_disadvantage_attack_rolls"
       ],
       "description": "You convince a creature that you mean it no harm. Force a creature to make a CHA saving throw against your Move DC. On a failure, any attack the target makes on its next turn is rolled at disadvantage. If the target activates a move that requires a saving throw, you have advantage on the roll.",
       "moveStat": "CHA",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Pound",
@@ -18141,12 +18626,43 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_resistance_upgrade",
+        "self_stat_buff_damage_rolls"
       ],
       "description": "You go into a fit of rage, attacking with relentless fury. While you are raging, you gain +1 on all damage rolls (only once per move), have resistance to normal damage, and have advantage on all Strength checks. Your rage ends if you are incapacitated or if you have not attacked a hostile target since your last turn, or taken any damage since then.",
       "moveStat": "STR",
       "vpCost": "5",
-      "scaling": "For damage when raging, the bonus changes to +2 at level 5, +4 at level 10, and +6 at level 17."
+      "scaling": "For damage when raging, the bonus changes to +2 at level 5, +4 at level 10, and +6 at level 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "resistance_upgrade",
+          "when": {
+            "type": "always"
+          },
+          "value": "Normal",
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "damage_rolls",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Rapid Spin",
@@ -18769,13 +19285,61 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_debuff_self"
+        "self_stat_debuff_ac",
+        "self_stat_buff_attack_rolls",
+        "self_stat_buff_damage_rolls"
       ],
       "description": "You break off a piece of your shell, lowering your AC, but improving your attack. When you activate this move, lower your AC by 1, but increase your attack and damage rolls by 1 for the duration. This move cannot stack.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "damage_rolls",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Simple Beam",
@@ -18958,7 +19522,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod",
         "base_crit"
       ],
       "description": "You slash out at a creature in range. Make a melee attack, doing 2d8 + MOVE normal damage on a hit. Slash results in a critical hit on 19s and 20s.",
@@ -19278,12 +19841,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_ac"
       ],
       "description": "You use your action to store energy for a Spit Up or Swallow move, increasing your defense. Gain one point of Stockpile. Raise your AC by 1 until you use one of those two moves. This move may be stacked a maximum of 3 times before the energy is used. As long as you have a point of Stockpile, your speed is halved, and you may only use the moves Stockpile, Spit Up or Swallow unless you drop the Stockpile points.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "stacks": {
+            "max": 3
+          }
+        }
+      ]
     },
     {
       "name": "Stomp",
@@ -19517,12 +20100,30 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "advantage_on_attack_roll"
+        "self_potential_advantage_attack_rolls"
       ],
       "description": "You release a sweet smell directed at a target in range. The target must make a CHA save against your Move DC. On a fail, you have advantage on your next two attacks against that target.",
       "moveStat": "CON/CHA",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 2
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Swift",
@@ -20567,13 +21168,30 @@
         "damage",
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "stat_debuff_enemy",
+        "potential_stat_debuff_ac",
         "recharge_locked"
       ],
       "description": "The user exhales a 15-foot cone of corrosive mist. Each creature in the area must make a Constitution saving throw. On a failure, a creature takes 3d10 + MOVE poison damage and its AC is reduced by 2 for 1 minute. On a success, it takes half damage and its AC is not reduced. This move bypasses Steel types' immunity to Poison.",
       "moveStat": "CON",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": -2,
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Cross Poison",
@@ -21548,13 +22166,45 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_debuff_self"
+        "self_stat_buff_ac",
+        "self_stat_buff_saving_throws"
       ],
       "description": "Your mind elevates to a new level of focus. Add +2 to you AC and any saving throw you make for the duration, but select one of your moves that is not Amnesia. You forget that move and cannot use it for the duration.",
       "moveStat": "None",
       "vpCost": "7",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "saving_throws",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Archive Blast",
@@ -23167,7 +23817,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod",
         "base_crit"
       ],
       "description": "You tear at a target with blades formed by psychic power. Make a ranged attack on a creature, dealing 1d10 + MOVE psychic damage on a hit. This move scores a critical hit on natural rolls of 19 or 20.",
@@ -23374,14 +24023,43 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally",
+        "self_stat_buff_ac",
+        "stat_buff_ac",
         "protect_negate"
       ],
       "description": "A glowing barrier of hieroglyphic text surrounds you in a 15 foot radius, protecting you and any creatures within the barrier from damage and status conditions. For the duration, the AC of you and all allied creatures inside the barrier is increased by 2, and you are immune to all incoming status conditions.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Skill Swap",
@@ -24578,13 +25256,27 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally",
-        "advantage_on_attack_roll"
+        "advantage_attack_rolls"
       ],
       "description": "You engage your gears to raise the attack of ally creatures in range with the Plus or Minus ability. While you maintain your concentration, Pokémon under the effects of Gear Up have advantage on all attack rolls.",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Gold Rush",
@@ -25216,12 +25908,43 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_attack_rolls",
+        "self_stat_buff_damage_rolls"
       ],
       "description": "You rotate your gears quickly, raising your attack and speed. When you activate this move, add +1 to your attack and damage rolls, and +10 to your speed for the duration. At the start of each of your turns while active, spend 2 VP or the effect ends.",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": "The attack and damage roll bonus for this move changes to +2 at level 5, +3 at level 10, and +4 at level 17."
+      "scaling": "The attack and damage roll bonus for this move changes to +2 at level 5, +3 at level 10, and +4 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "damage_rolls",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Smart Strike",
@@ -25599,7 +26322,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "crit_range_mod",
         "base_crit"
       ],
       "description": "You slam down onto an opponent with a heavy claw. Make a melee attack roll on a target, dealing 3d10 + MOVE water damage on a hit. This move scores a critical hit on rolls of 19 or 20.",
@@ -26275,13 +26997,44 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally"
+        "self_status_condition_resistance_upgrade",
+        "status_condition_resistance_upgrade"
       ],
       "description": "You soak yourself and all allies with water, reducing the amount of fire damage taken for anyone affected. For the duration, you and any ally in range (when you initially activated this move) have resistance to fire-type attacks. If you were already resistant, you are now immune If you were vulnerable, you now take normal damage. If you are immune to fire-type moves already, nothing happens.",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "resistance_upgrade",
+          "when": {
+            "type": "always"
+          },
+          "value": "Fire",
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "resistance_upgrade",
+          "when": {
+            "type": "always"
+          },
+          "value": "Fire",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Water Spout",

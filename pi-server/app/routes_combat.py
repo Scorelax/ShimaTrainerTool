@@ -1046,11 +1046,16 @@ def _active_participant_id(state):
 # they report and expires what the turn/round counters say has run out.
 # ---------------------------------------------------------------------------
 
-_STATUS_KINDS = ('condition', 'stat', 'roll', 'temp_hp')
+_STATUS_KINDS = ('condition', 'stat', 'roll', 'temp_hp', 'heal')
 _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'long_rest', 'uses', 'instant', 'other')
 # value2: a type_changed condition's optional second type (Reflect Type copying a
 # dual-type creature) -- every other condition/kind only ever uses `value`.
-_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note')
+# repeat: a `heal` status only (Aqua Ring/Ingrain's heal-over-time) -- 'start_of_turn' |
+# 'end_of_turn', re-triggers the heal at the HOLDER's own turn boundary each time it's
+# still active (see combat-wip.js's _promptTurnHeals). A one-shot `heal` effect (every
+# drain, every plain heal-on-use move) never reaches this at all -- it's intercepted
+# client-side and applied directly, same as reroll_damage.
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat')
 
 
 def _statuses_of(participant):
@@ -1083,6 +1088,16 @@ def _status_label(s):
     if kind == 'temp_hp':
         remaining = s.get('remaining')
         return f"{remaining} temporary HP" if remaining is not None else 'temporary HP'
+    if kind == 'heal':
+        amount = s.get('amount') or {}
+        pool = amount.get('pool', 'HP')
+        if amount.get('fractionOfDamage'):
+            return f"heal {round(amount['fractionOfDamage'] * 100)}% of damage dealt ({pool})"
+        if amount.get('levelMultiple'):
+            return f"heal {amount['levelMultiple']}x level ({pool})"
+        if amount.get('dice'):
+            return f"heal {amount['dice']}{' + MOVE' if amount.get('moveMod') else ''} ({pool})"
+        return f"heal ({pool})"
     return f"{s.get('roll')} on {(s.get('on') or '').replace('_', ' ')}"
 
 
@@ -1124,7 +1139,7 @@ def _apply_status(state, target_id, spec):
     if not target:
         raise ValueError('Unknown participant: ' + target_id)
     if spec.get('kind') not in _STATUS_KINDS:
-        raise ValueError('status kind must be condition, stat or roll')
+        raise ValueError('status kind must be condition, stat, roll, temp_hp or heal')
     raw_ends = spec.get('ends') or []
     for e in raw_ends:
         if not isinstance(e, dict) or e.get('type') not in _END_TYPES:

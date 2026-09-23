@@ -4534,12 +4534,31 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "A sweeping electric charge arcs around you, stealing some of the target's energy. Force all creatures in a 15ft radius, centered on you, to make a CON save against your Move DC, taking 3d10 + MOVE electric damage on a failure. Recover hit points equal to half the total damage dealt, but no more than 5 times your level.",
       "moveStat": "STR",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5,
+            "capMultipleOfLevel": 5
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Shock Wave",
@@ -5773,12 +5792,30 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "heal"
       ],
       "description": "You extend a healing energy to recover the hit points of a creature in range. The target gains 2d8 + MOVE hit points. If the terrain is grassy, double your MOVE modifier.",
       "moveStat": "CON",
       "vpCost": "6",
-      "scaling": "The damage dice roll for this move changes to 2d10 at level 5, 3d10 at level 10, and 4d12 at level 17."
+      "scaling": "The damage dice roll for this move changes to 2d10 at level 5, 3d10 at level 10, and 4d12 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d8",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Flower Shield",
@@ -12123,12 +12160,33 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self"
+        "heal_self",
+        "self_heal"
       ],
       "description": "You pierce the ground with roots, absorbing natural energy and fixing you in place. At the end of each of your next three turns (including this one), heal yourself for 1d10 + MOVE hit points as a free action. During this time, you may not move or be switched out.",
       "moveStat": "CON",
       "vpCost": "5",
-      "scaling": "The healing dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The healing dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "1d10",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "repeat": "end_of_turn",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Leaf Blade",
@@ -12710,12 +12768,30 @@
       "reaction": false,
       "categories": [
         "heal_target_or_aoe",
-        "recharge_locked"
+        "recharge_locked",
+        "heal"
       ],
       "description": "You summon a healing breeze in a 30ft. radius from a point within range, that restores 3d10 + MOVE hit points to all friendly creatures. This move can be used once per long rest.",
       "moveStat": "WIS",
       "vpCost": "25",
-      "scaling": "The healing dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The healing dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "3d10",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Spiky Shield",
@@ -12974,12 +13050,30 @@
         "trigger_saving_throw",
         "multi_hit_aoe",
         "drain",
-        "recharge_locked"
+        "recharge_locked",
+        "self_heal"
       ],
       "description": "Roots erupt from the ground in a 20ft radius centered on a point within 60ft. All creatures must make a CON save, taking 4d12 + MOVE grass damage on fail, half on success. You heal for 50% of total damage dealt to all targets.",
       "moveStat": "STR/DEX",
       "vpCost": "40",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Trop Kick",
@@ -18114,12 +18208,32 @@
       "reaction": false,
       "categories": [
         "heal_self",
-        "recharge_locked"
+        "recharge_locked",
+        "self_heal"
       ],
       "description": "You retreat from the fray to regain your composure. Gain 2d4 + MOVE VP. This move can only be used in combat, when no enemies are within melee range, and can only be used once per long rest.",
       "moveStat": "CON",
       "vpCost": "0",
-      "scaling": "The VP gained for this move changes to 4d6 at level 5, 6d8 at level 10, and 8d10 at level 17."
+      "scaling": "The VP gained for this move changes to 4d6 at level 5, 6d8 at level 10, and 8d10 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "2d4",
+            "moveMod": true,
+            "pool": "VP"
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Recycle",
@@ -24745,12 +24859,30 @@
       "reaction": false,
       "categories": [
         "heal_target_or_aoe",
-        "recharge_locked"
+        "recharge_locked",
+        "heal"
       ],
       "description": "You perform emergency maintenance on a creature or structure. Touch one target to restore 3d10 + MOVE hit points. If used on a structure or object instead, it is reinforced, gaining +5 AC and resistance to all damage types for 1 hour. This move can be used 3 times per long rest.",
       "moveStat": "CON",
       "vpCost": "15",
-      "scaling": "The healing dice roll for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The healing dice roll for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "3d10",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Metal Burst",
@@ -25266,12 +25398,31 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self"
+        "heal_self",
+        "self_heal"
       ],
       "description": "You surround yourself with a veil of healing water. At the end of each of your turns, as long as you hold concentration, regain a number of hit points equal to your level.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "levelMultiple": 1
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "repeat": "end_of_turn",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Aqua Tail",

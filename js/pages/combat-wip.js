@@ -26,7 +26,7 @@ import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, tempHpRemaining } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, tempHpRemaining } from '../utils/move-effects.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -1542,8 +1542,10 @@ function _attachMainFocusListeners(state) {
     const nextId = _nextOwnedAfter(session, endingId);
     const endingHasIngrain = ctx.filteredState.combatants[0]?.statusEffects
       ?.some(se => se.name === 'Ingrain' && se.duration > 0);
-    // Effects that end on a repeat save at the end of this turn get their save prompt first.
+    // Effects that end on a repeat save, or a `heal` status due to re-trigger
+    // (Aqua Ring/Ingrain), at the end of this turn get prompted first.
     _promptTurnSaves(endingId, 'end_of_turn')
+      .then(() => _promptTurnHeals(endingId, 'end_of_turn'))
       .then(() => CombatAPI.advanceTurn())
       .then(() => { if (nextId && nextId !== endingId && !endingHasIngrain) _setFocus(nextId); })
       .catch(() => {});
@@ -1950,11 +1952,16 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleRerollDamage({ reactorId: attackerId, attackerId: pick.targetId, moveName });
       continue;
     }
-    if (effect.kind === 'heal') {
-      // Not a status either -- an immediate HP change. pick.targetId is
-      // whoever gets healed (attackerId itself for a target:self effect,
-      // see the section-building above); ctx.damageDealt only matters for
-      // a fractionOfDamage amount (drain moves).
+    if (effect.kind === 'heal' && !effect.repeat) {
+      // Not a status -- an immediate HP/VP change. pick.targetId is whoever
+      // gets healed (attackerId itself for a target:self effect, see the
+      // section-building above); ctx.damageDealt only matters for a
+      // fractionOfDamage amount (drain moves). A `repeat` heal (Aqua
+      // Ring/Ingrain's heal-over-time) is the one exception -- that DOES
+      // need to persist as a real status, so it falls through to the same
+      // buildStatusSpec/apply-status path below instead of being
+      // intercepted here; combat-wip.js's _promptTurnHeals re-triggers it
+      // at each of its own turn boundaries from then on.
       await _handleApplyHeal({
         targetId: pick.targetId, effect, moveName,
         casterId: attackerId, casterName: attacker?.name,
@@ -1965,6 +1972,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
           ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker)
           : 0,
         damageDealt: ctx.damageDealt,
+        casterLevel: attacker?.level,
       });
       continue;
     }
@@ -2057,21 +2065,30 @@ async function _handleRerollDamage({ reactorId, attackerId, moveName }) {
   }
 }
 
-/** A `heal` effect (see move-effects-schema.md's own section): not a status,
- * an immediate HP change, so this runs instead of _offerMoveEffects's normal
- * apply-status loop (see its own call site). Two `amount` shapes:
+/** Applies ONE firing of a `heal` effect (see move-effects-schema.md's own
+ * section): an immediate HP/VP change, never a status write itself -- called
+ * straight from _offerMoveEffects's apply loop for a one-shot heal (that
+ * loop intercepts it there instead of the normal apply-status path), and
+ * from _applyRecurringHeal for each turn a `repeat` heal (Aqua Ring/Ingrain)
+ * re-triggers, once the STATUS itself is already stored. Three `amount`
+ * shapes:
  *   - `{dice}` (`moveModBonus` already includes the caller's own moveMod
  *     resolution): opens utils/heal-popup.js for the roll.
  *   - `{fractionOfDamage}`: no roll -- computed straight from `damageDealt`,
  *     the damage this same move-use just applied (threaded through from
  *     whichever damage-application call site actually hit; see the schema
- *     doc for which ones do). No damageDealt to work with (a drain effect
- *     offered outside a hit, or the one call site that doesn't thread it
- *     yet) just tells the table to apply it by hand, same fallback tone as
- *     every other "can't auto-detect" spot in this app. */
-async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterName, moveModBonus, damageDealt }) {
+ *     doc for which ones do). `capMultipleOfLevel` (Parabolic Charge's "no
+ *     more than 5x level") clamps the result if `casterLevel` is known. No
+ *     damageDealt to work with (a drain effect offered outside a hit, or a
+ *     call site that doesn't thread it) just tells the table to apply it by
+ *     hand, same fallback tone as every other "can't auto-detect" spot.
+ *   - `{levelMultiple}`: no roll either -- Aqua Ring's "regain HP equal to
+ *     your level", straight from `casterLevel`.
+ * `amount.pool` ('HP', the default, or 'VP') picks which resource updates. */
+async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterName, moveModBonus, damageDealt, casterLevel }) {
   const target = session?.participants?.[targetId];
   if (!target) return;
+  const pool = effect.amount?.pool === 'VP' ? 'VP' : 'HP';
 
   let amount, note;
   if (effect.amount?.fractionOfDamage) {
@@ -2081,6 +2098,23 @@ async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterNa
     }
     amount = Math.floor(effect.amount.fractionOfDamage * damageDealt);
     note = `${Math.round(effect.amount.fractionOfDamage * 100)}% of ${damageDealt} damage dealt`;
+    const capMult = effect.amount.capMultipleOfLevel;
+    if (capMult && Number.isFinite(casterLevel)) {
+      const cap = capMult * casterLevel;
+      if (amount > cap) {
+        amount = cap;
+        note += `, capped at ${cap} (${capMult}x level ${casterLevel})`;
+      }
+    }
+  } else if (effect.amount?.levelMultiple) {
+    // Aqua Ring's "regain HP equal to your level" -- no roll, straight from
+    // the caster's own level (== the target's, always self-only so far).
+    if (!Number.isFinite(casterLevel)) {
+      showCombatAlert(`Couldn't find a level to compute ${moveName}'s heal -- apply it manually.`, { title: moveName });
+      return;
+    }
+    amount = Math.floor(effect.amount.levelMultiple * casterLevel);
+    note = `${effect.amount.levelMultiple}x level (${casterLevel})`;
   } else if (effect.amount?.dice) {
     const rolled = await promptHealRoll({ dice: effect.amount.dice, moveModBonus, targetName: target.name, moveName });
     if (rolled === null) return; // closed without entering one
@@ -2091,18 +2125,20 @@ async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterNa
   }
   if (amount <= 0) return;
 
-  const maxHp = Number.isFinite(target.maxHP) ? target.maxHP : Infinity;
-  const newHp = Math.min(maxHp, target.currentHP + amount);
-  const actualHealed = newHp - target.currentHP;
+  const currentField = pool === 'VP' ? 'currentVP' : 'currentHP';
+  const maxField = pool === 'VP' ? 'maxVP' : 'maxHP';
+  const maxVal = Number.isFinite(target[maxField]) ? target[maxField] : Infinity;
+  const newVal = Math.min(maxVal, target[currentField] + amount);
+  const actualHealed = newVal - target[currentField];
   try {
-    await CombatAPI.updateStats(targetId, { currentHP: newHp });
+    await CombatAPI.updateStats(targetId, { [currentField]: newVal });
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
     return;
   }
   CombatAPI.logEvent({
     type: 'heal', actorId: casterId, actorName: casterName || '?', targetId, targetName: target.name,
-    text: `${target.name} healed ${actualHealed} HP from ${casterName || '?'}'s ${moveName} (${note})`,
+    text: `${target.name} healed ${actualHealed} ${pool} from ${casterName || '?'}'s ${moveName} (${note})`,
   }).catch(() => {});
 }
 
@@ -2250,6 +2286,20 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
   const hasDamage = !!computedData.damageDice;
   const moveType = (move && move[1]) || '';
   const attackerName = session?.participants?.[combatantId]?.name || '?';
+  // Summed across every target this blast actually damaged -- a self-only
+  // `heal` effect with fractionOfDamage (Parabolic Charge, Tera Drain) heals
+  // off the WHOLE AoE's total, never one target's own share, so it's offered
+  // once after the loop (see below) instead of the old "self effects ride
+  // along with the first target's own popup" shortcut -- that shortcut never
+  // actually depended on the first target's own save result either (a
+  // self-effect gated on save_fail always falls back to 'manual' regardless,
+  // see _offerMoveEffects's own verdictsFor), so no existing move's behavior
+  // changes, only the popup timing (self effects are now their own popup, at
+  // the end, instead of bundled into target #1's). Only wired for the
+  // save-triggered branch below -- no current guaranteed-hit AoE move (the
+  // `else` branch, which defers to _resolveOneHit) has a fractionOfDamage
+  // self-heal, so that path's damage isn't summed here.
+  let totalDamageDealt = 0;
 
   for (const targetId of targetIds) {
     const target = session?.participants?.[targetId];
@@ -2268,7 +2318,8 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
         try {
           // No "N damage applied" popup here either -- see _resolveOneHit's own note;
           // doubly true in a loop over several AoE targets, one popup per target.
-          await CombatAPI.applyDamage(combatantId, targetId, outcome.rawRoll + damageModifier, moveType, speciesName, moveName);
+          const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, outcome.rawRoll + damageModifier, moveType, speciesName, moveName);
+          if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
           await waitForDamagedReactions(targetId, combatantId, moveName);
         } catch (err) {
           showCombatAlert(err.message, { title: 'Error' });
@@ -2279,11 +2330,12 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
           text: `${target.name} failed the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}${applyHint}`,
         }).catch(() => {});
       }
-      // Everyone in the area was hit by the blast; the save's result decides which effects land.
+      // This target's own (non-self) effects only -- the move's self effects
+      // are offered once, after the loop, with the full AoE total.
       await _offerMoveEffects({
         attackerId: combatantId, targetId, moveName, computedData,
         ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed: outcome.passed, failBy: outcome.failBy ?? null } },
-        includeSelf: targetId === targetIds[0], // the user's own effects only once per use
+        includeSelf: false,
       });
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
@@ -2291,6 +2343,13 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
       const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
     }
+  }
+
+  if (isSaveTriggered && moveEffectsFor(moveName).some(e => e.target === 'self')) {
+    await _offerMoveEffects({
+      attackerId: combatantId, moveName, computedData,
+      ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: null, damageDealt: totalDamageDealt },
+    });
   }
 }
 
@@ -2476,13 +2535,52 @@ async function _promptTurnSaves(participantId, timing) {
   }
 }
 
+/** A `heal` status's own repeat trigger (Aqua Ring/Ingrain -- see move-effects-
+ * schema.md's `repeat` field and pendingTurnHeals's own docstring): rolls (or
+ * computes) this turn's amount and applies it, same client-authoritative
+ * update-stats correction every other heal in this app uses. The status
+ * itself is never touched here -- its own `ends` (concentration, a rounds/
+ * until_turn count) is what eventually removes it; this just fires again
+ * every time it's still around at the right turn boundary. */
+async function _applyRecurringHeal(targetId, status) {
+  const target = session?.participants?.[targetId];
+  if (!target) return;
+  const moveModBonus = status.amount?.moveMod
+    ? bestMoveStatModifier(findMoveRow(status.moveName) || [], target)
+    : 0;
+  await _handleApplyHeal({
+    targetId, effect: status, moveName: status.moveName || statusLabel(status),
+    casterId: status.sourceId || targetId, casterName: status.sourceName || target.name,
+    moveModBonus, damageDealt: undefined, casterLevel: target.level,
+  });
+}
+
+/** Prompts `participantId`'s repeat heal for every `heal` status due at `timing`
+ * (start_of_turn / end_of_turn), same "one after the other" pattern as
+ * _promptTurnSaves right above -- run alongside it at both this file's turn-
+ * boundary hooks. */
+async function _promptTurnHeals(participantId, timing) {
+  const holder = session?.participants?.[participantId];
+  if (!holder) return;
+  for (const due of pendingTurnHeals(holder, timing)) {
+    // Fresh lookup each time: an earlier prompt (or the server) may already have ended it.
+    const status = (session?.participants?.[participantId]?.statuses || []).find(st => st.id === due.id);
+    if (!status) continue;
+    try {
+      await _applyRecurringHeal(participantId, status);
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
+}
+
 const WIP_SAVE_PROMPT_KEY = 'combatWipLastSavePrompt';
 
 /** A push just landed: if it's now the turn of one of THIS device's participants and it
- * hasn't been prompted yet, run its start-of-turn saves. Remembered per battle/round/turn in
- * sessionStorage so a repeated push or a page refresh mid-turn doesn't ask twice. Participants
- * nobody owns (a DM's enemies) aren't prompted here -- anyone can roll their save from the
- * status badge. */
+ * hasn't been prompted yet, run its start-of-turn saves (and repeat heals -- Aqua Ring/
+ * Ingrain, see _promptTurnHeals). Remembered per battle/round/turn in sessionStorage so a
+ * repeated push or a page refresh mid-turn doesn't ask twice. Participants nobody owns (a
+ * DM's enemies) aren't prompted here -- anyone can roll their save from the status badge. */
 async function _maybePromptStartOfTurnSaves(state) {
   if (_promptingSaves || !state?.active || !state.started) return;
   const activeId = state.turnOrder?.[state.turnIndex];
@@ -2491,10 +2589,11 @@ async function _maybePromptStartOfTurnSaves(state) {
   const key = `${state.logFile}:${state.round}:${state.turnIndex}:${activeId}`;
   if (sessionStorage.getItem(WIP_SAVE_PROMPT_KEY) === key) return;
   sessionStorage.setItem(WIP_SAVE_PROMPT_KEY, key);
-  if (!pendingTurnSaves(p, 'start_of_turn').length) return;
+  if (!pendingTurnSaves(p, 'start_of_turn').length && !pendingTurnHeals(p, 'start_of_turn').length) return;
   _promptingSaves = true;
   try {
     await _promptTurnSaves(activeId, 'start_of_turn');
+    await _promptTurnHeals(activeId, 'start_of_turn');
   } finally {
     _promptingSaves = false;
   }

@@ -14,7 +14,10 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
   // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>"
   // temp_hp:    "amount": 10 -- a bonus-HP pool, see its own section below
   // reroll_damage: no extra fields -- see its own section below
-  // heal:       "amount": {"dice": "2d6", "moveMod": true} | {"fractionOfDamage": 0.5} -- see its own section below
+  // heal:       "amount": {"dice": "2d6", "moveMod?": true, "pool?": "VP"}
+  //                     | {"fractionOfDamage": 0.5, "capMultipleOfLevel?": 5, "pool?": "VP"}
+  //                     | {"levelMultiple": 1, "pool?": "VP"}       -- see its own section below
+  //             "repeat": "end_of_turn" | "start_of_turn"           -- heal-over-time only, see below
   "when":   { "type": ... },        // what triggers it — see below
   "target": "self",                 // only present when the USER is affected (default: the target)
   "ends":   [ ... ],                // how it stops — any ONE entry ending it removes it
@@ -54,33 +57,59 @@ client-authoritative correction the Modify Stats buttons already use for HP (no 
 action). No log entry to find (a freeform PvE hit, or the window opened too late) just tells the
 table to compare by hand, same fallback tone as every other "can't auto-detect" spot in this app.
 
-**`heal`** restores HP -- also never a stored status (`ends: [{type:"instant"}]`, same as
-`reroll_damage` above), since there's nothing to hold onto after the number is applied. Two
+**`heal`** restores HP or VP. A ONE-SHOT heal (no `repeat` -- every drain, every plain
+heal-on-use move) is never a stored status either, same `ends: [{type:"instant"}]` convention
+as `reroll_damage` above, since there's nothing to hold onto after the number is applied. Three
 `amount` shapes:
 - `{dice: "2d6"}`, optionally `moveMod: true` -- a one-off roll the human enters, same "the app
   shows the structure, a human supplies the number" pattern as every other roll in this app.
-  `moveMod: true` adds `computedData.damageBonus` (the move's own already-computed STAB/stat/item
-  bonus figure -- reused as-is, not recalculated, since a heal move's "+MOVE" text means the exact
-  same modifier a damage move's "+MOVE" does).
+  `moveMod: true` adds `pokemon-types.js`'s `bestMoveStatModifier` (the caster's best of the
+  move's own allowed stats -- STR/DEX/etc, whichever the move's `moveStat` field names) --
+  deliberately NOT `computedData.damageBonus`, which bakes in STAB/Ace Trainer/Type Master/
+  held-item bonuses a heal's "+MOVE" text was never talking about (the old combat.js heal
+  popups already drew this same line via a plain per-stat switch with no such extras).
 - `{fractionOfDamage: 0.5}` -- a drain move's "heal for half the damage dealt": no roll needed,
-  the amount is computed straight from the damage that was JUST applied (`Math.floor(fraction *
-  damageDealt)`). `1.0` for a full-damage drain (Oblivion Wing).
+  computed straight from the damage that was JUST applied (`Math.floor(fraction * damageDealt)`).
+  `1.0` for a full-damage drain (Oblivion Wing). `capMultipleOfLevel: 5` (Parabolic Charge's "no
+  more than 5x level") clamps the result against the caster's own level, when known.
+- `{levelMultiple: 1}` -- no roll either, straight from the caster's own level (Aqua Ring's
+  "regain HP equal to your level").
+
+`amount.pool` ('HP', the default, or 'VP') picks which resource a heal updates -- Recompose's
+"gain 2d4 + MOVE VP" is a `{dice, pool:"VP"}` heal, otherwise identical to any HP one.
 
 `target` follows the usual convention: `self` for a move that only ever heals its own user
 (unset, no picker), left unset for one that heals someone else (`_handleEffectsOnly`'s
-multi-target picker, same self+ally split Baby-Doll Eyes/Celebrate already use) -- a move that
-can heal EITHER (Recover, Milk Drink) ships as two separate `heal` effects, one of each, not a
+multi-target picker, same self+ally split Baby-Doll Eyes/Celebrate already use, and -- since
+`pickMultipleTargets` supports selecting several at once -- the same mechanism an "all allies"
+AoE heal like Soothing Breeze uses too, no separate AoE heal shape needed) -- a move that can
+heal EITHER (Recover, Milk Drink) ships as two separate `heal` effects, one of each, not a
 `choice` group (both are independently useful, not mutually exclusive picks).
 
-`combat-wip.js`'s `_offerMoveEffects` special-cases this kind exactly like `reroll_damage`:
-dice amounts open `utils/heal-popup.js` for the roll, fraction amounts read `ctx.damageDealt`
-(threaded through from whichever damage-application call site actually hit -- `_resolveOneHit`
-and `_handleSaveTriggered`'s damage branch both capture `apply-damage`'s own `damageApplied`
-return value for this; `_handleMultiHitAoe`'s own damage branch does NOT yet, so a
-`fractionOfDamage` effect on a multi-target AoE move won't compute correctly until that's
-wired too -- none of the moves migrated so far need it). Either way, the result clamps to the
-target's `maxHP` and applies through `update-stats`, same client-authoritative HP correction
-`reroll_damage`'s own refund already uses.
+**`repeat`** ("end_of_turn" | "start_of_turn") turns a `heal` effect into heal-OVER-TIME (Aqua
+Ring, Ingrain) -- the one case a `heal` effect DOES become a real stored status (a real `ends`,
+e.g. `{type:"concentration"}` for Aqua Ring or `{type:"rounds", n:3}` for Ingrain's "next three
+turns", never `instant`), re-triggering its own `amount` fresh every time the HOLDER's own turn
+reaches that point while the status is still active -- `pendingTurnHeals`/`_promptTurnHeals`/
+`_applyRecurringHeal` (combat-wip.js, mirroring the existing repeat-SAVE machinery,
+`pendingTurnSaves`/`_promptTurnSaves`, at the same two turn-boundary hooks) handle it; the
+status itself never expires early because of firing, only through its own `ends`. Always
+anchored to the STATUS HOLDER's own turn -- a heal delayed to a DIFFERENT participant's turn
+boundary (Wish: "at the end of MY [the caster's] next turn", healing someone else entirely)
+isn't a shape this covers, see "Not covered yet" below.
+
+`combat-wip.js`'s `_offerMoveEffects` special-cases a one-shot `heal` (`!effect.repeat`) exactly
+like `reroll_damage`, intercepting it instead of routing through apply-status: dice/levelMultiple
+amounts resolve immediately (a roll popup, or straight from the caster's level), fraction amounts
+read `ctx.damageDealt` -- threaded through from whichever damage-application call site actually
+hit (`_resolveOneHit`, `_handleSaveTriggered`'s damage branch, and `_handleMultiHitAoe`'s own
+save-triggered branch, which SUMS it across every target the blast actually damaged and offers
+a self-only fractionOfDamage heal once, after its whole target loop, rather than per target --
+Parabolic Charge/Tera Drain heal off the AoE's total, not one target's own share). A `repeat`
+heal skips this interception entirely and flows through the normal buildStatusSpec/apply-status
+path instead, same as any `stat`/`roll`/`condition` effect. Either way, the eventual HP/VP change
+clamps to the target's max and applies through `update-stats`, same client-authoritative
+correction `reroll_damage`'s own refund already uses.
 
 ## `when`
 | type | meaning |
@@ -247,3 +276,24 @@ eligibility system's proactive prompt (see that script's own module docstring: n
 event fits either existing reaction family). No new schema mechanism was needed for any of
 these seven — they're all existing kinds (`stat`, `roll`, `condition`) combined with the
 self + ally-via-multi-target-picker split Sentinel Strike's own effect first established.)*
+
+*(Update, same day: `drain`/`heal_self`/`heal_target_or_aoe` are no longer a gap category either
+— the new `heal` kind above (migrate_effects_v12.py's first 21 moves, migrate_effects_v13.py's
+heal-over-time/VP-pool/AoE-summed-drain batch after it) covers plain heals, drains, VP heals, and
+Aqua Ring/Ingrain's heal-over-time. Still explicitly NOT covered, each for its own reason (see
+migrate_effects_v13.py's own module docstring for the full per-move reasoning): a heal DELAYED to
+a different participant's future turn boundary (Wish -- `repeat` only ever anchors to the status
+HOLDER's own turn, never the caster's); VP damage doesn't have an application mechanism AT ALL
+yet, so a drain reading VP damage dealt has nothing to read (Enervation Ray, Energize, Spite,
+Grudge -- the latter two also bundle their own escalating-cost mechanics); a heal conditional on
+another not-yet-built mechanic (Purify needs the cure-status action this pass deliberately left
+out, see its own note below; Strength Sap needs a "negate an incoming buff and convert its value"
+mechanic with zero precedent); a heal that BRANCHES on something this schema can't express
+(Present: crit vs. a natural roll ≤2, no "at most" threshold exists, only "at least"; Pollen Puff:
+damage-or-heal depending on whether the target is an ally; Harmony Breath: damages enemies AND
+heals allies off one shared AoE roll, needs a per-target ally/enemy branch _handleMultiHitAoe
+doesn't have); a heal whose amount depends on ANOTHER status's own stack count (Swallow, scaling
+with Stockpile); and the pure status-cure moves (Aromatherapy, Heal Bell, Refresh, Scrub Down),
+which restore no HP/VP at all -- a different mechanic (removing OTHER participants' statuses
+programmatically) entirely out of scope for a heal-amount pass, already reachable by hand via
+each status badge's own Remove button.)*

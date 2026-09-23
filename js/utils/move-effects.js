@@ -104,9 +104,12 @@ export function statusLabel(s) {
     return 'Reroll their damage, take the lower';
   }
   if (s.kind === 'heal') {
-    if (s.amount?.fractionOfDamage) return `Heal ${Math.round(s.amount.fractionOfDamage * 100)}% of damage dealt`;
-    if (s.amount?.dice) return `Heal ${s.amount.dice}${s.amount.moveMod ? ' + MOVE' : ''}`;
-    return 'Heal';
+    const pool = s.amount?.pool === 'VP' ? ' VP' : '';
+    const repeatNote = s.repeat ? ` (${s.repeat === 'start_of_turn' ? 'start' : 'end'} of turn, while active)` : '';
+    if (s.amount?.fractionOfDamage) return `Heal ${Math.round(s.amount.fractionOfDamage * 100)}% of damage dealt${pool}${repeatNote}`;
+    if (s.amount?.levelMultiple) return `Heal ${s.amount.levelMultiple}x level${pool}${repeatNote}`;
+    if (s.amount?.dice) return `Heal ${s.amount.dice}${s.amount.moveMod ? ' + MOVE' : ''}${pool}${repeatNote}`;
+    return `Heal${pool}${repeatNote}`;
   }
   if (s.kind === 'stat') {
     const stat = s.stat === 'ac' ? 'AC'
@@ -492,6 +495,15 @@ export function pendingTurnSaves(participant, timing) {
     (s.ends || []).some(e => e.type === 'save' && e.timing === timing));
 }
 
+/** The holder's `heal` statuses that re-trigger at `timing` ('start_of_turn' |
+ * 'end_of_turn') -- Aqua Ring/Ingrain's heal-over-time (see move-effects-
+ * schema.md's `repeat` field). Always the HOLDER's own turn boundary -- a
+ * delayed heal anchored to whoever CAST it (Wish's "at the end of MY next
+ * turn") isn't a shape this covers yet. */
+export function pendingTurnHeals(participant, timing) {
+  return (participant?.statuses || []).filter(s => s.kind === 'heal' && s.repeat === timing);
+}
+
 /** describeEnds for a STORED status: a rounds end shows how many are left in the
  * current `round` ("3 rounds left"), the rest read as in describeEnd. */
 export function describeStatusEnds(status, round) {
@@ -517,7 +529,7 @@ export function describeEnds(ends) {
  * the caller already resolved rolled durations (a {dice} entry given an `n`). */
 export function buildStatusSpec(effect, { sourceId, sourceName, moveName, dc, ends }) {
   const spec = { kind: effect.kind, sourceId, sourceName, moveName, dc, ends: ends || effect.ends || [] };
-  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note']) {
+  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat']) {
     if (effect[k] !== undefined) spec[k] = effect[k];
   }
   if (effect.stacks) spec.stacks = effect.stacks;

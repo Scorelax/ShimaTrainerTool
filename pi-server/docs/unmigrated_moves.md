@@ -1,6 +1,6 @@
 # Moves still without structured `effects`
 
-_Generated 2026-09-23 (updated after migrate_effects_v12.py) against DnD_moves_categorized_draft.json -- 888 moves total, 497 with no `effects` array yet.
+_Generated 2026-09-23 (updated after migrate_effects_v13.py) against DnD_moves_categorized_draft.json -- 888 moves total, 489 with no `effects` array yet.
  See move-effects-schema.md for the schema itself and its own "Not covered yet" section for the gap-by-gap reasoning._
 
 
@@ -100,9 +100,9 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - **Wing Buffer** (stat_buff_self) -- You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successfu
 - **Wing Command** (stat_buff_ally) -- You spread your wings in a majestic display, inspiring allies close by. All allies within range that can see you receive a bonus to their at
 
-## 2. Needs a new effect kind / mechanism (157)
+## 2. Needs a new effect kind / mechanism (149)
 
-`drain`/`heal_self`/`heal_target_or_aoe` no longer appear here for the 21 moves migrate_effects_v12.py covered (the new `heal` kind) -- see its own module docstring for exactly which ones, and why the rest of those three tags are still listed below.
+drain/heal_self/heal_target_or_aoe are essentially clear now (the `heal` kind, migrate_effects_v12/v13.py) -- what remains under those three tags below is each individually excluded for its own bundled/novel reason; see move-effects-schema.md's own note and migrate_effects_v13.py's module docstring.
 
 
 ### conditional_damage (25) -- damage that changes based on a condition (target HP, a status, terrain, ...)
@@ -210,20 +210,6 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - U-turn
 - Volt Switch
 
-### heal_target_or_aoe (12) -- heals someone other than (or in addition to) the user
-- Aromatherapy
-- Cactus Bloom
-- Floral Healing
-- Harmony Breath
-- Heal Bell
-- Maintenance
-- Pollen Puff
-- Present
-- Purify
-- Scrub Down
-- Soothing Breeze
-- Wish
-
 ### field_terrain (12) -- sets/uses a terrain effect
 - Convergence
 - Electric Terrain
@@ -238,6 +224,17 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - Trick Room
 - Wonder Room
 
+### heal_target_or_aoe (9) -- heals someone other than (or in addition to) the user
+- Aromatherapy
+- Cactus Bloom
+- Harmony Breath
+- Heal Bell
+- Pollen Puff
+- Present
+- Purify
+- Scrub Down
+- Wish
+
 ### movement (9) -- forced or granted movement
 - Ally Switch
 - Ascension
@@ -249,16 +246,6 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - Splash
 - Teleport
 
-### heal_self (8) -- heals the user
-- Aqua Ring
-- Burning Glance
-- Ingrain
-- Purify
-- Recompose
-- Refresh
-- Strength Sap
-- Swallow
-
 ### attack_suppression (6) -- stops the target from attacking
 - Disable
 - Encore
@@ -266,14 +253,6 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - Oblivion Ink
 - Throat Chop
 - Torment
-
-### drain (6) -- heals the user for a portion of damage dealt
-- 5. Enervation Ray
-- Energize
-- Grudge
-- Parabolic Charge
-- Spite
-- Tera Drain
 
 ### lethal_faint (5) -- special behavior when the move would faint the target
 - 10. Death Ray
@@ -289,12 +268,25 @@ Plain stat/advantage moves -- the exact shape Noble Roar/Withdraw/Skyward Soar e
 - Thief
 - Trick
 
+### heal_self (5) -- heals the user
+- Burning Glance
+- Purify
+- Refresh
+- Strength Sap
+- Swallow
+
 ### field_weather (5) -- sets/uses a weather effect
 - Control Weather
 - Hail
 - Rain Dance
 - Sandstorm
 - Sunny Day
+
+### drain (4) -- heals the user for a portion of damage dealt
+- 5. Enervation Ray
+- Energize
+- Grudge
+- Spite
 
 ## 3. "unknown" category, needs manual review before anything else (32)
 

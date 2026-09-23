@@ -1,15 +1,14 @@
 # Moves still without structured `effects`
 
-_Generated 2026-09-23 (updated after migrate_effects_v16.py) against DnD_moves_categorized_draft.json -- 888 moves total, 461 with no `effects` array yet.
+_Generated 2026-09-23 (updated after migrate_effects_v18.py) against DnD_moves_categorized_draft.json -- 888 moves total, 459 with no `effects` array yet.
  See move-effects-schema.md for the schema itself and its own "Not covered yet" section for the gap-by-gap reasoning._
 
 
-## 1. Fits the schema already, just not migrated yet (53)
+## 1. Fits the schema already, just not migrated yet (41)
 
-Read carefully before assuming any of these are as simple as their tag suggests -- migrate_effects_v16.py's own module docstring found this bucket is NOT all clean stat/roll/condition shapes once fully read (dice-rolled-once debuffs, ability-specific save/roll scoping, self-damage, movement speed, VP-cost modifiers, resource/stacking systems, and outright novel mechanics all still hide behind a RETIRED_V3 tag here).
+What remains here is genuinely blocked on something -- movement speed (deferred), a "guaranteed hit" grantable status (needs a real target-picker.js UI change, not just data), ability/target-specific roll scoping beyond saving throws, VP-cost modifiers, "choose which stat", resource/stacking links to other moves, reactive-attack shapes, or an outright novel mechanic. See migrate_effects_v16/v17/v18.py's own module docstrings for the full reasoning already worked out per move.
 
 - **Agility** (stat_buff_self) -- You hone your abilities and feel a surge of speed course through your veins. Increase your movement speed by 20 feet for the duration. Appli
-- **Aqua Phase** (advantage_on_attack_roll) -- You disappear from view and prepare to surprise a target with an attack. When you activate this move, you become invisible and immune to any
 - **Artifact Light** (stat_buff_self) -- You channel energy from ancient artifacts to enhance your combat prowess. If an ancient artifact is within range and you know it is there, a
 - **Aura Theft** (potential_stat_increase) -- The user attempts to steal beneficial effects from a target within 30 feet. The target must succeed on a Charisma saving throw or lose all b
 - **Aurora Veil** (stat_buff_self) -- You use the environment to create a shield of ice around your body. Only able to be activated while it is hailing, this move can be used as 
@@ -17,40 +16,29 @@ Read carefully before assuming any of these are as simple as their tag suggests 
 - **Beat Up** (potential_disadvantage) -- You exploit a creature's vulnerable position. Make a melee attack, dealing 1d6 + MOVE dark damage on hit. Add 1d6 for each allied creature a
 - **Blood Shield** (stat_buff_self) -- You conjure a shield equal to melee damage you have dealt. Gain a shield equal to the damage you dealt since the beginning your last turn. T
 - **Calm Mind** (stat_buff_self, increase_stab) -- You clear your mind of all distractions. For the duration, double your STAB bonus when dealing damage of your type.
-- **Dig** (advantage_on_attack_roll) -- Your Pokémon burrows underground, disappearing from view before striking from underneath a foe. When you activate this move, you burrow unde
-- **Dive** (advantage_on_attack_roll) -- When you activate this move, you dive down and disappear into the Ethereal plane. You may not be targeted by attacks in the Ethereal plane. 
 - **Divine Noodle Form** (stat_buff_self) -- Your noodly appendages multiply, and your body grows to a huge size. While in this form, you gain the ability Spaghedeity; you get half of y
 - **Feather Dance** (stat_debuff_enemy) -- You distract a creature in range with a beautiful dance. The target must make a WIS saving throw against your Move DC. On a fail, the target
-- **Feint Attack** (advantage_on_attack_roll) -- You bring a creature close and hit it with a sucker punch. Make a melee attack on a creature, always with advantage, doing 1d10 + MOVE dark 
 - **Fell Stinger** (potential_stat_increase) -- You lunge at a creature with a devastating sting attack. Make a melee attack on a creature, dealing 2d8 + MOVE bug damage on a hit. If this 
 - **Fire Shield** (stat_buff_self) -- Thin, wispy flames dance around you, shedding bright light in a 10-foot radius and dim light for an additional 10 feet. The flames grant res
 - **Flame Charge** (stat_buff_self) -- You cloak yourself with flame and lash out at a creature. Make a melee attack, dealing 1d10 + MOVE fire damage on a hit. With each successfu
-- **Fly** (advantage_on_attack_roll) -- You fly high into the air to prepare for a dive bomb attack. When you activate this move, you flap your wings and disappear into the Etherea
 - **Foresight** (stat_buff_self) -- You grant yourself a brief but incredible sixth sense. On the next ghost-, normal-, or fighting-type move you activate, ignore any immunitie
 - **Grassy Terrain** (boosted_damage_rolls) -- Grass sprouts from the ground in a circle around you, coating the earth with healing energy. For 3 turns, all creatures in the affected area
-- **Hammer Arm** (stat_debuff_self) -- You put all your power into a strong and heavy fist attack. Make a melee attack, dealing 3d8 + MOVE fighting damage on a hit. Until the end 
 - **Harden** (stat_buff_self) -- You increase your defense, able to reduce incoming damage. After activating this move, reduce any damage dealt to you by 1d4 + MOVE until th
-- **Ice Hammer** (stat_debuff_enemy) -- You swing and hit with your strong, heavy fist. Make a melee attack dealing 2d8 + MOVE ice damage. Until the end of its next turn, the targe
 - **Imperial Guard** (stat_buff_self) -- You set your mind to protect your allies and strike back against your enemies. A dark purple aura surrounds you. For the duration, every tim
 - **Ink Veil** (stat_buff_self) -- You surround yourself with a cloud of glowing ink, protecting from any status conditions for the duration. If you a condition is inflicted o
 - **Kinesis** (stat_buff_self) -- You move with incredible speed. Increase your walking, flying, or swimming speed by 20 if it is greater than 0, and add +2 to AC when target
-- **Leaf Storm** (stat_debuff_self) -- You whip up a powerful storm of leaves in a 10 foot radius, centered on a point within range. All creatures in the area must make a DEX save
 - **Lock-On** (stat_buff_self) -- You hone in on your target, ready to strike. When this move is activated, a single attack roll you make next turn is guaranteed to hit. You 
 - **Mind Reader** (stat_buff_self) -- You sense the motives and moves of a creature around you. When this move is activated, a single attack roll you make next turn is guaranteed
 - **Miracle Eye** (stat_debuff_enemy) -- You flash your eyes at the target, stunning them briefly and lowering their defenses. When activating this move, choose a target in range an
 - **Nasty Plot** (stat_debuff_enemy, advantage_on_attack_roll) -- You stimulate your brain with nasty thoughts. For the duration, you have advantage on any attacks with the Wisdom move power. If the attack 
 - **Odor Sleuth** (stat_debuff_enemy) -- When you activate this move, choose a target in range. For the duration, the target cannot activate any move that would increase its AC. If 
 - **Omen Sense** (stat_debuff_enemy) -- You become highly alert, sensing incoming attacks and getting ready to respond to them. For one round, opponents have disadvantage on attack
-- **Phantom Force** (advantage_on_attack_roll) -- You disappear from view and prepare to surprise your target with an attack. When you activate this move, you become invisible and immune to 
 - **Power Split** (stat_buff_self) -- You use your psychic power to change your offense to match the target's the best you can. Force a creature in range to make a CHA save again
 - **Power Trick** (stat_buff_self) -- You employ your psychic power to switch your own attack and defense. Until the end of your next turn, switch your AC with an ability score o
 - **Power-Up Punch** (stat_buff_self) -- You strike out with a powerful punch that builds momentum. Make a melee attack, dealing 1d6 + MOVE fighting damage on hit. For each successf
 - **Psychic Terrain** (boosted_damage_rolls) -- Psychic energy emerges from the ground in a 40ft, centered on you. Begininng at the end of your turn, for three rounds, all grounded creatur
 - **Purgatory** (stat_debuff_enemy) -- You conjure a vortex of blue ethereal flames that superheats the air in a 10ft. radius, 40ft. high cylinder from a point within range. All c
 - **Radiant Hope** (stat_buff_ally) -- You channel the energy of the morning sun to heal your allies. Each ally within range regains hp equal to 4d12 + MOVE. They also gain advant
-- **Roar of Time** (stat_buff_self) -- You unleash a roar that has the power to distort time. All creatures within range must make a WIS save against your Move DC, taking 10d12 + 
-- **Safeguard** (stat_buff_self, stat_buff_ally) -- You boost defenses for you and all allies in range. For the duration, any ally within range is protected from new negative status conditions
-- **Shadow Force** (advantage_on_attack_roll) -- You disappear from view and prepare to surprise a target with an attack. When you activate this move, you become invisible and immune to any
 - **Silent Approach** (stat_buff_self) -- A ghostly darkness envelops you, hiding you, masking your scent and dampening the noise you make. For the duration, gain advantage on stealt
 - **Spirit Growth** (stat_buff_self) -- You channel a strong determination from deep within your mind. For the duration, all moves drawing on WIS for move power cost half their nor
 - **Study** (stat_buff_self, advantage_on_attack_roll) -- You study a target within 50 feet. For one minute, you have advantage on any ability checks or attack rolls against that target.
@@ -62,8 +50,36 @@ Read carefully before assuming any of these are as simple as their tag suggests 
 - **Wing Buffer** (stat_buff_self) -- You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successfu
 - **Wing Command** (stat_buff_ally) -- You spread your wings in a majestic display, inspiring allies close by. All allies within range that can see you receive a bonus to their at
 
-## 2. Needs a new effect kind / mechanism (149)
+## 2. Needs a new effect kind / mechanism (154)
 
+
+### protect_negate (26) -- blocks/negates an incoming effect (Protect-family)
+- Aqua Phase
+- Astral Jet
+- Captivate
+- Crafty Shield
+- Endure
+- Feint
+- Fly
+- Hover
+- Hyperspace Hole
+- King's Shield
+- Lucky Chant
+- Mat Block
+- Mist
+- Nature's Embrace
+- Parry
+- Phantom Force
+- Phantom Tendril
+- Protect
+- Quick Guard
+- Safeguard
+- Shadow Force
+- Shield Dome
+- Shield Guardian
+- Spiky Shield
+- Testudo Formation
+- Wide Guard
 
 ### conditional_damage (25) -- damage that changes based on a condition (target HP, a status, terrain, ...)
 - Archive Blast
@@ -116,29 +132,6 @@ Read carefully before assuming any of these are as simple as their tag suggests 
 - Speed Swap
 - Strength Sap
 - Thief
-
-### protect_negate (21) -- blocks/negates an incoming effect (Protect-family)
-- Astral Jet
-- Captivate
-- Crafty Shield
-- Endure
-- Feint
-- Hover
-- Hyperspace Hole
-- King's Shield
-- Lucky Chant
-- Mat Block
-- Mist
-- Nature's Embrace
-- Parry
-- Phantom Tendril
-- Protect
-- Quick Guard
-- Shield Dome
-- Shield Guardian
-- Spiky Shield
-- Testudo Formation
-- Wide Guard
 
 ### potential_damage_increase (13) -- damage that scales on a condition not yet modeled
 - Avalanche
@@ -283,6 +276,6 @@ Read carefully before assuming any of these are as simple as their tag suggests 
 - **Void Consumption** -- Requires Reality Bend to be active. You attempt to pull in creatures in a 60ft. cone in front of you. All creatures within range must make a
 - **Void Gate** -- You momentarily tear open a rift in space that creates a portal that lasts for 1 + MOVE rounds. First roll 1d4 to determine rift size. Then 
 
-## 4. Pure mechanical shape -- correctly has no `effects`, nothing to do (227)
+## 4. Pure mechanical shape -- correctly has no `effects`, nothing to do (232)
 
 Plain damage / save-for-damage / multi-hit / recharge moves with no secondary effect to encode. Listed only so this file accounts for all remaining moves -- not a backlog.

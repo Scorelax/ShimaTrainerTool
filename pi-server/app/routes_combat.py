@@ -1055,7 +1055,10 @@ _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'lon
 # still active (see combat-wip.js's _promptTurnHeals). A one-shot `heal` effect (every
 # drain, every plain heal-on-use move) never reaches this at all -- it's intercepted
 # client-side and applied directly, same as reroll_damage.
-_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat')
+# ability: a roll/stat saving_throws effect scoped to one ability only
+# (Hammer Arm's "disadvantage on DEX saves") -- unset applies broadly, same
+# as before this field existed. See move-effects.js's _abilityMatches.
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability')
 
 
 def _statuses_of(participant):
@@ -1077,6 +1080,8 @@ def _status_label(s):
         return (s.get('apply') or '').replace('_', ' ')
     if kind == 'stat':
         stat = (s.get('stat') or '').replace('_', ' ')
+        if s.get('stat') == 'saving_throws' and s.get('ability'):
+            stat = f"{s['ability']} {stat}"
         if 'set' in s:
             return f"{stat} set to {s['set']}"
         amount = s.get('amount')
@@ -1098,7 +1103,8 @@ def _status_label(s):
         if amount.get('dice'):
             return f"heal {amount['dice']}{' + MOVE' if amount.get('moveMod') else ''} ({pool})"
         return f"heal ({pool})"
-    return f"{s.get('roll')} on {(s.get('on') or '').replace('_', ' ')}"
+    on = f"{s['ability']} saving throws" if s.get('on') == 'saving_throws' and s.get('ability') else (s.get('on') or '').replace('_', ' ')
+    return f"{s.get('roll')} on {on}"
 
 
 def _same_status(a, b):

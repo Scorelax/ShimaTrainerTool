@@ -112,10 +112,13 @@ export function statusLabel(s) {
     return `Heal${pool}${repeatNote}`;
   }
   if (s.kind === 'stat') {
-    const stat = s.stat === 'ac' ? 'AC'
+    let stat = s.stat === 'ac' ? 'AC'
       : s.stat === 'crit' ? 'Crit range'
       : s.stat === 'attack_rolls_or_saving_throws' ? 'an attack roll or saving throw'
       : _title(String(s.stat || '').replace(/_/g, ' '));
+    // Hammer Arm's "disadvantage on DEX saves" -- see _abilityMatches's own
+    // docstring; only saving_throws is ever this narrow.
+    if (s.stat === 'saving_throws' && s.ability) stat = `${s.ability} ${stat.toLowerCase()}`;
     if (s.set !== undefined) return `${stat} set to ${s.set}`;
     if (s.amount === 'proficiency') return `${stat} + proficiency`;
     if (s.amount && typeof s.amount === 'object' && s.amount.dice) return `Add ${s.amount.dice} to ${stat}`;
@@ -125,7 +128,8 @@ export function statusLabel(s) {
     }
     return stat;
   }
-  return `${_title(s.roll)} on ${ON_TEXT[s.on] || String(s.on || '').replace(/_/g, ' ')}`;
+  const onText = s.on === 'saving_throws' && s.ability ? `${s.ability} saving throws` : (ON_TEXT[s.on] || String(s.on || '').replace(/_/g, ' '));
+  return `${_title(s.roll)} on ${onText}`;
 }
 
 const TIMING_TEXT = { start_of_turn: 'start of its turn', end_of_turn: 'end of its turn', action: 'as an action' };
@@ -401,6 +405,16 @@ function _abilityScoreDelta(saver, ability) {
   return statDeltas(saver)[String(ability || '').toLowerCase()] || 0;
 }
 
+/** True unless `s` carries its own `ability` field that doesn't match the save
+ * actually being rolled (Hammer Arm's "disadvantage on DEX saves" -- narrower
+ * than a plain `saving_throws` roll/stat effect, which applies to every
+ * ability). No `ability` on the effect = applies broadly, same as before this
+ * field existed. `all_rolls` is never ability-scoped -- only checked for
+ * `saving_throws` specifically, see its two call sites below. */
+function _abilityMatches(s, ability) {
+  return !s.ability || s.ability === ability;
+}
+
 /** Modifiers for `saver`'s saving throw (`ability` "STR".."CHA" or null) against a
  * move used by `moveUser`: the saver's own saving-throw bonuses and advantage/
  * disadvantage, its ability-score changes (as a change in the modifier), and the
@@ -414,8 +428,9 @@ export function saveRollContext(saver, moveUser, ability) {
     if (_hasUses(s)) ctx.consume.push({ holderId: holder.id, statusId: s.id });
   };
   for (const s of saver?.statuses || []) {
-    if (s.kind === 'roll' && (s.on === 'saving_throws' || s.on === 'all_rolls')) take(s, saver, s.roll === 'advantage' ? adv : dis);
-    if (s.kind === 'stat' && s.stat === 'saving_throws' && !_isDiceAmount(s)) {
+    if (s.kind === 'roll' && s.on === 'all_rolls') take(s, saver, s.roll === 'advantage' ? adv : dis);
+    if (s.kind === 'roll' && s.on === 'saving_throws' && _abilityMatches(s, ability)) take(s, saver, s.roll === 'advantage' ? adv : dis);
+    if (s.kind === 'stat' && s.stat === 'saving_throws' && _abilityMatches(s, ability) && !_isDiceAmount(s)) {
       const a = _statAmount(s, saver);
       ctx.modifierDelta += a;
       ctx.notes.push(_sourceText(s));
@@ -529,7 +544,7 @@ export function describeEnds(ends) {
  * the caller already resolved rolled durations (a {dice} entry given an `n`). */
 export function buildStatusSpec(effect, { sourceId, sourceName, moveName, dc, ends }) {
   const spec = { kind: effect.kind, sourceId, sourceName, moveName, dc, ends: ends || effect.ends || [] };
-  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat']) {
+  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability']) {
     if (effect[k] !== undefined) spec[k] = effect[k];
   }
   if (effect.stacks) spec.stacks = effect.stacks;

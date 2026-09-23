@@ -1944,7 +1944,6 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self",
         "recharge_locked",
         "multi_hit_aoe"
       ],
@@ -2724,8 +2723,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "advantage_on_attack_roll"
+        "damage"
       ],
       "description": "You bring a creature close and hit it with a sucker punch. Make a melee attack on a creature, always with advantage, doing 1d10 + MOVE dark damage on a hit.",
       "moveStat": "STR/DEX/CHA",
@@ -7460,12 +7458,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_self"
+        "self_disadvantage_saving_throws"
       ],
       "description": "You put all your power into a strong and heavy fist attack. Make a melee attack, dealing 3d8 + MOVE fighting damage on a hit. Until the end of your next turn, you have disadvantage on all DEX saves and your speed is halved.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 4d8 at level 5, 6d8 at level 10, and 8d8 at level 17."
+      "scaling": "The damage dice for this move changes to 4d8 at level 5, 6d8 at level 10, and 8d8 at level 17.",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "saving_throws",
+          "ability": "DEX",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "High Horsepower",
@@ -10202,8 +10219,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "protect_negate",
-        "advantage_on_attack_roll"
+        "protect_negate"
       ],
       "description": "You fly high into the air to prepare for a dive bomb attack. When you activate this move, you flap your wings and disappear into the Ethereal plane above you. You cannot be targeted by attacks while you are in the Ethereal plane. On your next turn, you use your action to reappear and make a diving melee attack on a creature in range, with advantage, dealing 2d8 + MOVE flying damage on a successful hit.",
       "moveStat": "STR/DEX",
@@ -11294,8 +11310,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "protect_negate",
-        "advantage_on_attack_roll"
+        "protect_negate"
       ],
       "description": "You disappear from view and prepare to surprise your target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use your action to reappear and make a melee attack against a creature, with advantage, dealing 2d8 + MOVE ghost damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "DEX/INT/WIS",
@@ -11518,7 +11533,6 @@
       "categories": [
         "damage",
         "protect_negate",
-        "advantage_on_attack_roll",
         "recharge_locked"
       ],
       "description": "You disappear from view and prepare to surprise a target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use may your action to reappear at a point within range and make a melee attack against a creature, with advantage, dealing 4d12 + MOVE ghost damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
@@ -12588,7 +12602,6 @@
         "damage",
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "stat_debuff_self",
         "recharge_locked"
       ],
       "description": "You whip up a powerful storm of leaves in a 10 foot radius, centered on a point within range. All creatures in the area must make a DEX save against your Move DC, taking 3d10 + MOVE grass damage on a fail, or half as much on a success. After activating this move, you are sapped of energy. Your next attack deals half the normal damage, if it hits.",
@@ -13718,8 +13731,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "advantage_on_attack_roll"
+        "damage"
       ],
       "description": "Your Pokémon burrows underground, disappearing from view before striking from underneath a foe. When you activate this move, you burrow underground and remain there until your next turn. During this time, you cannot be the target of any attack. On your next turn, make a melee attack on a creature in range, with advantage, doing 1d10 + MOVE ground damage on a successful hit. If the target has Tremorsense, the attack is not rolled with advantage.",
       "moveStat": "STR/DEX",
@@ -15010,12 +15022,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_debuff_enemy"
+        "disadvantage_saving_throws"
       ],
       "description": "You swing and hit with your strong, heavy fist. Make a melee attack dealing 2d8 + MOVE ice damage. Until the end of its next turn, the target has disadvantage on all DEX saves and its speed is halved.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "saving_throws",
+          "ability": "DEX",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Ice Punch",
@@ -18977,9 +19007,7 @@
       },
       "reaction": false,
       "categories": [
-        "protect_negate",
-        "stat_buff_self",
-        "stat_buff_ally"
+        "protect_negate"
       ],
       "description": "You boost defenses for you and all allies in range. For the duration, any ally within range is protected from new negative status conditions oof the following types: asleep, burned, confused, frozen, paralyzed, petrified, poisoned or slowed.",
       "moveStat": "None",
@@ -26116,8 +26144,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "protect_negate",
-        "advantage_on_attack_roll"
+        "protect_negate"
       ],
       "description": "You disappear from view and prepare to surprise a target with an attack. When you activate this move, you become invisible and immune to any attacks of opportunity. You cannot be targeted by attacks while you are invisible. On your next turn, you use may your action to reappear at a point within range and make a melee attack against a creature, with advantage, dealing 4d12 + MOVE water damage on a successful hit. Protect and Detect reactions may not be used when hit by this attack.",
       "moveStat": "WIS/INT",
@@ -26342,8 +26369,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "advantage_on_attack_roll"
+        "damage"
       ],
       "description": "When you activate this move, you dive down and disappear into the Ethereal plane. You may not be targeted by attacks in the Ethereal plane. On your next turn, as an action, you reappear and attempt to strike an opponent from below. Make a melee attack roll on an opponent in range, with advantage, doing 2d8 + MOVE water damage on a hit.",
       "moveStat": "DEX",

@@ -6,6 +6,7 @@ import { audioManager } from '../utils/audio.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData, SPECIALIZATION_TO_TYPE } from '../utils/pokemon-types.js';
 import { showMovePopup, showDrainHealPopupForCard } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
+import { showCombatAlert } from '../utils/combat-alert.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -3213,7 +3214,7 @@ export function attachPokemonCardListeners() {
 
     const healing = parseHealingEffect(selectedItemData.effect);
     if (!healing) {
-      alert('This item cannot be used (no healing effect detected).');
+      showCombatAlert('This item cannot be used (no healing effect detected).', { title: 'Error' });
       return;
     }
 
@@ -3397,7 +3398,7 @@ export function attachPokemonCardListeners() {
 
     const diceResult = parseInt(document.getElementById('useItemDiceResult').value);
     if (!diceResult || diceResult < 1) {
-      alert('Please enter a valid dice roll result.');
+      showCombatAlert('Please enter a valid dice roll result.', { title: 'Error' });
       return;
     }
 
@@ -3412,7 +3413,7 @@ export function attachPokemonCardListeners() {
       if (tpSpent > 0) {
         tpBonusValue = parseInt(tpBonusRoll.value) || 0;
         if (tpBonusValue < 1) {
-          alert('Please enter a valid TP bonus roll result.');
+          showCombatAlert('Please enter a valid TP bonus roll result.', { title: 'Error' });
           return;
         }
       }
@@ -3544,13 +3545,13 @@ export function attachPokemonCardListeners() {
     const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
 
     if (!selectedItemName || quantity < 1) {
-      alert('Please select a valid item and quantity.');
+      showCombatAlert('Please select a valid item and quantity.', { title: 'Error' });
       return;
     }
 
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
-      alert('Trainer data not found.');
+      showCombatAlert('Trainer data not found.', { title: 'Error' });
       return;
     }
 
@@ -3642,13 +3643,13 @@ export function attachPokemonCardListeners() {
     const newQuantity = parseInt(document.getElementById('editItemQuantity').value, 10);
 
     if (isNaN(newQuantity) || newQuantity < 0) {
-      alert('Please enter a valid quantity (0 or greater).');
+      showCombatAlert('Please enter a valid quantity (0 or greater).', { title: 'Error' });
       return;
     }
 
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
-      alert('Trainer data not found.');
+      showCombatAlert('Trainer data not found.', { title: 'Error' });
       return;
     }
 
@@ -3718,7 +3719,7 @@ export function attachPokemonCardListeners() {
   document.getElementById('confirmRemoveItem')?.addEventListener('click', function() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
-      alert('Trainer data not found.');
+      showCombatAlert('Trainer data not found.', { title: 'Error' });
       return;
     }
 

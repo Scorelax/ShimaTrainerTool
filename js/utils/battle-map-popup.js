@@ -125,13 +125,13 @@ function _ensureDom() {
       </div>
       <div class="combat-move-popup-body">
         <div class="bmap-toolbar">
-          <button id="bmapDmToggle" class="bmap-dm-toggle" title="Grid size + terrain marking -- temporary DM test controls, not the intended final setup UI">🛠️ DM Setup</button>
+          <button id="bmapDmToggle" class="bmap-dm-toggle" title="Grid size -- temporary DM test controls, not the intended final setup UI">🛠️ DM Setup</button>
         </div>
         <div class="bmap-dm-panel" id="bmapDmPanel" hidden>
           <input type="number" id="bmapCols" min="1" placeholder="Cols" style="width:60px;">
           <input type="number" id="bmapRows" min="1" placeholder="Rows" style="width:60px;">
           <button type="button" id="bmapSetGridBtn">Set Grid</button>
-          <span style="color:#a0a0c0;font-size:0.78rem;">Click a cell to mark/clear terrain. Resizing clears existing marks.</span>
+          <span style="color:#a0a0c0;font-size:0.78rem;">Resizing clears existing terrain marks.</span>
         </div>
         <div class="bmap-hint" id="bmapHint"></div>
         <div class="bmap-stage" id="bmapStage">
@@ -207,7 +207,7 @@ function _render() {
   const hint = document.getElementById('bmapHint');
   if (hint) {
     if (_dmMode) {
-      hint.textContent = 'DM Setup: click a cell to mark/clear terrain.';
+      hint.textContent = 'DM Setup: adjust the grid size above.';
     } else if (_selectedTokenId) {
       hint.textContent = 'Click a cell to move there.';
     } else {
@@ -245,16 +245,16 @@ function _renderGrid() {
   gridEl.innerHTML = gridCellsHtml(_session.board, 'bmap-cell');
 
   gridEl.querySelectorAll('[data-cell]').forEach(cell => {
-    cell.addEventListener('click', async () => {
+    cell.addEventListener('click', () => {
       const [col, row] = cell.dataset.cell.split(',').map(Number);
 
-      if (_dmMode) {
-        const current = cell.classList.contains('marked') ? cell.textContent : '';
-        const terrain = prompt('Terrain label for this cell (blank to clear):', current);
-        if (terrain === null) return; // cancelled
-        try { await CombatAPI.setCellTerrain(col, row, terrain); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
-        return;
-      }
+      // DM Setup mode is "look, don't touch" -- grid sizing only, no per-
+      // cell action of its own anymore (manual terrain labeling removed;
+      // a real terrain system with predefined types + effects is coming
+      // instead, see move-effects-schema.md's field_terrain/field_weather
+      // notes -- existing marked cells still just render, see
+      // battle-map-grid.js's gridCellsHtml).
+      if (_dmMode) return;
 
       if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
       const movingId = _selectedTokenId;
@@ -280,9 +280,8 @@ function _renderTokens() {
     if (!p) return;
 
     const isMine = !!_ownerName && p.owner === _ownerName;
-    // In DM Setup mode tokens are display-only -- otherwise a token sitting
-    // on a cell would swallow the click (pointer-events:auto from .my-turn)
-    // instead of letting it reach the cell underneath for terrain marking.
+    // In DM Setup mode tokens are display-only -- "look, don't touch" while
+    // adjusting grid size, not a real gameplay action.
     const isMyTurn = isMine && id === activeId && !_dmMode;
     const classes = ['bmap-token', p.side];
     if (isMine) classes.push('mine');

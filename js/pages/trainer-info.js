@@ -2,6 +2,7 @@
 
 import { showError, showSuccess } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
+import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 
 // Module-level variable to track selected inventory item
 let selectedItemData = null;
@@ -3098,7 +3099,7 @@ export function attachTrainerInfoListeners() {
 
     const healing = parseHealingEffect(selectedItemData.effect);
     if (!healing) {
-      alert('This item cannot be used (no healing effect detected).');
+      showCombatAlert('This item cannot be used (no healing effect detected).', { title: 'Error' });
       return;
     }
 
@@ -3282,7 +3283,7 @@ export function attachTrainerInfoListeners() {
 
     const diceResult = parseInt(document.getElementById('useItemDiceResult').value);
     if (!diceResult || diceResult < 1) {
-      alert('Please enter a valid dice roll result.');
+      showCombatAlert('Please enter a valid dice roll result.', { title: 'Error' });
       return;
     }
 
@@ -3297,7 +3298,7 @@ export function attachTrainerInfoListeners() {
       if (tpSpent > 0) {
         tpBonusValue = parseInt(tpBonusRoll.value) || 0;
         if (tpBonusValue < 1) {
-          alert('Please enter a valid TP bonus roll result.');
+          showCombatAlert('Please enter a valid TP bonus roll result.', { title: 'Error' });
           return;
         }
       }
@@ -3432,7 +3433,7 @@ export function attachTrainerInfoListeners() {
   document.getElementById('confirmAddItem')?.addEventListener('click', function() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
-      alert('Trainer data not found.');
+      showCombatAlert('Trainer data not found.', { title: 'Error' });
       return;
     }
 
@@ -3446,7 +3447,7 @@ export function attachTrainerInfoListeners() {
       const customQty = parseInt(document.getElementById('customItemQuantity').value, 10);
 
       if (!customName || customQty < 1) {
-        alert('Please enter a valid item name and quantity.');
+        showCombatAlert('Please enter a valid item name and quantity.', { title: 'Error' });
         return;
       }
 
@@ -3467,7 +3468,7 @@ export function attachTrainerInfoListeners() {
       const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
 
       if (!selectedItemName || quantity < 1) {
-        alert('Please select a valid item and quantity.');
+        showCombatAlert('Please select a valid item and quantity.', { title: 'Error' });
         return;
       }
 
@@ -3553,13 +3554,13 @@ export function attachTrainerInfoListeners() {
     const newQuantity = parseInt(document.getElementById('editItemQuantity').value, 10);
 
     if (isNaN(newQuantity) || newQuantity < 0) {
-      alert('Please enter a valid quantity (0 or greater).');
+      showCombatAlert('Please enter a valid quantity (0 or greater).', { title: 'Error' });
       return;
     }
 
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
-      alert('Trainer data not found.');
+      showCombatAlert('Trainer data not found.', { title: 'Error' });
       return;
     }
 
@@ -3639,7 +3640,7 @@ export function attachTrainerInfoListeners() {
   document.getElementById('confirmRemoveItem')?.addEventListener('click', function() {
     const trainerDataRaw = sessionStorage.getItem('trainerData');
     if (!trainerDataRaw) {
-      alert('Trainer data not found.');
+      showCombatAlert('Trainer data not found.', { title: 'Error' });
       return;
     }
 
@@ -4360,8 +4361,8 @@ export function attachTrainerInfoListeners() {
   });
 
   // Full Restore button - fully heals HP and VP
-  document.getElementById('fullRestore')?.addEventListener('click', () => {
-    if (confirm('Are you sure you want to fully restore HP and VP?')) {
+  document.getElementById('fullRestore')?.addEventListener('click', async () => {
+    if (await showCombatConfirm('Are you sure you want to fully restore HP and VP?')) {
       // Reset current HP to max HP
       trainerData[34] = trainerData[11];
       // Reset current VP to max VP

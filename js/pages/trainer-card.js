@@ -3,6 +3,7 @@
 import { showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
+import { showCombatConfirm } from '../utils/combat-alert.js';
 
 // Helper function to get max charges for a buff based on trainer level
 function getMaxCharges(buffName, trainerLevel) {
@@ -1212,13 +1213,13 @@ export function attachTrainerCardListeners() {
   });
 
   // Combat button
-  document.getElementById('combatBtn')?.addEventListener('click', () => {
+  document.getElementById('combatBtn')?.addEventListener('click', async () => {
     const existing = sessionStorage.getItem('combatState');
     if (existing) {
       const existingState = JSON.parse(existing);
       if (existingState.phase === 'battle' || existingState.phase === 'initiative') {
         // Ask: resume or new?
-        const resume = confirm('An active combat session exists.\n\nOK = Resume\nCancel = Start New');
+        const resume = await showCombatConfirm('An active combat session exists.', { yesLabel: 'Resume', noLabel: 'Start New' });
         if (!resume) {
           sessionStorage.removeItem('combatState');
         }

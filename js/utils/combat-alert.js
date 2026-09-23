@@ -4,7 +4,11 @@
 // suppresses toast notifications for tablet play (see notifications.js), and
 // a native alert() blocks the whole tab (stealing focus, pausing playing
 // media) rather than just showing a message, which is the opposite of that
-// same "don't interrupt the table" intent.
+// same "don't interrupt the table" intent. Despite the "combat" name, this
+// is the only real working modal-alert in the app (notifications.js's own
+// showError/showSuccess are no-ops, toasts intentionally suppressed) -- a
+// few non-combat pages (pokemon-card.js, trainer-info.js, trainer-card.js)
+// import it too for exactly that reason, not a copy/paste mistake.
 function _injectStyles() {
   if (document.getElementById('combat-alert-styles')) return;
   const style = document.createElement('style');

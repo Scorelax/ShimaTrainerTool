@@ -58,6 +58,15 @@ _EMPTY_STATE = {
     # happened to occupy index 0 before the roster was even final.
     'started': False,
     'reactingParticipantId': None,
+    # A live "does anyone want to react?" window (see _open_reaction_window and
+    # move-effects-schema.md's own reaction section) -- None when closed. While
+    # open: {id, trigger:'targeted'|'damaged', anchorId, attackerId, moveName,
+    # expiresAt (epoch ms), eligible: {participantId: {moves:[name,...],
+    # responded: bool}}}. Separate from reactingParticipantId -- this is "who
+    # COULD react and hasn't answered yet", that's "who currently HAS the floor
+    # because they said yes" (reaction-start/-end, unchanged, just now also
+    # ticking this window's bookkeeping when it's open).
+    'pendingReaction': None,
     'participants': {},
     'fieldEffects': [],
     # The shared battle log -- one chronological list of everything that's
@@ -174,6 +183,26 @@ def handle(conn, action, params):
 
     if action == 'reaction-end':
         return _mutate(conn, _reaction_end)
+
+    if action == 'open-reaction-window':
+        trigger = params.get('trigger')
+        if trigger not in ('targeted', 'damaged'):
+            raise ValueError('trigger must be targeted or damaged')
+        if not params.get('anchorId') or not params.get('attackerId'):
+            raise ValueError('Missing anchorId or attackerId')
+        outcome = {}
+        result = _mutate(conn, lambda s: outcome.update(_open_reaction_window(
+            s, trigger, params['anchorId'], params['attackerId'], params.get('moveName', ''))))
+        result.update(outcome)
+        return result
+
+    if action == 'decline-reaction':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _decline_reaction(s, params['id']))
+
+    if action == 'close-reaction-window':
+        return _mutate(conn, _close_reaction_window)
 
     if action == 'play-animation':
         if not params.get('id'):
@@ -781,6 +810,27 @@ def _rebuild_turn_order(state):
     state['turnIndex'] = state['turnOrder'].index(current_id) if current_id in state['turnOrder'] else 0
     if state['reactingParticipantId'] not in state['participants']:
         state['reactingParticipantId'] = None
+    # A reaction window whose anchor or attacker left (or stopped participating,
+    # e.g. fainted out) mid-window no longer means anything -- close it
+    # outright. One whose eligible list just shrank the same way (an
+    # eligible-but-undecided reactor left/dropped out) prunes them and
+    # re-checks whether everyone left is now answered.
+    def _still_participating(pid):
+        p = state['participants'].get(pid)
+        return bool(p) and p.get('status') == 'participating'
+
+    pr = state.get('pendingReaction')
+    if pr:
+        if not _still_participating(pr['anchorId']) or not _still_participating(pr['attackerId']):
+            state['pendingReaction'] = None
+        else:
+            for pid in list(pr['eligible']):
+                if not _still_participating(pid):
+                    del pr['eligible'][pid]
+            if not pr['eligible']:
+                state['pendingReaction'] = None
+            else:
+                _maybe_close_reaction_window(state)
 
 
 def _advance_turn(state):
@@ -828,6 +878,12 @@ def _reaction_start(state, pid):
     state['started'] = True  # see _rebuild_turn_order -- a reaction means turn order is now live
     state['reactingParticipantId'] = pid
     participant['reactionUsed'] = True
+    # If a reaction WINDOW is open and this is one of the participants it was
+    # offered to, saying yes counts as their answer -- same bookkeeping as an
+    # explicit decline (see _decline_reaction), just the opposite outcome.
+    pr = state.get('pendingReaction')
+    if pr and pid in pr['eligible']:
+        pr['eligible'][pid]['responded'] = True
     _log_event(state, 'reaction-start', text=f"{participant['name']} used a reaction", actorId=pid, actorName=participant['name'])
 
 
@@ -840,6 +896,135 @@ def _reaction_end(state):
     state['reactingParticipantId'] = None
     if reactor:
         _log_event(state, 'reaction-end', text=f"{reactor['name']}'s reaction ended", actorId=reactor['id'], actorName=reactor['name'])
+    # The window (if this reactor came from one) may have been waiting on
+    # them specifically -- now that they've released the floor, see if
+    # everyone eligible has answered and it can close.
+    _maybe_close_reaction_window(state)
+
+
+# ---------------------------------------------------------------------------
+# Reaction windows -- "does anyone want to react?" (see move-effects-schema.md's
+# own reaction section). Opened by the ATTACKER's own client at the point their
+# move's flow needs to pause (right after picking a target, for a `targeted`
+# trigger; right after damage lands, for a `damaged` one) and waited on until it
+# closes, same client-driven pattern _advance_turn/_reaction_start already use
+# for "no server background timer, the client that cares tracks the clock".
+# Actually reacting still goes through the EXISTING reaction-start/-end (turn
+# authority, one holder at a time) -- a window is just who's ELIGIBLE and
+# whether they've answered yet, not a second way to hold the floor.
+# ---------------------------------------------------------------------------
+
+# Chebyshev distance (5ft/square, a diagonal step costs the same as an
+# orthogonal one -- the user's own rule, no vertical axis tracked yet).
+_FT_PER_SQUARE = 5
+
+
+def _grid_distance_ft(state, id_a, id_b):
+    """Distance in feet between two participants' battle-map token positions,
+    or None if either isn't placed. The user's own rule is every participant
+    in the battle has to be on the map, but this stays defensive (excludes
+    them from eligibility rather than crashing an attack over a missing
+    token) instead of assuming that always holds true in practice."""
+    tokens = state.get('board', {}).get('tokens', {})
+    a, b = tokens.get(id_a), tokens.get(id_b)
+    if not a or not b:
+        return None
+    return max(abs(a['col'] - b['col']), abs(a['row'] - b['row'])) * _FT_PER_SQUARE
+
+
+def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id):
+    """{participantId: [moveName, ...]} for every OTHER participant (never the
+    attacker themselves) who knows at least one move flagged with this exact
+    `trigger` ('targeted' | 'damaged') and is within that move's own
+    `reactionRange` (feet) of `anchor_id` -- the target of the attack for
+    `targeted`, or whoever just took damage for `damaged`. `reactionRange: 0`
+    (the common case -- Noble Roar, Withdraw, Attract, ...) means the
+    reaction only ever protects its own user, so only anchor_id itself can
+    ever qualify for it; a move with a real range (Sentinel Strike's
+    adjacent-ally intervention, Baby-Doll Eyes' 30ft, ...) can put someone
+    ELSE in range of the anchor in the eligible set too. A participant with no
+    token on the map (see _grid_distance_ft) never qualifies for a
+    range-gated move, even range 0 -- an anchor with no token can't be
+    "distance 0 from itself" reliably either, so this errs toward excluding
+    rather than guessing."""
+    moves_by_name = {m['name']: m for m in moves_data.get('moves', [])}
+    result = {}
+    for pid, p in state['participants'].items():
+        if pid == exclude_id or p.get('status') != 'participating':
+            continue  # reaction-start itself requires 'participating' -- never offer one nobody could accept
+        for move_name in (p.get('moves') or []):
+            m = moves_by_name.get(move_name)
+            if not m or m.get('reactionTrigger') != trigger:
+                continue
+            dist = _grid_distance_ft(state, pid, anchor_id)
+            if dist is None or dist > (m.get('reactionRange') or 0):
+                continue
+            result.setdefault(pid, []).append(move_name)
+    return result
+
+
+def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name):
+    if state['pendingReaction']:
+        raise ValueError('A reaction window is already open')
+    if anchor_id not in state['participants']:
+        raise ValueError('Unknown anchor participant: ' + anchor_id)
+    eligible = _eligible_reactors(state, _load_move_data_file(), trigger, anchor_id, attacker_id)
+    if not eligible:
+        return {'opened': False}  # nothing to wait for -- caller's flow proceeds immediately
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    state['pendingReaction'] = {
+        'id': uuid.uuid4().hex[:8],
+        'trigger': trigger, 'anchorId': anchor_id, 'attackerId': attacker_id, 'moveName': move_name,
+        'expiresAt': now_ms + 10000,
+        'eligible': {pid: {'moves': names, 'responded': False} for pid, names in eligible.items()},
+    }
+    anchor_name = state['participants'][anchor_id]['name']
+    _log_event(state, 'reaction-window-open',
+               text=f"Reaction window open -- {', '.join(state['participants'][p]['name'] for p in eligible)} may react to {anchor_name}",
+               targetId=anchor_id, targetName=anchor_name)
+    return {'opened': True}
+
+
+def _decline_reaction(state, pid):
+    pr = state['pendingReaction']
+    if not pr:
+        raise ValueError('No reaction window open')
+    entry = pr['eligible'].get(pid)
+    if not entry:
+        raise ValueError('Not eligible to react to this')
+    entry['responded'] = True
+    _maybe_close_reaction_window(state)
+
+
+def _maybe_close_reaction_window(state):
+    """Closes the window the moment every eligible participant has answered
+    (accepted-and-finished their reaction, or explicitly declined), rather
+    than always waiting out the full 10 seconds. No-ops while someone
+    currently holds the floor -- see _close_reaction_window's own note on
+    never cutting a reaction off mid-use."""
+    pr = state['pendingReaction']
+    if not pr or state['reactingParticipantId']:
+        return
+    if all(e['responded'] for e in pr['eligible'].values()):
+        state['pendingReaction'] = None
+        _log_event(state, 'reaction-window-close', text='Reaction window closed (all answered)')
+
+
+def _close_reaction_window(state):
+    """Called by the attacker's own client once its local countdown to the
+    window's expiresAt runs out -- no server-side background timer in this
+    request-per-action model (same reasoning as _advance_turn's client-driven
+    turn timing). Refuses while someone currently holds the floor
+    (reactingParticipantId set): never force-close mid-reaction just because
+    the DECIDE window's clock ran out -- the caller retries shortly after
+    instead. Treats anyone who never answered as having declined."""
+    pr = state['pendingReaction']
+    if not pr:
+        return
+    if state['reactingParticipantId']:
+        raise ValueError('Someone is still reacting -- try again shortly')
+    state['pendingReaction'] = None
+    _log_event(state, 'reaction-window-close', text='Reaction window closed (time expired)')
 
 
 def _active_participant_id(state):
@@ -1227,15 +1412,27 @@ def _list_backgrounds():
     return {'status': 'success', 'backgrounds': backgrounds}
 
 
+def _load_move_data_file():
+    """Fresh read of upstream.MOVES_FILE (DnD_moves_categorized_draft.json) --
+    the full per-move record (categories, effects, reactionTrigger/
+    reactionRange, ...), not just the raw [name, type, ...] row
+    upstream.fetch_moves returns. No caching, same reasoning as
+    _list_move_categories below: an in-progress editing session on the Pi is
+    picked up on the very next read. {'moves': []} on any read failure --
+    every caller already treats a miss as "nothing special here", never a
+    hard error."""
+    try:
+        with open(upstream.MOVES_FILE, encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {'moves': []}
+
+
 def _list_move_categories():
     """{moveName: [category, ...]} for every move that's been through the
     user's manual categorization pass so far -- a move with no entry here
     just means "not categorized yet" client-side (see combat.js's
-    moveCategoriesFor), not an error. Reads upstream.MOVES_FILE -- the same
-    file upstream.fetch_moves itself now reads the actual move data from
-    (see that constant's own comment) -- fresh on every call (no caching)
-    so an in-progress editing session on the Pi is picked up on the next
-    move popup without a server restart. Missing/unparseable file -> empty
+    moveCategoriesFor), not an error. Missing/unparseable file -> empty
     dict, same reasoning: a category lookup miss should never block using
     a move, only skip whatever specialized flow that category would have
     triggered (see showCombatMoveDetails's _isSaveTriggered check).
@@ -1244,12 +1441,7 @@ def _list_move_categories():
     structured `effects` list (which condition a move applies and what triggers
     it -- schema in pi-server/docs/move-effects-schema.md). Same
     miss-is-not-an-error rule: no entry just means "no structured effects"."""
-    try:
-        with open(upstream.MOVES_FILE, encoding='utf-8') as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        return {'status': 'success', 'categories': {}, 'effects': {}}
-    moves = data.get('moves', [])
+    moves = _load_move_data_file().get('moves', [])
     categories = {m['name']: m.get('categories', []) for m in moves}
     effects = {m['name']: m['effects'] for m in moves if m.get('effects')}
     return {'status': 'success', 'categories': categories, 'effects': effects}

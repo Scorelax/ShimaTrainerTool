@@ -5065,12 +5065,46 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "stat_debuff_enemy"
+        "self_disadvantage_attacks_against",
+        "disadvantage_attacks_against"
       ],
       "description": "You quickly widen your eyes in an attempt to charm an opponent, decreasing their will to fight. When you or an ally in range are targeted by a Move that requires an attack roll, you may use a reaction to impose disadvantage on the roll.",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 30,
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Charm",
@@ -5973,12 +6007,32 @@
         "counter_reaction_effect",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "potential_disadvantage"
+        "potential_disadvantage_attack_rolls"
       ],
       "description": "When you are the target of an attack, you may use your reaction to emit a mesmerizing light pattern in a 30ft. radius. All creatures in range must make a Wisdom saving throw, suffering disadvantage on attack rolls against you until the beginning of your next turn. Then, roll a d10. On a 9 or 10, you regain your reaction.",
       "moveStat": "WIS",
       "vpCost": "12",
-      "scaling": "At level 10, the range increases to 50ft."
+      "scaling": "At level 10, the range increases to 50ft.",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "start"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Marinara Mist",
@@ -10091,13 +10145,32 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_self",
+        "self_stat_buff_ac",
         "counter_reaction_effect"
       ],
       "description": "You quickly take to the skies as a creature is about to attack you, before it rolls to hit. For this instant, you increase your AC by 10. If this causes the attack to miss, you're now 60ft. up in the air. Subsequent use of this move during the same encounter requires a roll of 15 or higher.",
       "moveStat": "None",
       "vpCost": "25",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 10,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Stormwind",
@@ -15053,12 +15126,44 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "advantage_on_attack_roll"
+        "self_advantage_attack_rolls",
+        "advantage_attack_rolls"
       ],
       "description": "On a successful takedown of an opponent by an ally within 5ft. of you, you may use one reaction to cheer on your ally. Both of you gain advantage on your next attack roll.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Chip Away",
@@ -15234,12 +15339,30 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "stat_buff_self"
+        "self_status_condition_type_changed"
       ],
       "description": "After taking damage from an attack, You may use your reaction to change your Pokémon type to one of your choice that is resistant or immune to the type of move used against you for the duration.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "type_changed",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Copycat",
@@ -16493,12 +16616,51 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "stat_buff_ally"
+        "stat_buff_attack_rolls",
+        "stat_buff_ac"
       ],
       "description": "If you are within melee range of an ally, you grasp its hand to spread happiness. Use this reaction when an ally is attacking to add +1 to its attack rolls, or when it is targeted by an attack to add +1 to its AC. This reaction can be used only before the result of either attack roll (by ally or creature) is called.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 5,
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "choice": {
+            "kind": "chosen"
+          }
+        },
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 1,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "choice": {
+            "kind": "chosen"
+          }
+        }
+      ]
     },
     {
       "name": "Horn Attack",
@@ -25612,12 +25774,31 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "stat_buff_self"
+        "self_stat_buff_ac"
       ],
       "description": "When subject to a melee or ranged attack, you can spend your reaction to increase your AC by +2 if it would cause the attack to miss.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": "Increase your AC by +3 at level 10 and above."
+      "scaling": "Increase your AC by +3 at level 10 and above.",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     }
   ]
 }

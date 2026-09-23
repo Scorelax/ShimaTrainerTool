@@ -209,6 +209,11 @@ original scoping snapshot otherwise — treat the two lists above as current, th
 
 *(Update, 2026-09-23: reaction-triggered effects are no longer a gap either — the reaction-window
 mechanism (see its own module docstring in routes_combat.py) plus the new `reroll_damage` kind
-above cover Noble Roar, Sentinel Strike, and Attract, all three fully wired end to end. Celebrate,
-Withdraw, Baby-Doll Eyes, Hold Hands, Luminous Veil, Conversion 2, and Skyward Soar are still on
-their old flat tags — next in line, not blocked on anything new.)*
+above cover all 10 reaction moves now: Noble Roar, Sentinel Strike, and Attract first, then
+Withdraw, Baby-Doll Eyes, Hold Hands, Celebrate, Luminous Veil, Conversion 2, and Skyward Soar
+(migrate_effects_v11.py) — every one fully structured, though Celebrate and half of Hold Hands
+("ally about to attack") only reach the player through the plain manual React button, not the
+eligibility system's proactive prompt (see that script's own module docstring: neither trigger
+event fits either existing reaction family). No new schema mechanism was needed for any of
+these seven — they're all existing kinds (`stat`, `roll`, `condition`) combined with the
+self + ally-via-multi-target-picker split Sentinel Strike's own effect first established.)*

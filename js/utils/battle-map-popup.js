@@ -19,6 +19,7 @@ import { CombatAPI } from '../api.js';
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
+import { showCombatAlert } from './combat-alert.js';
 
 function _injectStyles() {
   if (document.getElementById('battle-map-popup-styles')) return;
@@ -156,7 +157,7 @@ function _ensureDom() {
   document.getElementById('bmapSetGridBtn').addEventListener('click', async () => {
     const cols = parseInt(document.getElementById('bmapCols').value, 10) || 10;
     const rows = parseInt(document.getElementById('bmapRows').value, 10) || 12; // matches routes_combat.py's own default
-    try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { alert(err.message); }
+    try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
   });
 }
 
@@ -251,7 +252,7 @@ function _renderGrid() {
         const current = cell.classList.contains('marked') ? cell.textContent : '';
         const terrain = prompt('Terrain label for this cell (blank to clear):', current);
         if (terrain === null) return; // cancelled
-        try { await CombatAPI.setCellTerrain(col, row, terrain); } catch (err) { alert(err.message); }
+        try { await CombatAPI.setCellTerrain(col, row, terrain); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
         return;
       }
 
@@ -261,7 +262,7 @@ function _renderGrid() {
       // Turn-gated server-side (move-token, not the DM's unrestricted
       // set-token-position) -- selection was already limited to your
       // active-turn token below, but the server is the actual authority.
-      CombatAPI.moveToken(movingId, col, row).catch(err => alert(err.message));
+      CombatAPI.moveToken(movingId, col, row).catch(err => showCombatAlert(err.message, { title: 'Error' }));
       _render();
     });
   });

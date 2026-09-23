@@ -8,12 +8,13 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ```jsonc
 {
-  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal",
+  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal" | "block_attack",
   // condition:  "apply": "<name>", optional "value" (type_changed → "Ghost")
   // stat:       "stat": "<stat>", "amount": -1 | "proficiency" | {"dice": "1d4"}  OR  "set": 0, optional "stacks": {"max": 5}
-  // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>"
+  // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>", optional "ability" (saving_throws only)
   // temp_hp:    "amount": 10 -- a bonus-HP pool, see its own section below
   // reroll_damage: no extra fields -- see its own section below
+  // block_attack: no extra fields -- see its own section below
   // heal:       "amount": {"dice": "2d6", "moveMod?": true, "pool?": "VP"}
   //                     | {"fractionOfDamage": 0.5, "capMultipleOfLevel?": 5, "pool?": "VP"}
   //                     | {"levelMultiple": 1, "pool?": "VP"}       -- see its own section below
@@ -56,6 +57,55 @@ was already applied — refunds the reactor's HP by the difference via `update-s
 client-authoritative correction the Modify Stats buttons already use for HP (no new server
 action). No log entry to find (a freeform PvE hit, or the window opened too late) just tells the
 table to compare by hand, same fallback tone as every other "can't auto-detect" spot in this app.
+
+**`block_attack`** (Protect, King's Shield, Shield Guardian, Quick Guard) cancels the incoming
+attack that opened the reaction window it's used inside of, BEFORE the attack roll -- the first
+`protect_negate`-family move actually built. `target: "self"`, `ends: [{type:"instant"}]`, no
+other fields: the reactor is always the one applying it (even Shield Guardian, protecting an
+ADJACENT ally -- see below), so there's nothing else to configure. `_offerMoveEffects` special-
+cases it exactly like `reroll_damage`/`heal`: instead of `apply-status`, it calls a new
+`block-pending-attack` action (`routes_combat.py`'s `_block_pending_attack`) which requires the
+caller to actually be holding the floor via `reaction-start` for a live `pendingReaction` window
+they were eligible for, and records `{windowId, anchorId, attackerId, blockerId, blockerName}`
+on a new top-level `reactionBlock` session field -- deliberately separate from `pendingReaction`
+itself, since a block can land well before `reaction-end` closes the window, and needs to
+survive that close so the ATTACKER's own client (still polling in
+`utils/reaction-window.js`'s `waitForReactionWindow`) can see it. That function now resolves to
+`{blocked: false}` normally or `{blocked: true, blockerName}`, checked opportunistically every
+poll (not just once at the end) and confirmed against the window's own id so a stale block from
+an earlier, already-closed window can never bleed into a new one. Only `target-picker.js`'s
+`'targeted'`-family caller acts on it (`_afterTargetSelected` closes the popup immediately with
+`{blocked: true, ...}` instead of proceeding to the attack roll, and `_resolveOneHit` treats that
+exactly like "nothing landed" -- no damage, no further effects, already logged server-side) --
+a `'damaged'` reaction is already too late to block anything, and `pickTargetAgain`'s "hit
+again?" continuation doesn't reopen a window at all (a multi-hit move's later hits against the
+same target already had their one reaction opportunity on the first).
+
+Because eligibility and blocking are both keyed off "who's reacting", not "who's the target",
+Shield Guardian's ally-protection case needs no special handling at all: the guardian (not the
+attacked ally) is who's eligible (their own `reactionRange: 5` puts them in range of the anchor,
+same mechanism Sentinel Strike/Baby-Doll Eyes already use), the guardian is who ends up holding
+the floor and applying the effect to themselves (`target: "self"`), and `_block_pending_attack`
+reads the ORIGINAL anchor/attacker off the window itself, not off the blocker -- so the right
+attack gets cancelled regardless of who actually blocked it.
+
+**Deliberately left manual, same partial-implementation precedent as everywhere else in this
+schema:** every Protect-family move's own escalating "roll over 15 on a d20" cost after the
+first use in an encounter (no resource-tracking mechanism for that yet); King's Shield's own
+"blocks ALL damage until your next turn", not just the one attack that opened the window (that's
+a genuinely different, persisting "immune to damage" status this kind doesn't model, only the
+immediate block); Quick Guard's "first round of combat only" gate (already `situational_use`-
+tagged). Endure (retroactively drop to 1 HP instead of fainting, on the `'damaged'` family,
+after damage already landed) is a different shape entirely -- closer to `reroll_damage`'s own
+retroactive-correction pattern than to blocking an attack before it resolves -- and isn't built
+yet either. Everything else under `protect_negate` needs its own separate thing: custom math on
+top of blocking (Wide Guard halves instead of negating, Spiky Shield reflects damage back,
+Nature's Embrace redirects it, Parry is a contested roll, none of that math exists), a third
+reaction TIMING neither `targeted` nor `damaged` covers (Lucky Chant needs to intercept after the
+attack roll is known but before damage), or bypassing Protect specifically (Feint, Phantom
+Tendril, Hyperspace Hole, the vanish-family's "Protect can't be used" clause) -- meaningless
+until Protect itself has a real mechanism, which it now does, but "ignore an incoming
+`block_attack`" isn't wired up on the attacking side yet.
 
 **`heal`** restores HP or VP. A ONE-SHOT heal (no `repeat` -- every drain, every plain
 heal-on-use move) is never a stored status either, same `ends: [{type:"instant"}]` convention
@@ -148,6 +198,7 @@ correction `reroll_damage`'s own refund already uses.
 - roll — `advantage_<on>` / `disadvantage_<on>` / `potential_…`
 - reroll_damage — `reroll_damage` / `potential_reroll_damage` (always the latter in practice — it only ever rides on a `save_fail`)
 - heal — `heal` / `self_heal` (an `on_hit`-gated drain counts as guaranteed, same as any other `on_hit` effect — never gets a `potential_` prefix)
+- block_attack — always `self_block_attack` (`target: "self"` on every move that has it so far, `when: "always"` so never `potential_`)
 
 ## How live modifiers are applied (`js/utils/move-effects.js`, shown by the attack / save popups)
 The dice are rolled at the table, so the popups only *show* what applies and fold numbers into totals.

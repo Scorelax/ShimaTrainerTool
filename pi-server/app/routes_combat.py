@@ -67,6 +67,16 @@ _EMPTY_STATE = {
     # because they said yes" (reaction-start/-end, unchanged, just now also
     # ticking this window's bookkeeping when it's open).
     'pendingReaction': None,
+    # Set by block-pending-attack (see _block_pending_attack) when a reactor's
+    # own move applies a `block_attack` effect (Protect, King's Shield, ...) --
+    # {windowId, anchorId, attackerId, blockerId, blockerName}, or None. Never
+    # cleared automatically (a stale one is harmless: `windowId` only ever
+    # matches the ONE reaction window it was set during, see
+    # reaction-window.js's own waitForReactionWindow, which is what actually
+    # reads this). Deliberately separate from pendingReaction itself -- a
+    # block can land well before reaction-end closes the window, and needs to
+    # survive that close so the attacker's client (still polling) can see it.
+    'reactionBlock': None,
     'participants': {},
     'fieldEffects': [],
     # The shared battle log -- one chronological list of everything that's
@@ -200,6 +210,11 @@ def handle(conn, action, params):
         if not params.get('id'):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _decline_reaction(s, params['id']))
+
+    if action == 'block-pending-attack':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _block_pending_attack(s, params['id']))
 
     if action == 'close-reaction-window':
         return _mutate(conn, _close_reaction_window)
@@ -994,6 +1009,38 @@ def _decline_reaction(state, pid):
         raise ValueError('Not eligible to react to this')
     entry['responded'] = True
     _maybe_close_reaction_window(state)
+
+
+def _block_pending_attack(state, pid):
+    """Called from _apply_status's own caller (combat-wip.js's
+    _offerMoveEffects, special-casing a `block_attack` effect the same way it
+    already does reroll_damage/heal -- see move-effects-schema.md) the moment
+    a reactor actually USES a move like Protect: marks the CURRENT pending
+    reaction's attack as blocked, so the attacker's own client (waiting in
+    waitForReactionWindow) knows to skip its attack roll/damage step entirely
+    once the window closes, instead of proceeding as if nothing happened.
+    Requires the caller to actually be holding the floor via reaction-start
+    (same turn-authority check as every other reaction action) for a real
+    pending window they were eligible for -- applying a block_attack effect
+    with no live reaction to attach it to (a stray apply-status call, a
+    window that already closed) does nothing mechanically, same trust-the-
+    flow reasoning as everywhere else in this file. Never closes the window
+    itself -- reaction-end still does that, exactly like every other
+    reaction; this only leaves a note for the attacker to find."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if state['reactingParticipantId'] != pid:
+        raise ValueError('Not currently holding a reaction')
+    pr = state.get('pendingReaction')
+    if not pr or pid not in pr['eligible']:
+        raise ValueError('No pending reaction to block with')
+    state['reactionBlock'] = {
+        'windowId': pr['id'], 'anchorId': pr['anchorId'], 'attackerId': pr['attackerId'],
+        'blockerId': pid, 'blockerName': participant['name'],
+    }
+    _log_event(state, 'reaction-block', text=f"{participant['name']} blocks the attack!",
+               actorId=pid, actorName=participant['name'])
 
 
 def _maybe_close_reaction_window(state):

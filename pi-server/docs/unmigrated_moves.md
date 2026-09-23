@@ -1,6 +1,6 @@
 # Moves still without structured `effects`
 
-_Generated 2026-09-23 (updated after migrate_effects_v18.py) against DnD_moves_categorized_draft.json -- 888 moves total, 459 with no `effects` array yet.
+_Generated 2026-09-24 (updated after migrate_effects_v19.py) against DnD_moves_categorized_draft.json -- 888 moves total, 455 with no `effects` array yet.
  See move-effects-schema.md for the schema itself and its own "Not covered yet" section for the gap-by-gap reasoning._
 
 
@@ -50,36 +50,10 @@ What remains here is genuinely blocked on something -- movement speed (deferred)
 - **Wing Buffer** (stat_buff_self) -- You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successfu
 - **Wing Command** (stat_buff_ally) -- You spread your wings in a majestic display, inspiring allies close by. All allies within range that can see you receive a bonus to their at
 
-## 2. Needs a new effect kind / mechanism (154)
+## 2. Needs a new effect kind / mechanism (150)
 
+`protect_negate` now has a real core mechanism (`block_attack`, see move-effects-schema.md) -- migrate_effects_v19.py used it for Protect/King's Shield/Shield Guardian/Quick Guard. What remains under that tag below each needs something further on top (custom math, a third reaction timing, or bypassing Protect specifically) -- see that same schema doc section for the per-move list.
 
-### protect_negate (26) -- blocks/negates an incoming effect (Protect-family)
-- Aqua Phase
-- Astral Jet
-- Captivate
-- Crafty Shield
-- Endure
-- Feint
-- Fly
-- Hover
-- Hyperspace Hole
-- King's Shield
-- Lucky Chant
-- Mat Block
-- Mist
-- Nature's Embrace
-- Parry
-- Phantom Force
-- Phantom Tendril
-- Protect
-- Quick Guard
-- Safeguard
-- Shadow Force
-- Shield Dome
-- Shield Guardian
-- Spiky Shield
-- Testudo Formation
-- Wide Guard
 
 ### conditional_damage (25) -- damage that changes based on a condition (target HP, a status, terrain, ...)
 - Archive Blast
@@ -132,6 +106,30 @@ What remains here is genuinely blocked on something -- movement speed (deferred)
 - Speed Swap
 - Strength Sap
 - Thief
+
+### protect_negate (22) -- blocks/negates an incoming effect (Protect-family) -- core mechanism now exists, see above
+- Aqua Phase
+- Astral Jet
+- Captivate
+- Crafty Shield
+- Endure
+- Feint
+- Fly
+- Hover
+- Hyperspace Hole
+- Lucky Chant
+- Mat Block
+- Mist
+- Nature's Embrace
+- Parry
+- Phantom Force
+- Phantom Tendril
+- Safeguard
+- Shadow Force
+- Shield Dome
+- Spiky Shield
+- Testudo Formation
+- Wide Guard
 
 ### potential_damage_increase (13) -- damage that scales on a condition not yet modeled
 - Avalanche

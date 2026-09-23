@@ -829,6 +829,17 @@ export class CombatAPI {
     return API.request('combat', 'decline-reaction', { id }, { useCache: false });
   }
 
+  /** Called from combat-wip.js's _offerMoveEffects when a reactor's own move
+   * applies a `block_attack` effect (Protect, King's Shield, ...) -- marks
+   * the CURRENT pending reaction's attack as blocked, so the attacker's own
+   * waitForReactionWindow (utils/reaction-window.js) knows to skip the
+   * attack roll/damage step once the window closes. `id` must be the
+   * blocker, currently holding the floor via reaction-start for a real
+   * pending window -- see routes_combat.py's own _block_pending_attack. */
+  static async blockPendingAttack(id) {
+    return API.request('combat', 'block-pending-attack', { id }, { useCache: false });
+  }
+
   /** Called once the caller's own local clock reaches the window's expiresAt
    * -- server refuses (rejects the promise) while someone's actively
    * reacting, never force-closing mid-use; the caller just retries shortly

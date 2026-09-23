@@ -103,6 +103,9 @@ export function statusLabel(s) {
   if (s.kind === 'reroll_damage') {
     return 'Reroll their damage, take the lower';
   }
+  if (s.kind === 'block_attack') {
+    return 'Block the attack entirely';
+  }
   if (s.kind === 'heal') {
     const pool = s.amount?.pool === 'VP' ? ' VP' : '';
     const repeatNote = s.repeat ? ` (${s.repeat === 'start_of_turn' ? 'start' : 'end'} of turn, while active)` : '';

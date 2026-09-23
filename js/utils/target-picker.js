@@ -279,19 +279,33 @@ function _showStep1() {
  * ...) needs to land BEFORE the attack roll is entered, since it changes the
  * numbers that roll gets compared against. No-ops (proceeds immediately)
  * when nobody's eligible -- the overwhelming majority of moves, so this
- * almost never actually shows anything. */
+ * almost never actually shows anything.
+ *
+ * A `block_attack` effect (Protect, King's Shield, Shield Guardian, Quick
+ * Guard -- see move-effects-schema.md's own section) can end the whole
+ * attack right here: waitForReactionWindow resolves {blocked: true,
+ * blockerName} when the reactor used one, and this closes the popup
+ * immediately instead of proceeding to the roll -- there's no attack roll,
+ * no damage, nothing left for _resolveOneHit to do beyond logging it. Only
+ * wired here (pickTarget's own fresh-target flow), not pickTargetAgain's
+ * "hit again?" continuation -- a multi-hit move's later hits against the
+ * same target already had their one reaction opportunity on the first. */
 async function _afterTargetSelected(p, name) {
   document.getElementById('targetPickerStep1').hidden = true;
   document.getElementById('targetPickerReactionWait').hidden = false;
   document.getElementById('targetPickerTitle').textContent = 'Reaction Window';
   document.getElementById('targetPickerReactionWaitText').textContent = 'Waiting for possible reactions…';
   document.getElementById('targetPickerReactionWaitTimer').textContent = '';
-  await waitForReactionWindow('targeted', p.id, _attacker?.id, _moveName, (status) => {
+  const reaction = await waitForReactionWindow('targeted', p.id, _attacker?.id, _moveName, (status) => {
     if (!status.opened) return;
     const secs = Math.ceil(status.msLeft / 1000);
     document.getElementById('targetPickerReactionWaitTimer').textContent = `${secs}s`;
   });
   document.getElementById('targetPickerReactionWait').hidden = true;
+  if (reaction?.blocked) {
+    _close({ targetId: p.id, blocked: true, blockerName: reaction.blockerName });
+    return;
+  }
   if (_guaranteedHit) _autoHit(p, name);
   else _showStep2(p, name);
 }

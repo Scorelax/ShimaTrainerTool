@@ -1952,6 +1952,19 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleRerollDamage({ reactorId: attackerId, attackerId: pick.targetId, moveName });
       continue;
     }
+    if (effect.kind === 'block_attack') {
+      // Not a status either -- a one-shot signal to the ATTACKER's own
+      // client (mid waitForReactionWindow) that this attack is blocked
+      // entirely (Protect, King's Shield, ...). attackerId (closure) is
+      // the reactor themselves, using the move -- same as any other
+      // self-only reaction effect.
+      try {
+        await CombatAPI.blockPendingAttack(attackerId);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
     if (effect.kind === 'heal' && !effect.repeat) {
       // Not a status -- an immediate HP/VP change. pick.targetId is whoever
       // gets healed (attackerId itself for a target:self effect, see the
@@ -2177,6 +2190,7 @@ async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
  * again?" loop above, and _handleMultiHitAoe's per-target resolution. */
 async function _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked) {
   if (!picked) return null; // "no target" / closed -- move's own cost still applied, nothing more to do
+  if (picked.blocked) return null; // a reactor's block_attack effect (Protect, ...) ended this attack entirely -- routes_combat.py's own block-pending-attack already logged it (reaction-block), nothing left to do
   if (!picked.hit) {
     // Miss -- VP already spent when the move was confirmed, nothing else to
     // do mechanically, but it still belongs in the shared log (a Miss never

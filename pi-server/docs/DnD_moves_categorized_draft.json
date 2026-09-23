@@ -7840,12 +7840,29 @@
       "reaction": true,
       "categories": [
         "protect_negate",
-        "situational_use"
+        "situational_use",
+        "self_block_attack"
       ],
       "description": "You have the ability to rush to the aid of an ally at the start of combat. If an ally in range (or you) is attacked on the very first turn of the very first round of combat, you may use your reaction to negate any damage dealt.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 30,
+      "effects": [
+        {
+          "kind": "block_attack",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Revenge",
@@ -18595,12 +18612,29 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "protect_negate"
+        "protect_negate",
+        "self_block_attack"
       ],
       "description": "You sense incoming danger and are able to quickly avoid it. When targeted by a move (before the attack roll), or forced to make a saving throw, you may automatically avoid the damage/effects on the first instance of this reaction. On future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful. Unless the successful roll is 20, the damage you take instead drains your VP for half the damage amount.",
       "moveStat": "None",
       "vpCost": "25",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "block_attack",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Psych Up",
@@ -25553,12 +25587,29 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "protect_negate"
+        "protect_negate",
+        "self_block_attack"
       ],
       "description": "Your body is cloaked with a protective shield that negates all damage to you. When targeted by an attack, you may automatically avoid taking damage from this attack and any other damaging move until the beginning of your next turn. You may still suffer secondary effects. On future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful.",
       "moveStat": "None",
       "vpCost": "25",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "block_attack",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Magnet Bomb",
@@ -25916,12 +25967,29 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "protect_negate"
+        "protect_negate",
+        "self_block_attack"
       ],
       "description": "You protect a creature next to you from an incoming targeted attack by moving to block it, negating all damage and effects. On future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful, or suffer the damage and effects yourself.",
       "moveStat": "None",
       "vpCost": "25",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 5,
+      "effects": [
+        {
+          "kind": "block_attack",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Shift Gear",

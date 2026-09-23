@@ -14662,7 +14662,9 @@
       "description": "As a reaction, when dealt damage by an attack, you may force the attacker to make a WIS save against your Move DC. On a fail, the creature must roll the damage again and use the lower result.",
       "moveStat": "CHA",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0
     },
     {
       "name": "Barrage",
@@ -17179,12 +17181,31 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "potential_disadvantage"
+        "self_disadvantage_attacks_against"
       ],
       "description": "You let out a stunning roar that intimidates a target. When targeted by an attack, use this reaction to impose disadvantage on the attack roll",
       "moveStat": "STR/CHA",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attacks_against",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Odor Sleuth",
@@ -24340,12 +24361,31 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "advantage_on_attack_roll"
+        "self_advantage_attack_rolls"
       ],
       "description": "When a targeted attack would hit an ally adjacent to you, you can choose to take the damage instead. If you do, your next attack against that target has advantage.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 5,
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Shield Dome",

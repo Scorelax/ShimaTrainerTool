@@ -20,6 +20,8 @@ import { visibleToViewer } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
+import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
+import { waitForDamagedReactions } from '../utils/reaction-wait-overlay.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, tempHpRemaining } from '../utils/move-effects.js';
@@ -1669,6 +1671,7 @@ export function attachCombatWipListeners() {
       updateBattleMap(session);
       updateBattleLog(session);
       _maybePromptStartOfTurnSaves(session);
+      _maybeShowReactionPrompt(session);
       return;
     }
 
@@ -1680,6 +1683,7 @@ export function attachCombatWipListeners() {
     updateBattleMap(session); // no-ops if the popup isn't currently open
     updateBattleLog(session); // no-ops if the popup isn't currently open
     _maybePromptStartOfTurnSaves(session);
+    _maybeShowReactionPrompt(session);
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
 
@@ -1834,7 +1838,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // skips the attack roll -- the move guarantees a hit, not just a crit conditional
   // on one -- see _resolveOneHit for where the crit itself gets forced and consumed.
   const guaranteedHit = categories.includes('guaranteed_hit') || !!guaranteedCritStatusId(session?.participants?.[combatantId]);
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit });
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
 
   const isSameTarget = categories.includes('multi_hit_same_target');
@@ -1861,9 +1865,9 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
       const target = session?.participants?.[hitTargetId];
       if (!target) return; // target left the battle mid-chain
-      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId] });
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName });
     } else {
-      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit });
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
   }
@@ -2041,6 +2045,9 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     showCombatAlert(err.message, { title: 'Error' });
     return null;
   }
+  // 'damaged'-family reactions (Attract, Conversion 2, ...) fire right here --
+  // after damage lands, before anything else about this hit is resolved.
+  await waitForDamagedReactions(targetId, combatantId, moveName);
 
   // Some moves land a hit AND separately make the hit creature save against
   // a secondary consequence (e.g. Temporal Fang: damage on the attack roll,
@@ -2127,6 +2134,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
           // No "N damage applied" popup here either -- see _resolveOneHit's own note;
           // doubly true in a loop over several AoE targets, one popup per target.
           await CombatAPI.applyDamage(combatantId, targetId, outcome.rawRoll + damageModifier, moveType, speciesName, moveName);
+          await waitForDamagedReactions(targetId, combatantId, moveName);
         } catch (err) {
           showCombatAlert(err.message, { title: 'Error' });
         }
@@ -2145,7 +2153,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
       // so each selected target goes straight to its damage roll.
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId] });
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
     }
   }
@@ -2279,6 +2287,7 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   try {
     // No "N damage applied" popup -- see _resolveOneHit's own note on why.
     await CombatAPI.applyDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
+    await waitForDamagedReactions(picked.targetId, combatantId, moveName);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }
@@ -2350,6 +2359,23 @@ async function _maybePromptStartOfTurnSaves(state) {
   } finally {
     _promptingSaves = false;
   }
+}
+
+/** Shows the reactor-side "you may react" popup (reaction-prompt-popup.js)
+ * when this device owns a participant the live session says is currently
+ * eligible to react to something -- no-ops otherwise, including while the
+ * popup is already showing that same window (the popup module itself tracks
+ * that). Wired in alongside _maybePromptStartOfTurnSaves at both places this
+ * page re-renders from a live push, so it fires no matter which path
+ * handled it. Focuses the reacting participant's own card once they commit
+ * (reaction-start succeeds), so the next thing the player sees is the card
+ * they'll actually use their reaction move from. */
+function _maybeShowReactionPrompt(state) {
+  if (!state?.pendingReaction) return;
+  showReactionPromptIfEligible(state, _myParticipantIds, {
+    getName: (id) => state.participants?.[id]?.name,
+    onReacted: (participantId) => _setFocus(participantId),
+  });
 }
 
 /** A status badge was clicked (own card or another participant's panel). */

@@ -814,6 +814,29 @@ export class CombatAPI {
     return API.request('combat', 'reaction-end', {}, { useCache: false });
   }
 
+  /** Opens a "does anyone want to react?" window (see move-effects-schema.md's
+   * reaction section / routes_combat.py's own docstring on this) -- trigger is
+   * 'targeted' (anchorId = the target, called right after picking one, before
+   * the attack roll) or 'damaged' (anchorId = whoever just took damage, called
+   * right after applying it). Resolves to {opened: false} when nobody's
+   * eligible (proceed immediately, nothing to wait for) or {opened: true} (see
+   * utils/reaction-window.js for actually waiting it out). */
+  static async openReactionWindow(trigger, anchorId, attackerId, moveName) {
+    return API.request('combat', 'open-reaction-window', { trigger, anchorId, attackerId, moveName }, { useCache: false });
+  }
+
+  static async declineReaction(id) {
+    return API.request('combat', 'decline-reaction', { id }, { useCache: false });
+  }
+
+  /** Called once the caller's own local clock reaches the window's expiresAt
+   * -- server refuses (rejects the promise) while someone's actively
+   * reacting, never force-closing mid-use; the caller just retries shortly
+   * after (see utils/reaction-window.js). */
+  static async closeReactionWindow() {
+    return API.request('combat', 'close-reaction-window', {}, { useCache: false });
+  }
+
   /** Fire-and-forget cue for the display module to play a species' battle
    * animation clip right now -- not session state, nothing to await beyond
    * the request landing. */

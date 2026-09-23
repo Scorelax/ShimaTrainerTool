@@ -15,6 +15,7 @@ import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
 import { attackRollContext, rollModeText, diceBonusOptionsFor } from './move-effects.js';
+import { waitForReactionWindow } from './reaction-window.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -71,6 +72,8 @@ function _injectStyles() {
     .target-picker-anim-media { width: 100%; max-height: 40vh; display: flex; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
     .target-picker-anim-media:empty { display: none; }
     .target-picker-anim-media img, .target-picker-anim-media video { max-width: 100%; max-height: 40vh; border-radius: 12px; object-fit: contain; }
+    .target-picker-reaction-wait-text { text-align: center; font-size: 1rem; color: #e0e0e0; padding: 1.5rem 0 0.5rem; }
+    .target-picker-reaction-wait-timer { text-align: center; font-size: 0.85rem; color: #a0a0c0; padding-bottom: 1.5rem; }
     .target-picker-dice-row { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.7rem; }
     .target-picker-dice-row:empty { display: none; margin: 0; }
     .target-picker-dice-btn { background: rgba(255,215,0,0.14) !important; border: 1px solid rgba(255,215,0,0.5) !important; color: #FFD700 !important; font-size: 0.85rem !important; padding: 0.5rem !important; }
@@ -87,6 +90,10 @@ let _resolve = null;
 let _attackModifier = 0;
 let _damageModifier = 0;
 let _speciesName = '';
+// The attacking move's own name, needed for the reaction window ("Noble Roar --
+// does anyone want to react to being targeted by this?") -- combat-wip.js's
+// callers already know it, target-picker.js itself doesn't otherwise need it.
+let _moveName = '';
 let _selectedTargetId = null;
 let _selectedTarget = null;
 let _selectedTargetName = '';
@@ -195,6 +202,10 @@ function _ensureDom() {
           <div class="target-picker-grid" id="targetPickerGrid"></div>
           <button class="combat-use-move-btn target-picker-skip" id="targetPickerSkip">No Target (self-only move)</button>
         </div>
+        <div id="targetPickerReactionWait" hidden>
+          <div class="target-picker-reaction-wait-text" id="targetPickerReactionWaitText">Waiting for possible reactions…</div>
+          <div class="target-picker-reaction-wait-timer" id="targetPickerReactionWaitTimer"></div>
+        </div>
         <div id="targetPickerStep2" hidden>
           <div class="target-picker-roll-target" id="targetPickerRollTarget"></div>
           <div class="target-picker-roll-notes" id="targetPickerRollNotes"></div>
@@ -252,11 +263,37 @@ function _close(result) {
 
 function _showStep1() {
   document.getElementById('targetPickerStep1').hidden = false;
+  document.getElementById('targetPickerReactionWait').hidden = true;
   document.getElementById('targetPickerStep2').hidden = true;
   document.getElementById('targetPickerStep3').hidden = true;
   document.getElementById('targetPickerTitle').textContent = 'Choose a Target';
   _selectedTargetId = null;
   _selectedTarget = null;
+}
+
+/** Between picking a target and showing the Attack Roll step (or, on a
+ * guaranteed hit, the damage roll directly): opens a reaction window for the
+ * 'targeted' family (see reaction-window.js/routes_combat.py's own module
+ * docstring) anchored on the target just picked, and waits it out before
+ * continuing -- an opponent reacting to being targeted (Noble Roar, Withdraw,
+ * ...) needs to land BEFORE the attack roll is entered, since it changes the
+ * numbers that roll gets compared against. No-ops (proceeds immediately)
+ * when nobody's eligible -- the overwhelming majority of moves, so this
+ * almost never actually shows anything. */
+async function _afterTargetSelected(p, name) {
+  document.getElementById('targetPickerStep1').hidden = true;
+  document.getElementById('targetPickerReactionWait').hidden = false;
+  document.getElementById('targetPickerTitle').textContent = 'Reaction Window';
+  document.getElementById('targetPickerReactionWaitText').textContent = 'Waiting for possible reactions…';
+  document.getElementById('targetPickerReactionWaitTimer').textContent = '';
+  await waitForReactionWindow('targeted', p.id, _attacker?.id, _moveName, (status) => {
+    if (!status.opened) return;
+    const secs = Math.ceil(status.msLeft / 1000);
+    document.getElementById('targetPickerReactionWaitTimer').textContent = `${secs}s`;
+  });
+  document.getElementById('targetPickerReactionWait').hidden = true;
+  if (_guaranteedHit) _autoHit(p, name);
+  else _showStep2(p, name);
 }
 
 /** Attack-roll step -- entered fresh from a target card, or returned to via
@@ -503,7 +540,7 @@ function _cardHtml(p) {
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '' } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -517,6 +554,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _damageModifier = damageModifier;
   _speciesName = speciesName;
   _guaranteedHit = guaranteedHit;
+  _moveName = moveName;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   document.getElementById('targetPickerBack').style.display = '';
   document.getElementById('targetPickerBackToAttack').style.display = '';
@@ -528,8 +566,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
       const p = session.participants[card.dataset.targetId];
       const name = visibleToViewer(p, 'name') ? p.name : '???';
       _selectedTargetId = card.dataset.targetId;
-      if (_guaranteedHit) _autoHit(p, name);
-      else _showStep2(p, name);
+      _afterTargetSelected(p, name);
     });
   });
 
@@ -550,20 +587,23 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * null if closed. With guaranteedHit (see pickTarget) it opens directly at
  * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '' } = {}) {
   _ensureDom();
   _attacker = attacker;
   _attackModifier = attackModifier;
   _damageModifier = damageModifier;
   _speciesName = speciesName;
   _guaranteedHit = guaranteedHit;
+  _moveName = moveName;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _selectedTargetId = target.id;
   document.getElementById('targetPickerBack').style.display = 'none';
   document.getElementById('targetPickerBackToAttack').style.display = guaranteedHit ? 'none' : '';
+  document.getElementById('targetPickerStep1').hidden = true;
+  document.getElementById('targetPickerStep2').hidden = true;
+  document.getElementById('targetPickerStep3').hidden = true;
   _overlay.style.display = 'flex';
   const result = new Promise((resolve) => { _resolve = resolve; });
-  if (guaranteedHit) _autoHit(target, targetName);
-  else _showStep2(target, targetName);
+  _afterTargetSelected(target, targetName);
   return result;
 }

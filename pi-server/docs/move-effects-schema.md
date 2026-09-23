@@ -8,13 +8,14 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ```jsonc
 {
-  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal" | "block_attack",
+  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal" | "block_attack" | "prevent_faint",
   // condition:  "apply": "<name>", optional "value" (type_changed → "Ghost")
   // stat:       "stat": "<stat>", "amount": -1 | "proficiency" | {"dice": "1d4"}  OR  "set": 0, optional "stacks": {"max": 5}
   // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>", optional "ability" (saving_throws only)
   // temp_hp:    "amount": 10 -- a bonus-HP pool, see its own section below
   // reroll_damage: no extra fields -- see its own section below
   // block_attack: no extra fields -- see its own section below
+  // prevent_faint: no extra fields -- see its own section below
   // heal:       "amount": {"dice": "2d6", "moveMod?": true, "pool?": "VP"}
   //                     | {"fractionOfDamage": 0.5, "capMultipleOfLevel?": 5, "pool?": "VP"}
   //                     | {"levelMultiple": 1, "pool?": "VP"}       -- see its own section below
@@ -95,10 +96,7 @@ first use in an encounter (no resource-tracking mechanism for that yet); King's 
 "blocks ALL damage until your next turn", not just the one attack that opened the window (that's
 a genuinely different, persisting "immune to damage" status this kind doesn't model, only the
 immediate block); Quick Guard's "first round of combat only" gate (already `situational_use`-
-tagged). Endure (retroactively drop to 1 HP instead of fainting, on the `'damaged'` family,
-after damage already landed) is a different shape entirely -- closer to `reroll_damage`'s own
-retroactive-correction pattern than to blocking an attack before it resolves -- and isn't built
-yet either. Everything else under `protect_negate` needs its own separate thing: custom math on
+tagged). Everything else under `protect_negate` needs its own separate thing: custom math on
 top of blocking (Wide Guard halves instead of negating, Spiky Shield reflects damage back,
 Nature's Embrace redirects it, Parry is a contested roll, none of that math exists), a third
 reaction TIMING neither `targeted` nor `damaged` covers (Lucky Chant needs to intercept after the
@@ -106,6 +104,17 @@ attack roll is known but before damage), or bypassing Protect specifically (Fein
 Tendril, Hyperspace Hole, the vanish-family's "Protect can't be used" clause) -- meaningless
 until Protect itself has a real mechanism, which it now does, but "ignore an incoming
 `block_attack`" isn't wired up on the attacking side yet.
+
+**`prevent_faint`** (Endure's "instead fall to 1 HP") is `reroll_damage`'s own retroactive-
+correction shape, not `block_attack`'s -- it fires on the `'damaged'` family (the damage already
+landed by the time the reaction window even opens), so there's no attack left to cancel, only
+its OUTCOME to override. `target: "self"`, `ends: [{type:"instant"}]`, no other fields.
+`_offerMoveEffects` special-cases it the same way as every other one-shot kind: if the target's
+`currentHP` is already at or below 0 (the only case "instead of fainting" means anything), it's
+set to exactly 1 via `update-stats`, the same client-authoritative HP correction `reroll_damage`'s
+own refund and every `heal` effect already use; above 0, it's a no-op (nothing to prevent) rather
+than a genuine heal, so it never raises HP that wasn't already fatal. Same escalating "roll over
+15 after the first use" cost as the whole Protect family, left manual for the same reason.
 
 **`heal`** restores HP or VP. A ONE-SHOT heal (no `repeat` -- every drain, every plain
 heal-on-use move) is never a stored status either, same `ends: [{type:"instant"}]` convention
@@ -199,6 +208,7 @@ correction `reroll_damage`'s own refund already uses.
 - reroll_damage — `reroll_damage` / `potential_reroll_damage` (always the latter in practice — it only ever rides on a `save_fail`)
 - heal — `heal` / `self_heal` (an `on_hit`-gated drain counts as guaranteed, same as any other `on_hit` effect — never gets a `potential_` prefix)
 - block_attack — always `self_block_attack` (`target: "self"` on every move that has it so far, `when: "always"` so never `potential_`)
+- prevent_faint — always `self_prevent_faint` (same reasoning as block_attack)
 
 ## How live modifiers are applied (`js/utils/move-effects.js`, shown by the attack / save popups)
 The dice are rolled at the table, so the popups only *show* what applies and fold numbers into totals.

@@ -1965,6 +1965,15 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       }
       continue;
     }
+    if (effect.kind === 'prevent_faint') {
+      // Not a status -- a retroactive HP correction against damage that
+      // already landed (Endure's own 'damaged' family reaction, unlike
+      // block_attack's 'targeted' one -- there's no attack left to
+      // cancel here, only its outcome). pick.targetId is the reactor
+      // themselves (target: self).
+      await _handlePreventFaint({ targetId: pick.targetId, moveName });
+      continue;
+    }
     if (effect.kind === 'heal' && !effect.repeat) {
       // Not a status -- an immediate HP/VP change. pick.targetId is whoever
       // gets healed (attackerId itself for a target:self effect, see the
@@ -2023,6 +2032,31 @@ function _resolveSetValue(setSpec, attacker, target) {
     return Math.floor((a + t) / 2);
   }
   return null;
+}
+
+/** Endure's own effect (see move-effects-schema.md's `prevent_faint` section):
+ * a retroactive correction against damage that already landed (the
+ * 'damaged' reaction family -- there's no attack left to cancel, only its
+ * outcome, unlike block_attack's 'targeted' one). If the reactor's current
+ * HP is already at or below 0 -- the only case "instead of fainting" means
+ * anything -- it's set to exactly 1 via update-stats, the same client-
+ * authoritative correction reroll_damage's own refund and every `heal`
+ * effect already use. Above 0, this is a no-op: never a genuine heal, just
+ * "nothing to prevent" (using Endure when it wasn't actually fatal is the
+ * human's own call, same trust model as everywhere else). */
+async function _handlePreventFaint({ targetId, moveName }) {
+  const target = session?.participants?.[targetId];
+  if (!target || !Number.isFinite(target.currentHP) || target.currentHP > 0) return;
+  try {
+    await CombatAPI.updateStats(targetId, { currentHP: 1 });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  CombatAPI.logEvent({
+    type: 'save', actorId: targetId, actorName: target.name,
+    text: `${target.name} used ${moveName} -- falls to 1 HP instead of fainting`,
+  }).catch(() => {});
 }
 
 /** Attract's own effect (see move-effects-schema.md's `reroll_damage` section):

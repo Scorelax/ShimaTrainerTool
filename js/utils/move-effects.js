@@ -106,6 +106,9 @@ export function statusLabel(s) {
   if (s.kind === 'block_attack') {
     return 'Block the attack entirely';
   }
+  if (s.kind === 'prevent_faint') {
+    return 'Fall to 1 HP instead of fainting';
+  }
   if (s.kind === 'heal') {
     const pool = s.amount?.pool === 'VP' ? ' VP' : '';
     const repeatNote = s.repeat ? ` (${s.repeat === 'start_of_turn' ? 'start' : 'end'} of turn, while active)` : '';

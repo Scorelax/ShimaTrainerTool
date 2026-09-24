@@ -49,7 +49,7 @@ What remains here is genuinely blocked on something -- movement speed (deferred)
 - **Wing Buffer** (stat_buff_self) -- You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successfu
 - **Wing Command** (stat_buff_ally) -- You spread your wings in a majestic display, inspiring allies close by. All allies within range that can see you receive a bonus to their at
 
-## 2. Needs a new effect kind / mechanism (123)
+## 2. Needs a new effect kind / mechanism (138)
 
 
 ### steal_disrupt (23) -- steals or disrupts an item/ability/stat the target has
@@ -99,7 +99,24 @@ What remains here is genuinely blocked on something -- movement speed (deferred)
 - Testudo Formation
 - Wide Guard
 
-### potential_damage_increase (13) -- damage that scales on a condition -- not yet read move-by-move (conditional_damage turned out to need nothing; this might be the same, unverified)
+### conditional_damage (15) -- damage that scales on a condition -- 17 of 32 already have a damage_note reminder (see migrate_effects_v22/v23/v24.py and earlier), these are the rest
+- Archive Blast
+- Bide
+- Electro Ball
+- Formation Strike
+- Frustration
+- Heavy Slam
+- Return
+- Self-Destruct
+- Solar Beam
+- Solar Blade
+- Solvent Spray
+- Spit Up
+- Stored Power
+- Trump Card
+- Wring Out
+
+### potential_damage_increase (13) -- damage that scales on a condition -- not yet read move-by-move (conditional_damage turned out to need a damage_note reminder for most of its moves; this might be the same, unverified)
 - Avalanche
 - Charge Beam
 - Echoed Voice
@@ -242,6 +259,6 @@ What remains here is genuinely blocked on something -- movement speed (deferred)
 - **Void Consumption** -- Requires Reality Bend to be active. You attempt to pull in creatures in a 60ft. cone in front of you. All creatures within range must make a
 - **Void Gate** -- You momentarily tear open a rift in space that creates a portal that lasts for 1 + MOVE rounds. First roll 1d4 to determine rift size. Then 
 
-## 4. Pure mechanical shape -- correctly has no `effects`, nothing to do (247)
+## 4. Pure mechanical shape -- correctly has no `effects`, nothing to do (232)
 
 Plain damage / save-for-damage / multi-hit / recharge / conditional-damage-formula moves with no secondary effect to encode -- the damage math itself is always the human's own (no digital dice, no "damage formula" effect kind anywhere in this schema, on purpose). Listed only so this file accounts for all remaining moves -- not a backlog.

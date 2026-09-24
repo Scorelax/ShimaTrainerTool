@@ -34,28 +34,31 @@ RETIRED_V3 = {
     'potential_stat_increase', 'increase_stab',
 }
 
-# `conditional_damage` deliberately NOT here (see its own note below):
-# reading all 26 in full turned up exactly one (Beat Up) with a real
-# secondary consequence -- everything else is just a damage FORMULA
-# variation (target/self HP%, a visible status, a stat comparison, VP
-# spent) the human already computes themselves when entering their damage
-# roll, same as every other damage move in this app (there's no digital
-# dice and no "damage formula" effect anywhere in this schema, on purpose
-# -- see move-effects-schema.md). `potential_damage_increase` is very
-# likely the same story but hasn't actually been read move-by-move yet --
-# left in NEEDS_NEW_TAGS until it has, not moved on a guess.
+# `conditional_damage` WAS here (in NO_EFFECT_NEEDED_TAGS) on the reasoning
+# that it's just a damage FORMULA variation (target/self HP%, a visible
+# status, a stat comparison, VP spent) the human already computes
+# themselves when entering their damage roll -- corrected by the user: the
+# point was never the arithmetic, it's that the app should still REMIND the
+# player what to roll (easy to forget mid-battle), which is exactly what
+# `damage_note` does (see migrate_effects_v22/v23/v24.py and earlier -- 17
+# of 32 moves done that way already). Moved into NEEDS_NEW_TAGS below so
+# the remaining 15 keep surfacing here instead of silently reading as
+# "nothing to do" -- this exact silent-disappearance is what caught the
+# original conditional_damage mistake hiding in the first place, so
+# `potential_damage_increase` below is left unmoved until it's actually
+# been read move-by-move, not moved on a guess.
 NEEDS_NEW_TAGS = {
     'steal_disrupt', 'protect_negate', 'heal_target_or_aoe',
     'heal_self', 'drain', 'positioning', 'field_terrain', 'field_weather',
     'attack_suppression', 'movement', 'remove_item_on_target', 'lethal_faint',
-    'potential_damage_increase', 'shield_temphp',
+    'potential_damage_increase', 'shield_temphp', 'conditional_damage',
 }
 NO_EFFECT_NEEDED_TAGS = {
     'damage', 'recharge_locked', 'multi_hit_aoe', 'multi_hit_same_target',
     'multi_hit_choice', 'multi_hit_combined_roll', 'guaranteed_hit',
     'variable_move_type', 'base_crit', 'fixed_special_damage', 'situational_use',
     'berry_check', 'trigger_saving_throw', 'counter_reaction_effect', 'damage_vp',
-    'conditional_damage', 'self_faint',
+    'self_faint',
 }
 
 TAG_NOTES = {
@@ -64,7 +67,8 @@ TAG_NOTES = {
     'heal_target_or_aoe': "heals someone other than (or in addition to) the user",
     'drain': "heals the user for a portion of damage dealt",
     'heal_self': 'heals the user',
-    'potential_damage_increase': 'damage that scales on a condition -- not yet read move-by-move (conditional_damage turned out to need nothing; this might be the same, unverified)',
+    'conditional_damage': 'damage that scales on a condition -- 17 of 32 already have a damage_note reminder (see migrate_effects_v22/v23/v24.py and earlier), these are the rest',
+    'potential_damage_increase': 'damage that scales on a condition -- not yet read move-by-move (conditional_damage turned out to need a damage_note reminder for most of its moves; this might be the same, unverified)',
     'positioning': 'forces or requires specific battlefield positioning',
     'field_terrain': 'sets/uses a terrain effect',
     'movement': 'forced or granted movement',

@@ -313,7 +313,7 @@ def handle(conn, action, params):
         row = js_parse_int(params.get('row'))
         if not params.get('id') or col is None or row is None:
             raise ValueError('Missing participant id, col, or row')
-        return _mutate(conn, lambda s: _move_token(s, params['id'], col, row, params.get('moveType')))
+        return _mutate(conn, lambda s: _move_token(s, params['id'], col, row))
 
     if action == 'clear-token-position':
         if not params.get('id'):
@@ -1575,7 +1575,7 @@ def _set_token_position(state, pid, col, row):
 _MOVEMENT_BLOCKING_CONDITIONS = {'trapped'}
 
 
-def _move_token(state, pid, col, row, move_type=None):
+def _move_token(state, pid, col, row):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
@@ -1593,23 +1593,23 @@ def _move_token(state, pid, col, row, move_type=None):
     # straight" rule (Chebyshev distance x 5ft), not 5e's stricter 5/10ft
     # alternating-diagonal rule -- consistent with this board having no
     # other terrain-cost concept yet either.
+    #
+    # Deliberately doesn't ask (or care) WHICH movement type covers this
+    # move -- the user's own call: that decision (is this walk-able terrain,
+    # is this a burrow, ...) happens at the table, not in the app. The app
+    # only needs to know whether the distance is possible under ANY of the
+    # participant's own types, so the check is against whichever type has
+    # the most left, and the single shared movementUsed counter (see
+    # `speeds`' own comment) is what actually drops every type's own
+    # remaining number together afterwards.
     speeds = participant.get('speeds') or []
     if speeds:
         current = state['board']['tokens'].get(pid)
         distance_ft = max(abs(col - current['col']), abs(row - current['row'])) * 5 if current else 0
-        chosen = None
-        if move_type:
-            chosen = next((s for s in speeds if s['type'] == move_type), None)
-            if not chosen:
-                raise ValueError(f'Unknown movement type: {move_type}')
-        elif len(speeds) == 1:
-            chosen = speeds[0]
-        else:
-            raise ValueError('Must specify which movement type to move with')
         used = participant.get('movementUsed', 0)
-        remaining = max(0, chosen['ft'] - used)
-        if distance_ft > remaining:
-            raise ValueError(f"Not enough {chosen['type']} movement left ({remaining}ft remaining, this move needs {distance_ft}ft)")
+        best_remaining = max(max(0, s['ft'] - used) for s in speeds)
+        if distance_ft > best_remaining:
+            raise ValueError(f"Not enough movement left ({best_remaining}ft remaining, this move needs {distance_ft}ft)")
         participant['movementUsed'] = used + distance_ft
 
     state['started'] = True  # see _rebuild_turn_order -- acting on-turn means turn order is now live

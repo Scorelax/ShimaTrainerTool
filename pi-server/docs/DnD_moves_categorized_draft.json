@@ -16915,12 +16915,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You strike out at a creature with revenge. Make a melee attack roll against a target, dealing 2d8 + MOVE normal damage on a hit. If you are poisoned, paralyzed, or burned, double the dice for the damage.",
       "moveStat": "STR/DEX",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_status",
+            "any": [
+              "Poison",
+              "Paralysis",
+              "Burn"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "You are poisoned, paralyzed, or burned"
+        }
+      ]
     },
     {
       "name": "Fake Out",
@@ -17009,12 +17025,33 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You flail about with a wild strike that increases in power the more injured you are. Make a melee attack roll against a creature, doing 1d10 + MOVE normal damage on a hit. If you are below 50% of your maximum health, double the damage. If you are at 10% or below of your maximum health, triple the damage. The multiplier for this attack occurs before the multiplier for resistances or vulnerabilities.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_hp_below",
+            "fraction": 0.5
+          },
+          "diceMultiplier": 2,
+          "note": "Below 50% HP"
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_hp_at_or_below",
+            "fraction": 0.1
+          },
+          "diceMultiplier": 3,
+          "note": "At 10% HP or below"
+        }
+      ]
     },
     {
       "name": "Flash",
@@ -27204,12 +27241,24 @@
       "categories": [
         "damage",
         "conditional_damage",
-        "recharge_locked"
+        "recharge_locked",
+        "damage_note"
       ],
       "description": "You fire a blast of water at a creature that increases in power the more healthy you are. Make a ranged attack roll against a creature, doing 4d12 + MOVE water damage on a hit if you are at or above 50% of your health. If you are below 50%, halve the total damage done.",
       "moveStat": "STR/DEX",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_hp_below",
+            "fraction": 0.5
+          },
+          "totalMultiplier": 0.5,
+          "note": "Below 50% HP -- halve the total damage after rolling (not the dice)"
+        }
+      ]
     },
     {
       "name": "Waterfall",

@@ -8,7 +8,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ```jsonc
 {
-  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal" | "block_attack" | "prevent_faint",
+  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal" | "block_attack" | "prevent_faint" | "damage_note",
   // condition:  "apply": "<name>", optional "value" (type_changed → "Ghost")
   // stat:       "stat": "<stat>", "amount": -1 | "proficiency" | {"dice": "1d4"}  OR  "set": 0, optional "stacks": {"max": 5}
   // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>", optional "ability" (saving_throws only)
@@ -16,11 +16,13 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
   // reroll_damage: no extra fields -- see its own section below
   // block_attack: no extra fields -- see its own section below
   // prevent_faint: no extra fields -- see its own section below
+  // damage_note: "condition": {...}, "diceMultiplier?": 2, "totalMultiplier?": 0.5 -- see its own
+  //              section below; NOT a when/target/ends effect at all, see that section for why
   // heal:       "amount": {"dice": "2d6", "moveMod?": true, "pool?": "VP"}
   //                     | {"fractionOfDamage": 0.5, "capMultipleOfLevel?": 5, "pool?": "VP"}
   //                     | {"levelMultiple": 1, "pool?": "VP"}       -- see its own section below
   //             "repeat": "end_of_turn" | "start_of_turn"           -- heal-over-time only, see below
-  "when":   { "type": ... },        // what triggers it — see below
+  "when":   { "type": ... },        // what triggers it — see below (damage_note has no `when` at all)
   "target": "self",                 // only present when the USER is affected (default: the target)
   "ends":   [ ... ],                // how it stops — any ONE entry ending it removes it
   "choice": { "kind": "random", "die": "d6", "roll": 3 } | { "kind": "chosen" },
@@ -137,7 +139,55 @@ own refund and every `heal` effect already use; above 0, it's a no-op (nothing t
 than a genuine heal, so it never raises HP that wasn't already fatal. Same escalating "roll over
 15 after the first use" cost as the whole Protect family, left manual for the same reason.
 
-**`heal`** restores HP or VP. A ONE-SHOT heal (no `repeat` -- every drain, every plain
+**`damage_note`** is a genuinely different shape from every other kind, and the user's own
+correction of an earlier, wrong call in this schema's history: `conditional_damage`-tagged moves
+(Facade, Flail, Water Spout, ...) were first written off as "nothing to model, the human already
+does the damage math when they enter their roll" -- true for the ARITHMETIC, but not the point.
+The app has no digital dice and never will, but forgetting a move's own damage bonus applies at
+all, mid-battle, against a table full of opponents, is exactly the kind of thing this app's other
+reminders (an advantage banner, an AC hint, a dice-bonus button) already exist to prevent. So
+`damage_note` doesn't touch the dice roll itself -- it changes what the move-use popup SHOWS
+before the human ever rolls, the same "the app surfaces the number, a human acts on it" pattern as
+everywhere else, just for the damage-formula text instead of a roll banner.
+
+Not a `when`/`target`/`ends` effect at all -- it's evaluated by `combat.js`'s own
+`showCombatMoveDetails` (`_evaluateDamageNotes`), at move-popup display time, against the
+ATTACKER's own already-known HP/status, never through `_offerMoveEffects`'s post-attack
+confirmation flow every other kind goes through (there's nothing to confirm AFTER the fact here --
+the whole point is showing it BEFORE the roll). Only self-conditional moves fit this today (the
+attacker's own HP/status is known before a target is even picked); a target-conditional
+equivalent (Brine, Crush Grip, Cross Poison, Gyro Ball, Hex, Smelling Salts, Venoshock -- "double
+if the TARGET is below 50% HP / poisoned / ...") needs the same idea wired into
+`target-picker.js`'s own damage-roll step instead, once a target is actually selected -- not built
+yet, deliberately scoped out of this first slice.
+
+`condition` is one of:
+- `{type: "self_hp_below", fraction: 0.5}` / `{type: "self_hp_at_or_below", fraction: 0.1}` --
+  strict-less-than vs at-or-below, matching each move's own exact wording (Flail's two tiers use
+  both: "below 50%" for the ×2 tier, "at 10% or below" for the ×3 one).
+- `{type: "self_status", any: ["Poison", "Paralysis", "Burn"]}` -- checked against the same legacy
+  display names both engines' own status badges already use (`combat-wip.js`'s
+  `LEGACY_BADGE_NAMES` maps a structured `poisoned`/`burned`/`paralyzed` condition to these exact
+  strings), so this works identically whether the attacker came from the shared system or the old
+  local engine.
+
+Two mutually-exclusive result fields:
+- `diceMultiplier: 2` recomputes the shown dice STRING itself ("2d8" → "4d8", `_multiplyDiceString`)
+  -- multiplying the leading number is the same arithmetic as rolling that many more of the same
+  die, which is what "double/triple the dice" consistently means across this dataset's own move
+  text (Facade's "double the dice", Smelling Salts/Venoshock/Gyro Ball's "double the dice roll").
+  Several tiers on one move (Flail) resolve to whichever MET condition has the highest multiplier,
+  never stacked -- being at 10% HP already implies being below 50% too, so both conditions are
+  "met" at once and only the more severe one should show.
+- `totalMultiplier: 0.5` shows as a plain note instead (the popup's existing `noteText` banner,
+  previously Stockpile-only) rather than touching the dice string at all -- Water Spout's own text
+  says "halve the TOTAL damage done", not the dice, and those aren't the same thing: a flat MOVE
+  modifier doesn't halve along with a halved die count, and the two produce different
+  distributions even at the same average. Safer to say so in words than assert a recomputed
+  number that might be wrong.
+
+`note` is shown alongside whichever of the two applies (the dice breakdown line, or the note
+banner directly, for `totalMultiplier`). A ONE-SHOT heal (no `repeat` -- every drain, every plain
 heal-on-use move) is never a stored status either, same `ends: [{type:"instant"}]` convention
 as `reroll_damage` above, since there's nothing to hold onto after the number is applied. Three
 `amount` shapes:
@@ -230,6 +280,7 @@ correction `reroll_damage`'s own refund already uses.
 - heal — `heal` / `self_heal` (an `on_hit`-gated drain counts as guaranteed, same as any other `on_hit` effect — never gets a `potential_` prefix)
 - block_attack — always `self_block_attack` (`target: "self"` on every move that has it so far, `when: "always"` so never `potential_`)
 - prevent_faint — always `self_prevent_faint` (same reasoning as block_attack)
+- damage_note — always plain `damage_note`, no `self_`/`potential_` variants (it has no `when` or `target` field for that logic to read at all)
 
 ## How live modifiers are applied (`js/utils/move-effects.js`, shown by the attack / save popups)
 The dice are rolled at the table, so the popups only *show* what applies and fold numbers into totals.
@@ -403,3 +454,16 @@ script, replacing the ad-hoc python one-liner this got rebuilt from by hand afte
 migration script since v9) reflects this: `conditional_damage` moved from NEEDS_NEW_TAGS into
 NO_EFFECT_NEEDED_TAGS. `potential_damage_increase` is very likely the same story but hasn't
 actually been read move-by-move yet -- left alone until it has, not moved on a guess.)*
+
+*(Correction, same day: the paragraph above was wrong about WHY conditional_damage didn't need
+anything -- "the human does the arithmetic" is true, but conflated two different things. The new
+`damage_note` kind (its own section above) is the fix: the app was never meant to roll the dice,
+but forgetting a move's own damage bonus applies at all, mid-battle, is exactly what this app's
+other reminders already exist to prevent, and the move-popup already had an unused override hook
+(`diceOverride`) sitting there for exactly this. Facade/Flail/Water Spout (migrate_effects_v23.py)
+are the self-conditional slice; Brine/Crush Grip/Cross Poison/Gyro Ball/Hex/Smelling Salts/
+Venoshock's target-conditional equivalent is still deliberately not built (needs
+target-picker.js's damage-roll step, once a target is known, not the move-popup). The rest of the
+original finding stands: most of conditional_damage genuinely has nothing to remember (a stat
+comparison, a resource count already visible elsewhere) because there's no FUTURE roll or hidden
+state involved, only self/target status and HP -- damage_note only exists for exactly those two.)*

@@ -220,6 +220,13 @@ GEN_TAG = re.compile(
 
 
 def tag_for(e):
+    if e['kind'] == 'damage_note':
+        # Evaluated at move-popup display time against the attacker's own
+        # known HP/status (see combat.js's showCombatMoveDetails), never
+        # through the when-triggered effects-confirmation flow every other
+        # kind goes through -- has no `when` field at all, so this returns
+        # before the guaranteed/potential_ logic below even looks for one.
+        return 'damage_note'
     guaranteed = e['when']['type'] in ('always', 'on_hit')
     if e['kind'] == 'condition':
         base = f"status_condition_{e['apply']}"

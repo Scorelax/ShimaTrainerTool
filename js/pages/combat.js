@@ -2237,6 +2237,48 @@ function getHealDiceForLevel(move, level) {
   return dice;
 }
 
+/** "2d8" × 3 -> "6d8" -- the shown-dice-count half of a `damage_note` effect
+ * (see move-effects-schema.md and showCombatMoveDetails's own use of this).
+ * Multiplying the leading number is the same arithmetic as rolling the dice
+ * that many more times (same die size), which is what "double/triple the
+ * dice" in this dataset's own move text consistently means. Any shape that
+ * doesn't parse (there shouldn't be one -- computeMoveData's own damageDice
+ * is always plain XdY) is returned unchanged rather than guessed at. */
+function _multiplyDiceString(dice, multiplier) {
+  const m = /^(\d+)(d\d+)$/i.exec(dice || '');
+  if (!m) return dice;
+  return `${parseInt(m[1], 10) * multiplier}${m[2]}`;
+}
+
+/** Evaluates `damage_note` effects (already filtered to that kind) against
+ * `c`'s own current HP/status -- see showCombatMoveDetails's own call site
+ * for the full reasoning. Multiple dice-multiplier tiers (Flail's 2x at
+ * <50% HP, 3x at <=10%) resolve to whichever's condition is met with the
+ * HIGHEST multiplier, not stacked -- being at 10% HP already implies being
+ * below 50%, so both conditions are "met" at once and only the more severe
+ * one should show. Status names are checked against the same legacy display
+ * names (`Poison`, `Paralysis`, `Burn`, ...) both engines' own status badges
+ * already use (see combat-wip.js's LEGACY_BADGE_NAMES), so this works
+ * identically whether `c` came from the old local engine or the shared one. */
+function _evaluateDamageNotes(effects, c) {
+  const hpFrac = (c.maxHp || 0) > 0 ? (c.currentHp || 0) / c.maxHp : null;
+  const statusNames = new Set((c.statusEffects || []).map(se => se.name));
+  const conditionMet = (cond) => {
+    if (!cond) return false;
+    if (cond.type === 'self_hp_below') return hpFrac !== null && hpFrac < cond.fraction;
+    if (cond.type === 'self_hp_at_or_below') return hpFrac !== null && hpFrac <= cond.fraction;
+    if (cond.type === 'self_status') return (cond.any || []).some(name => statusNames.has(name));
+    return false;
+  };
+  let diceMultiplier = 1, diceNote = '', totalNote = '';
+  for (const e of effects) {
+    if (!conditionMet(e.condition)) continue;
+    if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) { diceMultiplier = e.diceMultiplier; diceNote = e.note || ''; }
+    if (e.totalMultiplier) totalNote = e.note || `×${e.totalMultiplier} total damage`;
+  }
+  return { diceMultiplier, diceNote, totalNote };
+}
+
 function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
   const modBonus = getStatMod(combatant, ingrainEffect.moveMod);
   const popup      = document.getElementById('ingrainHealPopup');
@@ -2726,6 +2768,33 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
       : '';
   }
 
+  // `damage_note` effects (see move-effects-schema.md's own section) --
+  // Facade/Flail/Water Spout-style "double the damage if you're poisoned/
+  // below X% HP" reminders, evaluated here against the ATTACKER's own
+  // already-known HP/status (knowable before a target is even picked, unlike
+  // a target-conditional move's own equivalent, which isn't built yet -- see
+  // that section for why). A `diceMultiplier` recomputes the shown dice
+  // string the same diceOverride mechanism above already uses (never stacks
+  // with the heal-dice override -- no move is both); a `totalMultiplier`
+  // (Water Spout's "halve the TOTAL after rolling") shows as a plain note
+  // instead of a recomputed dice string, since halving the dice COUNT isn't
+  // the same thing (a flat MOVE modifier doesn't halve with it, and the
+  // distributions differ) -- safer to say so in words than assert a number
+  // that might be wrong.
+  let _damageNote = '';
+  if (!_isDirectHeal && computedData.damageDice) {
+    const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
+    if (_dmgNoteEffects.length) {
+      const { diceMultiplier, diceNote, totalNote } = _evaluateDamageNotes(_dmgNoteEffects, c);
+      if (diceMultiplier > 1) {
+        const _adjustedDice = _multiplyDiceString(computedData.damageDice, diceMultiplier);
+        _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
+        _diceBreakdownOverride = [computedData.damageBreakdown, `×${diceMultiplier} dice (${diceNote})`].filter(Boolean).join(' · ');
+      }
+      if (totalNote) _damageNote = totalNote;
+    }
+  }
+
   // Same "is this an offensive move that will hand off to onDamageResolved"
   // check the onUseMove callback below uses to decide whether to actually
   // call it -- reused here so the popup's own inline battle animation is
@@ -2772,7 +2841,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
     spriteUrl: c.image,
     spriteAlt: c.name,
     speciesName: c.speciesName,
-    noteText: _stackNote,
+    noteText: _stackNote || _damageNote || undefined,
     disableUse: _isStackMove && _stacks === 0,
     disableUseMsg: 'No Stockpile stacks — use Stockpile first',
     diceLabel: _diceLabel,

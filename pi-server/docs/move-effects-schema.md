@@ -388,3 +388,18 @@ with Stockpile); and the pure status-cure moves (Aromatherapy, Heal Bell, Refres
 which restore no HP/VP at all -- a different mechanic (removing OTHER participants' statuses
 programmatically) entirely out of scope for a heal-amount pass, already reachable by hand via
 each status badge's own Remove button.)*
+
+*(Update, 2026-09-24: `conditional_damage` turned out not to be a gap at all, once actually read
+move-by-move (all 26 -- migrate_effects_v22.py). Every one is a damage FORMULA variation (target/
+self HP%, a visible status already shown as a badge, a stat comparison, VP spent so far) the
+human already computes themselves when entering their damage roll -- same as every other damage
+move in this app, since there's no digital dice and no "damage formula" effect kind anywhere in
+this schema, on purpose. The category was never really asking for a new mechanism; it was asking
+"does the app need to remember something for later", and the answer was almost always no. Beat
+Up was the one real exception (a stored consequence for a FUTURE roll -- "disadvantage on the
+target's next attack, if it was surrounded" -- isn't visible anywhere the way "the target is
+poisoned" already is), and got a real effect. `generate_unmigrated_moves.py` (now a committed
+script, replacing the ad-hoc python one-liner this got rebuilt from by hand after nearly every
+migration script since v9) reflects this: `conditional_damage` moved from NEEDS_NEW_TAGS into
+NO_EFFECT_NEEDED_TAGS. `potential_damage_increase` is very likely the same story but hasn't
+actually been read move-by-move yet -- left alone until it has, not moved on a guess.)*

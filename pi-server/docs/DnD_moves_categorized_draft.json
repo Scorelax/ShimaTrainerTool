@@ -2465,12 +2465,29 @@
       "categories": [
         "damage",
         "conditional_damage",
-        "potential_disadvantage"
+        "potential_disadvantage_attack_rolls"
       ],
       "description": "You exploit a creature's vulnerable position. Make a melee attack, dealing 1d6 + MOVE dark damage on hit. Add 1d6 for each allied creature adjacent to the target (max +4d6). If the target is completely surrounded (no empty adjacent squares), it has disadvantage on its next attack.",
       "moveStat": "STR",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "Only if the target was completely surrounded (no empty adjacent squares) when hit."
+        }
+      ]
     },
     {
       "name": "Bite",

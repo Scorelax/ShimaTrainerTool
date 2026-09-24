@@ -173,7 +173,12 @@ class API {
         const data = await response.json();
 
         if (data.status === 'error') {
-          throw new Error(data.error || 'Unknown API error');
+          // Most route handlers (pi-server/app/*.py) return their failure text
+          // as `message`, not `error` -- only a couple of main.py's own
+          // top-level wrappers use `error`. Checking `error` alone meant
+          // almost every real server-side rejection showed as this generic
+          // fallback instead of its actual reason.
+          throw new Error(data.error || data.message || 'Unknown API error');
         }
 
         if (useCache && cacheKey) {

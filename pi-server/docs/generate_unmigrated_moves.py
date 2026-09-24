@@ -79,9 +79,20 @@ TAG_NOTES = {
     'shield_temphp': 'a damage-absorbing shield (temp_hp kind exists -- none currently need it, kept for completeness)',
 }
 
+# Moves that are DONE but will never carry an `effects` array -- implemented
+# entirely as bespoke code instead of the generic schema (same reasoning as
+# Ingrain/Swallow's own name-matched special-casing, just with nothing
+# generic left over to also record here). Excluded up front so classify()
+# never has to reason about them, and so they can't silently reappear as
+# "needs work" the way conditional_damage itself just did.
+HANDLED_OUTSIDE_SCHEMA = {
+    'Bide',  # two-phase damage-taken-then-retaliate -- see combat.js's _handleBideClick /
+             # combat-wip.js's _handleBideResolve / routes_combat.py's _bide_use.
+}
+
 
 def classify(moves):
-    no_effects = [m for m in moves if not m.get('effects')]
+    no_effects = [m for m in moves if not m.get('effects') and m['name'] not in HANDLED_OUTSIDE_SCHEMA]
     fits_now, needs_new, unknown_only, fine_as_is = [], [], [], []
     for m in no_effects:
         cats = set(m.get('categories', []))

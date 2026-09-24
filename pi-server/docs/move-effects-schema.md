@@ -534,3 +534,25 @@ Power, Heavy Slam, Electro Ball, Spit Up, Frustration, Return, ...) is countable
 needs its own tracking this schema doesn't have yet (adjacent-ally count, VP spent, active buff
 count, a narrative Loyalty Chart stat, Stockpile's own stacks) -- each a further, separate slice,
 not folded into this one.)*
+
+*(Correction, another day later: `generate_unmigrated_moves.py`'s own classification had drifted
+back to the WRONG conclusion above (`conditional_damage` in NO_EFFECT_NEEDED_TAGS) and never got
+updated after the Correction two paragraphs up -- so the remaining 15 moves under it were silently
+reading as "nothing to do" again, the exact failure mode this whole doc's history is a record of.
+Moved back into NEEDS_NEW_TAGS. Five of those 15 turned out to fit existing or lightly-extended
+mechanisms after all (migrate_effects_v25.py): Solvent Spray/Wring Out are plain damage_note
+(`target_type`, `target_hp_at_or_above`, and a new `flatBonus: "moveModifier"` source); Trump
+Card/Frustration/Return needed one genuinely new shape, `scalingBonus` (a bonus proportional to a
+COUNTED value -- VP spent/10, Loyalty distance from zero -- rather than a fixed amount, see
+damage_note's own section above). Bide also got built, but NOT through this schema at all --
+two-phase (track damage taken, then a LATER use computes 2x it as a fixed, non-rolled damage
+number) is fundamentally different from every damage_note case, which only ever changes what
+gets SHOWN before a roll the human still makes; Bide has no roll to show a note next to. Bespoke
+code instead (combat.js's `_handleBideClick`, combat-wip.js's `_handleBideResolve`,
+routes_combat.py's `_bide_use`/`_damage_taken_since`), and excluded from
+`generate_unmigrated_moves.py`'s report entirely (`HANDLED_OUTSIDE_SCHEMA`) rather than left to
+reappear as a false gap the way this whole correction started. Archive Blast, Electro Ball,
+Formation Strike, Heavy Slam, Self-Destruct, Solar Beam, Solar Blade, and Spit Up remain -- each
+needs its own real sub-system (witnessed-move-type tracking, a formation concept, a size-rank
+comparison, a forced-death-save state, the weather system, Stockpile's own stacking), not a
+schema extension.)*

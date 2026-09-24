@@ -956,6 +956,13 @@ export class CombatAPI {
     return API.request('combat', 'move-token', { id, col, row }, { useCache: false });
   }
 
+  /** Bide's own two-phase toggle (see routes_combat.py's _bide_use) -- same
+   * call either way, the server decides activate vs. resolve from the
+   * participant's own current state. */
+  static async bideUse(id) {
+    return API.request('combat', 'bide-use', { id }, { useCache: false });
+  }
+
   static async clearTokenPosition(id) {
     return API.request('combat', 'clear-token-position', { id }, { useCache: false });
   }

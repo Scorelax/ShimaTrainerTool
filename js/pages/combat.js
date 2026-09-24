@@ -7,6 +7,7 @@ import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
 import { multiplyDiceString } from '../utils/move-effects.js';
+import { showCombatConfirm, showCombatAlert } from '../utils/combat-alert.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -1767,7 +1768,7 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
-export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, ...cardOptions } = {}) {
+export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve, ...cardOptions } = {}) {
   _battleState = state;
   _battleCardOptions = cardOptions; // see rerenderBattle -- every internal re-render (a move popup
   // confirming, an HP/VP adjuster click, etc.) needs to keep reusing the same per-card render
@@ -1933,7 +1934,7 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
         if (moveItem.dataset.isDiceLocked === 'true') {
           showDiceRechargePopup(moveItem.dataset.move, moveItem.dataset.combatantId, moveItem.dataset.rechargeRange, state); return;
         }
-        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly }); return;
+        showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve }); return;
       }
       // Toggle expand on card click (not on controls)
       const card = e.target.closest('.combat-card');
@@ -2714,7 +2715,53 @@ function removeStatusEffect(combatantId, effectName, state) {
 // MOVE POPUP
 // ============================================================================
 
-function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly } = {}) {
+/** Bide's own two-phase click handler (see routes_combat.py's _bide_use) --
+ * bideUse is the same call either way, the server decides activate vs.
+ * resolve from the participant's own current state; this only has to tell
+ * which one just happened from the fresh response, since the live push
+ * that will eventually update `c.bideCharging` hasn't arrived yet. */
+async function _handleBideClick(c, move, state, onBideResolve) {
+  if (!c.bideCharging) {
+    const confirmed = await showCombatConfirm(
+      'Damage you take from now until you use Bide again will be doubled and dealt back as a normal ranged attack.',
+      { title: 'Activate Bide', yesLabel: 'Activate', noLabel: 'Cancel' },
+    );
+    if (!confirmed) return;
+
+    // Same VP-spend showMovePopup's own onUseMove does for every other
+    // move (see attachBattleListeners below) -- replicated here since Bide
+    // never opens that popup at all, there's nothing on it to roll. Paid
+    // once, on activation, not again on the later unleash click -- Bide is
+    // "used" once, its payoff just lands a turn (or more) later.
+    const vpCost = parseInt(move[4]) || 0;
+    let newVp = c.currentVp - vpCost;
+    let newHp = c.currentHp;
+    if (newVp < 0) { newHp += newVp; newVp = 0; } // no floor -- see handleHpVpDelta
+    c.currentHp = newHp;
+    c.currentVp = newVp;
+    saveCombatState(state);
+    rerenderBattle(state);
+    logBattleEvent({ type: 'move-used', actorId: c.id, actorName: c.name, text: `${c.name} used Bide (-${vpCost} VP)` });
+
+    try { await CombatAPI.bideUse(c.id); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
+    return;
+  }
+
+  const confirmed = await showCombatConfirm(
+    'Unleash Bide now? This locks in your stored damage and moves straight to picking a target.',
+    { title: 'Unleash Bide', yesLabel: 'Unleash', noLabel: 'Cancel' },
+  );
+  if (!confirmed) return;
+  try {
+    const result = await CombatAPI.bideUse(c.id);
+    const dealt = result?.data?.participants?.[c.id]?.pendingBideDamage;
+    if (typeof dealt === 'number' && onBideResolve) onBideResolve({ combatantId: c.id, dealt });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve } = {}) {
   // Only combat-wip.js's shared-combat flow ever passes any of these (see
   // _attachMainFocusListeners) -- the legacy page's own attachCombatListeners()
   // calls attachBattleListeners(state) with none of them, so this stays false
@@ -2726,6 +2773,17 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
 
   const c = state.combatants.find(x => x.id === combatantId);
   if (!c) return;
+
+  // Bide -- a genuinely different shape from every other move: no dice at
+  // all, its payoff is computed server-side from damage actually taken
+  // (see routes_combat.py's _bide_use). Shared combat only -- needs the
+  // live session's log, which the legacy standalone engine has no
+  // equivalent of. Short-circuits the rest of this function entirely;
+  // there's no normal move-details view for a move with nothing to roll.
+  if (_isSharedCombat && moveName === 'Bide') {
+    _handleBideClick(c, move, state, onBideResolve);
+    return;
+  }
 
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const trainerPath = trainerData[25] || '';

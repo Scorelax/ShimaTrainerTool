@@ -320,6 +320,11 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _clear_token_position(s, params['id']))
 
+    if action == 'bide-use':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _bide_use(s, params['id']))
+
     if action == 'confirm-placement':
         col = js_parse_int(params.get('col'))
         row = js_parse_int(params.get('row'))
@@ -440,6 +445,56 @@ def _damage_taken_this_round(state, pid):
         entry.get('amount', 0) for entry in state.get('log', [])
         if entry.get('round') == round_now and entry.get('type') == 'damage' and entry.get('targetId') == pid
     )
+
+
+def _damage_taken_since(state, pid, since_log_id):
+    """Total damage `pid` has taken from the log entry AFTER `since_log_id`
+    onward -- Bide's own tally (see _bide_use), the general-purpose cousin
+    of _damage_taken_this_round above (an arbitrary marker instead of "this
+    round"). 0 if the marker itself isn't found (a stale id from a log that
+    somehow got reset -- shouldn't happen, the log is append-only and never
+    trimmed, but never worth raising over)."""
+    log = state.get('log', [])
+    idx = next((i for i, entry in enumerate(log) if entry.get('id') == since_log_id), None)
+    if idx is None:
+        return 0
+    return sum(
+        entry.get('amount', 0) for entry in log[idx + 1:]
+        if entry.get('type') == 'damage' and entry.get('targetId') == pid
+    )
+
+
+def _bide_use(state, pid):
+    """Bide's own two-phase toggle -- the client always calls this same
+    action regardless of which phase it's in, and reads the resulting
+    participant record to tell which one just happened (bideChargingSinceLogId
+    now set = just activated, pendingBideDamage now set = just resolved --
+    see combat-wip.js's _syncLocalCombatState). Not activated: starts
+    tracking, logs it, no damage yet -- a self-only use, same authority
+    check as any other on-turn action, no target/VP handling here (that's
+    apply-damage's own job once the resolved attack actually goes through
+    target-picker). Already charging: sums damage taken since that marker
+    (_damage_taken_since), doubles it, clears the marker."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if pid != _active_participant_id(state):
+        raise ValueError("It's not this participant's turn")
+
+    since_id = participant.get('bideChargingSinceLogId')
+    if not since_id:
+        entry = _log_event(state, 'bide-activate', text=f"{participant['name']} braces, waiting to strike back",
+                            actorId=pid, actorName=participant['name'])
+        participant['bideChargingSinceLogId'] = entry['id']
+        participant['pendingBideDamage'] = None
+    else:
+        taken = _damage_taken_since(state, pid, since_id)
+        dealt = taken * 2
+        participant['bideChargingSinceLogId'] = None
+        participant['pendingBideDamage'] = dealt
+        _log_event(state, 'bide-resolve',
+                   text=f"{participant['name']} unleashes Bide for {dealt} damage ({taken} taken while charging)",
+                   actorId=pid, actorName=participant['name'], amount=dealt)
 
 
 def _last_log_event_for(state, pid, types=None):
@@ -661,6 +716,13 @@ def _add_participant(state, data):
         # freeform enemy -- move-token skips enforcement entirely then, same
         # "missing means untracked" convention as combatantType/hasStatBlock.
         'speeds': data.get('speeds', []),
+        # Bide's own two-phase state (see _bide_use) -- bideChargingSinceLogId
+        # is the log entry id marking when charging started (None when not
+        # charging), pendingBideDamage is the computed payoff once resolved
+        # (None until then). Blank/None for every other move -- this is only
+        # ever touched by the bide-use action.
+        'bideChargingSinceLogId': None,
+        'pendingBideDamage': None,
         # Feet moved so far THIS turn, against whichever of the above types
         # move-token's own caller picked -- a single shared budget (5e's own
         # rule for a creature switching between multiple speeds: distance

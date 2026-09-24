@@ -122,6 +122,13 @@ let _selectedTargetName = '';
 // step is skipped entirely -- picking a target goes straight to the damage
 // roll, since there's nothing to roll against AC.
 let _guaranteedHit = false;
+// Pre-fills the damage-roll input instead of leaving it blank -- Bide's own
+// "the damage isn't rolled at all, it's 2x what you took" (see
+// combat.js's _handleBideClick), still editable same as everything else
+// here (this app's consistent trust model: the app shows a number, the
+// human can always override it), just saves the common case a manual
+// type-in. null everywhere else.
+let _presetRoll = null;
 // The natural d20 typed into the Attack Roll step, captured when the attack is
 // resolved (see _confirmAttack) and handed back with the result so the caller
 // can tell which natural-roll / crit effects triggered (null on a guaranteed
@@ -508,13 +515,16 @@ function _showStep3() {
   if (advantage) {
     noteParts.push(`<div class="mode advantage">Advantage: roll damage twice, take the higher${note ? ` — ${note}` : ''}</div>`);
   }
+  if (_presetRoll != null) {
+    noteParts.push(`<div class="note">Pre-filled with ${_presetRoll} -- not rolled, edit it if it's wrong</div>`);
+  }
   noteEl.innerHTML = noteParts.join('');
 
   const totalMod = _damageModifier + _targetFlatBonus;
   document.getElementById('targetPickerModifierNote').textContent =
     totalMod ? ` (${totalMod >= 0 ? '+' : ''}${totalMod} modifier added automatically)` : '';
   const input = document.getElementById('targetPickerRollInput');
-  input.value = '';
+  input.value = _presetRoll != null ? _presetRoll : '';
   _updateRollTotal();
   document.getElementById('targetPickerConfirmRoll').disabled = false;
   setTimeout(() => input.focus(), 50);
@@ -601,7 +611,7 @@ function _cardHtml(p) {
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0 } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, presetRoll = null } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -619,6 +629,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _damageDice = damageDice;
   _damageNotes = damageNotes;
   _moveModValue = moveModValue;
+  _presetRoll = presetRoll;
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   document.getElementById('targetPickerBack').style.display = '';
@@ -652,7 +663,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * null if closed. With guaranteedHit (see pickTarget) it opens directly at
  * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0 } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, presetRoll = null } = {}) {
   _ensureDom();
   _attacker = attacker;
   _attackModifier = attackModifier;
@@ -663,6 +674,7 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   _damageDice = damageDice;
   _damageNotes = damageNotes;
   _moveModValue = moveModValue;
+  _presetRoll = presetRoll;
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _selectedTargetId = target.id;

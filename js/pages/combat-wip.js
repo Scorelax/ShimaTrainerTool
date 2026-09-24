@@ -820,6 +820,11 @@ function _syncLocalCombatState(session) {
     }
     merged.currentHp = p.currentHP; merged.maxHp = p.maxHP;
     merged.currentVp = p.currentVP; merged.maxVp = p.maxVP;
+    // Bide's own two-phase state (see routes_combat.py's _bide_use) -- read
+    // straight off the live participant, never held locally, since it's the
+    // server that decides "activate" vs "resolve" each time the move is used.
+    merged.bideCharging = !!p.bideChargingSinceLogId;
+    merged.pendingBideDamage = p.pendingBideDamage ?? null;
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.
@@ -1542,7 +1547,7 @@ function _attachMainFocusListeners(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx || !ctx.isMine) return;
 
-  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, onMultiHitAoe: _handleMultiHitAoe, onEffectsOnly: _handleEffectsOnly, ...ctx.cardOptions });
+  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, onMultiHitAoe: _handleMultiHitAoe, onEffectsOnly: _handleEffectsOnly, onBideResolve: _handleBideResolve, ...ctx.cardOptions });
   _attachedFocusId = ctx.p.id;
 
   document.getElementById('battleList')?.addEventListener('click', (e) => {
@@ -1846,6 +1851,41 @@ function attachBodyListeners() {
   _attachMainFocusListeners(session);
 
   _syncTurnOrderSidebar(session);
+}
+
+/** Wired into combat.js's move-popup flow as onBideResolve (see
+ * attachBattleListeners above and combat.js's own _handleBideClick) -- the
+ * "unleash" half of Bide's two-phase toggle, once routes_combat.py's
+ * bide-use has already computed `dealt` (2x damage taken while charging).
+ * Deliberately NOT routed through _resolveOneHit below: that helper always
+ * adds computedData.damageBonus (STAB/Ace Trainer/move-mod/...) on top of
+ * the roll, correct for a normal attack but wrong here -- Bide's own
+ * damage IS the computed number, nothing else stacks on top of it. The
+ * attack roll still happens normally (the move text: "a normal ranged
+ * attack"), just the damage step skips straight to applying `dealt` once a
+ * hit is confirmed, no dice, no additional bonus. */
+async function _handleBideResolve({ combatantId, dealt }) {
+  const picked = await pickTarget(combatantId, {
+    moveName: 'Bide', damageDice: '', damageNotes: [], damageModifier: 0, presetRoll: dealt,
+  });
+  if (!picked || picked.blocked) return;
+  const attackerName = session?.participants?.[combatantId]?.name || '?';
+  if (!picked.hit) {
+    const targetName = session?.participants?.[picked.targetId]?.name || '?';
+    CombatAPI.logEvent({
+      type: 'miss', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
+      text: `${attackerName} used Bide on ${targetName} -- Miss`,
+    }).catch(() => {});
+    return;
+  }
+  try {
+    // Bide is Normal-type (see DnD_moves_categorized_draft.json) -- still
+    // passed through so type-effectiveness against the target applies same
+    // as any other attack.
+    await CombatAPI.applyDamage(combatantId, picked.targetId, picked.rawRoll, 'Normal', '', 'Bide');
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
 }
 
 /** Wired into combat.js's move-popup flow as onDamageResolved (see

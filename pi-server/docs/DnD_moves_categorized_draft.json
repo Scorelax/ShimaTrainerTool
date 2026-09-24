@@ -17229,12 +17229,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You lash out at a creature, venting your frustration at your trainer. Make a melee attack roll against a creature, doing 1d10 + MOVE normal damage on a hit When you make this attack, add an additional bonus to hit and damage equal to the number of levels you are below zero on the Loyalty Chart.",
       "moveStat": "STR",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_loyalty_below_zero"
+          },
+          "scalingBonus": {
+            "amountPerUnit": 1
+          },
+          "note": "+1 per level below 0 on the Loyalty Chart -- also add this to your attack roll"
+        }
+      ]
     },
     {
       "name": "Fury Attack",
@@ -19045,12 +19058,25 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You lash out at a creature, in hopes it will please your trainer. Make a melee attack roll against a creature, doing 1d10 + MOVE on a hit. When you make this attack, add an additional bonus to hit and damage equal to the number of levels you are above zero on the Loyalty Chart.",
       "moveStat": "STR",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_loyalty_above_zero"
+          },
+          "scalingBonus": {
+            "amountPerUnit": 1
+          },
+          "note": "+1 per level above 0 on the Loyalty Chart -- also add this to your attack roll"
+        }
+      ]
     },
     {
       "name": "Roar",
@@ -19870,12 +19896,26 @@
         "trigger_saving_throw",
         "multi_hit_aoe",
         "conditional_damage",
-        "recharge_locked"
+        "recharge_locked",
+        "damage_note"
       ],
       "description": "You spray a cone of powerful cleaning solution. All creatures in a 30-foot cone must make a CON save against your Move DC, taking 1d10 + MOVE normal damage on a failure, or half as much on a success. This move deals double damage to Poison-type Pokémon. All surfaces in the affected area are thoroughly cleaned.",
       "moveStat": "STR/DEX",
       "vpCost": "9",
-      "scaling": "The damage dice roll for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice roll for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_type",
+            "any": [
+              "poison"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "Target is Poison-type"
+        }
+      ]
     },
     {
       "name": "Sonic Boom",
@@ -20754,12 +20794,27 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You strike out with a blast of energy that increases in strength the more energy has been spent. Make a ranged attack, dealing 2d8 + MOVE normal damage on a hit. Increase the damage by your Move modifier for every 10VP that has been expended from the total, before the move was activated, up to a maximum of +10.",
       "moveStat": "STR/DEX",
       "vpCost": "8",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_vp_spent_per",
+            "per": 10
+          },
+          "scalingBonus": {
+            "amountPerUnit": "moveModifier",
+            "cap": 10
+          },
+          "note": "+MOVE mod per 10VP spent this battle, capped at +10"
+        }
+      ]
     },
     {
       "name": "Uproar",
@@ -21017,12 +21072,24 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You wrap your hands around the target and squeeze hard. Make a melee attack against a creature, dealing 3d8 + MOVE normal damage on a hit. If the target has 50% or more of its maximum HP, double your move modifier for the damage roll.",
       "moveStat": "STR",
       "vpCost": "10",
-      "scaling": "The damage dice roll for this move changes to 5d6 at level 5, 4d12 at level 10, and 8d8 at level 17."
+      "scaling": "The damage dice roll for this move changes to 5d6 at level 5, 4d12 at level 10, and 8d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_hp_at_or_above",
+            "fraction": 0.5
+          },
+          "flatBonus": "moveModifier",
+          "note": "Target at 50% HP or more -- double your move modifier"
+        }
+      ]
     },
     {
       "name": "Yawn",

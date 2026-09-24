@@ -16,8 +16,9 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
   // reroll_damage: no extra fields -- see its own section below
   // block_attack: no extra fields -- see its own section below
   // prevent_faint: no extra fields -- see its own section below
-  // damage_note: "condition": {...}, "diceMultiplier?"/"totalMultiplier?"/"flatBonus?"/"advantage?"
-  //              -- see its own section below; NOT a when/target/ends effect at all, see why there
+  // damage_note: "condition": {...}, "diceMultiplier?"/"totalMultiplier?"/"flatBonus?"/
+  //              "scalingBonus?"/"advantage?" -- see its own section below; NOT a when/target/ends
+  //              effect at all, see why there
   // heal:       "amount": {"dice": "2d6", "moveMod?": true, "pool?": "VP"}
   //                     | {"fractionOfDamage": 0.5, "capMultipleOfLevel?": 5, "pool?": "VP"}
   //                     | {"levelMultiple": 1, "pool?": "VP"}       -- see its own section below
@@ -186,11 +187,23 @@ BEFORE the roll.
   true whenever the target's own `statuses` array is non-empty.
 - `{type: "attacker_stat_below_target", stat: "dex"}` -- Gyro Ball's own stat comparison; checked
   against each participant's raw score (`attacker.dex`/`target.dex`), not a live-buffed one.
+- `{type: "target_hp_at_or_above", fraction: 0.5}` -- Wring Out's "50% or more", the missing fourth
+  comparison direction alongside `target_hp_below/at_or_below/above`.
+- `{type: "target_type", any: ["poison"]}` -- Solvent Spray's "double damage to Poison-type
+  Pokémon", checked against the target's `type1`/`type2` (case-insensitively), not a live matchup
+  chart lookup -- this is about the target's own species type, not effectiveness.
+- `{type: "self_vp_spent_per", per: 10}` / `{type: "self_loyalty_below_zero"}` /
+  `{type: "self_loyalty_above_zero"}` -- the three `scalingBonus` conditions (see below): each
+  reports a MAGNITUDE (how many "units" apply), not just met/not-met. VP spent is approximated as
+  `maxVp - currentVp` (Trump Card's own wording, same approximation level as everything else
+  derived in this app); Loyalty is a plain signed number already on the sheet (`pokemonData[33]`),
+  read straight onto the combatant as `loyalty`.
 
-Result fields (not all mutually exclusive -- `flatBonus` and `advantage` both accumulate/OR across
-every MET effect on a move, since nothing needs the "only the most severe tier" reasoning
-`diceMultiplier` does; a move only ever uses ONE of `diceMultiplier`/`totalMultiplier`/`flatBonus`/
-`advantage` per effect, but different effects on the same move could combine them in principle):
+Result fields (not all mutually exclusive -- `flatBonus`, `scalingBonus` and `advantage` all
+accumulate/OR across every MET effect on a move, since nothing needs the "only the most severe
+tier" reasoning `diceMultiplier` does; a move only ever uses ONE of `diceMultiplier`/
+`totalMultiplier`/`flatBonus`/`scalingBonus`/`advantage` per effect, but different effects on the
+same move could combine them in principle):
 - `diceMultiplier: 2` recomputes the shown dice STRING itself ("2d8" → "4d8",
   `move-effects.js`'s exported `multiplyDiceString`, shared by both the self- and target-
   conditional sides) -- multiplying the leading number is the same arithmetic as rolling that many
@@ -208,10 +221,23 @@ every MET effect on a move, since nothing needs the "only the most severe tier" 
   the same thing: a flat MOVE modifier doesn't halve along with a halved die count, and the two
   produce different distributions even at the same average. Safer to say so in words than assert a
   recomputed number that might be wrong.
-- `flatBonus: "proficiency"` or a plain number (target-conditional only so far) -- Crush Grip's own
-  "add your proficiency bonus to the damage roll": actually changes the total, folded straight into
-  the returned `rawRoll` the same way `target-picker.js`'s existing `damageModifier` param already
-  was, so the caller (`combat-wip.js`) needed no changes to pick it up correctly.
+- `flatBonus: "proficiency"`, `"moveModifier"`, or a plain number -- Crush Grip's own "add your
+  proficiency bonus to the damage roll" (target-conditional only); Wring Out's "double your move
+  modifier" (`"moveModifier"`, target-conditional -- one more copy of `computedData.highestMod`,
+  threaded through `pickTarget`/`pickTargetAgain` as `moveModValue` by whoever calls them, the same
+  value the move-popup's own dice breakdown already showed, not re-derived); a plain number works
+  on either side. Target-conditional: folded straight into the returned `rawRoll` the same way
+  `target-picker.js`'s existing `damageModifier` param already was. Self-conditional: folded into
+  the popup's own `diceOverride`/`diceBreakdownOverride`, alongside `computedData.damageBonus`.
+- `scalingBonus: {amountPerUnit: "moveModifier" | <number>, cap?: <number>}` (self-conditional only
+  so far) -- a bonus that scales with the condition's own MAGNITUDE rather than a fixed amount:
+  `bonus = magnitude * amountPerUnit`, clamped to `cap` when given. Trump Card: `magnitude` is VP
+  spent ÷ 10 (rounded down), `amountPerUnit: "moveModifier"`, `cap: 10` ("up to a maximum of +10").
+  Frustration/Return: `magnitude` is the Loyalty Chart distance from zero, `amountPerUnit: 1`, no
+  cap (the move text states none). Both of these also read "add this to your ATTACK roll too, not
+  just damage" -- `scalingBonus` only ever touches the damage total, so that half is folded into
+  `note` as a reminder instead, same "the app can't auto-apply it, so it says so" pattern as
+  `totalMultiplier`.
 - `advantage: true` (target-conditional only so far) -- Cross Poison/Hex's "damage is rolled with
   advantage": shown as its own banner ("roll damage twice, take the higher"), the same "the app
   surfaces the instruction, the human rolls accordingly" pattern as every other advantage/

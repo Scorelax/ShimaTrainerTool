@@ -568,8 +568,17 @@ function _targetConditionMet(cond, { attacker, target }) {
     case 'target_hp_below': { const f = _hpFraction(target); return f !== null && f < cond.fraction; }
     case 'target_hp_at_or_below': { const f = _hpFraction(target); return f !== null && f <= cond.fraction; }
     case 'target_hp_above': { const f = _hpFraction(target); return f !== null && f > cond.fraction; }
+    case 'target_hp_at_or_above': { const f = _hpFraction(target); return f !== null && f >= cond.fraction; }
     case 'target_status': return _hasCondition(target, cond.any);
     case 'target_has_any_status': return (target?.statuses || []).length > 0;
+    // Solvent Spray's own "double damage to Poison-type" -- checked against
+    // both of the target's type slots (type1/type2, see routes_combat.py's
+    // _add_participant), case-insensitively same as everywhere else in this
+    // app that compares type names.
+    case 'target_type': {
+      const types = [target?.type1, target?.type2].filter(Boolean).map(t => t.toLowerCase());
+      return (cond.any || []).some(t => types.includes(t.toLowerCase()));
+    }
     case 'attacker_stat_below_target': {
       const key = String(cond.stat || '').toLowerCase();
       const a = Number(attacker?.[key]);
@@ -593,13 +602,20 @@ function _targetConditionMet(cond, { attacker, target }) {
  * same "never stacked" rule as the self-conditional side; flatBonus and
  * advantage DO accumulate/OR across every met effect, since nothing here
  * needs Flail's own "only the most severe tier" reasoning. */
-export function targetDamageNoteResult(effects, { attacker, target }) {
+export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0 }) {
   let diceMultiplier = 1, flatBonus = 0, advantage = false;
   const notes = [];
   for (const e of effects || []) {
     if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target })) continue;
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) diceMultiplier = e.diceMultiplier;
     if (e.flatBonus === 'proficiency') flatBonus += Number(attacker?.proficiency) || 0;
+    // Wring Out's own "double your move modifier" -- one more copy of
+    // whatever the move's own base modifier already contributed. The value
+    // itself comes from the caller (combat.js's computedData.highestMod,
+    // threaded through pickTarget/pickTargetAgain -- see combat-wip.js's own
+    // call sites), not re-derived here, so it stays exactly consistent with
+    // whatever the move-popup already showed for this same move/combatant.
+    else if (e.flatBonus === 'moveModifier') flatBonus += moveModValue;
     else if (typeof e.flatBonus === 'number') flatBonus += e.flatBonus;
     if (e.advantage) advantage = true;
     if (e.note) notes.push(e.note);

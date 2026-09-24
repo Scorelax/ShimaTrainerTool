@@ -105,6 +105,11 @@ let _damageNotes = [];
 // advantage note in _showStep3, folded into the total the same way
 // _damageModifier already is.
 let _targetFlatBonus = 0;
+// The move's own single stat modifier (combat.js's computedData.highestMod)
+// -- only meaningful for a damage_note with flatBonus:'moveModifier'
+// (Wring Out), passed straight through from whoever called pickTarget/
+// pickTargetAgain rather than re-derived here.
+let _moveModValue = 0;
 let _speciesName = '';
 // The attacking move's own name, needed for the reaction window ("Noble Roar --
 // does anyone want to react to being targeted by this?") -- combat-wip.js's
@@ -493,7 +498,7 @@ function _showStep3() {
   // popup never had a base-dice display to begin with, unlike the
   // move-popup's own diceOverride) -- flatBonus DOES change the total,
   // folded in below same as _damageModifier.
-  const { diceMultiplier, flatBonus, advantage, note } = targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget });
+  const { diceMultiplier, flatBonus, advantage, note } = targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue });
   _targetFlatBonus = flatBonus;
   const noteEl = document.getElementById('targetPickerDamageNote');
   const noteParts = [];
@@ -596,7 +601,7 @@ function _cardHtml(p) {
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [] } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0 } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -613,6 +618,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _moveName = moveName;
   _damageDice = damageDice;
   _damageNotes = damageNotes;
+  _moveModValue = moveModValue;
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   document.getElementById('targetPickerBack').style.display = '';
@@ -646,7 +652,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * null if closed. With guaranteedHit (see pickTarget) it opens directly at
  * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [] } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0 } = {}) {
   _ensureDom();
   _attacker = attacker;
   _attackModifier = attackModifier;
@@ -656,6 +662,7 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   _moveName = moveName;
   _damageDice = damageDice;
   _damageNotes = damageNotes;
+  _moveModValue = moveModValue;
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _selectedTargetId = target.id;

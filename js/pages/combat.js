@@ -361,6 +361,7 @@ export function buildPokemonCombatant(pokemonKey) {
     ac: parseInt(pokemonData[8]) || 10, baseAc: parseInt(pokemonData[8]) || 10, critMod: 0,
     maxHp, currentHp, maxVp, currentVp,
     proficiency, stabBonusValue: parseInt(pokemonData[34]) || 2,
+    loyalty: parseInt(pokemonData[33]) || 0, // Frustration/Return's own damage_note condition
     savingThrows: pokemonData[21] || '',
     skills: pokemonData[22] || '',
     str, dex, con, int: int_, wis, cha,
@@ -2256,23 +2257,56 @@ function getHealDiceForLevel(move, level) {
  * names (`Poison`, `Paralysis`, `Burn`, ...) both engines' own status badges
  * already use (see combat-wip.js's LEGACY_BADGE_NAMES), so this works
  * identically whether `c` came from the old local engine or the shared one. */
-function _evaluateDamageNotes(effects, c) {
+function _evaluateDamageNotes(effects, c, moveModValue = 0) {
   const hpFrac = (c.maxHp || 0) > 0 ? (c.currentHp || 0) / c.maxHp : null;
   const statusNames = new Set((c.statusEffects || []).map(se => se.name));
-  const conditionMet = (cond) => {
-    if (!cond) return false;
-    if (cond.type === 'self_hp_below') return hpFrac !== null && hpFrac < cond.fraction;
-    if (cond.type === 'self_hp_at_or_below') return hpFrac !== null && hpFrac <= cond.fraction;
-    if (cond.type === 'self_status') return (cond.any || []).some(name => statusNames.has(name));
-    return false;
+  // VP "spent" is approximated as maxVp - currentVp (Trump Card's own
+  // wording) -- doesn't distinguish spent-on-moves from any other VP loss,
+  // same approximation level as every other derived number in this app.
+  const vpSpent = Math.max(0, (c.maxVp || 0) - (c.currentVp || 0));
+  const loyalty = c.loyalty || 0;
+
+  // {met, magnitude} -- magnitude is only meaningful for a scalingBonus
+  // effect (how many "units" of it apply); boolean-only conditions report 1
+  // when met, which scalingBonus effects never actually read.
+  const evalCondition = (cond) => {
+    if (!cond) return { met: false, magnitude: 0 };
+    switch (cond.type) {
+      case 'self_hp_below': return { met: hpFrac !== null && hpFrac < cond.fraction, magnitude: 1 };
+      case 'self_hp_at_or_below': return { met: hpFrac !== null && hpFrac <= cond.fraction, magnitude: 1 };
+      case 'self_status': return { met: (cond.any || []).some(name => statusNames.has(name)), magnitude: 1 };
+      // Trump Card: "+MOVE mod per 10VP spent".
+      case 'self_vp_spent_per': {
+        const units = Math.floor(vpSpent / (cond.per || 1));
+        return { met: units > 0, magnitude: units };
+      }
+      // Frustration/Return: "+1 per level below/above zero on the Loyalty Chart".
+      case 'self_loyalty_below_zero': { const units = Math.max(0, -loyalty); return { met: units > 0, magnitude: units }; }
+      case 'self_loyalty_above_zero': { const units = Math.max(0, loyalty); return { met: units > 0, magnitude: units }; }
+      default: return { met: false, magnitude: 0 };
+    }
   };
-  let diceMultiplier = 1, diceNote = '', totalNote = '';
+
+  let diceMultiplier = 1, diceNote = '', totalNote = '', flatBonus = 0;
+  const flatNotes = [];
   for (const e of effects) {
-    if (!conditionMet(e.condition)) continue;
+    const { met, magnitude } = evalCondition(e.condition);
+    if (!met) continue;
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) { diceMultiplier = e.diceMultiplier; diceNote = e.note || ''; }
     if (e.totalMultiplier) totalNote = e.note || `×${e.totalMultiplier} total damage`;
+    if (e.flatBonus === 'proficiency') { flatBonus += Number(c.proficiency) || 0; if (e.note) flatNotes.push(e.note); }
+    else if (typeof e.flatBonus === 'number') { flatBonus += e.flatBonus; if (e.note) flatNotes.push(e.note); }
+    // A bonus that scales with `magnitude` (how many "units" of the
+    // condition apply) rather than a fixed amount -- Trump Card/Frustration/
+    // Return all shape it this way; see move-effects-schema.md.
+    if (e.scalingBonus) {
+      const unitValue = e.scalingBonus.amountPerUnit === 'moveModifier' ? moveModValue : (e.scalingBonus.amountPerUnit || 0);
+      let bonus = magnitude * unitValue;
+      if (typeof e.scalingBonus.cap === 'number') bonus = Math.min(bonus, e.scalingBonus.cap);
+      if (bonus) { flatBonus += bonus; if (e.note) flatNotes.push(e.note); }
+    }
   }
-  return { diceMultiplier, diceNote, totalNote };
+  return { diceMultiplier, diceNote, totalNote, flatBonus, flatNote: flatNotes.join('; ') };
 }
 
 function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
@@ -2781,11 +2815,15 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
   if (!_isDirectHeal && computedData.damageDice) {
     const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
     if (_dmgNoteEffects.length) {
-      const { diceMultiplier, diceNote, totalNote } = _evaluateDamageNotes(_dmgNoteEffects, c);
-      if (diceMultiplier > 1) {
-        const _adjustedDice = multiplyDiceString(computedData.damageDice, diceMultiplier);
-        _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
-        _diceBreakdownOverride = [computedData.damageBreakdown, `×${diceMultiplier} dice (${diceNote})`].filter(Boolean).join(' · ');
+      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod);
+      if (diceMultiplier > 1 || flatBonus) {
+        const _adjustedDice = diceMultiplier > 1 ? multiplyDiceString(computedData.damageDice, diceMultiplier) : computedData.damageDice;
+        const _totalFlat = computedData.damageBonus + flatBonus;
+        _diceOverride = _totalFlat > 0 ? `${_adjustedDice} + ${_totalFlat}` : _adjustedDice;
+        const _extraParts = [];
+        if (diceMultiplier > 1) _extraParts.push(`×${diceMultiplier} dice (${diceNote})`);
+        if (flatBonus) _extraParts.push(`+${flatBonus} (${flatNote})`);
+        _diceBreakdownOverride = [computedData.damageBreakdown, ..._extraParts].filter(Boolean).join(' · ');
       }
       if (totalNote) _damageNote = totalNote;
     }

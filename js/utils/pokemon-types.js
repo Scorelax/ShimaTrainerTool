@@ -202,6 +202,13 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
     hasSTAB,
     attackBonus,
     damageBonus,
+    // The move's own single stat modifier alone, already folded into
+    // damageBonus above when includeStatInDmg -- exposed separately for
+    // damage_note's scalingBonus (see combat.js's _evaluateDamageNotes,
+    // Trump Card/Frustration/Return's own "+MOVE mod per X" wording), which
+    // needs this ONE number on its own, not the composite damageBonus
+    // (STAB/Ace/Type Master/held-item all mixed in).
+    highestMod,
     attackBreakdown: atkParts.length ? `(${atkParts.join(', ')})` : '',
     damageBreakdown: dmgParts.length ? `(${dmgParts.join(', ')})` : '',
     damageDice,

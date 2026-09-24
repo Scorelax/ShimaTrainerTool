@@ -599,3 +599,17 @@ self-conditional only, Trump Card/Frustration/Return) now works target-condition
 magnitude read from a new `attacker_size_above_target` condition (however many size levels the
 attacker outranks the target by, on the move's own named scale). Archive Blast, Formation Strike,
 Self-Destruct, Solar Beam, Solar Blade, and Spit Up remain.)*
+
+*(Update, next day: Self-Destruct's damage aspect is built too (migrate_effects_v28.py) -- the
+user's own explicit call: the forced-death-save/no-potions/recovery-days chain stays out entirely,
+just the self-faint and the AoE damage. Two pieces outside the `effects` schema itself: (1) a new
+generic `self_faint` handler in combat.js's own `onUseMove` (0 HP, nothing more, for any move
+carrying that category -- Lunar Dance, Memento, Final Gambit, Self-Destruct, Healing Wish, not
+just this one), and (2) `save-picker.js` gained an opt-in `damageOnPass` (default false, every
+other save-triggered move still deals zero damage on a pass) since this app's save flow never had
+ANY way to enter a damage roll on a passed save before -- Self-Destruct's own "half as much on a
+success" needed one. Once that exists, "half on a success" is the same unautomated assumption
+every other save-triggered move already makes (the human enters half by hand); the move's OWN
+damage_note only needs the low-HP tier's further halving on top, `totalMultiplier: 0.5` below 50%
+HP -- the exact same shape Water Spout already uses, just now also reachable from a passed save's
+own damage step. Archive Blast, Formation Strike, Solar Beam, Solar Blade, and Spit Up remain.)*

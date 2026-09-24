@@ -103,6 +103,15 @@ let _manualDc = false; // true when the DC isn't known ahead of time -- the huma
 let _damageModifier = 0;
 let _speciesName = '';
 let _hasDamage = false;
+// Self-Destruct's own "half as much on a success" -- opt-in (defaults
+// false, unchanged behavior for every other save-triggered move, which
+// really do deal zero damage on a pass) rather than a blanket "always ask
+// for a damage roll on pass" -- see confirmSecondarySave's own comment.
+let _damageOnPass = false;
+// Which outcome led to the current damage-roll step (_showStep3 is shared
+// by both _confirmFail and, when _damageOnPass, _confirmPass -- see
+// _confirmDamageRoll, which needs to report the right one).
+let _pendingPassed = false;
 let _selectedTargetId = null;
 let _selectedTarget = null;
 let _selectedTargetName = '';
@@ -336,8 +345,18 @@ function _consume() {
 }
 
 function _confirmPass() {
+  _pendingSave = { ..._captureSave(true), dc: _currentDc(), rollMode: _saveCtx?.mode || 'normal' };
+  _pendingPassed = true;
   _consume();
-  _close({ targetId: _selectedTargetId, passed: true, dc: _currentDc(), rollMode: _saveCtx?.mode || 'normal', ..._captureSave(true) });
+  // Self-Destruct's own "half as much on a success" -- everything else
+  // that's ever called this closes right away on a Pass, no damage step at
+  // all (see this file's own header comment).
+  if (_hasDamage && _damageOnPass) {
+    _showStep3();
+    _playAnimation();
+  } else {
+    _close({ targetId: _selectedTargetId, passed: true, ..._pendingSave });
+  }
 }
 
 /** Save Fail -- for a move with a damage component, shows the damage-roll step
@@ -350,6 +369,7 @@ function _confirmPass() {
  * get logged instead. */
 function _confirmFail() {
   _pendingSave = { ..._captureSave(false), dc: _currentDc(), rollMode: _saveCtx?.mode || 'normal' };
+  _pendingPassed = false;
   _consume();
   if (_hasDamage) {
     _showStep3();
@@ -409,7 +429,7 @@ function _updateRollTotal() {
 function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('savePickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
-  _close({ targetId: _selectedTargetId, passed: false, rawRoll: raw, ...(_pendingSave || {}) });
+  _close({ targetId: _selectedTargetId, passed: _pendingPassed, rawRoll: raw, ...(_pendingSave || {}) });
 }
 
 function _cardHtml(p) {
@@ -442,7 +462,7 @@ function _cardHtml(p) {
  * save bonuses), folds the numeric ones into the total, uses up "next roll"
  * effects once Success/Fail is chosen, and reports the net rollMode.
  */
-export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null } = {}) {
+export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false } = {}) {
   _ensureDom();
   _moveUser = moveUser;
   _dc = dc;
@@ -451,6 +471,7 @@ export async function confirmSecondarySave(target, targetName, { dc = 0, hasDama
   _damageModifier = damageModifier;
   _speciesName = speciesName;
   _saveAbility = ability;
+  _damageOnPass = damageOnPass;
   _pendingSave = null;
   _selectedTargetId = target.id;
   _showStep2(target, targetName);
@@ -487,6 +508,7 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _speciesName = speciesName;
   _hasDamage = hasDamage;
   _saveAbility = ability;
+  _damageOnPass = false; // single-target save flow -- no caller of this one needs it yet, unlike confirmSecondarySave
   _pendingSave = null;
   document.getElementById('savePickerAnimMedia').innerHTML = '';
   document.getElementById('savePickerBack').style.display = '';

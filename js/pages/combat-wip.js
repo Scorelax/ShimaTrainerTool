@@ -2448,24 +2448,40 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
     if (!target) continue;
 
     if (isSaveTriggered) {
-      const outcome = await confirmSecondarySave(target, target.name, { dc, hasDamage, damageModifier, speciesName, ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId] });
+      // damageOnPass: Self-Destruct's own "half as much on a success" --
+      // every other save-triggered move here deals zero damage on a pass,
+      // same as confirmSecondarySave's own default (see save-picker.js).
+      const outcome = await confirmSecondarySave(target, target.name, {
+        dc, hasDamage, damageModifier, speciesName, ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId],
+        damageOnPass: moveName === 'Self-Destruct',
+      });
       if (!outcome) continue; // closed for this target -- move on to the next one
       const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
-      if (outcome.passed) {
-        CombatAPI.logEvent({
-          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}`,
-        }).catch(() => {});
-      } else if (outcome.rawRoll !== undefined) {
+      // rawRoll checked FIRST, not outcome.passed -- a passed save can still
+      // carry a damage roll now (damageOnPass above), which used to be
+      // impossible (passed and rawRoll were mutually exclusive before this),
+      // so passed alone can no longer stand in for "no damage this target".
+      if (outcome.rawRoll !== undefined) {
         try {
           // No "N damage applied" popup here either -- see _resolveOneHit's own note;
           // doubly true in a loop over several AoE targets, one popup per target.
           const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, outcome.rawRoll + damageModifier, moveType, speciesName, moveName);
           if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
           await waitForDamagedReactions(targetId, combatantId, moveName);
+          if (outcome.passed) {
+            CombatAPI.logEvent({
+              type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
+              text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}, but still takes reduced damage`,
+            }).catch(() => {});
+          }
         } catch (err) {
           showCombatAlert(err.message, { title: 'Error' });
         }
+      } else if (outcome.passed) {
+        CombatAPI.logEvent({
+          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
+          text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}`,
+        }).catch(() => {});
       } else {
         CombatAPI.logEvent({
           type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,

@@ -2965,6 +2965,14 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
       let newVp = target.currentVp - vpCost;
       let newHp = target.currentHp;
       if (newVp < 0) { newHp = newHp + newVp; newVp = 0; } // no floor -- see handleHpVpDelta
+      // self_faint moves (Lunar Dance, Memento, Final Gambit, Self-Destruct,
+      // Healing Wish) -- "fainting immediately after the attack", modeled as
+      // a plain 0 HP, nothing more (no forced death-save chain, no "can't
+      // heal from potions" -- the user's own call: leave that part out,
+      // handle it by hand same as every other narrative consequence this
+      // app doesn't automate). Overrides the VP-overflow HP drain above,
+      // not combined with it.
+      if (moveCategoriesFor(usedMoveName).includes('self_faint')) newHp = 0;
       target.currentHp = newHp;
       target.currentVp = newVp;
       logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)` });

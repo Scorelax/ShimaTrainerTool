@@ -252,6 +252,12 @@ export function buildTrainerCombatant() {
   const currentVp = (trainerData[35] !== null && trainerData[35] !== undefined && trainerData[35] !== '') ? parseInt(trainerData[35]) : maxVp;
   const ac = parseInt(trainerData[36]) || parseInt(trainerData[13]) || 10;
   const baseAc = parseInt(trainerData[13]) || 10;
+  // Single walking speed -- trainers have no other movement types (see
+  // TRAINER_COLUMNS in db.py, index 14). 30ft is the standard humanoid
+  // default when a sheet has none recorded, matching every other stat
+  // default above.
+  const walkingSpeed = parseInt(trainerData[14]) || 30;
+  const speeds = [{ type: 'Walking', ft: walkingSpeed }];
 
   return {
     id: 'trainer', type: 'trainer', entityKey: 'trainerData',
@@ -267,6 +273,8 @@ export function buildTrainerCombatant() {
     moves: [], types: [], rechargeStates: {},
     feats: trainerData[33] || '',
     inventory: trainerData[20] || '',
+    movement: `Walking: ${walkingSpeed}`,
+    speeds,
     statusEffects: [], isExpanded: false
   };
 }
@@ -306,13 +314,18 @@ export function buildPokemonCombatant(pokemonKey) {
     }
   });
 
-  // Parse movement for display
+  // Parse movement -- pokemonData[13] is "walking,climbing,flying,hovering,swimming,burrowing"
+  // (see pokemon-card.js's own copy of this same parse). `speeds` is the
+  // structured form the battle map's movement tracker uses (see
+  // battle-map-popup.js); `movement` stays the plain display string the
+  // move-details info-row has always shown.
   const movementData = pokemonData[13] || '';
   const movementValues = movementData.split(',').map(v => v.trim());
   const movementTypes = ['Walking', 'Climbing', 'Flying', 'Hovering', 'Swimming', 'Burrowing'];
-  const movementDisplay = movementValues
-    .map((v, i) => (v && v !== '-' && v !== '0' && v !== '') ? `${movementTypes[i]}: ${v}` : null)
-    .filter(Boolean).join(', ');
+  const speeds = movementValues
+    .map((v, i) => ({ type: movementTypes[i], ft: parseInt(v, 10) || 0 }))
+    .filter(s => s.ft > 0);
+  const movementDisplay = speeds.map(s => `${s.type}: ${s.ft}`).join(', ');
 
   // Initialize recharge states (using existing KnownMoves from pokemonData[59] if present)
   const existingRecharges = parseKnownMoves(pokemonData[59] || '');
@@ -357,6 +370,7 @@ export function buildPokemonCombatant(pokemonKey) {
     item: pokemonData[35] || '',
     size: pokemonData[57] || '',
     movement: movementDisplay,
+    speeds,
     rechargeStates,
     feats: pokemonData[50] || '',
     typeChart: pokemonData[53] || '',

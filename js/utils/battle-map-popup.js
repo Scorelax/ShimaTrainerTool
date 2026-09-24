@@ -1,15 +1,22 @@
 // Interactive in-app battle map popup -- lets a player VIEW the same board
-// the table kiosk screen (battle-map.html) shows, and MOVE their own
-// token by clicking it, then clicking a destination cell. Deliberately
-// still the simplest possible version of movement itself: no range/
-// distance limits, no terrain blocking yet -- the user explicitly asked to
-// prove movement works first and layer real movement rules on later. Turn-
-// gating, however, is NOT one of those deferred rules -- the user was
-// explicit that movement only happens on your own turn, so a token is only
+// the table kiosk screen (battle-map.html) shows, and MOVE their own token:
+// click it, click a destination cell to STAGE a move (distance/movement-type
+// preview, no server call yet), then Confirm to actually commit it -- a
+// deliberate extra step so a misclick can't burn real movement (the user's
+// own call: hard-enforce the movement budget below, but only after an
+// explicit confirm). Turn-gating is enforced both ways -- a token is only
 // selectable when it's both yours (`owner` field, set by combat-wip.js's
 // "Join as yourself" flow) AND the current turn holder, and the server
-// enforces the same check (move-token in routes_combat.py, same authority
-// model as use-move) so this can't be bypassed from the client.
+// re-checks the same thing (move-token in routes_combat.py, same authority
+// model as use-move) so neither check can be bypassed from the client.
+//
+// Movement budget: each participant carries `speeds` ([{type, ft}, ...],
+// see combat.js's buildTrainerCombatant/buildPokemonCombatant) and a
+// server-tracked `movementUsed` (feet moved so far this turn, reset when
+// their next turn starts -- see routes_combat.py's _advance_turn). A
+// participant with no `speeds` at all (a DM's freeform enemy, or anyone
+// added before this existed) gets no budget UI and no enforcement --
+// move-token skips the check entirely for them.
 //
 // Mirrors move-popup.js's overlay pattern (create the DOM once, reuse
 // across calls) and target-picker.js's self-contained-styles approach
@@ -34,6 +41,27 @@ function _injectStyles() {
     .combat-move-popup-body { padding: 1rem 1.2rem; }
 
     .bmap-hint { font-size: 0.8rem; color: #a0a0c0; margin-bottom: 0.6rem; }
+
+    .bmap-move-panel {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px; padding: 0.55rem 0.7rem; margin-bottom: 0.6rem; font-size: 0.85rem;
+    }
+    .bmap-move-chip { background: rgba(255,255,255,0.08); border-radius: 6px; padding: 0.2rem 0.55rem; }
+    .bmap-move-chip.depleted { color: #e77373; }
+    .bmap-stage-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; width: 100%; }
+    .bmap-stage-row select {
+      background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
+      border-radius: 6px; padding: 0.25rem 0.4rem; font-size: 0.85rem;
+    }
+    .bmap-stage-row button {
+      border: none; border-radius: 6px; padding: 0.3rem 0.75rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    }
+    .bmap-confirm-btn { background: linear-gradient(135deg, #27ae60, #1e8449); color: #fff; }
+    .bmap-confirm-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+    .bmap-cancel-btn { background: rgba(255,255,255,0.12); color: #e0e0e0; }
+    .bmap-stage-warning { color: #e77373; }
+
     /* aspect-ratio is set inline per-render from the board's own cols/rows
        (see _applyStageAspect) -- gridTemplateStyle only ever divides this
        box into equal fractions, it doesn't know or care about shape, so
@@ -53,6 +81,8 @@ function _injectStyles() {
       background: #4a3520; display: flex; align-items: center; justify-content: center;
       font-size: 0.6rem; color: #e0c080; overflow: hidden; text-align: center; padding: 1px; box-sizing: border-box;
     }
+    /* The staged-but-not-yet-confirmed destination cell. */
+    .bmap-cell.staged { outline: 2px solid #FFD700; outline-offset: -2px; }
     /* pointer-events:none on the container (not just the default-none
        individual tokens below) -- without it, this full-stage layer sits on
        top of .bmap-grid in paint order and, having no click handler of its
@@ -89,6 +119,12 @@ let _overlay = null;
 let _session = null;
 let _ownerName = null;
 let _selectedTokenId = null;
+// A clicked-but-not-yet-confirmed destination for _selectedTokenId, plus
+// whichever movement type the Confirm button will actually move with (see
+// _eligibleTypes -- auto-picked when only one type can reach it, otherwise
+// left null until the player picks one from the chooser).
+let _stagedDestination = null;
+let _stagedMoveType = null;
 
 function _ensureDom() {
   if (_overlay) return;
@@ -105,6 +141,7 @@ function _ensureDom() {
       </div>
       <div class="combat-move-popup-body">
         <div class="bmap-hint" id="bmapHint"></div>
+        <div class="bmap-move-panel" id="bmapMovePanel" hidden></div>
         <div class="bmap-stage" id="bmapStage">
           <div class="bmap-grid" id="bmapGrid"></div>
           <div class="bmap-tokens" id="bmapTokens"></div>
@@ -121,6 +158,8 @@ function _ensureDom() {
 function _close() {
   if (_overlay) _overlay.style.display = 'none';
   _selectedTokenId = null;
+  _stagedDestination = null;
+  _stagedMoveType = null;
 }
 
 /** Opens the popup for `trainerName` (whoever's using this device) showing
@@ -130,6 +169,8 @@ export function showBattleMap(session, trainerName) {
   _session = session;
   _ownerName = trainerName;
   _selectedTokenId = null;
+  _stagedDestination = null;
+  _stagedMoveType = null;
   _ensureDom();
   _render();
   _overlay.style.display = 'flex';
@@ -152,12 +193,34 @@ function _activeParticipantId(session) {
   return null;
 }
 
+/** Feet of `type` movement `p` has left this turn -- speeds' own max minus
+ * the single shared movementUsed counter (see routes_combat.py's
+ * _move_token comment: switching between multiple speeds still draws from
+ * one pool, same as 5e's own rule for a creature with more than one
+ * speed), floored at 0. */
+function _remainingFt(p, type) {
+  const s = (p.speeds || []).find(x => x.type === type);
+  if (!s) return 0;
+  return Math.max(0, s.ft - (p.movementUsed || 0));
+}
+
+/** Grid distance between two cells in feet -- Chebyshev (diagonal costs the
+ * same as straight), not 5e's stricter 5/10ft alternating-diagonal rule.
+ * Matches routes_combat.py's own _move_token calc exactly (kept in sync
+ * manually, same as _activeParticipantId above) since the client needs to
+ * preview the same number the server will actually enforce. */
+function _distanceFt(fromCol, fromRow, toCol, toRow) {
+  return Math.max(Math.abs(toCol - fromCol), Math.abs(toRow - fromRow)) * 5;
+}
+
 function _render() {
   if (!_session || !_session.board) return;
 
   const hint = document.getElementById('bmapHint');
   if (hint) {
-    if (_selectedTokenId) {
+    if (_stagedDestination) {
+      hint.textContent = 'Confirm the move below, or click a different cell.';
+    } else if (_selectedTokenId) {
       hint.textContent = 'Click a cell to move there.';
     } else {
       const activeId = _activeParticipantId(_session);
@@ -167,9 +230,84 @@ function _render() {
         : "It's not your turn -- you can only move a token on your own turn.";
     }
   }
+  _renderMovePanel();
   _renderStage();
   _renderGrid();
   _renderTokens();
+}
+
+/** Shows the active mover's remaining-movement chips (whenever it's your
+ * own turn, whether or not you've selected the token yet -- the user's own
+ * ask: know how far you can move before you've even clicked anything) and,
+ * once a destination is staged, the distance/type-chooser/confirm row.
+ * Hidden entirely for a participant with no `speeds` recorded at all. */
+function _renderMovePanel() {
+  const panel = document.getElementById('bmapMovePanel');
+  if (!panel) return;
+
+  const activeId = _activeParticipantId(_session);
+  const p = activeId && _session.participants[activeId]?.owner === _ownerName
+    ? _session.participants[activeId] : null;
+  if (!p || !(p.speeds || []).length) { panel.hidden = true; return; }
+  panel.hidden = false;
+
+  const chips = p.speeds.map(s => {
+    const remaining = _remainingFt(p, s.type);
+    return `<span class="bmap-move-chip${remaining <= 0 ? ' depleted' : ''}">${s.type}: ${remaining}/${s.ft}ft</span>`;
+  }).join('');
+
+  let stageRow = '';
+  if (_stagedDestination && _selectedTokenId === activeId) {
+    const current = _session.board.tokens[activeId];
+    const distance = current ? _distanceFt(current.col, current.row, _stagedDestination.col, _stagedDestination.row) : 0;
+    const eligible = p.speeds.filter(s => _remainingFt(p, s.type) >= distance);
+    if (!_stagedMoveType && eligible.length === 1) _stagedMoveType = eligible[0].type;
+    if (_stagedMoveType && !eligible.some(s => s.type === _stagedMoveType)) _stagedMoveType = null;
+
+    if (!eligible.length) {
+      stageRow = `
+        <div class="bmap-stage-row">
+          <span class="bmap-stage-warning">Not enough movement left to reach that cell (needs ${distance}ft).</span>
+          <button type="button" class="bmap-cancel-btn" id="bmapCancelStage">Cancel</button>
+        </div>`;
+    } else {
+      const typeChooser = eligible.length > 1
+        ? `<select id="bmapMoveTypeSelect">
+            <option value="">Move via…</option>
+            ${eligible.map(s => `<option value="${s.type}"${s.type === _stagedMoveType ? ' selected' : ''}>${s.type}</option>`).join('')}
+          </select>`
+        : `<span>via ${eligible[0].type}</span>`;
+      stageRow = `
+        <div class="bmap-stage-row">
+          <span>Move ${distance}ft</span>
+          ${typeChooser}
+          <button type="button" class="bmap-confirm-btn" id="bmapConfirmMove"${_stagedMoveType ? '' : ' disabled'}>Confirm Move</button>
+          <button type="button" class="bmap-cancel-btn" id="bmapCancelStage">Cancel</button>
+        </div>`;
+    }
+  }
+
+  panel.innerHTML = `${chips}${stageRow}`;
+
+  document.getElementById('bmapMoveTypeSelect')?.addEventListener('change', (e) => {
+    _stagedMoveType = e.target.value || null;
+    _render();
+  });
+  document.getElementById('bmapCancelStage')?.addEventListener('click', () => {
+    _stagedDestination = null;
+    _stagedMoveType = null;
+    _render();
+  });
+  document.getElementById('bmapConfirmMove')?.addEventListener('click', () => {
+    const movingId = _selectedTokenId;
+    const { col, row } = _stagedDestination;
+    const moveType = _stagedMoveType;
+    _selectedTokenId = null;
+    _stagedDestination = null;
+    _stagedMoveType = null;
+    CombatAPI.moveToken(movingId, col, row, moveType).catch(err => showCombatAlert(err.message, { title: 'Error' }));
+    _render();
+  });
 }
 
 /** Keeps cells square for WHATEVER grid size is currently set (not just the
@@ -194,16 +332,17 @@ function _renderGrid() {
   gridEl.innerHTML = gridCellsHtml(_session.board, 'bmap-cell');
 
   gridEl.querySelectorAll('[data-cell]').forEach(cell => {
+    const [col, row] = cell.dataset.cell.split(',').map(Number);
+    if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) {
+      cell.classList.add('staged');
+    }
     cell.addEventListener('click', () => {
-      const [col, row] = cell.dataset.cell.split(',').map(Number);
-
       if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
-      const movingId = _selectedTokenId;
-      _selectedTokenId = null;
-      // Turn-gated server-side (move-token, not the DM's unrestricted
-      // set-token-position) -- selection was already limited to your
-      // active-turn token below, but the server is the actual authority.
-      CombatAPI.moveToken(movingId, col, row).catch(err => showCombatAlert(err.message, { title: 'Error' }));
+      // Re-clicking the same cell while it's already staged re-stages it
+      // (clears a stale type pick) rather than doing nothing -- cheap to
+      // just always reset both, no real cost to it.
+      _stagedDestination = { col, row };
+      _stagedMoveType = null;
       _render();
     });
   });
@@ -239,6 +378,8 @@ function _renderTokens() {
     if (isMyTurn) {
       el.addEventListener('click', () => {
         _selectedTokenId = _selectedTokenId === id ? null : id;
+        _stagedDestination = null;
+        _stagedMoveType = null;
         _render();
       });
     }

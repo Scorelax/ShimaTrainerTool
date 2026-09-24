@@ -511,6 +511,7 @@ function _combatantToParticipant(c) {
     initiative: c.initiativeTotal,
     level: c.level,
     size: c.size || '', // map footprint -- see footprintForSize in battle-map-grid.js; trainers have no size at all, always 1x1
+    speeds: c.speeds || [], // battle-map movement tracker -- see battle-map-popup.js
     // Full stat block -- see routes_combat.py's _add_participant for why
     // this is sent unconditionally for a trainer's own combatants (PvP has
     // no reason to hide it) and _richCombatantFromParticipant below for
@@ -554,7 +555,7 @@ function _richCombatantFromParticipant(p) {
     intMod: p.intMod, wisMod: p.wisMod, chaMod: p.chaMod,
     moves: p.moves || [], types: [p.type1, p.type2].filter(Boolean),
     abilities: p.abilities || '', item: p.item || '',
-    size: p.size || '',
+    size: p.size || '', speeds: p.speeds || [],
     rechargeStates: {}, statusEffects: [], isExpanded: false,
     hasStatBlock: true,
     // Trainer combatants never carry these pokemon-only fields at all

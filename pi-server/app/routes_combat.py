@@ -313,7 +313,7 @@ def handle(conn, action, params):
         row = js_parse_int(params.get('row'))
         if not params.get('id') or col is None or row is None:
             raise ValueError('Missing participant id, col, or row')
-        return _mutate(conn, lambda s: _move_token(s, params['id'], col, row))
+        return _mutate(conn, lambda s: _move_token(s, params['id'], col, row, params.get('moveType')))
 
     if action == 'clear-token-position':
         if not params.get('id'):
@@ -654,6 +654,20 @@ def _add_participant(state, data):
         # always 1x1 -- see footprintForSize in battle-map-grid.js, the
         # only place this is actually interpreted).
         'size': data.get('size', ''),
+        # Movement tracker -- [{type, ft}, ...] (see combat.js's
+        # buildTrainerCombatant/buildPokemonCombatant, the source of truth
+        # this mirrors, same relationship as combatantType's own comment
+        # below). Empty for anything added before this existed, or a DM's
+        # freeform enemy -- move-token skips enforcement entirely then, same
+        # "missing means untracked" convention as combatantType/hasStatBlock.
+        'speeds': data.get('speeds', []),
+        # Feet moved so far THIS turn, against whichever of the above types
+        # move-token's own caller picked -- a single shared budget (5e's own
+        # rule for a creature switching between multiple speeds: distance
+        # already moved counts against every type's own max, not a separate
+        # pool per type). Reset at the start of this participant's own next
+        # turn (see _advance_turn).
+        'movementUsed': 0,
         # Full stat block -- PvP only in practice (combatantToParticipant
         # only ever sends these for a trainer's own "join as yourself"
         # flow; a PvE freeform enemy never has them, side='enemy' stays
@@ -865,6 +879,7 @@ def _advance_turn(state):
     next_participant = state['participants'].get(state['turnOrder'][state['turnIndex']])
     if next_participant:
         next_participant['reactionUsed'] = False
+        next_participant['movementUsed'] = 0
     _log_event(state, 'turn-advance', text=f"Round {state['round']}: {next_participant['name'] if next_participant else '?'}'s turn",
                actorId=state['turnOrder'][state['turnIndex']], actorName=next_participant['name'] if next_participant else None)
     # Effects that end on a turn boundary or a round count (see the status
@@ -1560,7 +1575,7 @@ def _set_token_position(state, pid, col, row):
 _MOVEMENT_BLOCKING_CONDITIONS = {'trapped'}
 
 
-def _move_token(state, pid, col, row):
+def _move_token(state, pid, col, row, move_type=None):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
@@ -1570,6 +1585,33 @@ def _move_token(state, pid, col, row):
                       if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
     if blocking:
         raise ValueError(f"{participant['name']} is {blocking['apply']} and can't move")
+
+    # Movement budget -- skipped entirely for a participant with no `speeds`
+    # recorded (a DM's freeform enemy, or anyone added before this existed),
+    # same "missing means untracked" convention `speeds` itself documents.
+    # Grid distance -> feet uses the simplified "diagonal costs the same as
+    # straight" rule (Chebyshev distance x 5ft), not 5e's stricter 5/10ft
+    # alternating-diagonal rule -- consistent with this board having no
+    # other terrain-cost concept yet either.
+    speeds = participant.get('speeds') or []
+    if speeds:
+        current = state['board']['tokens'].get(pid)
+        distance_ft = max(abs(col - current['col']), abs(row - current['row'])) * 5 if current else 0
+        chosen = None
+        if move_type:
+            chosen = next((s for s in speeds if s['type'] == move_type), None)
+            if not chosen:
+                raise ValueError(f'Unknown movement type: {move_type}')
+        elif len(speeds) == 1:
+            chosen = speeds[0]
+        else:
+            raise ValueError('Must specify which movement type to move with')
+        used = participant.get('movementUsed', 0)
+        remaining = max(0, chosen['ft'] - used)
+        if distance_ft > remaining:
+            raise ValueError(f"Not enough {chosen['type']} movement left ({remaining}ft remaining, this move needs {distance_ft}ft)")
+        participant['movementUsed'] = used + distance_ft
+
     state['started'] = True  # see _rebuild_turn_order -- acting on-turn means turn order is now live
     state['board']['tokens'][pid] = {'col': col, 'row': row}
     _log_event(state, 'move', text=f"{participant['name']} moved to ({col}, {row})",

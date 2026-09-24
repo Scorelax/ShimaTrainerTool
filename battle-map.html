@@ -11,7 +11,6 @@
     background: #0a0a12; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif;
   }
   #mapRoot { height: 100vh; box-sizing: border-box; }
-  .map-empty { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 1.6rem; color: #a0a0c0; }
 
   /* container-type:size lets .map-rotor below size itself off THIS
      element's own actual pixel box (via cqw/cqh) rather than the viewport
@@ -50,6 +49,19 @@
     padding: 2px; text-align: center; box-sizing: border-box;
   }
 
+  /* Idle state -- no active battle, shown in place of the grid/tokens (see
+     js/pages/battle-map.js's render, which just toggles .map-stage's own
+     .active class rather than swapping any markup). Sits last in the rotor
+     so it paints over the grid's own always-on dark background, and lives
+     INSIDE the rotor (not the stage) so it rotates the same 90deg as
+     everything else here -- same logo used app-wide for the intro/loading
+     screen (see css/styles.css's #loadingScreen). */
+  .map-empty-bg {
+    position: absolute; inset: 0; display: none;
+    background-image: url('assets/TitleScreen.png'); background-size: cover; background-position: center;
+  }
+  .map-stage:not(.active) .map-empty-bg { display: block; }
+
   .map-tokens { position: absolute; inset: 0; pointer-events: none; }
   .map-token {
     position: absolute; display: flex; flex-direction: column;
@@ -68,7 +80,16 @@
 </style>
 </head>
 <body>
-  <div id="mapRoot"><div class="map-empty">Loading…</div></div>
+  <div id="mapRoot">
+    <div class="map-stage" id="mapStage">
+      <div class="map-rotor">
+        <div class="map-bg" id="mapBg"></div>
+        <div class="map-grid" id="mapGrid"></div>
+        <div class="map-tokens" id="mapTokens"></div>
+        <div class="map-empty-bg" id="mapEmptyBg"></div>
+      </div>
+    </div>
+  </div>
   <script type="module" src="js/pages/battle-map.js"></script>
 </body>
 </html>

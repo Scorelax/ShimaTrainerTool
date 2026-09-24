@@ -36,30 +36,18 @@ async function init() {
 // ---------------------------------------------------------------------------
 
 function render() {
-  const root = document.getElementById('mapRoot');
-  if (!root) return;
+  const stage = document.getElementById('mapStage');
+  if (!stage) return;
 
-  if (!session.active || !session.board) {
-    root.innerHTML = '<div class="map-empty">🗺️ Waiting for battle to start…</div>';
-    return;
-  }
+  const active = !!(session.active && session.board);
+  stage.classList.toggle('active', active);
+  // Idle state (no active battle) is pure CSS -- see battle-map.html's own
+  // .map-empty-bg rule -- nothing else to update while it's showing.
+  if (!active) return;
 
-  ensureSkeleton(root);
   updateBackground();
   updateGrid();
   updateTokens();
-}
-
-function ensureSkeleton(root) {
-  if (document.getElementById('mapGrid')) return;
-  root.innerHTML = `
-    <div class="map-stage" id="mapStage">
-      <div class="map-rotor">
-        <div class="map-bg" id="mapBg"></div>
-        <div class="map-grid" id="mapGrid"></div>
-        <div class="map-tokens" id="mapTokens"></div>
-      </div>
-    </div>`;
 }
 
 /** See .map-rotor's own comment in battle-map.html for why background,

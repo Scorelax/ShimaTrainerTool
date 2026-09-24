@@ -1923,7 +1923,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // Target-conditional damage_note effects (Brine, Smelling Salts, Venoshock,
   // ...) -- see move-effects-schema.md and target-picker.js's own use of these.
   const damageNotes = _targetDamageNotes(moveName);
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod });
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
 
   const isSameTarget = categories.includes('multi_hit_same_target');
@@ -1950,9 +1950,9 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
       const target = session?.participants?.[hitTargetId];
       if (!target) return; // target left the battle mid-chain
-      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod });
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
     } else {
-      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod });
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
   }
@@ -2482,7 +2482,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
       // so each selected target goes straight to its damage roll.
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod });
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
     }
   }

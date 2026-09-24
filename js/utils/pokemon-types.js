@@ -55,6 +55,29 @@ export function parseDamageDice(description, higherLevels, pokemonLevel) {
 }
 
 /**
+ * The dice from the NEXT tier up from `pokemonLevel` in `higherLevels`
+ * (Electro Ball's own "roll the next level tier's damage dice" -- see
+ * combat-wip.js's _handleDamageResolved/_resolveOneHit, threaded through as
+ * damage_note's own `nextTierDice` result field), or null when there isn't
+ * one (already at/above the highest tier -- Electro Ball's own fallback for
+ * that case, "double the damage dice" at level 17+, is a plain
+ * `diceMultiplier` instead, handled entirely in the move's own effect data,
+ * not here). Same tier-regex as parseDamageDice above, just picking the
+ * SMALLEST threshold ABOVE the current level instead of the largest one
+ * AT OR below it.
+ */
+export function nextTierDamageDice(higherLevels, pokemonLevel) {
+  if (!higherLevels) return null;
+  const tierRegex = /(\d+d\d+)\s+at\s+level\s+(\d+)/gi;
+  let match, nextDice = null, nextLevel = Infinity;
+  while ((match = tierRegex.exec(higherLevels)) !== null) {
+    const tierLevel = parseInt(match[2]);
+    if (tierLevel > pokemonLevel && tierLevel < nextLevel) { nextLevel = tierLevel; nextDice = match[1]; }
+  }
+  return nextDice;
+}
+
+/**
  * The best of a move's allowed stat modifiers ("STR/CHA" -> whichever of the
  * two is higher), in isolation -- factored out of computeMoveDC below since
  * a `heal` effect's `moveMod` (see move-effects-schema.md) needs this exact
@@ -195,6 +218,9 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
   heldItemDmgSources.forEach(s => dmgParts.push(s));
 
   const damageDice = parseDamageDice(desc, move[8] || '', level);
+  // Electro Ball's own damage_note nextTierDice field -- null once already
+  // at/above the highest tier (see nextTierDamageDice's own comment).
+  const nextTierDice = nextTierDamageDice(move[8] || '', level);
 
   const moveDC = 8 + highestMod + proficiency;
 
@@ -212,6 +238,7 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
     attackBreakdown: atkParts.length ? `(${atkParts.join(', ')})` : '',
     damageBreakdown: dmgParts.length ? `(${dmgParts.join(', ')})` : '',
     damageDice,
+    nextTierDice,
     moveDC,
   };
 }

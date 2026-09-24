@@ -552,6 +552,15 @@ function _hasCondition(p, applyNames) {
   return (p?.statuses || []).some(s => s.kind === 'condition' && (applyNames || []).includes(s.apply));
 }
 
+/** The fastest of a participant's own movement types (see combat-wip.js's
+ * `speeds` field -- [{type, ft}, ...]), or null with none recorded --
+ * Electro Ball's own "compare the target and user's highest speed type". */
+function _maxSpeed(p) {
+  const speeds = p?.speeds || [];
+  if (!speeds.length) return null;
+  return Math.max(...speeds.map(s => s.ft || 0));
+}
+
 /** One `damage_note` effect's `condition` (see move-effects-schema.md), for
  * the TARGET-conditional half -- checked against `apply` values directly
  * (e.g. "poisoned"), unlike the self-conditional half's own evaluator
@@ -585,6 +594,13 @@ function _targetConditionMet(cond, { attacker, target }) {
       const t = Number(target?.[key]);
       return Number.isFinite(a) && Number.isFinite(t) && a < t;
     }
+    // Electro Ball's own comparison -- fastest of each participant's own
+    // movement types, not a single flat stat (see _maxSpeed above).
+    case 'attacker_max_speed_above_target': {
+      const a = _maxSpeed(attacker);
+      const t = _maxSpeed(target);
+      return a !== null && t !== null && a > t;
+    }
     default:
       return false;
   }
@@ -602,12 +618,23 @@ function _targetConditionMet(cond, { attacker, target }) {
  * same "never stacked" rule as the self-conditional side; flatBonus and
  * advantage DO accumulate/OR across every met effect, since nothing here
  * needs Flail's own "only the most severe tier" reasoning. */
-export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0 }) {
-  let diceMultiplier = 1, flatBonus = 0, advantage = false;
+export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null }) {
+  let diceMultiplier = 1, diceOverride = null, flatBonus = 0, advantage = false;
   const notes = [];
   for (const e of effects || []) {
     if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target })) continue;
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) diceMultiplier = e.diceMultiplier;
+    // Electro Ball's own "roll the next tier's dice, or double at the top
+    // tier" -- nextTierDice (the caller's own computeMoveData.nextTierDice,
+    // see combat-wip.js's call sites) is null once already at the highest
+    // tier, where there's nothing higher to swap in, so the move's own
+    // level-17+ fallback ("double the damage dice") applies instead --
+    // same diceMultiplier this effect would otherwise use, just replacing
+    // the swap with a multiply once there's no tier left to swap to.
+    if (e.nextTierOrDouble) {
+      if (nextTierDice) diceOverride = nextTierDice;
+      else if (2 > diceMultiplier) diceMultiplier = 2;
+    }
     if (e.flatBonus === 'proficiency') flatBonus += Number(attacker?.proficiency) || 0;
     // Wring Out's own "double your move modifier" -- one more copy of
     // whatever the move's own base modifier already contributed. The value
@@ -620,7 +647,7 @@ export function targetDamageNoteResult(effects, { attacker, target, moveModValue
     if (e.advantage) advantage = true;
     if (e.note) notes.push(e.note);
   }
-  return { diceMultiplier, flatBonus, advantage, note: notes.join('; ') };
+  return { diceMultiplier, diceOverride, flatBonus, advantage, note: notes.join('; ') };
 }
 
 /** describeEnds for a STORED status: a rounds end shows how many are left in the

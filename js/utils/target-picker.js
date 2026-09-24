@@ -110,6 +110,10 @@ let _targetFlatBonus = 0;
 // (Wring Out), passed straight through from whoever called pickTarget/
 // pickTargetAgain rather than re-derived here.
 let _moveModValue = 0;
+// The move's own next-tier dice (combat.js's computedData.nextTierDice) --
+// only meaningful for a damage_note with nextTierOrDouble (Electro Ball),
+// same "passed through, not re-derived" reasoning as _moveModValue above.
+let _nextTierDice = null;
 let _speciesName = '';
 // The attacking move's own name, needed for the reaction window ("Noble Roar --
 // does anyone want to react to being targeted by this?") -- combat-wip.js's
@@ -501,15 +505,21 @@ function _showStep3() {
 
   // Target-conditional damage_note effects (see move-effects-schema.md) --
   // now that a target is actually known, unlike the self-conditional half
-  // shown at move-popup time. diceMultiplier is a reminder only (this
-  // popup never had a base-dice display to begin with, unlike the
-  // move-popup's own diceOverride) -- flatBonus DOES change the total,
-  // folded in below same as _damageModifier.
-  const { diceMultiplier, flatBonus, advantage, note } = targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue });
+  // shown at move-popup time. diceMultiplier/diceOverride are a reminder
+  // only (this popup never had a base-dice display to begin with, unlike
+  // the move-popup's own diceOverride hook) -- flatBonus DOES change the
+  // total, folded in below same as _damageModifier.
+  const { diceMultiplier, diceOverride, flatBonus, advantage, note } =
+    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice });
   _targetFlatBonus = flatBonus;
   const noteEl = document.getElementById('targetPickerDamageNote');
   const noteParts = [];
-  if (diceMultiplier > 1 && _damageDice) {
+  if (diceOverride && _damageDice) {
+    // Electro Ball's own "next tier" swap -- an absolute replacement dice
+    // string, not a multiple of the current one (multiplyDiceString would
+    // give the wrong number here, see targetDamageNoteResult's own comment).
+    noteParts.push(`<div class="note">Roll ${diceOverride} instead of ${_damageDice}${note ? ` — ${note}` : ''}</div>`);
+  } else if (diceMultiplier > 1 && _damageDice) {
     noteParts.push(`<div class="note">Roll ${multiplyDiceString(_damageDice, diceMultiplier)} instead of ${_damageDice}${note ? ` — ${note}` : ''}</div>`);
   }
   if (advantage) {
@@ -611,7 +621,7 @@ function _cardHtml(p) {
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, presetRoll = null } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -629,6 +639,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _damageDice = damageDice;
   _damageNotes = damageNotes;
   _moveModValue = moveModValue;
+  _nextTierDice = nextTierDice;
   _presetRoll = presetRoll;
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
@@ -663,7 +674,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * null if closed. With guaranteedHit (see pickTarget) it opens directly at
  * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, presetRoll = null } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null } = {}) {
   _ensureDom();
   _attacker = attacker;
   _attackModifier = attackModifier;
@@ -674,6 +685,7 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   _damageDice = damageDice;
   _damageNotes = damageNotes;
   _moveModValue = moveModValue;
+  _nextTierDice = nextTierDice;
   _presetRoll = presetRoll;
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';

@@ -192,6 +192,10 @@ BEFORE the roll.
 - `{type: "target_type", any: ["poison"]}` -- Solvent Spray's "double damage to Poison-type
   Pokémon", checked against the target's `type1`/`type2` (case-insensitively), not a live matchup
   chart lookup -- this is about the target's own species type, not effectiveness.
+- `{type: "attacker_max_speed_above_target"}` -- Electro Ball's own "compare the target and user's
+  highest speed type": the FASTEST of each participant's own `speeds` (walking/flying/swimming/...,
+  the movement-tracking field from the battle map's own work this session), not a single flat stat
+  like `attacker_stat_below_target` reads.
 - `{type: "self_vp_spent_per", per: 10}` / `{type: "self_loyalty_below_zero"}` /
   `{type: "self_loyalty_above_zero"}` -- the three `scalingBonus` conditions (see below): each
   reports a MAGNITUDE (how many "units" apply), not just met/not-met. VP spent is approximated as
@@ -201,7 +205,7 @@ BEFORE the roll.
 
 Result fields (not all mutually exclusive -- `flatBonus`, `scalingBonus` and `advantage` all
 accumulate/OR across every MET effect on a move, since nothing needs the "only the most severe
-tier" reasoning `diceMultiplier` does; a move only ever uses ONE of `diceMultiplier`/
+tier" reasoning `diceMultiplier` does; a move only ever uses ONE of `diceMultiplier`/`diceOverride`/
 `totalMultiplier`/`flatBonus`/`scalingBonus`/`advantage` per effect, but different effects on the
 same move could combine them in principle):
 - `diceMultiplier: 2` recomputes the shown dice STRING itself ("2d8" → "4d8",
@@ -215,6 +219,16 @@ same move could combine them in principle):
   target-conditional side this is shown as a REMINDER only (`target-picker.js`'s damage-roll step
   never had a base-dice display to literally change, unlike the move-popup's own `diceOverride`
   hook) -- "Roll 4d10 instead of 2d10" next to the plain roll input.
+- `nextTierOrDouble: true` (target-conditional only, Electro Ball) -- a different kind of dice
+  change from `diceMultiplier`: swaps in the move's own NEXT damage tier (the caller's
+  `computedData.nextTierDice`, `pokemon-types.js`'s `nextTierDamageDice` -- the smallest scaling
+  threshold ABOVE the attacker's current level, e.g. 2d6 → 2d8) via the result's own `diceOverride`
+  field, since multiplying the current dice would give the wrong number (2d6 doubled is 4d6, not
+  the real next tier 2d8). Once already at the highest tier (`nextTierDice` is null -- there's
+  nothing left to swap to), falls back to a plain `diceMultiplier: 2` instead -- the move's own
+  two sentences ("roll the next tier's dice" / "level 17+: double the damage dice") turn out to be
+  the SAME rule with a different mechanic depending on whether a higher tier still exists, not two
+  independent conditions.
 - `totalMultiplier: 0.5` (self-conditional only so far) shows as a plain note instead (the popup's
   existing `noteText` banner, previously Stockpile-only) rather than touching the dice string at
   all -- Water Spout's own text says "halve the TOTAL damage done", not the dice, and those aren't
@@ -564,3 +578,9 @@ resolving, so more damage keeps accumulating -- the move's own "chance to add ad
 falls out of the existing 2x-damage-taken math for free, nothing new to compute. combat.js offers
 the choice via two sequential yes/no prompts rather than repurposing one, so dismissing either is
 always a safe no-op instead of silently committing to whichever action happened to be "no".)*
+
+*(Update, next day: Electro Ball also fits damage_note after all (migrate_effects_v26.py), via two
+new pieces -- the `attacker_max_speed_above_target` condition and the `nextTierOrDouble` result
+field (both documented in their own sections above). Archive Blast, Formation Strike, Heavy Slam,
+Self-Destruct, Solar Beam, Solar Blade, and Spit Up remain -- each still needs its own real
+sub-system, not a schema extension.)*

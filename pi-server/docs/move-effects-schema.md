@@ -196,6 +196,12 @@ BEFORE the roll.
   highest speed type": the FASTEST of each participant's own `speeds` (walking/flying/swimming/...,
   the movement-tracking field from the battle map's own work this session), not a single flat stat
   like `attacker_stat_below_target` reads.
+- `{type: "attacker_size_above_target"}` -- Heavy Slam's own size comparison, on the move's own
+  named scale (Tiny/Small/Medium/Large/Huge/Gigantic -- `move-effects.js`'s own `_SIZE_RANK`), not
+  `footprintForSize`'s cruder Tiny/Small/Medium-vs-Large/Huge grid-footprint split. Blank/
+  unrecognized (every trainer, who carries no `size` at all) defaults to Medium. Also the
+  `scalingBonus` magnitude source for this condition (see below) -- however many size levels the
+  attacker outranks the target by.
 - `{type: "self_vp_spent_per", per: 10}` / `{type: "self_loyalty_below_zero"}` /
   `{type: "self_loyalty_above_zero"}` -- the three `scalingBonus` conditions (see below): each
   reports a MAGNITUDE (how many "units" apply), not just met/not-met. VP spent is approximated as
@@ -243,15 +249,18 @@ same move could combine them in principle):
   on either side. Target-conditional: folded straight into the returned `rawRoll` the same way
   `target-picker.js`'s existing `damageModifier` param already was. Self-conditional: folded into
   the popup's own `diceOverride`/`diceBreakdownOverride`, alongside `computedData.damageBonus`.
-- `scalingBonus: {amountPerUnit: "moveModifier" | <number>, cap?: <number>}` (self-conditional only
-  so far) -- a bonus that scales with the condition's own MAGNITUDE rather than a fixed amount:
-  `bonus = magnitude * amountPerUnit`, clamped to `cap` when given. Trump Card: `magnitude` is VP
-  spent ÷ 10 (rounded down), `amountPerUnit: "moveModifier"`, `cap: 10` ("up to a maximum of +10").
-  Frustration/Return: `magnitude` is the Loyalty Chart distance from zero, `amountPerUnit: 1`, no
-  cap (the move text states none). Both of these also read "add this to your ATTACK roll too, not
-  just damage" -- `scalingBonus` only ever touches the damage total, so that half is folded into
-  `note` as a reminder instead, same "the app can't auto-apply it, so it says so" pattern as
-  `totalMultiplier`.
+- `scalingBonus: {amountPerUnit: "moveModifier" | <number>, cap?: <number>}` -- a bonus that scales
+  with the condition's own MAGNITUDE rather than a fixed amount: `bonus = magnitude * amountPerUnit`,
+  clamped to `cap` when given. Self-conditional (combat.js's own evaluator): Trump Card's
+  `magnitude` is VP spent ÷ 10 (rounded down), `amountPerUnit: "moveModifier"`, `cap: 10` ("up to a
+  maximum of +10"); Frustration/Return's `magnitude` is the Loyalty Chart distance from zero,
+  `amountPerUnit: 1`, no cap (the move text states none) -- both of these also read "add this to
+  your ATTACK roll too, not just damage", folded into `note` as a reminder instead since
+  `scalingBonus` only ever touches the damage total, same "the app can't auto-apply it, so it says
+  so" pattern as `totalMultiplier`. Target-conditional (`move-effects.js`'s own
+  `_targetConditionMagnitude`): Heavy Slam's `magnitude` is however many size levels the attacker
+  outranks the target by (`attacker_size_above_target`'s own magnitude), `amountPerUnit:
+  "moveModifier"`, no cap.
 - `advantage: true` (target-conditional only so far) -- Cross Poison/Hex's "damage is rolled with
   advantage": shown as its own banner ("roll damage twice, take the higher"), the same "the app
   surfaces the instruction, the human rolls accordingly" pattern as every other advantage/
@@ -584,3 +593,9 @@ new pieces -- the `attacker_max_speed_above_target` condition and the `nextTierO
 field (both documented in their own sections above). Archive Blast, Formation Strike, Heavy Slam,
 Self-Destruct, Solar Beam, Solar Blade, and Spit Up remain -- each still needs its own real
 sub-system, not a schema extension.)*
+
+*(Update, same day: Heavy Slam too (migrate_effects_v27.py) -- `scalingBonus` (previously
+self-conditional only, Trump Card/Frustration/Return) now works target-conditionally as well, its
+magnitude read from a new `attacker_size_above_target` condition (however many size levels the
+attacker outranks the target by, on the move's own named scale). Archive Blast, Formation Strike,
+Self-Destruct, Solar Beam, Solar Blade, and Spit Up remain.)*

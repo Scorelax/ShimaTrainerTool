@@ -561,6 +561,22 @@ function _maxSpeed(p) {
   return Math.max(...speeds.map(s => s.ft || 0));
 }
 
+// Heavy Slam's own size ordering -- the move's own text names it exactly
+// this way ("Sizes, in order, are: Tiny, Small, Medium, Large, Huge,
+// Gigantic"), the one canonical size scale this app has (participants'
+// `size` field is otherwise freeform -- see footprintForSize).
+const _SIZE_RANK = { tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gigantic: 5 };
+
+/** A participant's size RANK on Heavy Slam's own scale, not footprintForSize's
+ * cruder Tiny/Small/Medium-vs-Large/Huge grid-footprint split -- blank or
+ * unrecognized (including every trainer, who carries no `size` at all)
+ * defaults to Medium, same "no size means ordinary humanoid-ish" convention
+ * footprintForSize's own 1x1 default already uses. */
+function _sizeRank(p) {
+  const s = (p?.size || '').trim().toLowerCase();
+  return _SIZE_RANK[s] ?? _SIZE_RANK.medium;
+}
+
 /** One `damage_note` effect's `condition` (see move-effects-schema.md), for
  * the TARGET-conditional half -- checked against `apply` values directly
  * (e.g. "poisoned"), unlike the self-conditional half's own evaluator
@@ -601,9 +617,23 @@ function _targetConditionMet(cond, { attacker, target }) {
       const t = _maxSpeed(target);
       return a !== null && t !== null && a > t;
     }
+    // Heavy Slam's own comparison -- see _sizeRank above.
+    case 'attacker_size_above_target': return _sizeRank(attacker) > _sizeRank(target);
     default:
       return false;
   }
+}
+
+/** How many size levels `attacker` outranks `target` by (Heavy Slam's own
+ * "for EACH size level you are above" -- a `scalingBonus` magnitude, not
+ * just met/not-met), 0 for every other condition type -- those are all
+ * boolean-only, magnitude is meaningless for them (targetDamageNoteResult
+ * only ever reads this when an effect actually declares scalingBonus,
+ * same "magnitude ignored unless scalingBonus asks for it" convention
+ * combat.js's own self-conditional evaluator uses). */
+function _targetConditionMagnitude(cond, { attacker, target }) {
+  if (cond?.type === 'attacker_size_above_target') return Math.max(0, _sizeRank(attacker) - _sizeRank(target));
+  return 1;
 }
 
 /** Evaluates every target-conditional `damage_note` effect for a move
@@ -644,6 +674,18 @@ export function targetDamageNoteResult(effects, { attacker, target, moveModValue
     // whatever the move-popup already showed for this same move/combatant.
     else if (e.flatBonus === 'moveModifier') flatBonus += moveModValue;
     else if (typeof e.flatBonus === 'number') flatBonus += e.flatBonus;
+    // Heavy Slam's own "+MOVE mod per size level above the target" --
+    // target-conditional counterpart to combat.js's self-conditional
+    // scalingBonus (Trump Card/Frustration/Return), just reading its
+    // magnitude from a target COMPARISON (_targetConditionMagnitude)
+    // instead of a self-only counted value.
+    if (e.scalingBonus) {
+      const magnitude = _targetConditionMagnitude(e.condition, { attacker, target });
+      const unitValue = e.scalingBonus.amountPerUnit === 'moveModifier' ? moveModValue : (e.scalingBonus.amountPerUnit || 0);
+      let bonus = magnitude * unitValue;
+      if (typeof e.scalingBonus.cap === 'number') bonus = Math.min(bonus, e.scalingBonus.cap);
+      if (bonus) flatBonus += bonus;
+    }
     if (e.advantage) advantage = true;
     if (e.note) notes.push(e.note);
   }

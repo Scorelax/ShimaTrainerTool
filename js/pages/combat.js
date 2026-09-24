@@ -2747,13 +2747,30 @@ async function _handleBideClick(c, move, state, onBideResolve) {
     return;
   }
 
-  const confirmed = await showCombatConfirm(
-    'Unleash Bide now? This locks in your stored damage and moves straight to picking a target.',
-    { title: 'Unleash Bide', yesLabel: 'Unleash', noLabel: 'Cancel' },
-  );
-  if (!confirmed) return;
+  // 10th-level "hold for a second turn" option -- allowed once per charge
+  // (bideHeld resets to false on the NEXT activation, see routes_combat.py's
+  // _bide_use). Two sequential yes/no prompts rather than a single
+  // repurposed one, so closing/cancelling EITHER one is always a safe
+  // no-op -- a single "Hold vs Unleash" confirm would make dismissing it
+  // silently commit to whichever action happened to be "no".
+  let hold = false;
+  if ((c.level || 0) >= 10 && !c.bideHeld) {
+    hold = await showCombatConfirm(
+      "You're 10th level or higher -- hold Bide for one more turn instead of unleashing now? Only once per charge; more time charging means more damage taken, and dealt back.",
+      { title: 'Bide', yesLabel: 'Hold', noLabel: "Don't Hold" },
+    );
+  }
+  if (!hold) {
+    const confirmed = await showCombatConfirm(
+      'Unleash Bide now? This locks in your stored damage and moves straight to picking a target.',
+      { title: 'Unleash Bide', yesLabel: 'Unleash', noLabel: 'Cancel' },
+    );
+    if (!confirmed) return;
+  }
+
   try {
-    const result = await CombatAPI.bideUse(c.id);
+    const result = await CombatAPI.bideUse(c.id, hold);
+    if (hold) { showToast(`${c.name} holds Bide for one more turn.`, 'info'); return; }
     const dealt = result?.data?.participants?.[c.id]?.pendingBideDamage;
     if (typeof dealt === 'number' && onBideResolve) onBideResolve({ combatantId: c.id, dealt });
   } catch (err) {

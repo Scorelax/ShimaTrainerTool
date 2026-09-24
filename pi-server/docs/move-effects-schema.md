@@ -556,3 +556,11 @@ Formation Strike, Heavy Slam, Self-Destruct, Solar Beam, Solar Blade, and Spit U
 needs its own real sub-system (witnessed-move-type tracking, a formation concept, a size-rank
 comparison, a forced-death-save state, the weather system, Stockpile's own stacking), not a
 schema extension.)*
+
+*(Update, same day: Bide's own "at 10th level, hold for a second turn" option is built too --
+`_bide_use` takes an optional `hold` flag (a new `bideHeld` participant field, allowed once per
+charge, reset on the NEXT activation) that leaves the charging marker untouched instead of
+resolving, so more damage keeps accumulating -- the move's own "chance to add additional damage"
+falls out of the existing 2x-damage-taken math for free, nothing new to compute. combat.js offers
+the choice via two sequential yes/no prompts rather than repurposing one, so dismissing either is
+always a safe no-op instead of silently committing to whichever action happened to be "no".)*

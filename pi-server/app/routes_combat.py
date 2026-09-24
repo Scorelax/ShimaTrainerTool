@@ -323,7 +323,8 @@ def handle(conn, action, params):
     if action == 'bide-use':
         if not params.get('id'):
             raise ValueError('Missing participant id')
-        return _mutate(conn, lambda s: _bide_use(s, params['id']))
+        hold = str(params.get('hold', '')).lower() in ('1', 'true')
+        return _mutate(conn, lambda s: _bide_use(s, params['id'], hold))
 
     if action == 'confirm-placement':
         col = js_parse_int(params.get('col'))
@@ -464,7 +465,7 @@ def _damage_taken_since(state, pid, since_log_id):
     )
 
 
-def _bide_use(state, pid):
+def _bide_use(state, pid, hold=False):
     """Bide's own two-phase toggle -- the client always calls this same
     action regardless of which phase it's in, and reads the resulting
     participant record to tell which one just happened (bideChargingSinceLogId
@@ -473,8 +474,13 @@ def _bide_use(state, pid):
     tracking, logs it, no damage yet -- a self-only use, same authority
     check as any other on-turn action, no target/VP handling here (that's
     apply-damage's own job once the resolved attack actually goes through
-    target-picker). Already charging: sums damage taken since that marker
-    (_damage_taken_since), doubles it, clears the marker."""
+    target-picker). Already charging: `hold` (10th level+ only, checked
+    client-side against the combatant's own level -- this function only
+    enforces the "just once" part) leaves the marker untouched -- charging
+    just keeps going, letting more damage accumulate, the move's own
+    "chance to add additional damage" if you wait -- rather than resolving.
+    Otherwise sums damage taken since that marker (_damage_taken_since),
+    doubles it, and clears the marker."""
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
@@ -487,11 +493,19 @@ def _bide_use(state, pid):
                             actorId=pid, actorName=participant['name'])
         participant['bideChargingSinceLogId'] = entry['id']
         participant['pendingBideDamage'] = None
+        participant['bideHeld'] = False
+    elif hold:
+        if participant.get('bideHeld'):
+            raise ValueError('Bide can only be held for one extra turn')
+        participant['bideHeld'] = True
+        _log_event(state, 'bide-hold', text=f"{participant['name']} holds Bide for one more turn",
+                   actorId=pid, actorName=participant['name'])
     else:
         taken = _damage_taken_since(state, pid, since_id)
         dealt = taken * 2
         participant['bideChargingSinceLogId'] = None
         participant['pendingBideDamage'] = dealt
+        participant['bideHeld'] = False
         _log_event(state, 'bide-resolve',
                    text=f"{participant['name']} unleashes Bide for {dealt} damage ({taken} taken while charging)",
                    actorId=pid, actorName=participant['name'], amount=dealt)
@@ -719,10 +733,14 @@ def _add_participant(state, data):
         # Bide's own two-phase state (see _bide_use) -- bideChargingSinceLogId
         # is the log entry id marking when charging started (None when not
         # charging), pendingBideDamage is the computed payoff once resolved
-        # (None until then). Blank/None for every other move -- this is only
-        # ever touched by the bide-use action.
+        # (None until then), bideHeld is the 10th-level "held for one extra
+        # turn" flag (see move-effects-schema.md's own Bide note) -- allowed
+        # once per charge, reset back to False on the NEXT activation.
+        # Blank/None/False for every other move -- this is only ever touched
+        # by the bide-use action.
         'bideChargingSinceLogId': None,
         'pendingBideDamage': None,
+        'bideHeld': False,
         # Feet moved so far THIS turn, against whichever of the above types
         # move-token's own caller picked -- a single shared budget (5e's own
         # rule for a creature switching between multiple speeds: distance

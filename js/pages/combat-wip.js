@@ -825,6 +825,7 @@ function _syncLocalCombatState(session) {
     // server that decides "activate" vs "resolve" each time the move is used.
     merged.bideCharging = !!p.bideChargingSinceLogId;
     merged.pendingBideDamage = p.pendingBideDamage ?? null;
+    merged.bideHeld = !!p.bideHeld;
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.

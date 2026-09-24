@@ -958,9 +958,11 @@ export class CombatAPI {
 
   /** Bide's own two-phase toggle (see routes_combat.py's _bide_use) -- same
    * call either way, the server decides activate vs. resolve from the
-   * participant's own current state. */
-  static async bideUse(id) {
-    return API.request('combat', 'bide-use', { id }, { useCache: false });
+   * participant's own current state. `hold` (10th level+ only) keeps
+   * charging for one more turn instead of resolving -- ignored/harmless on
+   * the activate call, only meaningful while already charging. */
+  static async bideUse(id, hold = false) {
+    return API.request('combat', 'bide-use', { id, hold }, { useCache: false });
   }
 
   static async clearTokenPosition(id) {

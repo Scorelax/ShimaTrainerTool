@@ -1339,11 +1339,13 @@ function _setFocus(id) {
 let _focusedParticipantId = null;
 let _focusManuallySet = false;
 // Which foreign (PvP opponent) participant currently has its read-only card
-// expanded -- see _foreignCombatantView / the click handler in
-// _bindStatusBadgeClicks. Not persisted; resets to collapsed whenever focus
-// moves to a different participant, same as the "mine" side never remembering
-// isExpanded across a fresh focus either.
-let _foreignExpandedId = null;
+// manually COLLAPSED (the user's own call: a PvP opponent's card should show
+// everything by default, same as your own combatant's -- collapsing is an
+// opt-in you can still click into, not the default). See _foreignCombatantView
+// / the click handler in _bindStatusBadgeClicks. Not persisted; resets back
+// to expanded whenever focus moves to a different participant, same as the
+// "mine" side never remembering isExpanded across a fresh focus either.
+let _foreignCollapsedId = null;
 // Which participant combat.js's button handlers (HP/VP, stats, moves, End
 // Turn's local half...) are currently attached for. Those handlers look their
 // combatant up in the state object they were attached with, so they only work
@@ -1450,7 +1452,7 @@ function _foreignCombatantView(p) {
     statusEffects: (p.statuses || []).map(st => _statusToBadge(st, session?.round)),
     appliedStatMods: { ...statDeltas(p), set: statSetOverrides(p) },
     hasStatBlock: p.combatantType != null && p.proficiency != null,
-    isExpanded: _foreignExpandedId === p.id,
+    isExpanded: _foreignCollapsedId !== p.id,
   };
 }
 
@@ -2787,7 +2789,7 @@ function _bindStatusBadgeClicks() {
     const foreignMain = e.target.closest?.('.wip-foreign-focus-full .combat-card-main');
     if (!foreignMain) return;
     const id = foreignMain.closest('.wip-foreign-focus-full')?.dataset.focusId;
-    _foreignExpandedId = _foreignExpandedId === id ? null : id;
+    _foreignCollapsedId = _foreignCollapsedId === id ? null : id;
     const el = document.getElementById('wipBattlePhase');
     if (el && session) el.innerHTML = _renderMainFocusHtml(session);
   };

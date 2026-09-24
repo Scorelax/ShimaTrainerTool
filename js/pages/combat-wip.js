@@ -275,6 +275,16 @@ const PLACEMENT_CSS = `
     background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
     border-radius: 6px; padding: 0.5rem 0.7rem; font-size: 0.9rem; min-width: 200px;
   }
+  .placement-grid-size-row { display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
+  .placement-grid-size-row input {
+    background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
+    border-radius: 6px; padding: 0.4rem 0.5rem; font-size: 0.9rem; text-align: center;
+  }
+  .placement-grid-size-row span { color: #a0a0c0; }
+  .placement-grid-size-row button {
+    background: linear-gradient(135deg, #8e44ad, #5b2c6f); border: none; color: #fff;
+    border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  }
   .placement-tokens { position: absolute; inset: 0; pointer-events: none; }
   .placement-token {
     position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -870,6 +880,15 @@ function renderPlacementPhase(state, currentId) {
           <div class="placement-grid" id="placementGrid" style="${gridTemplateStyle(state.board)}">${gridCellsHtml(state.board, 'bmap-cell')}</div>
           <div class="placement-tokens" id="placementTokens"></div>
         </div>
+        <div class="placement-bg-picker">
+          <label for="placementGridCols">Grid Size</label>
+          <div class="placement-grid-size-row">
+            <input type="number" id="placementGridCols" min="1" value="${cols}" style="width:56px;">
+            <span>×</span>
+            <input type="number" id="placementGridRows" min="1" value="${rows}" style="width:56px;">
+            <button type="button" id="placementSetGridBtn">Set</button>
+          </div>
+        </div>
         ${state.battleType === 'pvp' ? `
         <div class="placement-bg-picker">
           <label for="placementBgSelect">Battle Background</label>
@@ -947,6 +966,11 @@ function _syncPlacementBackground(state) {
   }
   const bgSelect = document.getElementById('placementBgSelect');
   if (bgSelect && document.activeElement !== bgSelect) bgSelect.value = state.board.backgroundImage || '';
+
+  const colsInput = document.getElementById('placementGridCols');
+  const rowsInput = document.getElementById('placementGridRows');
+  if (colsInput && document.activeElement !== colsInput) colsInput.value = state.board.grid.cols;
+  if (rowsInput && document.activeElement !== rowsInput) rowsInput.value = state.board.grid.rows;
 }
 
 function _renderPlacementActions(currentId) {
@@ -1045,6 +1069,16 @@ function attachPlacementListeners(state, currentId) {
       CombatAPI.setBoardBackground(bgSelect.value).catch(err => showCombatAlert(err.message, { title: 'Error' }));
     });
   }
+
+  // Grid size -- setup-only now (moved out of the in-battle map popup, which
+  // used to let anyone resize mid-fight -- see battle-map-popup.js's own
+  // history). Any placer can still set it, same open-trust model as the
+  // background picker above; whoever sets it last wins, same as before.
+  document.getElementById('placementSetGridBtn')?.addEventListener('click', async () => {
+    const cols = parseInt(document.getElementById('placementGridCols').value, 10) || 10;
+    const rows = parseInt(document.getElementById('placementGridRows').value, 10) || 12; // matches routes_combat.py's own default
+    try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
+  });
 
   const gridEl = document.getElementById('placementGrid');
   if (!gridEl) return;

@@ -34,25 +34,6 @@ function _injectStyles() {
     .combat-move-popup-body { padding: 1rem 1.2rem; }
 
     .bmap-hint { font-size: 0.8rem; color: #a0a0c0; margin-bottom: 0.6rem; }
-    .bmap-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.5rem; }
-    .bmap-dm-toggle {
-      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
-      border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.8rem; cursor: pointer;
-    }
-    .bmap-dm-toggle.on { background: #8e44ad; border-color: #8e44ad; }
-    .bmap-dm-panel {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-      background: rgba(142,68,173,0.12); border: 1px solid rgba(142,68,173,0.4);
-      border-radius: 8px; padding: 0.6rem 0.7rem; margin-bottom: 0.8rem;
-    }
-    .bmap-dm-panel input {
-      background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0;
-      border-radius: 4px; padding: 0.3rem 0.5rem; font-size: 0.85rem;
-    }
-    .bmap-dm-panel button {
-      background: linear-gradient(135deg, #8e44ad, #5b2c6f); border: none; color: #fff;
-      border-radius: 6px; padding: 0.35rem 0.8rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-    }
     /* aspect-ratio is set inline per-render from the board's own cols/rows
        (see _applyStageAspect) -- gridTemplateStyle only ever divides this
        box into equal fractions, it doesn't know or care about shape, so
@@ -108,7 +89,6 @@ let _overlay = null;
 let _session = null;
 let _ownerName = null;
 let _selectedTokenId = null;
-let _dmMode = false;
 
 function _ensureDom() {
   if (_overlay) return;
@@ -124,15 +104,6 @@ function _ensureDom() {
         <h2>🗺️ Battle Map</h2>
       </div>
       <div class="combat-move-popup-body">
-        <div class="bmap-toolbar">
-          <button id="bmapDmToggle" class="bmap-dm-toggle" title="Grid size -- temporary DM test controls, not the intended final setup UI">🛠️ DM Setup</button>
-        </div>
-        <div class="bmap-dm-panel" id="bmapDmPanel" hidden>
-          <input type="number" id="bmapCols" min="1" placeholder="Cols" style="width:60px;">
-          <input type="number" id="bmapRows" min="1" placeholder="Rows" style="width:60px;">
-          <button type="button" id="bmapSetGridBtn">Set Grid</button>
-          <span style="color:#a0a0c0;font-size:0.78rem;">Resizing clears existing terrain marks.</span>
-        </div>
         <div class="bmap-hint" id="bmapHint"></div>
         <div class="bmap-stage" id="bmapStage">
           <div class="bmap-grid" id="bmapGrid"></div>
@@ -145,20 +116,6 @@ function _ensureDom() {
 
   document.getElementById('battleMapClose').addEventListener('click', _close);
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(); });
-
-  document.getElementById('bmapDmToggle').addEventListener('click', () => {
-    _dmMode = !_dmMode;
-    _selectedTokenId = null;
-    document.getElementById('bmapDmToggle').classList.toggle('on', _dmMode);
-    document.getElementById('bmapDmPanel').hidden = !_dmMode;
-    _render();
-  });
-
-  document.getElementById('bmapSetGridBtn').addEventListener('click', async () => {
-    const cols = parseInt(document.getElementById('bmapCols').value, 10) || 10;
-    const rows = parseInt(document.getElementById('bmapRows').value, 10) || 12; // matches routes_combat.py's own default
-    try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
-  });
 }
 
 function _close() {
@@ -198,17 +155,9 @@ function _activeParticipantId(session) {
 function _render() {
   if (!_session || !_session.board) return;
 
-  // Don't clobber a value the DM is mid-typing when a live push re-renders.
-  const colsInput = document.getElementById('bmapCols');
-  const rowsInput = document.getElementById('bmapRows');
-  if (colsInput && document.activeElement !== colsInput) colsInput.value = _session.board.grid.cols;
-  if (rowsInput && document.activeElement !== rowsInput) rowsInput.value = _session.board.grid.rows;
-
   const hint = document.getElementById('bmapHint');
   if (hint) {
-    if (_dmMode) {
-      hint.textContent = 'DM Setup: adjust the grid size above.';
-    } else if (_selectedTokenId) {
+    if (_selectedTokenId) {
       hint.textContent = 'Click a cell to move there.';
     } else {
       const activeId = _activeParticipantId(_session);
@@ -248,14 +197,6 @@ function _renderGrid() {
     cell.addEventListener('click', () => {
       const [col, row] = cell.dataset.cell.split(',').map(Number);
 
-      // DM Setup mode is "look, don't touch" -- grid sizing only, no per-
-      // cell action of its own anymore (manual terrain labeling removed;
-      // a real terrain system with predefined types + effects is coming
-      // instead, see move-effects-schema.md's field_terrain/field_weather
-      // notes -- existing marked cells still just render, see
-      // battle-map-grid.js's gridCellsHtml).
-      if (_dmMode) return;
-
       if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
       const movingId = _selectedTokenId;
       _selectedTokenId = null;
@@ -280,9 +221,7 @@ function _renderTokens() {
     if (!p) return;
 
     const isMine = !!_ownerName && p.owner === _ownerName;
-    // In DM Setup mode tokens are display-only -- "look, don't touch" while
-    // adjusting grid size, not a real gameplay action.
-    const isMyTurn = isMine && id === activeId && !_dmMode;
+    const isMyTurn = isMine && id === activeId;
     const classes = ['bmap-token', p.side];
     if (isMine) classes.push('mine');
     if (isMyTurn) classes.push('my-turn');
@@ -297,7 +236,7 @@ function _renderTokens() {
     el.innerHTML = `<div class="bmap-token-portrait"></div>`;
     patchPortraitMedia(el.querySelector('.bmap-token-portrait'), p.image, name);
 
-    if (isMyTurn && !_dmMode) {
+    if (isMyTurn) {
       el.addEventListener('click', () => {
         _selectedTokenId = _selectedTokenId === id ? null : id;
         _render();

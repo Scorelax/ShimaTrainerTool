@@ -1842,7 +1842,10 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // skips the attack roll -- the move guarantees a hit, not just a crit conditional
   // on one -- see _resolveOneHit for where the crit itself gets forced and consumed.
   const guaranteedHit = categories.includes('guaranteed_hit') || !!guaranteedCritStatusId(session?.participants?.[combatantId]);
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName });
+  // Target-conditional damage_note effects (Brine, Smelling Salts, Venoshock,
+  // ...) -- see move-effects-schema.md and target-picker.js's own use of these.
+  const damageNotes = _targetDamageNotes(moveName);
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName, damageDice: computedData.damageDice, damageNotes });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
 
   const isSameTarget = categories.includes('multi_hit_same_target');
@@ -1869,9 +1872,9 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
       const target = session?.participants?.[hitTargetId];
       if (!target) return; // target left the battle mid-chain
-      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName });
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes });
     } else {
-      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName });
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName, damageDice: computedData.damageDice, damageNotes });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
   }
@@ -1887,6 +1890,18 @@ function _saveRollNote(outcome) {
  * save popup can add the target's modifier for it. null when the move has none. */
 function _saveAbilityFor(moveName) {
   return moveEffectsFor(moveName).find(e => e.when?.type === 'save_fail')?.when.ability || null;
+}
+
+/** `moveName`'s TARGET-conditional `damage_note` effects (see move-effects-
+ * schema.md) -- passed straight through to target-picker.js's own damage-
+ * roll step (see its own targetDamageNoteResult call), which evaluates them
+ * once a target is actually picked. Self-conditional ones are filtered out
+ * here (already shown at move-popup time, combat.js's own
+ * showCombatMoveDetails) -- harmless to also pass them, since none of
+ * target-picker.js's condition types match `self_*`, but there's no reason
+ * to hand it effects it'll never act on. */
+function _targetDamageNotes(moveName) {
+  return moveEffectsFor(moveName).filter(e => e.kind === 'damage_note' && !String(e.condition?.type || '').startsWith('self_'));
 }
 
 /** After an attack or save resolves: works out which of the move's structured
@@ -2334,6 +2349,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
   const hasDamage = !!computedData.damageDice;
   const moveType = (move && move[1]) || '';
   const attackerName = session?.participants?.[combatantId]?.name || '?';
+  const damageNotes = _targetDamageNotes(moveName);
   // Summed across every target this blast actually damaged -- a self-only
   // `heal` effect with fractionOfDamage (Parabolic Charge, Tera Drain) heals
   // off the WHOLE AoE's total, never one target's own share, so it's offered
@@ -2388,7 +2404,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
       // so each selected target goes straight to its damage roll.
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName });
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
     }
   }

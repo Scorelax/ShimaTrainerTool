@@ -6,6 +6,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
+import { multiplyDiceString } from '../utils/move-effects.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -2231,19 +2232,6 @@ function getHealDiceForLevel(move, level) {
   return dice;
 }
 
-/** "2d8" × 3 -> "6d8" -- the shown-dice-count half of a `damage_note` effect
- * (see move-effects-schema.md and showCombatMoveDetails's own use of this).
- * Multiplying the leading number is the same arithmetic as rolling the dice
- * that many more times (same die size), which is what "double/triple the
- * dice" in this dataset's own move text consistently means. Any shape that
- * doesn't parse (there shouldn't be one -- computeMoveData's own damageDice
- * is always plain XdY) is returned unchanged rather than guessed at. */
-function _multiplyDiceString(dice, multiplier) {
-  const m = /^(\d+)(d\d+)$/i.exec(dice || '');
-  if (!m) return dice;
-  return `${parseInt(m[1], 10) * multiplier}${m[2]}`;
-}
-
 /** Evaluates `damage_note` effects (already filtered to that kind) against
  * `c`'s own current HP/status -- see showCombatMoveDetails's own call site
  * for the full reasoning. Multiple dice-multiplier tiers (Flail's 2x at
@@ -2781,7 +2769,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
     if (_dmgNoteEffects.length) {
       const { diceMultiplier, diceNote, totalNote } = _evaluateDamageNotes(_dmgNoteEffects, c);
       if (diceMultiplier > 1) {
-        const _adjustedDice = _multiplyDiceString(computedData.damageDice, diceMultiplier);
+        const _adjustedDice = multiplyDiceString(computedData.damageDice, diceMultiplier);
         _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
         _diceBreakdownOverride = [computedData.damageBreakdown, `×${diceMultiplier} dice (${diceNote})`].filter(Boolean).join(' · ');
       }

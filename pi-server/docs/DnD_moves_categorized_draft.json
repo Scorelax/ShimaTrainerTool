@@ -11188,12 +11188,23 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You send a ghostly energy at a creature that does additional damage to those affected by status conditions. Make a ranged attack, dealing 1d10 + MOVE ghost damage on a hit. If the target is affected by a status condition, damage is rolled with advantage.",
       "moveStat": "WIS",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_has_any_status"
+          },
+          "advantage": true,
+          "note": "Target has a status condition"
+        }
+      ]
     },
     {
       "name": "Lick",
@@ -16359,12 +16370,24 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You clasp your hands around an opponent for a crushing blow. Make a melee attack against a target, dealing 2d10 + MOVE normal damage on a hit. If the target is above 50% of its maximum health, add your proficiency bonus to the damage roll.",
       "moveStat": "STR",
       "vpCost": "10",
-      "scaling": "The damage dice roll for this move changes to\n3d8 at level 5, 4d10 at level 10, and 7d8 at level 17."
+      "scaling": "The damage dice roll for this move changes to\n3d8 at level 5, 4d10 at level 10, and 7d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_hp_above",
+            "fraction": 0.5
+          },
+          "flatBonus": "proficiency",
+          "note": "Target above 50% HP -- add your proficiency bonus"
+        }
+      ]
     },
     {
       "name": "Cut",
@@ -19701,12 +19724,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You procure a handful of strong smelling salt, damaging a creature's senses. Make a ranged attack against a target, dealing 1d10 + MOVE normal damage on a hit. If the target is paralyzed, double the dice roll for the damage.",
       "moveStat": "CON",
       "vpCost": "4",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_status",
+            "any": [
+              "paralyzed"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "Target is paralyzed"
+        }
+      ]
     },
     {
       "name": "Smokescreen",
@@ -21345,12 +21382,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You slash at an opponent with a poisonous strike. Make a melee attack, dealing 1d10 + MOVE poison damage on a hit. On a poisoned opponent, damage for this move is rolled with advantage..",
       "moveStat": "DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_status",
+            "any": [
+              "poisoned"
+            ]
+          },
+          "advantage": true,
+          "note": "Target is poisoned"
+        }
+      ]
     },
     {
       "name": "Decomposing Touch",
@@ -22203,12 +22254,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You attempt to drench a creature in poisonous liquid. Make a ranged attack on a creature, dealing 1d10 + MOVE poison damage on a hit. If the target is already poisoned, double the dice roll for the damage.",
       "moveStat": "DEX/CON",
       "vpCost": "4",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_status",
+            "any": [
+              "poisoned"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "Target is poisoned"
+        }
+      ]
     },
     {
       "name": "6. Telekinetic Ray",
@@ -25451,12 +25516,24 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You tackle a creature with a high-speed spin. Make a melee attack against a creature, dealing 1d6 + MOVE steel damage on a hit. If your DEX score is lower than the target's, double the dice roll for damage.",
       "moveStat": "STR/DEX",
       "vpCost": "2",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "attacker_stat_below_target",
+            "stat": "dex"
+          },
+          "diceMultiplier": 2,
+          "note": "Your DEX is lower than the target's"
+        }
+      ]
     },
     {
       "name": "Heavy Slam",
@@ -26410,12 +26487,24 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You send a harsh blast of salt water at an opponent. Make a ranged attack against an opponent, dealing 1d10 + MOVE water damage on a hit. If the opponent has less than 50% of its max HP, double the damage dealt.",
       "moveStat": "STR/DEX",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_hp_below",
+            "fraction": 0.5
+          },
+          "diceMultiplier": 2,
+          "note": "Target below 50% HP"
+        }
+      ]
     },
     {
       "name": "Bubble",

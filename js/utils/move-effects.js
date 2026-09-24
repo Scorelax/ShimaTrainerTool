@@ -525,6 +525,88 @@ export function pendingTurnHeals(participant, timing) {
   return (participant?.statuses || []).filter(s => s.kind === 'heal' && s.repeat === timing);
 }
 
+/** "2d8" × 3 -> "6d8" -- the shown-dice-count half of a `damage_note` effect
+ * (see move-effects-schema.md), shared by combat.js's own self-conditional
+ * display (showCombatMoveDetails) and target-picker.js's target-conditional
+ * one. Multiplying the leading number is the same arithmetic as rolling the
+ * dice that many more times (same die size), which is what "double/triple
+ * the dice" in this dataset's own move text consistently means. Any shape
+ * that doesn't parse (there shouldn't be one -- computeMoveData's own
+ * damageDice is always plain XdY) is returned unchanged rather than
+ * guessed at. */
+export function multiplyDiceString(dice, multiplier) {
+  const m = /^(\d+)(d\d+)$/i.exec(dice || '');
+  if (!m) return dice;
+  return `${parseInt(m[1], 10) * multiplier}${m[2]}`;
+}
+
+/** Fraction of max HP (0..1), or null when either isn't a real number -- a
+ * freeform PvE enemy with no stat block, most often. */
+function _hpFraction(p) {
+  const max = p?.maxHP;
+  const cur = p?.currentHP;
+  return Number.isFinite(max) && max > 0 && Number.isFinite(cur) ? cur / max : null;
+}
+
+function _hasCondition(p, applyNames) {
+  return (p?.statuses || []).some(s => s.kind === 'condition' && (applyNames || []).includes(s.apply));
+}
+
+/** One `damage_note` effect's `condition` (see move-effects-schema.md), for
+ * the TARGET-conditional half -- checked against `apply` values directly
+ * (e.g. "poisoned"), unlike the self-conditional half's own evaluator
+ * (combat.js's _evaluateDamageNotes), which matches legacy DISPLAY names
+ * ("Poison") instead. Different on purpose: a self-conditional check reads
+ * `c.statusEffects`, shaped the same whether `c` came from the old local
+ * engine or the shared one; a target-conditional check only ever runs from
+ * target-picker.js, which only ever has the RAW structured session
+ * participant (`.statuses`, real `apply` values) to work with -- there's no
+ * second shape to reconcile with here. */
+function _targetConditionMet(cond, { attacker, target }) {
+  if (!cond) return false;
+  switch (cond.type) {
+    case 'target_hp_below': { const f = _hpFraction(target); return f !== null && f < cond.fraction; }
+    case 'target_hp_at_or_below': { const f = _hpFraction(target); return f !== null && f <= cond.fraction; }
+    case 'target_hp_above': { const f = _hpFraction(target); return f !== null && f > cond.fraction; }
+    case 'target_status': return _hasCondition(target, cond.any);
+    case 'target_has_any_status': return (target?.statuses || []).length > 0;
+    case 'attacker_stat_below_target': {
+      const key = String(cond.stat || '').toLowerCase();
+      const a = Number(attacker?.[key]);
+      const t = Number(target?.[key]);
+      return Number.isFinite(a) && Number.isFinite(t) && a < t;
+    }
+    default:
+      return false;
+  }
+}
+
+/** Evaluates every target-conditional `damage_note` effect for a move
+ * against the actual selected attacker/target -- target-picker.js's own
+ * counterpart to combat.js's self-conditional _evaluateDamageNotes, run
+ * once a target is actually known (its own step3, not the move-popup).
+ * `effects` is expected pre-filtered to `kind === 'damage_note'` (see
+ * combat-wip.js's own call sites); self-conditional ones among them are
+ * harmless here -- none of this function's `condition.type` values match
+ * `self_*`, so they're silently never met, already handled elsewhere.
+ * Multiple diceMultiplier effects resolve to the highest among those MET,
+ * same "never stacked" rule as the self-conditional side; flatBonus and
+ * advantage DO accumulate/OR across every met effect, since nothing here
+ * needs Flail's own "only the most severe tier" reasoning. */
+export function targetDamageNoteResult(effects, { attacker, target }) {
+  let diceMultiplier = 1, flatBonus = 0, advantage = false;
+  const notes = [];
+  for (const e of effects || []) {
+    if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target })) continue;
+    if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) diceMultiplier = e.diceMultiplier;
+    if (e.flatBonus === 'proficiency') flatBonus += Number(attacker?.proficiency) || 0;
+    else if (typeof e.flatBonus === 'number') flatBonus += e.flatBonus;
+    if (e.advantage) advantage = true;
+    if (e.note) notes.push(e.note);
+  }
+  return { diceMultiplier, flatBonus, advantage, note: notes.join('; ') };
+}
+
 /** describeEnds for a STORED status: a rounds end shows how many are left in the
  * current `round` ("3 rounds left"), the rest read as in describeEnd. */
 export function describeStatusEnds(status, round) {

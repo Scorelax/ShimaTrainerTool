@@ -16,8 +16,8 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
   // reroll_damage: no extra fields -- see its own section below
   // block_attack: no extra fields -- see its own section below
   // prevent_faint: no extra fields -- see its own section below
-  // damage_note: "condition": {...}, "diceMultiplier?": 2, "totalMultiplier?": 0.5 -- see its own
-  //              section below; NOT a when/target/ends effect at all, see that section for why
+  // damage_note: "condition": {...}, "diceMultiplier?"/"totalMultiplier?"/"flatBonus?"/"advantage?"
+  //              -- see its own section below; NOT a when/target/ends effect at all, see why there
   // heal:       "amount": {"dice": "2d6", "moveMod?": true, "pool?": "VP"}
   //                     | {"fractionOfDamage": 0.5, "capMultipleOfLevel?": 5, "pool?": "VP"}
   //                     | {"levelMultiple": 1, "pool?": "VP"}       -- see its own section below
@@ -150,16 +150,18 @@ reminders (an advantage banner, an AC hint, a dice-bonus button) already exist t
 before the human ever rolls, the same "the app surfaces the number, a human acts on it" pattern as
 everywhere else, just for the damage-formula text instead of a roll banner.
 
-Not a `when`/`target`/`ends` effect at all -- it's evaluated by `combat.js`'s own
-`showCombatMoveDetails` (`_evaluateDamageNotes`), at move-popup display time, against the
-ATTACKER's own already-known HP/status, never through `_offerMoveEffects`'s post-attack
-confirmation flow every other kind goes through (there's nothing to confirm AFTER the fact here --
-the whole point is showing it BEFORE the roll). Only self-conditional moves fit this today (the
-attacker's own HP/status is known before a target is even picked); a target-conditional
-equivalent (Brine, Crush Grip, Cross Poison, Gyro Ball, Hex, Smelling Salts, Venoshock -- "double
-if the TARGET is below 50% HP / poisoned / ...") needs the same idea wired into
-`target-picker.js`'s own damage-roll step instead, once a target is actually selected -- not built
-yet, deliberately scoped out of this first slice.
+Not a `when`/`target`/`ends` effect at all, and evaluated in TWO different places depending on
+whether `condition` needs a target or not:
+- Self-conditional (`self_*`) -- `combat.js`'s own `showCombatMoveDetails` (`_evaluateDamageNotes`),
+  at move-popup display time, against the ATTACKER's own already-known HP/status -- no target
+  needed yet.
+- Target-conditional (everything else) -- `target-picker.js`'s own `_showStep3`
+  (`move-effects.js`'s `targetDamageNoteResult`), once a target is actually picked, in its damage-
+  roll step instead of the move-popup.
+
+Neither ever goes through `_offerMoveEffects`'s post-attack confirmation flow every other kind
+goes through -- there's nothing to confirm AFTER the fact here, the whole point is showing it
+BEFORE the roll.
 
 `condition` is one of:
 - `{type: "self_hp_below", fraction: 0.5}` / `{type: "self_hp_at_or_below", fraction: 0.1}` --
@@ -170,23 +172,54 @@ yet, deliberately scoped out of this first slice.
   `LEGACY_BADGE_NAMES` maps a structured `poisoned`/`burned`/`paralyzed` condition to these exact
   strings), so this works identically whether the attacker came from the shared system or the old
   local engine.
+- `{type: "target_hp_below"|"target_hp_at_or_below"|"target_hp_above", fraction: 0.5}` -- the
+  target-conditional counterpart to `self_hp_*` (Brine's "target below 50%", Crush Grip's "target
+  ABOVE 50%" -- the one case that needed a third comparison direction self-conditional moves
+  never did).
+- `{type: "target_status", any: ["poisoned", "paralyzed"]}` -- the target-conditional counterpart
+  to `self_status`, but checked against real `apply` values directly (lowercase), not legacy
+  display names: `target-picker.js` only ever has the RAW structured session participant to work
+  with (`_selectedTarget`/`_attacker`, straight off `session.participants`), unlike a self-check
+  that might be reading a legacy-engine `c.statusEffects` badge -- there's no second shape to
+  reconcile with here, so the cleaner form is used instead of matching self_status's convention.
+- `{type: "target_has_any_status"}` -- Hex's "affected by A status condition" (no specific list),
+  true whenever the target's own `statuses` array is non-empty.
+- `{type: "attacker_stat_below_target", stat: "dex"}` -- Gyro Ball's own stat comparison; checked
+  against each participant's raw score (`attacker.dex`/`target.dex`), not a live-buffed one.
 
-Two mutually-exclusive result fields:
-- `diceMultiplier: 2` recomputes the shown dice STRING itself ("2d8" → "4d8", `_multiplyDiceString`)
-  -- multiplying the leading number is the same arithmetic as rolling that many more of the same
-  die, which is what "double/triple the dice" consistently means across this dataset's own move
-  text (Facade's "double the dice", Smelling Salts/Venoshock/Gyro Ball's "double the dice roll").
-  Several tiers on one move (Flail) resolve to whichever MET condition has the highest multiplier,
-  never stacked -- being at 10% HP already implies being below 50% too, so both conditions are
-  "met" at once and only the more severe one should show.
-- `totalMultiplier: 0.5` shows as a plain note instead (the popup's existing `noteText` banner,
-  previously Stockpile-only) rather than touching the dice string at all -- Water Spout's own text
-  says "halve the TOTAL damage done", not the dice, and those aren't the same thing: a flat MOVE
-  modifier doesn't halve along with a halved die count, and the two produce different
-  distributions even at the same average. Safer to say so in words than assert a recomputed
-  number that might be wrong.
+Result fields (not all mutually exclusive -- `flatBonus` and `advantage` both accumulate/OR across
+every MET effect on a move, since nothing needs the "only the most severe tier" reasoning
+`diceMultiplier` does; a move only ever uses ONE of `diceMultiplier`/`totalMultiplier`/`flatBonus`/
+`advantage` per effect, but different effects on the same move could combine them in principle):
+- `diceMultiplier: 2` recomputes the shown dice STRING itself ("2d8" → "4d8",
+  `move-effects.js`'s exported `multiplyDiceString`, shared by both the self- and target-
+  conditional sides) -- multiplying the leading number is the same arithmetic as rolling that many
+  more of the same die, which is what "double/triple the dice" consistently means across this
+  dataset's own move text (Facade's "double the dice", Smelling Salts/Venoshock/Gyro Ball's
+  "double the dice roll"). Several tiers on one move (Flail) resolve to whichever MET condition
+  has the highest multiplier, never stacked -- being at 10% HP already implies being below 50%
+  too, so both conditions are "met" at once and only the more severe one should show. On the
+  target-conditional side this is shown as a REMINDER only (`target-picker.js`'s damage-roll step
+  never had a base-dice display to literally change, unlike the move-popup's own `diceOverride`
+  hook) -- "Roll 4d10 instead of 2d10" next to the plain roll input.
+- `totalMultiplier: 0.5` (self-conditional only so far) shows as a plain note instead (the popup's
+  existing `noteText` banner, previously Stockpile-only) rather than touching the dice string at
+  all -- Water Spout's own text says "halve the TOTAL damage done", not the dice, and those aren't
+  the same thing: a flat MOVE modifier doesn't halve along with a halved die count, and the two
+  produce different distributions even at the same average. Safer to say so in words than assert a
+  recomputed number that might be wrong.
+- `flatBonus: "proficiency"` or a plain number (target-conditional only so far) -- Crush Grip's own
+  "add your proficiency bonus to the damage roll": actually changes the total, folded straight into
+  the returned `rawRoll` the same way `target-picker.js`'s existing `damageModifier` param already
+  was, so the caller (`combat-wip.js`) needed no changes to pick it up correctly.
+- `advantage: true` (target-conditional only so far) -- Cross Poison/Hex's "damage is rolled with
+  advantage": shown as its own banner ("roll damage twice, take the higher"), the same "the app
+  surfaces the instruction, the human rolls accordingly" pattern as every other advantage/
+  disadvantage banner in this app, just for a damage roll instead of an attack/save one (this
+  schema's `roll` kind has no `damage_rolls` target at all -- `damage_note`'s own `advantage` field
+  is what covers it instead, display-only, same as everything else here).
 
-`note` is shown alongside whichever of the two applies (the dice breakdown line, or the note
+`note` is shown alongside whichever of the above applies (the dice breakdown line, or the note
 banner directly, for `totalMultiplier`). A ONE-SHOT heal (no `repeat` -- every drain, every plain
 heal-on-use move) is never a stored status either, same `ends: [{type:"instant"}]` convention
 as `reroll_damage` above, since there's nothing to hold onto after the number is applied. Three
@@ -461,9 +494,17 @@ anything -- "the human does the arithmetic" is true, but conflated two different
 but forgetting a move's own damage bonus applies at all, mid-battle, is exactly what this app's
 other reminders already exist to prevent, and the move-popup already had an unused override hook
 (`diceOverride`) sitting there for exactly this. Facade/Flail/Water Spout (migrate_effects_v23.py)
-are the self-conditional slice; Brine/Crush Grip/Cross Poison/Gyro Ball/Hex/Smelling Salts/
-Venoshock's target-conditional equivalent is still deliberately not built (needs
-target-picker.js's damage-roll step, once a target is known, not the move-popup). The rest of the
-original finding stands: most of conditional_damage genuinely has nothing to remember (a stat
-comparison, a resource count already visible elsewhere) because there's no FUTURE roll or hidden
-state involved, only self/target status and HP -- damage_note only exists for exactly those two.)*
+are the self-conditional slice.)*
+
+*(Update, next day: the target-conditional half is built too now (migrate_effects_v24.py) --
+Brine, Crush Grip, Cross Poison, Gyro Ball, Hex, Smelling Salts, Venoshock, wired into
+target-picker.js's own damage-roll step instead of the move-popup (see damage_note's own section
+above for exactly how). That included Gyro Ball's stat comparison after all
+(`attacker_stat_below_target`) -- the "a stat comparison... already visible elsewhere" reasoning
+in the ORIGINAL finding undersold it: the target's own DEX score isn't necessarily visible to the
+human the way their OWN stats are, so a reminder is exactly as valuable there as for HP/status.
+What's left under conditional_damage now (Archive Blast, Formation Strike, Trump Card, Stored
+Power, Heavy Slam, Electro Ball, Spit Up, Frustration, Return, ...) is countable/comparable but
+needs its own tracking this schema doesn't have yet (adjacent-ally count, VP spent, active buff
+count, a narrative Loyalty Chart stat, Stockpile's own stacks) -- each a further, separate slice,
+not folded into this one.)*

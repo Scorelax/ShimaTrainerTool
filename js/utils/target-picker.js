@@ -14,7 +14,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { attackRollContext, rollModeText, diceBonusOptionsFor } from './move-effects.js';
+import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString } from './move-effects.js';
 import { waitForReactionWindow } from './reaction-window.js';
 
 function _injectStyles() {
@@ -89,6 +89,22 @@ let _overlay = null;
 let _resolve = null;
 let _attackModifier = 0;
 let _damageModifier = 0;
+// The move's own base damage dice ("1d10") and any target-conditional
+// `damage_note` effects (see move-effects-schema.md) -- Brine/Smelling
+// Salts/Venoshock-style "double if the TARGET is below 50% HP/poisoned/...".
+// Evaluated once a target is actually picked (_showStep3, below), unlike
+// the self-conditional half of the same effect kind (combat.js's own
+// showCombatMoveDetails), which shows at move-popup time since the
+// attacker's own HP/status is already known then. Both callers
+// (combat-wip.js) pass these in; harmless empty defaults for any caller
+// that doesn't (nothing shows).
+let _damageDice = '';
+let _damageNotes = [];
+// This attack's own target-conditional flat bonus (Crush Grip's
+// "+proficiency if target above 50% HP") -- computed alongside the dice/
+// advantage note in _showStep3, folded into the total the same way
+// _damageModifier already is.
+let _targetFlatBonus = 0;
 let _speciesName = '';
 // The attacking move's own name, needed for the reaction window ("Noble Roar --
 // does anyone want to react to being targeted by this?") -- combat-wip.js's
@@ -225,6 +241,7 @@ function _ensureDom() {
         <div id="targetPickerStep3" hidden>
           <div class="target-picker-anim-media" id="targetPickerAnimMedia"></div>
           <div class="target-picker-roll-target" id="targetPickerDamageTarget"></div>
+          <div class="target-picker-roll-notes" id="targetPickerDamageNote"></div>
           <label class="target-picker-roll-label" for="targetPickerRollInput">Damage roll<span id="targetPickerModifierNote"></span></label>
           <input type="number" id="targetPickerRollInput" class="target-picker-roll-input" placeholder="Enter roll…">
           <div class="target-picker-roll-total" id="targetPickerRollTotal"></div>
@@ -469,8 +486,28 @@ function _showStep3() {
   // pickTargetAgain's callers, so this is available on every path that reaches here.
   document.getElementById('targetPickerAnimMedia').innerHTML =
     spriteMediaHtml(_attacker?.image, _attacker?.name || 'Attacker');
+
+  // Target-conditional damage_note effects (see move-effects-schema.md) --
+  // now that a target is actually known, unlike the self-conditional half
+  // shown at move-popup time. diceMultiplier is a reminder only (this
+  // popup never had a base-dice display to begin with, unlike the
+  // move-popup's own diceOverride) -- flatBonus DOES change the total,
+  // folded in below same as _damageModifier.
+  const { diceMultiplier, flatBonus, advantage, note } = targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget });
+  _targetFlatBonus = flatBonus;
+  const noteEl = document.getElementById('targetPickerDamageNote');
+  const noteParts = [];
+  if (diceMultiplier > 1 && _damageDice) {
+    noteParts.push(`<div class="note">Roll ${multiplyDiceString(_damageDice, diceMultiplier)} instead of ${_damageDice}${note ? ` — ${note}` : ''}</div>`);
+  }
+  if (advantage) {
+    noteParts.push(`<div class="mode advantage">Advantage: roll damage twice, take the higher${note ? ` — ${note}` : ''}</div>`);
+  }
+  noteEl.innerHTML = noteParts.join('');
+
+  const totalMod = _damageModifier + _targetFlatBonus;
   document.getElementById('targetPickerModifierNote').textContent =
-    _damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '';
+    totalMod ? ` (${totalMod >= 0 ? '+' : ''}${totalMod} modifier added automatically)` : '';
   const input = document.getElementById('targetPickerRollInput');
   input.value = '';
   _updateRollTotal();
@@ -481,7 +518,7 @@ function _showStep3() {
 function _updateRollTotal() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   const totalEl = document.getElementById('targetPickerRollTotal');
-  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier}</strong>`;
+  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier + _targetFlatBonus}</strong>`;
 }
 
 /** Confirm Damage -- plays the one-shot attack animation (see _playAnimation)
@@ -497,7 +534,12 @@ async function _confirmDamageRoll() {
   if (btn.disabled) return;
   btn.disabled = true;
   const result = {
-    targetId: _selectedTargetId, hit: true, rawRoll: raw,
+    // _targetFlatBonus (Crush Grip's own "+proficiency if target above 50%
+    // HP", see _showStep3) folded straight into rawRoll -- the caller
+    // (combat-wip.js's _resolveOneHit) already adds its own damageModifier
+    // on top of whatever rawRoll it's given, same as it always has, so
+    // this needs no changes there to land correctly.
+    targetId: _selectedTargetId, hit: true, rawRoll: raw + _targetFlatBonus,
     attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _effectiveAttackMod(),
     rollMode: _atkCtx?.mode || 'normal',
   };
@@ -554,7 +596,7 @@ function _cardHtml(p) {
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '' } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [] } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -569,6 +611,9 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _speciesName = speciesName;
   _guaranteedHit = guaranteedHit;
   _moveName = moveName;
+  _damageDice = damageDice;
+  _damageNotes = damageNotes;
+  _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   document.getElementById('targetPickerBack').style.display = '';
   document.getElementById('targetPickerBackToAttack').style.display = '';
@@ -601,7 +646,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * null if closed. With guaranteedHit (see pickTarget) it opens directly at
  * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '' } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [] } = {}) {
   _ensureDom();
   _attacker = attacker;
   _attackModifier = attackModifier;
@@ -609,6 +654,9 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   _speciesName = speciesName;
   _guaranteedHit = guaranteedHit;
   _moveName = moveName;
+  _damageDice = damageDice;
+  _damageNotes = damageNotes;
+  _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _selectedTargetId = target.id;
   document.getElementById('targetPickerBack').style.display = 'none';

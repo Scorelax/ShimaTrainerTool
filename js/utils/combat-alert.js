@@ -22,6 +22,11 @@ function _injectStyles() {
     .combat-alert-actions { display: flex; gap: 0.7rem; }
     .combat-alert-actions .combat-alert-ok { flex: 1; }
     .combat-alert-cancel { background: rgba(255,255,255,0.1) !important; }
+    .combat-alert-number-input {
+      width: 100%; box-sizing: border-box; background: #1e1e2e; border: 1px solid rgba(255,255,255,0.2);
+      color: #e0e0e0; border-radius: 6px; padding: 0.6rem 0.7rem; font-size: 1.1rem; text-align: center;
+      margin-bottom: 1rem;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -97,4 +102,56 @@ export function showCombatConfirm(message, { title = '', yesLabel = 'Yes', noLab
   document.getElementById('combatConfirmNo2').textContent = noLabel;
   _confirmOverlay.style.display = 'flex';
   return new Promise((resolve) => { _confirmResolve = resolve; });
+}
+
+let _promptOverlay = null;
+let _promptResolve = null;
+
+function _ensurePromptDom() {
+  if (_promptOverlay) return;
+  _injectStyles();
+  _promptOverlay = document.createElement('div');
+  _promptOverlay.className = 'combat-alert-overlay';
+  _promptOverlay.id = 'combatPromptPopup';
+  _promptOverlay.style.display = 'none';
+  _promptOverlay.innerHTML = `
+    <div class="combat-alert-box">
+      <div class="combat-alert-title" id="combatPromptTitle"></div>
+      <div class="combat-alert-message" id="combatPromptMessage"></div>
+      <input type="number" class="combat-alert-number-input" id="combatPromptInput" inputmode="numeric">
+      <div class="combat-alert-actions">
+        <button class="combat-alert-ok combat-alert-cancel" id="combatPromptCancel">Cancel</button>
+        <button class="combat-alert-ok" id="combatPromptOk">OK</button>
+      </div>
+    </div>`;
+  document.body.appendChild(_promptOverlay);
+  const submit = () => {
+    const val = parseInt(document.getElementById('combatPromptInput').value, 10);
+    close(Number.isNaN(val) ? null : val);
+  };
+  const close = (result) => { _promptOverlay.style.display = 'none'; if (_promptResolve) { _promptResolve(result); _promptResolve = null; } };
+  document.getElementById('combatPromptOk').addEventListener('click', submit);
+  document.getElementById('combatPromptCancel').addEventListener('click', () => close(null));
+  document.getElementById('combatPromptInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  _promptOverlay.addEventListener('click', (e) => { if (e.target === _promptOverlay) close(null); });
+}
+
+/** A numeric-input variant of showCombatConfirm -- for a move whose damage
+ * depends on something this app has no other way to know (Formation
+ * Strike's own "how many creatures are in your formation"), asked once per
+ * use rather than tracked as state. Resolves to the entered integer, or
+ * null if cancelled/closed/left blank -- the caller decides what null
+ * means for its own move (Formation Strike treats it as "cancel the move
+ * entirely", not "assume 1"). */
+export function showCombatPrompt(message, { title = '', defaultValue = '', min = 1 } = {}) {
+  _ensurePromptDom();
+  document.getElementById('combatPromptTitle').textContent = title;
+  document.getElementById('combatPromptTitle').style.display = title ? 'block' : 'none';
+  document.getElementById('combatPromptMessage').textContent = message;
+  const input = document.getElementById('combatPromptInput');
+  input.value = defaultValue;
+  input.min = min;
+  _promptOverlay.style.display = 'flex';
+  setTimeout(() => input.focus(), 50);
+  return new Promise((resolve) => { _promptResolve = resolve; });
 }

@@ -769,6 +769,27 @@ function _statusToBadge(st, round) {
   return { name, description: describeStatusEnds(st, round), duration: -1, serverStatusId: st.id, concentration: isConcentration(st) };
 }
 
+/** Distinct move TYPES (Fire, Water, ...) actually dealt as damage in the
+ * shared log, from the entry AFTER `pid`'s own 'join' entry onward --
+ * Archive Blast's own condition (see _syncLocalCombatState's own comment).
+ * Only 'damage' log entries carry a moveType at all (see
+ * routes_combat.py's _apply_damage_to_target) -- a non-damaging move use
+ * isn't logged with type info anywhere, so "witnessed" here really means
+ * "witnessed dealing damage", a deliberate (and reasonable) approximation
+ * given what's actually reliably in the log. No 'join' entry for this
+ * participant (shouldn't happen -- every participant gets one) -- empty. */
+function _witnessedMoveTypesSince(session, pid) {
+  const log = session.log || [];
+  const joinIdx = log.findIndex(e => e.type === 'join' && e.actorId === pid);
+  if (joinIdx === -1) return [];
+  const types = new Set();
+  for (let i = joinIdx + 1; i < log.length; i++) {
+    const entry = log[i];
+    if (entry.type === 'damage' && entry.moveType) types.add(entry.moveType);
+  }
+  return [...types];
+}
+
 function _syncLocalCombatState(session) {
   _enterBattleSync();
 
@@ -826,6 +847,13 @@ function _syncLocalCombatState(session) {
     merged.bideCharging = !!p.bideChargingSinceLogId;
     merged.pendingBideDamage = p.pendingBideDamage ?? null;
     merged.bideHeld = !!p.bideHeld;
+    // Archive Blast's own "every type of move you have witnessed so far
+    // during this battle" -- distinct move types from the shared log,
+    // AFTER this participant's own join entry ("since the user was sent
+    // out", not from round 1 -- the user's own call). WIP-only, same
+    // limitation as Bide -- the legacy standalone engine has no log
+    // equivalent at all to derive this from.
+    merged.witnessedMoveTypes = _witnessedMoveTypesSince(session, p.id);
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.

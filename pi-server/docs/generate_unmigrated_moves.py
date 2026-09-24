@@ -88,6 +88,14 @@ TAG_NOTES = {
 HANDLED_OUTSIDE_SCHEMA = {
     'Bide',  # two-phase damage-taken-then-retaliate -- see combat.js's _handleBideClick /
              # combat-wip.js's _handleBideResolve / routes_combat.py's _bide_use.
+    'Swallow',  # heal dice x Stockpile stacks -- combat.js's _isDirectHeal branch, was already
+                # done before this comment even mentioned it, just never added here.
+    'Spit Up',  # damage dice x Stockpile stacks -- combat.js's own sibling branch to Swallow's.
+    'Formation Strike',  # damage dice x a per-use player-typed formation size (showCombatPrompt) --
+                          # nothing else in this app can know that number.
+    'Archive Blast',  # damage dice x distinct move types witnessed since the user joined (the
+                       # shared log, combat-wip.js's _witnessedMoveTypesSince) -- WIP-only, same
+                       # limitation as Bide.
 }
 
 

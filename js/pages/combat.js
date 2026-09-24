@@ -7,7 +7,7 @@ import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
 import { multiplyDiceString } from '../utils/move-effects.js';
-import { showCombatConfirm, showCombatAlert } from '../utils/combat-alert.js';
+import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -2815,7 +2815,7 @@ async function _handleBideClick(c, move, state, onBideResolve) {
   }
 }
 
-function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve } = {}) {
+async function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve } = {}) {
   // Only combat-wip.js's shared-combat flow ever passes any of these (see
   // _attachMainFocusListeners) -- the legacy page's own attachCombatListeners()
   // calls attachBattleListeners(state) with none of them, so this stays false
@@ -2837,6 +2837,20 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
   if (_isSharedCombat && moveName === 'Bide') {
     _handleBideClick(c, move, state, onBideResolve);
     return;
+  }
+
+  // Formation Strike -- "1d6 + MOVE steel damage for EACH creature in your
+  // formation", and this app has no formation/roster concept to count that
+  // from (the user's own call: just ask). Asked once per use, not tracked
+  // as state -- cancelling/leaving it blank cancels the move entirely,
+  // there's no sane damage to show without a number.
+  let _formationSize = null;
+  if (moveName === 'Formation Strike') {
+    _formationSize = await showCombatPrompt(
+      'How many creatures are in your formation? This decides how many damage dice you roll.',
+      { title: 'Formation Strike', defaultValue: 1, min: 1 },
+    );
+    if (!_formationSize || _formationSize < 1) return;
   }
 
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
@@ -2908,6 +2922,32 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
     _diceBreakdownOverride = _healMoveMod && _healModBonus !== 0
       ? `${_healMoveMod} modifier: ${_healModBonus >= 0 ? '+' : ''}${_healModBonus}`
       : '';
+  } else if (_moveLower === 'spit up' && _stacks > 1 && computedData.damageDice) {
+    // Spit Up's own damage-side counterpart to Swallow's _healStacks above --
+    // the stack note/reset (see onUseMove's own Stockpile/Spit Up handling)
+    // already existed, but the actual DAMAGE dice shown here were never
+    // multiplied to match it.
+    const _adjustedDice = multiplyDiceString(computedData.damageDice, _stacks);
+    _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
+    _diceBreakdownOverride = [computedData.damageBreakdown, `×${_stacks} (Stockpile)`].filter(Boolean).join(' · ');
+  } else if (_formationSize > 1 && computedData.damageDice) {
+    const _adjustedDice = multiplyDiceString(computedData.damageDice, _formationSize);
+    _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
+    _diceBreakdownOverride = [computedData.damageBreakdown, `×${_formationSize} (formation size)`].filter(Boolean).join(' · ');
+  } else if (moveName === 'Archive Blast' && computedData.damageDice) {
+    // Distinct move types witnessed since this Pokemon was sent out (see
+    // combat-wip.js's _witnessedMoveTypesSince) -- WIP-only, c.witnessedMoveTypes
+    // is simply never set on the legacy standalone engine (no log to derive
+    // it from), so this quietly no-ops there instead of asserting a wrong
+    // number. "For every type... up to a maximum of 6d6" -- 1 base + up to
+    // 5 more.
+    const _witnessed = (c.witnessedMoveTypes || []).length;
+    const _diceCount = Math.min(1 + _witnessed, 6);
+    if (_diceCount > 1) {
+      const _adjustedDice = multiplyDiceString(computedData.damageDice, _diceCount);
+      _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
+      _diceBreakdownOverride = [computedData.damageBreakdown, `×${_diceCount} dice (${_witnessed} move type${_witnessed === 1 ? '' : 's'} witnessed: ${c.witnessedMoveTypes.join(', ')})`].filter(Boolean).join(' · ');
+    }
   }
 
   // `damage_note` effects (see move-effects-schema.md's own section) --

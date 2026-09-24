@@ -636,3 +636,24 @@ happened to set the weather. New `self_weather_contains` condition (a loose subs
 against the freeform weather name) and `flatBonus: "moveModifier"` now working self-conditionally
 too (previously target-conditional only, Wring Out). Archive Blast, Formation Strike, and Spit Up
 remain.)*
+
+*(Update, same day: the last three, plus Swallow along with them (the user's own call, since it's
+the same Stockpile mechanic as Spit Up, just self_heal). None of the four got an `effects` entry
+-- all bespoke, name-matched code in combat.js, same as Ingrain/Bide -- and are now listed in
+`generate_unmigrated_moves.py`'s own `HANDLED_OUTSIDE_SCHEMA` so they can't silently reappear as
+"needs work":
+- **Swallow** turned out to already be fully built (`_isDirectHeal`'s own `_healStacks`, reading
+  `c.stockpileStacks`) -- found while reading the existing code for Spit Up, not new work.
+- **Spit Up** was 90% there already (the same `c.stockpileStacks`, the "×N Stockpile stacks" note,
+  Stockpile's own increment, Spit Up's own reset on use) -- missing only the one line actually
+  multiplying the DAMAGE dice by the stack count, Swallow's own sibling case.
+- **Formation Strike** ("1d6 ... for EACH creature in your formation") has no roster/formation
+  concept anywhere in this app to count from, so it just asks -- a new `showCombatPrompt` (a
+  numeric-input sibling to `showCombatConfirm`, `combat-alert.js`) once per use, not tracked as
+  state. Cancelling/leaving it blank cancels the move.
+- **Archive Blast** ("every type of move you have witnessed... since the user was sent out") reads
+  distinct move TYPES from the shared log, from this participant's own 'join' entry onward
+  (`combat-wip.js`'s new `_witnessedMoveTypesSince`) -- WIP-only, same limitation as Bide (no log
+  on the legacy engine). Only 'damage' log entries actually carry a moveType, so this really means
+  "witnessed dealing damage", a deliberate approximation of "witnessed" given what's reliably
+  loggable today.)*

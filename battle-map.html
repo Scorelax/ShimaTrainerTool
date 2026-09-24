@@ -54,11 +54,11 @@
      .active class rather than swapping any markup). Sits last in the rotor
      so it paints over the grid's own always-on dark background, and lives
      INSIDE the rotor (not the stage) so it rotates the same 90deg as
-     everything else here -- same logo used app-wide for the intro/loading
-     screen (see css/styles.css's #loadingScreen). */
+     everything else here -- a map of the Shiman region, replacing the
+     TitleScreen.png placeholder this started as. */
   .map-empty-bg {
     position: absolute; inset: 0; display: none;
-    background-image: url('assets/TitleScreen.png'); background-size: cover; background-position: center;
+    background-image: url('assets/Shiman Federation.png'); background-size: cover; background-position: center;
   }
   .map-stage:not(.active) .map-empty-bg { display: block; }
 

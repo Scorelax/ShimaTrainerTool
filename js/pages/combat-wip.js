@@ -852,7 +852,11 @@ function _syncLocalCombatState(session) {
     phase: 'battle', round: session.round,
     activeTurnIndex: foundIdx,
     combatants,
-    weather: existing?.weather || null, terrain: existing?.terrain || null,
+    // Read off the server session, not this device's own local cache
+    // (existing) -- weather/terrain are shared session state now (see
+    // routes_combat.py's set-weather/set-terrain), so every device sees
+    // whatever the DM actually set, not just whoever set it.
+    weather: session.weather || null, terrain: session.terrain || null,
   };
   sessionStorage.setItem(WIP_COMBAT_STATE_KEY, JSON.stringify(local));
   return local;

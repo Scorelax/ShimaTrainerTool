@@ -1002,6 +1002,16 @@ export class CombatAPI {
   static async setBoardBackground(url) {
     return API.request('combat', 'set-board-background', { url }, { useCache: false });
   }
+
+  /** Sets the shared session's weather/terrain (see routes_combat.py's
+   * set-weather/set-terrain) -- empty name clears it. */
+  static async setWeather(name, effect) {
+    return API.request('combat', 'set-weather', { name, effect }, { useCache: false });
+  }
+
+  static async setTerrain(name, effect) {
+    return API.request('combat', 'set-terrain', { name, effect }, { useCache: false });
+  }
 }
 
 // ============================================================================

@@ -13161,12 +13161,26 @@
         "damage",
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "When you use this move, soak in solar energy and prepare to unleash a devastating beam. On your next turn, if you keep your concentration, use an action to create a 80 foot line of solar energy, 5 feet wide. All creatures caught in the line must succeed on a DEX save or take 3d10 + MOVE grass damage on a fail and half as much on a save. If this move is used in harsh sunlight, double your MOVE modifier for damage and it can be used on the turn it is activated, without concentration.",
       "moveStat": "STR/DEX",
       "vpCost": "20",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_weather_contains",
+            "any": [
+              "sun"
+            ]
+          },
+          "flatBonus": "moveModifier",
+          "note": "Harsh sunlight -- double your move modifier for damage"
+        }
+      ]
     },
     {
       "name": "Solar Blade",
@@ -13182,12 +13196,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "When you activate this move, you use your action gathering in solar energy to prepare to strike with blades. On your next turn, if you keep your concentration. use an action to make a melee attack, dealing 3d10 + MOVE grass damage on a hit. If this move is used in harsh sunlight, double your MOVE modifier for damage and it can be used on the turn it is activated.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_weather_contains",
+            "any": [
+              "sun"
+            ]
+          },
+          "flatBonus": "moveModifier",
+          "note": "Harsh sunlight -- double your move modifier for damage"
+        }
+      ]
     },
     {
       "name": "Soothing Breeze",

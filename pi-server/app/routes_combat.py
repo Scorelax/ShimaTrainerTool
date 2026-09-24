@@ -79,6 +79,16 @@ _EMPTY_STATE = {
     'reactionBlock': None,
     'participants': {},
     'fieldEffects': [],
+    # Shared weather/terrain -- {name, effect} freeform (the DM types both,
+    # same shape combat.js's own weather/terrain badge already used when
+    # this lived purely on ONE device's local combatState), or None. Moved
+    # onto the session so every viewer sees the same value instead of only
+    # whichever device happened to set it -- Solar Beam/Solar Blade's own
+    # "if used in harsh sunlight" damage_note condition (self_weather_contains)
+    # needs this to actually be visible to whoever's USING the move, not
+    # just the DM's own screen. See _set_weather/_set_terrain below.
+    'weather': None,
+    'terrain': None,
     # The shared battle log -- one chronological list of everything that's
     # happened this session, oldest first, visible to every viewer (see
     # battle-log-popup.js) and readable by future move-logic that needs to
@@ -300,6 +310,12 @@ def handle(conn, action, params):
 
     if action == 'set-board-background':
         return _mutate(conn, lambda s: _set_board_background(s, params.get('url', '')))
+
+    if action == 'set-weather':
+        return _mutate(conn, lambda s: _set_weather(s, params.get('name', ''), params.get('effect', '')))
+
+    if action == 'set-terrain':
+        return _mutate(conn, lambda s: _set_terrain(s, params.get('name', ''), params.get('effect', '')))
 
     if action == 'set-token-position':
         col = js_parse_int(params.get('col'))
@@ -1636,6 +1652,14 @@ def _list_move_categories():
 
 def _set_board_background(state, url):
     state['board']['backgroundImage'] = url or None
+
+
+def _set_weather(state, name, effect):
+    state['weather'] = {'name': name, 'effect': effect} if name else None
+
+
+def _set_terrain(state, name, effect):
+    state['terrain'] = {'name': name, 'effect': effect} if name else None
 
 
 def _set_token_position(state, pid, col, row):

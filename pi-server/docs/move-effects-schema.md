@@ -202,6 +202,12 @@ BEFORE the roll.
   unrecognized (every trainer, who carries no `size` at all) defaults to Medium. Also the
   `scalingBonus` magnitude source for this condition (see below) -- however many size levels the
   attacker outranks the target by.
+- `{type: "self_weather_contains", any: ["sun"]}` -- Solar Beam/Solar Blade's own "if used in
+  harsh sunlight", checked against the shared session's `weather` field (`{name, effect}`, freeform
+  DM-typed text, `routes_combat.py`'s `set-weather` -- moved onto the session from a single
+  device's own local storage specifically so a check like this is visible to whoever's USING the
+  move, not just the DM's own screen). A loose case-insensitive SUBSTRING match, not an exact
+  name -- same "close enough" trust level as everything else freeform in this app.
 - `{type: "self_vp_spent_per", per: 10}` / `{type: "self_loyalty_below_zero"}` /
   `{type: "self_loyalty_above_zero"}` -- the three `scalingBonus` conditions (see below): each
   reports a MAGNITUDE (how many "units" apply), not just met/not-met. VP spent is approximated as
@@ -242,13 +248,16 @@ same move could combine them in principle):
   produce different distributions even at the same average. Safer to say so in words than assert a
   recomputed number that might be wrong.
 - `flatBonus: "proficiency"`, `"moveModifier"`, or a plain number -- Crush Grip's own "add your
-  proficiency bonus to the damage roll" (target-conditional only); Wring Out's "double your move
-  modifier" (`"moveModifier"`, target-conditional -- one more copy of `computedData.highestMod`,
-  threaded through `pickTarget`/`pickTargetAgain` as `moveModValue` by whoever calls them, the same
-  value the move-popup's own dice breakdown already showed, not re-derived); a plain number works
-  on either side. Target-conditional: folded straight into the returned `rawRoll` the same way
-  `target-picker.js`'s existing `damageModifier` param already was. Self-conditional: folded into
-  the popup's own `diceOverride`/`diceBreakdownOverride`, alongside `computedData.damageBonus`.
+  proficiency bonus to the damage roll" (target-conditional only); `"moveModifier"` is one more
+  copy of the move's own stat modifier (`computedData.highestMod`) and works on EITHER side now:
+  Wring Out (target-conditional, "double your move modifier" if the target's above 50% HP,
+  threaded through `pickTarget`/`pickTargetAgain` as `moveModValue`) and Solar Beam/Solar Blade
+  (self-conditional, "double your move modifier" in harsh sunlight, passed straight into
+  `_evaluateDamageNotes`) both read the exact same value the move-popup's own dice breakdown
+  already showed, never re-derived; a plain number works on either side too. Target-conditional:
+  folded straight into the returned `rawRoll` the same way `target-picker.js`'s existing
+  `damageModifier` param already was. Self-conditional: folded into the popup's own
+  `diceOverride`/`diceBreakdownOverride`, alongside `computedData.damageBonus`.
 - `scalingBonus: {amountPerUnit: "moveModifier" | <number>, cap?: <number>}` -- a bonus that scales
   with the condition's own MAGNITUDE rather than a fixed amount: `bonus = magnitude * amountPerUnit`,
   clamped to `cap` when given. Self-conditional (combat.js's own evaluator): Trump Card's
@@ -613,3 +622,17 @@ every other save-triggered move already makes (the human enters half by hand); t
 damage_note only needs the low-HP tier's further halving on top, `totalMultiplier: 0.5` below 50%
 HP -- the exact same shape Water Spout already uses, just now also reachable from a passed save's
 own damage step. Archive Blast, Formation Strike, Solar Beam, Solar Blade, and Spit Up remain.)*
+
+*(Update, next day: Solar Beam and Solar Blade too (migrate_effects_v29.py) -- identical mechanics
+between the two (one ranged/AoE, one melee), so one shared effect. The two-turn "charge, then
+attack" structure is deliberately unmodeled, same as the existing "vanish, then attack next turn"
+family (Aqua Phase, Dig, Dive, Fly, Phantom Force, Shadow Force) -- the human just uses the move's
+own attack half on their actual attack turn. The only real gap was the harsh-sunlight check, which
+needed weather to actually be shared: `routes_combat.py` gained `weather`/`terrain` fields on the
+session itself (`set-weather`/`set-terrain`), moved off combat.js's own global-conditions bar,
+which had been a single DEVICE's local storage only -- invisible to every other player, which
+would have made this move's own bonus silently never trigger for anyone except whoever's device
+happened to set the weather. New `self_weather_contains` condition (a loose substring match
+against the freeform weather name) and `flatBonus: "moveModifier"` now working self-conditionally
+too (previously target-conditional only, Wring Out). Archive Blast, Formation Strike, and Spit Up
+remain.)*

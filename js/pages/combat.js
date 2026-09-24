@@ -1768,12 +1768,30 @@ function recalcInitiativeTotal(id, state) {
 
 // -------------------------------- BATTLE -----------------------------------
 
+/** Pushes a weather/terrain change to the shared session (see
+ * routes_combat.py's set-weather/set-terrain) -- fire-and-forget same as
+ * every other best-effort sync call in this file, the next SSE push
+ * reconciles every OTHER device's own local `state.weather`/`state.terrain`
+ * (see combat-wip.js's _syncLocalCombatState, which now reads these off the
+ * server instead of this device's own local cache). `cond` is {name,
+ * effect} or null to clear. */
+function _pushGlobalCondition(type, cond) {
+  const api = type === 'weather' ? CombatAPI.setWeather : CombatAPI.setTerrain;
+  api(cond?.name || '', cond?.effect || '').catch(err => showCombatAlert(err.message, { title: 'Error' }));
+}
+
 export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve, ...cardOptions } = {}) {
   _battleState = state;
   _battleCardOptions = cardOptions; // see rerenderBattle -- every internal re-render (a move popup
   // confirming, an HP/VP adjuster click, etc.) needs to keep reusing the same per-card render
   // options this call was given, without every one of those many internal call sites having to
   // pass them through by hand.
+  // Same "only combat-wip.js's shared-combat flow ever passes any of these"
+  // check showCombatMoveDetails uses -- the weather/terrain handlers below
+  // need it too, to know whether to push to the shared session (see
+  // routes_combat.py's set-weather/set-terrain) or stay purely local (the
+  // legacy page has no server session for it to sync to at all).
+  const _isSharedCombat = !!(onDamageResolved || onSaveTriggered || onReactiveSave || onMultiHitAoe || onEffectsOnly);
   loadCombatMoves();
   loadMoveCategories();
   initializeRechargeStates(state);
@@ -1807,6 +1825,7 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
         state[btn.dataset.type] = null;
         saveCombatState(state);
         rerenderGlobalBar();
+        if (_isSharedCombat) _pushGlobalCondition(btn.dataset.type, null);
       });
     });
   };
@@ -1836,17 +1855,21 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
   document.getElementById('globalConditionSetBtn')?.addEventListener('click', () => {
     const name = gcName.value.trim();
     if (!name || !_gcmType) return;
-    state[_gcmType] = { name, effect: gcEffect.value.trim() };
+    const effect = gcEffect.value.trim();
+    state[_gcmType] = { name, effect };
     saveCombatState(state);
     rerenderGlobalBar();
+    if (_isSharedCombat) _pushGlobalCondition(_gcmType, { name, effect });
     closeGcModal();
   });
 
   gcClearBtn?.addEventListener('click', () => {
     if (!_gcmType) return;
-    state[_gcmType] = null;
+    const type = _gcmType;
+    state[type] = null;
     saveCombatState(state);
     rerenderGlobalBar();
+    if (_isSharedCombat) _pushGlobalCondition(type, null);
     closeGcModal();
   });
 
@@ -2258,7 +2281,7 @@ function getHealDiceForLevel(move, level) {
  * names (`Poison`, `Paralysis`, `Burn`, ...) both engines' own status badges
  * already use (see combat-wip.js's LEGACY_BADGE_NAMES), so this works
  * identically whether `c` came from the old local engine or the shared one. */
-function _evaluateDamageNotes(effects, c, moveModValue = 0) {
+function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null) {
   const hpFrac = (c.maxHp || 0) > 0 ? (c.currentHp || 0) / c.maxHp : null;
   const statusNames = new Set((c.statusEffects || []).map(se => se.name));
   // VP "spent" is approximated as maxVp - currentVp (Trump Card's own
@@ -2266,6 +2289,7 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0) {
   // same approximation level as every other derived number in this app.
   const vpSpent = Math.max(0, (c.maxVp || 0) - (c.currentVp || 0));
   const loyalty = c.loyalty || 0;
+  const weatherName = (weather?.name || '').toLowerCase();
 
   // {met, magnitude} -- magnitude is only meaningful for a scalingBonus
   // effect (how many "units" of it apply); boolean-only conditions report 1
@@ -2284,6 +2308,15 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0) {
       // Frustration/Return: "+1 per level below/above zero on the Loyalty Chart".
       case 'self_loyalty_below_zero': { const units = Math.max(0, -loyalty); return { met: units > 0, magnitude: units }; }
       case 'self_loyalty_above_zero': { const units = Math.max(0, loyalty); return { met: units > 0, magnitude: units }; }
+      // Solar Beam/Solar Blade's own "if used in harsh sunlight" -- weather
+      // is freeform DM-typed text (see routes_combat.py's set-weather), so
+      // this is a loose case-insensitive substring match rather than an
+      // exact name, same "close enough" trust level as everything else
+      // freeform in this app.
+      case 'self_weather_contains': {
+        const met = !!weatherName && (cond.any || []).some(kw => weatherName.includes(kw.toLowerCase()));
+        return { met, magnitude: 1 };
+      }
       default: return { met: false, magnitude: 0 };
     }
   };
@@ -2296,6 +2329,10 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0) {
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) { diceMultiplier = e.diceMultiplier; diceNote = e.note || ''; }
     if (e.totalMultiplier) totalNote = e.note || `×${e.totalMultiplier} total damage`;
     if (e.flatBonus === 'proficiency') { flatBonus += Number(c.proficiency) || 0; if (e.note) flatNotes.push(e.note); }
+    // Solar Beam/Solar Blade's own "double your MOVE modifier for damage"
+    // -- one more copy of the same value target-conditional's own
+    // flatBonus:'moveModifier' already uses (Wring Out), just self-sided.
+    else if (e.flatBonus === 'moveModifier') { flatBonus += moveModValue; if (e.note) flatNotes.push(e.note); }
     else if (typeof e.flatBonus === 'number') { flatBonus += e.flatBonus; if (e.note) flatNotes.push(e.note); }
     // A bonus that scales with `magnitude` (how many "units" of the
     // condition apply) rather than a fixed amount -- Trump Card/Frustration/
@@ -2890,7 +2927,7 @@ function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved,
   if (!_isDirectHeal && computedData.damageDice) {
     const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
     if (_dmgNoteEffects.length) {
-      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod);
+      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather);
       if (diceMultiplier > 1 || flatBonus) {
         const _adjustedDice = diceMultiplier > 1 ? multiplyDiceString(computedData.damageDice, diceMultiplier) : computedData.damageDice;
         const _totalFlat = computedData.damageBonus + flatBonus;

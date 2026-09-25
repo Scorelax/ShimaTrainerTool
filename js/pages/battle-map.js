@@ -9,7 +9,7 @@ import { CombatAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
-import { cellRect, footprintForSize } from '../utils/battle-map-grid.js';
+import { footprintForSize } from '../utils/battle-map-grid.js';
 
 let session = { active: false, participants: {}, board: null };
 
@@ -50,9 +50,11 @@ function render() {
   updateTokens();
 }
 
-/** See .map-rotor's own comment in battle-map.html for why background,
- * grid and tokens all rotate 90deg together here but not on the player-
- * facing popup/placement screens. */
+/** See battle-map.html's own comment on .map-bg/.map-empty-bg for why the
+ * background image still rotates 90deg via a live CSS transform while the
+ * grid/tokens below don't -- this page rotates the board to match the
+ * table's landscape screen, but the player-facing popup/placement screens
+ * never do. */
 function updateBackground() {
   const stage = document.getElementById('mapStage');
   const bg = document.getElementById('mapBg');
@@ -62,17 +64,42 @@ function updateBackground() {
   bg.style.backgroundImage = url ? `url(${url})` : '';
 }
 
+/** Screen-space equivalent of battle-map-grid.js's cellRect(), pre-rotated
+ * 90deg clockwise in the math instead of via a live CSS transform on
+ * rendered pixels -- see battle-map.html's .map-bg comment for why. Same
+ * (col, row, size) inputs/bottom-left-footprint convention as the shared
+ * cellRect(), just solving for where that footprint lands once the whole
+ * board is rotated 90deg clockwise to fit the landscape screen: the
+ * board's column axis becomes the screen's vertical axis, and the board's
+ * row axis becomes the screen's horizontal axis (reversed, since row 0 is
+ * the board's top edge, which rotates to the screen's right edge). */
+function screenCellRect(board, col, row, size = 1) {
+  const { cols, rows } = board.grid;
+  return {
+    left: `${((rows - row - 1) / rows) * 100}%`,
+    top: `${(col / cols) * 100}%`,
+    width: `${(size / rows) * 100}%`,
+    height: `${(size / cols) * 100}%`,
+  };
+}
+
 function updateGrid() {
   const gridEl = document.getElementById('mapGrid');
   if (!gridEl) return;
 
   const { cols, rows } = session.board.grid;
-  gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  gridEl.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  // Swapped from the board's own (cols, rows) to match screenCellRect()'s
+  // rotation -- the board's column count becomes the screen's row count
+  // and vice versa.
+  gridEl.style.gridTemplateColumns = `repeat(${rows}, 1fr)`;
+  gridEl.style.gridTemplateRows = `repeat(${cols}, 1fr)`;
 
+  // Emitted in row-major order for the *screen* grid above, not the
+  // board's own -- screen row = board col (ascending), screen col = board
+  // row (descending), same mapping screenCellRect() uses.
   const cells = [];
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
+  for (let col = 0; col < cols; col++) {
+    for (let row = rows - 1; row >= 0; row--) {
       const terrain = session.board.cells[`${col},${row}`]?.terrain || '';
       const classes = terrain ? 'map-cell marked' : 'map-cell';
       cells.push(`<div class="${classes}"${terrain ? ` title="${terrain}"` : ''}>${terrain}</div>`);
@@ -108,7 +135,7 @@ function updateTokens() {
     }
 
     const name = visibleToViewer(p, 'name') ? p.name : '???';
-    Object.assign(el.style, cellRect(session.board, pos.col, pos.row, footprintForSize(p.size)));
+    Object.assign(el.style, screenCellRect(session.board, pos.col, pos.row, footprintForSize(p.size)));
     el.className = `map-token ${p.side}`;
     el.title = name;
     patchPortraitMedia(el.querySelector('.map-token-portrait'), p.image, name);

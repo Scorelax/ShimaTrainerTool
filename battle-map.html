@@ -12,31 +12,41 @@
   }
   #mapRoot { height: 100vh; box-sizing: border-box; }
 
-  /* container-type:size lets .map-rotor below size itself off THIS
-     element's own actual pixel box (via cqw/cqh) rather than the viewport
-     -- needed for the rotate-90 trick to come out exact regardless of what
-     this page ends up embedded in. */
+  /* container-type:size lets .map-bg/.map-empty-bg below size themselves
+     off THIS element's own actual pixel box (via cqw/cqh) rather than the
+     viewport -- needed for their own rotate-90 trick (see their comment)
+     to come out exact regardless of what this page ends up embedded in. */
   .map-stage { position: relative; width: 100%; height: 100%; overflow: hidden; container-type: size; }
 
-  /* Background, grid and tokens all live inside this one rotor so they
-     rotate together as a single aligned unit -- the board is conceptually
-     portrait (see routes_combat.py's default 10x16 grid) but the table's
-     screen is landscape, so this always rotates 90 clockwise regardless of
-     whether a background image happens to be set. Without this, the grid/
-     tokens stayed unrotated while only the background (previously rotated
-     on its own) turned, so the two no longer lined up. Pre-rotation the
-     box is sized HEIGHTxWIDTH (swapped, via cqh/cqw) so that after the
-     90-degree turn it exactly fills the stage's actual WIDTHxHEIGHT with
-     no gaps or overflow -- sizing it WIDTHxHEIGHT like the stage itself
-     would rotate into a HEIGHTxWIDTH box instead, either leaving letterbox
-     gaps or overflowing, depending on which side is longer. */
-  .map-rotor {
+  /* Only these two *static* background images rotate via a live CSS
+     transform now -- the board is conceptually portrait (see
+     routes_combat.py's default 10x16 grid) but the table's screen is
+     landscape. .map-grid/.map-tokens below used to rotate the same way as
+     part of one shared .map-rotor wrapper, but that meant the browser had
+     to flatten the whole grid+tokens+autoplaying sprite-video layer into a
+     single offscreen bitmap on every frame just to rotate it -- on the
+     kiosk TV stick's weaker Android WebView renderer that offscreen layer
+     gets rasterized below the screen's real resolution before being
+     stretched back out, which is what showed up as pixelated tokens.
+     Grid/tokens now compute their positions pre-rotated in the math
+     instead (see battle-map.js's screenCellRect and updateGrid), so they
+     render directly in the screen's real orientation with no transform and
+     no forced rasterization. A static (non-animated) background image
+     doesn't have that live-recomposite cost, so it keeps the simple
+     transform approach. Pre-rotation each box is sized HEIGHTxWIDTH
+     (swapped, via cqh/cqw) so that after the 90-degree turn it exactly
+     fills the stage's actual WIDTHxHEIGHT with no gaps or overflow --
+     sizing it WIDTHxHEIGHT like the stage itself would rotate into a
+     HEIGHTxWIDTH box instead, either leaving letterbox gaps or
+     overflowing, depending on which side is longer. */
+  .map-bg, .map-empty-bg {
     position: absolute; top: 50%; left: 50%;
     width: 100cqh; height: 100cqw;
     transform: translate(-50%, -50%) rotate(90deg);
+    background-size: cover; background-position: center;
   }
 
-  .map-bg { position: absolute; inset: 0; display: none; background-size: cover; background-position: center; }
+  .map-bg { display: none; }
   .map-stage.has-bg .map-bg { display: block; }
 
   .map-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
@@ -51,14 +61,13 @@
 
   /* Idle state -- no active battle, shown in place of the grid/tokens (see
      js/pages/battle-map.js's render, which just toggles .map-stage's own
-     .active class rather than swapping any markup). Sits last in the rotor
-     so it paints over the grid's own always-on dark background, and lives
-     INSIDE the rotor (not the stage) so it rotates the same 90deg as
-     everything else here -- a map of the Shiman region, replacing the
-     TitleScreen.png placeholder this started as. */
+     .active class rather than swapping any markup). Sits last in the stage
+     so it paints over the grid's own always-on dark background -- a map of
+     the Shiman region, replacing the TitleScreen.png placeholder this
+     started as. */
   .map-empty-bg {
-    position: absolute; inset: 0; display: none;
-    background-image: url('assets/Shiman Federation.png'); background-size: cover; background-position: center;
+    display: none;
+    background-image: url('assets/Shiman Federation.png');
   }
   .map-stage:not(.active) .map-empty-bg { display: block; }
 
@@ -82,12 +91,10 @@
 <body>
   <div id="mapRoot">
     <div class="map-stage" id="mapStage">
-      <div class="map-rotor">
-        <div class="map-bg" id="mapBg"></div>
-        <div class="map-grid" id="mapGrid"></div>
-        <div class="map-tokens" id="mapTokens"></div>
-        <div class="map-empty-bg" id="mapEmptyBg"></div>
-      </div>
+      <div class="map-bg" id="mapBg"></div>
+      <div class="map-grid" id="mapGrid"></div>
+      <div class="map-tokens" id="mapTokens"></div>
+      <div class="map-empty-bg" id="mapEmptyBg"></div>
     </div>
   </div>
   <script type="module" src="js/pages/battle-map.js"></script>

@@ -34,6 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
+from .conditions import effective_speed_multiplier
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1711,7 +1712,11 @@ def _move_token(state, pid, col, row):
         current = state['board']['tokens'].get(pid)
         distance_ft = max(abs(col - current['col']), abs(row - current['row'])) * 5 if current else 0
         used = participant.get('movementUsed', 0)
-        best_remaining = max(max(0, s['ft'] - used) for s in speeds)
+        # Grappled/Restrained (speed -> 0) and, in a later phase, Paralyzed/
+        # Confused/Exhaustion (speed halved) shrink the budget itself here --
+        # the stored `speeds` data is never mutated, only this read.
+        multiplier = effective_speed_multiplier(participant)
+        best_remaining = max(max(0, s['ft'] * multiplier - used) for s in speeds)
         if distance_ft > best_remaining:
             raise ValueError(f"Not enough movement left ({best_remaining}ft remaining, this move needs {distance_ft}ft)")
         participant['movementUsed'] = used + distance_ft

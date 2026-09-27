@@ -8,16 +8,28 @@ import { CONDITION_RULES } from './condition-rules.js';
 
 const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
+/** One `advantageOn`/`disadvantageOn` list entry (condition-rules.js) matches
+ * `on` -- a plain string ("attack_rolls") matches unconditionally; an object
+ * ({on:'saving_throws', ability:'DEX'}) narrows to one ability's saves only,
+ * same convention `_abilityMatches` already uses for authored `roll`/`stat`
+ * effects (Restrained's own "disadvantage on DEX saves", not every save). */
+function _entryMatches(entry, on, ability) {
+  if (typeof entry === 'string') return entry === on;
+  return entry?.on === on && (!entry.ability || entry.ability === ability);
+}
+
 /** Does `s` (a stored status) grant advantage/disadvantage on `on` (the same
  * roll-target vocabulary authored `roll` effects use) purely from its
  * CONDITION IDENTITY (see condition-rules.js), rather than an authored `roll`
- * sub-effect? null when it doesn't apply at all. */
-function _conditionRollMode(s, on) {
+ * sub-effect? `ability` narrows a `saving_throws` check the same way
+ * `saveRollContext`'s own ability param already does. null when it doesn't
+ * apply at all. */
+function _conditionRollMode(s, on, ability) {
   if (s.kind !== 'condition') return null;
   const rule = CONDITION_RULES[s.apply];
   if (!rule) return null;
-  if (rule.advantageOn?.includes(on)) return 'advantage';
-  if (rule.disadvantageOn?.includes(on)) return 'disadvantage';
+  if ((rule.advantageOn || []).some(e => _entryMatches(e, on, ability))) return 'advantage';
+  if ((rule.disadvantageOn || []).some(e => _entryMatches(e, on, ability))) return 'disadvantage';
   return null;
 }
 
@@ -460,7 +472,7 @@ export function saveRollContext(saver, moveUser, ability) {
       ctx.modifierDelta += a;
       ctx.notes.push(_sourceText(s));
     }
-    const condMode = _conditionRollMode(s, 'saving_throws');
+    const condMode = _conditionRollMode(s, 'saving_throws', ability);
     if (condMode) take(s, saver, condMode === 'advantage' ? adv : dis);
   }
   const scoreDelta = ability ? _abilityScoreDelta(saver, ability) : 0;

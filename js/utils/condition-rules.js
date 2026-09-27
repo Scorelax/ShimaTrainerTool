@@ -40,4 +40,17 @@ export const CONDITION_RULES = {
   charmed: {
     note: "Can't attack the charmer or target them with harmful abilities/effects (not enforced — no move-targeting restriction exists in this app). The charmer has advantage on ability checks to interact with it socially.",
   },
+  grappled: {
+    speedMultiplier: 0,
+    note: "Speed becomes 0 and can't benefit from any bonus to speed. Ends if the grappler is incapacitated, or if an effect removes this creature from the grappler's reach (e.g. hurled away by Thunder Wave) — neither is auto-detected, remove the status by hand when it applies.",
+  },
+  restrained: {
+    // Restrained's own "disadvantage on DEX saves" is narrower than a plain
+    // saving_throws entry (see _entryMatches in move-effects.js) -- every
+    // OTHER ability's save is unaffected, only DEX.
+    disadvantageOn: ['attack_rolls', { on: 'saving_throws', ability: 'DEX' }],
+    advantageOn: ['attacks_against'],
+    speedMultiplier: 0,
+    note: "Speed becomes 0 and can't benefit from any bonus to speed.",
+  },
 };

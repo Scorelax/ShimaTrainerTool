@@ -78,4 +78,22 @@ export const CONDITION_RULES = {
     autoFailSaves: ['STR', 'DEX'],
     note: 'Transformed to stone (weight ×10, stops aging), unaware of its surroundings. Resistant to all damage, and immune to poison/disease (any existing poison/disease is suspended, not neutralized) -- damage resistance and the poison/disease interaction are not auto-enforced yet.',
   },
+  // Turn-boundary damage-over-time -- `turnDamage` is read server-side
+  // (conditions.py's mirror of this entry, applied automatically in
+  // _advance_turn since the amount is deterministic, no dice/human input
+  // needed, unlike a repeat `heal` status or a repeat save). `immuneTypes`
+  // is read client-side, right before a condition is actually applied (see
+  // combat-wip.js's _confirmNotImmune) -- advisory only, never a hard
+  // block, same "trust the human" philosophy as everywhere else in this app.
+  burned: {
+    turnDamage: { timing: 'start', amount: 'proficiency' },
+    immuneTypes: ['Fire'],
+    note: 'Rolls all damage rolls twice and takes the LOWER result (bypasses and does not cancel out with other damage-roll modifiers) -- not auto-enforced yet, no damage-roll-mode banner exists for this. Takes damage equal to proficiency bonus at the start of each of its turns until fainted or cured (auto-applied). Fire types are immune.',
+  },
+  poisoned: {
+    disadvantageOn: ['attack_rolls'],
+    turnDamage: { timing: 'end', amount: 'proficiency' },
+    immuneTypes: ['Poison', 'Steel'],
+    note: 'Also disadvantage on all ability checks (advisory only, no ability-check roll exists in this app). Takes damage equal to proficiency bonus at the end of each of its turns until fainted or cured (auto-applied). Poison and Steel types are immune.',
+  },
 };

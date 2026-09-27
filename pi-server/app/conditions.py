@@ -16,6 +16,14 @@ not preemptively (see the status-conditions plan's own phased approach).
 CONDITION_RULES = {
     'grappled': {'speedMultiplier': 0},
     'restrained': {'speedMultiplier': 0},
+    # 'timing' matches _expire_statuses_on_turn_point's own 'start'/'end'
+    # vocabulary (not the client's 'start_of_turn'/'end_of_turn' naming for
+    # repeat saves/heals) since this applies purely server-side, at the same
+    # turn point _advance_turn already hooks. Deterministic (no dice, no
+    # human decision) unlike a repeat heal/save, so it applies automatically
+    # rather than through the client-driven turn-boundary prompt machinery.
+    'burned': {'turnDamage': {'timing': 'start', 'amount': 'proficiency'}},
+    'poisoned': {'turnDamage': {'timing': 'end', 'amount': 'proficiency'}},
 }
 
 # Any of these blocks move-use and reactions entirely (_apply_move,
@@ -27,6 +35,27 @@ CONDITION_RULES = {
 # status for their own failed-roll turn rather than being listed here
 # directly -- see the status-conditions plan).
 INCAPACITATING_CONDITIONS = {'incapacitated', 'stunned', 'unconscious', 'petrified'}
+
+
+def condition_turn_damage(participant, point):
+    """Every (conditionName, amount) pair `participant` owes from a held
+    condition's own automatic turn-boundary damage (Burning/Poisoned) at
+    turn point `point` ('start' or 'end', see _expire_statuses_on_turn_point's
+    own vocabulary) -- amount already resolved to a number ('proficiency' ->
+    the participant's own proficiency bonus), 0 entries filtered out."""
+    out = []
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') != 'condition':
+            continue
+        rule = CONDITION_RULES.get(s.get('apply'))
+        turn_damage = rule.get('turnDamage') if rule else None
+        if not turn_damage or turn_damage.get('timing') != point:
+            continue
+        amount = turn_damage.get('amount')
+        resolved = participant.get('proficiency') or 0 if amount == 'proficiency' else amount
+        if resolved:
+            out.append((s['apply'], resolved))
+    return out
 
 
 def effective_speed_multiplier(participant):

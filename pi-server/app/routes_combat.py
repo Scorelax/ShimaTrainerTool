@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, effective_speed_multiplier
+from .conditions import INCAPACITATING_CONDITIONS, condition_turn_damage, effective_speed_multiplier
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -959,6 +959,24 @@ def _rebuild_turn_order(state):
                 _maybe_close_reaction_window(state)
 
 
+def _apply_condition_turn_damage(state, pid, point):
+    """Burning/Poisoned's automatic proficiency-bonus damage tick at turn
+    point `point` ('start'/'end') -- deterministic (no dice), so unlike a
+    repeat `heal` status or a repeat save (client-driven, see
+    pendingTurnSaves/pendingTurnHeals) this applies on its own, the same
+    moment _advance_turn's own ends-expiry runs for that turn point. Same
+    temp-HP-absorbs-first, no-floor-at-0 damage path as every other source
+    of damage in this module."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        return
+    for apply_name, amount in condition_turn_damage(participant, point):
+        leftover = _absorb_temp_hp(state, participant, amount)
+        participant['currentHP'] -= leftover
+        _log_event(state, 'status-damage', text=f"{participant['name']} takes {amount} damage from being {apply_name}",
+                   actorId=pid, actorName=participant['name'])
+
+
 def _advance_turn(state):
     if state['reactingParticipantId']:
         raise ValueError('Cannot advance turn while a reaction is in progress')
@@ -983,10 +1001,13 @@ def _advance_turn(state):
     # section) -- after the log line, so "wore off" entries read as happening
     # in the new turn/round.
     if ending_id:
+        _apply_condition_turn_damage(state, ending_id, 'end')
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
         _expire_statuses_by_round(state)
-    _expire_statuses_on_turn_point(state, state['turnOrder'][state['turnIndex']], 'start')
+    starting_id = state['turnOrder'][state['turnIndex']]
+    _apply_condition_turn_damage(state, starting_id, 'start')
+    _expire_statuses_on_turn_point(state, starting_id, 'start')
 
 
 def _reaction_start(state, pid):

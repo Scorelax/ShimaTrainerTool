@@ -27,6 +27,7 @@ import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, tempHpRemaining } from '../utils/move-effects.js';
+import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
@@ -2132,12 +2133,34 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       effect = { ...effect, set: resolved };
     }
     const spec = buildStatusSpec(effect, { sourceId: attackerId, sourceName: attacker?.name, moveName, dc, ends: pick.ends });
+    if (spec.kind === 'condition' && !(await _confirmNotImmune(pick.targetId, spec.apply))) continue;
     try {
       await CombatAPI.applyStatus(pick.targetId, spec);
     } catch (err) {
       showCombatAlert(err.message, { title: 'Error' });
     }
   }
+}
+
+/** Advisory-only type-immunity check (Fire/Burning, Ice/Frozen, Electric/
+ * Paralyzed, Poison+Steel/Poisoned -- see condition-rules.js's
+ * `immuneTypes`) -- never a hard block, matching this app's consistent
+ * "surface the info, trust the human" philosophy elsewhere (a 0x type
+ * matchup is never blocked either, a damage_note is a reminder not a
+ * refusal). Returns true (proceed) when the condition has no immunity rule,
+ * the recipient's types aren't known, or the human confirms anyway; false
+ * only when the human explicitly cancels. */
+async function _confirmNotImmune(targetId, apply) {
+  const immuneTypes = CONDITION_RULES[apply]?.immuneTypes;
+  if (!immuneTypes?.length) return true;
+  const recipient = session?.participants?.[targetId];
+  const types = [recipient?.type1, recipient?.type2].filter(Boolean).map(t => t.toLowerCase());
+  const matched = immuneTypes.find(t => types.includes(t.toLowerCase()));
+  if (!matched) return true;
+  return showCombatConfirm(
+    `${recipient.name} is ${matched}-type — ${matched} types are immune to ${statusLabel({ kind: 'condition', apply })}. Apply it anyway?`,
+    { title: 'Type immunity', yesLabel: 'Apply anyway', noLabel: 'Cancel' },
+  );
 }
 
 /** Resolves a `set` effect's sentinel formula (see move-effects-schema.md) against the

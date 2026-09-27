@@ -133,6 +133,19 @@ export const CONDITION_RULES = {
     speedMultiplier: 0.5,
     note: "Loses its reactions (enforced server-side) and moves at half speed. When it attempts an action or bonus action on its turn, rolls a d20 first (auto-prompted at the start of its turn): 10 or lower hurts itself for typeless damage equal to its proficiency modifier and forfeits the rest of the turn's action/bonus action; 16 or higher ends Confused immediately.",
   },
+  // Standing up (ending Prone) is a real server action -- routes_combat.py's
+  // _stand_up, CombatAPI.standUp, a button on the status badge (see
+  // status-popup.js) -- since the user specifically asked for the
+  // half-movement cost to be real logic, not just a note. The distance-
+  // dependent half of Prone's own rule (advantage to an attacker within
+  // 5ft, disadvantage otherwise) is NOT auto-enforced -- attackRollContext
+  // has no positional/distance awareness at all today (target-picker.js
+  // never threads board/grid data through it), so this stays advisory,
+  // same deferral as Charmed/Frightened's own positional clauses.
+  prone: {
+    disadvantageOn: ['attack_rolls'],
+    note: "Its only movement option is to crawl until it stands up (a button on this badge -- costs half its fastest movement speed for the round, auto-enforced). An attack against it has advantage if the attacker is within 5ft, otherwise disadvantage -- not auto-enforced, this app's attack-roll pipeline has no positional/distance awareness yet.",
+  },
   asleep: {
     disadvantageOn: ['attack_rolls', 'saving_throws'],
     advantageOn: ['attacks_against'],

@@ -332,6 +332,11 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id, col, or row')
         return _mutate(conn, lambda s: _move_token(s, params['id'], col, row))
 
+    if action == 'stand-up':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _stand_up(s, params['id']))
+
     if action == 'clear-token-position':
         if not params.get('id'):
             raise ValueError('Missing participant id')
@@ -1717,6 +1722,56 @@ def _incapacitating_status(participant):
                  if s.get('kind') == 'condition' and s.get('apply') in INCAPACITATING_CONDITIONS), None)
 
 
+def _movement_budget(participant):
+    """(fastest_effective_ft, best_remaining_ft) for `participant`'s own
+    movement this turn -- shared by _move_token (checks a travel distance
+    against best_remaining) and _stand_up (costs half of fastest_effective_ft
+    itself, Prone's own "standing costs half your movement" rule). Both
+    numbers already have Grappled/Restrained/Paralyzed/etc.'s speed
+    multiplier folded in; (0, 0) for a participant with no `speeds` recorded
+    -- same "missing means untracked" convention as _move_token's own
+    original comment."""
+    speeds = participant.get('speeds') or []
+    if not speeds:
+        return (0, 0)
+    used = participant.get('movementUsed', 0)
+    multiplier = effective_speed_multiplier(participant)
+    fastest = max(s['ft'] * multiplier for s in speeds)
+    best_remaining = max(max(0, s['ft'] * multiplier - used) for s in speeds)
+    return (fastest, best_remaining)
+
+
+def _stand_up(state, pid):
+    """Prone's own escape action -- standing up costs half the participant's
+    fastest movement speed for the round (the user's own addition to the
+    rulebook text, not covered by the source document) and ends Prone
+    immediately. Blocked the same way _move_token blocks voluntary movement
+    entirely (a fully incapacitated creature can't stand up either)."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if pid != _active_participant_id(state):
+        raise ValueError("It's not this participant's turn")
+    prone = next((s for s in _statuses_of(participant) if s.get('kind') == 'condition' and s.get('apply') == 'prone'), None)
+    if not prone:
+        raise ValueError(f"{participant['name']} isn't prone")
+    incap = _incapacitating_status(participant)
+    if incap:
+        raise ValueError(f"{participant['name']} is {incap['apply']} and can't stand up")
+
+    fastest, best_remaining = _movement_budget(participant)
+    if fastest:
+        cost = fastest / 2
+        if cost == int(cost):
+            cost = int(cost)
+        if cost > best_remaining:
+            raise ValueError(f"Not enough movement left to stand up ({best_remaining}ft remaining, standing needs {cost}ft)")
+        participant['movementUsed'] = participant.get('movementUsed', 0) + cost
+
+    state['started'] = True
+    _remove_status(state, pid, prone['id'], 'stood up')
+
+
 def _move_token(state, pid, col, row):
     participant = state['participants'].get(pid)
     if not participant:
@@ -1747,21 +1802,15 @@ def _move_token(state, pid, col, row):
     # the most left, and the single shared movementUsed counter (see
     # `speeds`' own comment) is what actually drops every type's own
     # remaining number together afterwards.
-    speeds = participant.get('speeds') or []
-    if speeds:
+    if participant.get('speeds'):
         current = state['board']['tokens'].get(pid)
         distance_ft = max(abs(col - current['col']), abs(row - current['row'])) * 5 if current else 0
-        used = participant.get('movementUsed', 0)
-        # Grappled/Restrained/Frozen/Asleep (speed -> 0) and Paralyzed/
-        # Confused (speed halved) shrink the budget itself here -- the
-        # stored `speeds` data is never mutated, only this read.
-        multiplier = effective_speed_multiplier(participant)
-        best_remaining = max(max(0, s['ft'] * multiplier - used) for s in speeds)
+        _, best_remaining = _movement_budget(participant)
         if best_remaining == int(best_remaining):  # cosmetic only -- "15ft" not "15.0ft"
             best_remaining = int(best_remaining)
         if distance_ft > best_remaining:
             raise ValueError(f"Not enough movement left ({best_remaining}ft remaining, this move needs {distance_ft}ft)")
-        participant['movementUsed'] = used + distance_ft
+        participant['movementUsed'] = participant.get('movementUsed', 0) + distance_ft
 
     state['started'] = True  # see _rebuild_turn_order -- acting on-turn means turn order is now live
     state['board']['tokens'][pid] = {'col': col, 'row': row}

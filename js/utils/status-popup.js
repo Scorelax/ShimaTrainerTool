@@ -40,6 +40,7 @@ export function showStatusDetail(holderName, status, round) {
     const from = status.sourceName ? `${status.sourceName}${status.moveName ? `'s ${status.moveName}` : ''}` : (status.moveName || '—');
     const hasSave = (status.ends || []).some(e => e.type === 'save');
     const hasUses = (status.ends || []).some(e => e.type === 'uses' && e.left > 0);
+    const isProne = status.kind === 'condition' && status.apply === 'prone';
     const rows = [
       ['On', holderName],
       ['From', from],
@@ -62,6 +63,7 @@ export function showStatusDetail(holderName, status, round) {
           <div class="status-popup-actions">
             ${hasSave ? '<button class="combat-use-move-btn" data-act="save">Roll the saving throw</button>' : ''}
             ${hasUses ? '<button class="combat-use-move-btn" data-act="use">Use it up (it applied to a roll)</button>' : ''}
+            ${isProne ? '<button class="combat-use-move-btn" data-act="stand-up">Stand up (costs half movement)</button>' : ''}
             <button class="combat-use-move-btn status-popup-remove" data-act="remove">Remove it</button>
             <button class="combat-use-move-btn status-popup-secondary" data-act="close">Close</button>
           </div>
@@ -72,7 +74,7 @@ export function showStatusDetail(holderName, status, round) {
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (e.target !== overlay && !act) return;
       overlay.remove();
-      resolve(act === 'save' || act === 'use' || act === 'remove' ? act : null);
+      resolve(['save', 'use', 'remove', 'stand-up'].includes(act) ? act : null);
     });
   });
 }

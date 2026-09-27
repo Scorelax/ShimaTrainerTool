@@ -2928,6 +2928,7 @@ async function _openStatusDetail(holderId, statusId) {
     if (action === 'remove') await CombatAPI.removeStatus(holderId, statusId, 'removed by hand');
     else if (action === 'use') await CombatAPI.useStatus(holderId, statusId);
     else if (action === 'save') await _rollStatusSave(holder, status);
+    else if (action === 'stand-up') await CombatAPI.standUp(holderId);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }

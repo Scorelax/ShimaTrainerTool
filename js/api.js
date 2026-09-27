@@ -956,6 +956,14 @@ export class CombatAPI {
     return API.request('combat', 'move-token', { id, col, row }, { useCache: false });
   }
 
+  /** Prone's own escape action -- stands up (ending Prone), costing half the
+   * participant's fastest movement speed for the round (see routes_combat.py's
+   * _stand_up). Rejected the same way move-token is if there isn't enough
+   * movement left this turn, or if the participant isn't actually prone. */
+  static async standUp(id) {
+    return API.request('combat', 'stand-up', { id }, { useCache: false });
+  }
+
   /** Bide's own two-phase toggle (see routes_combat.py's _bide_use) -- same
    * call either way, the server decides activate vs. resolve from the
    * participant's own current state. `hold` (10th level+ only) keeps

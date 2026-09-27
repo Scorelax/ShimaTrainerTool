@@ -53,4 +53,29 @@ export const CONDITION_RULES = {
     speedMultiplier: 0,
     note: "Speed becomes 0 and can't benefit from any bonus to speed.",
   },
+  // Incapacitation family -- "can't take actions or reactions" (and, for
+  // these three, "can't move" too) is enforced server-side (routes_combat.py's
+  // _apply_move/_reaction_start/_move_token, see conditions.py's
+  // INCAPACITATING_CONDITIONS). autoFailSaves is read by saveRollContext's
+  // sibling saveAutoFails() below, not attackRollContext/saveRollContext
+  // themselves -- an auto-fail isn't a roll MODIFIER, it overrides the
+  // outcome regardless of what's rolled.
+  incapacitated: {
+    note: "Can't take actions or reactions.",
+  },
+  stunned: {
+    advantageOn: ['attacks_against'],
+    autoFailSaves: ['STR', 'DEX'],
+    note: "Incapacitated, can't move, and can only speak falteringly.",
+  },
+  unconscious: {
+    advantageOn: ['attacks_against'],
+    autoFailSaves: ['STR', 'DEX'],
+    note: "Incapacitated, can't move or speak, unaware of its surroundings, drops whatever it's holding and falls prone (apply Prone separately by hand -- not auto-chained). Any attack that hits it from within 5ft is an automatic critical hit (not auto-enforced yet -- needs a range check at hit resolution).",
+  },
+  petrified: {
+    advantageOn: ['attacks_against'],
+    autoFailSaves: ['STR', 'DEX'],
+    note: 'Transformed to stone (weight ×10, stops aging), unaware of its surroundings. Resistant to all damage, and immune to poison/disease (any existing poison/disease is suspended, not neutralized) -- damage resistance and the poison/disease interaction are not auto-enforced yet.',
+  },
 };

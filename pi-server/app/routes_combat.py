@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import effective_speed_multiplier
+from .conditions import INCAPACITATING_CONDITIONS, effective_speed_multiplier
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1001,6 +1001,9 @@ def _reaction_start(state, pid):
         raise ValueError('Another reaction is already in progress')
     if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
         raise ValueError("It's already this participant's turn")
+    incap = _incapacitating_status(participant)
+    if incap:
+        raise ValueError(f"{participant['name']} is {incap['apply']} and can't react")
 
     state['started'] = True  # see _rebuild_turn_order -- a reaction means turn order is now live
     state['reactingParticipantId'] = pid
@@ -1468,6 +1471,9 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
         raise ValueError('Unknown participant: ' + pid)
     if pid != _active_participant_id(state):
         raise ValueError("It's not this participant's turn")
+    incap = _incapacitating_status(attacker)
+    if incap:
+        raise ValueError(f"{attacker['name']} is {incap['apply']} and can't act")
     state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
 
     # VP floors at 0; overflow drains the user's own HP with NO floor --
@@ -1680,6 +1686,15 @@ def _set_token_position(state, pid, col, row):
 _MOVEMENT_BLOCKING_CONDITIONS = {'trapped'}
 
 
+def _incapacitating_status(participant):
+    """The first incapacitating condition (see conditions.py's
+    INCAPACITATING_CONDITIONS) `participant` currently holds, or None --
+    shared by _apply_move/_reaction_start/_move_token, all three of which an
+    incapacitated creature can't do at all."""
+    return next((s for s in _statuses_of(participant)
+                 if s.get('kind') == 'condition' and s.get('apply') in INCAPACITATING_CONDITIONS), None)
+
+
 def _move_token(state, pid, col, row):
     participant = state['participants'].get(pid)
     if not participant:
@@ -1690,6 +1705,9 @@ def _move_token(state, pid, col, row):
                       if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
     if blocking:
         raise ValueError(f"{participant['name']} is {blocking['apply']} and can't move")
+    incap = _incapacitating_status(participant)
+    if incap:
+        raise ValueError(f"{participant['name']} is {incap['apply']} and can't move")
 
     # Movement budget -- skipped entirely for a participant with no `speeds`
     # recorded (a DM's freeform enemy, or anyone added before this existed),

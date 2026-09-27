@@ -540,6 +540,20 @@ export function guaranteedCritStatusId(participant) {
   return (participant?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'guaranteed_next_crit')?.id || null;
 }
 
+/** True when `saver` currently auto-fails a saving throw for `ability`
+ * ("STR".."CHA") purely from a held condition's own rulebook text (Stunned/
+ * Unconscious/Petrified's "automatically fails Strength and Dexterity
+ * saving throws") -- unlike everything in saveRollContext, this isn't a
+ * modifier, it overrides the outcome outright regardless of what's rolled.
+ * Still advisory, same as every other roll in this app: the save-picker
+ * pre-suggests Fail, a human still clicks the button. false when `ability`
+ * isn't given -- can't judge an unscoped save against a specific-ability
+ * rule. */
+export function saveAutoFails(saver, ability) {
+  if (!ability) return false;
+  return (saver?.statuses || []).some(s => s.kind === 'condition' && CONDITION_RULES[s.apply]?.autoFailSaves?.includes(ability));
+}
+
 /** The holder's statuses that end on a repeat saving throw at `timing`
  * ('start_of_turn' | 'end_of_turn') -- what to prompt for when that turn point
  * comes up. 'action' saves are never prompted (the holder chooses to spend the

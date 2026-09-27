@@ -18,7 +18,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor } from './move-effects.js';
+import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, saveAutoFails } from './move-effects.js';
 
 function _injectStyles() {
   if (document.getElementById('save-picker-styles')) return;
@@ -91,6 +91,7 @@ let _saveAbility = null;   // "STR".."CHA" when the caller knows which save this
 let _saveModifier = null;  // the target's save modifier for that ability, null when their sheet has no data
 let _moveUser = null;      // the participant whose move this is (their "saves against its moves" statuses apply)
 let _saveCtx = null;       // live-status modifiers for the selected target's save (see move-effects.js's saveRollContext)
+let _saveAutoFail = false; // true when a held condition auto-fails this exact save (see move-effects.js's saveAutoFails) -- pre-suggests Fail regardless of the typed roll
 // Dice-based bonuses (Growth, Aromatic Mist, Helping Hand -- see diceBonusOptionsFor)
 // the saver chose to spend on THIS save: the running total added in, and which of
 // those statuses still need use-status once the save is declared (only the ones with
@@ -202,6 +203,7 @@ function _showStep2(p, name) {
   document.getElementById('savePickerStep3').hidden = true;
   document.getElementById('savePickerTitle').textContent = 'Saving Throw';
   _saveCtx = saveRollContext(_selectedTarget, _moveUser, _saveAbility);
+  _saveAutoFail = saveAutoFails(_selectedTarget, _saveAbility);
   const baseModifier = saveModifierFor(_selectedTarget, _saveAbility);
   // Live changes only mean something on top of a known modifier; with no sheet data the human types the total.
   _saveModifier = baseModifier === null ? null : baseModifier + _saveCtx.modifierDelta;
@@ -209,8 +211,9 @@ function _showStep2(p, name) {
   _diceBonusConsume = [];
   _renderDiceRow();
   const modeText = rollModeText(_saveCtx.mode);
+  const autoFailNote = _saveAutoFail ? `<div class="mode disadvantage">Automatically fails this save</div>` : '';
   document.getElementById('savePickerRollNotes').innerHTML =
-    `${modeText ? `<div class="mode ${_saveCtx.mode}">${modeText}</div>` : ''}${_saveCtx.notes.map(n => `<div class="note">${n}</div>`).join('')}`;
+    `${autoFailNote}${modeText ? `<div class="mode ${_saveCtx.mode}">${modeText}</div>` : ''}${_saveCtx.notes.map(n => `<div class="note">${n}</div>`).join('')}`;
   const abilityText = _saveAbility ? ` (${_saveAbility})` : '';
   const modText = _saveModifier === null
     ? (_saveAbility ? ' — no ability data, enter the total' : '')
@@ -314,14 +317,19 @@ function _updateSaveTotal() {
   const failBtn = document.getElementById('savePickerFail');
   passBtn.classList.remove('save-picker-suggested');
   failBtn.classList.remove('save-picker-suggested');
+  // An auto-fail condition (Stunned/Unconscious/Petrified) always suggests
+  // Fail, regardless of what's rolled -- still just a suggestion, a human
+  // still has to click the button (same trust-the-human pattern as
+  // everywhere else in this app).
+  if (_saveAutoFail) failBtn.classList.add('save-picker-suggested');
   const raw = _currentSaveRoll();
   const dc = _currentDc();
-  if (raw === null) { totalEl.innerHTML = ''; return; }
+  if (raw === null) { totalEl.innerHTML = _saveAutoFail ? 'Auto-fails regardless of the roll' : ''; return; }
   const total = raw + (_saveModifier || 0) + _diceBonusExtra;
-  if (!dc) { totalEl.innerHTML = `Total: <strong>${total}</strong>`; return; }
-  const passed = total >= dc;
-  (passed ? passBtn : failBtn).classList.add('save-picker-suggested');
-  totalEl.innerHTML = `Total: <strong>${total}</strong> vs DC ${dc} — ${passed ? 'passes' : `fails by ${dc - total}`}`;
+  if (!dc) { totalEl.innerHTML = `Total: <strong>${total}</strong>${_saveAutoFail ? ' — auto-fails regardless' : ''}`; return; }
+  const passed = !_saveAutoFail && total >= dc;
+  if (passed) passBtn.classList.add('save-picker-suggested');
+  totalEl.innerHTML = `Total: <strong>${total}</strong> vs DC ${dc} — ${passed ? 'passes' : (_saveAutoFail ? 'auto-fails' : `fails by ${dc - total}`)}`;
 }
 
 /** {saveRoll, saveTotal, failBy} for the current inputs. failBy is how far the

@@ -18,6 +18,16 @@ CONDITION_RULES = {
     'restrained': {'speedMultiplier': 0},
 }
 
+# Any of these blocks move-use and reactions entirely (_apply_move,
+# _reaction_start) and movement (_move_token, alongside
+# _MOVEMENT_BLOCKING_CONDITIONS) -- "Incapacitated" itself plus every
+# condition whose own rulebook text says "incapacitated" as part of its
+# effect (Stunned, Unconscious, Petrified; Asleep/Frozen join this set in a
+# later phase, and Paralyzed/Confused apply a transient 'incapacitated'
+# status for their own failed-roll turn rather than being listed here
+# directly -- see the status-conditions plan).
+INCAPACITATING_CONDITIONS = {'incapacitated', 'stunned', 'unconscious', 'petrified'}
+
 
 def effective_speed_multiplier(participant):
     """The combined speed multiplier from every condition `participant`

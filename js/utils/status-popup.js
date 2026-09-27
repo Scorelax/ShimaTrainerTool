@@ -4,6 +4,7 @@
 // hand (a cure, a human ruling). Resolves to 'save' | 'use' | 'remove' | null
 // (closed); combat-wip.js does the actual save popup / server call.
 import { statusLabel, describeStatusEnds } from './move-effects.js';
+import { CONDITION_RULES } from './condition-rules.js';
 
 function _injectStyles() {
   if (document.getElementById('status-popup-styles')) return;
@@ -44,7 +45,11 @@ export function showStatusDetail(holderName, status, round) {
       ['From', from],
       ['Ends', describeStatusEnds(status, round)],
       status.dc ? ['Move DC', status.dc] : null,
-      status.note ? ['Note', status.note] : null,
+      // A status applied with its own authored note wins; otherwise fall back to
+      // the condition's own rulebook text (e.g. a DM's manual apply-status pick,
+      // which carries no authored note at all) -- see condition-rules.js.
+      (status.note || (status.kind === 'condition' && CONDITION_RULES[status.apply]?.note))
+        ? ['Note', status.note || CONDITION_RULES[status.apply].note] : null,
     ].filter(Boolean).map(([k, v]) => `<div class="status-popup-row"><span class="status-popup-key">${k}</span><span>${esc(v)}</span></div>`).join('');
     overlay.innerHTML = `
       <div class="combat-popup-content" style="max-width:420px;">

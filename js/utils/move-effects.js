@@ -4,7 +4,22 @@
 // No DOM, no API calls: the popups and combat-wip.js do the talking, this only
 // answers questions, so it can be exercised in isolation.
 
+import { CONDITION_RULES } from './condition-rules.js';
+
 const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+/** Does `s` (a stored status) grant advantage/disadvantage on `on` (the same
+ * roll-target vocabulary authored `roll` effects use) purely from its
+ * CONDITION IDENTITY (see condition-rules.js), rather than an authored `roll`
+ * sub-effect? null when it doesn't apply at all. */
+function _conditionRollMode(s, on) {
+  if (s.kind !== 'condition') return null;
+  const rule = CONDITION_RULES[s.apply];
+  if (!rule) return null;
+  if (rule.advantageOn?.includes(on)) return 'advantage';
+  if (rule.disadvantageOn?.includes(on)) return 'disadvantage';
+  return null;
+}
 
 /** A participant's saving-throw modifier for `ability` ("STR"..."CHA"): the
  * ability modifier plus proficiency when its `savingThrows` list names that
@@ -223,6 +238,8 @@ export function attackRollContext(attacker, target) {
       ctx.notes.push(_sourceText(s));
       if (_hasUses(s)) ctx.consume.push({ holderId: attacker.id, statusId: s.id });
     }
+    const condMode = _conditionRollMode(s, 'attack_rolls');
+    if (condMode) take(s, attacker, condMode === 'advantage' ? adv : dis);
   }
   for (const s of target?.statuses || []) {
     // (a target's own all_rolls status affects ITS rolls, not attacks against it)
@@ -232,6 +249,8 @@ export function attackRollContext(attacker, target) {
       ctx.acDelta += a;
       ctx.notes.push(_sourceText(s));
     }
+    const condMode = _conditionRollMode(s, 'attacks_against');
+    if (condMode) take(s, target, condMode === 'advantage' ? adv : dis);
   }
   return _finish(ctx, adv, dis);
 }
@@ -441,6 +460,8 @@ export function saveRollContext(saver, moveUser, ability) {
       ctx.modifierDelta += a;
       ctx.notes.push(_sourceText(s));
     }
+    const condMode = _conditionRollMode(s, 'saving_throws');
+    if (condMode) take(s, saver, condMode === 'advantage' ? adv : dis);
   }
   const scoreDelta = ability ? _abilityScoreDelta(saver, ability) : 0;
   if (scoreDelta) {

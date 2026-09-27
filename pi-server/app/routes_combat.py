@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, condition_turn_damage, effective_speed_multiplier
+from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1022,9 +1022,10 @@ def _reaction_start(state, pid):
         raise ValueError('Another reaction is already in progress')
     if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
         raise ValueError("It's already this participant's turn")
-    incap = _incapacitating_status(participant)
-    if incap:
-        raise ValueError(f"{participant['name']} is {incap['apply']} and can't react")
+    blocking = next((s for s in _statuses_of(participant)
+                      if s.get('kind') == 'condition' and s.get('apply') in REACTION_BLOCKING_CONDITIONS), None)
+    if blocking:
+        raise ValueError(f"{participant['name']} is {blocking['apply']} and can't react")
 
     state['started'] = True  # see _rebuild_turn_order -- a reaction means turn order is now live
     state['reactingParticipantId'] = pid
@@ -1751,11 +1752,13 @@ def _move_token(state, pid, col, row):
         current = state['board']['tokens'].get(pid)
         distance_ft = max(abs(col - current['col']), abs(row - current['row'])) * 5 if current else 0
         used = participant.get('movementUsed', 0)
-        # Grappled/Restrained (speed -> 0) and, in a later phase, Paralyzed/
-        # Confused/Exhaustion (speed halved) shrink the budget itself here --
-        # the stored `speeds` data is never mutated, only this read.
+        # Grappled/Restrained/Frozen/Asleep (speed -> 0) and Paralyzed/
+        # Confused (speed halved) shrink the budget itself here -- the
+        # stored `speeds` data is never mutated, only this read.
         multiplier = effective_speed_multiplier(participant)
         best_remaining = max(max(0, s['ft'] * multiplier - used) for s in speeds)
+        if best_remaining == int(best_remaining):  # cosmetic only -- "15ft" not "15.0ft"
+            best_remaining = int(best_remaining)
         if distance_ft > best_remaining:
             raise ValueError(f"Not enough movement left ({best_remaining}ft remaining, this move needs {distance_ft}ft)")
         participant['movementUsed'] = used + distance_ft

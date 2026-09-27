@@ -25,17 +25,28 @@ CONDITION_RULES = {
     # rather than through the client-driven turn-boundary prompt machinery.
     'burned': {'turnDamage': {'timing': 'start', 'amount': 'proficiency'}},
     'poisoned': {'turnDamage': {'timing': 'end', 'amount': 'proficiency'}},
+    'paralyzed': {'speedMultiplier': 0.5},
+    'confused': {'speedMultiplier': 0.5},
 }
 
 # Any of these blocks move-use and reactions entirely (_apply_move,
 # _reaction_start) and movement (_move_token, alongside
 # _MOVEMENT_BLOCKING_CONDITIONS) -- "Incapacitated" itself plus every
 # condition whose own rulebook text says "incapacitated" as part of its
-# effect (Stunned, Unconscious, Petrified, Frozen; Asleep joins this set
-# next, and Paralyzed/Confused apply a transient 'incapacitated' status for
-# their own failed-roll turn rather than being listed here directly -- see
-# the status-conditions plan).
-INCAPACITATING_CONDITIONS = {'incapacitated', 'stunned', 'unconscious', 'petrified', 'frozen'}
+# effect (Stunned, Unconscious, Petrified, Frozen, Asleep). Paralyzed/
+# Confused apply a transient 'incapacitated' status for their own
+# failed-roll turn instead of being listed here directly (see
+# combat-wip.js's _promptParalysisCheck/_promptConfusionCheck) -- most of
+# the time they're NOT incapacitated at all, unlike everything in this set.
+INCAPACITATING_CONDITIONS = {'incapacitated', 'stunned', 'unconscious', 'petrified', 'frozen', 'asleep'}
+
+# Confused blocks reactions specifically ("loses its ability to take
+# reactions") without being fully incapacitated the rest of the time --
+# checked only in _reaction_start, alongside INCAPACITATING_CONDITIONS,
+# never in _apply_move/_move_token (a confused creature can still act and
+# move, just with its own d20 self-harm check gating whether it actually
+# gets to).
+REACTION_BLOCKING_CONDITIONS = INCAPACITATING_CONDITIONS | {'confused'}
 
 
 def condition_turn_damage(participant, point):

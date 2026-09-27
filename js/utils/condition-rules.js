@@ -117,4 +117,26 @@ export const CONDITION_RULES = {
     immuneTypes: ['Ice'],
     note: "Incapacitated and restrained (blocks actions/reactions/movement, enforced server-side). Breaks free with a STR save at the end of each of its turns -- authored as ends:[{type:'save', ability:'STR', timing:'end_of_turn'}] on whichever move applies it. Outside of combat this lasts 1 hour instead (not tracked -- this app only models combat turns).",
   },
+  // The remaining three (Paralyzed/Confused/Asleep) each roll their own
+  // flat d20/d4 check at a turn boundary -- see combat-wip.js's
+  // _promptParalysisCheck/_promptConfusionCheck/_promptSleepCheck, driven
+  // directly by condition identity rather than an authored `ends` entry
+  // (these checks are a fixed, unconditional part of what the condition IS,
+  // not something a move author configures per use).
+  paralyzed: {
+    disadvantageOn: [{ on: 'saving_throws', ability: 'STR' }, { on: 'saving_throws', ability: 'DEX' }],
+    speedMultiplier: 0.5,
+    immuneTypes: ['Electric'],
+    note: "At the start of its turn, rolls a d4: on a 1, it's incapacitated and restrained until the start of its next turn, forfeiting its remaining action and bonus action (auto-prompted). If also Confused or Asleep, this roll happens first -- a failure skips the confusion/wake-up check entirely for that turn (enforced in the prompt order, not a passive rule). Electric types are immune.",
+  },
+  confused: {
+    speedMultiplier: 0.5,
+    note: "Loses its reactions (enforced server-side) and moves at half speed. When it attempts an action or bonus action on its turn, rolls a d20 first (auto-prompted at the start of its turn): 10 or lower hurts itself for typeless damage equal to its proficiency modifier and forfeits the rest of the turn's action/bonus action; 16 or higher ends Confused immediately.",
+  },
+  asleep: {
+    disadvantageOn: ['attack_rolls', 'saving_throws'],
+    advantageOn: ['attacks_against'],
+    speedMultiplier: 0,
+    note: "Incapacitated and restrained (blocks actions/reactions/movement, enforced server-side), and rolls all saving throws with disadvantage. Rolls a d20 at the end of each of its turns (auto-prompted), ending immediately on 11+ -- the rulebook's OTHER trigger (\"when subject to a move\") isn't auto-prompted, that would need a hook into every attack-resolution path. If returned to its ball during this time, the round count pauses until released again (not auto-tracked -- handle by hand).",
+  },
 };

@@ -17,7 +17,7 @@ import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
-import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
+import { showCombatAlert, showCombatConfirm, showCombatPrompt } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
@@ -1622,6 +1622,7 @@ function _attachMainFocusListeners(state) {
     // (Aqua Ring/Ingrain), at the end of this turn get prompted first.
     _promptTurnSaves(endingId, 'end_of_turn')
       .then(() => _promptTurnHeals(endingId, 'end_of_turn'))
+      .then(() => _promptSleepCheck(endingId))
       .then(() => CombatAPI.advanceTurn())
       .then(() => { if (nextId && nextId !== endingId && !endingHasIngrain) _setFocus(nextId); })
       .catch(() => {});
@@ -2748,6 +2749,86 @@ async function _promptTurnSaves(participantId, timing) {
   }
 }
 
+/** Paralyzed/Confused/Asleep's own escape/failure rolls: a plain d20/d4 vs a
+ * flat threshold, no ability or DC involved at all -- a genuinely different
+ * shape from a `save` end (see _rollStatusSave above), so these are three
+ * bespoke functions rather than forced into one generic mechanism (matches
+ * this app's own "give each condition its own flow wrinkle" precedent).
+ * Driven purely by the condition's IDENTITY (does the holder carry
+ * 'paralyzed'/'confused'/'asleep'), not an authored `ends` entry -- unlike a
+ * move-granted status, these checks are a fixed, unconditional part of what
+ * these three conditions ARE, the same way their advantage/disadvantage
+ * comes from condition-rules.js rather than a per-move `roll` effect. */
+
+/** Paralyzed's own start-of-turn d4 check: on a 1, the holder is locked out
+ * for the rest of this turn AND their entire next turn (a transient
+ * 'incapacitated' status lasting until the START of their own next turn --
+ * "forfeits their remaining action and bonus action to their trainer").
+ * Returns true when the lock triggered, so the caller can skip the
+ * confusion check this turn -- the rulebook's own explicit ordering: "the
+ * paralysis roll comes first... if it fails, it does not roll to wake or be
+ * confused." */
+async function _promptParalysisCheck(holderId) {
+  const holder = session?.participants?.[holderId];
+  if (!holder || !(holder.statuses || []).some(s => s.kind === 'condition' && s.apply === 'paralyzed')) return false;
+  const roll = await showCombatPrompt(`${holder.name} is Paralyzed — roll a d4 at the start of their turn.`, { title: 'Paralysis check' });
+  if (roll === null) return false;
+  if (roll !== 1) return false;
+  await CombatAPI.applyStatus(holderId, buildStatusSpec(
+    { kind: 'condition', apply: 'incapacitated', ends: [{ type: 'until_turn', whose: 'holder', point: 'start', count: 1 }] },
+    { sourceId: holderId, sourceName: holder.name, moveName: 'Paralysis' },
+  )).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+  CombatAPI.logEvent({
+    type: 'status', actorId: holderId, actorName: holder.name,
+    text: `${holder.name} rolled a 1 on their paralysis check — incapacitated until the start of their next turn`,
+  }).catch(() => {});
+  return true;
+}
+
+/** Confused's own "attempting an action" d20 check, prompted once at the
+ * start of its turn (before it acts): 10 or lower hurts itself for typeless
+ * damage equal to its proficiency modifier and forfeits the rest of THIS
+ * turn's action/bonus action (a transient 'incapacitated' status lasting
+ * until the END of this same turn -- not the next one, unlike Paralyzed's
+ * own lock); 16 or higher ends Confused immediately; 11-15 does nothing. */
+async function _promptConfusionCheck(holderId) {
+  const holder = session?.participants?.[holderId];
+  const status = (holder?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'confused');
+  if (!status) return;
+  const roll = await showCombatPrompt(`${holder.name} is Confused — roll a d20 before acting this turn.`, { title: 'Confusion check' });
+  if (roll === null) return;
+  if (roll <= 10) {
+    const dmg = Number(holder.proficiency) || 0;
+    if (dmg) await CombatAPI.updateStats(holderId, { currentHP: holder.currentHP - dmg }).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+    await CombatAPI.applyStatus(holderId, buildStatusSpec(
+      { kind: 'condition', apply: 'incapacitated', ends: [{ type: 'until_turn', whose: 'holder', point: 'end', count: 1 }] },
+      { sourceId: holderId, sourceName: holder.name, moveName: 'Confusion' },
+    )).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+    CombatAPI.logEvent({
+      type: 'status', actorId: holderId, actorName: holder.name,
+      text: `${holder.name} rolled ${roll} on their confusion check — hurts itself for ${dmg} and forfeits the rest of the turn`,
+    }).catch(() => {});
+  } else if (roll >= 16) {
+    await CombatAPI.removeStatus(holderId, status.id, `rolled ${roll} on the confusion check`);
+  }
+}
+
+/** Asleep's own end-of-turn d20 wake-up check: 11 or higher ends it
+ * immediately. The rulebook's other trigger ("when subject to a move")
+ * isn't covered here -- deliberately deferred, see the status-conditions
+ * plan; it would need a hook into every attack-resolution path, not just
+ * this turn boundary. Also deliberately not modeled: the 3-round fixed
+ * duration pausing while the Pokemon is in its ball (no in-app concept of
+ * "currently benched mid-combat" to hook into) -- handle by hand. */
+async function _promptSleepCheck(holderId) {
+  const holder = session?.participants?.[holderId];
+  const status = (holder?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'asleep');
+  if (!status) return;
+  const roll = await showCombatPrompt(`${holder.name} is Asleep — roll a d20 to see if it wakes up.`, { title: 'Wake-up check' });
+  if (roll === null) return;
+  if (roll >= 11) await CombatAPI.removeStatus(holderId, status.id, `rolled ${roll} on the wake-up check`);
+}
+
 /** A `heal` status's own repeat trigger (Aqua Ring/Ingrain -- see move-effects-
  * schema.md's `repeat` field and pendingTurnHeals's own docstring): rolls (or
  * computes) this turn's amount and applies it, same client-authoritative
@@ -2802,11 +2883,18 @@ async function _maybePromptStartOfTurnSaves(state) {
   const key = `${state.logFile}:${state.round}:${state.turnIndex}:${activeId}`;
   if (sessionStorage.getItem(WIP_SAVE_PROMPT_KEY) === key) return;
   sessionStorage.setItem(WIP_SAVE_PROMPT_KEY, key);
-  if (!pendingTurnSaves(p, 'start_of_turn').length && !pendingTurnHeals(p, 'start_of_turn').length) return;
+  const hasParalyzed = (p.statuses || []).some(s => s.kind === 'condition' && s.apply === 'paralyzed');
+  const hasConfused = (p.statuses || []).some(s => s.kind === 'condition' && s.apply === 'confused');
+  if (!pendingTurnSaves(p, 'start_of_turn').length && !pendingTurnHeals(p, 'start_of_turn').length && !hasParalyzed && !hasConfused) return;
   _promptingSaves = true;
   try {
     await _promptTurnSaves(activeId, 'start_of_turn');
     await _promptTurnHeals(activeId, 'start_of_turn');
+    // Paralysis is checked first and, on a failed roll, suppresses the
+    // confusion check entirely for this turn -- see _promptParalysisCheck's
+    // own docstring for the rulebook's explicit ordering.
+    const locked = await _promptParalysisCheck(activeId);
+    if (!locked) await _promptConfusionCheck(activeId);
   } finally {
     _promptingSaves = false;
   }

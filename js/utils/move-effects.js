@@ -26,11 +26,37 @@ function _entryMatches(entry, on, ability) {
  * apply at all. */
 function _conditionRollMode(s, on, ability) {
   if (s.kind !== 'condition') return null;
+  // Exhaustion's roll-mode effect is level-dependent (level 3+ disadvantages
+  // attack rolls AND saving throws, cumulative with lower levels) rather
+  // than a fixed CONDITION_RULES entry -- special-cased here instead of in
+  // the data table, since nothing else in this app's conditions scales with
+  // a stored numeric level. Level 1's "disadvantage on ability checks" has
+  // nowhere to auto-enforce, same as everywhere else in this app with no
+  // ability-check roll (see condition-rules.js's own note for it).
+  if (s.apply === 'exhaustion') {
+    const level = s.value || 1;
+    return level >= 3 && (on === 'attack_rolls' || on === 'saving_throws') ? 'disadvantage' : null;
+  }
   const rule = CONDITION_RULES[s.apply];
   if (!rule) return null;
   if ((rule.advantageOn || []).some(e => _entryMatches(e, on, ability))) return 'advantage';
   if ((rule.disadvantageOn || []).some(e => _entryMatches(e, on, ability))) return 'disadvantage';
   return null;
+}
+
+/** Exhaustion (level 4+) halves max HP -- level-dependent, same reasoning
+ * as _conditionRollMode's own exhaustion special-case. Not yet wired into
+ * any display surface (the combat card/HP bar show participant.maxHP
+ * directly) -- exposed here for whenever that display work happens,
+ * deliberately not force-fit into this pass. Returns the participant's
+ * plain maxHP unchanged when it isn't a finite number or exhaustion hasn't
+ * reached level 4. */
+export function effectiveMaxHP(participant) {
+  const max = participant?.maxHP;
+  if (!Number.isFinite(max)) return max;
+  const exhaustion = (participant?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'exhaustion');
+  const level = exhaustion?.value || 0;
+  return level >= 4 ? Math.floor(max / 2) : max;
 }
 
 /** A participant's saving-throw modifier for `ability` ("STR"..."CHA"): the
@@ -122,6 +148,7 @@ export function statusLabel(s) {
     if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value2 ? `${s.value}/${s.value2}` : s.value}`;
     if (s.apply === 'resistance_upgrade') return `Resistance upgraded (${s.value === 'all' ? 'all types' : s.value || ''})`;
     if (s.apply === 'granted_immunity') return `Immune to ${s.value || ''}`;
+    if (s.apply === 'exhaustion') return `Exhaustion (level ${s.value || 1})`;
     return _title(String(s.apply || '').replace(/_/g, ' '));
   }
   if (s.kind === 'temp_hp') {

@@ -152,4 +152,16 @@ export const CONDITION_RULES = {
     speedMultiplier: 0,
     note: "Incapacitated and restrained (blocks actions/reactions/movement, enforced server-side), and rolls all saving throws with disadvantage. Rolls a d20 at the end of each of its turns (auto-prompted), ending immediately on 11+ -- the rulebook's OTHER trigger (\"when subject to a move\") isn't auto-prompted, that would need a hook into every attack-resolution path. If returned to its ball during this time, the round count pauses until released again (not auto-tracked -- handle by hand).",
   },
+  // Exhaustion is a single LEVELED status (1-6, stored as this status's own
+  // `value`), not a fixed presence/absence condition -- its roll-mode/speed
+  // effects scale with that level and are special-cased directly in
+  // move-effects.js (_conditionRollMode) and conditions.py
+  // (effective_speed_multiplier) rather than living in this data table.
+  // Session-only for now (resets when the combat session ends) -- NOT
+  // persisted across encounters via a Long Rest, a deliberate scope
+  // decision (Long Rest lives entirely outside any combat session, on the
+  // trainer-card page, with no hook into this at all).
+  exhaustion: {
+    note: '6 cumulative levels (each includes every lower level\'s own effect): 1 = disadvantage on ability checks (advisory only, no ability-check roll exists in this app); 2 = speed halved (auto-enforced); 3 = disadvantage on attack rolls AND saving throws (auto-enforced); 4 = max HP halved (exposed via effectiveMaxHP, not yet wired into any display); 5 = speed reduced to 0 (auto-enforced); 6 = death (NOT auto-applied -- a human decides how this plays out, same as this app\'s other death/faint edge cases). A long rest reduces the level by 1 (not tracked here -- session-only, see above). Reapplying from ANY source/move adds to the same shared level rather than creating a separate status.',
+  },
 };

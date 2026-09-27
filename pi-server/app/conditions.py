@@ -76,11 +76,19 @@ def effective_speed_multiplier(participant):
     sources rather than multiplying them together -- standard "the worst
     source wins, reductions don't stack" convention, not stated in the
     user's own rules text, so an assumption worth revisiting if it ever
-    matters in play (e.g. once Exhaustion's own speed-halving lands
-    alongside Grappled/Restrained's flat zero)."""
+    matters in play. Exhaustion is level-dependent (level 2+ halves, level
+    5+ zeroes) rather than a flat CONDITION_RULES entry, since its speed
+    effect isn't fixed the way Grappled/Restrained's is."""
     multiplier = 1
     for s in (participant or {}).get('statuses', []):
         if s.get('kind') != 'condition':
+            continue
+        if s.get('apply') == 'exhaustion':
+            level = s.get('value') or 1
+            if level >= 5:
+                multiplier = min(multiplier, 0)
+            elif level >= 2:
+                multiplier = min(multiplier, 0.5)
             continue
         rule = CONDITION_RULES.get(s.get('apply'))
         if rule and 'speedMultiplier' in rule:

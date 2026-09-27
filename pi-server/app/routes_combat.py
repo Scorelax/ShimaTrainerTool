@@ -1379,6 +1379,20 @@ def _apply_status(state, target_id, spec):
     new['appliedRound'] = state['round']
     new['ends'] = [_prime_end(e, state, target_id, source_id) for e in raw_ends]
 
+    if spec.get('kind') == 'condition' and spec.get('apply') == 'exhaustion':
+        # Exhaustion is a single leveled status (1-6), not the usual
+        # presence/absence condition -- and unlike every other status here,
+        # a LATER application from a completely different source/move still
+        # has to find and bump the SAME existing entry (_same_status's own
+        # sourceId/moveName/value match would never do that, since the
+        # whole point is the value changing). `value` on the incoming spec
+        # is how many levels this application ADDS (the rulebook's own "one
+        # or more levels, as specified" -- unspecified defaults to 1), not
+        # the resulting level itself. Session-only for now (see the
+        # status-conditions plan) -- no `ends` at all, cleared manually or
+        # by a long rest outside combat, which this module has no hook into.
+        return _apply_exhaustion(state, target, new, js_parse_int(spec.get('value')) or 1, from_text, source_id, source_name)
+
     statuses = _statuses_of(target)
     existing = next((s for s in statuses if _same_status(s, new)), None)
     new['id'] = existing['id'] if existing else uuid.uuid4().hex[:8]
@@ -1400,6 +1414,31 @@ def _apply_status(state, target_id, spec):
         statuses.append(new)
     _log_event(state, 'status-apply', text=f"{target['name']} {verb} {_status_label(new)}{from_text}",
                actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
+
+
+def _apply_exhaustion(state, target, new, increment, from_text, source_id, source_name):
+    """See _apply_status's own call site for why this is special-cased
+    entirely outside the generic stacking path."""
+    existing = next((s for s in _statuses_of(target) if s.get('kind') == 'condition' and s.get('apply') == 'exhaustion'), None)
+    if existing:
+        existing['value'] = min(6, (existing.get('value') or 1) + increment)
+        level = existing['value']
+        text = f"{target['name']}'s Exhaustion increases to level {level}{from_text}"
+    else:
+        new['value'] = min(6, increment)
+        new['id'] = uuid.uuid4().hex[:8]
+        level = new['value']
+        _statuses_of(target).append(new)
+        text = f"{target['name']} gains Exhaustion (level {level}){from_text}"
+    _log_event(state, 'status-apply', text=text, actorId=source_id, actorName=source_name,
+               targetId=target['id'], targetName=target['name'])
+    if level >= 6:
+        # The rulebook's own level-6 effect is death outright -- deliberately
+        # NOT auto-applied (no HP/fainted change here), same precedent as
+        # Self-Destruct's own forced-death-save chain being left as a human
+        # judgment call rather than automated.
+        _log_event(state, 'status-apply', text=f"{target['name']} has reached Exhaustion level 6 -- death, per the rulebook (not auto-applied; a human decides how this plays out)",
+                   targetId=target['id'], targetName=target['name'])
 
 
 def _find_status(state, target_id, status_id):

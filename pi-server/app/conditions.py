@@ -16,6 +16,7 @@ not preemptively (see the status-conditions plan's own phased approach).
 CONDITION_RULES = {
     'grappled': {'speedMultiplier': 0},
     'restrained': {'speedMultiplier': 0},
+    'frozen': {'speedMultiplier': 0},
     # 'timing' matches _expire_statuses_on_turn_point's own 'start'/'end'
     # vocabulary (not the client's 'start_of_turn'/'end_of_turn' naming for
     # repeat saves/heals) since this applies purely server-side, at the same
@@ -30,11 +31,11 @@ CONDITION_RULES = {
 # _reaction_start) and movement (_move_token, alongside
 # _MOVEMENT_BLOCKING_CONDITIONS) -- "Incapacitated" itself plus every
 # condition whose own rulebook text says "incapacitated" as part of its
-# effect (Stunned, Unconscious, Petrified; Asleep/Frozen join this set in a
-# later phase, and Paralyzed/Confused apply a transient 'incapacitated'
-# status for their own failed-roll turn rather than being listed here
-# directly -- see the status-conditions plan).
-INCAPACITATING_CONDITIONS = {'incapacitated', 'stunned', 'unconscious', 'petrified'}
+# effect (Stunned, Unconscious, Petrified, Frozen; Asleep joins this set
+# next, and Paralyzed/Confused apply a transient 'incapacitated' status for
+# their own failed-roll turn rather than being listed here directly -- see
+# the status-conditions plan).
+INCAPACITATING_CONDITIONS = {'incapacitated', 'stunned', 'unconscious', 'petrified', 'frozen'}
 
 
 def condition_turn_damage(participant, point):

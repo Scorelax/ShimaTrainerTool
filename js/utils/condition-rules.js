@@ -96,4 +96,25 @@ export const CONDITION_RULES = {
     immuneTypes: ['Poison', 'Steel'],
     note: 'Also disadvantage on all ability checks (advisory only, no ability-check roll exists in this app). Takes damage equal to proficiency bonus at the end of each of its turns until fainted or cured (auto-applied). Poison and Steel types are immune.',
   },
+  // Incapacitated + Restrained's own effects bundled together (enforced
+  // server-side via INCAPACITATING_CONDITIONS/speedMultiplier, same as
+  // those conditions individually), plus its own escape mechanic: a STR
+  // save at the end of each of its turns breaks it free. That save reuses
+  // the EXISTING ends:{type:'save', ability, timing} + repeat-save
+  // machinery as-is (see move-effects-schema.md's own "holder repeats a
+  // save against the source's Move DC") -- authored on whichever move
+  // applies Frozen, not new engine code. Deliberate simplification: the
+  // user's own rulebook text specifies DC 10 + the causer's proficiency,
+  // but every OTHER save-based condition in this schema uses the applying
+  // move's own Move DC (8 + proficiency + ability modifier) -- Frozen uses
+  // that same uniform convention too rather than a one-off DC formula that
+  // would only apply to this single condition. Revisit if that
+  // inconsistency ever actually matters at the table.
+  frozen: {
+    disadvantageOn: ['attack_rolls', { on: 'saving_throws', ability: 'DEX' }],
+    advantageOn: ['attacks_against'],
+    speedMultiplier: 0,
+    immuneTypes: ['Ice'],
+    note: "Incapacitated and restrained (blocks actions/reactions/movement, enforced server-side). Breaks free with a STR save at the end of each of its turns -- authored as ends:[{type:'save', ability:'STR', timing:'end_of_turn'}] on whichever move applies it. Outside of combat this lasts 1 hour instead (not tracked -- this app only models combat turns).",
+  },
 };

@@ -439,7 +439,7 @@ correction `reroll_damage`'s own refund already uses.
 | `{type:"other", text}` | anything else — shown, removed manually |
 
 ## Vocabularies
-- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit guaranteed_next_hit mist safeguard`. `guaranteed_next_crit` (Laser Focus) and `guaranteed_next_hit` (Lock-On, Mind Reader — `guaranteedHitStatusId`, same shape/wiring as `guaranteedCritStatusId` but never forces a crit) are standalone flags, not stat/roll effects. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below. `mist`/`safeguard` are standing immunity shields checked by `blocking_shield()` — see the `protect_negate` update below.
+- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit guaranteed_next_hit mist safeguard mat_block testudo_formation`. `guaranteed_next_crit` (Laser Focus) and `guaranteed_next_hit` (Lock-On, Mind Reader — `guaranteedHitStatusId`, same shape/wiring as `guaranteedCritStatusId` but never forces a crit) are standalone flags, not stat/roll effects. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below. `mist`/`safeguard` are standing immunity shields checked by `blocking_shield()`; `mat_block`/`testudo_formation` are standing damage-multiplier conditions checked by `incoming_damage_multiplier`/`outgoing_damage_multiplier` — see the `protect_negate` updates below.
 - **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities attack_rolls_or_saving_throws` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field). `attack_rolls_or_saving_throws` is a single bonus eligible for either roll type (Growth, Helping Hand) -- spending it on one consumes it for both.
 - **roll `on`**: `attack_rolls` (the holder's own) · `attacks_against` (rolls made against the holder) · `saving_throws` (the holder's) · `saves_against_its_moves` · `ability_checks` · `all_rolls`
 - **`ability`** (optional, `roll`/`stat` effects on `saving_throws` only): narrows to one ability's saves -- Hammer Arm's "disadvantage on DEX saves" (a plain `saving_throws` roll/stat with no `ability` still applies broadly, to every save, same as before this field existed). `saveRollContext`'s own `ability` param (already threaded through from the save popup) is what it's matched against; nothing analogous exists yet for `attack_rolls`/`ability_checks` (Nasty Plot's "advantage on WIS-power attacks", Study's "advantage vs one specific target" -- neither `attackRollContext` nor `ability_checks` rolls carry enough context to scope against yet, left unmigrated).
@@ -1185,3 +1185,55 @@ Verified with 5 direct calls against the avoided-amount math (standard 2x,
 a stacked 4x case, non-vulnerable and resistant hits both correctly report
 nothing to discount, an odd total floors the same way the rest of this
 schema's refund math already does).)*
+
+*(Update, 2026-09-30: Crafty Shield, Mat Block, and Testudo Formation built
+(`migrate_effects_v43.py`), closing out the pushback list -- only Shield
+Dome is left unmigrated in `protect_negate` now, and it stays that way for a
+reason genuinely unlike anything else in this pass (real wall/line-of-sight
+geometry this app's grid has no representation of at all, a battle-map
+feature, not a move-effects one).
+
+**Crafty Shield** shipped as a documented simplification rather than left
+fully unmigrated: it reuses `block_attack`/`when:"special"` exactly like
+Parry/Captivate/Hover, correct for a pure status-inflicting move (the common
+case) but an over-correction for a damage+condition combo move, since this
+app has no mechanism to selectively cancel just the condition half of an
+attack. The `note` field says so explicitly.
+
+**Mat Block** / **Testudo Formation** got a genuinely new mechanism:
+`incoming_damage_multiplier`/`outgoing_damage_multiplier` (conditions.py),
+checked in `_apply_damage_to_target` -- Mat Block's "immune to damage from
+damaging moves" (0x) and Testudo's "take half damage... the damage they
+deal is also halved" (0.5x both ways) are STANDING, multi-turn conditions
+scaling every hit during their duration, unlike `block_attack`/
+`damage_multiplier`'s one-shot reaction-window cancel of a single attack.
+Applied server-side, so every client call site is covered automatically.
+Kept deliberately separate from the logged type `multiplier` field --
+Nature's Embrace's own reactor-side "was I vulnerable" check reads that
+field, and a Mat-Block-zeroed or Testudo-halved hit shouldn't look like a
+type-chart result it never was; the log text instead gets an explicit
+"-- Mat Block/Testudo Formation reduces this" suffix when either applies.
+The two checks compound if a formation member ever attacks ANOTHER
+formation member (0.5 × 0.5 = 0.25x) -- a documented assumption, same
+spirit as `resistance_upgrade`'s own "several sources each bump their own
+step, compounding". Both moves ship with the same dual-effect shape Haze/
+Safeguard's own AoE buffs already use (`target:"self"` + target-unset for
+the multi-target picker).
+
+Testudo Formation's own two extra riders stay manual, flagged in a `note`:
+automatically avoiding the ONE triggering attack (a multi-participant
+simultaneous block this app's single-anchor reaction-window model has no
+shape for) and "rooted together... until the beginning of your next turn"
+(a positional-linking constraint `_move_token` has no concept of). Both are
+narrower gaps than this category's original "not a small increment on
+anything already built" framing suggested for this move, but still real,
+not silently dropped.
+
+Verified with 8 direct calls against `incoming_damage_multiplier`/
+`outgoing_damage_multiplier` (each condition's own multiplier, the two
+combining via minimum on the incoming side, Mat Block correctly NOT
+affecting outgoing) plus 8 against the full `_apply_damage_to_target`
+integration (Mat Block zeroes damage while the logged type multiplier
+stays untouched, Testudo halves incoming and outgoing independently, both
+sides together compound to 0.25x, an unaffected hit gets no reduction note
+in its log text).)*

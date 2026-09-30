@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield
+from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1760,12 +1760,22 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
 
     multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target)
     actual_damage = round(dice_roll * multiplier)
+    # Mat Block/Testudo Formation's own standing damage reductions -- applied
+    # AFTER the type multiplier (kept separate, not folded into `multiplier`
+    # itself: Nature's Embrace's own reactor-side "was I vulnerable"
+    # check reads this logged field, and a Mat Block/Testudo hit shouldn't
+    # look like a type-chart result it never was). condition_multiplier == 1
+    # for the overwhelming majority of hits -- no condition to check.
+    condition_multiplier = incoming_damage_multiplier(target) * outgoing_damage_multiplier(attacker)
+    if condition_multiplier != 1:
+        actual_damage = round(actual_damage * condition_multiplier)
     leftover = _absorb_temp_hp(state, target, actual_damage)
     target['currentHP'] -= leftover  # no floor, same reasoning as elsewhere in this module
     move_label = f' with {move_name}' if move_name else ''
+    condition_note = ' -- Mat Block/Testudo Formation reduces this' if condition_multiplier != 1 else ''
     _log_event(
         state, 'damage',
-        text=f"{attacker['name']} hit {target['name']}{move_label} for {actual_damage} damage ({multiplier}x)",
+        text=f"{attacker['name']} hit {target['name']}{move_label} for {actual_damage} damage ({multiplier}x){condition_note}",
         actorId=pid, actorName=attacker['name'], targetId=target_id, targetName=target['name'],
         move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier, crit=bool(crit),
     )

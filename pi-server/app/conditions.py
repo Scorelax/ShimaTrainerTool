@@ -166,3 +166,44 @@ def zero_speed_condition(participant):
         if rule and rule.get('speedMultiplier') == 0:
             return s['apply']
     return None
+
+
+def incoming_damage_multiplier(participant):
+    """Combined multiplier on damage `participant` is about to RECEIVE, from
+    every standing condition that scales it -- Mat Block's own "immune to
+    damage from damaging moves" (0x) and Testudo Formation's own "take half
+    damage from all other attacks" (0.5x). Takes the MINIMUM across active
+    sources, same "worst source wins, doesn't stack multiplicatively"
+    convention effective_speed_multiplier already uses. Checked at damage-
+    APPLICATION time (_apply_damage_to_target), not a reaction-window block
+    like block_attack/damage_multiplier -- these are standing, multi-turn
+    conditions applying to every hit during their duration, not a one-shot
+    cancellation of a single incoming attack. Neither condition affects a
+    status-inducing move at all -- those never call _apply_damage_to_target
+    in the first place, so "status-inducing moves can still affect their
+    targets" (Mat Block's own text) is already true with no extra check."""
+    multiplier = 1
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') != 'condition':
+            continue
+        if s.get('apply') == 'mat_block':
+            multiplier = min(multiplier, 0)
+        elif s.get('apply') == 'testudo_formation':
+            multiplier = min(multiplier, 0.5)
+    return multiplier
+
+
+def outgoing_damage_multiplier(participant):
+    """Testudo Formation's own "the damage they deal is also halved" --
+    checked on the ATTACKER side, separately from incoming_damage_multiplier
+    (which scales what the DEFENDER receives): a formation member's own
+    outgoing attacks are halved for the duration regardless of what the
+    target holds. The two checks compound if a formation member ever attacks
+    ANOTHER formation member (an unusual case the rulebook doesn't call out
+    either way) -- a documented assumption, same spirit as
+    resistance_upgrade's own "several sources each bump their own step,
+    compounding"."""
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') == 'condition' and s.get('apply') == 'testudo_formation':
+            return 0.5
+    return 1

@@ -15108,12 +15108,41 @@
       },
       "reaction": false,
       "categories": [
-        "steal_disrupt"
+        "steal_disrupt",
+        "self_stat_transfer_dispel_all",
+        "stat_transfer_dispel_all"
       ],
       "description": "You create a haze of light magical snow that washes over all creatures in a 30ft circle, centered on you. Any stat bonuses or modifiers, status effects, shields or other outside forces affecting the stats or abilities of a creature are removed. This includes things like Leech Seed, Focus Energy, Iron Defense, Disable, etc.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_all",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_all",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Ice Ball",

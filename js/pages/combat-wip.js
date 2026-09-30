@@ -2075,24 +2075,31 @@ function _targetDamageNotes(moveName) {
  * without being tagged trigger_saving_throw*) gets its save asked for here.
  * `targetId` null offers only the user's own (target:'self') effects; includeSelf
  * false offers only the target's (for a loop that already offered self once). */
-/** Clear Smog/Psych Up/Heart Swap/Spectral Thief's own "read the currently
- * active stat buffs on one or two participants and remove/copy/swap/steal
- * them" family -- not a status applied to the move's own user, a one-shot
- * bulk operation against whatever `kind:'stat'` statuses are ALREADY live
- * right now. `mode`:
- *   'dispel' -- remove every kind:'stat' status from targetId (Clear Smog:
- *     "any stat changes ... are reset").
- *   'copy'   -- recreate every kind:'stat' status FROM targetId onto
+/** Clear Smog/Psych Up/Heart Swap/Spectral Thief/Haze's own "read the
+ * currently active statuses on one or two participants and remove/copy/
+ * swap/steal them" family -- not a status applied to the move's own user,
+ * a one-shot bulk operation against whatever's ALREADY live right now.
+ * `mode`:
+ *   'dispel'     -- remove every kind:'stat' status from targetId (Clear
+ *     Smog: "any stat changes ... are reset").
+ *   'dispel_all' -- remove EVERY status regardless of kind (Haze: "stat
+ *     bonuses, status effects, shields ... are removed" -- broader than
+ *     plain 'dispel', which only ever touched kind:'stat'). The one mode
+ *     that gets authored with `target:'self'` too (Haze hits everyone in
+ *     its own blast radius, caster included) -- see the call site's own
+ *     comment for why targetId has to come from `pick.targetId`, not the
+ *     closure, for this to actually reach the caster.
+ *   'copy'       -- recreate every kind:'stat' status FROM targetId onto
  *     attackerId, target's own copy untouched (Psych Up).
- *   'swap'   -- exchange BOTH sides' current kind:'stat' statuses (Heart
- *     Swap).
- *   'steal'  -- move only targetId's POSITIVE kind:'stat' statuses onto
- *     attackerId, removed from target (Spectral Thief's own "steal all
- *     positive stat changes").
+ *   'swap'       -- exchange BOTH sides' current kind:'stat' statuses
+ *     (Heart Swap).
+ *   'steal'      -- move only targetId's POSITIVE kind:'stat' statuses
+ *     onto attackerId, removed from target (Spectral Thief's own "steal
+ *     all positive stat changes").
  * Recreated statuses keep their ORIGINAL sourceId/sourceName/moveName/dc
  * (so a copied Focus Energy still reads "from Focus Energy", not "from
- * Psych Up") -- only the stat delta itself moves, never its own history.
- * A status's remaining duration isn't preserved exactly (it restarts from
+ * Psych Up") -- only the delta itself moves, never its own history. A
+ * status's remaining duration isn't preserved exactly (it restarts from
  * its own authored `ends`, e.g. a fresh 10 rounds rather than however many
  * were actually left) -- a documented simplification, same "close enough"
  * trust level as everything else in this app that doesn't track exact
@@ -2113,6 +2120,10 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName }) {
     try { await CombatAPI.removeStatus(holderId, status.id, reason); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
   };
 
+  if (mode === 'dispel_all') {
+    for (const s of target.statuses || []) await remove(targetId, s, `dispelled by ${moveName}`);
+    return;
+  }
   const targetStats = (target.statuses || []).filter(s => s.kind === 'stat');
   if (mode === 'dispel') {
     for (const s of targetStats) await remove(targetId, s, `dispelled by ${moveName}`);
@@ -2220,13 +2231,16 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       continue;
     }
     if (effect.kind === 'stat_transfer') {
-      // Not a status -- a one-shot bulk operation against whatever stat
-      // buffs are already active on one or two participants right now
-      // (see _handleStatTransfer's own docstring). Uses attackerId/targetId
-      // straight from this function's own closure, not pick.targetId --
-      // every mode reads/writes both sides regardless of which section
-      // the popup happened to list it under.
-      await _handleStatTransfer({ mode: effect.mode, attackerId, targetId, moveName });
+      // Not a status -- a one-shot bulk operation against whatever's
+      // already active on one or two participants right now (see
+      // _handleStatTransfer's own docstring). pick.targetId here (NOT the
+      // closure's own targetId) -- it resolves to attackerId for a
+      // target:'self' effect (Haze's own self-hit) and to the real target
+      // otherwise, so a single-participant mode (dispel/dispel_all/copy/
+      // steal) always operates on whoever this specific effect actually
+      // means, self included. 'swap' still reaches both sides regardless,
+      // since it reads attackerId from the closure too.
+      await _handleStatTransfer({ mode: effect.mode, attackerId, targetId: pick.targetId, moveName });
       continue;
     }
     if (effect.kind === 'heal' && !effect.repeat) {

@@ -16,7 +16,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
   // reroll_damage: no extra fields -- see its own section below
   // block_attack: no extra fields -- see its own section below
   // prevent_faint: no extra fields -- see its own section below
-  // stat_transfer: "mode": "dispel" | "copy" | "swap" | "steal" -- see its own section below
+  // stat_transfer: "mode": "dispel" | "dispel_all" | "copy" | "swap" | "steal" -- see its own section below
   // damage_note: "condition": {...}, "diceMultiplier?"/"totalMultiplier?"/"flatBonus?"/
   //              "scalingBonus?"/"advantage?" -- see its own section below; NOT a when/target/ends
   //              effect at all, see why there
@@ -141,22 +141,28 @@ own refund and every `heal` effect already use; above 0, it's a no-op (nothing t
 than a genuine heal, so it never raises HP that wasn't already fatal. Same escalating "roll over
 15 after the first use" cost as the whole Protect family, left manual for the same reason.
 
-**`stat_transfer`** (Clear Smog/Psych Up/Heart Swap/Spectral Thief) reads the currently active
-`kind:'stat'` statuses on one or two participants and removes/copies/swaps/steals them -- never
-stored as a status itself, a one-shot bulk operation against whatever's already live, same
-"intercepted before `apply-status`" treatment as `reroll_damage`/`block_attack`/`prevent_faint`.
-`mode` picks the shape: `"dispel"` (Clear Smog -- remove every one of the target's own `kind:'stat'`
-statuses), `"copy"` (Psych Up -- recreate the target's onto the user, target's own copy untouched),
-`"swap"` (Heart Swap -- exchange BOTH sides' current ones), `"steal"` (Spectral Thief -- move only
-the target's POSITIVE ones onto the user, removed from the target). `combat-wip.js`'s
-`_handleStatTransfer` does the actual work via plain `apply-status`/`remove-status` calls -- a
-recreated status keeps its ORIGINAL `sourceId`/`sourceName`/`moveName`/`dc` (a copied Focus Energy
-still reads "from Focus Energy", not from the transfer move itself), only the delta moves. Remaining
-duration isn't preserved exactly -- a recreated status restarts from its own authored `ends` (e.g. a
-fresh 10 rounds) rather than however many were actually left on the original, a documented
-simplification. `no other fields` beyond `mode`/`when`/`ends: [{type:"instant"}]`/`target` (unset --
-shown under the target section in the popup, same convention as any other move that does something
-TO the target, regardless of which side ends up holding what afterward).
+**`stat_transfer`** (Clear Smog/Psych Up/Heart Swap/Spectral Thief/Haze) reads the currently active
+statuses on one or two participants and removes/copies/swaps/steals them -- never stored as a status
+itself, a one-shot bulk operation against whatever's already live, same "intercepted before
+`apply-status`" treatment as `reroll_damage`/`block_attack`/`prevent_faint`. `mode` picks the shape:
+`"dispel"` (Clear Smog -- remove every one of the target's own `kind:'stat'` statuses only),
+`"dispel_all"` (Haze -- broader: remove EVERY status regardless of kind, "stat bonuses, status
+effects, shields ... are removed"), `"copy"` (Psych Up -- recreate the target's `kind:'stat'`
+statuses onto the user, target's own copy untouched), `"swap"` (Heart Swap -- exchange BOTH sides'
+current `kind:'stat'` ones), `"steal"` (Spectral Thief -- move only the target's POSITIVE
+`kind:'stat'` ones onto the user, removed from the target). `combat-wip.js`'s `_handleStatTransfer`
+does the actual work via plain `apply-status`/`remove-status` calls -- a recreated status keeps its
+ORIGINAL `sourceId`/`sourceName`/`moveName`/`dc` (a copied Focus Energy still reads "from Focus
+Energy", not from the transfer move itself), only the delta moves. Remaining duration isn't preserved
+exactly -- a recreated status restarts from its own authored `ends` (e.g. a fresh 10 rounds) rather
+than however many were actually left on the original, a documented simplification. `no other fields`
+beyond `mode`/`when`/`ends: [{type:"instant"}]`/`target`. `target` is usually left unset (shown under
+the target section, same convention as any other move that does something TO the target) but
+`dispel_all` is the one mode that CAN be authored `target:"self"` too (Haze hits its own blast
+radius, caster included) -- `_offerMoveEffects`'s own call site reads `pick.targetId`, not a closure
+variable, specifically so a single-participant mode correctly resolves to the caster for a
+`target:"self"` effect and to the real target otherwise (`swap` is unaffected, it always reads both
+sides regardless).
 
 Deliberately NOT this kind: moving or copying a SINGLE CHOSEN stat (Guard Swap/Power Swap/Role
 Play -- these need a small "which one" picker first, not built yet) or transferring a named
@@ -835,3 +841,19 @@ with 12 checks against a reimplementation of `_handleStatTransfer`'s exact
 logic (dispel/copy/steal/swap, including that `steal` correctly leaves a
 negative stat untouched and `swap` snapshots both sides before mutating
 either).)*
+
+*(Update, same day, a real correction: Haze was identified during the pass
+above as fitting the same `stat_transfer` mechanism but never actually
+migrated or flagged as excluded -- a gap in that commit's own reporting,
+caught when the user asked for a plain yes/no on what was actually
+implemented. Fixed (`migrate_effects_v36.py`) with a new `dispel_all` mode
+(see its own bullet above) plus a real bug fix this exposed: Haze is the
+first move authored with a `target:"self"` `stat_transfer` effect (it hits
+its own blast radius too), which revealed `_offerMoveEffects`'s call site
+was reading `targetId`/`attackerId` from its enclosing closure instead of
+`pick.targetId` -- harmless for the four already-shipped moves (none of
+them are ever self-targeted, so the two values were always equal) but
+wrong in general. Fixed by reading `pick.targetId` instead. Verified with
+6 checks, including that `dispel_all` removes a `condition`-kind status
+(not just `kind:'stat'`) and that self-targeting now actually reaches the
+caster's own statuses.)*

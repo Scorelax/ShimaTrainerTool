@@ -94,3 +94,26 @@ def effective_speed_multiplier(participant):
         if rule and 'speedMultiplier' in rule:
             multiplier = min(multiplier, rule['speedMultiplier'])
     return multiplier
+
+
+def zero_speed_condition(participant):
+    """The apply-name of the first condition driving `participant`'s speed
+    multiplier all the way to 0 (Grappled/Restrained/Frozen's own flat
+    speedMultiplier, or Exhaustion level 5+), or None -- lets _move_token
+    hard-block movement for these the same unconditional way
+    _MOVEMENT_BLOCKING_CONDITIONS already does for 'trapped', regardless of
+    whether `speeds` is recorded at all. Without this, a participant with no
+    `speeds` data (a DM's freeform enemy) could still be freely dragged
+    around the map while Grappled, since effective_speed_multiplier's own
+    0x result only ever got READ from inside _move_token's speeds-gated
+    budget check -- never enforced for a participant that check skips
+    entirely."""
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') != 'condition':
+            continue
+        if s.get('apply') == 'exhaustion' and (s.get('value') or 1) >= 5:
+            return 'exhaustion'
+        rule = CONDITION_RULES.get(s.get('apply'))
+        if rule and rule.get('speedMultiplier') == 0:
+            return s['apply']
+    return None

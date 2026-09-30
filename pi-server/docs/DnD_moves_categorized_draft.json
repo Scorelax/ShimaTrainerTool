@@ -3291,7 +3291,8 @@
             "statFields": [
               "attack_rolls",
               "damage_rolls",
-              "ac"
+              "ac",
+              "attack_rolls_or_saving_throws"
             ]
           },
           "extraDice": {

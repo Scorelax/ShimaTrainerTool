@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier
+from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1343,8 +1343,13 @@ def _prime_end(e, state, holder_id, source_id):
         e['count'] = max(1, js_parse_int(e.get('count')) or 1)
         who = source_id if e.get('whose') == 'source' else holder_id
         # "The end of their next turn", applied during their own turn, means the
-        # following one -- so this turn's end doesn't count.
-        e['skip'] = e.get('point') == 'end' and who is not None and who == _active_participant_id(state)
+        # following one -- so this turn's end doesn't count. `noSkip` opts a
+        # caller OUT of that -- Confused's own "forfeits the rest of THIS
+        # turn" (combat-wip.js's _promptConfusionCheck) is applied at the
+        # START of the very turn it needs to expire at the END of, not their
+        # NEXT one, so the disambiguation this skip exists for is exactly
+        # backwards for it.
+        e['skip'] = (not e.get('noSkip')) and e.get('point') == 'end' and who is not None and who == _active_participant_id(state)
     elif kind == 'uses':
         e['left'] = max(1, js_parse_int(e.get('n')) or 1)
     return e
@@ -1761,6 +1766,14 @@ def _incapacitating_status(participant):
                  if s.get('kind') == 'condition' and s.get('apply') in INCAPACITATING_CONDITIONS), None)
 
 
+def _fmt_ft(n):
+    """Cosmetic only -- "15ft" not "15.0ft" in a rejection message. Shared by
+    _move_token and _stand_up so the two can't drift apart on this again (an
+    earlier pass fixed it in _move_token alone and _stand_up's own message
+    was still showing raw floats)."""
+    return int(n) if n == int(n) else n
+
+
 def _movement_budget(participant):
     """(fastest_effective_ft, best_remaining_ft) for `participant`'s own
     movement this turn -- shared by _move_token (checks a travel distance
@@ -1801,10 +1814,8 @@ def _stand_up(state, pid):
     fastest, best_remaining = _movement_budget(participant)
     if fastest:
         cost = fastest / 2
-        if cost == int(cost):
-            cost = int(cost)
         if cost > best_remaining:
-            raise ValueError(f"Not enough movement left to stand up ({best_remaining}ft remaining, standing needs {cost}ft)")
+            raise ValueError(f"Not enough movement left to stand up ({_fmt_ft(best_remaining)}ft remaining, standing needs {_fmt_ft(cost)}ft)")
         participant['movementUsed'] = participant.get('movementUsed', 0) + cost
 
     state['started'] = True
@@ -1824,6 +1835,15 @@ def _move_token(state, pid, col, row):
     incap = _incapacitating_status(participant)
     if incap:
         raise ValueError(f"{participant['name']} is {incap['apply']} and can't move")
+    zeroed = zero_speed_condition(participant)
+    if zeroed:
+        # Unconditional, same as the two checks above -- a 0x speed
+        # multiplier means "can't move at all" regardless of whether
+        # `speeds` happens to be recorded (the budget check below is
+        # skipped entirely without it, which used to let a Grappled/
+        # Restrained participant with no speeds data move completely
+        # unrestricted).
+        raise ValueError(f"{participant['name']} is {zeroed} and can't move")
 
     # Movement budget -- skipped entirely for a participant with no `speeds`
     # recorded (a DM's freeform enemy, or anyone added before this existed),
@@ -1845,8 +1865,7 @@ def _move_token(state, pid, col, row):
         current = state['board']['tokens'].get(pid)
         distance_ft = max(abs(col - current['col']), abs(row - current['row'])) * 5 if current else 0
         _, best_remaining = _movement_budget(participant)
-        if best_remaining == int(best_remaining):  # cosmetic only -- "15ft" not "15.0ft"
-            best_remaining = int(best_remaining)
+        best_remaining = _fmt_ft(best_remaining)
         if distance_ft > best_remaining:
             raise ValueError(f"Not enough movement left ({best_remaining}ft remaining, this move needs {distance_ft}ft)")
         participant['movementUsed'] = participant.get('movementUsed', 0) + distance_ft

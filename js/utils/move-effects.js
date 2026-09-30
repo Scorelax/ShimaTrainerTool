@@ -646,13 +646,19 @@ export function addDiceString(dice, extraCount) {
  * positive resolved amount (stacks applied) -- Power Trip's "each positive
  * stat change affecting you" (self, no filter) and Punishment's "under an
  * effect that boosts attack/damage/AC" (target, `statFields`-filtered).
- * A `set` override never counts -- no baseline to compare it against (see
+ * A dice-based amount (Sharpen/Growth/Aromatic Mist/Helping Hand, see
+ * _isDiceAmount) always counts -- it's an available bonus the moment it's
+ * applied, unconditionally positive by construction (no sign to check, and
+ * `_stackCount` doesn't apply to it the way it does a flat number). A `set`
+ * override never counts -- no baseline to compare it against (see
  * statSetOverrides's own "always a plain literal, no live delta" reasoning)
  * -- a real, documented simplification rather than an oversight. */
 export function activeBuffCount(participant, statFields = null) {
   return (participant?.statuses || []).filter(s => {
-    if (s.kind !== 'stat' || typeof s.amount !== 'number') return false;
+    if (s.kind !== 'stat') return false;
     if (statFields && !statFields.includes(s.stat)) return false;
+    if (_isDiceAmount(s)) return true;
+    if (typeof s.amount !== 'number') return false;
     return s.amount * _stackCount(s) > 0;
   }).length;
 }

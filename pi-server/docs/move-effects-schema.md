@@ -857,3 +857,62 @@ wrong in general. Fixed by reading `pick.targetId` instead. Verified with
 6 checks, including that `dispel_all` removes a `condition`-kind status
 (not just `kind:'stat'`) and that self-targeting now actually reaches the
 caster's own statuses.)*
+
+*(Update, 2026-09-30: a correctness review of everything shipped so far (all
+of status conditions plus every move-effects category up through
+`steal_disrupt`), requested after several rounds each turning up its own new
+bug -- two independent passes, one per body of work, ~19 findings between
+them. Confirmed and fixed:
+- **`_resolveOneHit`'s stale `guaranteedHit`** (`combat-wip.js`): read only
+  `categories.includes('guaranteed_hit')`, never the status-granted guarantee
+  (Laser Focus/Lock-On/Mind Reader) that `_guaranteedHitFor` already checks
+  correctly at the pickTarget call site earlier in the same flow -- so a
+  status-guaranteed hit fed `crit: undefined` and `ctx.guaranteedHit: false`
+  into `evaluateEffect`, which made its `natural_roll`/`crit` cases fall
+  through to `'manual'` (ask a human) instead of the correct `'no'` (there
+  was never a roll to have crossed a threshold on). Fixed by reusing
+  `_guaranteedHitFor` instead of re-deriving the category-only check.
+- **`activeBuffCount` skipped dice-shaped amounts** (`move-effects.js`):
+  Sharpen/Growth/Aromatic Mist/Helping Hand's `amount: {dice: "1d4"}` shape
+  (see "Dice-based bonuses" above) never satisfied `typeof s.amount ===
+  'number'`, so a target buffed by Growth or Helping Hand never counted
+  toward Power Trip's or Punishment's own buff count at all. Fixed: a
+  dice-based amount now always counts (unconditionally positive by
+  construction, no sign or `_stackCount` to check the way a flat number
+  needs).
+- **Punishment's `statFields` missing `attack_rolls_or_saving_throws`**
+  (`DnD_moves_categorized_draft.json`, `migrate_effects_v32.py`): the filter
+  list (`attack_rolls`, `damage_rolls`, `ac`) left out Growth/Helping Hand's
+  own dual-purpose stat field, so even with the `activeBuffCount` fix above,
+  a target buffed via Growth still wouldn't count for Punishment specifically
+  (Power Trip has no filter, so it was unaffected). Added to the list in both
+  the live data and the migration script (for reproducibility).
+
+Also reviewed and fixed, from the status-conditions pass specifically (all in
+`routes_combat.py`/`conditions.py`/`combat-wip.js`, unrelated to the
+move-effects schema this doc covers, noted here only for a single
+changelog): Confused's `until_turn`/`point:'end'` status applied while the
+holder is already active was tripping `_prime_end`'s skip logic (built for a
+different case), adding a spurious extra round of incapacitation -- fixed
+with a new `noSkip` opt-out. Grappled/Restrained's speed-0 enforcement lived
+entirely inside `_move_token`'s speeds-gated budget check, so a participant
+with no `speeds` data at all (a DM's freeform enemy) was unrestricted despite
+holding the condition -- fixed with a new unconditional `zero_speed_condition`
+check. `_promptConfusionCheck` re-read a stale HP value across an await
+(race), and `_promptParalysisCheck`/`_promptConfusionCheck`/
+`_promptSleepCheck` had a few apply/remove-status calls whose rejection
+wasn't handled, desyncing local state from a failed server write -- all
+given explicit try/catch or `.catch()` handling. `_stand_up`'s error message
+had inconsistent float formatting between its two numbers -- given a shared
+`_fmt_ft()` helper. The save-picker's own auto-fail support (Phase 3 of
+status conditions) had regressed the plain "suggest Fail on an ordinary
+failed save" case; fixed same session (`3518d4c`).
+
+Nothing else in either review's findings list turned out to be a real
+correctness bug -- the rest were either already-documented simplifications
+(the `set`-override-never-counts case `activeBuffCount` still doesn't cover,
+Charmed/Frightened's targeting-restriction clauses still deferred) or
+genuinely low-priority dormant gaps (a `damage_note` result combining
+`advantage` with a totalNote, or `diceMultiplier` with `extraDiceCount`, in
+the same effect -- no shipped move does both, so no note-composition code
+path for it exists yet; left as-is until a move actually needs it).)*

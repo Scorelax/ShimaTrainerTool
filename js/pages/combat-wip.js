@@ -2577,7 +2577,14 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // What the recorded rolls say this hit triggered: natural-roll thresholds, a crit,
   // the secondary save's failure margin, plain on-hit effects.
   const attackRoll = picked.attackRoll ?? null;
-  const guaranteedHit = categories.includes('guaranteed_hit');
+  // Not just the fixed category -- a status-granted guarantee (Laser
+  // Focus/Lock-On/Mind Reader) skips the attack-roll step exactly the same
+  // way (see _guaranteedHitFor), and this value feeds evaluateEffect's own
+  // natural_roll/crit checks below (`ctx.guaranteedHit`) -- reading only
+  // the category here left those checks falling through to 'manual' for a
+  // status-guaranteed hit instead of the correct 'no' (there was never a
+  // roll to have crossed a threshold or crit on).
+  const guaranteedHit = _guaranteedHitFor(combatantId, categories);
   const attacker = session?.participants?.[combatantId];
   let crit = false; // a guaranteed hit has no roll to crit on
   if (!guaranteedHit) {
@@ -2923,10 +2930,18 @@ async function _promptParalysisCheck(holderId) {
   const roll = await showCombatPrompt(`${holder.name} is Paralyzed — roll a d4 at the start of their turn.`, { title: 'Paralysis check' });
   if (roll === null) return false;
   if (roll !== 1) return false;
-  await CombatAPI.applyStatus(holderId, buildStatusSpec(
-    { kind: 'condition', apply: 'incapacitated', ends: [{ type: 'until_turn', whose: 'holder', point: 'start', count: 1 }] },
-    { sourceId: holderId, sourceName: holder.name, moveName: 'Paralysis' },
-  )).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+  try {
+    await CombatAPI.applyStatus(holderId, buildStatusSpec(
+      { kind: 'condition', apply: 'incapacitated', ends: [{ type: 'until_turn', whose: 'holder', point: 'start', count: 1 }] },
+      { sourceId: holderId, sourceName: holder.name, moveName: 'Paralysis' },
+    ));
+  } catch (err) {
+    // The lock never actually landed server-side -- don't log it as if it
+    // did, and don't tell the caller to skip this turn's confusion check
+    // over a lock that isn't real.
+    showCombatAlert(err.message, { title: 'Error' });
+    return false;
+  }
   CombatAPI.logEvent({
     type: 'status', actorId: holderId, actorName: holder.name,
     text: `${holder.name} rolled a 1 on their paralysis check — incapacitated until the start of their next turn`,
@@ -2947,18 +2962,32 @@ async function _promptConfusionCheck(holderId) {
   const roll = await showCombatPrompt(`${holder.name} is Confused — roll a d20 before acting this turn.`, { title: 'Confusion check' });
   if (roll === null) return;
   if (roll <= 10) {
-    const dmg = Number(holder.proficiency) || 0;
-    if (dmg) await CombatAPI.updateStats(holderId, { currentHP: holder.currentHP - dmg }).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
-    await CombatAPI.applyStatus(holderId, buildStatusSpec(
-      { kind: 'condition', apply: 'incapacitated', ends: [{ type: 'until_turn', whose: 'holder', point: 'end', count: 1 }] },
-      { sourceId: holderId, sourceName: holder.name, moveName: 'Confusion' },
-    )).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+    // Re-fetch fresh -- `holder` was captured before the human answered the
+    // prompt above, and currentHP may have moved in the meantime (another
+    // player's hit landing, a DM edit). Computing the self-damage off the
+    // stale snapshot would silently discard whatever changed while this was
+    // open.
+    const current = session?.participants?.[holderId] || holder;
+    const dmg = Number(current.proficiency) || 0;
+    if (dmg) await CombatAPI.updateStats(holderId, { currentHP: current.currentHP - dmg }).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+    try {
+      await CombatAPI.applyStatus(holderId, buildStatusSpec(
+        { kind: 'condition', apply: 'incapacitated', ends: [{ type: 'until_turn', whose: 'holder', point: 'end', count: 1, noSkip: true }] },
+        { sourceId: holderId, sourceName: holder.name, moveName: 'Confusion' },
+      ));
+    } catch (err) {
+      // The self-damage above already landed regardless -- that part of the
+      // roll's outcome is real either way -- but don't claim the forfeiture
+      // took effect if it didn't actually reach the server.
+      showCombatAlert(err.message, { title: 'Error' });
+      return;
+    }
     CombatAPI.logEvent({
       type: 'status', actorId: holderId, actorName: holder.name,
       text: `${holder.name} rolled ${roll} on their confusion check — hurts itself for ${dmg} and forfeits the rest of the turn`,
     }).catch(() => {});
   } else if (roll >= 16) {
-    await CombatAPI.removeStatus(holderId, status.id, `rolled ${roll} on the confusion check`);
+    await CombatAPI.removeStatus(holderId, status.id, `rolled ${roll} on the confusion check`).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
   }
 }
 
@@ -2975,7 +3004,11 @@ async function _promptSleepCheck(holderId) {
   if (!status) return;
   const roll = await showCombatPrompt(`${holder.name} is Asleep — roll a d20 to see if it wakes up.`, { title: 'Wake-up check' });
   if (roll === null) return;
-  if (roll >= 11) await CombatAPI.removeStatus(holderId, status.id, `rolled ${roll} on the wake-up check`);
+  // Caught, not left to reject up the chain -- this runs as one step of the
+  // End Turn button's own .then(...).then(() => CombatAPI.advanceTurn())
+  // sequence (see its own call site), and an uncaught rejection here would
+  // silently skip advanceTurn() too, making End Turn appear to do nothing.
+  if (roll >= 11) await CombatAPI.removeStatus(holderId, status.id, `rolled ${roll} on the wake-up check`).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
 }
 
 /** A `heal` status's own repeat trigger (Aqua Ring/Ingrain -- see move-effects-

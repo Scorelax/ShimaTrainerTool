@@ -129,7 +129,12 @@ OVERRIDES = {
     'Punishment': [
         {
             'kind': 'damage_note',
-            'condition': {'type': 'target_active_buff_count', 'statFields': ['attack_rolls', 'damage_rolls', 'ac']},
+            # attack_rolls_or_saving_throws included -- Growth/Helping Hand's
+            # own dual-purpose bonus (see move-effects-schema.md's stat-field
+            # list) boosts attack rolls same as a plain 'attack_rolls' entry
+            # would, and Punishment's rule text has no reason to exclude it.
+            # Missing from the original migration (found on review).
+            'condition': {'type': 'target_active_buff_count', 'statFields': ['attack_rolls', 'damage_rolls', 'ac', 'attack_rolls_or_saving_throws']},
             'extraDice': {'amountPerUnit': 1},
         },
     ],

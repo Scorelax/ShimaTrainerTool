@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition
+from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1361,6 +1361,15 @@ def _apply_status(state, target_id, spec):
         raise ValueError('Unknown participant: ' + target_id)
     if spec.get('kind') not in _STATUS_KINDS:
         raise ValueError('status kind must be condition, stat, roll, temp_hp or heal')
+    shield = blocking_shield(target, target_id, spec)
+    if shield:
+        # Mist/Safeguard -- a standing protection blocks THIS apply outright,
+        # same "the app enforces what the rules say, no dice involved"
+        # treatment as block_attack -- surfaced as an ordinary ValueError so
+        # every existing apply-status call site's own error handling (just
+        # fixed this session, see move-effects-schema.md's review-pass note)
+        # already shows it correctly with no client changes needed.
+        raise ValueError(f"{target['name']} is immune to that ({shield.title()})")
     raw_ends = spec.get('ends') or []
     for e in raw_ends:
         if not isinstance(e, dict) or e.get('type') not in _END_TYPES:

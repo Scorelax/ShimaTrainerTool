@@ -439,7 +439,7 @@ correction `reroll_damage`'s own refund already uses.
 | `{type:"other", text}` | anything else — shown, removed manually |
 
 ## Vocabularies
-- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit guaranteed_next_hit`. `guaranteed_next_crit` (Laser Focus) and `guaranteed_next_hit` (Lock-On, Mind Reader — `guaranteedHitStatusId`, same shape/wiring as `guaranteedCritStatusId` but never forces a crit) are standalone flags, not stat/roll effects. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below.
+- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit guaranteed_next_hit mist safeguard`. `guaranteed_next_crit` (Laser Focus) and `guaranteed_next_hit` (Lock-On, Mind Reader — `guaranteedHitStatusId`, same shape/wiring as `guaranteedCritStatusId` but never forces a crit) are standalone flags, not stat/roll effects. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below. `mist`/`safeguard` are standing immunity shields checked by `blocking_shield()` — see the `protect_negate` update below.
 - **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities attack_rolls_or_saving_throws` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field). `attack_rolls_or_saving_throws` is a single bonus eligible for either roll type (Growth, Helping Hand) -- spending it on one consumes it for both.
 - **roll `on`**: `attack_rolls` (the holder's own) · `attacks_against` (rolls made against the holder) · `saving_throws` (the holder's) · `saves_against_its_moves` · `ability_checks` · `all_rolls`
 - **`ability`** (optional, `roll`/`stat` effects on `saving_throws` only): narrows to one ability's saves -- Hammer Arm's "disadvantage on DEX saves" (a plain `saving_throws` roll/stat with no `ability` still applies broadly, to every save, same as before this field existed). `saveRollContext`'s own `ability` param (already threaded through from the save popup) is what it's matched against; nothing analogous exists yet for `attack_rolls`/`ability_checks` (Nasty Plot's "advantage on WIS-power attacks", Study's "advantage vs one specific target" -- neither `attackRollContext` nor `ability_checks` rolls carry enough context to scope against yet, left unmigrated).
@@ -916,3 +916,77 @@ genuinely low-priority dormant gaps (a `damage_note` result combining
 `advantage` with a totalNote, or `diceMultiplier` with `extraDiceCount`, in
 the same effect -- no shipped move does both, so no note-composition code
 path for it exists yet; left as-is until a move actually needs it).)*
+
+*(Update, 2026-09-30: moved to `protect_negate` (20 moves). 7 of them (Aqua
+Phase, Astral Jet, Fly, Hyperspace Hole, Phantom Force, Phantom Tendril,
+Shadow Force) already carry `ignoresProtect: true` from an earlier pass --
+that already fully covers this category's own concern for them, same
+documented-manual treatment the already-migrated Bounce and the
+never-migrated Dig/Dive give their own semi-invulnerable-turn-plus-advantage
+shape; nothing else to add. 4 more shipped this pass (`migrate_effects_v37.py`):
+
+- **Captivate** / **Hover**: both reused Parry's own `block_attack` +
+  `when:"special"` pattern as-is (a contested/conditional outcome the human
+  judges and ticks after the fact) -- zero new code. Along the way, found
+  that NONE of this category's 10 reaction-shaped moves (the ones whose own
+  text says "you may use a reaction") had `reactionTrigger`/`reactionRange`
+  set at all -- an original-categorization gap, not a schema gap, since
+  without it `_eligible_reactors` never offers the reaction regardless of
+  what `effects` say. Backfilled for these two (`targeted`/0, matching
+  Parry/Protect); still missing on the other 8 (Crafty Shield, Feint, Lucky
+  Chant, Mat Block [not itself a reaction, see below], Nature's Embrace,
+  Spiky Shield, Testudo Formation, Wide Guard) -- flagged for whoever
+  migrates each one, not fixed blanket here since some of those still need
+  their own new mechanism first regardless. Hover's second effect reuses
+  `granted_immunity` (Magnet Rise's own mechanism, read generically off
+  whatever's currently active -- no code cared that it had only ever shipped
+  with an `encounter`-length `ends` before) with a `until_turn`/start/1 end
+  for "dodging Ground moves until the beginning of your next turn" -- also
+  zero new code.
+- **Mist** / **Safeguard**: a real new mechanism, `blocking_shield()`
+  (`conditions.py`) -- the apply-name of a `mist`/`safeguard` condition
+  already active on a target that blocks an incoming status `spec` outright,
+  checked from `_apply_status` (`routes_combat.py`) before anything lands,
+  raising the same plain `ValueError` every other blocked action in this
+  file already raises (shown correctly by every existing call site's error
+  handling with no client changes). Mist scopes to `kind:'stat'` with a
+  negative flat `amount` (a dice-shaped bonus is never negative by
+  construction, so it's unaffected); Safeguard scopes to its own named
+  condition list (asleep/burned/confused/frozen/paralyzed/petrified/
+  poisoned/slowed), not every condition or `INCAPACITATING_CONDITIONS`.
+  Neither blocks a self-sourced apply (`sourceId` unset or equal to the
+  target's own id) -- both moves protect against an ENEMY's incoming effect,
+  and this app has no team/faction concept anywhere to check that
+  properly against; a documented simplification, same spirit as
+  `granted_immunity` having no team check either. Verified with 11 direct
+  calls against `blocking_shield` (blocks/allows on both moves, self-sourced
+  and sourceless applies passing through untouched, a dice-shaped amount
+  never counting as negative, an unrelated status on the same participant
+  not confusing the scan).
+
+The remaining 9 stay unmigrated, each for a real, different reason (5 already
+scoped above, 4 assessed fresh this pass): Feint (reaction to a DEFENDER's
+own declared reaction -- this app's one-floor-holder turn model has no shape
+for that), Wide Guard (halves rather than negates, needs a reaction window
+INSIDE an AoE resolution `_handleMultiHitAoe` doesn't have), Spiky Shield
+(reflects damage back -- no "deal damage" effect kind exists anywhere in this
+schema), Nature's Embrace (redirects the avoided damage into a brand new
+attack roll against a different target -- a full reactive mini-attack-flow,
+not a status), Lucky Chant (needs a third reaction timing, after the attack
+roll but before damage -- crit itself isn't determined until well after
+target-picker.js's own attack-roll step has closed); and, assessed this
+pass: **Crafty Shield** (blocks only the CONDITION half of an incoming
+attack, never any accompanying damage -- reusing `block_attack` as-is would
+over-block a damage+condition combo move like Thunder Punch, a real gap, not
+an acceptable approximation), **Mat Block** (not a reaction at all -- a
+proactively-cast, multi-turn, AoE "immune to damage from damaging moves"
+shield needing a check at DAMAGE-APPLICATION time, parallel to `temp_hp`'s
+own `_absorb_temp_hp` hook, not a reaction-window block), **Shield Dome** (a
+physical terrain barrier blocking movement and ranged line-of-sight through a
+fixed radius -- needs real wall/LOS geometry this app's grid has no
+representation of, unrelated to the Protect-family reaction-block shape
+entirely), **Testudo Formation** (compounds King's Shield's own
+already-deferred "blocks ALL damage, persists past the one triggering
+attack" gap with Wide Guard's halve-math-inside-an-AoE gap AND a
+formation-membership concept this app tracks nowhere -- not a small
+increment on anything already built).)*

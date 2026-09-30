@@ -96,6 +96,55 @@ def effective_speed_multiplier(participant):
     return multiplier
 
 
+# Safeguard's own named list ("protected from new negative status conditions
+# of the following types: asleep, burned, confused, frozen, paralyzed,
+# petrified, poisoned or slowed") -- kept as its own explicit set rather than
+# reusing INCAPACITATING_CONDITIONS or any other existing grouping, since
+# none of them matches this exact list (poisoned/burned/slowed aren't
+# incapacitating; petrified is, but it's in both lists for different
+# reasons).
+SAFEGUARD_BLOCKED_CONDITIONS = {'asleep', 'burned', 'confused', 'frozen', 'paralyzed', 'petrified', 'poisoned', 'slowed'}
+
+
+def blocking_shield(target, target_id, spec):
+    """The apply-name of a `mist`/`safeguard`-style immunity shield already
+    active on `target` that blocks an incoming status `spec` (about to be
+    applied via _apply_status), or None. Both moves are a standing
+    protection a PRIOR move granted, checked against every LATER apply
+    attempt -- never against whatever's already active (each move's own
+    "any current effects are still in place" / Mist's target keeps whatever
+    it already had). `spec['sourceId']` unset, or equal to `target_id`
+    itself (a self-inflicted debuff, e.g. a move's own drawback), never gets
+    blocked -- both moves protect against an ENEMY's incoming effect, and
+    nothing about a stat delta or a condition name says who dealt it on its
+    own. This is a stand-in for a real team/faction check, which this app
+    has no other example of anywhere -- a documented simplification, same
+    spirit as `granted_immunity` having no team check either.
+
+    Mist ("immune to negative stat effects or modifier changes") scopes to
+    `kind:'stat'` with a negative flat amount only -- a dice-shaped bonus is
+    never negative by construction (see move-effects.js's `_isDiceAmount`),
+    and a `set` override or a `roll` advantage/disadvantage effect are both
+    a different shape this move's own wording doesn't clearly cover either;
+    left unblocked, a documented gap. Safeguard blocks only its own named
+    condition list above, not the `INCAPACITATING_CONDITIONS` catch-all or
+    every condition -- both scopes read the move's own text literally."""
+    source_id = spec.get('sourceId')
+    if not source_id or source_id == target_id:
+        return None
+    for s in (target or {}).get('statuses', []):
+        if s.get('kind') != 'condition':
+            continue
+        apply_name = s.get('apply')
+        if apply_name == 'mist' and spec.get('kind') == 'stat':
+            amount = spec.get('amount')
+            if isinstance(amount, (int, float)) and amount < 0:
+                return 'mist'
+        if apply_name == 'safeguard' and spec.get('kind') == 'condition' and spec.get('apply') in SAFEGUARD_BLOCKED_CONDITIONS:
+            return 'safeguard'
+    return None
+
+
 def zero_speed_condition(participant):
     """The apply-name of the first condition driving `participant`'s speed
     multiplier all the way to 0 (Grappled/Restrained/Frozen's own flat

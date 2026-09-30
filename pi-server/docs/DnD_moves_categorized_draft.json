@@ -10439,12 +10439,48 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "protect_negate"
+        "protect_negate",
+        "self_potential_block_attack",
+        "self_status_condition_granted_immunity"
       ],
       "description": "When targeted or otherwise affected by a Ground type move affecting grounded creatures, you swiftly take flight, dodging ground based Ground moves until the beginning of your next turn.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "block_attack",
+          "target": "self",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Only if the triggering move was Ground-type."
+        },
+        {
+          "kind": "condition",
+          "apply": "granted_immunity",
+          "value": "Ground",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start",
+              "count": 1
+            }
+          ]
+        }
+      ],
+      "reactionTrigger": "targeted",
+      "reactionRange": 0
     },
     {
       "name": "Hurricane",
@@ -15474,12 +15510,28 @@
       },
       "reaction": false,
       "categories": [
-        "protect_negate"
+        "protect_negate",
+        "status_condition_mist"
       ],
       "description": "A light mist surrounds a target, offering a protective barrier. The target is immune to negative stat effects or modifier changes for the duration, but any current effects are still in place.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "mist",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Pack Frost",
@@ -16242,12 +16294,30 @@
       "categories": [
         "counter_reaction_effect",
         "trigger_saving_throw",
-        "protect_negate"
+        "protect_negate",
+        "self_potential_block_attack"
       ],
       "description": "You attempt to charm an opponent into pulling its punches. When hit by an attack from an opponent, you may use a reaction to force it to make a WIS save against your Move DC. On a failure, the attack does not hit.",
       "moveStat": "WIS/CHA",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "block_attack",
+          "target": "self",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Only if the attacker fails the WIS save (vs your Move DC) this reaction forces -- tick this after confirming the save failed."
+        }
+      ],
+      "reactionTrigger": "targeted",
+      "reactionRange": 0
     },
     {
       "name": "Celebrate",
@@ -19443,12 +19513,43 @@
       },
       "reaction": false,
       "categories": [
-        "protect_negate"
+        "protect_negate",
+        "self_status_condition_safeguard",
+        "status_condition_safeguard"
       ],
       "description": "You boost defenses for you and all allies in range. For the duration, any ally within range is protected from new negative status conditions oof the following types: asleep, burned, confused, frozen, paralyzed, petrified, poisoned or slowed.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "safeguard",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "safeguard",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Scary Face",

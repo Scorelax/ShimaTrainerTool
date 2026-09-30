@@ -567,6 +567,21 @@ export function guaranteedCritStatusId(participant) {
   return (participant?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'guaranteed_next_crit')?.id || null;
 }
 
+/** The status id of an active "next attack always hits" flag (Lock-On, Mind
+ * Reader) on `participant`, or null -- guaranteed_next_crit's own sibling,
+ * same standalone-condition shape (not a stat/roll effect) and same
+ * target-picker.js wiring (skips the attack roll/AC comparison entirely,
+ * same as a guaranteed_next_crit attack). Both moves' own text adds "you
+ * may still roll to see if you crit" -- NOT modeled, since target-picker's
+ * guaranteedHit path skips the roll step outright (same as Laser Focus);
+ * giving guaranteed-hit-but-still-rollable its own path is a materially
+ * bigger target-picker.js change for a minor clause, left as a documented
+ * gap rather than built here. Consumed (use-status) once the attack
+ * actually resolves, same as guaranteedCritStatusId. */
+export function guaranteedHitStatusId(participant) {
+  return (participant?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'guaranteed_next_hit')?.id || null;
+}
+
 /** True when `saver` currently auto-fails a saving throw for `ability`
  * ("STR".."CHA") purely from a held condition's own rulebook text (Stunned/
  * Unconscious/Petrified's "automatically fails Strength and Dexterity

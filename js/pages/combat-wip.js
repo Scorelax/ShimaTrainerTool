@@ -26,7 +26,7 @@ import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, tempHpRemaining } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -1925,6 +1925,21 @@ async function _handleBideResolve({ combatantId, dealt }) {
   }
 }
 
+/** Whether `combatantId`'s NEXT attack roll is guaranteed to hit -- a fixed
+ * move-level property (guaranteed_hit-tagged moves like Aerial Ace/Aura
+ * Sphere) OR a live status (Laser Focus's guaranteed_next_crit, Lock-On/
+ * Mind Reader's guaranteed_next_hit). Re-checked fresh from the CURRENT
+ * session on every call rather than cached once -- both status flags are
+ * one-shot and get consumed (use-status) the moment an attack actually
+ * resolves (see _resolveOneHit), so a multi-hit move's "hit again?" loop
+ * must re-evaluate this each time through, not reuse whatever was true
+ * before the first hit already spent it. */
+function _guaranteedHitFor(combatantId, categories) {
+  if (categories.includes('guaranteed_hit')) return true;
+  const attacker = session?.participants?.[combatantId];
+  return !!guaranteedCritStatusId(attacker) || !!guaranteedHitStatusId(attacker);
+}
+
 /** Wired into combat.js's move-popup flow as onDamageResolved (see
  * attachBattleListeners above) -- fires right after the player confirms an
  * offensive move (combat.js has already handled that move's own VP cost
@@ -1950,14 +1965,10 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // the target is in the invulnerable stage of Fly/Dig") stays a human call,
   // same trust model as the rest of this flow.
   const categories = moveCategoriesFor(moveName);
-  // Laser Focus ("your first attack ... always results in a critical hit") also
-  // skips the attack roll -- the move guarantees a hit, not just a crit conditional
-  // on one -- see _resolveOneHit for where the crit itself gets forced and consumed.
-  const guaranteedHit = categories.includes('guaranteed_hit') || !!guaranteedCritStatusId(session?.participants?.[combatantId]);
   // Target-conditional damage_note effects (Brine, Smelling Salts, Venoshock,
   // ...) -- see move-effects-schema.md and target-picker.js's own use of these.
   const damageNotes = _targetDamageNotes(moveName);
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
 
   const isSameTarget = categories.includes('multi_hit_same_target');
@@ -1984,9 +1995,9 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
       const target = session?.participants?.[hitTargetId];
       if (!target) return; // target left the battle mid-chain
-      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
     } else {
-      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit, moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
   }
@@ -2451,6 +2462,13 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   if (laserFocusId) {
     crit = true;
     CombatAPI.useStatus(combatantId, laserFocusId).catch(() => {});
+  }
+  // Lock-On/Mind Reader's own guaranteed-hit flag -- same "spent the moment
+  // this attack resolves" consumption as Laser Focus, but never forces a
+  // crit (guaranteedHit above already covers the hit itself being certain).
+  const guaranteedHitId = guaranteedHitStatusId(attacker);
+  if (guaranteedHitId) {
+    CombatAPI.useStatus(combatantId, guaranteedHitId).catch(() => {});
   }
   await _offerMoveEffects({
     attackerId: combatantId, targetId, moveName, computedData,

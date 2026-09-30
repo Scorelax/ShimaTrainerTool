@@ -356,7 +356,7 @@ correction `reroll_damage`'s own refund already uses.
 | `{type:"other", text}` | anything else — shown, removed manually |
 
 ## Vocabularies
-- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit`. `guaranteed_next_crit` (Laser Focus) is a standalone flag, not a stat/roll effect — see `guaranteedCritStatusId` below. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below.
+- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit guaranteed_next_hit`. `guaranteed_next_crit` (Laser Focus) and `guaranteed_next_hit` (Lock-On, Mind Reader — `guaranteedHitStatusId`, same shape/wiring as `guaranteedCritStatusId` but never forces a crit) are standalone flags, not stat/roll effects. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below.
 - **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities attack_rolls_or_saving_throws` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field). `attack_rolls_or_saving_throws` is a single bonus eligible for either roll type (Growth, Helping Hand) -- spending it on one consumes it for both.
 - **roll `on`**: `attack_rolls` (the holder's own) · `attacks_against` (rolls made against the holder) · `saving_throws` (the holder's) · `saves_against_its_moves` · `ability_checks` · `all_rolls`
 - **`ability`** (optional, `roll`/`stat` effects on `saving_throws` only): narrows to one ability's saves -- Hammer Arm's "disadvantage on DEX saves" (a plain `saving_throws` roll/stat with no `ability` still applies broadly, to every save, same as before this field existed). `saveRollContext`'s own `ability` param (already threaded through from the save popup) is what it's matched against; nothing analogous exists yet for `attack_rolls`/`ability_checks` (Nasty Plot's "advantage on WIS-power attacks", Study's "advantage vs one specific target" -- neither `attackRollContext` nor `ability_checks` rolls carry enough context to scope against yet, left unmigrated).
@@ -684,3 +684,25 @@ effect, reactive/retaliatory damage, tracked amounts with no tracking
 mechanism, and field/terrain AoE-over-time (no "who's standing in this map
 area" concept exists). Full per-move reasoning in
 `migrate_effects_v30.py`'s own module docstring -- not repeated here.)*
+
+*(Update, 2026-09-30: the "guaranteed hit" gap named above is closed for
+Lock-On and Mind Reader (migrate_effects_v31.py) -- a new
+`guaranteed_next_hit` condition, `guaranteedHitStatusId()` mirroring
+`guaranteedCritStatusId()` exactly (same standalone-flag shape, same
+target-picker.js wiring, same use-status consumption once the attack
+resolves), just never forcing a crit. Both moves' own "you may still roll
+to check for a crit" clause isn't modeled -- the guaranteed-hit path skips
+the roll step entirely, so keeping the roll around for crit-fishing only
+would need a materially different code path. Thunderstorm Dance ("while
+concentrating, ALL electric-type moves guaranteed to hit") is NOT
+included -- it's an ongoing, move-TYPE-scoped effect, not a one-shot "next
+attack" flag, and this mechanism has no concept of narrowing to a specific
+move type at all; left for its own slice. Also fixed a real latent bug
+found while wiring this in, pre-dating this change: the "hit again?" loop
+for multi-hit moves (multi_hit_same_target/multi_hit_choice) reused a
+single `guaranteedHit` value computed once before the first hit, across
+every subsequent hit — a one-shot status (Laser Focus's crit, or this new
+hit-guarantee) would incorrectly stay "guaranteed" for later hits too, even
+after being consumed by the first one. Fixed with a new
+`_guaranteedHitFor(combatantId, categories)` helper (combat-wip.js) that
+re-checks the live session state fresh on every call.)*

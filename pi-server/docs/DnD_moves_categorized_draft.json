@@ -18146,12 +18146,29 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_guaranteed_next_hit"
       ],
       "description": "You hone in on your target, ready to strike. When this move is activated, a single attack roll you make next turn is guaranteed to hit. You may roll to see if you crit or cause an effect from a high roll. This move does not affect one-shot moves like Fissure, Guillotine, etc.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "guaranteed_next_hit",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "You may still roll to check for a crit or a high-roll effect -- not auto-supported, the guaranteed-hit path skips the roll step entirely."
+        }
+      ]
     },
     {
       "name": "Lovely Kiss",
@@ -18395,12 +18412,29 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_guaranteed_next_hit"
       ],
       "description": "You sense the motives and moves of a creature around you. When this move is activated, a single attack roll you make next turn is guaranteed to hit. You may roll to see if you crit or cause an effect from a high roll. This move does not affect one-shot moves like Fissure, Guillotine, etc.",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "guaranteed_next_hit",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "You may still roll to check for a crit or a high-roll effect -- not auto-supported, the guaranteed-hit path skips the roll step entirely."
+        }
+      ]
     },
     {
       "name": "Minimize",

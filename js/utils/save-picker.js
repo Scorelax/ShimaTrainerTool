@@ -328,7 +328,14 @@ function _updateSaveTotal() {
   const total = raw + (_saveModifier || 0) + _diceBonusExtra;
   if (!dc) { totalEl.innerHTML = `Total: <strong>${total}</strong>${_saveAutoFail ? ' — auto-fails regardless' : ''}`; return; }
   const passed = !_saveAutoFail && total >= dc;
-  if (passed) passBtn.classList.add('save-picker-suggested');
+  // Ordinary (non-auto-fail) case: highlight whichever the total actually
+  // suggests -- this used to be unconditional before auto-fail existed
+  // (`(passed ? passBtn : failBtn).classList.add(...)`); adding the
+  // auto-fail branch above accidentally dropped the plain-Fail half of
+  // that, leaving neither button highlighted on an ordinary failed save.
+  // Harmless to still hit this for the auto-fail case too (failBtn already
+  // has the class from above; adding it again is a no-op).
+  (passed ? passBtn : failBtn).classList.add('save-picker-suggested');
   totalEl.innerHTML = `Total: <strong>${total}</strong> vs DC ${dc} — ${passed ? 'passes' : (_saveAutoFail ? 'auto-fails' : `fails by ${dc - total}`)}`;
 }
 

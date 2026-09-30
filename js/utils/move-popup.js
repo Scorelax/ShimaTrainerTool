@@ -547,8 +547,9 @@ function _renderCommander(trainerData) {
  * @param {string} [params.speciesName]  - Species name used to look up a preloaded battle animation (see utils/battle-animation.js)
  * @param {boolean} [params.deferAnimation] - Skip playing the battle animation here on "Yes" -- for callers (combat-wip.js's onDamageResolved flow) that show it themselves later, once a target is picked and the attack roll is confirmed a hit, instead of the instant "Use Move" is confirmed. Defaults to false (legacy behavior: plays immediately), so every other caller is unaffected.
  * @param {boolean} [params.skipConfirm] - Skip the separate "Use MoveName (N VP)? Yes/No" confirm popup entirely -- clicking Use Move directly uses it (the same VP cost is already shown in this popup's own grid, so that confirm step was just a second click for no new information). Defaults to false (legacy behavior: confirm popup shown), so only callers that opt in (combat-wip.js) are affected -- pokemon-card.js's own semi-permanent VP/HP deduction keeps the confirm step.
+ * @param {number} [params.vpCostOverride] - Actual VP cost to show/deduct, in place of move[4]'s base value -- Fury Cutter/Ice Ball/Rollout's own escalating cost per consecutive hit (see combat.js's showCombatMoveDetails). Falls back to move[4] when not given, same as before this existed.
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, spriteUrl, spriteAlt, speciesName, deferAnimation, skipConfirm }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, vpCostOverride, spriteUrl, spriteAlt, speciesName, deferAnimation, skipConfirm }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -587,7 +588,7 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   document.getElementById('combatMoveTypePopup').textContent = move[1];
   document.getElementById('cMoveModifier').textContent = move[2] || '—';
   document.getElementById('cMoveAction').textContent = move[3] || '—';
-  document.getElementById('cMoveVP').textContent = move[4] || '0';
+  document.getElementById('cMoveVP').textContent = vpCostOverride ?? (move[4] || '0');
   document.getElementById('cMoveDuration').textContent = move[5] || '—';
   document.getElementById('cMoveRange').textContent = move[6] || '—';
   document.getElementById('cMoveSize').textContent = size || '—';
@@ -658,7 +659,7 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   const useBtn = document.getElementById('useCombatMoveBtn');
   if (useBtn) {
     useBtn.dataset.moveName = move[0];
-    useBtn.dataset.vpCost = move[4] || 0;
+    useBtn.dataset.vpCost = vpCostOverride ?? (move[4] || 0);
     const isSpent = chargesLeft !== undefined && chargesLeft === 0;
     useBtn.disabled = isSpent || !!disableUse;
     if (isSpent) {

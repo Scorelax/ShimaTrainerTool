@@ -216,12 +216,18 @@ BEFORE the roll.
   `activeBuffCount`/`witnessedMoveTypes`): a miss never reaches the damage-logging step, and an
   incapacitated participant can't have used a move at all, so the mere ABSENCE of a matching `damage`
   log entry for a given round already covers those two reset conditions for free. Two cap shapes, per
-  each move's own text: `cap` (the multiplier itself tops out and stays there, however long the streak
-  continues) or `maxStreak` (reaching it is the last escalated hit -- the next one restarts from 1x,
-  "in which case the damage would reset"). NOT checked: the escalating VP cost (+1 per consecutive
-  use -- a different code path, VP cost is computed before the damage-roll step this hooks into) and
-  Ice Ball/Rollout's own "also resets if speed is reduced to 0" (a narrow edge case) -- both surfaced
-  as a plain `note` reminder instead of silently dropped.
+  each move's own text, both resolved through a shared `_consecutiveHitPosition(rawCount, cond)`
+  helper so the damage multiplier and the VP-cost escalation below always agree on where in the streak
+  a given use actually is: `cap` (Fury Cutter/Ice Ball -- position never wraps, the multiplier itself
+  tops out and stays there, but VP cost keeps climbing right along with it, matching the move's own
+  text stating no VP cap) or `maxStreak` (Rollout -- position wraps every `maxStreak` hits: reaching it
+  is the last escalated hit of one cycle, VP cost included, and the next hit restarts a fresh cycle
+  from position 0 rather than getting stuck at the reset value forever). Also drives the escalating VP
+  cost itself (+1 per position, `combat.js`'s own `showCombatMoveDetails` computing it independently of
+  the dice-override branch and passing it to `move-popup.js` as a new `vpCostOverride` param, shown and
+  deducted in place of the move's own flat `vpCost`). NOT checked: Ice Ball/Rollout's own "also resets
+  if speed is reduced to 0" (a narrow edge case) -- surfaced as a plain `note` reminder instead of
+  silently dropped.
 - `{type: "target_type", any: ["poison"]}` -- Solvent Spray's "double damage to Poison-type
   Pokémon", checked against the target's `type1`/`type2` (case-insensitively), not a live matchup
   chart lookup -- this is about the target's own species type, not effectiveness.

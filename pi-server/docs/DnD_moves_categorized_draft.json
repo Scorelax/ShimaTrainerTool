@@ -237,8 +237,7 @@
             "type": "self_consecutive_move_hits",
             "cap": 8
           },
-          "diceMultiplierFromMagnitude": true,
-          "note": "VP cost also increases by 1 each consecutive use -- not auto-tracked, add it by hand."
+          "diceMultiplierFromMagnitude": true
         }
       ]
     },
@@ -15129,7 +15128,7 @@
             "cap": 8
           },
           "diceMultiplierFromMagnitude": true,
-          "note": "VP cost also increases by 1 each consecutive use -- not auto-tracked, add it by hand. Also resets if your speed is reduced to 0 -- not checked separately."
+          "note": "Also resets if your speed is reduced to 0 -- not checked separately."
         }
       ]
     },
@@ -25353,7 +25352,7 @@
             "maxStreak": 5
           },
           "diceMultiplierFromMagnitude": true,
-          "note": "VP cost also increases by 1 each consecutive use -- not auto-tracked, add it by hand. Also resets if your speed is reduced to 0 -- not checked separately."
+          "note": "Also resets if your speed is reduced to 0 -- not checked separately."
         }
       ]
     },

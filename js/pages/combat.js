@@ -2271,6 +2271,25 @@ function getHealDiceForLevel(move, level) {
   return dice;
 }
 
+/** The 0-based position within a repeating escalation cycle for Fury
+ * Cutter/Ice Ball/Rollout's own consecutive-hit streak (`rawCount` = how
+ * many consecutive prior rounds landed, from c.lastHitMoveStreak) -- shared
+ * by the damage multiplier (self_consecutive_move_hits, above) and the VP
+ * cost escalation (showCombatMoveDetails's own call site, below), so both
+ * always agree on where in the streak this attack actually is. A `cap`
+ * condition (Fury Cutter/Ice Ball) never wraps -- the streak just keeps
+ * counting once the MULTIPLIER hits its cap, and VP cost keeps climbing
+ * right along with it (the move's own text states no VP cap). A
+ * `maxStreak` condition (Rollout) wraps every `maxStreak` hits -- reaching
+ * it is the last escalated hit of ONE cycle; the next hit restarts a fresh
+ * cycle from position 0 rather than getting stuck at the reset value
+ * forever (a real refinement over this project's own first cut at Rollout,
+ * which flattened every count past maxStreak to a permanent "no bonus"). */
+function _consecutiveHitPosition(rawCount, cond) {
+  if (!rawCount) return 0;
+  return cond.maxStreak ? rawCount % cond.maxStreak : rawCount;
+}
+
 /** Evaluates `damage_note` effects (already filtered to that kind) against
  * `c`'s own current HP/status -- see showCombatMoveDetails's own call site
  * for the full reasoning. Multiple dice-multiplier tiers (Flail's 2x at
@@ -2341,9 +2360,8 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null, move
       case 'self_consecutive_move_hits': {
         const streak = c.lastHitMoveStreak;
         if (!streak || streak.moveName !== moveName || !streak.count) return { met: false, magnitude: 1 };
-        const mult = cond.maxStreak
-          ? (streak.count >= cond.maxStreak ? 1 : 2 ** streak.count)
-          : Math.min(2 ** streak.count, cond.cap || Infinity);
+        const pos = _consecutiveHitPosition(streak.count, cond);
+        const mult = cond.cap ? Math.min(2 ** pos, cond.cap) : 2 ** pos;
         return { met: mult > 1, magnitude: mult };
       }
       default: return { met: false, magnitude: 0 };
@@ -3010,10 +3028,21 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // distributions differ) -- safer to say so in words than assert a number
   // that might be wrong.
   let _damageNote = '';
+  let _extraVpCost = 0;
   if (!_isDirectHeal && computedData.damageDice) {
     const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
     if (_dmgNoteEffects.length) {
       const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather, moveName);
+      // Fury Cutter/Ice Ball/Rollout's own escalating VP cost -- the exact
+      // same streak position the damage multiplier above was just computed
+      // from (see _consecutiveHitPosition's own docstring), so the two
+      // always agree on where in the streak this particular use actually
+      // is. Computed independently of the dice-override branch below since
+      // position 0 (a fresh streak) correctly means +0 VP either way.
+      const _streakEffect = _dmgNoteEffects.find(e => e.condition?.type === 'self_consecutive_move_hits');
+      if (_streakEffect && c.lastHitMoveStreak?.moveName === moveName) {
+        _extraVpCost = _consecutiveHitPosition(c.lastHitMoveStreak.count, _streakEffect.condition);
+      }
       if (diceMultiplier > 1 || flatBonus || extraDiceCount > 0) {
         // extraDiceCount (real extra dice, Power Trip) and diceMultiplier
         // (Flail/Facade) never co-occur on the same move today, but compose
@@ -3086,6 +3115,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
+    vpCostOverride: _extraVpCost > 0 ? (parseInt(move[4], 10) || 0) + _extraVpCost : undefined,
     deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave || _willDeferToMultiHitAoe,
     skipConfirm: _isSharedCombat,
     onUseMove: (usedMoveName, vpCost) => {

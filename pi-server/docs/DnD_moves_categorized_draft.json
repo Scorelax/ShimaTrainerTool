@@ -25703,12 +25703,31 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "protect_negate"
+        "protect_negate",
+        "self_potential_damage_multiplier"
       ],
       "description": "You have the ability to guard your allies from area-of-effect moves. As a reaction, when a creature activates a damaging move that damages multiple allies within range, you may halve the damage dealt. On future instances of this reaction in the same combat, you must roll higher than a 15 on a d20 roll or forfeit the reaction with no effect.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "damage_multiplier",
+          "multiplier": 0.5,
+          "target": "self",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Only the first use each combat is free -- after that, roll over 15 on a d20 or forfeit the reaction with no effect."
+        }
+      ],
+      "reactionTrigger": "targeted",
+      "reactionRange": 50
     },
     {
       "name": "Autotomize",

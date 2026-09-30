@@ -19,14 +19,20 @@ function _sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); 
  * is called so the caller can render its own "waiting for reactions..." UI --
  * once with `{opened: false}` if nobody was eligible (nothing to wait for, proceed
  * immediately), or repeatedly with `{opened: true, msLeft, pendingReaction}` while
- * genuinely waiting. Resolves to `{blocked: false}` normally, or `{blocked: true,
+ * genuinely waiting. Resolves to `{blocked: false}` normally, `{blocked: true,
  * blockerName}` once a reactor's own `block_attack` effect (Protect, King's
- * Shield, ...) landed -- see move-effects-schema.md's own section; only
- * target-picker.js's 'targeted' caller actually acts on this, a 'damaged'
- * reaction is already too late to block anything. Never rejects, so a network
- * hiccup mid-wait costs the attacker a little extra delay rather than losing
- * their whole action, the same trust-the-flow-keeps-moving decision made
- * everywhere else in this app.
+ * Shield, ...) landed, or `{blocked: false, multiplier, reactorName}` once a
+ * reactor's own `damage_multiplier` effect (Wide Guard) landed instead -- see
+ * move-effects-schema.md's own sections; a block and a multiplier are
+ * mutually exclusive in practice (only one reactor's outcome is ever acted
+ * on by a caller) but not structurally prevented from both being set if two
+ * different eligible reactors each used one within the same window. Only
+ * target-picker.js's 'targeted' caller and combat-wip.js's own AoE reaction
+ * (_handleMultiHitAoe) act on either of these; a 'damaged' reaction is
+ * already too late for both. Never rejects, so a network hiccup mid-wait
+ * costs the attacker a little extra delay rather than losing their whole
+ * action, the same trust-the-flow-keeps-moving decision made everywhere
+ * else in this app.
  */
 export async function waitForReactionWindow(trigger, anchorId, attackerId, moveName, onStatus) {
   let opened;
@@ -41,32 +47,35 @@ export async function waitForReactionWindow(trigger, anchorId, attackerId, moveN
     return { blocked: false };
   }
 
-  // Captured from the first poll that sees the window at all, so a block
-  // reported later (session.reactionBlock, set by a separate
-  // block-pending-attack call the reactor's own move triggers -- see
+  // Captured from the first poll that sees the window at all, so an outcome
+  // reported later (session.reactionBlock / session.reactionDamageMultiplier,
+  // each set by a separate call the reactor's own move triggers -- see
   // routes_combat.py) can be confirmed as belonging to THIS window and not
-  // some earlier one that already closed. block-pending-attack never closes
-  // the window itself (reaction-end still does, same as any other reaction),
-  // so a block can be visible on a poll well before pendingReaction goes
-  // null -- checked opportunistically every iteration rather than only once
-  // at the end, so a late/slow final poll can't miss it.
+  // some earlier one that already closed. Neither ever closes the window
+  // itself (reaction-end still does, same as any other reaction), so either
+  // can be visible on a poll well before pendingReaction goes null -- checked
+  // opportunistically every iteration rather than only once at the end, so a
+  // late/slow final poll can't miss it.
   let windowId = null;
-  let blockResult = { blocked: false };
+  let result = { blocked: false };
   // eslint-disable-next-line no-constant-condition
   while (true) {
     let session = null;
     try {
-      const result = await CombatAPI.getState();
-      session = result?.status === 'success' ? result.data : null;
+      const apiResult = await CombatAPI.getState();
+      session = apiResult?.status === 'success' ? apiResult.data : null;
     } catch {
       // transient -- fall through and poll again rather than giving up on the wait
     }
     const pr = session?.pendingReaction;
     if (!windowId && pr) windowId = pr.id;
     if (session?.reactionBlock?.windowId && session.reactionBlock.windowId === windowId) {
-      blockResult = { blocked: true, blockerName: session.reactionBlock.blockerName };
+      result = { blocked: true, blockerName: session.reactionBlock.blockerName };
     }
-    if (!pr) return blockResult; // closed -- everyone answered, or someone's client already timed it out
+    if (session?.reactionDamageMultiplier?.windowId && session.reactionDamageMultiplier.windowId === windowId) {
+      result = { ...result, multiplier: session.reactionDamageMultiplier.multiplier, reactorName: session.reactionDamageMultiplier.reactorName };
+    }
+    if (!pr) return result; // closed -- everyone answered, or someone's client already timed it out
 
     const msLeft = pr.expiresAt - Date.now();
     onStatus?.({ opened: true, msLeft: Math.max(0, msLeft), pendingReaction: pr });

@@ -78,6 +78,15 @@ _EMPTY_STATE = {
     # block can land well before reaction-end closes the window, and needs to
     # survive that close so the attacker's client (still polling) can see it.
     'reactionBlock': None,
+    # Set by apply-reaction-damage-multiplier (see _apply_reaction_damage_multiplier)
+    # when a reactor's own move applies a `damage_multiplier` effect (Wide
+    # Guard) -- {windowId, anchorId, attackerId, reactorId, reactorName,
+    # multiplier}, or None. Same never-cleared-automatically/windowId-scoped
+    # reasoning as reactionBlock, and deliberately a SEPARATE field from it
+    # (a block cancels the attack outright; a multiplier only scales the
+    # damage that still lands) -- reaction-window.js's waitForReactionWindow
+    # reads both and a caller can act on either or neither.
+    'reactionDamageMultiplier': None,
     'participants': {},
     'fieldEffects': [],
     # Shared weather/terrain -- {name, effect} freeform (the DM types both,
@@ -231,6 +240,12 @@ def handle(conn, action, params):
         if not params.get('id'):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _negate_reaction_block(s, params['id'], _load_move_data_file()))
+
+    if action == 'apply-reaction-damage-multiplier':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        multiplier = float(params.get('multiplier', 0.5))
+        return _mutate(conn, lambda s: _apply_reaction_damage_multiplier(s, params['id'], multiplier))
 
     if action == 'close-reaction-window':
         return _mutate(conn, _close_reaction_window)
@@ -1277,6 +1292,36 @@ def _negate_reaction_block(state, pid, moves_data):
                text=f"{attacker['name']} used Feint (-{feint_vp or 0} VP) -- bypasses "
                     f"{blocker['name'] if blocker else 'the'} protection, the attack resolves normally{refund_text}",
                actorId=pid, actorName=attacker['name'], move='Feint', vpCost=feint_vp or 0)
+
+
+def _apply_reaction_damage_multiplier(state, pid, multiplier):
+    """Wide Guard's own mechanism: "As a reaction, when a creature activates
+    a damaging move that damages multiple allies within range, you may halve
+    the damage dealt." Recorded the same way `_block_pending_attack` records
+    a block -- {windowId, anchorId, attackerId, reactorId, reactorName,
+    multiplier} on a new top-level `reactionDamageMultiplier` field -- so the
+    attacker's own client (still polling in waitForReactionWindow) can pick
+    it up once the window closes, matched by windowId exactly like
+    reactionBlock already is. Same reaction-floor requirement as
+    _block_pending_attack (the caller must actually be holding the floor for
+    a real pending window they were eligible for) -- unlike
+    _negate_reaction_block, this IS an ordinary reaction, not a follow-up
+    action outside the floor-holding model."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if state['reactingParticipantId'] != pid:
+        raise ValueError('Not currently holding a reaction')
+    pr = state.get('pendingReaction')
+    if not pr or pid not in pr['eligible']:
+        raise ValueError('No pending reaction to apply this to')
+    state['reactionDamageMultiplier'] = {
+        'windowId': pr['id'], 'anchorId': pr['anchorId'], 'attackerId': pr['attackerId'],
+        'reactorId': pid, 'reactorName': participant['name'], 'multiplier': multiplier,
+    }
+    pct = round((1 - multiplier) * 100)
+    _log_event(state, 'reaction-block', text=f"{participant['name']} reduces the incoming damage by {pct}%!",
+               actorId=pid, actorName=participant['name'])
 
 
 def _maybe_close_reaction_window(state):

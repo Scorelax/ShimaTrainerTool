@@ -1040,3 +1040,44 @@ boundary. Feint itself gets no `effects` entry at all -- there's no attack
 of its OWN to roll; what it acts on is already fully specified by the
 just-recorded block -- its `categories` are left exactly as originally
 hand-assigned, same treatment as the 7 `ignoresProtect` moves.)*
+
+*(Update, 2026-09-30: Wide Guard built (`migrate_effects_v39.py`), the second
+of the pushback list. Its own deferral had two stated reasons -- it halves
+rather than negates, and the reaction window would need to open INSIDE an
+AoE resolution, which `_handleMultiHitAoe` didn't have at all -- both
+addressed, at the cost of one simplification the user explicitly signed off
+on: a human eyeballing who's actually in range of the blast is fine (same
+trust model as every other AoE-membership check in this app already), so no
+new positional/radius system was needed, only the halving mechanic and a
+place for the reaction to happen.
+
+New `kind: "damage_multiplier"` effect ({multiplier, target:"self",
+when:"special" -- the Protect family's own escalating "roll over 15 after
+the first use" cost stays a manual human judgment call, same treatment
+Parry/Captivate/Hover already get). Wired into `_offerMoveEffects` exactly
+like `block_attack` -- a one-shot signal to the ATTACKER's client instead of
+a stored status, just scaling the damage that still lands instead of
+cancelling it (`_apply_reaction_damage_multiplier`, a new top-level
+`reactionDamageMultiplier` session field structurally identical to
+`reactionBlock`). `reaction-window.js`'s `waitForReactionWindow` now watches
+both fields, resolving to `{blocked}` or `{blocked: false, multiplier,
+reactorName}`.
+
+`_handleMultiHitAoe` now opens ONE 'targeted' window right after targets are
+picked, anchored on the first one selected (the closest stand-in this app
+has for "is the reactor in range of the blast"). A `block_attack` reactor
+(also eligible here, since it rides the same 'targeted' family) only ever
+protects its own user, so it's filtered OUT of the AoE's target list rather
+than aborting the whole resolution; a `damage_multiplier` reactor instead
+scales every remaining target's own damage, threaded through both of this
+function's branches (the save-triggered one inline, the guaranteed-hit one
+via a new optional `damageMultiplier` param on `_resolveOneHit`, defaulted
+to 1 everywhere else). New `waitForTargetedAoeReactions`
+(reaction-wait-overlay.js, generalized from the 'damaged'-only
+`waitForDamagedReactions` it already shared code with) gives this its own
+"waiting..." overlay, since this loop -- unlike target-picker.js's
+single-target flow -- has no existing popup step to pause inside of.
+Verified with 4 direct calls against `_apply_reaction_damage_multiplier`
+(records correctly, requires floor-holding, requires a live pending
+reaction) plus the 9 existing `_negate_reaction_block`-family checks
+re-confirming Feint's own mechanism is untouched by this change.)*

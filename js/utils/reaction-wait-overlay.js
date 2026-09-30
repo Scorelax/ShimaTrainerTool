@@ -1,10 +1,14 @@
-// A tiny, non-interactive "Waiting for possible reactions..." overlay for the
-// 'damaged' reaction family (see reaction-window.js) -- unlike the 'targeted'
-// family, which pauses INSIDE an already-open popup (target-picker.js's own
-// step), a damage-based wait happens after every popup involved has already
-// closed, so there's no existing step to show it in. Just a small blocking
-// indicator with a live countdown; nothing to click, it closes itself once
-// the wait resolves.
+// A tiny, non-interactive "Waiting for possible reactions..." overlay for a
+// reaction wait that has no existing popup step of its own to show it in.
+// The 'damaged' family (see reaction-window.js) is always like this -- a
+// damage-based wait happens after every popup involved has already closed.
+// The 'targeted' family usually pauses INSIDE an already-open popup instead
+// (target-picker.js's own step) and so doesn't need this, EXCEPT
+// combat-wip.js's own AoE flow (_handleMultiHitAoe, Wide Guard's own
+// reaction window), which has no popup step at all to pause inside of --
+// same "nothing to show it in" situation as 'damaged', just a different
+// trigger. Just a small blocking indicator with a live countdown; nothing to
+// click, it closes itself once the wait resolves.
 import { waitForReactionWindow } from './reaction-window.js';
 
 function _injectStyles() {
@@ -36,18 +40,35 @@ function _ensureDom() {
   document.body.appendChild(_overlay);
 }
 
-/** Opens a 'damaged' reaction window anchored on `anchorId` (whoever just took
- * damage) and shows this overlay only for as long as it's genuinely waiting
- * on someone -- no-ops visibly (never shown at all) when nobody's eligible,
- * same as target-picker.js's own version of this for the 'targeted' family. */
-export async function waitForDamagedReactions(anchorId, attackerId, moveName) {
+/** Opens a reaction window of `trigger` ('damaged' or 'targeted') anchored on
+ * `anchorId` and shows this overlay only for as long as it's genuinely
+ * waiting on someone -- no-ops visibly (never shown at all) when nobody's
+ * eligible. Returns whatever waitForReactionWindow itself resolves to
+ * (`{blocked}` or, for Wide Guard's own `damage_multiplier` effect,
+ * `{blocked: false, multiplier, reactorName}`) -- this overlay is purely
+ * cosmetic, it doesn't interpret the result. */
+async function _waitForReactions(trigger, anchorId, attackerId, moveName) {
   _ensureDom();
   let shown = false;
-  await waitForReactionWindow('damaged', anchorId, attackerId, moveName, (status) => {
+  const result = await waitForReactionWindow(trigger, anchorId, attackerId, moveName, (status) => {
     if (!status.opened) return;
     if (!shown) { shown = true; _overlay.style.display = 'flex'; }
     const secs = Math.ceil(status.msLeft / 1000);
     document.getElementById('reactionWaitOverlayTimer').textContent = `${secs}s`;
   });
   if (shown) _overlay.style.display = 'none';
+  return result;
+}
+
+export async function waitForDamagedReactions(anchorId, attackerId, moveName) {
+  return _waitForReactions('damaged', anchorId, attackerId, moveName);
+}
+
+/** combat-wip.js's own _handleMultiHitAoe -- the ONE 'targeted'-family
+ * caller with no existing popup step of its own (see this module's header
+ * comment). `anchorId` is the first target actually picked for the AoE, the
+ * closest stand-in this app has for "is the reactor in range of the blast"
+ * (there's no real blast-center/positional-radius concept anywhere here). */
+export async function waitForTargetedAoeReactions(anchorId, attackerId, moveName) {
+  return _waitForReactions('targeted', anchorId, attackerId, moveName);
 }

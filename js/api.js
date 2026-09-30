@@ -854,6 +854,14 @@ export class CombatAPI {
     return API.request('combat', 'negate-reaction-block', { id }, { useCache: false });
   }
 
+  /** Wide Guard's own mechanism -- `id` is the REACTOR (the one holding the
+   * floor via reaction-start), same caller shape as blockPendingAttack, not
+   * negateReactionBlock's attacker-identity one. See routes_combat.py's own
+   * _apply_reaction_damage_multiplier. */
+  static async applyReactionDamageMultiplier(id, multiplier) {
+    return API.request('combat', 'apply-reaction-damage-multiplier', { id, multiplier }, { useCache: false });
+  }
+
   /** Called once the caller's own local clock reaches the window's expiresAt
    * -- server refuses (rejects the promise) while someone's actively
    * reacting, never force-closing mid-use; the caller just retries shortly

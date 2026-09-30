@@ -253,6 +253,12 @@ def tag_for(e):
         # remove/copy/swap/steal them" family -- see combat-wip.js's
         # _handleStatTransfer for the actual mechanism.
         base = f"stat_transfer_{e['mode']}"
+    elif e['kind'] == 'damage_multiplier':
+        # Wide Guard's own "halve the damage dealt" reaction -- same
+        # always-self-only, when:"special" (manual, escalating-cost-after-
+        # first-use) shape as block_attack, just scaling the damage that
+        # still lands instead of cancelling it.
+        base = 'damage_multiplier'
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

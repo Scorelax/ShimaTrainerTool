@@ -21,7 +21,7 @@ import { showCombatAlert, showCombatConfirm, showCombatPrompt } from '../utils/c
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
-import { waitForDamagedReactions } from '../utils/reaction-wait-overlay.js';
+import { waitForDamagedReactions, waitForTargetedAoeReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
@@ -2233,6 +2233,18 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       }
       continue;
     }
+    if (effect.kind === 'damage_multiplier') {
+      // Same shape as block_attack (a one-shot signal to the ATTACKER's own
+      // client mid waitForReactionWindow), just scaling the damage that
+      // still lands instead of cancelling it outright (Wide Guard).
+      // attackerId (closure) is the reactor themselves, same convention.
+      try {
+        await CombatAPI.applyReactionDamageMultiplier(attackerId, effect.multiplier);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
     if (effect.kind === 'prevent_faint') {
       // Not a status -- a retroactive HP correction against damage that
       // already landed (Endure's own 'damaged' family reaction, unlike
@@ -2525,7 +2537,7 @@ async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
  * actually landed (so a multi_hit_same_target loop knows who to keep
  * hitting), or null otherwise. Shared by the single-hit path, the "hit
  * again?" loop above, and _handleMultiHitAoe's per-target resolution. */
-async function _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked) {
+async function _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier = 1 } = {}) {
   if (!picked) return null; // "no target" / closed -- move's own cost still applied, nothing more to do
   if (picked.blocked) return null; // a reactor's block_attack effect (Protect, ...) ended this attack entirely -- routes_combat.py's own block-pending-attack already logged it (reaction-block), nothing left to do
   if (!picked.hit) {
@@ -2560,8 +2572,13 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     // every damage application here); see the user's own "less tooltip noise" call.
     // damageApplied (post type-multiplier) is captured for a `heal` effect's own
     // fractionOfDamage amount (Absorb, Drain Punch, ...) -- see _offerMoveEffects's
-    // own apply loop.
-    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, rawRoll + damageModifier, moveType, speciesName, moveName);
+    // own apply loop. damageMultiplier (Wide Guard's own reaction, see
+    // _handleMultiHitAoe) scales the raw total BEFORE type-effectiveness --
+    // multiplication commutes, so this is equivalent to scaling the server's
+    // own post-type-multiplier result, just one round trip cheaper.
+    const rawTotal = rawRoll + damageModifier;
+    const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
+    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName);
     damageDealt = dmgResult?.damageApplied;
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
@@ -2640,8 +2657,25 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
  * (pickTargetAgain + _resolveOneHit) otherwise (Meteor Swarm: "make as
  * many ranged attacks as there are targets"). */
 async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
-  const targetIds = await pickMultipleTargets(combatantId);
+  let targetIds = await pickMultipleTargets(combatantId);
   if (!targetIds || !targetIds.length) return; // closed / nobody picked -- move's own cost still applied
+
+  // Wide Guard's own reaction: this app has no real blast-center/positional-
+  // radius concept, so the first target actually picked stands in for "is
+  // the reactor in range of the blast" (see waitForTargetedAoeReactions's
+  // own note). A `damage_multiplier` effect (Wide Guard) scales every
+  // target's own damage below; a `block_attack` effect (Protect et al, also
+  // eligible here since this reuses the same 'targeted' family) only ever
+  // protects its OWN user -- filtered out of this AoE's target list rather
+  // than aborting the whole thing, since nothing about blocking one
+  // participant's share says anything about anyone else's.
+  const anchorId = targetIds[0];
+  const aoeReaction = await waitForTargetedAoeReactions(anchorId, combatantId, moveName);
+  if (aoeReaction?.blocked) {
+    targetIds = targetIds.filter((id) => id !== anchorId);
+    if (!targetIds.length) return; // that was the only target -- nothing left to resolve
+  }
+  const damageMultiplier = aoeReaction?.multiplier || 1;
 
   const isSaveTriggered = moveCategoriesFor(moveName).includes('trigger_saving_throw');
   const guaranteedHit = moveCategoriesFor(moveName).includes('guaranteed_hit');
@@ -2689,7 +2723,10 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
         try {
           // No "N damage applied" popup here either -- see _resolveOneHit's own note;
           // doubly true in a loop over several AoE targets, one popup per target.
-          const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, outcome.rawRoll + damageModifier, moveType, speciesName, moveName);
+          // damageMultiplier: see this function's own Wide Guard note above.
+          const rawTotal = outcome.rawRoll + damageModifier;
+          const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
+          const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName);
           if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
           await waitForDamagedReactions(targetId, combatantId, moveName);
           if (outcome.passed) {
@@ -2723,7 +2760,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
       // so each selected target goes straight to its damage roll.
       const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
-      await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
+      await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier });
     }
   }
 

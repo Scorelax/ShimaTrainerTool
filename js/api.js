@@ -841,8 +841,17 @@ export class CombatAPI {
    * attack roll/damage step once the window closes. `id` must be the
    * blocker, currently holding the floor via reaction-start for a real
    * pending window -- see routes_combat.py's own _block_pending_attack. */
-  static async blockPendingAttack(id) {
-    return API.request('combat', 'block-pending-attack', { id }, { useCache: false });
+  static async blockPendingAttack(id, moveName = '') {
+    return API.request('combat', 'block-pending-attack', { id, moveName }, { useCache: false });
+  }
+
+  /** Feint's own mechanism -- `id` is the ORIGINAL ATTACKER of a block just
+   * recorded (never the blocker/reactor), undoing it and resolving the
+   * attack normally; see routes_combat.py's own _negate_reaction_block for
+   * the identity check and the VP cost/refund it bundles in. Rejects if
+   * `id` isn't that attack's own attacker, or it was already bypassed. */
+  static async negateReactionBlock(id) {
+    return API.request('combat', 'negate-reaction-block', { id }, { useCache: false });
   }
 
   /** Called once the caller's own local clock reaches the window's expiresAt

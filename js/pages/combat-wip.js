@@ -33,7 +33,7 @@ import {
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
-  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor, moveEffectsFor, findMoveRow,
+  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
   buildKnownMovesString,
 } from './combat.js';
 
@@ -1979,6 +1979,18 @@ function _guaranteedHitFor(combatantId, categories) {
   return !!guaranteedCritStatusId(attacker) || !!guaranteedHitStatusId(attacker);
 }
 
+/** The name of a move `combatantId` knows that carries `negatesProtectBlock`
+ * (Feint), or '' if they don't know one -- target-picker.js has no
+ * dependency on combat.js (see its own header comment) and so can't call
+ * moveFlagsFor itself, hence resolving this HERE and passing the result in
+ * as a plain string, same layering `moveCategoriesFor`'s own callers
+ * already respect. Scans by flag, not by hardcoding "Feint", so a future
+ * homebrew move with the same shape works with no code change. */
+function _feintMoveNameFor(combatantId) {
+  const attacker = session?.participants?.[combatantId];
+  return (attacker?.moves || []).find(name => moveFlagsFor(name)?.negatesProtectBlock) || '';
+}
+
 /** Wired into combat.js's move-popup flow as onDamageResolved (see
  * attachBattleListeners above) -- fires right after the player confirms an
  * offensive move (combat.js has already handled that move's own VP cost
@@ -2007,7 +2019,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // Target-conditional damage_note effects (Brine, Smelling Salts, Venoshock,
   // ...) -- see move-effects-schema.md and target-picker.js's own use of these.
   const damageNotes = _targetDamageNotes(moveName);
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
 
   const isSameTarget = categories.includes('multi_hit_same_target');
@@ -2036,7 +2048,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!target) return; // target left the battle mid-chain
       nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
     } else {
-      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
   }
@@ -2215,7 +2227,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // the reactor themselves, using the move -- same as any other
       // self-only reaction effect.
       try {
-        await CombatAPI.blockPendingAttack(attackerId);
+        await CombatAPI.blockPendingAttack(attackerId, moveName);
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });
       }

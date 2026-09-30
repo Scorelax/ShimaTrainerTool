@@ -40,6 +40,11 @@ let _moveCategoriesLoading = false;
 // pi-server/docs/move-effects-schema.md). {} until loaded, and for a move with no
 // entry -- callers treat "no effects" as "nothing to offer", never an error.
 let _moveEffects = {};
+// Move-name -> top-level flags that aren't shaped like an `effects` entry at
+// all (see routes_combat.py's own list-move-categories docstring) -- so far
+// just Feint's own `negatesProtectBlock`. {} until loaded, same
+// miss-means-nothing convention as _moveEffects.
+let _moveFlags = {};
 
 // The data file's tags may still carry the manual-review decoration ("--TRIGGER
 // SAVING THROW--", "-- POTENTIAL DAMAGE INCREASE--", ...) that marked the user's
@@ -62,6 +67,7 @@ function loadMoveCategories() {
     }
     _moveCategories = normalized;
     _moveEffects = result.effects || {};
+    _moveFlags = result.flags || {};
   }).catch(() => {}).finally(() => { _moveCategoriesLoading = false; });
 }
 
@@ -74,6 +80,13 @@ export function moveCategoriesFor(moveName) {
  * move has none (or the data hasn't loaded yet). */
 export function moveEffectsFor(moveName) {
   return _moveEffects[moveName] || [];
+}
+
+/** Top-level flags for `moveName` that don't fit the `effects` shape (see
+ * routes_combat.py's own list-move-categories docstring) -- {} for a move
+ * with none, same miss-is-nothing convention as moveEffectsFor. */
+export function moveFlagsFor(moveName) {
+  return _moveFlags[moveName] || {};
 }
 
 /** The raw move row [name, type, modifier, actionType, vpCost, duration,

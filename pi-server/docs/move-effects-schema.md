@@ -990,3 +990,53 @@ already-deferred "blocks ALL damage, persists past the one triggering
 attack" gap with Wide Guard's halve-math-inside-an-AoE gap AND a
 formation-membership concept this app tracks nowhere -- not a small
 increment on anything already built).)*
+
+*(Update, 2026-09-30: the user pushed back on how much of `protect_negate`
+got deferred above, specifically naming Feint and Wide Guard as moves that
+didn't need nearly as much new work as their write-ups implied. Re-examined
+both with that in mind -- Feint built this pass (`migrate_effects_v38.py`),
+Wide Guard next.
+
+**Feint**'s own deferral reasoning ("a reaction to a DEFENDER's own declared
+reaction -- this app's one-floor-holder turn model has no shape for that")
+was too literal: the tabletop flavor text describes a nested interrupt, but
+the actual GAME OUTCOME only needs the attacker to undo an already-recorded
+block after the fact -- by the time Feint could ever apply,
+the blocker's own reaction has already fully resolved (`reactionBlock` is
+set, possibly after its window even closed). So Feint is authored as a
+plain follow-up action the attacker takes, checked by IDENTITY against the
+block record, not through the reaction-floor machinery every other reaction
+uses -- no interrupt nesting needed at all.
+
+New pieces: `_block_pending_attack` (routes_combat.py) now takes the
+blocker's own move name and stores it on `reactionBlock`; a new
+`_negate_reaction_block` (`negate-reaction-block` action) lets the recorded
+ATTACKER (never the blocker) mark it negated once, charging Feint's own
+`vpCost` against themselves (same VP-floors-at-0-overflows-into-HP rule
+`_apply_move` already uses) and refunding half the blocker's move's own
+`vpCost` to them. Verified with 9 direct calls (charge/refund math, can't
+negate twice, only the recorded attacker may, no-block-yet raises, VP
+overflow into HP, moveName round-trips onto the record).
+
+Also new: `_list_move_categories` gains a `flags` map alongside
+`categories`/`effects` -- the first thing in this schema that isn't shaped
+like an `effects` entry at all but still needs a client-side read. Feint's
+own `negatesProtectBlock: true` is the first (and so far only) entry;
+`ignoresProtect`/`reactionTrigger`/`reactionRange` stay server-only (only
+`_eligible_reactors` reads them). Client-side, `combat.js` exposes it as
+`moveFlagsFor(moveName)`, same shape/convention as `moveEffectsFor`.
+target-picker.js's `_afterTargetSelected` -- the one place a `block_attack`
+result is already handled -- now offers a confirm dialog on a block if the
+attacker knows a `negatesProtectBlock` move, and on accepting, calls
+`negateReactionBlock` and proceeds exactly as if `blocked` had been false
+all along. target-picker.js still has zero dependency on combat.js (its own
+stated design constraint, preserved) -- the move name is resolved by the
+CALLER (combat-wip.js's new `_feintMoveNameFor`, scanning the attacker's
+whole moveset by FLAG rather than hardcoding "Feint" by name, so a future
+homebrew move with the same shape works with no code change) and passed in
+as a plain `feintMoveName` string, same layering every other combat.js-
+derived value (categories, guaranteedHit) already respects at that
+boundary. Feint itself gets no `effects` entry at all -- there's no attack
+of its OWN to roll; what it acts on is already fully specified by the
+just-recorded block -- its `categories` are left exactly as originally
+hand-assigned, same treatment as the 7 `ignoresProtect` moves.)*

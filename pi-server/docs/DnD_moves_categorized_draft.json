@@ -17330,7 +17330,8 @@
       "description": "When a creature you are targeting declares it will use Protect, Detect, or similar protective move in response, you may use your reaction to activate Feint. Your attack bypasses the protection and resolves normally, and the target gets half the VP for the protection move refunded.",
       "moveStat": "DEX",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "negatesProtectBlock": true
     },
     {
       "name": "Flail",

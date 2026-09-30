@@ -16,6 +16,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
 import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString } from './move-effects.js';
 import { waitForReactionWindow } from './reaction-window.js';
+import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -119,6 +120,12 @@ let _speciesName = '';
 // does anyone want to react to being targeted by this?") -- combat-wip.js's
 // callers already know it, target-picker.js itself doesn't otherwise need it.
 let _moveName = '';
+// The name of a move the ATTACKER knows that carries `negatesProtectBlock`
+// (Feint), precomputed by the caller (combat-wip.js's own _feintMoveNameFor
+// -- this module has no dependency on combat.js, see its header comment, so
+// it can't resolve this itself). '' when they don't know one -- no "Use
+// Feint" offer at all then, same as today.
+let _feintMoveName = '';
 let _selectedTargetId = null;
 let _selectedTarget = null;
 let _selectedTargetName = '';
@@ -317,12 +324,18 @@ function _showStep1() {
  * A `block_attack` effect (Protect, King's Shield, Shield Guardian, Quick
  * Guard -- see move-effects-schema.md's own section) can end the whole
  * attack right here: waitForReactionWindow resolves {blocked: true,
- * blockerName} when the reactor used one, and this closes the popup
- * immediately instead of proceeding to the roll -- there's no attack roll,
- * no damage, nothing left for _resolveOneHit to do beyond logging it. Only
- * wired here (pickTarget's own fresh-target flow), not pickTargetAgain's
- * "hit again?" continuation -- a multi-hit move's later hits against the
- * same target already had their one reaction opportunity on the first. */
+ * blockerName} when the reactor used one. That's usually the end of it --
+ * this closes the popup with no attack roll, no damage, nothing left for
+ * _resolveOneHit to do beyond logging it. EXCEPT when the attacker knows
+ * Feint (`_feintMoveName`, see pickTarget's own param): offered a chance to
+ * bypass the block right here (routes_combat.py's own _negate_reaction_block,
+ * which checks the ATTACKER's own identity against the block record, not a
+ * reaction-floor check -- Feint isn't "reacting" in the engine's sense, it's
+ * a follow-up action after learning the outcome), and on success this
+ * proceeds exactly as if `blocked` had been false all along. Only wired
+ * here (pickTarget's own fresh-target flow), not pickTargetAgain's "hit
+ * again?" continuation -- a multi-hit move's later hits against the same
+ * target already had their one reaction opportunity on the first. */
 async function _afterTargetSelected(p, name) {
   document.getElementById('targetPickerStep1').hidden = true;
   document.getElementById('targetPickerReactionWait').hidden = false;
@@ -336,6 +349,24 @@ async function _afterTargetSelected(p, name) {
   });
   document.getElementById('targetPickerReactionWait').hidden = true;
   if (reaction?.blocked) {
+    if (_feintMoveName) {
+      const useFeint = await showCombatConfirm(
+        `${reaction.blockerName} blocked the attack. Use ${_feintMoveName} to bypass it and resolve the attack normally?`,
+        { title: 'Blocked!', yesLabel: `Use ${_feintMoveName}`, noLabel: 'Accept the block' },
+      );
+      if (useFeint) {
+        try {
+          await CombatAPI.negateReactionBlock(_attacker.id);
+          if (_guaranteedHit) _autoHit(p, name);
+          else _showStep2(p, name);
+          return;
+        } catch (err) {
+          showCombatAlert(err.message, { title: 'Error' });
+          // Falls through to the ordinary blocked-close below -- whatever
+          // went wrong, the block itself still stands.
+        }
+      }
+    }
     _close({ targetId: p.id, blocked: true, blockerName: reaction.blockerName });
     return;
   }
@@ -625,7 +656,7 @@ function _cardHtml(p) {
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null, feintMoveName = '' } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -645,6 +676,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _moveModValue = moveModValue;
   _nextTierDice = nextTierDice;
   _presetRoll = presetRoll;
+  _feintMoveName = feintMoveName;
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   document.getElementById('targetPickerBack').style.display = '';
@@ -691,6 +723,7 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   _moveModValue = moveModValue;
   _nextTierDice = nextTierDice;
   _presetRoll = presetRoll;
+  _feintMoveName = ''; // never reaches _afterTargetSelected from here -- see this function's own header
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _selectedTargetId = target.id;

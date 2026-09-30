@@ -225,7 +225,12 @@ def handle(conn, action, params):
     if action == 'block-pending-attack':
         if not params.get('id'):
             raise ValueError('Missing participant id')
-        return _mutate(conn, lambda s: _block_pending_attack(s, params['id']))
+        return _mutate(conn, lambda s: _block_pending_attack(s, params['id'], params.get('moveName', '')))
+
+    if action == 'negate-reaction-block':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _negate_reaction_block(s, params['id'], _load_move_data_file()))
 
     if action == 'close-reaction-window':
         return _mutate(conn, _close_reaction_window)
@@ -1174,7 +1179,7 @@ def _decline_reaction(state, pid):
     _maybe_close_reaction_window(state)
 
 
-def _block_pending_attack(state, pid):
+def _block_pending_attack(state, pid, move_name=''):
     """Called from _apply_status's own caller (combat-wip.js's
     _offerMoveEffects, special-casing a `block_attack` effect the same way it
     already does reroll_damage/heal -- see move-effects-schema.md) the moment
@@ -1189,7 +1194,14 @@ def _block_pending_attack(state, pid):
     window that already closed) does nothing mechanically, same trust-the-
     flow reasoning as everywhere else in this file. Never closes the window
     itself -- reaction-end still does that, exactly like every other
-    reaction; this only leaves a note for the attacker to find."""
+    reaction; this only leaves a note for the attacker to find.
+
+    `move_name` (the reactor's own blocking move, e.g. "Protect") is stored
+    on the record purely for Feint's own later use -- see
+    _negate_reaction_block, which needs to know what move's VP cost to
+    refund half of. Every OTHER reader of `reactionBlock` (reaction-window.js's
+    waitForReactionWindow) only ever looked at windowId/blockerName, so this
+    is additive."""
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
@@ -1200,10 +1212,71 @@ def _block_pending_attack(state, pid):
         raise ValueError('No pending reaction to block with')
     state['reactionBlock'] = {
         'windowId': pr['id'], 'anchorId': pr['anchorId'], 'attackerId': pr['attackerId'],
-        'blockerId': pid, 'blockerName': participant['name'],
+        'blockerId': pid, 'blockerName': participant['name'], 'moveName': move_name,
     }
     _log_event(state, 'reaction-block', text=f"{participant['name']} blocks the attack!",
                actorId=pid, actorName=participant['name'])
+
+
+def _negate_reaction_block(state, pid, moves_data):
+    """Feint's own mechanism: "When a creature you are targeting declares it
+    will use Protect... you may use your reaction to activate Feint. Your
+    attack bypasses the protection and resolves normally, and the target
+    gets half the VP for the protection move refunded." Deliberately NOT
+    modeled as a reaction to the reactor's own reaction -- this app's
+    turn-authority model has exactly one floor-holder at a time, and by the
+    time this can even be called the blocker's own reaction has already
+    fully resolved (reactionBlock is set; the window may already be closed).
+    Feint instead just checks identity against the recorded block: only the
+    ORIGINAL ATTACKER of that specific block may ever call this, and only
+    once (`rb['negated']` guards a double-use). No reaction-floor check at
+    all -- this isn't "reacting" in the engine's sense, it's the attacker
+    taking a follow-up action after learning the outcome, and this app has
+    no reaction-economy tracking anywhere to spend against regardless (every
+    already-shipped reaction move has this same gap).
+
+    Never routed through the normal _apply_move/target-picker flow -- Feint
+    is triggered directly from target-picker.js's own "blocked" state, not
+    by the player picking a target and rolling an attack for it (there's
+    nothing to target here; the attack it un-blocks is already fully
+    specified by `reactionBlock`). So its own VP cost is charged HERE
+    instead, same VP-floors-at-0-overflows-into-HP rule _apply_move already
+    uses for every other move's cost."""
+    rb = state.get('reactionBlock')
+    if not rb:
+        raise ValueError('No blocked attack to bypass')
+    if rb.get('attackerId') != pid:
+        raise ValueError('Not eligible to bypass this block')
+    if rb.get('negated'):
+        raise ValueError('Already bypassed')
+    attacker = state['participants'].get(pid)
+    if not attacker:
+        raise ValueError('Unknown participant: ' + pid)
+
+    moves_by_name = {m['name']: m for m in moves_data.get('moves', [])}
+    feint = moves_by_name.get('Feint')
+    feint_vp = js_parse_int(feint.get('vpCost')) if feint else 0
+    new_vp = attacker['currentVP'] - (feint_vp or 0)
+    new_hp = attacker['currentHP']
+    if new_vp < 0:
+        new_hp += new_vp
+        new_vp = 0
+    attacker['currentHP'] = new_hp
+    attacker['currentVP'] = new_vp
+
+    blocker = state['participants'].get(rb.get('blockerId'))
+    blocker_move = moves_by_name.get(rb.get('moveName'))
+    blocker_vp = js_parse_int(blocker_move.get('vpCost')) if blocker_move else 0
+    refund = (blocker_vp or 0) // 2
+    if blocker and refund:
+        blocker['currentVP'] = (blocker.get('currentVP') or 0) + refund
+
+    rb['negated'] = True
+    refund_text = f" -- {blocker['name']} gets {refund} VP refunded" if blocker and refund else ''
+    _log_event(state, 'move-used',
+               text=f"{attacker['name']} used Feint (-{feint_vp or 0} VP) -- bypasses "
+                    f"{blocker['name'] if blocker else 'the'} protection, the attack resolves normally{refund_text}",
+               actorId=pid, actorName=attacker['name'], move='Feint', vpCost=feint_vp or 0)
 
 
 def _maybe_close_reaction_window(state):
@@ -1730,11 +1803,21 @@ def _list_move_categories():
     Also returns `effects`: {moveName: [effect, ...]} for the moves that have a
     structured `effects` list (which condition a move applies and what triggers
     it -- schema in pi-server/docs/move-effects-schema.md). Same
-    miss-is-not-an-error rule: no entry just means "no structured effects"."""
+    miss-is-not-an-error rule: no entry just means "no structured effects".
+
+    Also returns `flags`: {moveName: {negatesProtectBlock?: true}} for a move
+    with a top-level marker the client needs but that isn't shaped like an
+    `effects` entry at all -- so far just Feint's own `negatesProtectBlock`
+    (target-picker.js's _afterTargetSelected scans the ATTACKER's whole
+    moveset for one, to decide whether to offer "Use Feint" after a block).
+    `ignoresProtect`/`reactionTrigger`/`reactionRange` stay server-only
+    (only `_eligible_reactors` ever reads them) -- not added here until a
+    client caller actually needs one too."""
     moves = _load_move_data_file().get('moves', [])
     categories = {m['name']: m.get('categories', []) for m in moves}
     effects = {m['name']: m['effects'] for m in moves if m.get('effects')}
-    return {'status': 'success', 'categories': categories, 'effects': effects}
+    flags = {m['name']: {'negatesProtectBlock': True} for m in moves if m.get('negatesProtectBlock')}
+    return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags}
 
 
 def _set_board_background(state, url):

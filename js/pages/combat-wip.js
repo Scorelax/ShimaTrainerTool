@@ -791,6 +791,36 @@ function _witnessedMoveTypesSince(session, pid) {
   return [...types];
 }
 
+/** {moveName, count} -- how many CONSECUTIVE prior rounds `pid` has landed
+ * a hit with the SAME move, read straight off the shared log. Fury Cutter/
+ * Ice Ball/Rollout's own "double the dice each consecutive [turn/round]
+ * you hit" escalation -- moveName is whatever move they hit with on their
+ * most recent prior round (null if none), count is how many rounds in a
+ * row (going backward, unbroken) that exact move landed (0 = no streak at
+ * all yet, this would be their first use). A round with no matching
+ * 'damage' log entry from this attacker -- whether they missed, used a
+ * different move, or were incapacitated (which already blocks move-use
+ * entirely, see routes_combat.py's INCAPACITATING_CONDITIONS) -- ends the
+ * streak right there. The rules' own "also resets if your speed is reduced
+ * to 0" clause (Ice Ball/Rollout) isn't separately checked -- a narrow edge
+ * case (speed independently dropping to 0 while still somehow landing
+ * hits with an unrelated move) -- documented, not modeled. WIP-only, same
+ * log-dependency limitation as _witnessedMoveTypesSince/Bide's own damage
+ * tracking (empty on the legacy standalone engine, which has no log). */
+function _lastHitMoveStreak(session, pid) {
+  const log = session.log || [];
+  const currentRound = session.round || 0;
+  let moveName = null, count = 0;
+  for (let round = currentRound - 1; round >= 1; round--) {
+    const hit = log.find(e => e.type === 'damage' && e.actorId === pid && e.round === round);
+    if (!hit) break;
+    if (moveName === null) moveName = hit.move || null;
+    if (hit.move !== moveName) break;
+    count++;
+  }
+  return { moveName, count };
+}
+
 function _syncLocalCombatState(session) {
   _enterBattleSync();
 
@@ -861,6 +891,9 @@ function _syncLocalCombatState(session) {
     // witnessedMoveTypes above (quietly reads 0 on the legacy engine, which
     // never populates this field at all).
     merged.activeBuffCount = activeBuffCount(p);
+    // Fury Cutter/Ice Ball/Rollout's own consecutive-hit escalation -- see
+    // _lastHitMoveStreak's own docstring. Same WIP-only bridging pattern.
+    merged.lastHitMoveStreak = _lastHitMoveStreak(session, p.id);
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.

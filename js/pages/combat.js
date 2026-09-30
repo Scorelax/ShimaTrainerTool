@@ -2281,7 +2281,7 @@ function getHealDiceForLevel(move, level) {
  * names (`Poison`, `Paralysis`, `Burn`, ...) both engines' own status badges
  * already use (see combat-wip.js's LEGACY_BADGE_NAMES), so this works
  * identically whether `c` came from the old local engine or the shared one. */
-function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null) {
+function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null, moveName = '') {
   const hpFrac = (c.maxHp || 0) > 0 ? (c.currentHp || 0) / c.maxHp : null;
   const statusNames = new Set((c.statusEffects || []).map(se => se.name));
   // VP "spent" is approximated as maxVp - currentVp (Trump Card's own
@@ -2327,6 +2327,25 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null) {
       // "quietly reads 0 on the legacy standalone engine" limitation as
       // c.witnessedMoveTypes above it.
       case 'self_active_buff_count': { const units = c.activeBuffCount || 0; return { met: units > 0, magnitude: units }; }
+      // Fury Cutter/Ice Ball/Rollout's own "double the dice each
+      // consecutive [turn/round] you hit [with this move]" -- magnitude
+      // here is already the FINAL capped multiplier (not a raw count), fed
+      // straight into diceMultiplierFromMagnitude below. c.lastHitMoveStreak
+      // is WIP-only (see combat-wip.js's own _lastHitMoveStreak/
+      // _syncLocalCombatState) -- quietly never streaks on the legacy
+      // standalone engine, same limitation as c.witnessedMoveTypes/
+      // c.activeBuffCount above. Two cap shapes, per the move's own text:
+      // `cap` (Fury Cutter/Ice Ball -- the multiplier itself tops out and
+      // stays there) or `maxStreak` (Rollout -- reaching it forces the
+      // escalation to restart from 1x, "in which case the damage resets").
+      case 'self_consecutive_move_hits': {
+        const streak = c.lastHitMoveStreak;
+        if (!streak || streak.moveName !== moveName || !streak.count) return { met: false, magnitude: 1 };
+        const mult = cond.maxStreak
+          ? (streak.count >= cond.maxStreak ? 1 : 2 ** streak.count)
+          : Math.min(2 ** streak.count, cond.cap || Infinity);
+        return { met: mult > 1, magnitude: mult };
+      }
       default: return { met: false, magnitude: 0 };
     }
   };
@@ -2337,6 +2356,10 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null) {
     const { met, magnitude } = evalCondition(e.condition);
     if (!met) continue;
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) { diceMultiplier = e.diceMultiplier; diceNote = e.note || ''; }
+    // Fury Cutter/Ice Ball/Rollout's own escalating multiplier -- magnitude
+    // IS the final capped multiplier already (see self_consecutive_move_hits
+    // above), not a count to feed into a separate formula here.
+    if (e.diceMultiplierFromMagnitude && magnitude > diceMultiplier) { diceMultiplier = magnitude; diceNote = e.note || ''; }
     if (e.totalMultiplier) totalNote = e.note || `×${e.totalMultiplier} total damage`;
     // Power Trip's own "add an additional damage die for each positive stat
     // change" -- real extra dice of the move's own size, not a flat number
@@ -2990,7 +3013,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   if (!_isDirectHeal && computedData.damageDice) {
     const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
     if (_dmgNoteEffects.length) {
-      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather);
+      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather, moveName);
       if (diceMultiplier > 1 || flatBonus || extraDiceCount > 0) {
         // extraDiceCount (real extra dice, Power Trip) and diceMultiplier
         // (Flail/Facade) never co-occur on the same move today, but compose

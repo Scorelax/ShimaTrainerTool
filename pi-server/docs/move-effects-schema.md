@@ -208,6 +208,20 @@ BEFORE the roll.
   session participant directly) -- fixed the same way Archive Blast's own `witnessedMoveTypes` did, a
   WIP-only `merged.activeBuffCount` field bridged on in `combat-wip.js`'s `_syncLocalCombatState`
   (quietly reads 0 on the legacy standalone engine, same limitation `witnessedMoveTypes` already has).
+- `{type: "self_consecutive_move_hits", cap?: <number>, maxStreak?: <number>}` (self-conditional
+  only) -- Fury Cutter/Ice Ball/Rollout's own "double the dice each consecutive [turn/round] you hit
+  with this move". Magnitude IS the final, already-capped multiplier (fed straight into
+  `diceMultiplierFromMagnitude` above), from a new `_lastHitMoveStreak(session, pid)` log-scan
+  (`combat-wip.js`) bridged onto the combatant as WIP-only `merged.lastHitMoveStreak` (same pattern as
+  `activeBuffCount`/`witnessedMoveTypes`): a miss never reaches the damage-logging step, and an
+  incapacitated participant can't have used a move at all, so the mere ABSENCE of a matching `damage`
+  log entry for a given round already covers those two reset conditions for free. Two cap shapes, per
+  each move's own text: `cap` (the multiplier itself tops out and stays there, however long the streak
+  continues) or `maxStreak` (reaching it is the last escalated hit -- the next one restarts from 1x,
+  "in which case the damage would reset"). NOT checked: the escalating VP cost (+1 per consecutive
+  use -- a different code path, VP cost is computed before the damage-roll step this hooks into) and
+  Ice Ball/Rollout's own "also resets if speed is reduced to 0" (a narrow edge case) -- both surfaced
+  as a plain `note` reminder instead of silently dropped.
 - `{type: "target_type", any: ["poison"]}` -- Solvent Spray's "double damage to Poison-type
   Pokémon", checked against the target's `type1`/`type2` (case-insensitively), not a live matchup
   chart lookup -- this is about the target's own species type, not effectiveness.
@@ -250,6 +264,10 @@ same move could combine them in principle):
   target-conditional side this is shown as a REMINDER only (`target-picker.js`'s damage-roll step
   never had a base-dice display to literally change, unlike the move-popup's own `diceOverride`
   hook) -- "Roll 4d10 instead of 2d10" next to the plain roll input.
+- `diceMultiplierFromMagnitude: true` (self-conditional only, Fury Cutter/Ice Ball/Rollout) -- same
+  `diceMultiplier` display/application path, but sourced from the condition's own magnitude instead
+  of a fixed per-effect number: `self_consecutive_move_hits` (see its own section below) already
+  resolves that magnitude to the final, already-capped multiplier, so this field just says "use it."
 - `nextTierOrDouble: true` (target-conditional only, Electro Ball) -- a different kind of dice
   change from `diceMultiplier`: swaps in the move's own NEXT damage tier (the caller's
   `computedData.nextTierDice`, `pokemon-types.js`'s `nextTierDamageDice` -- the smallest scaling
@@ -758,3 +776,14 @@ two genuinely novel shapes with no shared mechanism worth building
 alongside anything else (Echoed Voice's cross-creature stacking counter,
 Round's reaction-injected bonus into someone ELSE's in-progress roll).
 Full reasoning in `migrate_effects_v32.py`'s own module docstring.)*
+
+*(Update, same day: the Fury Cutter/Ice Ball/Rollout consecutive-hit group
+flagged above as "its own mini-system" turned out to fit the existing
+damage_note mechanism after all (migrate_effects_v33.py) -- no new effect
+kind, just a new log-scan (`_lastHitMoveStreak`, same WIP-only bridging
+pattern as `activeBuffCount`), a new condition
+(`self_consecutive_move_hits`, magnitude already the final capped
+multiplier), and a new `diceMultiplierFromMagnitude` result field reusing
+the existing `diceMultiplier` display/application path end to end. See
+their own sections above. VP-cost escalation and the speed-reduced-to-0
+reset clause are noted, not modeled -- see the condition's own section.)*

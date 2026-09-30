@@ -3232,12 +3232,24 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_damage_increase"
+        "potential_damage_increase",
+        "damage_note"
       ],
       "description": "You boast your strength and attack a target. Make a melee attack, doing 1d4 + MOVE dark damage on a hit. For each positive stat change affecting the user, add an additional damage dice (Focus Energy, Harden, etc.).",
       "moveStat": "STR/DEX",
       "vpCost": "1",
-      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17."
+      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_active_buff_count"
+          },
+          "extraDice": {
+            "amountPerUnit": 1
+          }
+        }
+      ]
     },
     {
       "name": "Punishment",
@@ -3253,12 +3265,29 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_damage_increase"
+        "potential_damage_increase",
+        "damage_note"
       ],
       "description": "You send dark energy to punish a creature. Make a ranged attack against a creature, dealing 1d10 + MOVE dark damage on a hit. If the target is currently under the influence of a move or ability that boosts its attack, damage, or AC, increase the damage by 1d10 for each effect.",
       "moveStat": "STR/WIS",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_active_buff_count",
+            "statFields": [
+              "attack_rolls",
+              "damage_rolls",
+              "ac"
+            ]
+          },
+          "extraDice": {
+            "amountPerUnit": 1
+          }
+        }
+      ]
     },
     {
       "name": "Pursuit",
@@ -4167,12 +4196,23 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_damage_increase"
+        "potential_damage_increase",
+        "damage_note"
       ],
       "description": "You send a beam of electric energy at an opponent that has a chance to power you up. Make a ranged attack, dealing 1d6 + MOVE electric damage on a hit. If the natural attack roll is 10 or higher and the attack hits, add your proficiency bonus to the damage.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "attack_roll_at_least",
+            "min": 10
+          },
+          "flatBonus": "proficiency"
+        }
+      ]
     },
     {
       "name": "Cyclone Charge",
@@ -8736,12 +8776,24 @@
         "multi_hit_aoe",
         "trigger_saving_throw",
         "potential_damage_increase",
-        "recharge_locked"
+        "recharge_locked",
+        "damage_note"
       ],
       "description": "You spew hot magma in a 15 foot cone. Any creature caught in the blast must make a DEX saving throw against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success. If you are at full health when activating this move, double your STAB bonus when dealing damage, and roll damage with advantage.",
       "moveStat": "STR/DEX",
       "vpCost": "20",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_hp_at_or_above",
+            "fraction": 1.0
+          },
+          "advantage": true,
+          "note": "Also doubles your STAB bonus -- not migrated, STAB doubling has no backing mechanism anywhere in this schema (increase_stab is a standing gap)."
+        }
+      ]
     },
     {
       "name": "Ether Pyre",

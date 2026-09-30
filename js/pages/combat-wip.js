@@ -26,7 +26,7 @@ import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -855,6 +855,12 @@ function _syncLocalCombatState(session) {
     // limitation as Bide -- the legacy standalone engine has no log
     // equivalent at all to derive this from.
     merged.witnessedMoveTypes = _witnessedMoveTypesSince(session, p.id);
+    // Power Trip's own "each positive stat change affecting you" -- counted
+    // straight off the raw session participant's own statuses (see
+    // move-effects.js's activeBuffCount), same WIP-only bridging pattern as
+    // witnessedMoveTypes above (quietly reads 0 on the legacy engine, which
+    // never populates this field at all).
+    merged.activeBuffCount = activeBuffCount(p);
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.

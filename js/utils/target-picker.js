@@ -14,7 +14,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString } from './move-effects.js';
+import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString } from './move-effects.js';
 import { waitForReactionWindow } from './reaction-window.js';
 
 function _injectStyles() {
@@ -509,8 +509,8 @@ function _showStep3() {
   // only (this popup never had a base-dice display to begin with, unlike
   // the move-popup's own diceOverride hook) -- flatBonus DOES change the
   // total, folded in below same as _damageModifier.
-  const { diceMultiplier, diceOverride, flatBonus, advantage, note } =
-    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice });
+  const { diceMultiplier, diceOverride, flatBonus, advantage, extraDiceCount, note } =
+    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll });
   _targetFlatBonus = flatBonus;
   const noteEl = document.getElementById('targetPickerDamageNote');
   const noteParts = [];
@@ -521,6 +521,10 @@ function _showStep3() {
     noteParts.push(`<div class="note">Roll ${diceOverride} instead of ${_damageDice}${note ? ` — ${note}` : ''}</div>`);
   } else if (diceMultiplier > 1 && _damageDice) {
     noteParts.push(`<div class="note">Roll ${multiplyDiceString(_damageDice, diceMultiplier)} instead of ${_damageDice}${note ? ` — ${note}` : ''}</div>`);
+  } else if (extraDiceCount > 0 && _damageDice) {
+    // Punishment's own "+1d10 damage for each effect" -- real extra dice,
+    // not a flat number (see addDiceString's own docstring).
+    noteParts.push(`<div class="note">Roll ${addDiceString(_damageDice, extraDiceCount)} instead of ${_damageDice}${note ? ` — ${note}` : ''}</div>`);
   }
   if (advantage) {
     noteParts.push(`<div class="mode advantage">Advantage: roll damage twice, take the higher${note ? ` — ${note}` : ''}</div>`);

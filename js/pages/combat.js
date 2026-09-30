@@ -6,7 +6,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
-import { multiplyDiceString } from '../utils/move-effects.js';
+import { multiplyDiceString, addDiceString } from '../utils/move-effects.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
@@ -2299,6 +2299,9 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null) {
     switch (cond.type) {
       case 'self_hp_below': return { met: hpFrac !== null && hpFrac < cond.fraction, magnitude: 1 };
       case 'self_hp_at_or_below': return { met: hpFrac !== null && hpFrac <= cond.fraction, magnitude: 1 };
+      // Eruption's own "if at full health" -- the self-conditional side's
+      // missing counterpart to target_hp_at_or_above (Wring Out).
+      case 'self_hp_at_or_above': return { met: hpFrac !== null && hpFrac >= cond.fraction, magnitude: 1 };
       case 'self_status': return { met: (cond.any || []).some(name => statusNames.has(name)), magnitude: 1 };
       // Trump Card: "+MOVE mod per 10VP spent".
       case 'self_vp_spent_per': {
@@ -2317,17 +2320,33 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null) {
         const met = !!weatherName && (cond.any || []).some(kw => weatherName.includes(kw.toLowerCase()));
         return { met, magnitude: 1 };
       }
+      // Power Trip's own "for each positive stat change affecting the
+      // user" -- c.activeBuffCount is WIP-only, bridged from the raw
+      // session participant's own statuses (see move-effects.js's
+      // activeBuffCount and combat-wip.js's _syncLocalCombatState), same
+      // "quietly reads 0 on the legacy standalone engine" limitation as
+      // c.witnessedMoveTypes above it.
+      case 'self_active_buff_count': { const units = c.activeBuffCount || 0; return { met: units > 0, magnitude: units }; }
       default: return { met: false, magnitude: 0 };
     }
   };
 
-  let diceMultiplier = 1, diceNote = '', totalNote = '', flatBonus = 0;
+  let diceMultiplier = 1, diceNote = '', totalNote = '', flatBonus = 0, advantage = false, extraDiceCount = 0;
   const flatNotes = [];
   for (const e of effects) {
     const { met, magnitude } = evalCondition(e.condition);
     if (!met) continue;
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) { diceMultiplier = e.diceMultiplier; diceNote = e.note || ''; }
     if (e.totalMultiplier) totalNote = e.note || `×${e.totalMultiplier} total damage`;
+    // Power Trip's own "add an additional damage die for each positive stat
+    // change" -- real extra dice of the move's own size, not a flat number
+    // (see addDiceString's own docstring for why scalingBonus is the wrong
+    // shape for this).
+    if (e.extraDice) {
+      let extra = magnitude * (e.extraDice.amountPerUnit || 0);
+      if (typeof e.extraDice.cap === 'number') extra = Math.min(extra, e.extraDice.cap);
+      if (extra) { extraDiceCount += extra; if (e.note) flatNotes.push(e.note); }
+    }
     if (e.flatBonus === 'proficiency') { flatBonus += Number(c.proficiency) || 0; if (e.note) flatNotes.push(e.note); }
     // Solar Beam/Solar Blade's own "double your MOVE modifier for damage"
     // -- one more copy of the same value target-conditional's own
@@ -2343,8 +2362,12 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null) {
       if (typeof e.scalingBonus.cap === 'number') bonus = Math.min(bonus, e.scalingBonus.cap);
       if (bonus) { flatBonus += bonus; if (e.note) flatNotes.push(e.note); }
     }
+    // Eruption's own "roll damage with advantage" -- the target-conditional
+    // side (target-picker.js's targetDamageNoteResult) has had this since
+    // Cross Poison/Hex; this is its self-conditional counterpart.
+    if (e.advantage) advantage = true;
   }
-  return { diceMultiplier, diceNote, totalNote, flatBonus, flatNote: flatNotes.join('; ') };
+  return { diceMultiplier, diceNote, totalNote, flatBonus, flatNote: flatNotes.join('; '), advantage, extraDiceCount };
 }
 
 function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
@@ -2967,17 +2990,24 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   if (!_isDirectHeal && computedData.damageDice) {
     const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
     if (_dmgNoteEffects.length) {
-      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather);
-      if (diceMultiplier > 1 || flatBonus) {
-        const _adjustedDice = diceMultiplier > 1 ? multiplyDiceString(computedData.damageDice, diceMultiplier) : computedData.damageDice;
+      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather);
+      if (diceMultiplier > 1 || flatBonus || extraDiceCount > 0) {
+        // extraDiceCount (real extra dice, Power Trip) and diceMultiplier
+        // (Flail/Facade) never co-occur on the same move today, but compose
+        // safely in whichever order they're applied -- multiply first, then
+        // add the flat extra count, same as how flatBonus stacks on top too.
+        let _adjustedDice = diceMultiplier > 1 ? multiplyDiceString(computedData.damageDice, diceMultiplier) : computedData.damageDice;
+        if (extraDiceCount > 0) _adjustedDice = addDiceString(_adjustedDice, extraDiceCount);
         const _totalFlat = computedData.damageBonus + flatBonus;
         _diceOverride = _totalFlat > 0 ? `${_adjustedDice} + ${_totalFlat}` : _adjustedDice;
         const _extraParts = [];
         if (diceMultiplier > 1) _extraParts.push(`×${diceMultiplier} dice (${diceNote})`);
+        if (extraDiceCount > 0) _extraParts.push(`+${extraDiceCount} dice (${flatNote})`);
         if (flatBonus) _extraParts.push(`+${flatBonus} (${flatNote})`);
         _diceBreakdownOverride = [computedData.damageBreakdown, ..._extraParts].filter(Boolean).join(' · ');
       }
       if (totalNote) _damageNote = totalNote;
+      else if (advantage) _damageNote = 'Roll damage with advantage — roll twice, take the higher';
     }
   }
 

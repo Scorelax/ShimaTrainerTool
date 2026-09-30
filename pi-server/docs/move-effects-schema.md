@@ -189,6 +189,25 @@ BEFORE the roll.
   against each participant's raw score (`attacker.dex`/`target.dex`), not a live-buffed one.
 - `{type: "target_hp_at_or_above", fraction: 0.5}` -- Wring Out's "50% or more", the missing fourth
   comparison direction alongside `target_hp_below/at_or_below/above`.
+- `{type: "self_hp_at_or_above", fraction: 1.0}` -- Eruption's own "if at full health", the
+  self-conditional side's missing counterpart to `target_hp_at_or_above` (had never come up before).
+- `{type: "attack_roll_at_least", min: 10}` (target-conditional only) -- Charge Beam's own "if the
+  natural attack roll is 10 or higher (and it hits)" -- the natural d20 already entered in the
+  attack-roll step (target-picker.js's own `_attackRoll`), threaded into `targetDamageNoteResult` as
+  `attackRoll` since the damage-roll step (where `damage_note` effects are evaluated) comes after it.
+  `null` (a guaranteed-hit attack that skipped the roll entirely) never meets this.
+- `{type: "self_active_buff_count"}` / `{type: "target_active_buff_count", statFields?: [...]}` --
+  Power Trip's "add a damage die for each positive stat change affecting you" / Punishment's target-
+  side mirror ("... boosting the target's attack, damage, or AC"), via a new
+  `activeBuffCount(participant, statFields)`: counts the holder's own active `kind:'stat'` statuses
+  with a positive resolved amount (stacks applied); `statFields` (target-side only so far) narrows to
+  specific `stat` names. A `set` override never counts -- no baseline to compare it against (same
+  reasoning `statSetOverrides` itself documents). The self-conditional side needed a small bridging
+  addition: `combat.js`'s own evaluator only ever sees the LOCAL merged combatant, which has no raw
+  `.statuses` list to count from (unlike the target-conditional side, which already reads the raw
+  session participant directly) -- fixed the same way Archive Blast's own `witnessedMoveTypes` did, a
+  WIP-only `merged.activeBuffCount` field bridged on in `combat-wip.js`'s `_syncLocalCombatState`
+  (quietly reads 0 on the legacy standalone engine, same limitation `witnessedMoveTypes` already has).
 - `{type: "target_type", any: ["poison"]}` -- Solvent Spray's "double damage to Poison-type
   Pokémon", checked against the target's `type1`/`type2` (case-insensitively), not a live matchup
   chart lookup -- this is about the target's own species type, not effectiveness.
@@ -270,12 +289,24 @@ same move could combine them in principle):
   `_targetConditionMagnitude`): Heavy Slam's `magnitude` is however many size levels the attacker
   outranks the target by (`attacker_size_above_target`'s own magnitude), `amountPerUnit:
   "moveModifier"`, no cap.
-- `advantage: true` (target-conditional only so far) -- Cross Poison/Hex's "damage is rolled with
-  advantage": shown as its own banner ("roll damage twice, take the higher"), the same "the app
-  surfaces the instruction, the human rolls accordingly" pattern as every other advantage/
-  disadvantage banner in this app, just for a damage roll instead of an attack/save one (this
-  schema's `roll` kind has no `damage_rolls` target at all -- `damage_note`'s own `advantage` field
-  is what covers it instead, display-only, same as everything else here).
+- `advantage: true` (both sides) -- Cross Poison/Hex's "damage is rolled with advantage": shown as
+  its own banner ("roll damage twice, take the higher"), the same "the app surfaces the instruction,
+  the human rolls accordingly" pattern as every other advantage/disadvantage banner in this app, just
+  for a damage roll instead of an attack/save one (this schema's `roll` kind has no `damage_rolls`
+  target at all -- `damage_note`'s own `advantage` field is what covers it instead, display-only,
+  same as everything else here). Self-conditional support (Eruption, "if at full health") came later
+  than the target-conditional side (Cross Poison/Hex) -- shown as a plain `noteText` banner, the same
+  slot `totalMultiplier`'s own note already uses.
+- `extraDice: {amountPerUnit: <number>, cap?: <number>}` -- Power Trip/Punishment's own "add an
+  additional damage die [of the move's own size] for each...", via a new `addDiceString(dice, n)`
+  helper ("1d4" + 2 -> "3d4"). Deliberately NOT `scalingBonus` -- that adds a flat NUMBER per unit,
+  which would silently substitute a fixed number for real extra dice and distort both the average
+  and the variance, especially for a small die. Self-conditional (Power Trip, magnitude from
+  `self_active_buff_count`): actually recomputes the popup's own dice string/breakdown, same as
+  `diceMultiplier` already does, composing with it if a move ever had both (none do yet -- multiply
+  first, then add). Target-conditional (Punishment, magnitude from `target_active_buff_count`):
+  shown as a reminder only in target-picker.js's damage-roll step, same treatment `diceMultiplier`
+  already gets there (that popup never had a live dice-override slot to begin with).
 
 `note` is shown alongside whichever of the above applies (the dice breakdown line, or the note
 banner directly, for `totalMultiplier`). A ONE-SHOT heal (no `repeat` -- every drain, every plain
@@ -706,3 +737,24 @@ hit-guarantee) would incorrectly stay "guaranteed" for later hits too, even
 after being consumed by the first one. Fixed with a new
 `_guaranteedHitFor(combatantId, categories)` helper (combat-wip.js) that
 re-checks the live session state fresh on every call.)*
+
+*(Update, 2026-09-30: moved on to the next unmigrated category,
+`potential_damage_increase` (13 moves) -- same "read it fully before
+trusting the label" discipline as the `migrate_effects_v30.py` pass. 4 of
+the 13 fit with small, genuinely new but reusable additions
+(migrate_effects_v32.py): `attack_roll_at_least` (Charge Beam),
+`self_hp_at_or_above` + self-conditional `advantage` support (Eruption),
+and a new `extraDice` result field + `self_active_buff_count`/
+`target_active_buff_count` conditions + `activeBuffCount()` (Power Trip,
+Punishment) -- see their own sections above for the full reasoning. The
+other 9 each need something genuinely different: a battle-log scan for a
+time-windowed "did the target hit me recently" condition (Avalanche,
+Payback, both same shape, different windows) or "was a specific move
+already used this round" (Fusion Bolt) or "did my last attack miss"
+(Stomping Tantrum); a real resource-tracking mini-system shared by Fury
+Cutter/Ice Ball/Rollout (cumulative same-move-consecutive-turn stacking,
+closer to Stockpile's own stacking than anything damage_note does); and
+two genuinely novel shapes with no shared mechanism worth building
+alongside anything else (Echoed Voice's cross-creature stacking counter,
+Round's reaction-injected bonus into someone ELSE's in-progress roll).
+Full reasoning in `migrate_effects_v32.py`'s own module docstring.)*

@@ -629,6 +629,34 @@ export function multiplyDiceString(dice, multiplier) {
   return `${parseInt(m[1], 10) * multiplier}${m[2]}`;
 }
 
+/** "1d4" + 2 -> "3d4" -- Power Trip/Punishment's own "add an additional
+ * damage die [of the same size] for each..." shape, genuinely different
+ * from multiplyDiceString's multiplicative one: `scalingBonus`'s existing
+ * flat-number-per-unit mechanism would silently substitute a fixed number
+ * for real extra dice, distorting the average AND the variance (especially
+ * for a small die like a d4) -- this adds real dice of the move's own
+ * existing size instead. `extraCount` of 0 or less returns `dice` unchanged. */
+export function addDiceString(dice, extraCount) {
+  const m = /^(\d+)(d\d+)$/i.exec(dice || '');
+  if (!m || !extraCount || extraCount <= 0) return dice;
+  return `${parseInt(m[1], 10) + extraCount}${m[2]}`;
+}
+
+/** Count of `participant`'s own active `kind:'stat'` statuses with a
+ * positive resolved amount (stacks applied) -- Power Trip's "each positive
+ * stat change affecting you" (self, no filter) and Punishment's "under an
+ * effect that boosts attack/damage/AC" (target, `statFields`-filtered).
+ * A `set` override never counts -- no baseline to compare it against (see
+ * statSetOverrides's own "always a plain literal, no live delta" reasoning)
+ * -- a real, documented simplification rather than an oversight. */
+export function activeBuffCount(participant, statFields = null) {
+  return (participant?.statuses || []).filter(s => {
+    if (s.kind !== 'stat' || typeof s.amount !== 'number') return false;
+    if (statFields && !statFields.includes(s.stat)) return false;
+    return s.amount * _stackCount(s) > 0;
+  }).length;
+}
+
 /** Fraction of max HP (0..1), or null when either isn't a real number -- a
  * freeform PvE enemy with no stat block, most often. */
 function _hpFraction(p) {
@@ -676,9 +704,20 @@ function _sizeRank(p) {
  * target-picker.js, which only ever has the RAW structured session
  * participant (`.statuses`, real `apply` values) to work with -- there's no
  * second shape to reconcile with here. */
-function _targetConditionMet(cond, { attacker, target }) {
+function _targetConditionMet(cond, { attacker, target, attackRoll }) {
   if (!cond) return false;
   switch (cond.type) {
+    // Charge Beam's own "if the natural attack roll is 10 or higher" --
+    // attackRoll is the natural d20 already entered in the attack-roll step
+    // (target-picker.js's own module state), threaded through here since
+    // the damage-roll step (where damage_note effects are evaluated) comes
+    // after it. null when guaranteedHit skipped that step entirely -- never
+    // met, same "nothing to compare" convention _requirementMet already uses.
+    case 'attack_roll_at_least': return attackRoll !== null && attackRoll !== undefined && attackRoll >= cond.min;
+    // Punishment's own "target is under an effect that boosts attack,
+    // damage, or AC" -- magnitude (how many such effects) matters for its
+    // own scalingBonus, see _targetConditionMagnitude below.
+    case 'target_active_buff_count': return activeBuffCount(target, cond.statFields) > 0;
     case 'target_hp_below': { const f = _hpFraction(target); return f !== null && f < cond.fraction; }
     case 'target_hp_at_or_below': { const f = _hpFraction(target); return f !== null && f <= cond.fraction; }
     case 'target_hp_above': { const f = _hpFraction(target); return f !== null && f > cond.fraction; }
@@ -722,6 +761,7 @@ function _targetConditionMet(cond, { attacker, target }) {
  * combat.js's own self-conditional evaluator uses). */
 function _targetConditionMagnitude(cond, { attacker, target }) {
   if (cond?.type === 'attacker_size_above_target') return Math.max(0, _sizeRank(attacker) - _sizeRank(target));
+  if (cond?.type === 'target_active_buff_count') return activeBuffCount(target, cond.statFields);
   return 1;
 }
 
@@ -737,11 +777,11 @@ function _targetConditionMagnitude(cond, { attacker, target }) {
  * same "never stacked" rule as the self-conditional side; flatBonus and
  * advantage DO accumulate/OR across every met effect, since nothing here
  * needs Flail's own "only the most severe tier" reasoning. */
-export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null }) {
-  let diceMultiplier = 1, diceOverride = null, flatBonus = 0, advantage = false;
+export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null, attackRoll = null }) {
+  let diceMultiplier = 1, diceOverride = null, flatBonus = 0, advantage = false, extraDiceCount = 0;
   const notes = [];
   for (const e of effects || []) {
-    if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target })) continue;
+    if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target, attackRoll })) continue;
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) diceMultiplier = e.diceMultiplier;
     // Electro Ball's own "roll the next tier's dice, or double at the top
     // tier" -- nextTierDice (the caller's own computeMoveData.nextTierDice,
@@ -775,10 +815,19 @@ export function targetDamageNoteResult(effects, { attacker, target, moveModValue
       if (typeof e.scalingBonus.cap === 'number') bonus = Math.min(bonus, e.scalingBonus.cap);
       if (bonus) flatBonus += bonus;
     }
+    // Punishment's own "+1d10 damage for EACH effect" -- real extra dice of
+    // the move's own size, not a flat number (see addDiceString's own
+    // docstring for why this is a different shape from scalingBonus).
+    if (e.extraDice) {
+      const magnitude = _targetConditionMagnitude(e.condition, { attacker, target });
+      let extra = magnitude * (e.extraDice.amountPerUnit || 0);
+      if (typeof e.extraDice.cap === 'number') extra = Math.min(extra, e.extraDice.cap);
+      extraDiceCount += extra;
+    }
     if (e.advantage) advantage = true;
     if (e.note) notes.push(e.note);
   }
-  return { diceMultiplier, diceOverride, flatBonus, advantage, note: notes.join('; ') };
+  return { diceMultiplier, diceOverride, flatBonus, advantage, extraDiceCount, note: notes.join('; ') };
 }
 
 /** describeEnds for a STORED status: a rounds end shows how many are left in the

@@ -18407,12 +18407,29 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "protect_negate"
+        "protect_negate",
+        "self_undo_crit_damage"
       ],
       "description": "When a creature scores a critical hit on you, you may use your reaction to quickly recite a magical incantation that treats the attack like a normal hit, preventing the extra damage.",
       "moveStat": "None",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "undo_crit_damage",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ],
+      "reactionTrigger": "damaged",
+      "reactionRange": 0
     },
     {
       "name": "Me First",

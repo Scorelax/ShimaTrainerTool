@@ -271,11 +271,17 @@ def handle(conn, action, params):
         dice_roll = js_parse_int(params.get('diceRoll'))
         if dice_roll is None:
             raise ValueError('Missing diceRoll')
+        # Every param arrives as a query-string value (see api.js's own
+        # URLSearchParams-based request()), so a JS `false` reaches here as
+        # the STRING "false" -- truthy under a bare bool(...), hence the
+        # explicit string check.
+        crit = str(params.get('crit', '')).lower() == 'true'
         return _apply_damage(
             conn, params['id'], params['targetId'], dice_roll,
             move_type=params.get('moveType', ''),
             species=params.get('species'),
             move_name=params.get('moveName', ''),
+            crit=crit,
         )
 
     if action == 'apply-status':
@@ -1711,7 +1717,7 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
     return outcome
 
 
-def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name=''):
+def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name='', crit=False):
     """The other half of resolving an attack, split out from use-move: that
     action's VP cost was for a single-participant local engine (combat.js's
     own move popup, driven client-side) that already handles spending VP and
@@ -1722,10 +1728,14 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name
     (computeMoveData's damageBonus -- combat.js already computes and shows
     this in the move popup, so there's no reason to duplicate that
     calculation server-side), convert it to damage via type effectiveness
-    and apply it. Same turn-authority rule as every other on-turn action."""
+    and apply it. Same turn-authority rule as every other on-turn action.
+
+    `crit` is recorded on the log entry purely for Lucky Chant's own later
+    use (a 'damaged' reaction reading `entry.crit` back off the most recent
+    damage entry against the reactor) -- nothing else here reads it."""
     outcome = {}
     result = _mutate(conn, lambda s: outcome.update(
-        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type, move_name)))
+        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type, move_name, crit)))
     result.update(outcome)
 
     attacker = result['data']['participants'].get(pid, {})
@@ -1737,7 +1747,7 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name
     return result
 
 
-def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name=''):
+def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False):
     attacker = state['participants'].get(pid)
     if not attacker:
         raise ValueError('Unknown participant: ' + pid)
@@ -1757,7 +1767,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         state, 'damage',
         text=f"{attacker['name']} hit {target['name']}{move_label} for {actual_damage} damage ({multiplier}x)",
         actorId=pid, actorName=attacker['name'], targetId=target_id, targetName=target['name'],
-        move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier,
+        move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier, crit=bool(crit),
     )
     return {'multiplier': multiplier, 'damageApplied': actual_damage}
 

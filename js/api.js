@@ -934,10 +934,15 @@ export class CombatAPI {
    * local move-popup flow (synced via updateStats) already spent. diceRoll
    * is expected to already include the caller's own damage modifier (the
    * same figure combat.js's move popup already computes and shows) --
-   * this endpoint only applies type effectiveness on top of it. Returns
-   * {multiplier, damageApplied} alongside the usual {status, data}. */
-  static async applyDamage(id, targetId, diceRoll, moveType, species, moveName) {
-    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName }, { useCache: false });
+   * this endpoint only applies type effectiveness on top of it. `crit`
+   * (default false) is recorded on the damage log entry itself -- the
+   * REACTOR of a later 'damaged' reaction (Lucky Chant) has no other way to
+   * know whether the hit that just landed on them was a crit, since that's
+   * only ever computed on the ATTACKER's own device (combat-wip.js's
+   * _resolveOneHit). Returns {multiplier, damageApplied} alongside the
+   * usual {status, data}. */
+  static async applyDamage(id, targetId, diceRoll, moveType, species, moveName, crit = false) {
+    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName, crit }, { useCache: false });
   }
 
   /** Appends one entry to the shared battle log (routes_combat.py's 'log')

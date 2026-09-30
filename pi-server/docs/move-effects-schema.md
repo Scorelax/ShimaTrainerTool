@@ -1081,3 +1081,45 @@ Verified with 4 direct calls against `_apply_reaction_damage_multiplier`
 (records correctly, requires floor-holding, requires a live pending
 reaction) plus the 9 existing `_negate_reaction_block`-family checks
 re-confirming Feint's own mechanism is untouched by this change.)*
+
+*(Update, 2026-09-30: Lucky Chant built (`migrate_effects_v40.py`), the
+third of the pushback list. Its own deferral reasoning ("needs a third
+reaction timing neither `targeted` nor `damaged` covers -- crit isn't
+determined until well after target-picker.js's attack-roll step has
+closed") was solving the wrong problem: instead of intercepting BEFORE
+damage, this reuses `reroll_damage`'s own RETROACTIVE-correction shape
+(the 'damaged' family Attract already rides) -- "treats it like a normal
+hit" becomes "refund half the crit's own final total", the same halving
+approximation Wide Guard/Nature's Embrace's own rules text already leans on
+(no digital dice anywhere in this app, so there's no real non-crit roll to
+recompute from, only the crit's own total to work backward from).
+
+The one genuinely missing piece: a 'damaged' reactor had no way to know
+whether the hit that just landed on THEM was a crit at all -- only ever
+computed on the ATTACKER's own device (`_resolveOneHit`), never reaching the
+shared log. Fixed by reordering `_resolveOneHit`'s own crit computation to
+run BEFORE `CombatAPI.applyDamage` instead of after (nothing it depends on
+comes from the damage result, so this is a safe reorder -- status
+CONSUMPTION, the Laser Focus/Lock-On/Mind Reader `useStatus` calls, stays in
+its original post-damage spot; only the pure `crit` boolean moved), and
+threading a new `crit` param through `applyDamage` -> the `apply-damage`
+action -> `_apply_damage`/`_apply_damage_to_target` -> the `'damage'` log
+entry itself. Arrives as the string `"true"`/`"false"` like every other
+query-string param this app already parses explicitly.
+
+New `kind: "undo_crit_damage"` effect (`target:"self"`, `when:"always"` --
+deterministic, NOT a human judgment call like Parry/Captivate/Hover's own
+`"special"`: the log entry either says `crit:true` or it doesn't).
+`_handleUndoCritDamage` differs from `_handleRerollDamage` in one way worth
+noting: it takes no `attackerId` at all. `reroll_damage` rides a `save_fail`
+and gets its "who's the attacker" from that save's own targeting flow;
+Lucky Chant has no save and is offered through `_handleEffectsOnly`'s plain
+self-only path, which passes no `targetId` whatsoever. So the attacker is
+instead read straight off the most recent damage log entry against the
+reactor (`entry.actorId`/`actorName`) -- no second lookup needed, this app
+already logs everything required. Verified with 3 direct calls against
+`_apply_damage_to_target` (crit recorded true/false correctly, damage math
+unaffected) plus 6 against a reimplementation of `_handleUndoCritDamage`'s
+own log-scan/refund logic (finds the right entry, floors an odd refund,
+picks the MOST RECENT entry not an earlier one, ignores unrelated
+targets/non-damage entries).)*

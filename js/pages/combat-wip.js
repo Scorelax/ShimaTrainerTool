@@ -2220,6 +2220,15 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleRerollDamage({ reactorId: attackerId, attackerId: pick.targetId, moveName });
       continue;
     }
+    if (effect.kind === 'undo_crit_damage') {
+      // Lucky Chant -- not gated by a save at all (see _handleUndoCritDamage's
+      // own docstring for why it needs no attackerId passed in here, unlike
+      // reroll_damage just above). attackerId (closure) is the reactor
+      // themselves, using the move -- same self-only-reaction convention as
+      // block_attack/damage_multiplier.
+      await _handleUndoCritDamage({ reactorId: attackerId, moveName });
+      continue;
+    }
     if (effect.kind === 'block_attack') {
       // Not a status either -- a one-shot signal to the ATTACKER's own
       // client (mid waitForReactionWindow) that this attack is blocked
@@ -2427,6 +2436,64 @@ async function _handleRerollDamage({ reactorId, attackerId, moveName }) {
   }
 }
 
+/** Lucky Chant's own mechanism -- "treats the attack like a normal hit,
+ * preventing the extra damage" from a crit, a retroactive HP refund against
+ * an already-applied damage entry same shape as _handleRerollDamage's own,
+ * just computing the refund differently: this app has no digital dice, so
+ * there's no real "what a non-crit roll would have been" to recompute from
+ * -- only the crit's own final total to work backward from -- so it halves
+ * that total, same approximation Wide Guard/Nature's Embrace's own rules
+ * text already leans on for "half the damage" in this schema. Deterministic,
+ * not a human judgment call (`when: "always"`, unlike Parry/Captivate's own
+ * "special"): the most recent damage entry against `reactorId` either says
+ * `crit: true` (see _resolveOneHit's own new pre-damage crit computation,
+ * threaded into CombatAPI.applyDamage) or it doesn't, so this checks that
+ * directly instead of asking the reactor to self-report it.
+ *
+ * Unlike _handleRerollDamage, takes no `attackerId` -- Lucky Chant has no
+ * save and is offered through _handleEffectsOnly's plain self-only path
+ * (see its own docstring: the FIRST _offerMoveEffects call there passes no
+ * targetId at all), so there's no save-targeting flow to have supplied one.
+ * The attacker is instead read straight off the log entry itself
+ * (`entry.actorId`/`actorName`) -- this app already logs everything needed,
+ * no second lookup required. */
+async function _handleUndoCritDamage({ reactorId, moveName }) {
+  const reactor = session?.participants?.[reactorId];
+  if (!reactor) return;
+
+  const log = session?.log || [];
+  let original = null;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const entry = log[i];
+    if (entry.type === 'damage' && entry.targetId === reactorId) { original = entry; break; }
+  }
+  if (!original || !Number.isFinite(original.amount)) {
+    showCombatAlert(`Couldn't find the damage roll to check -- compare it with the table by hand.`, { title: moveName });
+    return;
+  }
+  const attackerName = original.actorName || '?';
+  if (!original.crit) {
+    showCombatAlert(`${attackerName}'s last hit on ${reactor.name} wasn't a critical hit -- nothing for ${moveName} to undo.`, { title: moveName });
+    return;
+  }
+
+  const refund = Math.floor(original.amount / 2);
+  CombatAPI.logEvent({
+    type: 'save', actorId: reactorId, actorName: reactor.name, targetId: original.actorId, targetName: attackerName,
+    text: `${reactor.name} used ${moveName} -- ${attackerName}'s critical hit is treated as a normal hit, refunding ${refund} HP`,
+  }).catch(() => {});
+
+  if (refund > 0) {
+    const maxHp = Number.isFinite(reactor.maxHP) ? reactor.maxHP : Infinity;
+    const newHp = Math.min(maxHp, reactor.currentHP + refund);
+    try {
+      await CombatAPI.updateStats(reactorId, { currentHP: newHp });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
+}
+
 /** Applies ONE firing of a `heal` effect (see move-effects-schema.md's own
  * section): an immediate HP/VP change, never a status write itself -- called
  * straight from _offerMoveEffects's apply loop for a one-shot heal (that
@@ -2565,46 +2632,15 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   const { targetId, rawRoll } = picked;
   const damageModifier = computedData.damageBonus || 0;
   const moveType = (move && move[1]) || '';
-  let damageDealt;
-  try {
-    // No "N damage applied" popup -- it's already in the shared battle log
-    // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
-    // every damage application here); see the user's own "less tooltip noise" call.
-    // damageApplied (post type-multiplier) is captured for a `heal` effect's own
-    // fractionOfDamage amount (Absorb, Drain Punch, ...) -- see _offerMoveEffects's
-    // own apply loop. damageMultiplier (Wide Guard's own reaction, see
-    // _handleMultiHitAoe) scales the raw total BEFORE type-effectiveness --
-    // multiplication commutes, so this is equivalent to scaling the server's
-    // own post-type-multiplier result, just one round trip cheaper.
-    const rawTotal = rawRoll + damageModifier;
-    const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
-    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName);
-    damageDealt = dmgResult?.damageApplied;
-  } catch (err) {
-    showCombatAlert(err.message, { title: 'Error' });
-    return null;
-  }
-  // 'damaged'-family reactions (Attract, Conversion 2, ...) fire right here --
-  // after damage lands, before anything else about this hit is resolved.
-  await waitForDamagedReactions(targetId, combatantId, moveName);
-
-  // Some moves land a hit AND separately make the hit creature save against
-  // a secondary consequence (e.g. Temporal Fang: damage on the attack roll,
-  // then the hit target saves against being slowed) -- distinct from a pure
-  // save move (no attack roll at all, see _handleSaveTriggered), per the
-  // user's own explicit correction that "trigger saving throw" can't be
-  // assumed to skip the attack roll. Only reachable once the attack already
-  // landed, since a Miss never applies damage in the first place.
-  const categories = moveCategoriesFor(moveName);
-  let save = null;
-  if (categories.includes('trigger_saving_throw_on_hit')) {
-    const outcome = await _handleSecondarySave(combatantId, targetId, moveName, computedData);
-    // Closed without declaring = no save result (nothing that hinges on one gets offered).
-    save = { passed: outcome ? outcome.passed : true, failBy: outcome?.failBy ?? null };
-  }
 
   // What the recorded rolls say this hit triggered: natural-roll thresholds, a crit,
-  // the secondary save's failure margin, plain on-hit effects.
+  // the secondary save's failure margin, plain on-hit effects. Computed BEFORE
+  // applyDamage below (this used to run after it, purely for _offerMoveEffects's
+  // own ctx) so a definite crit can be recorded on the damage log entry itself --
+  // Lucky Chant's own 'damaged' reaction needs to read it back from there, since
+  // the REACTOR's own client has no other way to know whether the hit that just
+  // landed on THEM was a crit (that's only ever computed on the ATTACKER's device).
+  const categories = moveCategoriesFor(moveName);
   const attackRoll = picked.attackRoll ?? null;
   // Not just the fixed category -- a status-granted guarantee (Laser
   // Focus/Lock-On/Mind Reader) skips the attack-roll step exactly the same
@@ -2623,16 +2659,57 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     crit = attackRoll === null ? undefined : attackRoll >= critThreshold(effectiveStats(attacker).critMod, categories.includes('base_crit'));
   }
   // Laser Focus overrides whatever the roll says (there may be no roll at all, see
-  // guaranteedHit above) and is spent the moment this attack actually resolves --
-  // hit or miss was never in question, but the crit itself only happens once.
+  // guaranteedHit above) -- computed here too (consumed further down, only once the
+  // hit's actually resolved) since it also affects the `crit` this damage log gets.
   const laserFocusId = guaranteedCritStatusId(attacker);
+  if (laserFocusId) crit = true;
+
+  let damageDealt;
+  try {
+    // No "N damage applied" popup -- it's already in the shared battle log
+    // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
+    // every damage application here); see the user's own "less tooltip noise" call.
+    // damageApplied (post type-multiplier) is captured for a `heal` effect's own
+    // fractionOfDamage amount (Absorb, Drain Punch, ...) -- see _offerMoveEffects's
+    // own apply loop. damageMultiplier (Wide Guard's own reaction, see
+    // _handleMultiHitAoe) scales the raw total BEFORE type-effectiveness --
+    // multiplication commutes, so this is equivalent to scaling the server's
+    // own post-type-multiplier result, just one round trip cheaper.
+    const rawTotal = rawRoll + damageModifier;
+    const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
+    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit);
+    damageDealt = dmgResult?.damageApplied;
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return null;
+  }
+  // 'damaged'-family reactions (Attract, Conversion 2, Lucky Chant, ...) fire
+  // right here -- after damage lands, before anything else about this hit is
+  // resolved.
+  await waitForDamagedReactions(targetId, combatantId, moveName);
+
+  // Some moves land a hit AND separately make the hit creature save against
+  // a secondary consequence (e.g. Temporal Fang: damage on the attack roll,
+  // then the hit target saves against being slowed) -- distinct from a pure
+  // save move (no attack roll at all, see _handleSaveTriggered), per the
+  // user's own explicit correction that "trigger saving throw" can't be
+  // assumed to skip the attack roll. Only reachable once the attack already
+  // landed, since a Miss never applies damage in the first place.
+  let save = null;
+  if (categories.includes('trigger_saving_throw_on_hit')) {
+    const outcome = await _handleSecondarySave(combatantId, targetId, moveName, computedData);
+    // Closed without declaring = no save result (nothing that hinges on one gets offered).
+    save = { passed: outcome ? outcome.passed : true, failBy: outcome?.failBy ?? null };
+  }
+
+  // Laser Focus/Lock-On/Mind Reader are spent the moment this attack actually
+  // resolves -- hit or miss was never in question, but the crit/guaranteed-hit
+  // itself only happens once. Consumption deliberately stays here (after
+  // damage/the secondary save, not up where `crit` itself was computed) --
+  // only a hit that actually went through should spend either status.
   if (laserFocusId) {
-    crit = true;
     CombatAPI.useStatus(combatantId, laserFocusId).catch(() => {});
   }
-  // Lock-On/Mind Reader's own guaranteed-hit flag -- same "spent the moment
-  // this attack resolves" consumption as Laser Focus, but never forces a
-  // crit (guaranteedHit above already covers the hit itself being certain).
   const guaranteedHitId = guaranteedHitStatusId(attacker);
   if (guaranteedHitId) {
     CombatAPI.useStatus(combatantId, guaranteedHitId).catch(() => {});

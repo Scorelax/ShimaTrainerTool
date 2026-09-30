@@ -241,6 +241,11 @@ def tag_for(e):
         base = 'temp_hp'
     elif e['kind'] == 'reroll_damage':
         base = 'reroll_damage'
+    elif e['kind'] == 'undo_crit_damage':
+        # Lucky Chant's own "treats a crit like a normal hit" -- reroll_damage's
+        # own retroactive-correction shape, just recomputing the refund from
+        # the crit's own final total (halved) instead of a fresh reroll.
+        base = 'undo_crit_damage'
     elif e['kind'] == 'heal':
         base = 'heal'
     elif e['kind'] == 'block_attack':

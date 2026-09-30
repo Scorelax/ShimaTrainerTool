@@ -1123,3 +1123,38 @@ unaffected) plus 6 against a reimplementation of `_handleUndoCritDamage`'s
 own log-scan/refund logic (finds the right entry, floors an odd refund,
 picks the MOST RECENT entry not an earlier one, ignores unrelated
 targets/non-damage entries).)*
+
+*(Update, 2026-09-30: Spiky Shield built (`migrate_effects_v41.py`), the
+fourth of the pushback list. Its own deferral reasoning ("needs a deal
+damage effect kind that doesn't exist anywhere in this schema") was true in
+the narrow sense that no move had ever AUTHORED one, but the underlying
+PRIMITIVE (`CombatAPI.applyDamage` -- attacker, target, amount, type,
+species, moveName) already existed and works generically for any
+(source, target) pair; nothing stopped a reaction handler from calling it
+with the reactor and the original attacker's roles swapped. Building the
+kind was mostly writing the handler, not inventing new server plumbing.
+
+Two new effect kinds, both `target:"self"` (Spiky Shield, like Lucky Chant,
+is offered through `_handleEffectsOnly`'s plain self-only path, which never
+supplies a real targetId -- "self" is the only section that renders
+sensibly here) and `when:"always"` (deterministic):
+- `kind: "negate_damage"` -- `reroll_damage`'s own retroactive-correction
+  shape, a full (100%) refund against the most recent damage entry against
+  the reactor instead of a human-entered reroll (`_handleNegateDamage`).
+- `kind: "deal_damage"` (`{amount: "proficiency" | <number>, damageType?}`)
+  -- a flat guaranteed counter-hit against whoever that same entry says
+  attacked (`_handleDealDamageToAttacker`).
+
+Both read "who attacked me" via a new shared `_lastDamageAgainst(reactorId)`
+helper -- the same log-scan `_handleUndoCritDamage` already did inline,
+factored out now that a third handler needs it too. Deliberately NOT
+modeled, same manual-after-first-use precedent every other Protect-family
+move here already gets: the escalating "roll over 15 after the first use"
+cost, and its own rider that a later successful (non-natural-20) use still
+drains the reactor's own VP for half the damage amount -- both riders only
+ever apply on a use this schema already leaves manual, so there's nothing
+lost leaving them that way too. Verified with 7 direct calls against a
+reimplementation of the negate/deal-damage logic (full refund, proficiency
+and plain-number amounts both resolve, a zero amount no-ops, missing-entry
+cases report cleanly, and the MOST RECENT entry against the reactor
+specifically is what's picked, not an unrelated or earlier one).)*

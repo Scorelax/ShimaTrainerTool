@@ -2229,6 +2229,19 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleUndoCritDamage({ reactorId: attackerId, moveName });
       continue;
     }
+    if (effect.kind === 'negate_damage') {
+      // Spiky Shield's own "ignore damage" half -- same no-attackerId-needed
+      // reasoning as undo_crit_damage above.
+      await _handleNegateDamage({ reactorId: attackerId, moveName });
+      continue;
+    }
+    if (effect.kind === 'deal_damage') {
+      // Spiky Shield's own "...dealing grass damage instead" half -- a flat
+      // guaranteed counter-hit, same no-attackerId-needed reasoning as the
+      // other log-reading handlers above.
+      await _handleDealDamageToAttacker({ reactorId: attackerId, effect, moveName });
+      continue;
+    }
     if (effect.kind === 'block_attack') {
       // Not a status either -- a one-shot signal to the ATTACKER's own
       // client (mid waitForReactionWindow) that this attack is blocked
@@ -2436,6 +2449,22 @@ async function _handleRerollDamage({ reactorId, attackerId, moveName }) {
   }
 }
 
+/** Most recent `damage` log entry against `reactorId` (from ANY attacker),
+ * or null -- shared by every 'damaged'-family handler that needs to know
+ * what just happened to the reactor without a pre-supplied attacker id.
+ * Needed because these are all offered through _handleEffectsOnly's plain
+ * self-only path (see its own docstring), which never supplies a targetId
+ * at all -- Lucky Chant's own undo, and Spiky Shield's own negate/counter
+ * pair, all resolve "who hit me" from the log itself instead. */
+function _lastDamageAgainst(reactorId) {
+  const log = session?.log || [];
+  for (let i = log.length - 1; i >= 0; i--) {
+    const entry = log[i];
+    if (entry.type === 'damage' && entry.targetId === reactorId) return entry;
+  }
+  return null;
+}
+
 /** Lucky Chant's own mechanism -- "treats the attack like a normal hit,
  * preventing the extra damage" from a crit, a retroactive HP refund against
  * an already-applied damage entry same shape as _handleRerollDamage's own,
@@ -2448,25 +2477,12 @@ async function _handleRerollDamage({ reactorId, attackerId, moveName }) {
  * "special"): the most recent damage entry against `reactorId` either says
  * `crit: true` (see _resolveOneHit's own new pre-damage crit computation,
  * threaded into CombatAPI.applyDamage) or it doesn't, so this checks that
- * directly instead of asking the reactor to self-report it.
- *
- * Unlike _handleRerollDamage, takes no `attackerId` -- Lucky Chant has no
- * save and is offered through _handleEffectsOnly's plain self-only path
- * (see its own docstring: the FIRST _offerMoveEffects call there passes no
- * targetId at all), so there's no save-targeting flow to have supplied one.
- * The attacker is instead read straight off the log entry itself
- * (`entry.actorId`/`actorName`) -- this app already logs everything needed,
- * no second lookup required. */
+ * directly instead of asking the reactor to self-report it. */
 async function _handleUndoCritDamage({ reactorId, moveName }) {
   const reactor = session?.participants?.[reactorId];
   if (!reactor) return;
 
-  const log = session?.log || [];
-  let original = null;
-  for (let i = log.length - 1; i >= 0; i--) {
-    const entry = log[i];
-    if (entry.type === 'damage' && entry.targetId === reactorId) { original = entry; break; }
-  }
+  const original = _lastDamageAgainst(reactorId);
   if (!original || !Number.isFinite(original.amount)) {
     showCombatAlert(`Couldn't find the damage roll to check -- compare it with the table by hand.`, { title: moveName });
     return;
@@ -2491,6 +2507,69 @@ async function _handleUndoCritDamage({ reactorId, moveName }) {
     } catch (err) {
       showCombatAlert(err.message, { title: 'Error' });
     }
+  }
+}
+
+/** Spiky Shield's own "ignore damage" half -- a full (100%) retroactive
+ * refund against the most recent damage entry against the reactor, same
+ * shape as _handleUndoCritDamage's own halving just without the crit
+ * gate or the fraction. The escalating "roll over 15 after the first use"
+ * cost and its own "drains your VP for half the damage amount" rider are
+ * deliberately NOT modeled -- same manual-after-first-use precedent every
+ * other Protect-family move in this schema already gets (no resource-
+ * tracking mechanism for "which use number is this" exists anywhere). */
+async function _handleNegateDamage({ reactorId, moveName }) {
+  const reactor = session?.participants?.[reactorId];
+  if (!reactor) return;
+
+  const original = _lastDamageAgainst(reactorId);
+  if (!original || !Number.isFinite(original.amount)) {
+    showCombatAlert(`Couldn't find the damage roll to ignore -- refund it by hand if needed.`, { title: moveName });
+    return;
+  }
+  const refund = original.amount;
+  CombatAPI.logEvent({
+    type: 'save', actorId: reactorId, actorName: reactor.name, targetId: original.actorId, targetName: original.actorName || '?',
+    text: `${reactor.name} used ${moveName} -- ignores the ${refund} damage, refunding it in full`,
+  }).catch(() => {});
+
+  if (refund > 0) {
+    const maxHp = Number.isFinite(reactor.maxHP) ? reactor.maxHP : Infinity;
+    const newHp = Math.min(maxHp, reactor.currentHP + refund);
+    try {
+      await CombatAPI.updateStats(reactorId, { currentHP: newHp });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
+}
+
+/** Spiky Shield's own "dealing grass damage equal to your proficiency
+ * modifier to the attacker instead" half -- a flat, guaranteed counter-hit
+ * against whoever's own damage entry `_lastDamageAgainst` finds (same
+ * "read it off the log, no id passed in" reasoning as every handler above).
+ * `effect.amount` is `'proficiency'` (Spiky Shield's own case) or a plain
+ * number -- no dice shape needed yet, so unlike a `heal` effect's own
+ * amount this doesn't try to support one. Reuses the ordinary
+ * CombatAPI.applyDamage primitive with the reactor and the original
+ * attacker's roles swapped -- nothing new needed there, it already applies
+ * type effectiveness and logs a normal 'damage' entry regardless of which
+ * "direction" it's called in. */
+async function _handleDealDamageToAttacker({ reactorId, effect, moveName }) {
+  const reactor = session?.participants?.[reactorId];
+  if (!reactor) return;
+
+  const original = _lastDamageAgainst(reactorId);
+  if (!original) {
+    showCombatAlert(`Couldn't find who hit ${reactor.name} -- deal ${moveName}'s counter-damage by hand.`, { title: moveName });
+    return;
+  }
+  const amount = effect.amount === 'proficiency' ? (Number(reactor.proficiency) || 0) : (Number(effect.amount) || 0);
+  if (!amount) return;
+  try {
+    await CombatAPI.applyDamage(reactorId, original.actorId, amount, effect.damageType || '', reactor.name, moveName);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
   }
 }
 

@@ -246,6 +246,16 @@ def tag_for(e):
         # own retroactive-correction shape, just recomputing the refund from
         # the crit's own final total (halved) instead of a fresh reroll.
         base = 'undo_crit_damage'
+    elif e['kind'] == 'negate_damage':
+        # Spiky Shield's own "ignore damage" half -- reroll_damage's own
+        # retroactive-correction shape, a full (100%) refund instead of a
+        # human-entered reroll.
+        base = 'negate_damage'
+    elif e['kind'] == 'deal_damage':
+        # Spiky Shield's own "...dealing grass damage instead" half -- a
+        # flat guaranteed counter-hit against whoever's own damage entry the
+        # handler finds, see combat-wip.js's _handleDealDamageToAttacker.
+        base = 'deal_damage'
     elif e['kind'] == 'heal':
         base = 'heal'
     elif e['kind'] == 'block_attack':

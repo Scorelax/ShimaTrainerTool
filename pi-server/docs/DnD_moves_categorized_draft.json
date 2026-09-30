@@ -13455,12 +13455,45 @@
       "categories": [
         "counter_reaction_effect",
         "protect_negate",
-        "damage"
+        "damage",
+        "self_negate_damage",
+        "self_deal_damage"
       ],
       "description": "You quickly raise a spiked shield to protect yourself from damage. When you are hit by a melee attack, use your reaction to ignore damage, dealing grass damage equal to your proficiency modifier to the attacker instead. On future instances of this reaction in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful. Unless the successful roll is 20, the damage you take instead drains your VP for half the damage amount.",
       "moveStat": "None",
       "vpCost": "20",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "negate_damage",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "deal_damage",
+          "amount": "proficiency",
+          "damageType": "Grass",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Deals your proficiency modifier in Grass damage to the attacker instead."
+        }
+      ],
+      "reactionTrigger": "damaged",
+      "reactionRange": 0
     },
     {
       "name": "Spore",

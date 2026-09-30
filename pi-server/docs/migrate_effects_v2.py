@@ -256,6 +256,11 @@ def tag_for(e):
         # flat guaranteed counter-hit against whoever's own damage entry the
         # handler finds, see combat-wip.js's _handleDealDamageToAttacker.
         base = 'deal_damage'
+    elif e['kind'] == 'redirect_avoided_damage':
+        # Nature's Embrace's own "discount the extra [vulnerability] damage,
+        # redirect it into a ranged attack" -- see combat-wip.js's
+        # _handleRedirectAvoidedDamage.
+        base = 'redirect_avoided_damage'
     elif e['kind'] == 'heal':
         base = 'heal'
     elif e['kind'] == 'block_attack':

@@ -13061,12 +13061,29 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "protect_negate"
+        "protect_negate",
+        "self_redirect_avoided_damage"
       ],
       "description": "You call upon the power of nature to protect you. Whenever you sustain damage of a type you are vulnerable to, you may use this reaction to discount the extra damage. Make a ranged attack roll, redirecting the damage you avoided to a creature in range on a hit.",
       "moveStat": "STR/DEX",
       "vpCost": "12",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "redirect_avoided_damage",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ],
+      "reactionTrigger": "damaged",
+      "reactionRange": 0
     },
     {
       "name": "Needle Arm",

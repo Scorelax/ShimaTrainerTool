@@ -1158,3 +1158,30 @@ reimplementation of the negate/deal-damage logic (full refund, proficiency
 and plain-number amounts both resolve, a zero amount no-ops, missing-entry
 cases report cleanly, and the MOST RECENT entry against the reactor
 specifically is what's picked, not an unrelated or earlier one).)*
+
+*(Update, 2026-09-30: Nature's Embrace built (`migrate_effects_v42.py`), the
+fifth of the pushback list. Its own deferral ("needs a full reactive
+mini-attack-flow, not a status") was right that it needs a real attack roll
+against a freely chosen target -- but `_handleBideResolve` already proved
+this exact shape works: `pickTarget`'s own `presetRoll` param pre-fills a
+KNOWN damage amount (still editable) while still running the ordinary
+attack-roll step. Nothing new needed for that half either.
+
+The "discount the extra damage" half turned out NICER than the halving
+approximation Wide Guard/Lucky Chant lean on: the damage log already
+records the type multiplier that applied, so "discount the extra" is an
+EXACT figure -- `amount - floor(amount / multiplier)`, reducing the total
+back down to what a plain 1x hit would have been. Correct for a stacked 4x
+vulnerability (two type weaknesses) the same as the common 2x case, not
+just an approximation of the common case.
+
+New `kind: "redirect_avoided_damage"` effect (`target:"self"`, `when:"always"`
+-- deterministic: `original.multiplier > 1` either holds or it doesn't, same
+pattern Lucky Chant's own crit check already uses). `_handleRedirectAvoidedDamage`
+first refunds the discounted amount to the reactor's own HP, then -- only if
+something was actually avoided -- opens `pickTarget` with that amount as the
+`presetRoll`, mirroring `_handleBideResolve`'s own miss/hit handling exactly.
+Verified with 5 direct calls against the avoided-amount math (standard 2x,
+a stacked 4x case, non-vulnerable and resistant hits both correctly report
+nothing to discount, an odd total floors the same way the rest of this
+schema's refund math already does).)*

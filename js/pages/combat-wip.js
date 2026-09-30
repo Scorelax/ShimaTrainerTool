@@ -2242,6 +2242,13 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleDealDamageToAttacker({ reactorId: attackerId, effect, moveName });
       continue;
     }
+    if (effect.kind === 'redirect_avoided_damage') {
+      // Nature's Embrace -- discounts a vulnerability hit's own "extra" and
+      // (on a hit) redirects it into a fresh ranged attack against a freely
+      // chosen target. attackerId (closure) is the reactor themselves.
+      await _handleRedirectAvoidedDamage({ reactorId: attackerId, moveName });
+      continue;
+    }
     if (effect.kind === 'block_attack') {
       // Not a status either -- a one-shot signal to the ATTACKER's own
       // client (mid waitForReactionWindow) that this attack is blocked
@@ -2568,6 +2575,70 @@ async function _handleDealDamageToAttacker({ reactorId, effect, moveName }) {
   if (!amount) return;
   try {
     await CombatAPI.applyDamage(reactorId, original.actorId, amount, effect.damageType || '', reactor.name, moveName);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+/** Nature's Embrace's own mechanism -- "whenever you sustain damage of a
+ * type you are vulnerable to, you may discount the extra damage. Make a
+ * ranged attack roll, redirecting the damage you avoided to a creature in
+ * range on a hit." Unlike Lucky Chant/Wide Guard's own "halve it" (an
+ * approximation this app leans on because there's no cleaner number to
+ * recompute from), this is an EXACT figure: the damage log already records
+ * the type multiplier that applied (`_apply_damage_to_target`'s own
+ * `multiplier` field), so "discount the extra" is simply "reduce the total
+ * back down to what a 1x hit would have been" -- `amount - floor(amount /
+ * multiplier)` -- correct for a 2x vulnerability same as a stacked 4x one
+ * (two type weaknesses), not just the common case.
+ *
+ * The redirect itself reuses `_handleBideResolve`'s own established
+ * pattern exactly: `pickTarget`'s `presetRoll` pre-fills a KNOWN damage
+ * amount (still editable) while still running the normal attack-roll step
+ * against a freely chosen target -- this app already proved this shape
+ * works, nothing new needed for it. */
+async function _handleRedirectAvoidedDamage({ reactorId, moveName }) {
+  const reactor = session?.participants?.[reactorId];
+  if (!reactor) return;
+
+  const original = _lastDamageAgainst(reactorId);
+  if (!original || !Number.isFinite(original.amount)) {
+    showCombatAlert(`Couldn't find the damage roll to check -- compare it with the table by hand.`, { title: moveName });
+    return;
+  }
+  if (!(original.multiplier > 1)) {
+    showCombatAlert(`${reactor.name} wasn't vulnerable to that hit -- nothing for ${moveName} to discount.`, { title: moveName });
+    return;
+  }
+  const avoided = original.amount - Math.floor(original.amount / original.multiplier);
+  if (avoided > 0) {
+    const maxHp = Number.isFinite(reactor.maxHP) ? reactor.maxHP : Infinity;
+    const newHp = Math.min(maxHp, reactor.currentHP + avoided);
+    try {
+      await CombatAPI.updateStats(reactorId, { currentHP: newHp });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+      return;
+    }
+  }
+  CombatAPI.logEvent({
+    type: 'save', actorId: reactorId, actorName: reactor.name,
+    text: `${reactor.name} used ${moveName} -- discounts ${avoided} damage from the vulnerability${avoided > 0 ? ', then redirects it into a ranged attack' : ''}`,
+  }).catch(() => {});
+  if (avoided <= 0) return; // vulnerable but rounded down to nothing avoided -- no redirect to make
+
+  const picked = await pickTarget(reactorId, { moveName, damageDice: '', damageNotes: [], damageModifier: 0, presetRoll: avoided });
+  if (!picked || picked.blocked) return;
+  if (!picked.hit) {
+    const targetName = session?.participants?.[picked.targetId]?.name || '?';
+    CombatAPI.logEvent({
+      type: 'miss', actorId: reactorId, actorName: reactor.name, targetId: picked.targetId, targetName,
+      text: `${reactor.name} redirected the avoided damage at ${targetName} with ${moveName} -- Miss`,
+    }).catch(() => {});
+    return;
+  }
+  try {
+    await CombatAPI.applyDamage(reactorId, picked.targetId, picked.rawRoll, '', reactor.name, moveName);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }

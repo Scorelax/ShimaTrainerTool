@@ -11940,12 +11940,28 @@
       "categories": [
         "damage",
         "steal_disrupt",
-        "movement"
+        "movement",
+        "stat_transfer_steal"
       ],
       "description": "You succumb to darkness and transport yourself into a creature's shadow. Immediately teleport to a point in range and make a melee attack on a creature. On hit, you steal all positive stat changes affecting the creature (increases to AC, attack rolls, damage bonuses, etc.) and deal 3d10 + MOVE ghost damage.",
       "moveStat": "DEX/WIS",
       "vpCost": "16",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "steal",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Teleporting to the target first is not automated -- position the token by hand."
+        }
+      ]
     },
     {
       "name": "Spectral Vision",
@@ -18977,12 +18993,27 @@
       },
       "reaction": false,
       "categories": [
-        "steal_disrupt"
+        "steal_disrupt",
+        "stat_transfer_copy"
       ],
       "description": "You sync up with a creature, copying any positive or negative stat changes affecting them due to weather or moves this combat.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "copy",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Quick Attack",
@@ -21537,12 +21568,27 @@
       "reaction": false,
       "categories": [
         "damage",
-        "steal_disrupt"
+        "steal_disrupt",
+        "stat_transfer_dispel"
       ],
       "description": "You throw a clump of special mud that has the power to remove all stat changes from a target. Make a ranged attack, dealing 1d10 + MOVE poison damage on a hit. On a hit, any stat changes affecting the target since the beginning of battle are reset.",
       "moveStat": "DEX/CON",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Coil",
@@ -23283,12 +23329,28 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "potential_stat_transfer_swap"
       ],
       "description": "Force a creature in range to make a CHA save against your Move DC. On a failure, you employ your psychic power to swap any changes in ability modifiers, AC, attack changes, damage boosts, etc. that are currently in affect on you or the target.",
       "moveStat": "WIS/INT",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "swap",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Hypnosis",

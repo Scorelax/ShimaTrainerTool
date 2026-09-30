@@ -8,7 +8,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
 
 ```jsonc
 {
-  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal" | "block_attack" | "prevent_faint" | "damage_note",
+  "kind": "condition" | "stat" | "roll" | "temp_hp" | "reroll_damage" | "heal" | "block_attack" | "prevent_faint" | "stat_transfer" | "damage_note",
   // condition:  "apply": "<name>", optional "value" (type_changed → "Ghost")
   // stat:       "stat": "<stat>", "amount": -1 | "proficiency" | {"dice": "1d4"}  OR  "set": 0, optional "stacks": {"max": 5}
   // roll:       "roll": "advantage" | "disadvantage", "on": "<roll-on>", optional "ability" (saving_throws only)
@@ -16,6 +16,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
   // reroll_damage: no extra fields -- see its own section below
   // block_attack: no extra fields -- see its own section below
   // prevent_faint: no extra fields -- see its own section below
+  // stat_transfer: "mode": "dispel" | "copy" | "swap" | "steal" -- see its own section below
   // damage_note: "condition": {...}, "diceMultiplier?"/"totalMultiplier?"/"flatBonus?"/
   //              "scalingBonus?"/"advantage?" -- see its own section below; NOT a when/target/ends
   //              effect at all, see why there
@@ -139,6 +140,27 @@ set to exactly 1 via `update-stats`, the same client-authoritative HP correction
 own refund and every `heal` effect already use; above 0, it's a no-op (nothing to prevent) rather
 than a genuine heal, so it never raises HP that wasn't already fatal. Same escalating "roll over
 15 after the first use" cost as the whole Protect family, left manual for the same reason.
+
+**`stat_transfer`** (Clear Smog/Psych Up/Heart Swap/Spectral Thief) reads the currently active
+`kind:'stat'` statuses on one or two participants and removes/copies/swaps/steals them -- never
+stored as a status itself, a one-shot bulk operation against whatever's already live, same
+"intercepted before `apply-status`" treatment as `reroll_damage`/`block_attack`/`prevent_faint`.
+`mode` picks the shape: `"dispel"` (Clear Smog -- remove every one of the target's own `kind:'stat'`
+statuses), `"copy"` (Psych Up -- recreate the target's onto the user, target's own copy untouched),
+`"swap"` (Heart Swap -- exchange BOTH sides' current ones), `"steal"` (Spectral Thief -- move only
+the target's POSITIVE ones onto the user, removed from the target). `combat-wip.js`'s
+`_handleStatTransfer` does the actual work via plain `apply-status`/`remove-status` calls -- a
+recreated status keeps its ORIGINAL `sourceId`/`sourceName`/`moveName`/`dc` (a copied Focus Energy
+still reads "from Focus Energy", not from the transfer move itself), only the delta moves. Remaining
+duration isn't preserved exactly -- a recreated status restarts from its own authored `ends` (e.g. a
+fresh 10 rounds) rather than however many were actually left on the original, a documented
+simplification. `no other fields` beyond `mode`/`when`/`ends: [{type:"instant"}]`/`target` (unset --
+shown under the target section in the popup, same convention as any other move that does something
+TO the target, regardless of which side ends up holding what afterward).
+
+Deliberately NOT this kind: moving or copying a SINGLE CHOSEN stat (Guard Swap/Power Swap/Role
+Play -- these need a small "which one" picker first, not built yet) or transferring a named
+CONDITION rather than a stat (Psycho Shift) -- both real, both held for their own slice.
 
 **`damage_note`** is a genuinely different shape from every other kind, and the user's own
 correction of an earlier, wrong call in this schema's history: `conditional_damage`-tagged moves
@@ -793,3 +815,23 @@ multiplier), and a new `diceMultiplierFromMagnitude` result field reusing
 the existing `diceMultiplier` display/application path end to end. See
 their own sections above. VP-cost escalation and the speed-reduced-to-0
 reset clause are noted, not modeled -- see the condition's own section.)*
+
+*(Update, 2026-09-30: moved to `steal_disrupt` (23 moves, the largest
+remaining category) -- same "read every move fully before trusting the
+label" discipline. Most are genuinely blocked (item theft with no
+held-item field anywhere in this app; a Pokemon "Ability" subsystem that
+doesn't exist; the already-known "choose which stat" gap; three other
+not-yet-built categories; five DIFFERENT reactive-theft mechanics with no
+shared mechanism). Four share one real mechanism -- a new `stat_transfer`
+kind, see its own section above -- migrated in `migrate_effects_v35.py`:
+Clear Smog (dispel), Psych Up (copy), Heart Swap (swap), Spectral Thief
+(steal, partial -- its own teleport clause needs the positioning category).
+Required a new `tag_for` branch (`migrate_effects_v2.py`) since an
+unrecognized effect `kind` would otherwise crash there. Guard Swap/Power
+Swap/Role Play (swap or copy ONE CHOSEN stat) and Psycho Shift (transfer
+ONE named condition) are real and buildable but need their own small
+"choose which" picker -- deliberately held for a separate slice. Verified
+with 12 checks against a reimplementation of `_handleStatTransfer`'s exact
+logic (dispel/copy/steal/swap, including that `steal` correctly leaves a
+negative stat untouched and `swap` snapshots both sides before mutating
+either).)*

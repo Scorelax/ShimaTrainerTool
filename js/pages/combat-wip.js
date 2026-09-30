@@ -2075,6 +2075,74 @@ function _targetDamageNotes(moveName) {
  * without being tagged trigger_saving_throw*) gets its save asked for here.
  * `targetId` null offers only the user's own (target:'self') effects; includeSelf
  * false offers only the target's (for a loop that already offered self once). */
+/** Clear Smog/Psych Up/Heart Swap/Spectral Thief's own "read the currently
+ * active stat buffs on one or two participants and remove/copy/swap/steal
+ * them" family -- not a status applied to the move's own user, a one-shot
+ * bulk operation against whatever `kind:'stat'` statuses are ALREADY live
+ * right now. `mode`:
+ *   'dispel' -- remove every kind:'stat' status from targetId (Clear Smog:
+ *     "any stat changes ... are reset").
+ *   'copy'   -- recreate every kind:'stat' status FROM targetId onto
+ *     attackerId, target's own copy untouched (Psych Up).
+ *   'swap'   -- exchange BOTH sides' current kind:'stat' statuses (Heart
+ *     Swap).
+ *   'steal'  -- move only targetId's POSITIVE kind:'stat' statuses onto
+ *     attackerId, removed from target (Spectral Thief's own "steal all
+ *     positive stat changes").
+ * Recreated statuses keep their ORIGINAL sourceId/sourceName/moveName/dc
+ * (so a copied Focus Energy still reads "from Focus Energy", not "from
+ * Psych Up") -- only the stat delta itself moves, never its own history.
+ * A status's remaining duration isn't preserved exactly (it restarts from
+ * its own authored `ends`, e.g. a fresh 10 rounds rather than however many
+ * were actually left) -- a documented simplification, same "close enough"
+ * trust level as everything else in this app that doesn't track exact
+ * remaining-duration bookkeeping. */
+async function _handleStatTransfer({ mode, attackerId, targetId, moveName }) {
+  const attacker = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  if (!attacker || !target) return;
+  const isPositive = (s) => typeof s.amount === 'number' && s.amount * (s.stacks || 1) > 0;
+  const recreate = async (status, destId) => {
+    const spec = buildStatusSpec(status, {
+      sourceId: status.sourceId, sourceName: status.sourceName, moveName: status.moveName,
+      dc: status.dc, ends: status.ends,
+    });
+    try { await CombatAPI.applyStatus(destId, spec); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
+  };
+  const remove = async (holderId, status, reason) => {
+    try { await CombatAPI.removeStatus(holderId, status.id, reason); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
+  };
+
+  const targetStats = (target.statuses || []).filter(s => s.kind === 'stat');
+  if (mode === 'dispel') {
+    for (const s of targetStats) await remove(targetId, s, `dispelled by ${moveName}`);
+    return;
+  }
+  if (mode === 'copy') {
+    for (const s of targetStats) await recreate(s, attackerId);
+    return;
+  }
+  if (mode === 'steal') {
+    for (const s of targetStats.filter(isPositive)) {
+      await remove(targetId, s, `stolen by ${moveName}`);
+      await recreate(s, attackerId);
+    }
+    return;
+  }
+  if (mode === 'swap') {
+    // Snapshot BOTH sides before touching either -- these are plain JS
+    // arrays of the status objects as they stood the instant this ran, not
+    // live references, so removing/recreating below can't shift out from
+    // under this loop (the client's own `session` mirror only updates on
+    // the next SSE push, well after this whole function has finished).
+    const selfStats = (attacker.statuses || []).filter(s => s.kind === 'stat');
+    for (const s of targetStats) await remove(targetId, s, `swapped by ${moveName}`);
+    for (const s of selfStats) await remove(attackerId, s, `swapped by ${moveName}`);
+    for (const s of targetStats) await recreate(s, attackerId);
+    for (const s of selfStats) await recreate(s, targetId);
+  }
+}
+
 async function _offerMoveEffects({ attackerId, targetId = null, moveName, computedData, ctx, includeSelf = true }) {
   const effects = moveEffectsFor(moveName);
   if (!effects.length) return;
@@ -2149,6 +2217,16 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // cancel here, only its outcome). pick.targetId is the reactor
       // themselves (target: self).
       await _handlePreventFaint({ targetId: pick.targetId, moveName });
+      continue;
+    }
+    if (effect.kind === 'stat_transfer') {
+      // Not a status -- a one-shot bulk operation against whatever stat
+      // buffs are already active on one or two participants right now
+      // (see _handleStatTransfer's own docstring). Uses attackerId/targetId
+      // straight from this function's own closure, not pick.targetId --
+      // every mode reads/writes both sides regardless of which section
+      // the popup happened to list it under.
+      await _handleStatTransfer({ mode: effect.mode, attackerId, targetId, moveName });
       continue;
     }
     if (effect.kind === 'heal' && !effect.repeat) {

@@ -247,6 +247,12 @@ def tag_for(e):
         base = 'block_attack'
     elif e['kind'] == 'prevent_faint':
         base = 'prevent_faint'
+    elif e['kind'] == 'stat_transfer':
+        # Clear Smog/Psych Up/Heart Swap/Spectral Thief's own "read the
+        # currently active stat buffs on one or two participants and
+        # remove/copy/swap/steal them" family -- see combat-wip.js's
+        # _handleStatTransfer for the actual mechanism.
+        base = f"stat_transfer_{e['mode']}"
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

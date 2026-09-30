@@ -3151,13 +3151,31 @@
       },
       "reaction": false,
       "categories": [
-        "stat_debuff_enemy",
+        "self_disadvantage_attacks_against",
         "recharge_locked"
       ],
       "description": "You become highly alert, sensing incoming attacks and getting ready to respond to them. For one round, opponents have disadvantage on attack rolls against you. Upon being hit, you may use your reaction to retaliate with an attacking move against your attacker. The retaliation will be resovled simultaneously, meaning you still do damage even if you faint from the hit. This move may be used once per short rest.",
       "moveStat": "None",
       "vpCost": "25",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attacks_against",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ],
+          "note": "Its own reactive retaliation-on-being-hit clause needs a full reaction-triggered counter-attack flow this schema doesn't have yet -- not modeled."
+        }
+      ]
     },
     {
       "name": "Parting Shot",
@@ -5245,13 +5263,30 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_potential_stat_buff_attack_rolls",
         "situational_use"
       ],
       "description": "You channel energy from ancient artifacts to enhance your combat prowess. If an ancient artifact is within range and you know it is there, add double your proficiency bonus to attack and damage rolls.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": "proficiency",
+          "target": "self",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "Only while an ancient artifact is in range and known to you -- a human judgment call, same as Parry's contested-roll gate. Also doubles damage rolls per its own text, but this schema has no live damage_rolls consumer yet (listed in the vocab, never wired up) -- not applied."
+        }
+      ]
     },
     {
       "name": "Baby-Doll Eyes",
@@ -6753,14 +6788,47 @@
       "reaction": false,
       "categories": [
         "heal_target_or_aoe",
-        "stat_buff_ally",
+        "heal",
+        "advantage_attack_rolls",
         "recoil",
         "recharge_locked"
       ],
       "description": "You channel the energy of the morning sun to heal your allies. Each ally within range regains hp equal to 4d12 + MOVE. They also gain advantage on their next attack roll. Using this move strains the user, damaging it by the same amount it heals others. This move may only be used once per day, recharging at dawn.",
       "moveStat": "CHA",
       "vpCost": "35",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "4d12",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ],
+          "note": "The move's own self-recoil (damaging the user by the same amount it heals others) has no mechanism -- not modeled."
+        }
+      ]
     },
     {
       "name": "Relic Song",

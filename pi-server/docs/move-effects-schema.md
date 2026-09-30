@@ -657,3 +657,30 @@ the same Stockpile mechanic as Spit Up, just self_heal). None of the four got an
   on the legacy engine). Only 'damage' log entries actually carry a moveType, so this really means
   "witnessed dealing damage", a deliberate approximation of "witnessed" given what's reliably
   loggable today.)*
+
+*(Update, 2026-09-30: a full re-read of the "fits the schema already" bucket
+(migrate_effects_v30.py) found only 3 of its 40 moves have a genuine,
+non-lossy fit -- Artifact Light (doubled proficiency on attack rolls via a
+second `amount:'proficiency'` stat effect, gated `when:'special'` since the
+precondition is a human judgment call; the damage-rolls half of its own
+text has no live consumer -- `damage_rolls` is in this doc's own `stat`
+vocabulary but nothing in `move-effects.js` reads it), Omen Sense
+(disadvantage on attacks against the holder for 1 round -- its own reactive
+retaliation-attack clause needs a full counter-attack flow, left
+unmodeled), and Radiant Hope (heal + advantage-on-next-attack for allies,
+both existing shapes -- its own self-recoil-equal-to-healing clause has no
+mechanism). The other 37 are each blocked on a real, specific gap --
+`speed` as a flat/multiplicative buff (still never implemented anywhere,
+despite being listed in the `stat` vocabulary below -- Agility, Autotomize,
+Kinesis, Flame Charge, Surface Glide, Tailwind), STAB doubling
+(`increase_stab` has never had a backing mechanism -- Calm Mind, Tail
+Glow), a "guaranteed hit" grantable status (the `guaranteed_next_crit`
+precedent's un-built sibling -- Lock-On, Mind Reader, Thunderstorm Dance),
+ability/target-specific attack-roll scoping (the `ability` field only
+narrows `saving_throws`, not `attack_rolls` -- Nasty Plot, Study), damage
+reduction on defense, VP-cost modifiers, the already-flagged "choose which
+stat" gap (Power Trick/Power Split), stealing or inverting an existing
+effect, reactive/retaliatory damage, tracked amounts with no tracking
+mechanism, and field/terrain AoE-over-time (no "who's standing in this map
+area" concept exists). Full per-move reasoning in
+`migrate_effects_v30.py`'s own module docstring -- not repeated here.)*

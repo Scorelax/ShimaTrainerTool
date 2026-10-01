@@ -3022,12 +3022,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "remove_item_on_target"
+        "remove_item_on_target",
+        "drop_item"
       ],
       "description": "You attempt to rid a creature of their held item for the rest of battle. Make a melee attack roll against a target. On a hit, deal 1d10 + MOVE dark damage and any held item of the target falls to the ground somewhere in the vicinity.",
       "moveStat": "DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "drop_item",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Memento",
@@ -3526,12 +3540,27 @@
       "categories": [
         "trigger_saving_throw",
         "remove_item",
-        "remove_item_on_target"
+        "remove_item_on_target",
+        "potential_swap_item"
       ],
       "description": "Your hands move with incredible speed as you attempt to switch held items with a creature. Force a creature to make a DEX save against your Move DC. On a failure, you take their held item and replace it with your own. If you do not have a held item, you simply take theirs without replacement.",
       "moveStat": "DEX",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "swap_item",
+          "when": {
+            "type": "save_fail",
+            "ability": "DEX"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Taunt",
@@ -25980,12 +26009,26 @@
       "reaction": false,
       "categories": [
         "remove_item",
-        "remove_item_on_target"
+        "remove_item_on_target",
+        "swap_item"
       ],
       "description": "You move quickly to attempt to swap held items with a creature. Make a melee attack roll against a creature, swapping held items with them on a hit.",
       "moveStat": "WIS",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "swap_item",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Trick Room",

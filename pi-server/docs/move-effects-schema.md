@@ -1884,3 +1884,36 @@ behavior to before this pass, confirmed side by side against the same
 state), plus `evaluateEffect`/`buildStatusSpec` against the new `heal`
 `pool:"VP"` + `fractionOfDamage` combo and `drain_attacker_vp`'s `special`
 verdict.)*
+
+*(Update, 2026-10-01: `remove_item_on_target` built (`migrate_effects_v57.py`,
+all 3 moves) -- the last of the size-ordered `drain`-and-smaller categories.
+All three reuse the `item` field + `update-item` action built earlier for
+Covet/Thief (`steal_disrupt`), just with two shapes `steal_item`'s own
+handler doesn't cover:
+
+- **Knock Off** ("any held item of the target falls to the ground... for
+  the rest of battle") -- new `kind:"drop_item"`: nothing moves to the
+  attacker, the item is just gone. `_handleDropItem` clears the target's
+  own `item` field, no gate on the attacker's state (unlike `steal_item`,
+  Knock Off doesn't care whether the attacker already holds something).
+- **Switcheroo** (DEX save) / **Trick** (melee attack roll) -- new
+  `kind:"swap_item"`: a full two-way exchange of the WHOLE `item` string on
+  each side, not `steal_item`'s "only if empty-handed, take just their
+  first-listed item" shape (a straight swap has no one-item constraint to
+  honor). `_handleSwapItem` covers Switcheroo's own "if you do not have a
+  held item, you simply take theirs without replacement" for free --
+  swapping an empty string into the target IS "no replacement given", no
+  special-casing needed.
+
+No new infrastructure beyond the two small kinds -- both reuse the
+already-built `item` field/`update-item` action end to end. Verified with 5
+direct calls against `evaluateEffect` for both kinds (`drop_item`'s
+`on_hit` gating, `swap_item`'s `save_fail`/`on_hit` verdicts across both
+moves' own trigger shapes).
+
+This closes the size-ordered `drain`-and-smaller run entirely. What's left:
+leftover one-offs flagged as genuinely novel inside categories already
+visited (Echoed Voice/Round, Cactus Bloom, Stored Power, Throat Chop), the
+larger not-yet-touched categories (`field_terrain`/`field_weather`,
+`positioning`/`protect_negate`/`steal_disrupt` remainders), and the 32
+"unknown" moves needing manual review.)*

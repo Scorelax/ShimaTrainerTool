@@ -2421,6 +2421,67 @@ async function _handleStealItem({ attackerId, targetId, moveName }) {
   }).catch(() => {});
 }
 
+/** Knock Off's own "any held item of the target falls to the ground... for
+ * the rest of battle" -- unlike steal_item, nothing moves to the attacker
+ * at all, the item is just GONE. Same plain client-authoritative `item`
+ * field write as steal_item, just a clear instead of a move -- no gate on
+ * the attacker's own state either, since Knock Off doesn't care whether
+ * they're already holding something. A target with no item at all is a
+ * harmless no-op (shown, not silently swallowed), same tone as every other
+ * "nothing to do here" spot in this app. */
+async function _handleDropItem({ targetId, moveName }) {
+  const target = session?.participants?.[targetId];
+  if (!target) return;
+  if (!(target.item || '').trim()) {
+    showCombatAlert(`${target.name} isn't holding an item -- nothing for ${moveName} to knock off.`, { title: moveName });
+    return;
+  }
+  const dropped = target.item;
+  try {
+    await CombatAPI.updateItem(targetId, '');
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  CombatAPI.logEvent({
+    type: 'save', actorId: targetId, actorName: target.name,
+    text: `${target.name}'s ${dropped} is knocked to the ground by ${moveName}`,
+  }).catch(() => {});
+}
+
+/** Switcheroo/Trick's own "swap held items with a creature" -- a full
+ * two-way exchange of the whole `item` field on both sides, unlike
+ * steal_item's one-way "only if you're empty-handed, take just their
+ * first-listed item" shape. Deliberately swaps the ENTIRE string on each
+ * side (not just a first-listed item) since there's no "only one item
+ * moves" constraint here the way steal_item has -- a straight exchange.
+ * This also covers Switcheroo's own explicit "if you do not have a held
+ * item, you simply take theirs without replacement" for free: swapping an
+ * empty string INTO the target is exactly "no replacement given", no
+ * special-casing needed. */
+async function _handleSwapItem({ attackerId, targetId, moveName }) {
+  const attacker = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  if (!attacker || !target) return;
+  const attackerItem = attacker.item || '';
+  const targetItem = target.item || '';
+  if (!attackerItem.trim() && !targetItem.trim()) {
+    showCombatAlert(`Neither ${attacker.name} nor ${target.name} is holding an item -- nothing for ${moveName} to swap.`, { title: moveName });
+    return;
+  }
+  try {
+    await CombatAPI.updateItem(attackerId, targetItem);
+    await CombatAPI.updateItem(targetId, attackerItem);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  CombatAPI.logEvent({
+    type: 'save', actorId: attackerId, actorName: attacker.name, targetId, targetName: target.name,
+    text: `${attacker.name} and ${target.name} swap held items with ${moveName}`,
+  }).catch(() => {});
+}
+
 /** Ally Switch's own "switching places on the battlefield" -- reads both
  * tokens' CURRENT positions straight off the board and swaps them via two
  * `set-token-position` calls (routes_combat.py -- "DM/setup placement, NOT
@@ -2655,6 +2716,16 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // handler above), so pick.targetId here is the real target, same as
       // any other on-hit/save-gated effect.
       await _handleStealItem({ attackerId, targetId: pick.targetId, moveName });
+      continue;
+    }
+    if (effect.kind === 'drop_item') {
+      // Knock Off -- pick.targetId is the real target, same convention.
+      await _handleDropItem({ targetId: pick.targetId, moveName });
+      continue;
+    }
+    if (effect.kind === 'swap_item') {
+      // Switcheroo/Trick -- attackerId (closure) is the caster, pick.targetId the real target.
+      await _handleSwapItem({ attackerId, targetId: pick.targetId, moveName });
       continue;
     }
     if (effect.kind === 'teleport_swap') {

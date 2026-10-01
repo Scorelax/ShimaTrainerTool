@@ -321,6 +321,14 @@ def tag_for(e):
         # Grudge/Spite's own "force the attacker who hit you to save, then
         # drain its VP" -- see combat-wip.js's _handleDrainAttackerVp.
         base = 'drain_attacker_vp'
+    elif e['kind'] == 'drop_item':
+        # Knock Off's own "the item falls to the ground" -- see
+        # combat-wip.js's _handleDropItem.
+        base = 'drop_item'
+    elif e['kind'] == 'swap_item':
+        # Switcheroo/Trick's own "swap held items" -- see combat-wip.js's
+        # _handleSwapItem.
+        base = 'swap_item'
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

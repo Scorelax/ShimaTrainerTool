@@ -23,6 +23,7 @@ import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
 import { waitForDamagedReactions, waitForTargetedAoeReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
+import { pickOneStatus } from '../utils/status-picker.js';
 import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
@@ -2108,6 +2109,21 @@ function _targetDamageNotes(moveName) {
  *   'steal'      -- move only targetId's POSITIVE kind:'stat' statuses
  *     onto attackerId, removed from target (Spectral Thief's own "steal
  *     all positive stat changes").
+ *   'swap_value' -- Guard Swap/Speed Swap/Power Swap's own "switch
+ *     [AC/speed/an ability score] with the target" -- a DIFFERENT shape
+ *     from plain 'swap' above (which moves whole status ENTRIES): this
+ *     swaps the current EFFECTIVE VALUE of one named `field` via a
+ *     `set`-override on each side instead, see its own case below for why.
+ *   'transfer_condition' -- Psycho Shift's own "a status affecting [a
+ *     willing ally, or yourself] is transferred to the target instead",
+ *     shipped self-only (see its own case below for why "or a willing
+ *     ally" isn't supported). Moves ONE kind:'condition' status, chosen by
+ *     the human from the caster's own current list.
+ *   'dispel_one' -- Searing Flame's own "burns away one positive effect on
+ *     a hostile target, or one negative effect if used on an ally" --
+ *     removes ONE status (stat or condition), chosen by the human from the
+ *     target's own current list (this app has no hostile/ally concept to
+ *     filter by itself, see its own case below).
  * Recreated statuses keep their ORIGINAL sourceId/sourceName/moveName/dc
  * (so a copied Focus Energy still reads "from Focus Energy", not "from
  * Psych Up") -- only the delta itself moves, never its own history. A
@@ -2198,6 +2214,43 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
     } catch (err) {
       showCombatAlert(err.message, { title: 'Error' });
     }
+    return;
+  }
+  if (mode === 'transfer_condition') {
+    // Psycho Shift's own "a status affecting [a willing ally, or yourself]
+    // is transferred to the target instead" -- shipped as a documented
+    // simplification, self-only (never "or a willing ally"): this app has
+    // no mechanism to pick a THIRD participant (the ally) on top of the
+    // caster and the save-target, and the move's own text treats "yourself"
+    // as the plain, always-available case. Reuses `remove`/`recreate`
+    // exactly like every other stat_transfer mode -- the only new piece is
+    // asking WHICH of the caster's own conditions to move, via a dynamic
+    // list (status-picker.js), since there's no fixed vocabulary of
+    // condition names to draw a dropdown from the way a stat name has.
+    const selfConditions = (attacker.statuses || []).filter(s => s.kind === 'condition');
+    const chosen = await pickOneStatus(selfConditions, {
+      title: moveName, message: `Choose one of ${attacker.name}'s own conditions to transfer to ${target.name}.`,
+    });
+    if (!chosen) return;
+    await remove(attackerId, chosen, `transferred by ${moveName}`);
+    await recreate(chosen, targetId);
+    return;
+  }
+  if (mode === 'dispel_one') {
+    // Searing Flame's own "burns away one positive effect on a hostile
+    // target, or one negative effect if used on an ally" -- this app has no
+    // team/faction concept to tell hostile from ally itself (same
+    // documented gap `blocking_shield` already has), so the human picks
+    // from the target's WHOLE current list (stat buffs/debuffs and
+    // conditions both) and judges which one fits their own use, rather than
+    // the app silently filtering to only "positive" ones and guessing wrong
+    // for an ally-cast use.
+    const candidates = (target.statuses || []).filter(s => s.kind === 'stat' || s.kind === 'condition');
+    const chosen = await pickOneStatus(candidates, {
+      title: moveName, message: `Choose one effect on ${target.name} to burn away (a positive one if hostile, a negative one if an ally).`,
+    });
+    if (!chosen) return;
+    await remove(targetId, chosen, `burned away by ${moveName}`);
   }
 }
 

@@ -1278,3 +1278,38 @@ First batch (`migrate_effects_v44.py`):
   against the swap-direction logic (each side receives the OTHER's value,
   a null field reports cleanly, missing stat data on either side reports
   cleanly rather than sending a bad number).)*
+
+*(Update, same day: Psycho Shift and Searing Flame built
+(`migrate_effects_v45.py`) -- `steal_disrupt`'s own "choose which status"
+pair, the category's version of the "player picks which stat" gap the
+numeric swaps above just closed. Both need the human to pick ONE status
+from a participant's CURRENT list -- a dynamic set with no fixed vocabulary
+(unlike a stat name or a Pokémon type) -- so a new small popup,
+`pickOneStatus` (`js/utils/status-picker.js`), lists whatever's actually
+live right now as clickable options instead of a dropdown of pre-known
+choices.
+
+Two new `stat_transfer` modes, both reusing `_handleStatTransfer`'s
+existing `remove`/`recreate` helpers -- the only new piece either needs is
+the picker call:
+
+- **Psycho Shift** (`mode: "transfer_condition"`) -- "a status affecting
+  [a willing ally, or yourself] is transferred to the target instead",
+  shipped SELF-ONLY as a documented simplification: this app has no
+  mechanism to pick a THIRD participant (the ally) on top of the caster and
+  the save-target, and the move's own text already treats "yourself" as the
+  always-available case. Moves one `kind:'condition'` status from the
+  caster to the target.
+- **Searing Flame** (`mode: "dispel_one"`) -- "burns away one positive
+  effect on a hostile target, or one negative effect if used on an ally".
+  This app has no team/faction concept to tell hostile from ally itself
+  (the same documented gap `blocking_shield` already has for Mist/
+  Safeguard), so rather than guess, the picker shows the target's WHOLE
+  current list (stat AND condition statuses both) and trusts the human to
+  pick the one that fits their own hostile-or-ally use.
+
+Verified with 5 direct calls against the candidate-filtering logic
+(`transfer_condition` includes only condition-kind statuses, `dispel_one`
+includes both stat and condition kinds but excludes `temp_hp`, both report
+an empty list cleanly rather than erroring on a participant with no
+statuses at all).)*

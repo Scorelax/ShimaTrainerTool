@@ -1738,3 +1738,81 @@ closes). Would need either a new top-level session field (parallel to
 or a stored per-participant status every potential user has to carry and
 check -- real new infrastructure, not a small increment on
 `_lastHitMoveStreak`.)*
+
+*(Update, 2026-10-01: `attack_suppression` built (`migrate_effects_v55.py`,
+5 of 6 moves). The category's own real blocker was server-side, not
+client-side: nothing anywhere checked whether a move was currently USABLE
+before `_apply_move` ran it. Fixed with two new `conditions.py` lookups,
+`disabled_moves(participant)` (every move NAME currently forbidden, off
+every `apply:"move_disabled"` status) and `move_lock(participant)` (the ONE
+move name still allowed, off `apply:"move_locked_to"`), both checked in
+`_apply_move` right after the existing incapacitation check. With that in
+place, every move but one turned out buildable:
+
+- **Disable** ("choose one of the opponent's known moves... this move is
+  now disabled") needed a genuine human CHOICE -- new `kind:"disable_move"`,
+  `_handleDisableMove` (combat-wip.js), opening a new `pickOneMoveName`
+  popup over the target's own `.moves` array. `status-picker.js`'s own
+  `pickOneStatus` was generalized into a shared `_pickFrom` core this pass
+  so it can list either live statuses (its original job) or plain move-name
+  strings -- the only difference between the two is how an item renders,
+  not the picking mechanics themselves.
+- **Imprison** ("unable to use any Move it knows that is the same as
+  yours") needed no picker at all -- the overlap between the CASTER's own
+  `.moves` and the target's `.moves` is exact, already-known data on both
+  sides. New `kind:"disable_overlapping_moves"`,
+  `_handleDisableOverlappingMoves`: disables every name in that overlap as
+  its own separate `move_disabled` status sharing one duration
+  (`disabled_moves()` unions whatever's live, so N statuses works the same
+  as one).
+- **Oblivion Ink** ("the last move used by the creature is disabled") is
+  also fully computable -- a new `_lastMoveUsedBy` log-scan helper (same
+  backward-walk convention as `_didLastAttackMiss`) reads the target's own
+  most recent `'move-used'` entry. New `kind:"disable_last_used_move"`,
+  `_handleDisableLastUsedMove`.
+- **Encore** / **Torment** (both reactions: "force [whoever just
+  targeted/hit you] to make a WIS save... on a fail, [it] can only use /
+  cannot use the move that targeted/hit you") share the one real structural
+  gap in this category: both moves' own effect targets the ORIGINAL
+  ATTACKER, a third party relative to the reactor casting them -- something
+  `_handleEffectsOnly`'s normal `pickMultipleTargets` (a free pick of ANY
+  participant) has no way to resolve automatically. Fixed with two pieces:
+  1. `_handleEffectsOnly` now checks for a live `session.pendingReaction`
+     anchored on the reactor themselves before falling back to
+     `pickMultipleTargets` -- when one's open (which it still is: the
+     reactor only reaches their own move-use while holding the floor for
+     the SAME window, the same precedent `_handleStealBuff` already
+     established for `steal_disrupt`'s reaction moves), its own
+     `attackerId` becomes the one and only target automatically. This
+     reuses the EXISTING `save_fail` + `confirmSecondarySave` machinery for
+     free -- the save prompt just runs against the auto-resolved attacker
+     like any other real target.
+  2. The move NAME to lock/disable isn't knowable at authoring time either
+     (it's "whichever move just hit the reactor", not fixed) -- a new
+     `value: {fromPendingReactionMove: true}` sentinel, resolved in
+     `_offerMoveEffects`'s own picks loop (same "mutate a clone, fall
+     through to the normal path" shape `_resolveSetValue`'s own caller
+     already uses for Guard Split's `avgWithTarget`) by reading
+     `session.pendingReaction.moveName`. From there it's a plain
+     `kind:"condition"` effect needing no new kind at all -- Encore applies
+     `move_locked_to`, Torment applies `move_disabled`. Both use
+     `ends:{type:"until_turn", whose:"holder", point:"start", count:1}`
+     ("for its next turn") -- already-implemented vocabulary, just never
+     previously exercised by anything in this category.
+
+**Throat Chop** ("unable to activate sound-based attacks") stays
+unmigrated: there's no sound-based move TAG anywhere in this dataset
+(confirmed -- no `soundBased`/`sound_based` key on any move), so there's no
+way to even evaluate the restriction, let alone enforce it. Advisory-only,
+same as every other "the data just doesn't carry this distinction yet" gap
+in this schema (team/faction, wall/collision, ...).
+
+Verified with 7 direct calls -- 3 against `disabled_moves`/`move_lock`'s own
+reading logic (a disabled-move set, a lock value, an empty-statuses
+participant reporting cleanly), and 4 against `evaluateEffect`/
+`buildStatusSpec` for the three new kinds plus the `fromPendingReactionMove`
+sentinel shape (`disable_move`'s `needs_save`/`yes`/`no` verdicts,
+`disable_last_used_move`'s `on_hit` gating, `buildStatusSpec` passing the
+unresolved sentinel through untouched since the resolution itself happens
+one level up in `_offerMoveEffects`, before `buildStatusSpec` is ever
+called on the mutated clone).)*

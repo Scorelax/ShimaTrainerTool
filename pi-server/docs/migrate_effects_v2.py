@@ -302,6 +302,21 @@ def tag_for(e):
         # first-use) shape as block_attack, just scaling the damage that
         # still lands instead of cancelling it.
         base = 'damage_multiplier'
+    elif e['kind'] == 'disable_move':
+        # Disable's own "choose one of the opponent's known moves... this
+        # move is now disabled" -- the human picks which, see
+        # combat-wip.js's _handleDisableMove.
+        base = 'disable_move'
+    elif e['kind'] == 'disable_overlapping_moves':
+        # Imprison's own "unable to use any Move it knows that is the same
+        # as yours" -- computed from both sides' own move lists, see
+        # combat-wip.js's _handleDisableOverlappingMoves.
+        base = 'disable_overlapping_moves'
+    elif e['kind'] == 'disable_last_used_move':
+        # Oblivion Ink's own "the last move used by the creature is
+        # disabled" -- read off the shared log, see combat-wip.js's
+        # _handleDisableLastUsedMove.
+        base = 'disable_last_used_move'
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

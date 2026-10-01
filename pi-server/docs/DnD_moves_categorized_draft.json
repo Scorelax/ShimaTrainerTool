@@ -3669,12 +3669,35 @@
       "categories": [
         "counter_reaction_effect",
         "trigger_saving_throw",
-        "attack_suppression"
+        "attack_suppression",
+        "potential_status_condition_move_disabled"
       ],
       "description": "You send a dark energy to torment a creature in range that attacks you. When hit by a melee or ranged attack, force the target to make a WIS saving throw against your Move DC. On a failure, the target cannot use the same move that hit you on its next turn.",
       "moveStat": "DEX/WIS",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "move_disabled",
+          "value": {
+            "fromPendingReactionMove": true
+          },
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start",
+              "count": 1
+            }
+          ],
+          "note": "Targets whoever just hit the reactor (session.pendingReaction); disables that same move."
+        }
+      ]
     },
     {
       "name": "Twilight Rush",
@@ -17273,12 +17296,32 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "attack_suppression"
+        "attack_suppression",
+        "potential_disable_move"
       ],
       "description": "You attempt to disable a Pokémon, hindering its abilities. Choose a target in range. The target must succeed on a WIS saving throw against your Move DC. On a fail, choose one of the opponent's known moves, that you know it knows. This move is now disabled.",
       "moveStat": "CHA/WIS",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "disable_move",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "Human picks which of the target's known moves gets disabled (pickOneMoveName)."
+        }
+      ]
     },
     {
       "name": "Dizzy Punch",
@@ -17530,12 +17573,35 @@
       "categories": [
         "counter_reaction_effect",
         "trigger_saving_throw",
-        "attack_suppression"
+        "attack_suppression",
+        "potential_status_condition_move_locked_to"
       ],
       "description": "After being targeted by a move, force a creature to make a WIS save against your Move DC as a reaction. On a fail, the target can only use the move that targeted you for its next turn.",
       "moveStat": "WIS/CHA",
       "vpCost": "3",
-      "scaling": "The number of turns the creature must use the move increases to 2 turns at level 10 and 3 turns at\nlevel 17."
+      "scaling": "The number of turns the creature must use the move increases to 2 turns at level 10 and 3 turns at\nlevel 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "move_locked_to",
+          "value": {
+            "fromPendingReactionMove": true
+          },
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start",
+              "count": 1
+            }
+          ],
+          "note": "Targets whoever just targeted the reactor (session.pendingReaction); locks them to that same move."
+        }
+      ]
     },
     {
       "name": "Endeavor",
@@ -24297,12 +24363,32 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "attack_suppression"
+        "attack_suppression",
+        "potential_disable_overlapping_moves"
       ],
       "description": "You create psychic walls within the mind of a target in range. Force the target to make a WIS saving throw against your Move DC. On a failure, the target is unable to use any Move it knows that is the same as yours for the duration.",
       "moveStat": "WIS/INT",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "disable_overlapping_moves",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "Disables every move name the target shares with the caster -- computed, no picker needed."
+        }
+      ]
     },
     {
       "name": "Instruct",
@@ -28118,12 +28204,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "attack_suppression"
+        "attack_suppression",
+        "disable_last_used_move"
       ],
       "description": "A strange ink emanates from your body, and descends on a creature in range, making them forgetful. Make a ranged attack, dealing 3d10 + MOVE water damage on a hit. For 1d6 turns, the last move used by the creature is disabled.",
       "moveStat": "None",
       "vpCost": "18",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17"
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17",
+      "effects": [
+        {
+          "kind": "disable_last_used_move",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "dice": "1d6"
+            }
+          ],
+          "note": "Disables the target's own most recent move-used log entry."
+        }
+      ]
     },
     {
       "name": "Octazooka",

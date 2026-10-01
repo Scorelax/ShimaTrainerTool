@@ -52,22 +52,25 @@ function _close(result) {
   if (_resolve) { _resolve(result); _resolve = null; }
 }
 
-/**
- * Shows every status in `statuses` (already pre-filtered by the caller --
- * see Psycho Shift/Searing Flame's own handlers for the "which kind
- * qualifies" logic) as a clickable option, and resolves to whichever one the
+/** Shared core: shows `items` as clickable options, each rendered by
+ * `renderItem(item) -> {name, sub}`, and resolves to whichever one the
  * human picks, or null if cancelled/closed/nothing was eligible to begin
- * with (shown as a plain message, not an empty clickable list).
- */
-export async function pickOneStatus(statuses, { title = 'Choose one', message = '' } = {}) {
+ * with (shown as a plain message, not an empty clickable list). Both
+ * `pickOneStatus` and `pickOneMoveName` are thin wrappers around this --
+ * the only difference between them is what an "item" looks like and how
+ * it's labeled. */
+async function _pickFrom(items, renderItem, { title = 'Choose one', message = '' } = {}) {
   _ensureDom();
-  const body = !statuses.length
+  const body = !items.length
     ? '<div class="status-picker-empty">Nothing eligible right now.</div>'
-    : statuses.map((s, i) => `
+    : items.map((item, i) => {
+      const { name, sub } = renderItem(item);
+      return `
       <button class="status-picker-option" data-idx="${i}">
-        <div class="status-picker-name">${esc(statusLabel(s))}</div>
-        <div class="status-picker-sub">${esc(describeEnds(s.ends))}${s.sourceName ? ` · from ${esc(s.sourceName)}` : ''}</div>
-      </button>`).join('');
+        <div class="status-picker-name">${esc(name)}</div>
+        ${sub ? `<div class="status-picker-sub">${esc(sub)}</div>` : ''}
+      </button>`;
+    }).join('');
   _overlay.innerHTML = `
     <div class="status-picker-box">
       <div class="status-picker-title">${esc(title)}</div>
@@ -76,9 +79,36 @@ export async function pickOneStatus(statuses, { title = 'Choose one', message = 
       <button class="status-picker-cancel" id="statusPickerCancel">Cancel</button>
     </div>`;
   _overlay.querySelectorAll('[data-idx]').forEach((btn) => {
-    btn.addEventListener('click', () => _close(statuses[Number(btn.dataset.idx)]));
+    btn.addEventListener('click', () => _close(items[Number(btn.dataset.idx)]));
   });
   document.getElementById('statusPickerCancel').addEventListener('click', () => _close(null));
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });
+}
+
+/**
+ * Shows every status in `statuses` (already pre-filtered by the caller --
+ * see Psycho Shift/Searing Flame's own handlers for the "which kind
+ * qualifies" logic) as a clickable option, and resolves to whichever one the
+ * human picks, or null if cancelled/closed/nothing was eligible to begin
+ * with (shown as a plain message, not an empty clickable list).
+ */
+export async function pickOneStatus(statuses, options = {}) {
+  return _pickFrom(statuses, (s) => ({
+    name: statusLabel(s),
+    sub: `${describeEnds(s.ends)}${s.sourceName ? ` · from ${s.sourceName}` : ''}`,
+  }), options);
+}
+
+/**
+ * Shows every move name in `moveNames` as a clickable option, and resolves
+ * to whichever one the human picks (a plain string), or null if cancelled/
+ * closed/nothing was eligible. Disable's own "choose one of the opponent's
+ * known moves" and Imprison/Oblivion Ink's own overlap/last-used lookups all
+ * need to show a move NAME list -- a different shape from pickOneStatus's
+ * own live-status list (no fixed vocabulary either way, just a different
+ * kind of "currently true about this participant" data to choose from).
+ */
+export async function pickOneMoveName(moveNames, options = {}) {
+  return _pickFrom(moveNames, (name) => ({ name }), options);
 }

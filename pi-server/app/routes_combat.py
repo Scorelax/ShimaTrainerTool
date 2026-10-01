@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries
+from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1724,6 +1724,16 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
     incap = _incapacitating_status(attacker)
     if incap:
         raise ValueError(f"{attacker['name']} is {incap['apply']} and can't act")
+    # Disable/Imprison/Oblivion Ink/Torment's own "this move can't be used"
+    # and Encore's own "can ONLY use this move" -- the one real enforcement
+    # point this whole family needed (conditions.py's own disabled_moves/
+    # move_lock), since nothing here previously tracked per-move usability
+    # at all.
+    if move_name in disabled_moves(attacker):
+        raise ValueError(f"{attacker['name']}'s {move_name} is currently disabled")
+    lock = move_lock(attacker)
+    if lock and move_name != lock:
+        raise ValueError(f"{attacker['name']} can only use {lock} right now")
     state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
 
     # VP floors at 0; overflow drains the user's own HP with NO floor --

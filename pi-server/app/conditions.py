@@ -244,3 +244,36 @@ def granted_speed_entries(participant):
         if isinstance(ft, (int, float)) and ft:
             out.append({'type': 'flying', 'ft': ft})
     return out
+
+
+def disabled_moves(participant):
+    """Disable/Oblivion Ink/Torment's own "this one move can't be used" --
+    the set of move names a participant currently can't use, read off every
+    `apply:"move_disabled"` condition they hold (`value` = the move name).
+    More than one can be active at once -- Imprison's own "any move you know
+    that matches mine" disables potentially SEVERAL moves at a time, modeled
+    as one status per overlapping move (combat-wip.js's own
+    _handleDisableOverlappingMoves) rather than a list-valued single status,
+    same atomic-per-effect shape every other condition here already uses. Checked by
+    _apply_move before a move is allowed to be used at all -- the one real
+    enforcement point this whole family needed, since nothing anywhere in
+    the shared combat system previously tracked "can this participant use
+    THIS move right now" (use-move's own module docstring is explicit that
+    per-move rules like this stayed client-only/legacy-engine territory
+    before now)."""
+    return {s['value'] for s in (participant or {}).get('statuses', [])
+            if s.get('kind') == 'condition' and s.get('apply') == 'move_disabled' and s.get('value')}
+
+
+def move_lock(participant):
+    """Encore's own "can ONLY use the move that targeted you" -- the one
+    move name still allowed, or None if nothing locks the participant down
+    this way. Unlike disabled_moves (a blacklist, any number active), this
+    is a whitelist of exactly one -- only one `move_locked_to` condition
+    should ever be active on a participant at a time in practice (nothing
+    stops authoring two, but Encore is the only move that grants this, so
+    there's nothing to combine); the first one found wins."""
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') == 'condition' and s.get('apply') == 'move_locked_to' and s.get('value'):
+            return s['value']
+    return None

@@ -23,7 +23,7 @@ import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
 import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficialReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
-import { pickOneStatus } from '../utils/status-picker.js';
+import { pickOneStatus, pickOneMoveName } from '../utils/status-picker.js';
 import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
@@ -858,6 +858,23 @@ function _didLastAttackMiss(session, pid) {
     if (e.type === 'damage') return false;
   }
   return false;
+}
+
+/** The last move `pid` actually used, read straight off the shared log --
+ * Oblivion Ink's own "the last move used by the creature is disabled" (a
+ * one-time lookup at apply time, not a bridged WIP field, since nothing
+ * needs to keep watching it the way _movesUsedThisRound/_didLastAttackMiss
+ * do). Only 'move-used' entries carry a move name (routes_combat.py's
+ * _apply_move logs one on every confirmed move use, hit or miss alike), so
+ * this walks the log backward for pid's own most recent one. null if pid
+ * hasn't used a move yet this encounter. */
+function _lastMoveUsedBy(session, pid) {
+  const log = session.log || [];
+  for (let i = log.length - 1; i >= 0; i--) {
+    const e = log[i];
+    if (e.type === 'move-used' && e.actorId === pid && e.move) return e.move;
+  }
+  return null;
 }
 
 function _syncLocalCombatState(session) {
@@ -2440,6 +2457,89 @@ async function _handleTeleportSwap({ casterId, targetId, moveName }) {
   }).catch(() => {});
 }
 
+/** Disable's own "choose one of the opponent's known moves, that you know
+ * it knows -- this move is now disabled": the human picks ONE move name off
+ * the target's own `.moves` list (status-picker.js's `pickOneMoveName`,
+ * same dynamic-list-picker shape Psycho Shift/Searing Flame's
+ * `pickOneStatus` already uses for a participant's live STATUSES -- here
+ * it's a participant's known MOVE NAMES instead, a different dynamic list
+ * with no fixed vocabulary either way). Applies a plain `move_disabled`
+ * condition carrying the chosen name as `value` -- `disabled_moves()`
+ * (conditions.py) already reads any status shaped this way, Disable just
+ * needed a way to pick WHICH name. */
+async function _handleDisableMove({ targetId, moveName, ends, sourceId, sourceName, dc }) {
+  const target = session?.participants?.[targetId];
+  if (!target) return;
+  const moves = target.moves || [];
+  if (!moves.length) {
+    showCombatAlert(`${target.name} has no known moves to disable.`, { title: moveName });
+    return;
+  }
+  const chosen = await pickOneMoveName(moves, {
+    title: `${moveName} — choose a move to disable`,
+    message: `Pick one of ${target.name}'s known moves.`,
+  });
+  if (!chosen) return;
+  try {
+    await CombatAPI.applyStatus(targetId, { kind: 'condition', apply: 'move_disabled', value: chosen, sourceId, sourceName, moveName, dc, ends });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+/** Imprison's own "unable to use any Move it knows that is the same as
+ * yours, for the duration" -- fully computable with no human picker at all
+ * (unlike Disable, which needs a free choice): disables EVERY move name in
+ * the overlap of the caster's own `.moves` and the target's `.moves`, each
+ * as its own separate `move_disabled` status sharing the same duration --
+ * `disabled_moves()` just unions whatever's live, so N statuses works the
+ * same as one. */
+async function _handleDisableOverlappingMoves({ attackerId, targetId, moveName, ends, dc }) {
+  const attacker = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  if (!attacker || !target) return;
+  const mine = new Set(attacker.moves || []);
+  const overlap = (target.moves || []).filter((m) => mine.has(m));
+  if (!overlap.length) {
+    showCombatAlert(`${target.name} doesn't know any of the same moves as ${attacker.name} -- nothing for ${moveName} to disable.`, { title: moveName });
+    return;
+  }
+  for (const m of overlap) {
+    try {
+      await CombatAPI.applyStatus(targetId, { kind: 'condition', apply: 'move_disabled', value: m, sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+      return;
+    }
+  }
+  CombatAPI.logEvent({
+    type: 'save', actorId: attackerId, actorName: attacker.name, targetId, targetName: target.name,
+    text: `${attacker.name} used ${moveName} -- disabled ${target.name}'s shared move${overlap.length === 1 ? '' : 's'}: ${overlap.join(', ')}`,
+  }).catch(() => {});
+}
+
+/** Oblivion Ink's own "the last move used by the creature is disabled" --
+ * reads the target's own most recent 'move-used' log entry (`_lastMoveUsedBy`)
+ * rather than offering a picker, since the move's own text leaves no choice
+ * to make. No log entry found (target hasn't acted yet this encounter) just
+ * tells the table to apply it by hand, same fallback tone as every other
+ * "can't auto-detect" spot in this app. */
+async function _handleDisableLastUsedMove({ attackerId, targetId, moveName, ends, dc }) {
+  const attacker = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  if (!attacker || !target) return;
+  const lastMove = _lastMoveUsedBy(session, targetId);
+  if (!lastMove) {
+    showCombatAlert(`Couldn't find a move ${target.name} has used yet -- apply ${moveName}'s disable by hand.`, { title: moveName });
+    return;
+  }
+  try {
+    await CombatAPI.applyStatus(targetId, { kind: 'condition', apply: 'move_disabled', value: lastMove, sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
 async function _offerMoveEffects({ attackerId, targetId = null, moveName, computedData, ctx, includeSelf = true }) {
   const effects = moveEffectsFor(moveName);
   if (!effects.length) return;
@@ -2551,6 +2651,22 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleTeleportSwap({ casterId: attackerId, targetId: pick.targetId, moveName });
       continue;
     }
+    if (effect.kind === 'disable_move') {
+      // Disable -- pick.targetId is the real target (this effect has no
+      // target:'self', same convention as steal_item above).
+      await _handleDisableMove({ targetId: pick.targetId, moveName, ends: pick.ends, sourceId: attackerId, sourceName: attacker?.name, dc });
+      continue;
+    }
+    if (effect.kind === 'disable_overlapping_moves') {
+      // Imprison -- attackerId (closure) is the caster, pick.targetId the real target.
+      await _handleDisableOverlappingMoves({ attackerId, targetId: pick.targetId, moveName, ends: pick.ends, dc });
+      continue;
+    }
+    if (effect.kind === 'disable_last_used_move') {
+      // Oblivion Ink -- attackerId (closure) is the caster, pick.targetId the real target.
+      await _handleDisableLastUsedMove({ attackerId, targetId: pick.targetId, moveName, ends: pick.ends, dc });
+      continue;
+    }
     if (effect.kind === 'clear_field') {
       // Defog's own "sweeps away ... any area of effect moves still active"
       // -- this app models weather/terrain as a single freeform {name,
@@ -2657,6 +2773,23 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         showCombatAlert(err.message, { title: 'Error' });
       }
       continue;
+    }
+    if (effect.value && typeof effect.value === 'object' && effect.value.fromPendingReactionMove) {
+      // Encore/Torment's own "the move that targeted/hit you" -- the move
+      // NAME isn't knowable at authoring time, only at apply time, off the
+      // SAME live reaction window that let the reactor act in the first
+      // place (session.pendingReaction's own moveName -- see
+      // _handleEffectsOnly's own pendingReaction-anchored auto-targeting,
+      // which is what made pick.targetId the original attacker to begin
+      // with). Resolved here, same "mutate a clone, fall through to the
+      // normal apply-status path" shape _resolveSetValue's own caller
+      // already uses for Guard Split's avgWithTarget.
+      const moveFromWindow = session?.pendingReaction?.moveName;
+      if (!moveFromWindow) {
+        showCombatAlert(`Couldn't find which move targeted you -- apply ${moveName} by hand.`, { title: moveName });
+        continue;
+      }
+      effect = { ...effect, value: moveFromWindow };
     }
     if (effect.set !== undefined && typeof effect.set === 'object') {
       const resolved = _resolveSetValue(effect.set, attacker, target);
@@ -3171,7 +3304,17 @@ async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
   if (reaction?.blocked) return;
   await _offerMoveEffects({ attackerId: combatantId, moveName, computedData, ctx });
   if (!moveEffectsFor(moveName).some(e => e.target !== 'self')) return;
-  const targetIds = await pickMultipleTargets(combatantId);
+  // Encore/Torment's own "force the creature that just targeted/hit you" --
+  // a reaction move's non-self effect has no free target to pick when it's
+  // still riding the SAME window that let the reactor act in the first
+  // place (session.pendingReaction's own attackerId IS the only sensible
+  // "a creature" these moves ever mean) -- pickMultipleTargets's free
+  // choice is for every OTHER non-self effects-only move, which never has
+  // a live window anchored on this combatant to read instead.
+  const pr = session?.pendingReaction;
+  const targetIds = (pr && pr.anchorId === combatantId && pr.attackerId)
+    ? [pr.attackerId]
+    : await pickMultipleTargets(combatantId);
   if (!targetIds || !targetIds.length) return;
   for (const targetId of targetIds) {
     await _offerMoveEffects({ attackerId: combatantId, targetId, moveName, computedData, ctx, includeSelf: false });

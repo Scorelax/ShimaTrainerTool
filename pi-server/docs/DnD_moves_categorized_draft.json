@@ -3697,7 +3697,9 @@
           ],
           "note": "Targets whoever just hit the reactor (session.pendingReaction); disables that same move."
         }
-      ]
+      ],
+      "reactionTrigger": "damaged",
+      "reactionRange": 30
     },
     {
       "name": "Twilight Rush",
@@ -4567,12 +4569,32 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "drain"
+        "drain",
+        "self_heal"
       ],
       "description": "You create a field of static energy in a 15 foot radius around you, draining the vitality from nearby creatures. Force all creatures in range to attempt a CON save, losing 2d8 VP on a failure and half of that on a success. Regain half of the total amount of VP drained.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5,
+            "pool": "VP"
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Same AoE-drain-back shape as Parabolic Charge/Tera Drain, just VP instead of HP."
+        }
+      ]
     },
     {
       "name": "Ether Bolt",
@@ -11259,12 +11281,33 @@
       "categories": [
         "trigger_saving_throw",
         "damage_vp",
-        "drain"
+        "drain",
+        "self_potential_heal"
       ],
       "description": "You fire a draining ray. The targeted creature must succeed a Constitution saving throw, taking 2d8 MOVE + Ghost damage on a failed save, or half as much damage on a successful one. The damage from this move affects VP. The user regains half of the damage dealt as VP.",
       "moveStat": "CON",
       "vpCost": "8",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5,
+            "pool": "VP"
+          },
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Same single-target drain-back shape as Soul Drain, just VP instead of HP."
+        }
+      ]
     },
     {
       "name": "Astonish",
@@ -11682,12 +11725,33 @@
         "counter_reaction_effect",
         "trigger_saving_throw",
         "damage_vp",
-        "drain"
+        "drain",
+        "potential_drain_attacker_vp"
       ],
       "description": "When you take damage from a move that reduces you to zero hit points, you may use your reaction to force the attacker to make a WIS saving throw against your Move DC. On a failure, the creature loses 3d10 VP. On the first instance of this happening in one encounter, you regain the VP drained as HP. On subsequent instances of this move being used in the same combat encounter, you must succeed a DC15 on a d20 roll for the healing to take effect.",
       "moveStat": "WIS/CHA",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "drain_attacker_vp",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "dice": "3d10",
+          "healPool": "HP",
+          "healFraction": 1.0,
+          "requireZeroHp": true,
+          "note": "Only if this hit reduced you to 0 HP, and only after confirming the attacker's WIS save actually fails. Subsequent uses this encounter need a manual DC15 d20 roll for the healing to land."
+        }
+      ],
+      "reactionTrigger": "damaged",
+      "reactionRange": 50
     },
     {
       "name": "Hex",
@@ -12428,12 +12492,32 @@
         "counter_reaction_effect",
         "trigger_saving_throw",
         "damage_vp",
-        "drain"
+        "drain",
+        "potential_drain_attacker_vp"
       ],
       "description": "When hit by a targeted attack, you can spend a reaction to attempt to drain the attacker’s VP, if they are in range. Force the attacker to make a WIS save against your Move DC. On a fail, the target loses the amount of VP it spent on the move, and you gain an equal amount.",
       "moveStat": "INT/WIS",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "drain_attacker_vp",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "vpCostFromLog": true,
+          "healPool": "VP",
+          "healFraction": 1.0,
+          "note": "Drains exactly what the attacker's own move cost in VP, read off the shared log -- only after confirming its WIS save actually fails."
+        }
+      ],
+      "reactionTrigger": "damaged",
+      "reactionRange": 30
     },
     {
       "name": "Trick-or-Treat",
@@ -17601,7 +17685,9 @@
           ],
           "note": "Targets whoever just targeted the reactor (session.pendingReaction); locks them to that same move."
         }
-      ]
+      ],
+      "reactionTrigger": "targeted",
+      "reactionRange": 100
     },
     {
       "name": "Endeavor",

@@ -317,6 +317,10 @@ def tag_for(e):
         # disabled" -- read off the shared log, see combat-wip.js's
         # _handleDisableLastUsedMove.
         base = 'disable_last_used_move'
+    elif e['kind'] == 'drain_attacker_vp':
+        # Grudge/Spite's own "force the attacker who hit you to save, then
+        # drain its VP" -- see combat-wip.js's _handleDrainAttackerVp.
+        base = 'drain_attacker_vp'
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

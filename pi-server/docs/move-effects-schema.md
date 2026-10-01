@@ -1816,3 +1816,71 @@ sentinel shape (`disable_move`'s `needs_save`/`yes`/`no` verdicts,
 unresolved sentinel through untouched since the resolution itself happens
 one level up in `_offerMoveEffects`, before `buildStatusSpec` is ever
 called on the mutated clone).)*
+
+*(Update, 2026-10-01: `drain` built (`migrate_effects_v56.py`, all 4
+moves) -- heals the user for a portion of damage dealt, same family
+Absorb/Drain Punch/Parabolic Charge/Soul Drain/Tera Drain already cover,
+except all four of these drain VP instead of HP.
+
+**Energize** / **Enervation Ray** needed NOTHING new in the `effects`
+vocabulary -- a plain `heal` effect with the EXISTING `pool:"VP"` field
+(built earlier for Recompose's flat-dice VP heal, never exercised by a
+`fractionOfDamage` amount before) does the drain-back half exactly like
+Parabolic Charge/Soul Drain/Tera Drain already do for HP. The real gap was
+upstream of `effects` entirely: `ctx.damageDealt` (what `fractionOfDamage`
+reads) was only ever populated from `CombatAPI.applyDamage`'s own result,
+which always wrote to `currentHP` -- neither move's own PRIMARY damage had
+anywhere to land on VP in the first place. Fixed at the one spot that
+actually does the writing, `routes_combat.py`'s `_apply_damage_to_target`,
+now taking a `pool` param: keeps the SAME type-effectiveness multiplier
+(both moves' own text still names a damage type), but skips the HP-
+specific shields nothing in this dataset gives VP an equivalent of (temp HP
+absorption, Mat Block/Testudo Formation's standing reduction) and writes to
+`currentVP` instead. Threaded through via the already-existing `damage_vp`
+hand category (untouched by any derived-tag rebuild, since no effect `kind`
+produces it) -- a new client-side `_applyPrimaryDamage` (combat-wip.js)
+wraps `CombatAPI.applyDamage` with this one tag check, dropped into the two
+EXISTING save-triggered damage call sites (`_handleSaveTriggered`,
+`_handleMultiHitAoe`'s own loop) so both moves -- and any future
+`damage_vp` move using either flow (Purgatory) -- get VP-pool support for
+free, no per-move special-casing.
+
+**Grudge** / **Spite** (both reactions) share Encore/Torment's own
+third-party-target shape from `attack_suppression`: the effect's "target"
+is the ORIGINAL ATTACKER, auto-resolved from the still-live
+`session.pendingReaction` (`_handleEffectsOnly`'s own pendingReaction-
+anchored auto-targeting, already built, needed no changes). New
+`kind:"drain_attacker_vp"`, `when:"special"` (Grudge's own extra "only if
+this reduced YOU to zero HP" gate has to run BEFORE any save is even
+offered, no `when` vocabulary covers that, so the whole flow is
+self-contained in `_handleDrainAttackerVp`, same shape as
+`_handlePreventFaint`/`_handleStealBuff`). Two amount sources: Grudge's own
+flat "3d10 VP" is genuinely un-rollable elsewhere (no digital dice anywhere
+in this app) -- a new `promptDrainRoll` (`heal-popup.js`, generalized this
+pass into a shared `_promptRoll` core alongside the existing
+`promptHealRoll`, just worded for a drain). Spite's own "whatever VP the
+attacking move actually cost" needs no roll at all -- that figure was
+already deducted and logged (`_apply_move`'s own `vpCost` on every
+'move-used' entry); a new `_vpCostOfMoveUsed` log-scan (same backward-walk
+convention as `_lastMoveUsedBy`) reads it straight off the log instead
+(`vpCostFromLog: true`). Grudge's own escalating "subsequent uses this
+encounter need a DC15 d20 roll for the healing to land" stays manual, same
+precedent as the whole Protect family's own escalating cost.
+
+**Bugfix, same pass**: Encore and Torment (`attack_suppression`,
+`migrate_effects_v55.py`) shipped with real `effects` but no top-level
+`reactionTrigger`/`reactionRange` fields -- `_eligible_reactors` gates
+purely on `m.get('reactionTrigger') == trigger`, so neither move could
+actually have opened as a reaction at all; the whole mechanism built for
+them was unreachable. Every earlier reaction-move pass (v46, v47) DID set
+this via a sibling `fields` key next to `effects` -- v55 simply never did,
+a plain oversight. Fixed via a fields-only patch (their `effects` are
+untouched).
+
+Verified with 4 direct calls: `_apply_damage_to_target`'s new `pool='vp'`
+branch (drains `currentVP`, leaves `currentHP` untouched, logs `pool:'vp'`
+and VP-worded text) and its unchanged `pool='hp'` default (identical
+behavior to before this pass, confirmed side by side against the same
+state), plus `evaluateEffect`/`buildStatusSpec` against the new `heal`
+`pool:"VP"` + `fractionOfDamage` combo and `drain_attacker_vp`'s `special`
+verdict.)*

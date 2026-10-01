@@ -946,10 +946,12 @@ export class CombatAPI {
    * REACTOR of a later 'damaged' reaction (Lucky Chant) has no other way to
    * know whether the hit that just landed on them was a crit, since that's
    * only ever computed on the ATTACKER's own device (combat-wip.js's
-   * _resolveOneHit). Returns {multiplier, damageApplied} alongside the
-   * usual {status, data}. */
-  static async applyDamage(id, targetId, diceRoll, moveType, species, moveName, crit = false) {
-    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName, crit }, { useCache: false });
+   * _resolveOneHit). `pool` ('hp', the default, or 'vp') -- Energize/
+   * Enervation Ray's own "damage_vp" category drains VP instead, see
+   * combat-wip.js's _applyPrimaryDamage. Returns {multiplier,
+   * damageApplied} alongside the usual {status, data}. */
+  static async applyDamage(id, targetId, diceRoll, moveType, species, moveName, crit = false, pool = 'hp') {
+    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName, crit, pool }, { useCache: false });
   }
 
   /** Electrify's own mechanism -- `id` is the REACTOR, retroactively

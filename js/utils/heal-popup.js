@@ -1,9 +1,13 @@
-// Dice-roll half of the `heal` effect kind (see move-effects-schema.md's own
-// section) -- for a move whose heal amount is rolled ("regain 2d6 + MOVE hit
-// points"), not derived from a drain's already-known damage figure (that half
-// needs no roll at all, see combat-wip.js's _handleApplyHeal). Same "the app
-// shows the structure, a human supplies the die roll" pattern as every other
-// roll in this app -- no digital dice here.
+// A "type in what you rolled" popup for a dice-based amount this app has no
+// digital dice to compute itself -- shared by the `heal` effect kind's own
+// {dice} amount shape (promptHealRoll, "regain 2d6 + MOVE hit points", see
+// move-effects-schema.md), not derived from a drain's already-known damage
+// figure (that half needs no roll at all, see combat-wip.js's
+// _handleApplyHeal), and by Grudge/Spite's own VP-drain roll (promptDrainRoll
+// -- their OWN loss amount isn't computed anywhere else either, same "no
+// digital dice" situation, just draining instead of healing). Both are thin
+// wrappers around the shared `_promptRoll` core below -- the only difference
+// between them is the popup's own title/verb/pool wording.
 function _injectStyles() {
   if (document.getElementById('heal-popup-styles')) return;
   const style = document.createElement('style');
@@ -31,6 +35,7 @@ function _injectStyles() {
 let _overlay = null;
 let _resolve = null;
 let _moveModBonus = 0;
+let _poolLabel = 'HP';
 
 function _ensureDom() {
   if (_overlay) return;
@@ -43,7 +48,7 @@ function _ensureDom() {
     <div class="combat-popup-content">
       <div class="combat-move-popup-header">
         <button id="healPopupClose" class="combat-popup-close">×</button>
-        <h2>Heal Roll</h2>
+        <h2 id="healPopupTitle">Heal Roll</h2>
       </div>
       <div class="combat-move-popup-body">
         <div class="heal-popup-desc" id="healPopupDesc"></div>
@@ -76,7 +81,7 @@ function _updateTotal() {
   const el = document.getElementById('healPopupTotal');
   const raw = _currentRoll();
   if (raw === null) { el.innerHTML = ''; return; }
-  el.innerHTML = `Total: <strong>${raw + _moveModBonus}</strong> HP`;
+  el.innerHTML = `Total: <strong>${raw + _moveModBonus}</strong> ${_poolLabel}`;
 }
 
 function _confirm() {
@@ -85,17 +90,12 @@ function _confirm() {
   _close(raw);
 }
 
-/**
- * Shows the roll input for a dice-based `heal` effect. `dice` is the formula
- * text ("2d6"), `moveModBonus` the already-computed MOVE-stat figure to add
- * on top (0 if the effect had no `moveMod`). Resolves to the TOTAL healed
- * (roll + moveModBonus, a plain number), or null if closed without entering
- * one.
- */
-export function promptHealRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?' } = {}) {
+function _promptRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', title = 'Heal Roll', verb = 'heals', pool = 'HP' } = {}) {
   _ensureDom();
   _moveModBonus = moveModBonus;
-  document.getElementById('healPopupDesc').textContent = `${moveName} heals ${targetName}.`;
+  _poolLabel = pool;
+  document.getElementById('healPopupTitle').textContent = title;
+  document.getElementById('healPopupDesc').textContent = `${moveName} ${verb} ${targetName}.`;
   document.getElementById('healPopupLabel').textContent =
     `Roll ${dice}${moveModBonus ? ` (+${moveModBonus} from MOVE added automatically)` : ''}`;
   const input = document.getElementById('healPopupInput');
@@ -106,4 +106,28 @@ export function promptHealRoll({ dice, moveModBonus = 0, targetName = '?', moveN
   return new Promise((resolve) => {
     _resolve = (raw) => resolve(raw === null ? null : raw + _moveModBonus);
   });
+}
+
+/**
+ * Shows the roll input for a dice-based `heal` effect. `dice` is the formula
+ * text ("2d6"), `moveModBonus` the already-computed MOVE-stat figure to add
+ * on top (0 if the effect had no `moveMod`). `pool` ('HP', the default, or
+ * 'VP') only changes the displayed unit -- the caller still applies the
+ * result to whichever field it means. Resolves to the TOTAL healed (roll +
+ * moveModBonus, a plain number), or null if closed without entering one.
+ */
+export function promptHealRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', pool = 'HP' } = {}) {
+  return _promptRoll({ dice, moveModBonus, targetName, moveName, pool, title: 'Heal Roll', verb: 'heals' });
+}
+
+/**
+ * Same shape as promptHealRoll, worded for a DRAIN instead -- Grudge/Spite's
+ * own "the target loses [dice] VP" has no automated damage figure to read
+ * (see combat-wip.js's _handleDrainAttackerVp), so the human enters it here
+ * exactly like any other un-rollable amount in this app. `pool` defaults to
+ * 'VP' (both moves drain VP), but is still a param since nothing about this
+ * popup is specific to that pool.
+ */
+export function promptDrainRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', pool = 'VP' } = {}) {
+  return _promptRoll({ dice, moveModBonus, targetName, moveName, pool, title: 'Damage Roll', verb: 'drains' });
 }

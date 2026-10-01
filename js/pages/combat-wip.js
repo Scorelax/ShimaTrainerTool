@@ -24,7 +24,7 @@ import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js'
 import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficialReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { pickOneStatus, pickOneMoveName } from '../utils/status-picker.js';
-import { promptHealRoll } from '../utils/heal-popup.js';
+import { promptHealRoll, promptDrainRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed } from '../utils/move-effects.js';
@@ -2638,6 +2638,18 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleStealBuff({ reactorId: attackerId, moveName });
       continue;
     }
+    if (effect.kind === 'drain_attacker_vp') {
+      // Grudge/Spite -- pick.targetId is the original attacker (resolved by
+      // _handleEffectsOnly's own pendingReaction-anchored auto-targeting,
+      // same as Encore/Torment). attackerId (closure) is the reactor
+      // themselves, using the move.
+      await _handleDrainAttackerVp({
+        reactorId: attackerId, originalAttackerId: pick.targetId, moveName, dc,
+        dice: effect.dice, vpCostFromLog: !!effect.vpCostFromLog,
+        healPool: effect.healPool, healFraction: effect.healFraction, requireZeroHp: !!effect.requireZeroHp,
+      });
+      continue;
+    }
     if (effect.kind === 'steal_item') {
       // Covet/Thief -- a normal attack-flow effect (unlike every other
       // handler above), so pick.targetId here is the real target, same as
@@ -3196,6 +3208,107 @@ async function _handleStealBuff({ reactorId, moveName }) {
   }
 }
 
+/** Spite's own "the target loses the amount of VP it SPENT ON THE MOVE" --
+ * unlike Grudge's own flat dice amount, this needs no roll at all: the
+ * exact figure was already deducted and logged when the attacker used
+ * that move (routes_combat.py's own _apply_move logs `vpCost` on every
+ * 'move-used' entry, see _applyPrimaryDamage's own docstring on this
+ * category's other already-logged numbers). Walks the log backward for
+ * `pid`'s own most recent 'move-used' entry matching `moveName` exactly
+ * (not just "their last move", in case something else interleaved) --
+ * same backward-walk convention as _lastMoveUsedBy. null if no matching
+ * entry is found (predates this session, or vpCost wasn't recorded for
+ * some other reason). */
+function _vpCostOfMoveUsed(pid, moveName) {
+  const log = session?.log || [];
+  for (let i = log.length - 1; i >= 0; i--) {
+    const e = log[i];
+    if (e.type === 'move-used' && e.actorId === pid && e.move === moveName) {
+      return Number.isFinite(e.vpCost) ? e.vpCost : null;
+    }
+  }
+  return null;
+}
+
+/** Grudge/Spite's own "force the attacker who just hit you to make a WIS
+ * save against your Move DC... on a fail, drain its VP, and you gain [some
+ * of] it back" -- `when:"special"` (not the usual auto-prompted save_fail
+ * flow) for the same reason _handleStealBuff is: Grudge's own extra "only
+ * if this hit reduced YOU to zero HP" gate has to be checked BEFORE any
+ * save is even offered, something _offerMoveEffects's generic flow has no
+ * vocabulary for -- a self-contained handler that does its own gate, save
+ * prompt, drain-amount lookup, and apply, same shape as every other
+ * `special` kind here. `originalAttackerId` is whoever _handleEffectsOnly's
+ * own pendingReaction-anchored auto-targeting resolved (see its own
+ * docstring) -- the creature that just targeted/hit the reactor, read off
+ * the SAME still-live window (the reactor only reaches their own move-use
+ * while holding the floor for it). `requireZeroHp` is Grudge's own extra
+ * gate (false for Spite, which has none); `healPool`/`healFraction` cover
+ * Grudge's own "regain it as HP" (1.0x, 'HP') vs Spite's "gain an equal
+ * amount" (1.0x, 'VP'). `dice` (Grudge's own flat "3d10 VP", a genuinely
+ * un-rollable-elsewhere amount -- promptDrainRoll, same "no digital dice"
+ * situation as any other roll in this app) and `vpCostFromLog` (Spite's
+ * own "whatever the attacking move actually cost", read off the shared log
+ * instead -- _vpCostOfMoveUsed) are mutually exclusive amount sources, only
+ * one set per move. Grudge's own "subsequent uses this encounter need a
+ * DC15 d20 roll for the healing to land" escalating cost is left manual,
+ * same precedent as the whole Protect family's own escalating cost. */
+async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName, dc, dice, vpCostFromLog, healPool, healFraction, requireZeroHp }) {
+  const reactor = session?.participants?.[reactorId];
+  const originalAttacker = session?.participants?.[originalAttackerId];
+  if (!reactor || !originalAttacker) return;
+  if (requireZeroHp && !(Number.isFinite(reactor.currentHP) && reactor.currentHP <= 0)) {
+    showCombatAlert(`${moveName} only triggers when that hit reduces you to 0 HP -- this one didn't.`, { title: moveName });
+    return;
+  }
+  const outcome = await confirmSecondarySave(originalAttacker, originalAttacker.name, {
+    dc, ability: 'WIS', title: 'Saving Throw', moveUser: reactor,
+  });
+  if (!outcome) return;
+  CombatAPI.logEvent({
+    type: 'save', actorId: reactorId, actorName: reactor.name, targetId: originalAttackerId, targetName: originalAttacker.name,
+    text: `${originalAttacker.name} ${outcome.passed ? 'succeeded' : 'failed'} the saving throw against ${reactor.name}'s ${moveName}${_saveRollNote(outcome)}`,
+  }).catch(() => {});
+  if (outcome.passed) return;
+
+  let drained;
+  if (vpCostFromLog) {
+    const attackingMoveName = session?.pendingReaction?.moveName;
+    drained = attackingMoveName ? _vpCostOfMoveUsed(originalAttackerId, attackingMoveName) : null;
+    if (!Number.isFinite(drained)) {
+      showCombatAlert(`Couldn't find how much VP ${originalAttacker.name}'s move cost -- apply ${moveName}'s drain by hand.`, { title: moveName });
+      return;
+    }
+  } else {
+    const rolled = await promptDrainRoll({ dice, targetName: originalAttacker.name, moveName });
+    if (rolled === null) return; // closed without entering one
+    drained = Math.max(0, rolled);
+  }
+  if (drained <= 0) return;
+  try {
+    await CombatAPI.updateStats(originalAttackerId, { currentVP: originalAttacker.currentVP - drained });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  const healAmount = Math.floor(drained * healFraction);
+  if (healAmount > 0) {
+    const healField = healPool === 'HP' ? 'currentHP' : 'currentVP';
+    const maxField = healPool === 'HP' ? 'maxHP' : 'maxVP';
+    const maxVal = Number.isFinite(reactor[maxField]) ? reactor[maxField] : Infinity;
+    const newVal = Math.min(maxVal, reactor[healField] + healAmount);
+    try {
+      await CombatAPI.updateStats(reactorId, { [healField]: newVal });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
+  CombatAPI.logEvent({
+    type: 'heal', actorId: reactorId, actorName: reactor.name, targetId: originalAttackerId, targetName: originalAttacker.name,
+    text: `${reactor.name}'s ${moveName} drains ${drained} VP from ${originalAttacker.name}${healAmount ? `, regaining ${healAmount} ${healPool}` : ''}`,
+  }).catch(() => {});
+}
+
 /** Applies ONE firing of a `heal` effect (see move-effects-schema.md's own
  * section): an immediate HP/VP change, never a status write itself -- called
  * straight from _offerMoveEffects's apply loop for a one-shot heal (that
@@ -3247,7 +3360,7 @@ async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterNa
     amount = Math.floor(effect.amount.levelMultiple * casterLevel);
     note = `${effect.amount.levelMultiple}x level (${casterLevel})`;
   } else if (effect.amount?.dice) {
-    const rolled = await promptHealRoll({ dice: effect.amount.dice, moveModBonus, targetName: target.name, moveName });
+    const rolled = await promptHealRoll({ dice: effect.amount.dice, moveModBonus, targetName: target.name, moveName, pool });
     if (rolled === null) return; // closed without entering one
     amount = rolled;
     note = `${effect.amount.dice}${moveModBonus ? ` + ${moveModBonus}` : ''}`;
@@ -3445,6 +3558,20 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   return targetId;
 }
 
+/** Energize/Enervation Ray's own `damage_vp` tag ("this move's damage
+ * drains VP, not HP") -- a thin wrapper around CombatAPI.applyDamage that
+ * reads the tag and threads the right pool through, so every EXISTING
+ * save-triggered damage call site (_handleSaveTriggered's single target,
+ * _handleMultiHitAoe's own loop) gets VP-pool support for free instead of
+ * needing its own branch. The tag survives migration untouched (nothing in
+ * `tag_for` derives it from any effect kind, so rebuild_categories never
+ * retires it) -- already-reliable, already-present data, not something
+ * this pass had to add. */
+async function _applyPrimaryDamage(casterId, targetId, diceRoll, moveType, speciesName, moveName, crit = false) {
+  const pool = moveCategoriesFor(moveName).includes('damage_vp') ? 'vp' : 'hp';
+  return CombatAPI.applyDamage(casterId, targetId, diceRoll, moveType, speciesName, moveName, crit, pool);
+}
+
 /** Wired into combat.js's move-popup flow as onMultiHitAoe -- for moves
  * tagged multi_hit_aoe (Judgment, Meteor Swarm, etc.), where one move-use
  * hits every creature caught in an area at once. This app has no
@@ -3527,7 +3654,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
           // damageMultiplier: see this function's own Wide Guard note above.
           const rawTotal = outcome.rawRoll + damageModifier;
           const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
-          const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName);
+          const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName);
           if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
           await waitForDamagedReactions(targetId, combatantId, moveName);
           if (outcome.passed) {
@@ -3723,7 +3850,7 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   let damageDealt;
   try {
     // No "N damage applied" popup -- see _resolveOneHit's own note on why.
-    const dmgResult = await CombatAPI.applyDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
+    const dmgResult = await _applyPrimaryDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
     damageDealt = dmgResult?.damageApplied;
     await waitForDamagedReactions(picked.targetId, combatantId, moveName);
   } catch (err) {

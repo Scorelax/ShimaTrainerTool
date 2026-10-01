@@ -284,12 +284,14 @@ def handle(conn, action, params):
         # the STRING "false" -- truthy under a bare bool(...), hence the
         # explicit string check.
         crit = str(params.get('crit', '')).lower() == 'true'
+        pool = params.get('pool', 'hp')
         return _apply_damage(
             conn, params['id'], params['targetId'], dice_roll,
             move_type=params.get('moveType', ''),
             species=params.get('species'),
             move_name=params.get('moveName', ''),
             crit=crit,
+            pool=pool if pool == 'vp' else 'hp',
         )
 
     if action == 'retype-last-damage':
@@ -1773,7 +1775,7 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
     return outcome
 
 
-def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name='', crit=False):
+def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name='', crit=False, pool='hp'):
     """The other half of resolving an attack, split out from use-move: that
     action's VP cost was for a single-participant local engine (combat.js's
     own move popup, driven client-side) that already handles spending VP and
@@ -1786,12 +1788,17 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name
     calculation server-side), convert it to damage via type effectiveness
     and apply it. Same turn-authority rule as every other on-turn action.
 
+    `pool` ('hp', the default, or 'vp') -- the `damage_vp` category's own
+    drain moves (Energize, Enervation Ray) deal typed damage that drains VP
+    instead of HP; see _apply_damage_to_target's own docstring for why that's
+    a genuinely smaller code path, not the full HP pipeline with a pool swap.
+
     `crit` is recorded on the log entry purely for Lucky Chant's own later
     use (a 'damaged' reaction reading `entry.crit` back off the most recent
     damage entry against the reactor) -- nothing else here reads it."""
     outcome = {}
     result = _mutate(conn, lambda s: outcome.update(
-        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type, move_name, crit)))
+        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type, move_name, crit, pool)))
     result.update(outcome)
 
     attacker = result['data']['participants'].get(pid, {})
@@ -1847,7 +1854,7 @@ def _retype_last_damage(conn, state, reactor_id, new_type):
     return {'oldAmount': amount, 'newAmount': new_amount}
 
 
-def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False):
+def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False, pool='hp'):
     attacker = state['participants'].get(pid)
     if not attacker:
         raise ValueError('Unknown participant: ' + pid)
@@ -1860,6 +1867,26 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
 
     multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target)
     actual_damage = round(dice_roll * multiplier)
+
+    if pool == 'vp':
+        # Energize/Enervation Ray's own "deals typed damage, but it's VP, not
+        # HP, that drains" -- keeps the SAME type-effectiveness multiplier
+        # above (their own text still says "+ Ghost damage" etc.), but skips
+        # every HP-SPECIFIC shield this module has (temp HP, Mat Block/
+        # Testudo Formation's own standing damage reduction) -- nothing in
+        # this dataset gives VP an analogous shield, and these moves' own
+        # text never mentions one, so there's nothing to apply here. A
+        # genuinely smaller code path, not the HP one with a field swapped.
+        target['currentVP'] -= actual_damage  # no floor, same reasoning as the HP path below
+        move_label = f' with {move_name}' if move_name else ''
+        _log_event(
+            state, 'damage',
+            text=f"{attacker['name']} drained {actual_damage} VP from {target['name']}{move_label} ({multiplier}x)",
+            actorId=pid, actorName=attacker['name'], targetId=target_id, targetName=target['name'],
+            move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier, crit=bool(crit), pool='vp',
+        )
+        return {'multiplier': multiplier, 'damageApplied': actual_damage}
+
     # Mat Block/Testudo Formation's own standing damage reductions -- applied
     # AFTER the type multiplier (kept separate, not folded into `multiplier`
     # itself: Nature's Embrace's own reactor-side "was I vulnerable"

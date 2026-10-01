@@ -928,12 +928,31 @@
       },
       "reaction": false,
       "categories": [
-        "increase_stab"
+        "self_status_condition_stab_doubled"
       ],
       "description": "Your tail emits a flash of light, boosting your attack. For the duration, double your STAB damage.",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "stab_doubled",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Transfusion",
@@ -1034,7 +1053,7 @@
       },
       "reaction": true,
       "categories": [
-        "stat_buff_self",
+        "self_potential_halve_damage",
         "counter_reaction_effect",
         "recoil",
         "reactive_save"
@@ -1042,7 +1061,21 @@
       "description": "You beat your wings at an incredible frequency, creating an air cushion that buffers damage towards you. Until your next turn. any successful hit against you triggers a Dexterity saving throw for you, against their move DC. On a successful save, you take half damage.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "halve_damage",
+          "when": {
+            "type": "special"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "X-Scissor",
@@ -2490,12 +2523,27 @@
       "reaction": false,
       "categories": [
         "steal_disrupt",
-        "potential_stat_increase"
+        "potential_stat_transfer_steal_choice"
       ],
       "description": "The user attempts to steal beneficial effects from a target within 30 feet. The target must succeed on a Charisma saving throw or lose all beneficial effects currently affecting it. The user gains the effects of one of these spells or effects (user's choice) for the remainder of their duration.",
       "moveStat": "CHA",
       "vpCost": "8",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "steal_choice",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Beat Up",
@@ -5945,12 +5993,31 @@
       "reaction": false,
       "categories": [
         "shield_temphp",
-        "stat_buff_self"
+        "self_temp_hp"
       ],
       "description": "Your noodly appendages multiply, and your body grows to a huge size. While in this form, you gain the ability Spaghedeity; you get half of your current max HP as temporary bonus HP, and your melee reach is increased to 15ft.",
       "moveStat": "None",
       "vpCost": "21",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "temp_hp",
+          "amount": {
+            "fractionOfMaxHP": 0.5
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "note": "Melee reach increase to 15ft is not enforced -- no positional/range system exists in this app."
+        }
+      ]
     },
     {
       "name": "Draining Kiss",
@@ -9475,12 +9542,32 @@
       "reaction": false,
       "categories": [
         "damage",
-        "stat_buff_self"
+        "self_stat_buff_speed"
       ],
       "description": "You cloak yourself with flame and lash out at a creature. Make a melee attack, dealing 1d10 + MOVE fire damage on a hit. With each successful hit from this move, increase your movement speed by 5 until you are incapacitated, are switched out, or the combat ends. (Maximum of +30 to movement speed)",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 5,
+          "stacks": {
+            "max": 6
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "note": "Lasts until incapacitated/switched out/combat ends -- approximated as \"rest of the battle\" (no incapacitation-triggered early-end hook exists)."
+        }
+      ]
     },
     {
       "name": "Flame Wheel",
@@ -10760,12 +10847,31 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "stat_debuff_enemy"
+        "potential_status_condition_no_proficiency_attacks"
       ],
       "description": "You distract a creature in range with a beautiful dance. The target must make a WIS saving throw against your Move DC. On a fail, the target cannot add proficiency to its attack rolls for the duration.",
       "moveStat": "DEX/CHA",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "no_proficiency_attacks",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Feather Spear",
@@ -11267,13 +11373,55 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "stat_buff_ally"
+        "self_stat_buff_speed",
+        "stat_buff_speed"
       ],
       "description": "You whip up a turbulent whirlwind that boosts the speed of you and all allies in a 30 foot circle, centered on you. The wind only follows you and your allies, and doubles their movement speed for the duration.",
       "moveStat": "None",
       "vpCost": "6",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 2
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 2
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "each ally within the 30ft circle when cast"
+        }
+      ]
     },
     {
       "name": "Wing Attack",
@@ -15435,12 +15583,28 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_aurora_veil"
       ],
       "description": "You use the environment to create a shield of ice around your body. Only able to be activated while it is hailing, this move can be used as a bonus action to halve all damage dealt to you for three rounds.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "aurora_veil",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Avalanche",
@@ -18493,12 +18657,34 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_damage_reduction"
       ],
       "description": "You increase your defense, able to reduce incoming damage. After activating this move, reduce any damage dealt to you by 1d4 + MOVE until the beginning of your next turn.",
       "moveStat": "CON",
       "vpCost": "1",
-      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17."
+      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "damage_reduction",
+          "value": {
+            "dice": "1d4",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start",
+              "count": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Head Charge",
@@ -23743,13 +23929,30 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_stat_buff_speed",
         "movement"
       ],
       "description": "You hone your abilities and feel a surge of speed course through your veins. Increase your movement speed by 20 feet for the duration. Applicable to any movement type the Pokémon has.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 20,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Ally Switch",
@@ -23954,13 +24157,31 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "increase_stab"
+        "self_status_condition_stab_doubled"
       ],
       "description": "You clear your mind of all distractions. For the duration, double your STAB bonus when dealing damage of your type.",
       "moveStat": "None",
       "vpCost": "6",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "stab_doubled",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Confusion",
@@ -24579,13 +24800,63 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_stat_buff_speed",
         "movement"
       ],
       "description": "You move with incredible speed. Increase your walking, flying, or swimming speed by 20 if it is greater than 0, and add +2 to AC when targeted by ranged attacks for the duration. This move cannot be stacked.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 20,
+          "appliesTo": "walking",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 20,
+          "appliesTo": "flying",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 20,
+          "appliesTo": "swimming",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Light Screen",
@@ -26819,12 +27090,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_buff_speed"
       ],
       "description": "You shed away part of your body to make yourself lighter and increase your speed. For the duration, your speed increases by 10 feet. This move may be stacked to a maximum speed increase of 30 feet.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 10,
+          "stacks": {
+            "max": 3
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Bell Toll",
@@ -28789,13 +29080,33 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_stat_buff_speed",
         "movement"
       ],
       "description": "You channel water energy to boost your movement. Gain double speed on and in water. While this effect is active, you don't provoke attacks of opportunity. If it is raining, all surfaces are considered to be water for you.",
       "moveStat": "DEX",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 2
+          },
+          "appliesTo": "swimming",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "Duration is \"1 + MOVE minutes\" -- approximated as concentration-only (removed manually), no fixed round count authored."
+        }
+      ]
     },
     {
       "name": "Water Gun",

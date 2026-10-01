@@ -42,7 +42,10 @@ to end up in one group — a different `kind` (e.g. a `stat` row next to a `temp
 the grouping never looks at that field.
 
 **`temp_hp`** (Acupressure's "roll a 3: +10 temporary HP") is a real bonus-HP pool, not a stat --
-`amount` is its starting size, and the server tracks how much is left as `remaining` on the stored
+`amount` is its starting size, either a plain number or `{fractionOfMaxHP: 0.5}` (Divine Noodle
+Form's own "half of your current max HP", resolved against the holder's own live `maxHP` in
+`_offerMoveEffects`, same dynamic-value-resolution convention `avgWithTarget`/
+`fromPendingReactionMove` already use). The server tracks how much is left as `remaining` on the stored
 status (js/utils/move-effects.js's `tempHpRemaining` sums it up for display: a small light-blue
 "+N" tag next to the HP number, same convention as a live stat buff's tag). Incoming damage drains
 this pool FIRST (`routes_combat.py`'s `_absorb_temp_hp`, called from both damage-application paths)
@@ -460,8 +463,8 @@ correction `reroll_damage`'s own refund already uses.
 | `{type:"other", text}` | anything else — shown, removed manually |
 
 ## Vocabularies
-- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit guaranteed_next_hit mist safeguard mat_block testudo_formation`. `guaranteed_next_crit` (Laser Focus) and `guaranteed_next_hit` (Lock-On, Mind Reader — `guaranteedHitStatusId`, same shape/wiring as `guaranteedCritStatusId` but never forces a crit) are standalone flags, not stat/roll effects. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below. `mist`/`safeguard` are standing immunity shields checked by `blocking_shield()`; `mat_block`/`testudo_formation` are standing damage-multiplier conditions checked by `incoming_damage_multiplier`/`outgoing_damage_multiplier` — see the `protect_negate` updates below.
-- **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities attack_rolls_or_saving_throws` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field). `attack_rolls_or_saving_throws` is a single bonus eligible for either roll type (Growth, Helping Hand) -- spending it on one consumes it for both.
+- **conditions** — standard: `blinded charmed deafened exhaustion frightened grappled incapacitated invisible paralyzed petrified poisoned prone restrained stunned unconscious`; Pokémon-style: `burned frozen asleep confused flinched`; custom: `slowed blink grounded taunted infested seeded cursed trapped drowsy disoriented infected insomnia bleeding type_changed resistance_upgrade granted_immunity removed_from_reality controlled_senses mind_captured watchful_embers perish_song abilities_suppressed forced_movement guaranteed_next_crit guaranteed_next_hit mist safeguard mat_block testudo_formation move_disabled move_locked_to speed_override granted_flight_speed stab_doubled aurora_veil damage_reduction no_proficiency_attacks`. `guaranteed_next_crit` (Laser Focus) and `guaranteed_next_hit` (Lock-On, Mind Reader — `guaranteedHitStatusId`, same shape/wiring as `guaranteedCritStatusId` but never forces a crit) are standalone flags, not stat/roll effects. `stab_doubled` (Calm Mind, Tail Glow) is likewise standalone, read by `computeMoveData`'s own `stabMultiplier` param. `type_changed`/`resistance_upgrade`/`granted_immunity` are the type-matchup family — see their own section below. `mist`/`safeguard` are standing immunity shields checked by `blocking_shield()`; `mat_block`/`testudo_formation`/`aurora_veil` are standing incoming-damage-MULTIPLIER conditions checked by `incoming_damage_multiplier`/`outgoing_damage_multiplier`; `damage_reduction` (Harden, `value` = a rolled flat number) is a standing FLAT-subtraction sibling, checked by `incoming_flat_reduction` — see the `protect_negate`/35-move-batch updates below. `move_disabled`/`move_locked_to` (`value` = a move name) are checked by `disabled_moves()`/`move_lock()`; `no_proficiency_attacks` (Feather Dance) is checked directly in `attackRollContext`.
+- **stat**: `ac crit speed attack_rolls damage_rolls saving_throws str dex con int wis cha all_abilities attack_rolls_or_saving_throws` -- `crit` is the number subtracted from 20 to get the crit threshold (see `critThreshold`; +1 = crits on 19-20 instead of just 20), applied like `ac` (a flat delta straight to `critMod`, no derived field). `attack_rolls_or_saving_throws` is a single bonus eligible for either roll type (Growth, Helping Hand) -- spending it on one consumes it for both. `speed` (Agility et al, see the 35-move-batch update below) is a different shape from every other stat -- `speeds` is a whole array of movement TYPES, not a flat scalar, so its own `amount` is either a plain number (additive, `speed_bonus_entries`) or `{multiplier}` (`speed_multiplier_entries`), with an optional `appliesTo` field (one speed `type` string, or `'all'` by default) scoping either to a single movement type.
 - **roll `on`**: `attack_rolls` (the holder's own) · `attacks_against` (rolls made against the holder) · `saving_throws` (the holder's) · `saves_against_its_moves` · `ability_checks` · `all_rolls`
 - **`ability`** (optional, `roll`/`stat` effects on `saving_throws` only): narrows to one ability's saves -- Hammer Arm's "disadvantage on DEX saves" (a plain `saving_throws` roll/stat with no `ability` still applies broadly, to every save, same as before this field existed). `saveRollContext`'s own `ability` param (already threaded through from the save popup) is what it's matched against; nothing analogous exists yet for `attack_rolls`/`ability_checks` (Nasty Plot's "advantage on WIS-power attacks", Study's "advantage vs one specific target" -- neither `attackRollContext` nor `ability_checks` rolls carry enough context to scope against yet, left unmigrated).
 
@@ -1951,3 +1954,117 @@ Chop), the larger not-yet-touched categories (`field_terrain`,
 `field_weather`, and the remainders of `positioning`/`protect_negate`/
 `steal_disrupt`), and 32 "unknown" moves needing manual review before
 anything else.)*
+
+*(Update, 2026-10-01: first batch of the 35 "fits the schema already, just
+not migrated yet" moves built (`migrate_effects_v59.py`, 14 of 35). Read
+all 35 fresh rather than trusting the coarse label (same lesson as every
+prior "don't repeat a category's own summary back without checking"
+correction) -- grouped by the real blocker each one actually shares:
+
+**`stat:"speed"`** -- never wired in anywhere before this pass (`speeds` is
+a whole array of movement TYPES per participant, not a flat scalar the
+existing additive statDeltas machinery has any notion of). Two new
+`conditions.py` lookups, both folded into `_movement_budget`:
+`speed_bonus_entries` (flat ADDITIVE `amount`, a plain number, stacking via
+the existing `stacks` mechanism) and `speed_multiplier_entries`
+(MULTIPLICATIVE, `amount:{multiplier}`, combined separately from the
+existing debuff-only `effective_speed_multiplier` table since a buff
+doesn't compose the same way). A new optional `appliesTo` field (one speed
+`type` string, or `'all'` by default) scopes either shape to ONE movement
+type so a buff that only touches water (Surface Glide) doesn't leak onto
+an unrelated type the same participant also has. Built: Agility (+20 all),
+Autotomize (+10, stacks to +30), Flame Charge (+5 per hit, stacks to +30,
+`when:"on_hit"`), Kinesis (+20 each to walking/flying/swimming -- only the
+speed half; its own "+2 AC vs ranged attacks" needs AC scoping this app has
+no equivalent of, a different gap), Surface Glide (x2, `swimming` only),
+Tailwind (x2, `'all'`, granted to the caster AND every ally in range via
+the existing target:'self' + target-unset dual-effect AoE shape
+Aromatherapy/Heal Bell already established).
+
+**STAB doubling** (`increase_stab`, a long-standing tag never backed by a
+mechanism -- STAB is computed inline in `pokemon-types.js`'s
+`computeMoveData`, not a modifiable status field). New standalone flag
+condition `stab_doubled` (same family as `guaranteed_next_crit`/
+`guaranteed_next_hit`), read into a new `stabMultiplier` param on
+`computeMoveData` -- WIP-only bridged (`combat-wip.js`'s
+`_syncLocalCombatState` reads the holder's own live statuses into
+`merged.stabMultiplier`, threaded through `combat.js`'s shared
+`showCombatMoveDetails` call site), same "always 1 on the legacy
+standalone engine" limitation every other live modifier already has.
+Compounds multiplicatively with Tough Claws' own doubling. Built: Calm
+Mind, Tail Glow.
+
+**Standing incoming-damage shields**, both checked in
+`_apply_damage_to_target` AFTER the type multiplier: **Aurora Veil**
+("halve all damage dealt to you for three rounds") folds into the EXISTING
+`incoming_damage_multiplier` table alongside Mat Block/Testudo Formation
+(its own "only while hailing" gate is advisory -- no structured, query-able
+weather system exists, same "surface it in the text, trust the human"
+philosophy as everywhere else this app handles weather/terrain). **Harden**
+("reduce any damage dealt to you by 1d4 + MOVE") is a FLAT subtraction
+instead, a new sibling function `incoming_flat_reduction` keyed off a new
+`damage_reduction` condition -- its reduction amount is rolled ONCE at cast
+time via a new `promptValueRoll` (`heal-popup.js`'s shared `_promptRoll`
+core generalized a third time, a bare-number sibling to
+`promptHealRoll`/`promptDrainRoll` for a condition's own `value` rather
+than an immediate HP/VP change).
+
+**Aura Theft** ("the target loses ALL beneficial effects... the user gains
+the effects of ONE of these, user's choice") -- a new `stat_transfer` mode,
+`"steal_choice"`: every positive `kind:'stat'` status still comes OFF the
+target (same as plain `'steal'`), but only ONE is recreated on the
+attacker, picked via the EXISTING `pickOneStatus` popup, reused as-is.
+
+**Divine Noodle Form** ("half of your current max HP as temporary bonus
+HP") -- a new `temp_hp` amount shape, `{fractionOfMaxHP}`, resolved the
+same dynamic-value way `_offerMoveEffects` already resolves `avgWithTarget`/
+`fromPendingReactionMove`/Harden's own roll. Its melee-reach increase isn't
+enforced (no positional/range system anywhere in this app), flagged in the
+effect's own `note` rather than silently dropped.
+
+**Wing Buffer** ("on a successful [reactive] save, you take half damage")
+-- the one `reactive_save` move already wired to `_handleReactiveSave`
+(auto-detects the attacker/DC, prompts the save), just never applying its
+own outcome; that function's own fallback text literally said "apply its
+effect manually (e.g. half damage)" as its anticipated example. New
+`kind:"halve_damage"`, applied DIRECTLY in `_handleReactiveSave` on a PASS
+(inverted from every other save-triggered move's own fail-fires
+convention) via a new `_handleHalveDamage` -- the same retroactive-
+correction family as `reroll_damage`/`negate_damage`/`undo_crit_damage`,
+a flat 50% refund with no crit gate.
+
+**Feather Dance** ("the target cannot add proficiency to its attack
+rolls") -- a new standalone condition, `no_proficiency_attacks`, checked
+directly in `attackRollContext` (subtracts the HOLDER's own live
+`proficiency` from their attack-roll delta, not a fixed authored amount
+that could drift from it).
+
+Verified with 10+ direct calls: `_movement_budget`'s additive/
+multiplicative/scoped/stacked speed combinations (including a scoped bonus
+correctly having nothing to apply to when the participant lacks that speed
+type at all) composing correctly with the pre-existing debuff multiplier;
+`_apply_damage_to_target`'s new flat-reduction and Aurora Veil paths side
+by side with the unchanged default; `attackRollContext`'s proficiency
+subtraction; `statusLabel`'s new `stab_doubled`/speed-multiplier display
+branches; `evaluateEffect`'s `halve_damage` manual verdict.
+
+**The other 21 of the 35 stay deferred this pass**, each needing at least
+one MORE new piece beyond what this pass built -- not a guess: Fell
+Stinger/Power Split/Power Trick need a "double/average my own current
+modifier" formula gated on new when-types (a "did this hit faint the
+target" check, a third pickable stat); Nasty Plot/Study need attack-roll
+scoping beyond `saving_throws`' existing `ability` field; Foresight needs
+a move-type-scoped one-shot immunity-ignore flag; Imperial Guard/Power-Up
+Punch/Blood Shield need an accumulating log-scan-derived amount; Spirit
+Growth needs VP-cost modifiers; Fire Shield needs a passive always-on
+retaliation trigger with no reaction-floor-grab involved; Ink Veil/Miracle
+Eye/Odor Sleuth/Topsy-Turvy need stealing/inverting an EXISTING effect;
+Wing Command needs a fixed modifier riding alongside a claimable dice
+bonus (unverified whether the existing claim UI supports that combination
+-- left rather than risk a shallow guess); Thunderstorm Dance needs a
+move-TYPE-scoped persistent guaranteed-hit status; Silent Approach needs a
+real ability-check roll this app has none of anywhere. Grassy Terrain/
+Psychic Terrain/Purgatory share the exact same blocker as the whole
+still-untouched `field_terrain` category (no structured, query-able
+terrain-effect system) -- fixing them ad hoc here would duplicate that
+category's own eventual pass.)*

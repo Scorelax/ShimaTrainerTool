@@ -116,12 +116,16 @@ export function computeMoveDC(move, stats) {
  * Shared by combat.js (showCombatMoveDetails) and pokemon-card.js (showMoveDetails).
  *
  * @param {Array} move - Move data array [name, type, modifier, actionType, vpCost, duration, range, desc, higherLevels]
- * @param {{ types: string[], strMod: number, dexMod: number, conMod: number, intMod: number, wisMod: number, chaMod: number, proficiency: number, stabBonusValue: number, level: number }} pokemonAttrs
+ * @param {{ types: string[], strMod: number, dexMod: number, conMod: number, intMod: number, wisMod: number, chaMod: number, proficiency: number, stabBonusValue: number, level: number, stabMultiplier?: number }} pokemonAttrs
+ *   `stabMultiplier` (default 1) -- Calm Mind/Tail Glow's own "double your STAB [bonus/damage]"
+ *   for the duration, a WIP-only bridged field (see combat-wip.js's _syncLocalCombatState,
+ *   reading a held `stab_doubled` condition) -- always 1 on the legacy standalone engine, same
+ *   limitation every other WIP-only live modifier already has.
  * @param {{ path: string, level: number, specializationsStr: string }} trainerAttrs
  * @returns {{ hasSTAB: boolean, attackBonus: number, damageBonus: number, attackBreakdown: string, damageBreakdown: string, damageDice: string|null }}
  */
 export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffects = []) {
-  const { types, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level, hasToughClaws } = pokemonAttrs;
+  const { types, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level, hasToughClaws, stabMultiplier = 1 } = pokemonAttrs;
   const { path, level: trainerLevel, specializationsStr } = trainerAttrs;
 
   const moveType = move[1];
@@ -174,7 +178,11 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
   // Damage roll bonus
   const desc = move[7] || '';
   const includeStatInDmg = /\+\s*MOVE/i.test(desc);
-  const stabBonus = hasSTAB ? (toughClawsDoubled ? stabBonusValue * 2 : stabBonusValue) : 0;
+  // Tough Claws' own doubling and Calm Mind/Tail Glow's own `stabMultiplier`
+  // compound multiplicatively (no move text says otherwise, same "several
+  // sources each compound" convention this app already uses for
+  // resistance_upgrade) rather than one overriding the other.
+  const stabBonus = hasSTAB ? stabBonusValue * (toughClawsDoubled ? 2 : 1) * stabMultiplier : 0;
 
   // Held item: "Holder adds prof. bonus to damage from <TYPE> type moves"
   const heldItemProfPattern = /holder adds prof(?:iciency|\.)? bonus to damage from (\w+)(?:-| )type moves?/i;

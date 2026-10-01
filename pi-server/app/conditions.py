@@ -171,24 +171,32 @@ def zero_speed_condition(participant):
 def incoming_damage_multiplier(participant):
     """Combined multiplier on damage `participant` is about to RECEIVE, from
     every standing condition that scales it -- Mat Block's own "immune to
-    damage from damaging moves" (0x) and Testudo Formation's own "take half
-    damage from all other attacks" (0.5x). Takes the MINIMUM across active
-    sources, same "worst source wins, doesn't stack multiplicatively"
-    convention effective_speed_multiplier already uses. Checked at damage-
-    APPLICATION time (_apply_damage_to_target), not a reaction-window block
-    like block_attack/damage_multiplier -- these are standing, multi-turn
+    damage from damaging moves" (0x), Testudo Formation's own "take half
+    damage from all other attacks" (0.5x), and Aurora Veil's own "halve all
+    damage dealt to you for three rounds" (0.5x, same shape as Testudo
+    Formation's incoming half -- just without an outgoing half of its own).
+    Takes the MINIMUM across active sources, same "worst source wins,
+    doesn't stack multiplicatively" convention effective_speed_multiplier
+    already uses. Checked at damage-APPLICATION time
+    (_apply_damage_to_target), not a reaction-window block like
+    block_attack/damage_multiplier -- these are standing, multi-turn
     conditions applying to every hit during their duration, not a one-shot
-    cancellation of a single incoming attack. Neither condition affects a
-    status-inducing move at all -- those never call _apply_damage_to_target
-    in the first place, so "status-inducing moves can still affect their
-    targets" (Mat Block's own text) is already true with no extra check."""
+    cancellation of a single incoming attack. None of these conditions
+    affect a status-inducing move at all -- those never call
+    _apply_damage_to_target in the first place, so "status-inducing moves
+    can still affect their targets" (Mat Block's own text) is already true
+    with no extra check. Aurora Veil's own "only while it is hailing" gate
+    is advisory, not enforced here -- same "surface it, trust the human"
+    philosophy as every other weather/terrain check in this app (there's no
+    structured weather-effect system to query authoritatively from, see
+    move-effects-schema.md's own field_terrain/field_weather notes)."""
     multiplier = 1
     for s in (participant or {}).get('statuses', []):
         if s.get('kind') != 'condition':
             continue
         if s.get('apply') == 'mat_block':
             multiplier = min(multiplier, 0)
-        elif s.get('apply') == 'testudo_formation':
+        elif s.get('apply') in ('testudo_formation', 'aurora_veil'):
             multiplier = min(multiplier, 0.5)
     return multiplier
 
@@ -277,3 +285,78 @@ def move_lock(participant):
         if s.get('kind') == 'condition' and s.get('apply') == 'move_locked_to' and s.get('value'):
             return s['value']
     return None
+
+
+def speed_bonus_entries(participant):
+    """Agility/Autotomize/Flame Charge/Kinesis's own flat "+Nft to your
+    [movement type(s)]" -- the FIRST real use of `kind:'stat', stat:'speed'`
+    anywhere in this schema (never wired in before this pass -- `speeds` is
+    a whole array of movement TYPES per participant, not a flat scalar the
+    existing additive statDeltas machinery has any notion of, which is
+    exactly why it sat unbuilt). {scope: total_ft}, `scope` is either one
+    speed `type` string (an `appliesTo` field on the status -- Kinesis only
+    buffs walking/flying/swimming, never a type the participant doesn't
+    already have) or `'all'` (the default -- Agility/Autotomize/Flame
+    Charge's own "any movement type"). Stacks already folded in via the
+    stored `stacks` count, same `amount * stacks` convention this module's
+    display logic elsewhere already uses. Only ADDITIVE amounts (a plain
+    number) count here -- see speed_multiplier_entries for the `{multiplier}`
+    shape (Surface Glide/Tailwind's own "double speed")."""
+    out = {}
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') != 'stat' or s.get('stat') != 'speed':
+            continue
+        amount = s.get('amount')
+        if not isinstance(amount, (int, float)):
+            continue
+        scope = s.get('appliesTo') or 'all'
+        out[scope] = out.get(scope, 0) + amount * s.get('stacks', 1)
+    return out
+
+
+def speed_multiplier_entries(participant):
+    """Surface Glide's own "double speed on/in water" (scoped to `'swimming'`
+    via `appliesTo`) and Tailwind's "doubles movement speed" (`'all'`, and
+    granted to allies too -- see combat-wip.js's own AoE-targeting for that
+    half, this function only ever reads ONE participant's own statuses).
+    {scope: factor}, same scope convention as speed_bonus_entries, combined
+    multiplicatively when more than one source targets the same scope.
+    Deliberately separate from effective_speed_multiplier (the
+    Grappled/Paralyzed/... DEBUFF table, which takes the MINIMUM across
+    sources and is keyed by CONDITION NAME, not a `kind:'stat'` status at
+    all) -- a buff combines differently (multiplied together, starting from
+    1) and these are authored as a `stat:'speed'` status with a
+    `{multiplier}`-shaped `amount`, never a candidate for that table."""
+    out = {}
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') != 'stat' or s.get('stat') != 'speed':
+            continue
+        amount = s.get('amount')
+        if not isinstance(amount, dict) or not isinstance(amount.get('multiplier'), (int, float)):
+            continue
+        scope = s.get('appliesTo') or 'all'
+        out[scope] = out.get(scope, 1) * amount['multiplier']
+    return out
+
+
+def incoming_flat_reduction(participant):
+    """Harden's own "reduce any damage dealt to you by 1d4 + MOVE until the
+    beginning of your next turn" -- a FLAT subtraction per hit, a different
+    shape from incoming_damage_multiplier's own standing-condition
+    MULTIPLIER table (Mist/Safeguard/Mat Block/Testudo Formation): Harden's
+    reduction is a fixed number rolled ONCE at cast time (this app has no
+    digital dice, so the human enters it then, same as any other rolled
+    amount), not a percentage. Returns the LARGEST active value (several
+    sources don't stack additively here -- no text says they should, same
+    "worst/best source wins" convention this module already uses for the
+    multiplier tables) or 0 with nothing active. Checked by
+    _apply_damage_to_target AFTER the type multiplier, same ordering
+    incoming_damage_multiplier already uses, and floored at 0 damage (never
+    heals from an overlarge reduction)."""
+    best = 0
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') == 'condition' and s.get('apply') == 'damage_reduction':
+            value = s.get('value')
+            if isinstance(value, (int, float)):
+                best = max(best, value)
+    return best

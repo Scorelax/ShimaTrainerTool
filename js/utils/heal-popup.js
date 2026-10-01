@@ -81,7 +81,7 @@ function _updateTotal() {
   const el = document.getElementById('healPopupTotal');
   const raw = _currentRoll();
   if (raw === null) { el.innerHTML = ''; return; }
-  el.innerHTML = `Total: <strong>${raw + _moveModBonus}</strong> ${_poolLabel}`;
+  el.innerHTML = `Total: <strong>${raw + _moveModBonus}</strong>${_poolLabel ? ` ${_poolLabel}` : ''}`;
 }
 
 function _confirm() {
@@ -90,12 +90,12 @@ function _confirm() {
   _close(raw);
 }
 
-function _promptRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', title = 'Heal Roll', verb = 'heals', pool = 'HP' } = {}) {
+function _promptRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', title = 'Heal Roll', verb = 'heals', pool = 'HP', description } = {}) {
   _ensureDom();
   _moveModBonus = moveModBonus;
   _poolLabel = pool;
   document.getElementById('healPopupTitle').textContent = title;
-  document.getElementById('healPopupDesc').textContent = `${moveName} ${verb} ${targetName}.`;
+  document.getElementById('healPopupDesc').textContent = description || `${moveName} ${verb} ${targetName}.`;
   document.getElementById('healPopupLabel').textContent =
     `Roll ${dice}${moveModBonus ? ` (+${moveModBonus} from MOVE added automatically)` : ''}`;
   const input = document.getElementById('healPopupInput');
@@ -130,4 +130,16 @@ export function promptHealRoll({ dice, moveModBonus = 0, targetName = '?', moveN
  */
 export function promptDrainRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', pool = 'VP' } = {}) {
   return _promptRoll({ dice, moveModBonus, targetName, moveName, pool, title: 'Damage Roll', verb: 'drains' });
+}
+
+/**
+ * Same shape again, for a plain NUMBER with no heal/drain framing at all --
+ * Harden's own "reduce incoming damage by 1d4 + MOVE" needs a rolled VALUE
+ * to carry on a status (not an immediate HP/VP change either direction),
+ * so neither promptHealRoll's nor promptDrainRoll's wording fits. No
+ * `pool` suffix on the total by default (empty string hides it entirely,
+ * see _updateTotal) since this is a bare number, not a resource amount.
+ */
+export function promptValueRoll({ dice, moveModBonus = 0, moveName = '?', description, pool = '' } = {}) {
+  return _promptRoll({ dice, moveModBonus, moveName, pool, title: 'Roll', description: description || `${moveName} -- enter your roll.` });
 }

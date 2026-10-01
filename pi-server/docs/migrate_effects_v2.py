@@ -329,6 +329,10 @@ def tag_for(e):
         # Switcheroo/Trick's own "swap held items" -- see combat-wip.js's
         # _handleSwapItem.
         base = 'swap_item'
+    elif e['kind'] == 'halve_damage':
+        # Wing Buffer's own "on a successful save, you take half damage" --
+        # see combat-wip.js's _handleReactiveSave/_handleHalveDamage.
+        base = 'halve_damage'
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

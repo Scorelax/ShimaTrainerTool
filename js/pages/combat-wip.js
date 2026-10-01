@@ -24,7 +24,7 @@ import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js'
 import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficialReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { pickOneStatus, pickOneMoveName } from '../utils/status-picker.js';
-import { promptHealRoll, promptDrainRoll } from '../utils/heal-popup.js';
+import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed } from '../utils/move-effects.js';
@@ -959,6 +959,14 @@ function _syncLocalCombatState(session) {
     // Stomping Tantrum's own "if your last attack missed" -- see
     // _didLastAttackMiss's own docstring. Same WIP-only bridging pattern.
     merged.lastAttackMissed = _didLastAttackMiss(session, p.id);
+    // Calm Mind/Tail Glow's own "double your STAB [bonus/damage]" -- a
+    // standalone flag condition (same family as guaranteed_next_crit/
+    // guaranteed_next_hit, see move-effects-schema.md's own vocab note),
+    // read straight off p's own live statuses and bridged onto the merged
+    // combatant so computeMoveData's call in combat.js can see it (that
+    // function only ever receives this WIP-built `c`, never the raw
+    // session participant).
+    merged.stabMultiplier = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'stab_doubled') ? 2 : 1;
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.
@@ -2184,6 +2192,10 @@ function _targetDamageNotes(moveName) {
  *   'steal'      -- move only targetId's POSITIVE kind:'stat' statuses
  *     onto attackerId, removed from target (Spectral Thief's own "steal
  *     all positive stat changes").
+ *   'steal_choice' -- Aura Theft's own "loses ALL beneficial effects... the
+ *     user gains the effects of ONE of these (user's choice)" -- every
+ *     positive status still comes off the target, but the human picks
+ *     (pickOneStatus) just ONE of them to recreate on the attacker.
  *   'swap_value' -- Guard Swap/Power Swap's own "switch [AC/an ability
  *     score] with the target" -- a DIFFERENT shape from plain 'swap' above
  *     (which moves whole status ENTRIES): this swaps the current EFFECTIVE
@@ -2269,6 +2281,28 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
       await remove(targetId, s, `stolen by ${moveName}`);
       await recreate(s, attackerId);
     }
+    return;
+  }
+  if (mode === 'steal_choice') {
+    // Aura Theft's own "the target loses ALL beneficial effects... the
+    // user gains the effects of ONE of these (user's choice)" -- a
+    // different shape from plain 'steal' above (which moves EVERY positive
+    // stat buff, no choice involved): everything positive still comes OFF
+    // the target, but only ONE of them is recreated on the attacker,
+    // picked by the human from the removed list (status-picker.js's
+    // pickOneStatus, same dynamic-list-picker shape Psycho Shift/Searing
+    // Flame's own "choose which status" already uses).
+    const positives = targetStats.filter(isPositive);
+    if (!positives.length) {
+      showCombatAlert(`${target.name} has no beneficial effects for ${moveName} to steal.`, { title: moveName });
+      return;
+    }
+    for (const s of positives) await remove(targetId, s, `stripped by ${moveName}`);
+    const chosen = await pickOneStatus(positives, {
+      title: `${moveName} — choose which effect to gain`,
+      message: `Pick one of ${target.name}'s former effects to gain for yourself.`,
+    });
+    if (chosen) await recreate(chosen, attackerId);
     return;
   }
   if (mode === 'swap') {
@@ -2872,6 +2906,19 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       }
       continue;
     }
+    if (effect.value && typeof effect.value === 'object' && effect.value.dice) {
+      // Harden's own "reduce incoming damage by 1d4 + MOVE" -- the damage-
+      // reduction AMOUNT itself has to be rolled once at apply time (no
+      // digital dice anywhere in this app), carried as a condition's own
+      // `value` rather than a `heal`/`drain_attacker_vp` immediate change,
+      // so neither promptHealRoll nor promptDrainRoll fits -- promptValueRoll
+      // is the bare-number sibling. Same "mutate a clone, fall through"
+      // shape every other dynamic-value resolution here already uses.
+      const moveModBonus = effect.value.moveMod && attacker ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker) : 0;
+      const rolled = await promptValueRoll({ dice: effect.value.dice, moveModBonus, moveName });
+      if (rolled === null) continue;
+      effect = { ...effect, value: rolled };
+    }
     if (effect.value && typeof effect.value === 'object' && effect.value.fromPendingReactionMove) {
       // Encore/Torment's own "the move that targeted/hit you" -- the move
       // NAME isn't knowable at authoring time, only at apply time, off the
@@ -2896,6 +2943,22 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         continue;
       }
       effect = { ...effect, set: resolved };
+    }
+    if (effect.kind === 'temp_hp' && effect.amount && typeof effect.amount === 'object' && effect.amount.fractionOfMaxHP) {
+      // Divine Noodle Form's own "half of your current max HP as temporary
+      // bonus HP" -- a different temp_hp amount shape from Acupressure's
+      // own flat rolled number (that one's already a concrete number by
+      // the time it's offered, from a dice-table choice): this resolves a
+      // {fractionOfMaxHP} sentinel against whoever's about to hold it,
+      // same "mutate a clone, fall through to the normal apply-status
+      // path" shape `_resolveSetValue`'s own caller just above uses for
+      // Guard Split's avgWithTarget.
+      const holder = session?.participants?.[pick.targetId];
+      if (!Number.isFinite(holder?.maxHP)) {
+        showCombatAlert(`Couldn't read max HP for ${moveName} -- apply its temporary HP by hand.`, { title: moveName });
+        continue;
+      }
+      effect = { ...effect, amount: Math.floor(effect.amount.fractionOfMaxHP * holder.maxHP) };
     }
     const spec = buildStatusSpec(effect, { sourceId: attackerId, sourceName: attacker?.name, moveName, dc, ends: pick.ends });
     if (spec.kind === 'condition' && !(await _confirmNotImmune(pick.targetId, spec.apply))) continue;
@@ -3107,6 +3170,46 @@ async function _handleNegateDamage({ reactorId, moveName }) {
   CombatAPI.logEvent({
     type: 'save', actorId: reactorId, actorName: reactor.name, targetId: original.actorId, targetName: original.actorName || '?',
     text: `${reactor.name} used ${moveName} -- ignores the ${refund} damage, refunding it in full`,
+  }).catch(() => {});
+
+  if (refund > 0) {
+    const maxHp = Number.isFinite(reactor.maxHP) ? reactor.maxHP : Infinity;
+    const newHp = Math.min(maxHp, reactor.currentHP + refund);
+    try {
+      await CombatAPI.updateStats(reactorId, { currentHP: newHp });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
+}
+
+/** Wing Buffer's own "on a successful [reactive] save, you take half
+ * damage" -- the SAME retroactive-correction shape as _handleUndoCritDamage
+ * just above, minus the crit gate (any successful reactive save halves the
+ * hit, crit or not) and reading attackerId directly from the caller
+ * (_handleReactiveSave already knows exactly who it reacted to, same
+ * `actorId`/`targetId` precision _handleRerollDamage's own log filter uses)
+ * rather than falling back to "whoever hit the reactor most recently". */
+async function _handleHalveDamage({ reactorId, attackerId, moveName }) {
+  const reactor = session?.participants?.[reactorId];
+  const attacker = session?.participants?.[attackerId];
+  if (!reactor || !attacker) return;
+
+  const log = session?.log || [];
+  let original = null;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const entry = log[i];
+    if (entry.type === 'damage' && entry.actorId === attackerId && entry.targetId === reactorId) { original = entry; break; }
+  }
+  if (!original || !Number.isFinite(original.amount)) {
+    showCombatAlert(`Couldn't find ${attacker.name}'s damage roll to halve -- refund it by hand if needed.`, { title: moveName });
+    return;
+  }
+
+  const refund = Math.floor(original.amount / 2);
+  CombatAPI.logEvent({
+    type: 'save', actorId: reactorId, actorName: reactor.name, targetId: attackerId, targetName: attacker.name,
+    text: `${reactor.name} used ${moveName} -- takes half damage from ${attacker.name}'s hit, refunding ${refund} HP`,
   }).catch(() => {});
 
   if (refund > 0) {
@@ -3832,7 +3935,10 @@ async function _handleSecondarySave(combatantId, targetId, moveName, computedDat
  * log, falling back to a manual "pick who attacked you and type in their
  * DC" flow when that isn't possible -- no matching damage entry, the
  * attacker's record predates the full-stat-block feature (e.g. a PvE
- * freeform enemy), or the attacking move isn't in the moves dataset. */
+ * freeform enemy), or the attacking move isn't in the moves dataset.
+ * Wing Buffer's own effect (`kind:"halve_damage"`) fires here directly on
+ * a PASS, not through _offerMoveEffects's generic save_fail flow -- see
+ * the inline comment at its own call below. */
 async function _handleReactiveSave({ combatantId, moveName }) {
   const result = await CombatAPI.getState();
   const freshSession = result.status === 'success' ? result.data : session;
@@ -3872,9 +3978,19 @@ async function _handleReactiveSave({ combatantId, moveName }) {
 
   const reactorName = freshSession?.participants?.[combatantId]?.name || '?';
   const attackerName = (attacker || freshSession?.participants?.[outcome.targetId])?.name || '?';
+  // Wing Buffer's own "on a SUCCESSFUL save, you take half damage" -- the
+  // one existing move with this shape, inverted from every other
+  // save-triggered move's own convention (effect on a FAIL): handled here
+  // directly rather than through _offerMoveEffects's generic save_fail
+  // flow, which has no "on success" case at all. Gated on the move
+  // actually carrying this kind so a future differently-shaped
+  // reactive_save move doesn't silently get it too.
+  if (outcome.passed && moveEffectsFor(moveName).some((e) => e.kind === 'halve_damage')) {
+    await _handleHalveDamage({ reactorId: combatantId, attackerId: outcome.targetId, moveName });
+  }
   const text = outcome.passed
     ? `${reactorName} succeeded a reactive saving throw (DC ${outcome.dc}) against ${attackerName}'s attack using ${moveName}`
-    : `${reactorName} failed a reactive saving throw (DC ${outcome.dc}) against ${attackerName}'s attack using ${moveName} -- apply its effect manually (e.g. half damage)`;
+    : `${reactorName} failed a reactive saving throw (DC ${outcome.dc}) against ${attackerName}'s attack using ${moveName}`;
   CombatAPI.logEvent({
     type: 'save', actorId: combatantId, actorName: reactorName, targetId: outcome.targetId, targetName: attackerName, text,
   }).catch(() => {});

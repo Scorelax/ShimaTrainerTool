@@ -2967,6 +2967,11 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       stabBonusValue: c.stabBonusValue || 2,
       level: c.level,
       hasToughClaws: hasAbility(c, 'Tough Claws'),
+      // Calm Mind/Tail Glow's own "double your STAB [bonus/damage]" --
+      // WIP-only bridged field (combat-wip.js's _syncLocalCombatState),
+      // undefined (-> computeMoveData's own default of 1) on the legacy
+      // standalone engine.
+      stabMultiplier: c.stabMultiplier,
     },
     { path: trainerPath, level: trainerLevel, specializationsStr },
     heldItemEffects

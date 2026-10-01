@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock
+from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1896,10 +1896,19 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
     condition_multiplier = incoming_damage_multiplier(target) * outgoing_damage_multiplier(attacker)
     if condition_multiplier != 1:
         actual_damage = round(actual_damage * condition_multiplier)
+    # Harden's own "reduce any damage dealt to you by 1d4 + MOVE" -- a FLAT
+    # subtraction (one number, rolled once at cast time), applied AFTER the
+    # multiplier above rather than folded into it (a percentage and a flat
+    # amount compose by subtracting the flat one from the already-scaled
+    # total, not by multiplying them together).
+    flat_reduction = incoming_flat_reduction(target)
+    if flat_reduction:
+        actual_damage = max(0, actual_damage - flat_reduction)
     leftover = _absorb_temp_hp(state, target, actual_damage)
     target['currentHP'] -= leftover  # no floor, same reasoning as elsewhere in this module
     move_label = f' with {move_name}' if move_name else ''
     condition_note = ' -- Mat Block/Testudo Formation reduces this' if condition_multiplier != 1 else ''
+    condition_note += ' -- Harden reduces this' if flat_reduction else ''
     _log_event(
         state, 'damage',
         text=f"{attacker['name']} hit {target['name']}{move_label} for {actual_damage} damage ({multiplier}x){condition_note}",
@@ -2074,7 +2083,15 @@ def _movement_budget(participant):
     speed now IS that value, not an addition to what they already had.
     Ascension's own `granted_flight_speed` instead ADDS an entry alongside
     the real ones (a genuinely new, separate movement type the participant
-    didn't have before), so it folds in rather than replacing."""
+    didn't have before), so it folds in rather than replacing.
+
+    Agility/Autotomize/Flame Charge/Kinesis's own flat "+Nft" buffs
+    (speed_bonus_entries) and Surface Glide/Tailwind's own "double speed"
+    buffs (speed_multiplier_entries) are applied per speed-TYPE entry
+    (additive first, then multiplicative, then the existing debuff-only
+    `multiplier` below) -- both can scope to one movement type via
+    `appliesTo` (Surface Glide's own "on/in water" only ever touches
+    `swimming`) or apply to every entry (`'all'`, the default)."""
     override = speed_override(participant)
     if override is not None:
         speeds = [{'type': 'overridden', 'ft': override}]
@@ -2084,8 +2101,16 @@ def _movement_budget(participant):
         return (0, 0)
     used = participant.get('movementUsed', 0)
     multiplier = effective_speed_multiplier(participant)
-    fastest = max(s['ft'] * multiplier for s in speeds)
-    best_remaining = max(max(0, s['ft'] * multiplier - used) for s in speeds)
+    bonuses = speed_bonus_entries(participant)
+    buff_multipliers = speed_multiplier_entries(participant)
+
+    def _effective_ft(entry):
+        bonus = bonuses.get('all', 0) + bonuses.get(entry['type'], 0)
+        buff = buff_multipliers.get('all', 1) * buff_multipliers.get(entry['type'], 1)
+        return max(0, entry['ft'] + bonus) * buff * multiplier
+
+    fastest = max(_effective_ft(s) for s in speeds)
+    best_remaining = max(max(0, _effective_ft(s) - used) for s in speeds)
     return (fastest, best_remaining)
 
 

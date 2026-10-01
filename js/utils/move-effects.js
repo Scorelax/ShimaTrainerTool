@@ -158,6 +158,7 @@ export function statusLabel(s) {
     if (s.apply === 'resistance_upgrade') return `Resistance upgraded (${s.value === 'all' ? 'all types' : s.value || ''})`;
     if (s.apply === 'granted_immunity') return `Immune to ${s.value || ''}`;
     if (s.apply === 'exhaustion') return `Exhaustion (level ${s.value || 1})`;
+    if (s.apply === 'stab_doubled') return 'STAB doubled';
     return _title(String(s.apply || '').replace(/_/g, ' '));
   }
   if (s.kind === 'temp_hp') {
@@ -191,6 +192,15 @@ export function statusLabel(s) {
     if (s.set !== undefined) return `${stat} set to ${s.set}`;
     if (s.amount === 'proficiency') return `${stat} + proficiency`;
     if (s.amount && typeof s.amount === 'object' && s.amount.dice) return `Add ${s.amount.dice} to ${stat}`;
+    // Surface Glide/Tailwind's own "double speed" -- a multiplicative
+    // speed buff, a different shape from every other stat (scoped to one
+    // movement type via `appliesTo`, or 'all' by default -- see
+    // conditions.py's speed_multiplier_entries, the only consumer of this
+    // shape so far).
+    if (s.amount && typeof s.amount === 'object' && s.amount.multiplier) {
+      const scope = s.appliesTo && s.appliesTo !== 'all' ? ` ${s.appliesTo}` : '';
+      return `${stat}${scope} x${s.amount.multiplier}`;
+    }
     if (typeof s.amount === 'number') {
       const total = s.amount * (s.stacks || 1);
       return `${stat} ${total >= 0 ? '+' : '-'}${Math.abs(total)}`;
@@ -285,6 +295,16 @@ export function attackRollContext(attacker, target) {
       ctx.attackBonus += a;
       ctx.notes.push(_sourceText(s));
       if (_hasUses(s)) ctx.consume.push({ holderId: attacker.id, statusId: s.id });
+    }
+    // Feather Dance's own "cannot add proficiency to its attack rolls" --
+    // a standalone flag (not a `stat` delta, since the amount to subtract
+    // isn't fixed data on the status, it's whatever the holder's OWN
+    // proficiency happens to be right now) rather than authoring a
+    // negative `stat:'attack_rolls'` bonus with a hardcoded number that
+    // would drift from the holder's real proficiency bonus.
+    if (s.kind === 'condition' && s.apply === 'no_proficiency_attacks') {
+      ctx.attackBonus -= attacker.proficiency || 0;
+      ctx.notes.push(_sourceText(s));
     }
     const condMode = _conditionRollMode(s, 'attack_rolls');
     if (condMode) take(s, attacker, condMode === 'advantage' ? adv : dis);

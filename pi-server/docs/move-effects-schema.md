@@ -1237,3 +1237,44 @@ integration (Mat Block zeroes damage while the logged type multiplier
 stays untouched, Testudo halves incoming and outgoing independently, both
 sides together compound to 0.25x, an unaffected hit gets no reduction note
 in its log text).)*
+
+*(Update, 2026-10-01: moved to `steal_disrupt` (18 moves remaining). Per the
+user's own instruction, starting with the genuinely easy ones before
+re-assessing the rest the same way `protect_negate` just got re-assessed.
+First batch (`migrate_effects_v44.py`):
+
+- **Defog** ("sweeps away any area of effect moves still active") -- this
+  app models weather/terrain as a single freeform `{name, effect}` pair
+  EACH, not a stack of named effects, so "clear every active field effect"
+  is just clearing both to null. New `kind: "clear_field"`, special-cased in
+  `_offerMoveEffects` to call the already-client-exposed
+  `CombatAPI.setWeather('','')`/`setTerrain('','')` -- no new server action.
+
+- **Guard Swap** / **Speed Swap** / **Power Swap**: a new `stat_transfer`
+  mode, `"swap_value"` -- unlike the existing `"swap"` mode (which moves
+  WHOLE `kind:'stat'` status entries, built for Heart Swap's own buff
+  exchange), this swaps the CURRENT EFFECTIVE VALUE of one named field
+  (`effectiveStats(p)[field]`, reading base stats AND active statuses both),
+  since AC/speed/an ability score's current value can come from either.
+  Applies a `set`-override status to each side holding the OTHER's current
+  value; the overlay model's existing snapshot-at-apply/restore-at-expiry
+  behavior (see the `set` section above) handles "for the duration" with no
+  new code at all. Guard Swap (`field:"ac"`)/Speed Swap (`field:"speed"`)
+  name their own stat directly; Power Swap's own "a single ability score"
+  doesn't, so it ships with `field: null` and a new stat-choice dropdown in
+  effects-popup.js (`_needsStatChoice`/`_statChoiceInput`, mirroring the
+  EXISTING type-choice dropdown `type_changed`/`resistance_upgrade` already
+  use), asked ONCE per use rather than once per sibling effect -- the swap
+  is computed and applied to both sides inside ONE handler call, so there's
+  no risk of the caster's and target's own pick landing on two different
+  fields, which two independent dropdowns on two separate effects could
+  never have guaranteed.
+
+  This directly unblocks a gap already flagged for a different category:
+  "Power Trick (swap AC with an ability score) and Power Split (replace a
+  CHOSEN score with an average) both also need a 'player picks which stat'
+  mechanic that doesn't exist yet" (see the `set` section above) -- it now
+  does, for whenever those get migrated. Verified with 5 direct calls
+  against the swap-direction logic (each side receives the OTHER's value,
+  a null field reports cleanly, missing stat data on either side reports
+  cleanly rather than sending a bad number).)*

@@ -80,6 +80,33 @@ function _typeChoiceInput(effect, id) {
   </div>`;
 }
 
+// Power Swap's own "a single ability score" -- the move's text names no
+// specific one, unlike Guard Swap/Speed Swap's fixed `field` (those never
+// need this at all, see _needsStatChoice below). Scoped to just the six
+// ability scores since that's the only move using this so far; a future
+// AC/speed-inclusive variant (Power Trick's own "swap AC with an ability
+// score") can widen this list when it's actually migrated.
+const STAT_CHOICES = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+/** True for a `stat_transfer`/`swap_value` effect (Guard Swap/Speed Swap/
+ * Power Swap, see combat-wip.js's _handleStatTransfer) whose own `field` is
+ * explicitly `null` -- the move's text doesn't name a specific stat (Power
+ * Swap's "a single ability score"), so a human picks one here, same "the app
+ * shows a dropdown, the human supplies what it can't decide" pattern
+ * _needsTypeChoice already uses. A single effect (not two sibling ones) asks
+ * for this ONCE -- the swap itself is computed and applied to BOTH
+ * participants inside one handler call, so there's no risk of the caster's
+ * and the target's own pick ending up on two different fields. */
+function _needsStatChoice(effect) {
+  return effect.kind === 'stat_transfer' && effect.mode === 'swap_value' && effect.field === null;
+}
+
+function _statChoiceInput(effect, id) {
+  if (!_needsStatChoice(effect)) return '';
+  const opts = STAT_CHOICES.map(s => `<option value="${esc(s)}">${esc(s.toUpperCase())}</option>`).join('');
+  return `<div class="effects-popup-inline">Stat: <select data-stat-for="${id}">${opts}</select></div>`;
+}
+
 function _optionHtml(entry, id, inputType, name, checked) {
   const e = entry.effect;
   const manual = entry.verdict === 'manual' ? '<div class="effects-popup-manual">Needs your call — the move text isn\'t decided by the rolls</div>' : '';
@@ -117,7 +144,7 @@ export function showEffectsPopup({ title, sections }) {
         };
         if (item.type === 'row') {
           const id = idOf(item.entry);
-          return `<div class="effects-popup-row">${_optionHtml(item.entry, id, 'checkbox', id, item.entry.verdict === 'yes')}${_diceInput(item.entry.effect, id)}${_typeChoiceInput(item.entry.effect, id)}</div>`;
+          return `<div class="effects-popup-row">${_optionHtml(item.entry, id, 'checkbox', id, item.entry.verdict === 'yes')}${_diceInput(item.entry.effect, id)}${_typeChoiceInput(item.entry.effect, id)}${_statChoiceInput(item.entry.effect, id)}</div>`;
         }
         const gname = `g${gCount++}`;
         const rollInput = item.type === 'random'
@@ -125,7 +152,7 @@ export function showEffectsPopup({ title, sections }) {
           : '<div class="effects-popup-sub">Choose one</div>';
         const opts = item.entries.map(en => {
           const id = idOf(en);
-          return _optionHtml(en, id, 'radio', gname, false) + _diceInput(en.effect, id) + _typeChoiceInput(en.effect, id);
+          return _optionHtml(en, id, 'radio', gname, false) + _diceInput(en.effect, id) + _typeChoiceInput(en.effect, id) + _statChoiceInput(en.effect, id);
         }).join('');
         return `<div class="effects-popup-group" data-group="${gname}" data-kind="${item.type}">${rollInput}${opts}</div>`;
       }).join('');
@@ -183,6 +210,10 @@ export function showEffectsPopup({ title, sections }) {
           const value = overlay.querySelector(`[data-type-for="${input.dataset.eid}"]`)?.value;
           const value2 = overlay.querySelector(`[data-type2-for="${input.dataset.eid}"]`)?.value;
           effect = { ...effect, value, ...(value2 ? { value2 } : {}) };
+        }
+        if (_needsStatChoice(effect)) {
+          const field = overlay.querySelector(`[data-stat-for="${input.dataset.eid}"]`)?.value;
+          effect = { ...effect, field };
         }
         picks.push({ targetId, effect, ends });
       });

@@ -2116,7 +2116,7 @@ function _targetDamageNotes(moveName) {
  * were actually left) -- a documented simplification, same "close enough"
  * trust level as everything else in this app that doesn't track exact
  * remaining-duration bookkeeping. */
-async function _handleStatTransfer({ mode, attackerId, targetId, moveName }) {
+async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field, ends, dc }) {
   const attacker = session?.participants?.[attackerId];
   const target = session?.participants?.[targetId];
   if (!attacker || !target) return;
@@ -2163,6 +2163,41 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName }) {
     for (const s of selfStats) await remove(attackerId, s, `swapped by ${moveName}`);
     for (const s of targetStats) await recreate(s, attackerId);
     for (const s of selfStats) await recreate(s, targetId);
+    return;
+  }
+  if (mode === 'swap_value') {
+    // Guard Swap (field:"ac", fixed)/Speed Swap (field:"speed", fixed)/Power
+    // Swap (field left null in the move's own data, filled in by the human
+    // via effects-popup.js's own stat-choice dropdown -- see
+    // _needsStatChoice) -- unlike plain 'swap' above (which moves WHOLE
+    // kind:'stat' STATUS ENTRIES), this swaps the CURRENT EFFECTIVE VALUE of
+    // ONE named field, since AC/speed/an ability score's current value can
+    // come from base stats as much as from an active status, which moving
+    // status entries alone could never capture. Applies a `set`-override
+    // status to EACH side holding the OTHER's current value -- the
+    // overlay-model's own existing snapshot-at-apply/restore-at-expiry
+    // behavior (see move-effects-schema.md's own `set` section) handles the
+    // "for the duration" half with no extra code.
+    if (!field) {
+      showCombatAlert(`No stat chosen for ${moveName} -- nothing to swap.`, { title: moveName });
+      return;
+    }
+    const a = effectiveStats(attacker)[field];
+    const t = effectiveStats(target)[field];
+    if (!Number.isFinite(a) || !Number.isFinite(t)) {
+      showCombatAlert(`Couldn't read ${field.toUpperCase()} for both sides -- swap it by hand.`, { title: moveName });
+      return;
+    }
+    const specFor = (value) => buildStatusSpec(
+      { kind: 'stat', stat: field, set: value },
+      { sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends },
+    );
+    try {
+      await CombatAPI.applyStatus(attackerId, specFor(t));
+      await CombatAPI.applyStatus(targetId, specFor(a));
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
   }
 }
 
@@ -2249,6 +2284,21 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleRedirectAvoidedDamage({ reactorId: attackerId, moveName });
       continue;
     }
+    if (effect.kind === 'clear_field') {
+      // Defog's own "sweeps away ... any area of effect moves still active"
+      // -- this app models weather/terrain as a single freeform {name,
+      // effect} pair each (not a stack of named effects), so "clear every
+      // active field effect" is just clearing both straight to null. Not a
+      // status, no target -- weather/terrain are shared session fields, not
+      // per-participant, so this ignores targetId entirely.
+      try {
+        await CombatAPI.setWeather('', '');
+        await CombatAPI.setTerrain('', '');
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
     if (effect.kind === 'block_attack') {
       // Not a status either -- a one-shot signal to the ATTACKER's own
       // client (mid waitForReactionWindow) that this attack is blocked
@@ -2291,9 +2341,11 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // target:'self' effect (Haze's own self-hit) and to the real target
       // otherwise, so a single-participant mode (dispel/dispel_all/copy/
       // steal) always operates on whoever this specific effect actually
-      // means, self included. 'swap' still reaches both sides regardless,
-      // since it reads attackerId from the closure too.
-      await _handleStatTransfer({ mode: effect.mode, attackerId, targetId: pick.targetId, moveName });
+      // means, self included. 'swap'/'swap_value' still reach both sides
+      // regardless, since they read attackerId from the closure too.
+      // field/ends/dc only matter for 'swap_value' (Guard/Power/Speed Swap)
+      // -- harmless no-ops for every other mode.
+      await _handleStatTransfer({ mode: effect.mode, attackerId, targetId: pick.targetId, moveName, field: effect.field, ends: pick.ends, dc });
       continue;
     }
     if (effect.kind === 'heal' && !effect.repeat) {

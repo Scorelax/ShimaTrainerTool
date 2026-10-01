@@ -10331,12 +10331,26 @@
       },
       "reaction": false,
       "categories": [
-        "steal_disrupt"
+        "steal_disrupt",
+        "clear_field"
       ],
       "description": "You summon a swift, magical breeze in a 50 foot radius, centered on you, that sweeps away foggy weather and obstacles. When activating this move, any area of effect moves that are still active end immediately (Examples: Misty Terrain, Fog Cloud, Smog, etc.).",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "clear_field",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Drill Peck",
@@ -23498,12 +23512,29 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "potential_stat_transfer_swap_value"
       ],
       "description": "You use your psychic power to swap defenses with a creature. Force a creature in range to make a CHA save against your Move DC. On a failure, switch armor class with the target for the duration.",
       "moveStat": "WIS/INT",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "swap_value",
+          "field": "ac",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Heal Block",
@@ -24404,12 +24435,32 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "potential_stat_transfer_swap_value"
       ],
       "description": "As a bonus action, force a creature in range to make a WIS save against your Move DC. On a failure, you employ your psychic power to swap a single ability score with a creature until the end of their next turn, for purposes of attack and damage rolls.",
       "moveStat": "WIS/INT",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "swap_value",
+          "field": null,
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Power Trick",
@@ -24946,12 +24997,29 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "potential_stat_transfer_swap_value"
       ],
       "description": "You use your psychic power to swap speed with a creature. Force a creature in range to make a CHA save against your Move DC. On a failure, switch speed with the target for the duration.",
       "moveStat": "INT/WIS",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "swap_value",
+          "field": "speed",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Spirit Growth",

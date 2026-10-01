@@ -1446,3 +1446,68 @@ unmigrated for a reason genuinely different from everything built above:
   overlay/restore system for a field that currently has none, comparable in
   scope to the stat overlay system itself -- real, but a separate slice,
   not a "choose which" gap this pass's new status/stat pickers could close.)*
+
+*(Update, 2026-10-01: moved to `positioning` (13 moves). 8 of the 13 fit
+mechanisms that already existed but had each only ever been used for ONE
+move before -- read every move fully before trusting the category label,
+same discipline as always (`migrate_effects_v49.py`).
+
+**Push/pull reuses `forced_movement`** (built for Dawn Dance, never reused
+since): `kind:"condition"`, `ends:[{type:"instant"}]` means "announced,
+never stored" (`_apply_status`'s own instant-conditions branch just logs
+the shove as a battle-log entry) -- the human drags the token on the actual
+map same as any other manual positioning in this app already works. No new
+code at all, just data -- a `note` on each describing the distance/
+direction, since unlike Dawn Dance's own single d4-table entry these vary
+move to move and are worth having in the effects-popup itself. Circle Throw
+(`on_hit`), Lava Cannon (`save_fail`/DEX, already `multi_hit_aoe` so this
+rides the existing per-target save loop), Magnetic Pulse (`save_fail`/STR),
+Roar (`save_fail`/CHA, also `multi_hit_aoe`), Strength (`on_hit` -- the
+move's own "you may ALSO choose to push" is already optional for free,
+since the effects-popup already lets a human leave any offered effect
+unchecked).
+
+**"Cannot flee or be switched out" reuses `trapped`** (the SAME mechanism
+Ingrain/Thousand Waves already use, matching these moves' own near-verbatim
+wording -- `_MOVEMENT_BLOCKING_CONDITIONS` already gives it this exact
+meaning). Real, enforced automation for the "flee" half (`_move_token`
+hard-blocks a trapped participant's own grid movement); the "switched out"
+half stays advisory only -- there is no switch-Pokémon mechanic ANYWHERE in
+the shared combat system yet (routes_combat.py has no switch action at
+all, only the legacy local engine does, and only for Ingrain specifically),
+a real, separate, much bigger gap than this migration pass is scoped to
+close. Fairy Lock (no save at all -- `when:"always"`, the same `target:
+"self"` + target-unset dual-effect shape Haze/Safeguard/Mat Block already
+use for an automatic, no-save AoE; `ends:{until_turn, point:"end", count:1}`
+for "on their next turn", including on the caster's own self-effect -- the
+status is applied WHILE the caster is active, so the existing until_turn
+skip logic's default behavior is exactly right here (push the expiry to
+the END of their actual next turn, not this one), unlike Confused's own
+`noSkip` exception earlier this session, which needed the OPPOSITE because
+it has to expire at the end of THIS SAME turn instead), Mean Look
+(`save_fail`/WIS, `ends:{rounds,n:3}`, the move's own stated duration),
+Spirit Shackle (`on_hit`, `ends:{type:"other", text:...}` -- "while the
+user remains in battle" matches no existing `ends` entry, so this uses the
+vocabulary's own catch-all exactly as documented for cases like it).
+
+The remaining 5 stay unmigrated: **U-turn**/**Volt Switch** need no effects
+entry at all -- their own "move up to half your speed away... or switch
+out" needs nothing new for the movement half (a player can already freely
+use the existing, fully-working move-token feature afterward, same "the
+app doesn't need to gate what's already open" reasoning Dig/Dive's own
+un-automated "with advantage" clause gets) and the switch-out half is the
+same unbuilt mechanic noted above. **Block** reacts to an opponent
+attempting to flee/switch out, which has no trigger point to hook into at
+all (no reaction window opens before a token move is attempted, and
+switch-out still isn't a mechanic here). **Pasta Portal** compounds THREE
+separate unbuilt systems (a persistent walkable map hazard, a "flee the
+whole encounter" group-check mechanic distinct from grid movement, and the
+same switch-out gap) -- not a small increment on anything already built.
+**Strafe**'s own post-hit reposition is a special grant explicitly OUTSIDE
+the normal movement budget ("ignoring your flying speed"), unlike U-turn/
+Volt Switch's plain "up to half your speed" (ordinary budgeted movement,
+needing nothing new) -- reusing `_move_token` directly would incorrectly
+check/consume the character's own ordinary per-turn allowance for a move
+whose text says it doesn't; needs a "reposition that bypasses the normal
+movement budget" action that doesn't exist, plus the same switch-out
+alternative.)*

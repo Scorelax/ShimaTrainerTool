@@ -4711,12 +4711,29 @@
       "categories": [
         "positioning",
         "trigger_saving_throw",
-        "situational_use"
+        "situational_use",
+        "potential_status_condition_forced_movement"
       ],
       "description": "The user emits a pulse of magnetic energy. Each creature that is steel type, wearing metal armor or holding a metal weapon within 30 feet must succeed on a Strength saving throw or either be pulled 15 feet toward the user, or pushed 15 feet away.",
       "moveStat": "STR",
       "vpCost": "10",
-      "scaling": "Starting from level 10, the user may choose to knock creatures that fail the saving throw prone instead of pushing or pulliing them."
+      "scaling": "Starting from level 10, the user may choose to knock creatures that fail the saving throw prone instead of pushing or pulliing them.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "forced_movement",
+          "when": {
+            "type": "save_fail",
+            "ability": "STR"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Pulled 15ft toward you or pushed 15ft away, your choice. Only affects Steel-type creatures, or ones wearing metal armor/holding a metal weapon -- use judgment for anyone else."
+        }
+      ]
     },
     {
       "name": "Nuzzle",
@@ -5891,12 +5908,48 @@
       },
       "reaction": false,
       "categories": [
-        "positioning"
+        "positioning",
+        "self_status_condition_trapped",
+        "status_condition_trapped"
       ],
       "description": "You summon forth a mystical power that locks down the battlefield. Creatures within a 40 foot circle, centered on you, may not flee or be switched out on their next turn.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": "The range of this move changes to 50ft. at level 5, 60ft. at level 10, and 80ft. at level 17."
+      "scaling": "The range of this move changes to 50ft. at level 5, 60ft. at level 10, and 80ft. at level 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "trapped",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "trapped",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ],
+          "note": "Blocks grid movement (this app's own enforced meaning for trapped); switching out isn't a mechanic this app's shared combat system has yet, so that half stays advisory only."
+        }
+      ]
     },
     {
       "name": "Fairy Scales",
@@ -7321,12 +7374,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "positioning"
+        "positioning",
+        "status_condition_forced_movement"
       ],
       "description": "You grab and hurl the opponent across the battlefield. Make a melee attack, dealing 1d10 + MOVE fighting damage on a hit. On hit, throw the target in a direction of your choice: 30ft if your size or smaller, 15ft if one size larger, or 5ft if two or more sizes larger. If the target collides with a solid surface or another creature, both take 1d6 typeless damage.",
       "moveStat": "STR",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "forced_movement",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "30ft (your size or smaller target), 15ft (one size larger), or 5ft (two+ sizes larger), in a direction of your choice. A collision with a solid surface or another creature deals 1d6 typeless damage to both -- not automated."
+        }
+      ]
     },
     {
       "name": "Close Combat",
@@ -9512,12 +9581,29 @@
         "multi_hit_aoe",
         "trigger_saving_throw",
         "positioning",
-        "recharge_locked"
+        "recharge_locked",
+        "potential_status_condition_forced_movement"
       ],
       "description": "You emit a stream of superheated lava in a 60ft. line. All creatures caught in the line must make a DEX saving throw, taking 3d12 + MOVE fire damage and 1d12 rock damage, or half damage on a success. On a failed save, creatures hit are pushed back 10ft.",
       "moveStat": "STR",
       "vpCost": "35",
-      "scaling": "The damage dice for this move changes to 4d12 and 2d12 at level 5, 5d12 and 3d12 at level 10, and 10d12 and 4d12 at level 17."
+      "scaling": "The damage dice for this move changes to 4d12 and 2d12 at level 5, 5d12 and 3d12 at level 10, and 10d12 and 4d12 at level 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "forced_movement",
+          "when": {
+            "type": "save_fail",
+            "ability": "DEX"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Pushed back 10ft, straight away from the line."
+        }
+      ]
     },
     {
       "name": "Lava Plume",
@@ -12187,12 +12273,29 @@
       "reaction": false,
       "categories": [
         "damage",
-        "positioning"
+        "positioning",
+        "status_condition_trapped"
       ],
       "description": "You employ dark energy to stitch a creature’s shadow to the ground. Make a ranged attack, dealing 2d8 + MOVE ghost damage on a hit. On hit, the target is unable to flee or switch out while the user remains in battle.",
       "moveStat": "DEX/CHA",
       "vpCost": "9",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "trapped",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "other",
+              "text": "until the attacker leaves the battle"
+            }
+          ],
+          "note": "Blocks grid movement; switching out isn't a mechanic this app's shared combat system has yet, so that half stays advisory only."
+        }
+      ]
     },
     {
       "name": "Spite",
@@ -18717,12 +18820,30 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "positioning"
+        "positioning",
+        "potential_status_condition_trapped"
       ],
       "description": "You flash an intimidating look at a target, attempting to freeze them in fear. Force a target in range to make a WIS save against your Move DC. On a fail, the target cannot flee or be switched out for 3 rounds.",
       "moveStat": "STR/CHA",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "trapped",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ],
+          "note": "Blocks grid movement; switching out isn't a mechanic this app's shared combat system has yet, so that half stays advisory only."
+        }
+      ]
     },
     {
       "name": "Mega Kick",
@@ -19709,12 +19830,29 @@
       "categories": [
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "positioning"
+        "positioning",
+        "potential_status_condition_forced_movement"
       ],
       "description": "You release an intimidating roar at all creatures within 15 feet of you. Creatures affected that are not your ally must make a CHA save against your Move DC. On a fail, the creature must immediately Disengage as a free action and move up to its speed in a straight line away from the user, or until met by an impeding force. Moving out of an opponent's melee range will trigger an Attack of Opportunity.",
       "moveStat": "STR/CHA",
       "vpCost": "15",
-      "scaling": "The effective range for this move increases to 30 feet at level 10."
+      "scaling": "The effective range for this move increases to 30 feet at level 10.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "forced_movement",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "The creature Disengages (free action) and moves up to its own speed in a straight line directly away from you. Allies are unaffected."
+        }
+      ]
     },
     {
       "name": "Rock Climb",
@@ -20787,12 +20925,28 @@
       "reaction": false,
       "categories": [
         "damage",
-        "positioning"
+        "positioning",
+        "status_condition_forced_movement"
       ],
       "description": "You strike out at a creature with brute strength. Make a melee attack roll, doing 2d8 + MOVE normal damage on a hit. On a hit, you may also choose to push the creature 5 feet away.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "forced_movement",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Optional -- pushed 5ft away, your choice."
+        }
+      ]
     },
     {
       "name": "Struggle",

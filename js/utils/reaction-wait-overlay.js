@@ -72,3 +72,14 @@ export async function waitForDamagedReactions(anchorId, attackerId, moveName) {
 export async function waitForTargetedAoeReactions(anchorId, attackerId, moveName) {
   return _waitForReactions('targeted', anchorId, attackerId, moveName);
 }
+
+/** combat-wip.js's own _handleEffectsOnly -- opened right before a self-
+ * only move's own effects are offered, so a Heal Block/Strength Sap/
+ * Spectral Surge/Snatch-style reactor can interject before a self-buff or
+ * self-heal actually lands. Anchored on the CASTER themselves (both
+ * anchorId and attackerId -- there's no separate "target" here, the caster
+ * IS who the reaction concerns), same generic trigger-name-agnostic
+ * eligibility `_eligible_reactors` already uses for every other trigger. */
+export async function waitForBeneficialReactions(casterId, moveName) {
+  return _waitForReactions('beneficial', casterId, casterId, moveName);
+}

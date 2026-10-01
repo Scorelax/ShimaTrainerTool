@@ -21,7 +21,7 @@ import { showCombatAlert, showCombatConfirm, showCombatPrompt } from '../utils/c
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
-import { waitForDamagedReactions, waitForTargetedAoeReactions } from '../utils/reaction-wait-overlay.js';
+import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficialReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { pickOneStatus } from '../utils/status-picker.js';
 import { promptHealRoll } from '../utils/heal-popup.js';
@@ -2254,6 +2254,47 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
   }
 }
 
+/** Covet/Thief's own "steal the opponent's held item if you are not
+ * currently holding one" -- a plain client-authoritative move/remove
+ * against the `item` field (a comma-separated freeform string, same shape
+ * as `abilities`), via the new update-item action. Unlike a temporary
+ * status, this is PERMANENT -- no duration, no restore-on-expiry to design
+ * around, just moving one name from the target's own list onto the
+ * attacker's. If the target holds more than one item, takes the
+ * first-listed one -- a documented simplification rather than a new
+ * "choose which item" picker, since this app's own data rarely populates
+ * more than one anyway. Both of Covet's own "if you are not currently
+ * holding one" and Thief's own "if the user does not have an item held"
+ * gates are checked here, inside the handler, rather than via the generic
+ * `when` vocabulary -- neither reads naturally as an attack-roll/save
+ * condition, they're both about the ATTACKER's own unrelated state. */
+async function _handleStealItem({ attackerId, targetId, moveName }) {
+  const attacker = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  if (!attacker || !target) return;
+  if ((attacker.item || '').trim()) {
+    showCombatAlert(`${attacker.name} is already holding an item -- ${moveName} only works empty-handed.`, { title: moveName });
+    return;
+  }
+  const items = (target.item || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!items.length) {
+    showCombatAlert(`${target.name} isn't holding an item -- nothing for ${moveName} to steal.`, { title: moveName });
+    return;
+  }
+  const [stolen, ...rest] = items;
+  try {
+    await CombatAPI.updateItem(attackerId, stolen);
+    await CombatAPI.updateItem(targetId, rest.join(', '));
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  CombatAPI.logEvent({
+    type: 'save', actorId: attackerId, actorName: attacker.name, targetId, targetName: target.name,
+    text: `${attacker.name} used ${moveName} to steal ${target.name}'s ${stolen}`,
+  }).catch(() => {});
+}
+
 async function _offerMoveEffects({ attackerId, targetId = null, moveName, computedData, ctx, includeSelf = true }) {
   const effects = moveEffectsFor(moveName);
   if (!effects.length) return;
@@ -2342,6 +2383,21 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // hit as if it had been effect.newType all along. attackerId (closure)
       // is the reactor themselves.
       await _handleRetypeDamage({ reactorId: attackerId, newType: effect.newType, moveName });
+      continue;
+    }
+    if (effect.kind === 'steal_buff') {
+      // Spectral Surge/Snatch -- blocks the caster's own stat buff (fired
+      // from a 'beneficial' window, see _handleEffectsOnly) and reapplies
+      // it to the reactor instead. attackerId (closure) is the reactor
+      // themselves.
+      await _handleStealBuff({ reactorId: attackerId, moveName });
+      continue;
+    }
+    if (effect.kind === 'steal_item') {
+      // Covet/Thief -- a normal attack-flow effect (unlike every other
+      // handler above), so pick.targetId here is the real target, same as
+      // any other on-hit/save-gated effect.
+      await _handleStealItem({ attackerId, targetId: pick.targetId, moveName });
       continue;
     }
     if (effect.kind === 'clear_field') {
@@ -2775,6 +2831,68 @@ async function _handleRetypeDamage({ reactorId, newType, moveName }) {
   }
 }
 
+/** Spectral Surge/Snatch's own shared mechanism -- "steal the stat bonus"/
+ * "you gain the positive effect and the target's move fails", fired from a
+ * `beneficial`-trigger window (see waitForBeneficialReactions) BEFORE the
+ * caster's own buff has ever actually applied. `when:"special"` on both
+ * (not the usual auto-evaluated save_fail/attack-roll machinery): Spectral
+ * Surge's own trigger is a fresh ranged attack roll against the caster,
+ * Snatch's is a forced WIS save against the caster -- either way it's a
+ * contested/conditional outcome involving a THIRD PARTY (the caster, not
+ * the reactor), which `_handleEffectsOnly`'s own self-only architecture
+ * has nowhere to run (see its own docstring note on exactly this shape for
+ * Guard Split). Reusing Parry/Captivate/Hover's own "the human judges it
+ * and ticks the box after confirming" pattern sidesteps needing a new
+ * third-party save/attack sub-flow entirely.
+ *
+ * `session.pendingReaction` is still the live window at this point (the
+ * reactor only reaches their own move-use while holding the floor for it),
+ * so its own `moveName`/`attackerId` fields -- recorded when the window
+ * opened -- say exactly which move and which caster this reacts to. Reads
+ * that move's own authored `kind:'stat', target:'self'` effects (the ones
+ * it would have granted ITS OWN user) and reapplies them to the REACTOR
+ * instead, scoped to stat buffs only -- same "steal only the stat changes"
+ * precedent Spectral Thief's own stat_transfer `steal` mode already uses;
+ * a healing/condition-curing "positive effect" (Snatch's own broader
+ * wording) isn't covered. Blocks the caster's own buff first via the same
+ * `block-pending-attack` action block_attack itself uses (trigger-agnostic
+ * -- it only cares about the live pendingReaction, not which trigger
+ * opened it), so the caster never also gets a copy. */
+async function _handleStealBuff({ reactorId, moveName }) {
+  const pr = session?.pendingReaction;
+  const casterId = pr?.attackerId;
+  const casterMoveName = pr?.moveName;
+  if (!casterId || !casterMoveName) {
+    showCombatAlert(`Couldn't tell which move ${moveName} is reacting to -- apply its effect by hand.`, { title: moveName });
+    return;
+  }
+  // set === undefined excludes a set-override buff (Guard Split-style) --
+  // those resolve against live attacker/target context (_resolveSetValue)
+  // that doesn't carry over to a stolen copy; no move needing THIS kind so
+  // far has one, but scoping it explicitly avoids silently sending a raw
+  // sentinel object as a status's `set` value if one ever does.
+  const buffs = moveEffectsFor(casterMoveName).filter(e => e.kind === 'stat' && e.target === 'self' && e.set === undefined);
+  if (!buffs.length) {
+    showCombatAlert(`Couldn't find ${casterMoveName}'s own stat buff to steal -- apply it by hand.`, { title: moveName });
+    return;
+  }
+  try {
+    await CombatAPI.blockPendingAttack(reactorId, moveName);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  const caster = session?.participants?.[casterId];
+  for (const effect of buffs) {
+    const spec = buildStatusSpec(effect, { sourceId: casterId, sourceName: caster?.name, moveName: casterMoveName, dc: 0, ends: effect.ends });
+    try {
+      await CombatAPI.applyStatus(reactorId, spec);
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
+}
+
 /** Applies ONE firing of a `heal` effect (see move-effects-schema.md's own
  * section): an immediate HP/VP change, never a status write itself -- called
  * straight from _offerMoveEffects's apply loop for a one-shot heal (that
@@ -2869,6 +2987,18 @@ async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterNa
  * before assuming it just works. */
 async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
   const ctx = { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: null };
+  // A 'beneficial' reaction (Heal Block/Strength Sap/Spectral Surge/Snatch)
+  // can cancel this move's own effects entirely before they're ever
+  // offered -- see waitForBeneficialReactions's own docstring for why this
+  // handler specifically never opened any reaction window before. A block
+  // cancels the WHOLE move, including any ally-targeting half below (e.g.
+  // Tailwind-style "you and all allies"), not just the caster's own slice
+  // -- a documented simplification, same "cancels the whole attack"
+  // precedent block_attack already has elsewhere (Crafty Shield), since
+  // this app has no mechanism to selectively cancel just one target's own
+  // share of a shared effect.
+  const reaction = await waitForBeneficialReactions(combatantId, moveName);
+  if (reaction?.blocked) return;
   await _offerMoveEffects({ attackerId: combatantId, moveName, computedData, ctx });
   if (!moveEffectsFor(moveName).some(e => e.target !== 'self')) return;
   const targetIds = await pickMultipleTargets(combatantId);

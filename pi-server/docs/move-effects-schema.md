@@ -1338,3 +1338,111 @@ confirming the attacker's CON save actually failed"). Verified with 6
 direct calls against `_retype_last_damage` (recomputes correctly, adjusts
 HP by the diff, logs the new type/amount, rejects a same-type retype,
 requires holding the reaction floor, requires a damage entry to exist).)*
+
+*(Update, same day: Heal Block, Strength Sap, Spectral Surge, and Snatch
+built (`migrate_effects_v47.py`) -- the last hard group in `steal_disrupt`,
+all four sharing one real structural gap: each reacts to an ENEMY'S OWN
+self-targeted move (a self-buff or self-heal) before it lands, and
+`_handleEffectsOnly` (the self-only move flow) never opened ANY reaction
+window at all -- every other reaction in this app fires off a 'targeted'/
+'damaged' window tied to an externally-chosen target, which a self-only
+move never has.
+
+Fixed with one new trigger, `"beneficial"` (`open-reaction-window`'s own
+validation; `_eligible_reactors`'s eligibility logic was already trigger-
+name-agnostic, so nothing else server-side needed to change), opened from
+`_handleEffectsOnly` right before a move's own effects are offered.
+Anchored on the CASTER themselves (both anchorId and attackerId -- there's
+no separate "target" here). A block cancels the move's own effects
+entirely, INCLUDING any ally-targeting half of a mixed move (Tailwind-style
+"you and all allies") -- a documented simplification, same "cancels the
+whole attack" precedent `block_attack` already has elsewhere (Crafty
+Shield), since this app has no mechanism to selectively cancel just one
+target's own share of a shared effect. Verified with 5 direct calls against
+`_eligible_reactors`/`_open_reaction_window` for the new trigger (in-range
+reactor eligible, out-of-range bystander isn't, the caster is excluded from
+reacting to their own move, the window records the right move/attacker).
+
+Two of the four needed nothing beyond the new window plus EXISTING kinds:
+**Heal Block** is plain `block_attack`, reused as-is; **Strength Sap** is
+`block_attack` + a plain `heal` effect (`{dice:"1d10", moveMod:true}`) --
+the heal amount has no connection to whatever was negated, so no new
+mechanism at all.
+
+The other two needed one new kind, **`steal_buff`** -- "steal the stat
+bonus"/"you gain the positive effect", fired `when:"special"` (the same
+Parry/Captivate/Hover "human judges a contested/conditional outcome and
+ticks the box" pattern): both **Spectral Surge**'s and **Snatch**'s own
+trigger involves a THIRD PARTY (the caster) making an attack roll or a
+saving throw, a shape `_handleEffectsOnly`'s self-only architecture has
+nowhere to run (the exact gap its own docstring already calls out for
+Guard Split). `_handleStealBuff` reads `session.pendingReaction`'s own
+`moveName`/`attackerId` (still the live window -- the reactor only reaches
+their own move-use while holding the floor for it) to find the CASTER's
+own authored `kind:'stat', target:'self'` effects, blocks them (reusing
+`block-pending-attack`, which is trigger-agnostic), and reapplies them to
+the reactor instead. Scoped to stat buffs only -- same "steal only the stat
+changes" precedent Spectral Thief's own `stat_transfer` `steal` mode
+already uses; Snatch's own broader wording ("curing a negative status
+effect... healing... etc") isn't covered. Verified with 5 direct calls
+against the buff-filtering logic (a plain self stat buff qualifies, a
+set-override effect is excluded since it resolves against live
+attacker/target context that doesn't carry over to a stolen copy, a
+condition-kind or non-self effect is excluded, a mixed list keeps only the
+one qualifying entry).
+
+With this, every `steal_disrupt` move that's buildable with a reasonable
+amount of new mechanism is done except the five noted below.)*
+
+*(Update, same day: Covet and Thief built (`migrate_effects_v48.py`) --
+previously written off as blocked on "no held-item field anywhere in this
+app." That was wrong: `item` is a real, populated, DISPLAYED per-participant
+field (a comma-separated freeform string, same shape as `abilities`,
+rendered on the combat card), just with no WRITE path during combat --
+only ever set once, from the sheet's own data, at participant-creation
+time. Fixed with a new `_update_item` (`update-item` action), a plain
+client-authoritative field sync, same trust model `_update_stats` already
+uses for HP/VP.
+
+New `kind: "steal_item"` effect, handled by `_handleStealItem`: checks the
+attacker's own "not currently holding one" gate inside the handler rather
+than via the generic `when` vocabulary (it's about the attacker's own
+unrelated state, not an attack-roll/save condition). Unlike the ability-
+swap group below, an item transfer is PERMANENT -- no duration, no
+restore-on-expiry problem to design around. If the target holds more than
+one item, takes the first-listed one -- a documented simplification rather
+than a new "choose which item" picker, since this app's own data rarely
+populates more than one anyway. Covet: `when: {type:"on_hit"}`. Thief:
+`when: {type:"save_fail", ability:"DEX", requires:"hit"}` -- the save only
+happens after the attack roll hits, matching the move's own text exactly.
+Verified with 3 direct calls against `_update_item` and 5 against the
+steal-resolution logic (basic steal, attacker-already-holding blocks it,
+target-has-nothing blocks it, multiple items take the first and leave the
+rest, whitespace-only counts as empty-handed).
+
+**`steal_disrupt`'s own final tally: 16 of 18 moves migrated.** The
+remaining two, Psychic Fangs and the ability-swap group, each stay
+unmigrated for a reason genuinely different from everything built above:
+
+- **Psychic Fangs** ("automatically ends a creature's Light Screen, and
+  bypasses Reflect with no effect") -- in this app's own data, Light Screen
+  and Reflect are both ALREADY-REDESIGNED REACTION moves ("use your
+  reaction to take half the damage dealt"), not standing barrier statuses
+  at all -- there is no "Light Screen status" to end, nothing for this
+  clause to act on. The move's own damage (2d8+MOVE psychic) is an ordinary
+  attack needing no effects entry of its own, same as Dig/Dive; left
+  unmigrated rather than authoring an effect that does nothing.
+- **Entrainment / Role Play / Simple Beam / Skill Swap** (all "replace
+  one of [a participant's] own abilities with another, for the duration") --
+  genuinely harder than the numeric stat swaps above for a structural
+  reason, not a missing picker: `abilities` is a raw freeform string with
+  NO overlay model the way AC/speed/an ability score has (`effectiveStats`/
+  `statSetOverrides` compute those live from active statuses every time, so
+  simply removing a status is enough to revert them automatically).
+  Verified `_expire_status` has no hook for a custom side effect when a
+  SPECIFIC status expires -- every other "temporary change" in this schema
+  achieves automatic reversal through that overlay model, which `abilities`
+  doesn't have. Building this properly would mean inventing a parallel
+  overlay/restore system for a field that currently has none, comparable in
+  scope to the stat overlay system itself -- real, but a separate slice,
+  not a "choose which" gap this pass's new status/stat pickers could close.)*

@@ -902,6 +902,13 @@ export class CombatAPI {
     return API.request('combat', 'update-stats', { id, currentHP, currentVP }, { useCache: false });
   }
 
+  /** Covet/Thief's own mechanism -- sets a participant's whole `item` field
+   * (a comma-separated freeform string, see routes_combat.py's own
+   * _update_item), same client-authoritative sync model as updateStats. */
+  static async updateItem(id, item) {
+    return API.request('combat', 'update-item', { id, item }, { useCache: false });
+  }
+
   /** Reports a combatant's manual stat edits (AC, ability scores + modifiers, crit
    * modifier) so every other player's popups use them -- BASE values, without the
    * live status deltas (see routes_combat.py's update-base-stats and

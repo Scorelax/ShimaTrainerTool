@@ -271,6 +271,15 @@ def tag_for(e):
         # -- a retroactive recompute of the reactor's own most recent damage
         # entry, see combat-wip.js's _handleRetypeDamage.
         base = 'retype_damage'
+    elif e['kind'] == 'steal_buff':
+        # Spectral Surge/Snatch's own "steal the stat bonus"/"you gain the
+        # positive effect" -- blocks the caster's own buff and reapplies it
+        # to the reactor, see combat-wip.js's _handleStealBuff.
+        base = 'steal_buff'
+    elif e['kind'] == 'steal_item':
+        # Covet/Thief's own "steal the opponent's held item" -- see
+        # combat-wip.js's _handleStealItem.
+        base = 'steal_item'
     elif e['kind'] == 'heal':
         base = 'heal'
     elif e['kind'] == 'block_attack':

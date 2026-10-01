@@ -216,8 +216,16 @@ def handle(conn, action, params):
 
     if action == 'open-reaction-window':
         trigger = params.get('trigger')
-        if trigger not in ('targeted', 'damaged'):
-            raise ValueError('trigger must be targeted or damaged')
+        # 'beneficial': a creature ABOUT TO USE a move with a positive effect
+        # on itself (a self-buff/self-heal) -- the one case `_handleEffectsOnly`
+        # (combat-wip.js, the self-only move flow) never opened ANY window
+        # for before Heal Block/Strength Sap/Spectral Surge/Snatch needed one.
+        # Anchored on the CASTER themselves (both anchorId and attackerId),
+        # same as every other trigger -- _eligible_reactors doesn't care
+        # which trigger name it's given, only that it matches a candidate's
+        # own reactionTrigger.
+        if trigger not in ('targeted', 'damaged', 'beneficial'):
+            raise ValueError('trigger must be targeted, damaged, or beneficial')
         if not params.get('anchorId') or not params.get('attackerId'):
             raise ValueError('Missing anchorId or attackerId')
         outcome = {}
@@ -322,6 +330,11 @@ def handle(conn, action, params):
             js_parse_int(params.get('currentHP')),
             js_parse_int(params.get('currentVP')),
         ))
+
+    if action == 'update-item':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _update_item(s, params['id'], params.get('item', '')))
 
     if action == 'set-board-template':
         cols = js_parse_int(params.get('cols'))
@@ -905,6 +918,23 @@ def _update_stats(state, pid, current_hp, current_vp):
         participant['currentHP'] = current_hp
     if current_vp is not None:
         participant['currentVP'] = current_vp
+
+
+def _update_item(state, pid, item):
+    """Covet/Thief's own mechanism needs SOME way to move a held item between
+    two participants, and `item` (a comma-separated freeform string, same
+    shape as `abilities`) had no write path during combat at all before this
+    -- only ever set once, at participant-creation time, from the sheet's
+    own data. Unlike `abilities`' own overlay-less mutation problem (see
+    move-effects-schema.md's own "not covered yet" note on Entrainment/Role
+    Play/Simple Beam/Skill Swap), an item transfer is PERMANENT, not "for a
+    duration" -- there's no restore-on-expiry to design around, just a plain
+    client-authoritative field sync, same trust model `_update_stats`
+    already uses for HP/VP."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    participant['item'] = item
 
 
 _BASE_STAT_KEYS = ('ac', 'str', 'dex', 'con', 'int', 'wis', 'cha',

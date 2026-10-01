@@ -1313,3 +1313,28 @@ Verified with 5 direct calls against the candidate-filtering logic
 includes both stat and condition kinds but excludes `temp_hp`, both report
 an empty list cleanly rather than erroring on a participant with no
 statuses at all).)*
+
+*(Update, same day: Electrify built (`migrate_effects_v46.py`). It looked
+like it needed to intercept BEFORE the attack roll/damage calculation
+(threading a type override through target-picker.js's own multi-step
+attack-roll/damage-roll flow -- real plumbing nothing else in this app
+does), but it doesn't: by the time a 'damaged' reaction can even fire, the
+hit has already landed using its own type's multiplier, so this is instead
+a RETROACTIVE correction against the just-applied log entry, same family as
+`reroll_damage`/`undo_crit_damage`/`negate_damage`.
+
+New `_retype_last_damage` (`retype-last-damage` action): reverses the
+ORIGINAL type multiplier to recover the raw roll (`amount / multiplier`, a
+rounding approximation this app already accepts elsewhere), recomputes the
+multiplier with the NEW type against the reactor's own types (reusing
+`_type_multiplier` exactly like `_apply_damage_to_target` already does),
+and adjusts HP by the difference -- worth noting this can make the hit
+WORSE, not just better, if the new type happens to be one the reactor is
+vulnerable to; the move's own rules text doesn't promise otherwise, so this
+doesn't either. New `kind: "retype_damage"` effect (`{newType}`,
+`target:"self"`, `when:"special"` -- same Parry/Captivate/Hover "tick this
+after confirming the contested/conditional outcome" pattern, here "after
+confirming the attacker's CON save actually failed"). Verified with 6
+direct calls against `_retype_last_damage` (recomputes correctly, adjusts
+HP by the diff, logs the new type/amount, rejects a same-type retype,
+requires holding the reaction floor, requires a damage entry to exist).)*

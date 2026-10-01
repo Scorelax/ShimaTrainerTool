@@ -284,6 +284,14 @@ def handle(conn, action, params):
             crit=crit,
         )
 
+    if action == 'retype-last-damage':
+        if not params.get('id') or not params.get('newType'):
+            raise ValueError('Missing participant id or newType')
+        outcome = {}
+        result = _mutate(conn, lambda s: outcome.update(_retype_last_damage(conn, s, params['id'], params['newType'])))
+        result.update(outcome)
+        return result
+
     if action == 'apply-status':
         if not params.get('targetId') or not params.get('status'):
             raise ValueError('Missing targetId or status')
@@ -1745,6 +1753,50 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name
         'species': species or attacker.get('name', ''),
     })
     return result
+
+
+def _retype_last_damage(conn, state, reactor_id, new_type):
+    """Electrify's own mechanism: "the attacking move's type is changed to
+    electric" -- by the time a 'damaged' reaction can even fire, the hit
+    already landed using its OWN type's multiplier, so this is a
+    RETROACTIVE correction against the log entry, same family as
+    reroll_damage/undo_crit_damage/negate_damage rather than anything that
+    intercepts before the roll (avoids needing to thread a type override
+    through target-picker.js's own multi-step attack-roll/damage-roll flow,
+    which nothing else in this app does either). Reverses the ORIGINAL type
+    multiplier to recover the raw roll (`amount / multiplier` -- a rounding
+    approximation, same "close enough" trust level `round()` already
+    accepts everywhere else in this file), recomputes with `new_type`
+    against the reactor's own types, and adjusts HP by the difference --
+    note this can make the hit WORSE, not just better, if the new type
+    happens to be one the reactor is vulnerable to; Electrify's own rules
+    text doesn't promise otherwise. Requires the caller to be currently
+    holding the reaction floor, same gate every other reaction-triggered
+    action in this file uses."""
+    reactor = state['participants'].get(reactor_id)
+    if not reactor:
+        raise ValueError('Unknown participant: ' + reactor_id)
+    if state['reactingParticipantId'] != reactor_id:
+        raise ValueError('Not currently holding a reaction')
+    original = next((e for e in reversed(state['log']) if e.get('type') == 'damage' and e.get('targetId') == reactor_id), None)
+    if not original or not original.get('amount'):
+        raise ValueError('No damage entry found to retype')
+    old_type = original.get('moveType') or ''
+    if old_type.lower() == new_type.lower():
+        raise ValueError(f'That hit was already {new_type}-type')
+    old_multiplier = original.get('multiplier') or 1
+    amount = original['amount']
+    raw = amount / old_multiplier if old_multiplier else amount
+    new_multiplier = _type_multiplier(conn, new_type, reactor.get('type1'), reactor.get('type2'), reactor)
+    new_amount = round(raw * new_multiplier)
+    diff = new_amount - amount
+    reactor['currentHP'] -= diff  # no floor, same reasoning as elsewhere in this module
+    _log_event(
+        state, 'damage',
+        text=f"{reactor['name']}'s last hit is retyped to {new_type} -- damage adjusted from {amount} to {new_amount} ({new_multiplier}x)",
+        targetId=reactor_id, targetName=reactor['name'], amount=new_amount, multiplier=new_multiplier, moveType=new_type,
+    )
+    return {'oldAmount': amount, 'newAmount': new_amount}
 
 
 def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False):

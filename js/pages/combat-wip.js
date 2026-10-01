@@ -2337,6 +2337,13 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleRedirectAvoidedDamage({ reactorId: attackerId, moveName });
       continue;
     }
+    if (effect.kind === 'retype_damage') {
+      // Electrify -- retroactively recomputes the reactor's own most recent
+      // hit as if it had been effect.newType all along. attackerId (closure)
+      // is the reactor themselves.
+      await _handleRetypeDamage({ reactorId: attackerId, newType: effect.newType, moveName });
+      continue;
+    }
     if (effect.kind === 'clear_field') {
       // Defog's own "sweeps away ... any area of effect moves still active"
       // -- this app models weather/terrain as a single freeform {name,
@@ -2744,6 +2751,25 @@ async function _handleRedirectAvoidedDamage({ reactorId, moveName }) {
   }
   try {
     await CombatAPI.applyDamage(reactorId, picked.targetId, picked.rawRoll, '', reactor.name, moveName);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+/** Electrify's own mechanism -- "the attacking move's type is changed to
+ * electric". By the time this 'damaged' reaction can even fire, the hit
+ * already landed using its own type's multiplier, so this is a RETROACTIVE
+ * correction against the log entry (routes_combat.py's own
+ * _retype_last_damage reverses the original multiplier to recover the raw
+ * roll, recomputes with the new type, and adjusts HP by the difference) --
+ * same family as _handleUndoCritDamage/_handleNegateDamage, avoiding any
+ * need to thread a type override through target-picker.js's own multi-step
+ * attack-roll/damage-roll flow. The server already logs the before/after
+ * numbers clearly, so this handler is thin -- just the call and error
+ * surfacing. */
+async function _handleRetypeDamage({ reactorId, newType, moveName }) {
+  try {
+    await CombatAPI.retypeLastDamage(reactorId, newType);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }

@@ -266,6 +266,11 @@ def tag_for(e):
         # shared weather/terrain session fields, see combat-wip.js's own
         # branch in _offerMoveEffects.
         base = 'clear_field'
+    elif e['kind'] == 'retype_damage':
+        # Electrify's own "the attacking move's type is changed to electric"
+        # -- a retroactive recompute of the reactor's own most recent damage
+        # entry, see combat-wip.js's _handleRetypeDamage.
+        base = 'retype_damage'
     elif e['kind'] == 'heal':
         base = 'heal'
     elif e['kind'] == 'block_attack':

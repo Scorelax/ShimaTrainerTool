@@ -4357,12 +4357,31 @@
       "categories": [
         "counter_reaction_effect",
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "self_potential_retype_damage"
       ],
       "description": "You suddenly surge with a strange electric energy signature that transfers to your attacker. When hit by a melee attack, you may instantly use your reaction to force the attacker to make a CON save against your Move DC. On a failure, the attacking move's type is changed to electric.",
       "moveStat": "STR/DEX",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "retype_damage",
+          "newType": "Electric",
+          "target": "self",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Only if the attacker fails the CON save vs your Move DC."
+        }
+      ],
+      "reactionTrigger": "damaged",
+      "reactionRange": 0
     },
     {
       "name": "Electro Ball",

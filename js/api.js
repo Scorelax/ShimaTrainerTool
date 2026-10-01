@@ -945,6 +945,15 @@ export class CombatAPI {
     return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName, crit }, { useCache: false });
   }
 
+  /** Electrify's own mechanism -- `id` is the REACTOR, retroactively
+   * recomputing their own most recent damage entry as if it had been
+   * `newType`-typed all along (see routes_combat.py's own
+   * _retype_last_damage). Returns {oldAmount, newAmount} alongside the
+   * usual {status, data}. */
+  static async retypeLastDamage(id, newType) {
+    return API.request('combat', 'retype-last-damage', { id, newType }, { useCache: false });
+  }
+
   /** Appends one entry to the shared battle log (routes_combat.py's 'log')
    * for a mechanic that only ever happens client-side -- status effects,
    * heal-popup amounts, an attack roll declared a Miss, etc. -- see

@@ -499,12 +499,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "heal"
       ],
       "description": "You send forth a flurry of pollen at a target in range. Make a ranged attack roll, dealing 2d8 + MOVE bug damage on a hit. If the target is an ally, it heals for half the amount of the damage roll instead.",
       "moveStat": "DEX/CON",
       "vpCost": "9",
-      "scaling": "The damage dice roll for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice roll for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5,
+            "moveMod": true
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Only if the target is an ally -- zero out (or otherwise undo) the damage roll above and use this heal instead."
+        }
+      ]
     },
     {
       "name": "Powder",
@@ -6331,12 +6350,30 @@
         "heal_target_or_aoe",
         "recharge_locked",
         "multi_hit_aoe",
-        "trigger_saving_throw"
+        "trigger_saving_throw",
+        "heal"
       ],
       "description": "You exhale a cone of shimmering energy that damages enemies and heals allies. All affected hostile creatures must succeed a WIS saving throw or take 3d10 + MOVE fairy damage. Allied creatures caught in the blast heal for half the amount rolled + MOVE.",
       "moveStat": "WIS/CHA",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 0.5,
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Light Dance",
@@ -12449,12 +12486,41 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "self_stat_transfer_dispel_conditions",
+        "stat_transfer_dispel_conditions"
       ],
       "description": "You release a pleasant aroma that empowers your allies. All allies within a ten foot circle, centered on you, are cured of all negative status ailments.",
       "moveStat": "None",
       "vpCost": "6",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_conditions",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_conditions",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Bioluminescent Spores",
@@ -18222,12 +18288,41 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "self_stat_transfer_dispel_conditions",
+        "stat_transfer_dispel_conditions"
       ],
       "description": "You ring a bell that chimes beautifully across the battlefield. All active allied creature in a 60ft circle, centered on you, are healed of their negative status effects.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_conditions",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_conditions",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Helping Hand",
@@ -19425,12 +19520,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "potential_heal"
       ],
       "description": "You send a booby-trapped gift to a creature. Make a ranged attack on a creature in range. On a hit, the present explodes, doing 1d6 + MOVE normal damage. If the natural attack roll is 2 or lower, however, regardless if it hits, the present provides the target with 1d6 + MOVE hit points instead.",
       "moveStat": "DEX/CHA",
       "vpCost": "1",
-      "scaling": "The damage dice roll for this move changes to 2d4 at level 5, 1d12 at level 10, and 4d4 at level 17."
+      "scaling": "The damage dice roll for this move changes to 2d4 at level 5, 1d12 at level 10, and 4d4 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "1d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "natural_roll_at_most",
+            "max": 2
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Protect",
@@ -20065,12 +20179,28 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "stat_transfer_dispel_one"
       ],
       "description": "You carefully clean away harmful substances from yourself or an ally. Touch one creature to remove one condition affecting it. The condition is successfully removed if you keep yourr concentration until the beginning of your next turn, and you are still within touching range of the target. This move can be used on yourself.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_one",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Applied immediately -- assumes you keep concentration and stay in touching range until the beginning of your next turn. Undo by hand if either breaks first."
+        }
+      ]
     },
     {
       "name": "Secret Power",
@@ -21829,12 +21959,34 @@
       },
       "reaction": false,
       "categories": [
-        "heal_target_or_aoe"
+        "heal_target_or_aoe",
+        "heal"
       ],
       "description": "You send forth a healing wish that takes time to come true. At the end of your next turn, as a free action, heal a target in range for 3d8 + MOVE hit points.",
       "moveStat": "WIS/CHA",
       "vpCost": "12",
-      "scaling": "The healing dice roll for this move changes to 5d6 at level 5, 4d12 at level 10, and 8d8 at level 17."
+      "scaling": "The healing dice roll for this move changes to 5d6 at level 5, 4d12 at level 10, and 8d8 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "dice": "3d8",
+            "moveMod": true
+          },
+          "repeat": "end_of_turn",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Work Up",
@@ -22762,12 +22914,44 @@
       "reaction": false,
       "categories": [
         "heal_target_or_aoe",
-        "heal_self"
+        "heal_self",
+        "stat_transfer_dispel_all",
+        "self_heal"
       ],
       "description": "You extend a healing energy to remove all status effects from a target. If a status effect is healed, it also restores the user's current hit points by twice its level. This user of this move cannot target itself.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_all",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "heal",
+          "amount": {
+            "levelMultiple": 2
+          },
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Approximates \"twice its level\" as a flat per-use heal -- not scaled by how many statuses were actually removed."
+        }
+      ]
     },
     {
       "name": "Sludge",

@@ -24,6 +24,7 @@ Tags in `categories` are *derived* from it — never hand-edit them (see the mig
   //                     | {"fractionOfDamage": 0.5, "capMultipleOfLevel?": 5, "pool?": "VP"}
   //                     | {"levelMultiple": 1, "pool?": "VP"}       -- see its own section below
   //             "repeat": "end_of_turn" | "start_of_turn"           -- heal-over-time only, see below
+  //             "healTargetId?": "<participantId>"                  -- Wish only, see below
   "when":   { "type": ... },        // what triggers it — see below (damage_note has no `when` at all)
   "target": "self",                 // only present when the USER is affected (default: the target)
   "ends":   [ ... ],                // how it stops — any ONE entry ending it removes it
@@ -420,7 +421,8 @@ correction `reroll_damage`'s own refund already uses.
 |---|---|
 | `always` | no roll or save needed |
 | `on_hit` | the attack roll hitting is the only requirement |
-| `natural_roll` `{min}` | natural attack roll ≥ `min` |
+| `natural_roll` `{min}` | natural attack roll ≥ `min`, only on a hit |
+| `natural_roll_at_most` `{max}` | natural attack roll ≤ `max`, regardless of hit or miss (Present) |
 | `crit` | on a critical hit |
 | `save_fail` `{ability, failBy?, requires?}` | target fails a save; `failBy` = fail by at least N (absent = any failure); `requires` = `"hit"` \| `"crit"` \| `{type:"natural_roll",min}` when the save only happens after that |
 | `special` | see `note` (speed reduced to 0, HP-pool sleep, on a miss, …) |
@@ -1511,3 +1513,65 @@ check/consume the character's own ordinary per-turn allowance for a move
 whose text says it doesn't; needs a "reposition that bypasses the normal
 movement budget" action that doesn't exist, plus the same switch-out
 alternative.)*
+
+*(Update, 2026-10-01: moved to `heal_target_or_aoe` (9 moves). Per the
+user's own steer, skipped `field_terrain`/`field_weather` entirely --
+`weather`/`terrain` are both just freeform `{name, effect}` strings with no
+structured hooks behind them at all (confirmed building Defog), so nearly
+every move in those two categories would need a real terrain/weather effect
+system built from scratch, not a small reuse.
+
+Easy half (`migrate_effects_v50.py`): **Aromatherapy**/**Heal Bell** ("cured
+of all negative status ailments", AoE, no save) get a new `stat_transfer`
+mode, `"dispel_conditions"` -- the inverse scope of the existing `"dispel"`
+(`kind:'stat'` only): this removes every `kind:'condition'` status instead,
+no further "negative" filtering needed since this app has no condition ever
+authored as a benefit to its own holder. Both ship as the same `target:
+"self"` + target-unset dual-effect pair Haze/Safeguard/Mat Block already
+use. **Scrub Down** reuses the ALREADY-BUILT `dispel_one` (Searing Flame)
+applied immediately, noting the real delayed/concentration-conditional
+resolution as a documented simplification rather than new infrastructure.
+**Purify** is `dispel_all` (broader than Aromatherapy/Heal Bell's own
+condition-only scope, matching its own "all status effects" wording) + a
+plain `heal` (`{levelMultiple: 2}`) approximating "twice its level" as a
+flat per-use amount, since nothing scales a heal by how many statuses a
+dispel just removed. **Pollen Puff** is a plain `heal`
+(`{fractionOfDamage: 0.5}`) offered ALONGSIDE the move's own normal
+damage, noting that the human needs to zero out the damage roll by hand
+when the target turns out to be an ally (this app has no team/faction
+concept, same gap `blocking_shield` already has). **Present** needed one
+new `when` type, `"natural_roll_at_most"` (the mirror of the existing
+`natural_roll`, deliberately NOT gated on `hit` since the move's own text
+says a low roll counts on a miss too).
+
+Moderate half (`migrate_effects_v51.py`): **Wish** ("at the end of YOUR
+next turn, heal a target in range") exposed a real gap in the `repeat`-heal
+machinery -- every prior repeat heal (Aqua Ring, Ingrain) is self-only, so
+`_promptTurnHeals`/`_applyRecurringHeal` always healed whoever the status
+was HELD BY, with no way to heal someone else. Fixed with a new
+`healTargetId` field (added to `_STATUS_FIELDS` -- it was silently dropped
+before that) and a new `_offerMoveEffects` special case for the one
+combination no existing move needed (`kind:"heal"` + `repeat` + NOT
+`target:"self"`): applies the status to the CASTER (so it fires at the
+caster's own next turn end) with `healTargetId` pointing at whoever was
+picked, while still computing "+MOVE" off the HOLDER's own stats --
+backward compatible, since Aqua Ring/Ingrain never set the new field.
+**Harmony Breath** ("allied creatures caught in the blast heal for half the
+amount rolled") needed `_handleMultiHitAoe` to gain a SECOND multi-target
+picker after its main hostile loop, gated on the move having a non-self
+heal effect so no other AoE move gets an unwanted extra prompt -- heals
+whichever allies the human says were also in the blast off the SAME
+`totalDamageDealt` the hostile loop already sums (one shared roll for the
+whole blast, not a second one for allies). Verified with 3 direct calls
+confirming `healTargetId` persists through `_apply_status` and the status
+lands on the caster not the recipient, plus 3 against the client-side
+redirect logic (redirects when set, falls back to the holder when absent
+or empty -- Aqua Ring/Ingrain unaffected).
+
+**Cactus Bloom** stays unmigrated -- it compounds three separate things
+this app has no hook for at all: a "participant just fainted" reaction
+trigger (nothing like it exists -- every reaction here fires off an
+attack/damage/self-buff moment, never a fainting event), real death-save
+tracking to add a failed one to, and a persistent, pickable battlefield
+object (the same hazard-tile gap Pasta Portal's own deferral already
+named). Not a small increment on anything already built.)*

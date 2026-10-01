@@ -1430,7 +1430,15 @@ _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'lon
 # ability: a roll/stat saving_throws effect scoped to one ability only
 # (Hammer Arm's "disadvantage on DEX saves") -- unset applies broadly, same
 # as before this field existed. See move-effects.js's _abilityMatches.
-_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability')
+# healTargetId: a `repeat` heal only, Wish's own "at the end of YOUR next
+# turn, heal a target in range" -- the repeat-heal machinery always fires
+# at the STATUS HOLDER's own turn boundary (combat-wip.js's
+# _promptTurnHeals/_applyRecurringHeal), so the status has to be held by
+# the CASTER (to fire at the caster's own next turn end, not the healed
+# target's) with this field saying who actually receives it. Every other
+# repeat heal (Aqua Ring, Ingrain) is self-only, so holder and recipient
+# were always the same participant before this.
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId')
 
 
 def _statuses_of(participant):

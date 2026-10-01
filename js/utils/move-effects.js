@@ -110,6 +110,15 @@ export function evaluateEffect(effect, ctx) {
       if (!hit || ctx.guaranteedHit) return 'no';
       if (ctx.attackRoll === null || ctx.attackRoll === undefined) return 'manual';
       return ctx.attackRoll >= w.min ? 'yes' : 'no';
+    case 'natural_roll_at_most':
+      // Present's own "if the natural attack roll is 2 or lower, REGARDLESS
+      // if it hits" -- deliberately does NOT gate on `hit` the way plain
+      // natural_roll does above (a low roll triggering this is just as
+      // likely to be a miss as a hit, and the move's own text is explicit
+      // that it still counts either way).
+      if (ctx.guaranteedHit) return 'no'; // no roll was made at all
+      if (ctx.attackRoll === null || ctx.attackRoll === undefined) return 'manual';
+      return ctx.attackRoll <= w.max ? 'yes' : 'no';
     case 'crit':
       if (!hit) return 'no';
       if (ctx.crit === undefined) return 'manual';

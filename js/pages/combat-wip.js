@@ -2102,6 +2102,13 @@ function _targetDamageNotes(moveName) {
  *     its own blast radius, caster included) -- see the call site's own
  *     comment for why targetId has to come from `pick.targetId`, not the
  *     closure, for this to actually reach the caster.
+ *   'dispel_conditions' -- remove every kind:'condition' status from
+ *     targetId (Aromatherapy/Heal Bell's own "cured of all negative status
+ *     ailments") -- the inverse scope of plain 'dispel', which only ever
+ *     touches kind:'stat'. Also authored `target:'self'` + target-unset in
+ *     pairs for an AoE (same Haze/Mat Block dual-effect shape), since
+ *     Aromatherapy/Heal Bell heal "you and all allies", same reasoning as
+ *     'dispel_all' above.
  *   'copy'       -- recreate every kind:'stat' status FROM targetId onto
  *     attackerId, target's own copy untouched (Psych Up).
  *   'swap'       -- exchange BOTH sides' current kind:'stat' statuses
@@ -2150,6 +2157,19 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
 
   if (mode === 'dispel_all') {
     for (const s of target.statuses || []) await remove(targetId, s, `dispelled by ${moveName}`);
+    return;
+  }
+  if (mode === 'dispel_conditions') {
+    // Aromatherapy/Heal Bell's own "cured of all NEGATIVE STATUS AILMENTS"
+    // -- the inverse scope of plain 'dispel' (which only ever touches
+    // kind:'stat'): this removes every kind:'condition' status instead,
+    // leaving any active stat buffs/debuffs untouched. No "negative"
+    // filtering beyond that -- this app has no condition that's ever
+    // authored as a deliberate BENEFIT to its own holder, so "every
+    // condition" and "every negative one" are the same set in practice.
+    for (const s of (target.statuses || []).filter((st) => st.kind === 'condition')) {
+      await remove(targetId, s, `cured by ${moveName}`);
+    }
     return;
   }
   const targetStats = (target.statuses || []).filter(s => s.kind === 'stat');
@@ -2486,6 +2506,25 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         damageDealt: ctx.damageDealt,
         casterLevel: attacker?.level,
       });
+      continue;
+    }
+    if (effect.kind === 'heal' && effect.repeat && effect.target !== 'self') {
+      // Wish's own "at the end of YOUR next turn, heal a target in range" --
+      // the repeat-heal machinery (_promptTurnHeals/_applyRecurringHeal)
+      // always fires at the STATUS HOLDER's own turn boundary, so the
+      // status has to be held by the CASTER (attackerId) to fire at the
+      // caster's own next turn end rather than the healed target's, with a
+      // separate healTargetId saying who actually receives it. Every other
+      // repeat heal (Aqua Ring, Ingrain) is self-only (target:'self',
+      // caught by the branch above instead), so holder and recipient were
+      // always the same participant until this.
+      const spec = buildStatusSpec(effect, { sourceId: attackerId, sourceName: attacker?.name, moveName, dc, ends: pick.ends });
+      spec.healTargetId = pick.targetId;
+      try {
+        await CombatAPI.applyStatus(attackerId, spec);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
       continue;
     }
     if (effect.set !== undefined && typeof effect.set === 'object') {
@@ -3258,6 +3297,26 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
       ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: null, damageDealt: totalDamageDealt },
     });
   }
+  // Harmony Breath's own "allied creatures caught in the blast heal for
+  // half the amount rolled" -- a SEPARATE multi-target picker for whichever
+  // allies were ALSO in the cone (this app has no team/faction concept, so
+  // a human picks, same as every other AoE-membership case here), healed
+  // off the SAME totalDamageDealt the hostile loop above already summed --
+  // one shared roll resolved once for the whole blast, not a second roll
+  // just for allies. Gated on the move actually having a non-self heal
+  // effect, so this extra prompt never shows for any other AoE move.
+  if (isSaveTriggered && moveEffectsFor(moveName).some((e) => e.kind === 'heal' && e.target !== 'self')) {
+    const allyIds = await pickMultipleTargets(combatantId);
+    if (allyIds && allyIds.length) {
+      for (const allyId of allyIds) {
+        await _offerMoveEffects({
+          attackerId: combatantId, targetId: allyId, moveName, computedData,
+          ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: null, damageDealt: totalDamageDealt },
+          includeSelf: false,
+        });
+      }
+    }
+  }
 }
 
 async function _handleSecondarySave(combatantId, targetId, moveName, computedData) {
@@ -3554,17 +3613,27 @@ async function _promptSleepCheck(holderId) {
  * update-stats correction every other heal in this app uses. The status
  * itself is never touched here -- its own `ends` (concentration, a rounds/
  * until_turn count) is what eventually removes it; this just fires again
- * every time it's still around at the right turn boundary. */
-async function _applyRecurringHeal(targetId, status) {
-  const target = session?.participants?.[targetId];
-  if (!target) return;
+ * every time it's still around at the right turn boundary.
+ *
+ * `holderId` is always the status HOLDER (whoever `_promptTurnHeals` found
+ * it on, and so whose OWN turn boundary just triggered this) -- for Aqua
+ * Ring/Ingrain that's also who gets healed, but Wish's own `healTargetId`
+ * (see _offerMoveEffects's own special case) can redirect the heal to a
+ * DIFFERENT participant while still computing "+MOVE"/the caster-level
+ * scaling off the HOLDER's own stats, since it's the holder's move, not the
+ * recipient's. */
+async function _applyRecurringHeal(holderId, status) {
+  const holder = session?.participants?.[holderId];
+  const recipientId = status.healTargetId || holderId;
+  const recipient = session?.participants?.[recipientId];
+  if (!recipient) return;
   const moveModBonus = status.amount?.moveMod
-    ? bestMoveStatModifier(findMoveRow(status.moveName) || [], target)
+    ? bestMoveStatModifier(findMoveRow(status.moveName) || [], holder || recipient)
     : 0;
   await _handleApplyHeal({
-    targetId, effect: status, moveName: status.moveName || statusLabel(status),
-    casterId: status.sourceId || targetId, casterName: status.sourceName || target.name,
-    moveModBonus, damageDealt: undefined, casterLevel: target.level,
+    targetId: recipientId, effect: status, moveName: status.moveName || statusLabel(status),
+    casterId: status.sourceId || holderId, casterName: status.sourceName || holder?.name,
+    moveModBonus, damageDealt: undefined, casterLevel: holder?.level,
   });
 }
 

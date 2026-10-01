@@ -207,3 +207,40 @@ def outgoing_damage_multiplier(participant):
         if s.get('kind') == 'condition' and s.get('apply') == 'testudo_formation':
             return 0.5
     return 1
+
+
+def speed_override(participant):
+    """Speed Swap's own "switch speed with the target" -- `speeds` is a
+    whole array of movement TYPES per participant (walking/flying/
+    swimming/...), not a flat scalar effective_speed_multiplier's own
+    multiplier-only model has any notion of, so a swapped value is carried
+    as its own condition instead of a `kind:'stat'` one (nothing reads a
+    stat-kind "speed" field anywhere). The ft value to use INSTEAD of the
+    participant's own recorded `speeds`, or None -- see _movement_budget's
+    own use of this (routes_combat.py), which replaces the whole list with
+    this single number for the duration rather than trying to merge it."""
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') == 'condition' and s.get('apply') == 'speed_override':
+            value = s.get('value')
+            if isinstance(value, (int, float)):
+                return value
+    return None
+
+
+def granted_speed_entries(participant):
+    """Ascension's own "their flight speed becomes Xft for the duration" --
+    `speeds` is read-only sheet data with no overlay mechanism the way flat
+    stats have (effective_speed_multiplier only ever SCALES an existing
+    entry, never adds one), so a granted temporary speed type is folded in
+    by _movement_budget generically instead, never mutating the
+    participant's own stored `speeds` list. Returns additional {type, ft}
+    entries to fold in alongside the real ones -- empty when nothing's
+    granted."""
+    out = []
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') != 'condition' or s.get('apply') != 'granted_flight_speed':
+            continue
+        ft = s.get('value')
+        if isinstance(ft, (int, float)) and ft:
+            out.append({'type': 'flying', 'ft': ft})
+    return out

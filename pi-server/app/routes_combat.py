@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier
+from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -2028,9 +2028,21 @@ def _movement_budget(participant):
     itself, Prone's own "standing costs half your movement" rule). Both
     numbers already have Grappled/Restrained/Paralyzed/etc.'s speed
     multiplier folded in; (0, 0) for a participant with no `speeds` recorded
-    -- same "missing means untracked" convention as _move_token's own
-    original comment."""
-    speeds = participant.get('speeds') or []
+    (and nothing granted/overriding one either) -- same "missing means
+    untracked" convention as _move_token's own original comment.
+
+    Speed Swap's own `speed_override` (conditions.py), when present,
+    REPLACES the participant's own recorded `speeds` entirely with just that
+    one overridden number -- "switch speed with the target" means their
+    speed now IS that value, not an addition to what they already had.
+    Ascension's own `granted_flight_speed` instead ADDS an entry alongside
+    the real ones (a genuinely new, separate movement type the participant
+    didn't have before), so it folds in rather than replacing."""
+    override = speed_override(participant)
+    if override is not None:
+        speeds = [{'type': 'overridden', 'ft': override}]
+    else:
+        speeds = list(participant.get('speeds') or []) + granted_speed_entries(participant)
     if not speeds:
         return (0, 0)
     used = participant.get('movementUsed', 0)

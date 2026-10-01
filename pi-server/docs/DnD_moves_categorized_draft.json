@@ -1077,12 +1077,29 @@
       },
       "reaction": false,
       "categories": [
-        "movement"
+        "movement",
+        "status_condition_granted_flight_speed"
       ],
       "description": "You point at a creature in range, speaking an ancient blessing that temporarily grants them the ability to fly with a set of ethereal wings. Their flight speed becomes 30ft. for the duration.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "granted_flight_speed",
+          "value": 30,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Astral Shift",
@@ -23466,12 +23483,26 @@
       },
       "reaction": false,
       "categories": [
-        "movement"
+        "movement",
+        "teleport_swap"
       ],
       "description": "You use a strange psychic power to teleport yourself and one willing creature in range, switching places on the battlefield.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "teleport_swap",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Amnesia",
@@ -25504,7 +25535,7 @@
       "categories": [
         "trigger_saving_throw",
         "steal_disrupt",
-        "potential_stat_transfer_swap_value"
+        "potential_stat_transfer_swap_fastest_speed"
       ],
       "description": "You use your psychic power to swap speed with a creature. Force a creature in range to make a CHA save against your Move DC. On a failure, switch speed with the target for the duration.",
       "moveStat": "INT/WIS",
@@ -25513,8 +25544,7 @@
       "effects": [
         {
           "kind": "stat_transfer",
-          "mode": "swap_value",
-          "field": "speed",
+          "mode": "swap_fastest_speed",
           "when": {
             "type": "save_fail",
             "ability": "CHA"

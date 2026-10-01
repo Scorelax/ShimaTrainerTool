@@ -280,6 +280,10 @@ def tag_for(e):
         # Covet/Thief's own "steal the opponent's held item" -- see
         # combat-wip.js's _handleStealItem.
         base = 'steal_item'
+    elif e['kind'] == 'teleport_swap':
+        # Ally Switch's own "switching places on the battlefield" -- see
+        # combat-wip.js's _handleTeleportSwap.
+        base = 'teleport_swap'
     elif e['kind'] == 'heal':
         base = 'heal'
     elif e['kind'] == 'block_attack':

@@ -686,8 +686,12 @@ function _hasCondition(p, applyNames) {
 
 /** The fastest of a participant's own movement types (see combat-wip.js's
  * `speeds` field -- [{type, ft}, ...]), or null with none recorded --
- * Electro Ball's own "compare the target and user's highest speed type". */
-function _maxSpeed(p) {
+ * Electro Ball's own "compare the target and user's highest speed type",
+ * and Speed Swap's own fastest-speed swap (see combat-wip.js's
+ * _handleStatTransfer) -- `speeds` is a whole array of movement TYPES, not
+ * a flat scalar `effectiveStats` has any notion of, so a "swap speed with
+ * the target" move reads this directly instead. Exported for that reuse. */
+export function maxSpeed(p) {
   const speeds = p?.speeds || [];
   if (!speeds.length) return null;
   return Math.max(...speeds.map(s => s.ft || 0));
@@ -754,10 +758,10 @@ function _targetConditionMet(cond, { attacker, target, attackRoll }) {
       return Number.isFinite(a) && Number.isFinite(t) && a < t;
     }
     // Electro Ball's own comparison -- fastest of each participant's own
-    // movement types, not a single flat stat (see _maxSpeed above).
+    // movement types, not a single flat stat (see maxSpeed above).
     case 'attacker_max_speed_above_target': {
-      const a = _maxSpeed(attacker);
-      const t = _maxSpeed(target);
+      const a = maxSpeed(attacker);
+      const t = maxSpeed(target);
       return a !== null && t !== null && a > t;
     }
     // Heavy Slam's own comparison -- see _sizeRank above.

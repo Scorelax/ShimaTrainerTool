@@ -27,7 +27,7 @@ import { pickOneStatus } from '../utils/status-picker.js';
 import { promptHealRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -2116,11 +2116,15 @@ function _targetDamageNotes(moveName) {
  *   'steal'      -- move only targetId's POSITIVE kind:'stat' statuses
  *     onto attackerId, removed from target (Spectral Thief's own "steal
  *     all positive stat changes").
- *   'swap_value' -- Guard Swap/Speed Swap/Power Swap's own "switch
- *     [AC/speed/an ability score] with the target" -- a DIFFERENT shape
- *     from plain 'swap' above (which moves whole status ENTRIES): this
- *     swaps the current EFFECTIVE VALUE of one named `field` via a
- *     `set`-override on each side instead, see its own case below for why.
+ *   'swap_value' -- Guard Swap/Power Swap's own "switch [AC/an ability
+ *     score] with the target" -- a DIFFERENT shape from plain 'swap' above
+ *     (which moves whole status ENTRIES): this swaps the current EFFECTIVE
+ *     VALUE of one named `field` via a `set`-override on each side instead,
+ *     see its own case below for why (and why "speed" never belongs here).
+ *   'swap_fastest_speed' -- Speed Swap's own "switch speed with the
+ *     target" -- `speeds` is a whole array of movement types, not a flat
+ *     scalar, so this swaps each side's own FASTEST recorded speed via a
+ *     new `speed_override` condition instead of a `kind:'stat'` one.
  *   'transfer_condition' -- Psycho Shift's own "a status affecting [a
  *     willing ally, or yourself] is transferred to the target instead",
  *     shipped self-only (see its own case below for why "or a willing
@@ -2202,18 +2206,24 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
     return;
   }
   if (mode === 'swap_value') {
-    // Guard Swap (field:"ac", fixed)/Speed Swap (field:"speed", fixed)/Power
-    // Swap (field left null in the move's own data, filled in by the human
-    // via effects-popup.js's own stat-choice dropdown -- see
-    // _needsStatChoice) -- unlike plain 'swap' above (which moves WHOLE
-    // kind:'stat' STATUS ENTRIES), this swaps the CURRENT EFFECTIVE VALUE of
-    // ONE named field, since AC/speed/an ability score's current value can
-    // come from base stats as much as from an active status, which moving
-    // status entries alone could never capture. Applies a `set`-override
-    // status to EACH side holding the OTHER's current value -- the
-    // overlay-model's own existing snapshot-at-apply/restore-at-expiry
-    // behavior (see move-effects-schema.md's own `set` section) handles the
-    // "for the duration" half with no extra code.
+    // Guard Swap (field:"ac", fixed)/Power Swap (field left null in the
+    // move's own data, filled in by the human via effects-popup.js's own
+    // stat-choice dropdown -- see _needsStatChoice) -- unlike plain 'swap'
+    // above (which moves WHOLE kind:'stat' STATUS ENTRIES), this swaps the
+    // CURRENT EFFECTIVE VALUE of one named field, via effectiveStats, since
+    // AC/an ability score's current value can come from base stats as much
+    // as from an active status, which moving status entries alone could
+    // never capture. Applies a `set`-override status to EACH side holding
+    // the OTHER's current value -- the overlay model's own existing
+    // snapshot-at-apply/restore-at-expiry behavior (see move-effects-
+    // schema.md's own `set` section) handles the "for the duration" half
+    // with no extra code. Deliberately NEVER "speed" -- `effectiveStats`
+    // has no notion of a flat speed scalar at all (movement lives in the
+    // participant's own `speeds` ARRAY, a different shape entirely), which
+    // is exactly why Speed Swap gets its own `swap_fastest_speed` mode
+    // below instead of reusing this one (an earlier version of this file
+    // tried `field:"speed"` here -- it silently never worked, since
+    // effectiveStats(p).speed was always undefined).
     if (!field) {
       showCombatAlert(`No stat chosen for ${moveName} -- nothing to swap.`, { title: moveName });
       return;
@@ -2226,6 +2236,38 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
     }
     const specFor = (value) => buildStatusSpec(
       { kind: 'stat', stat: field, set: value },
+      { sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends },
+    );
+    try {
+      await CombatAPI.applyStatus(attackerId, specFor(t));
+      await CombatAPI.applyStatus(targetId, specFor(a));
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+    return;
+  }
+  if (mode === 'swap_fastest_speed') {
+    // Speed Swap's own "switch speed with the target" -- `speeds` is a
+    // whole array of movement TYPES per participant (walking/flying/
+    // swimming/...), not a flat scalar `effectiveStats`/`swap_value` above
+    // has any notion of, so this reads each side's own FASTEST recorded
+    // speed directly (maxSpeed, move-effects.js -- same helper Electro
+    // Ball's own comparison already uses) as a reasonable approximation of
+    // "their speed", rather than attempting a full per-type array swap. A
+    // new `apply:"speed_override"` condition (not `kind:'stat'` -- nothing
+    // reads a stat-kind "speed" field either) carries the swapped value;
+    // conditions.py's own `_movement_budget` checks for it and, when
+    // present, replaces the holder's entire `speeds` list with just that
+    // one overridden number for the duration, the same "for the duration"
+    // auto-expiry every other status here already gets for free.
+    const a = maxSpeed(attacker);
+    const t = maxSpeed(target);
+    if (a === null || t === null) {
+      showCombatAlert(`Couldn't read a movement speed for both sides -- swap it by hand.`, { title: moveName });
+      return;
+    }
+    const specFor = (value) => buildStatusSpec(
+      { kind: 'condition', apply: 'speed_override', value },
       { sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends },
     );
     try {
@@ -2312,6 +2354,42 @@ async function _handleStealItem({ attackerId, targetId, moveName }) {
   CombatAPI.logEvent({
     type: 'save', actorId: attackerId, actorName: attacker.name, targetId, targetName: target.name,
     text: `${attacker.name} used ${moveName} to steal ${target.name}'s ${stolen}`,
+  }).catch(() => {});
+}
+
+/** Ally Switch's own "switching places on the battlefield" -- reads both
+ * tokens' CURRENT positions straight off the board and swaps them via two
+ * `set-token-position` calls (routes_combat.py -- "DM/setup placement, NOT
+ * turn-gated", the same unrestricted reposition the board editor already
+ * uses, reused here for a player's own move instead). No new cell to PICK
+ * at all -- both destinations are already known (wherever the OTHER
+ * creature currently stands) -- which is what makes this buildable at all:
+ * Teleport's own "reappear at an unoccupied point" needs the human to
+ * choose an ARBITRARY new cell, and the battle-map's own grid has no
+ * coordinate labels anywhere (gridCellsHtml renders blank clickable
+ * squares, nothing a text prompt could ask for and have the human read
+ * back off the physical display) -- Teleport stays unmigrated for exactly
+ * that reason, see move-effects-schema.md. */
+async function _handleTeleportSwap({ casterId, targetId, moveName }) {
+  const caster = session?.participants?.[casterId];
+  const target = session?.participants?.[targetId];
+  if (!caster || !target) return;
+  const casterPos = session?.board?.tokens?.[casterId];
+  const targetPos = session?.board?.tokens?.[targetId];
+  if (!casterPos || !targetPos) {
+    showCombatAlert(`Couldn't find both tokens on the map -- swap their positions by hand.`, { title: moveName });
+    return;
+  }
+  try {
+    await CombatAPI.setTokenPosition(casterId, targetPos.col, targetPos.row);
+    await CombatAPI.setTokenPosition(targetId, casterPos.col, casterPos.row);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  CombatAPI.logEvent({
+    type: 'save', actorId: casterId, actorName: caster.name, targetId, targetName: target.name,
+    text: `${caster.name} and ${target.name} switched places with ${moveName}`,
   }).catch(() => {});
 }
 
@@ -2418,6 +2496,12 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // handler above), so pick.targetId here is the real target, same as
       // any other on-hit/save-gated effect.
       await _handleStealItem({ attackerId, targetId: pick.targetId, moveName });
+      continue;
+    }
+    if (effect.kind === 'teleport_swap') {
+      // Ally Switch -- swaps the caster's and the chosen ally's current
+      // board positions. attackerId (closure) is the caster.
+      await _handleTeleportSwap({ casterId: attackerId, targetId: pick.targetId, moveName });
       continue;
     }
     if (effect.kind === 'clear_field') {

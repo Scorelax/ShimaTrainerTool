@@ -1575,3 +1575,77 @@ attack/damage/self-buff moment, never a fainting event), real death-save
 tracking to add a failed one to, and a persistent, pickable battlefield
 object (the same hazard-tile gap Pasta Portal's own deferral already
 named). Not a small increment on anything already built.)*
+
+*(Update, 2026-10-01: moved to `movement` (8 moves) -- and found that
+Speed Swap (`steal_disrupt`, `migrate_effects_v44.py`) never actually
+worked. It was authored as `stat_transfer`/`swap_value` with `field:"speed"`,
+modeled on Guard Swap's own `field:"ac"` -- but `effectiveStats(p).speed` is
+always `undefined`: `speed` was never one of the flat scalar fields
+`effectiveStats` resolves (only `ac`/`crit`/the six ability scores are). A
+participant's actual movement lives in `speeds`, a whole ARRAY of `{type,
+ft}` entries, a shape `swap_value`'s whole design assumes away. In practice
+this meant Speed Swap's own handler always hit the "couldn't read
+AC/SPEED for both sides" fallback and silently did nothing, every time --
+caught while reading Ascension/Phase, which also touch `speeds`.
+
+Fixed (`migrate_effects_v52.py`, overwriting the broken data) with a new
+`stat_transfer` mode, `"swap_fastest_speed"`: reads each side's own FASTEST
+recorded speed (`maxSpeed`, now exported from move-effects.js -- the same
+helper Electro Ball's own comparison already used internally) as a
+reasonable approximation of "their speed" rather than a full per-type array
+swap, carried as a new `apply:"speed_override"` CONDITION instead of a
+`kind:'stat'` one (nothing reads a stat-kind "speed" field either).
+`_movement_budget` now checks for it and, when present, REPLACES the
+holder's entire `speeds` list with just that one overridden number for the
+duration -- the existing status `ends` machinery handles expiry with no
+extra code. Verified with 6 direct calls against `speed_override`/
+`granted_speed_entries`, 5 against the full `_movement_budget` integration,
+and 5 against `maxSpeed` itself.
+
+The same `_movement_budget` extension also picked up a new
+`granted_flight_speed` condition for **Ascension** ("their flight speed
+becomes 30ft for the duration") -- ADDS an entry alongside the participant's
+real ones (a genuinely new movement type they didn't have before) rather
+than replacing, the opposite of `speed_override`'s own behavior; a
+participant with NO recorded `speeds` at all still gets a real budget from
+the grant alone. `target` unset (grants to a chosen creature, not the
+caster), `ends:{rounds, n:10}` (the move's own stated "1 minute").
+
+**Ally Switch** ("switching places on the battlefield") got a new `kind:
+"teleport_swap"` effect, `_handleTeleportSwap`: reads both tokens' CURRENT
+board positions and swaps them via two `set-token-position` calls -- the
+same unrestricted reposition the DM's own board editor already uses ("NOT
+turn-gated" by design), reused for a player's own move instead. No new cell
+to PICK at all here -- both destinations are already known (wherever the
+OTHER creature currently stands) -- which is exactly what makes this
+buildable while **Teleport** isn't: Teleport's own "reappear at an
+unoccupied point" needs the human to choose an ARBITRARY new cell, and the
+battle-map's own grid has NO coordinate labels anywhere at all
+(`gridCellsHtml` renders blank clickable squares -- nothing a text prompt
+could ask for that the human could read back off the actual physical
+display). A real fix would need a "teleport mode" added to battle-map-
+popup.js's own existing stage/confirm click flow (skip the distance check,
+call `set-token-position` instead of `move-token`) -- a live, heavily-used
+tool this pass isn't risking a blind refactor of. Also references the same
+unbuilt "flee the whole encounter" group-check mechanic Pasta Portal's own
+deferral already named.
+
+The remaining 5 stay unmigrated too: **Extreme Speed**/**Quick Attack**
+("you can immediately move up to Xft... without taking an attack of
+opportunity") need no new effect at all -- opportunity attacks aren't
+automated anywhere in this app, and the movement itself is ordinary
+budgeted movement a player can already use via the existing map UI, same
+reasoning U-turn/Volt Switch already got. **Phase** ("move up to 30ft
+through solid matter") -- "through solid matter" is moot on its own terms,
+since this app has no wall/collision system at all (confirmed for Shield
+Dome's own deferral), so normal movement already passes through anything;
+its own 30ft figure plausibly exceeds a plain walker's speed, which WOULD
+need a temporary grant like Ascension's, but unlike Ascension naming a
+real, distinct movement type (flight), "phasing" has no mechanical identity
+separate from ordinary movement once walls are moot -- left unmigrated
+rather than overreaching a generic "+30ft" grant onto a condition name that
+wouldn't mean anything. **Splash** ("leap up to 50 feet in the air") is
+flavor-only -- this app's grid has no vertical/altitude dimension for a
+leap to interact with. **Retaliate** ("When a creature causes an ally to
+faint...") reacts to a "participant just fainted" event, the exact same
+unbuilt reaction trigger Cactus Bloom's own deferral already named.)*

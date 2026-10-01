@@ -1917,3 +1917,37 @@ visited (Echoed Voice/Round, Cactus Bloom, Stored Power, Throat Chop), the
 larger not-yet-touched categories (`field_terrain`/`field_weather`,
 `positioning`/`protect_negate`/`steal_disrupt` remainders), and the 32
 "unknown" moves needing manual review.)*
+
+*(Update, 2026-10-01: `heal_self` built (`migrate_effects_v58.py`, both
+moves) -- the last of the size-ordered small categories.
+
+**Burning Glance** needed nothing new at all: no `trigger_saving_throw`
+tag, so it's a plain melee attack going through the ordinary single-target
+attack-roll flow like any other damage move ("reaction" only changes WHEN
+it's used, via the pre-existing reaction-floor mechanism, never WHICH flow
+handles it) -- just a `heal` effect gated `when:"crit"` (an existing
+`evaluateEffect` case, never exercised by anything in this category
+before) instead of `on_hit`, `pool:"VP"` reusing the same field `drain`
+built out for Energize/Enervation Ray/Recompose.
+
+**Refresh** ("curing poison, paralysis, and burn") needed one new small
+`stat_transfer` mode, `"cure_named"` -- a NAMED subset, narrower than the
+existing `dispel_conditions` mode (Aromatherapy/Heal Bell's own "all
+negative status ailments"): an unrelated condition like Confused is
+correctly left untouched, since Refresh's own text names only these three.
+`names` (array of `apply` values) says exactly which; one new filter line
+in `_handleStatTransfer`, reusing the same `remove()` helper every other
+dispel mode already has.
+
+Verified with 4 direct calls: `evaluateEffect`'s `crit` gating (yes on a
+crit, no on a normal hit or a miss) and `cure_named`'s own filter logic
+(matches only the named conditions, leaves an unrelated condition and a
+stat-kind status both untouched).
+
+**This closes the entire size-ordered "small category" run.** What remains:
+leftover one-offs already flagged as genuinely novel inside categories
+visited earlier (Echoed Voice/Round, Cactus Bloom, Stored Power, Throat
+Chop), the larger not-yet-touched categories (`field_terrain`,
+`field_weather`, and the remainders of `positioning`/`protect_negate`/
+`steal_disrupt`), and 32 "unknown" moves needing manual review before
+anything else.)*

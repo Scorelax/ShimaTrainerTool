@@ -8870,12 +8870,32 @@
       "categories": [
         "damage",
         "heal_self",
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "self_potential_heal"
       ],
       "description": "When hit by a melee attack, you may use this reaction to make a melee attack, dealing 1d6 + MOVE fire damage on a hit. On a critical hit, no additional damage is done, but you regain the damage done as VP.",
       "moveStat": "DEX/WIS",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 1.0,
+            "pool": "VP"
+          },
+          "when": {
+            "type": "crit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Only on a crit -- a normal hit deals damage with no VP regained."
+        }
+      ]
     },
     {
       "name": "Chronoflame",
@@ -20123,12 +20143,33 @@
       },
       "reaction": false,
       "categories": [
-        "heal_self"
+        "heal_self",
+        "self_stat_transfer_cure_named"
       ],
       "description": "A wave of healing energy washes over you, curing poison, paralysis, and burn.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "cure_named",
+          "names": [
+            "poisoned",
+            "paralyzed",
+            "burned"
+          ],
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Retaliate",

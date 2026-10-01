@@ -2173,6 +2173,10 @@ function _targetDamageNotes(moveName) {
  *     pairs for an AoE (same Haze/Mat Block dual-effect shape), since
  *     Aromatherapy/Heal Bell heal "you and all allies", same reasoning as
  *     'dispel_all' above.
+ *   'cure_named' -- Refresh's own "curing poison, paralysis, and burn", a
+ *     NAMED subset of conditions (not "all ailments" the way
+ *     dispel_conditions means it) -- `names` (array of `apply` values) says
+ *     exactly which.
  *   'copy'       -- recreate every kind:'stat' status FROM targetId onto
  *     attackerId, target's own copy untouched (Psych Up).
  *   'swap'       -- exchange BOTH sides' current kind:'stat' statuses
@@ -2207,7 +2211,7 @@ function _targetDamageNotes(moveName) {
  * were actually left) -- a documented simplification, same "close enough"
  * trust level as everything else in this app that doesn't track exact
  * remaining-duration bookkeeping. */
-async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field, ends, dc }) {
+async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field, ends, dc, names }) {
   const attacker = session?.participants?.[attackerId];
   const target = session?.participants?.[targetId];
   if (!attacker || !target) return;
@@ -2236,6 +2240,17 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
     // authored as a deliberate BENEFIT to its own holder, so "every
     // condition" and "every negative one" are the same set in practice.
     for (const s of (target.statuses || []).filter((st) => st.kind === 'condition')) {
+      await remove(targetId, s, `cured by ${moveName}`);
+    }
+    return;
+  }
+  if (mode === 'cure_named') {
+    // Refresh's own "curing poison, paralysis, and burn" -- a NAMED subset,
+    // narrower than dispel_conditions's "every condition" (Refresh's own
+    // text doesn't say "all status ailments", just these three by name, so
+    // an unrelated condition like Confused is correctly left untouched).
+    // `names` is a plain array of `apply` values, authored on the effect.
+    for (const s of (target.statuses || []).filter((st) => st.kind === 'condition' && names.includes(st.apply))) {
       await remove(targetId, s, `cured by ${moveName}`);
     }
     return;
@@ -2809,9 +2824,9 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // steal) always operates on whoever this specific effect actually
       // means, self included. 'swap'/'swap_value' still reach both sides
       // regardless, since they read attackerId from the closure too.
-      // field/ends/dc only matter for 'swap_value' (Guard/Power/Speed Swap)
-      // -- harmless no-ops for every other mode.
-      await _handleStatTransfer({ mode: effect.mode, attackerId, targetId: pick.targetId, moveName, field: effect.field, ends: pick.ends, dc });
+      // field/ends/dc only matter for 'swap_value' (Guard/Power/Speed Swap);
+      // names only for 'cure_named' (Refresh) -- harmless no-ops otherwise.
+      await _handleStatTransfer({ mode: effect.mode, attackerId, targetId: pick.targetId, moveName, field: effect.field, ends: pick.ends, dc, names: effect.names });
       continue;
     }
     if (effect.kind === 'heal' && !effect.repeat) {

@@ -2377,6 +2377,21 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null, move
         const mult = cond.cap ? Math.min(2 ** pos, cond.cap) : 2 ** pos;
         return { met: mult > 1, magnitude: mult };
       }
+      // Fusion Bolt's own "if Fusion Bolt or Fusion Flare was already used
+      // this round" -- c.movesUsedThisRound is WIP-only (see combat-wip.js's
+      // own _movesUsedThisRound/_syncLocalCombatState), same "quietly never
+      // matches on the legacy standalone engine" limitation as
+      // c.witnessedMoveTypes/c.activeBuffCount above. Checks EVERY move used
+      // this round regardless of who used it or whether it hit -- the combo
+      // only cares that the OTHER half of the pair was cast.
+      case 'self_move_used_this_round': {
+        const used = c.movesUsedThisRound || [];
+        return { met: (cond.anyOf || []).some(name => used.includes(name)), magnitude: 1 };
+      }
+      // Stomping Tantrum's own "if your last attack missed" --
+      // c.lastAttackMissed is WIP-only (see combat-wip.js's own
+      // _didLastAttackMiss), same limitation as the others above.
+      case 'self_last_attack_missed': return { met: !!c.lastAttackMissed, magnitude: 1 };
       default: return { met: false, magnitude: 0 };
     }
   };

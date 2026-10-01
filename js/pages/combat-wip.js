@@ -822,6 +822,44 @@ function _lastHitMoveStreak(session, pid) {
   return { moveName, count };
 }
 
+/** Move names used by ANYONE so far in the CURRENT round, read straight off
+ * the shared log -- Fusion Bolt's own "if Fusion Bolt or Fusion Flare was
+ * already used this round, double the damage" (a combo move pair almost
+ * always cast by two DIFFERENT creatures, unlike _lastHitMoveStreak's own
+ * single-caster streak). Only 'move-used' log entries carry a move name at
+ * all, so this is every move actually confirmed through the normal use-move
+ * flow this round, hit or miss alike -- the condition only cares that the
+ * move was USED, not that it landed. WIP-only, same log-dependency
+ * limitation as every other bridged field here. */
+function _movesUsedThisRound(session) {
+  const log = session.log || [];
+  const currentRound = session.round || 0;
+  const names = new Set();
+  for (const e of log) {
+    if (e.type === 'move-used' && e.move && e.round === currentRound) names.add(e.move);
+  }
+  return [...names];
+}
+
+/** Whether `pid`'s own MOST RECENT attack (any move) missed, read straight
+ * off the shared log -- Stomping Tantrum's own "if your last attack missed,
+ * double the dice roll". Walks the log backward for `pid`'s own most recent
+ * 'damage' or 'miss' entry (whichever comes first going backward) rather
+ * than bounding by round, since "your last attack" means whenever that
+ * actually was, even if it was earlier the SAME round. false (not true) if
+ * no prior attack is found at all -- "your last attack missed" can't be
+ * true with no last attack to judge. */
+function _didLastAttackMiss(session, pid) {
+  const log = session.log || [];
+  for (let i = log.length - 1; i >= 0; i--) {
+    const e = log[i];
+    if (e.actorId !== pid) continue;
+    if (e.type === 'miss') return true;
+    if (e.type === 'damage') return false;
+  }
+  return false;
+}
+
 function _syncLocalCombatState(session) {
   _enterBattleSync();
 
@@ -895,6 +933,15 @@ function _syncLocalCombatState(session) {
     // Fury Cutter/Ice Ball/Rollout's own consecutive-hit escalation -- see
     // _lastHitMoveStreak's own docstring. Same WIP-only bridging pattern.
     merged.lastHitMoveStreak = _lastHitMoveStreak(session, p.id);
+    // Fusion Bolt's own "if Fusion Bolt or Fusion Flare was already used
+    // this round" -- see _movesUsedThisRound's own docstring. Same move
+    // names regardless of WHO this combatant is, so it's bridged once per
+    // sync, not scoped to p.id -- harmless to compute per-combatant since
+    // _syncLocalCombatState already runs once per owned combatant anyway.
+    merged.movesUsedThisRound = _movesUsedThisRound(session);
+    // Stomping Tantrum's own "if your last attack missed" -- see
+    // _didLastAttackMiss's own docstring. Same WIP-only bridging pattern.
+    merged.lastAttackMissed = _didLastAttackMiss(session, p.id);
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.

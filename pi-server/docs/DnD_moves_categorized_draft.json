@@ -3258,12 +3258,22 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_damage_increase"
+        "potential_damage_increase",
+        "damage_note"
       ],
       "description": "You strike hard in retaliation. Make a melee attack, dealing 1d6 + MOVE dark damage on a hit. If the target damaged you earlier this round, double the dice roll for the damage of this attack.",
       "moveStat": "STR/DEX",
       "vpCost": "1",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_damaged_me_this_round"
+          },
+          "diceMultiplier": 2
+        }
+      ]
     },
     {
       "name": "Power Trip",
@@ -4611,12 +4621,26 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "potential_damage_increase"
+        "potential_damage_increase",
+        "damage_note"
       ],
       "description": "You summon a gigantic lightning bolt that strikes down from the heavens in a 30 foot radius, centered on a point within range. All creatures caught in the blast must make a DEX save against your Move DC, taking 4d12 + MOVE electric damage on a failure, or half as much on a success. If Fusion Bolt or Fusion Flare was already used this round, double the damage dealt.",
       "moveStat": "STR",
       "vpCost": "40",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_move_used_this_round",
+            "anyOf": [
+              "Fusion Bolt",
+              "Fusion Flare"
+            ]
+          },
+          "diceMultiplier": 2
+        }
+      ]
     },
     {
       "name": "Ion Deluge",
@@ -9471,12 +9495,26 @@
         "multi_hit_aoe",
         "trigger_saving_throw",
         "fixed_special_damage",
-        "recharge_locked"
+        "recharge_locked",
+        "damage_note"
       ],
       "description": "You summon a gigantic fireball that strikes down from the heavens in a 15 foot radius, centered on a point within range. All creatures caught in the blast must make a DEX save against your Move DC, taking 4d12 + MOVE fire damage on a failure, or half as much on a success. If Fusion Bolt or Fusion Flare was already used this round, double the damage dealt. Fusion Flare may be used to thaw out the user from the frozen status before attacking.",
       "moveStat": "STR",
       "vpCost": "40",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_move_used_this_round",
+            "anyOf": [
+              "Fusion Bolt",
+              "Fusion Flare"
+            ]
+          },
+          "diceMultiplier": 2
+        }
+      ]
     },
     {
       "name": "Heat Crash",
@@ -15097,12 +15135,22 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_damage_increase"
+        "potential_damage_increase",
+        "damage_note"
       ],
       "description": "Driven by frustration, you aggressively attack. Make a melee attack, dealing 2d8 + MOVE ground damage on a hit. If your last attack missed, double the dice roll for damage.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_last_attack_missed"
+          },
+          "diceMultiplier": 2
+        }
+      ]
     },
     {
       "name": "Thousand Arrows",
@@ -15252,12 +15300,23 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_damage_increase"
+        "potential_damage_increase",
+        "damage_note"
       ],
       "description": "You send forth a heap of powerful snow to pummel an opponent. Make a ranged attack on a target, dealing 1d10 + MOVE ice damage on a hit. If the target has dealt any damage to you since the end of your last turn, double the damage you deal.",
       "moveStat": "STR",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_damaged_me_this_round"
+          },
+          "diceMultiplier": 2,
+          "note": "Approximates \"since the end of your last turn\" as \"this round\" -- correct when each combatant acts once per round."
+        }
+      ]
     },
     {
       "name": "Blizzard",

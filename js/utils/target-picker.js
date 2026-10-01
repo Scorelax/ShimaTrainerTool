@@ -140,6 +140,17 @@ let _guaranteedHit = false;
 // human can always override it), just saves the common case a manual
 // type-in. null everywhere else.
 let _presetRoll = null;
+// A snapshot of the shared log/round, captured once at pickTarget's own
+// start (same one-time-snapshot limitation _attacker/_selectedTarget
+// already have -- this module has no live SSE-updated session the way
+// combat-wip.js's own top-level `session` does). Avalanche/Payback's own
+// "did the target damage me [this round]" damage_note condition is the one
+// thing here that needs log access at all -- see _targetDamagedMeThisRound.
+// Empty/0 for pickTargetAgain's own flow, which never re-fetches state (see
+// its own docstring) -- harmless, since no multi_hit_same_target/
+// multi_hit_choice move needs this condition.
+let _log = [];
+let _round = 0;
 // The natural d20 typed into the Attack Roll step, captured when the attack is
 // resolved (see _confirmAttack) and handed back with the result so the caller
 // can tell which natural-roll / crit effects triggered (null on a guaranteed
@@ -519,6 +530,18 @@ async function _playAnimation() {
   });
 }
 
+/** Avalanche/Payback's own "did the target damage me [this round]" --
+ * scans the snapshot taken at pickTarget's own start (see `_log`/`_round`'s
+ * own declaration for why this is a snapshot, not a live read) for a
+ * 'damage' entry the CURRENTLY SELECTED target dealt against this attacker
+ * this round. false with no attacker/target selected yet, or on
+ * pickTargetAgain's own flow (empty `_log`, never reached by either move
+ * anyway). */
+function _targetDamagedMeThisRound() {
+  if (!_attacker || !_selectedTarget) return false;
+  return _log.some((e) => e.type === 'damage' && e.actorId === _selectedTarget.id && e.targetId === _attacker.id && e.round === _round);
+}
+
 function _showStep3() {
   document.getElementById('targetPickerStep1').hidden = true; // only visible here on the guaranteed-hit path
   document.getElementById('targetPickerStep2').hidden = true;
@@ -541,7 +564,7 @@ function _showStep3() {
   // the move-popup's own diceOverride hook) -- flatBonus DOES change the
   // total, folded in below same as _damageModifier.
   const { diceMultiplier, diceOverride, flatBonus, advantage, extraDiceCount, note } =
-    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll });
+    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll, targetDamagedMeThisRound: _targetDamagedMeThisRound() });
   _targetFlatBonus = flatBonus;
   const noteEl = document.getElementById('targetPickerDamageNote');
   const noteParts = [];
@@ -666,6 +689,8 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
 
   _ensureDom();
   _attacker = session.participants[attackerId] || null;
+  _log = session.log || [];
+  _round = session.round || 0;
   _attackModifier = attackModifier;
   _damageModifier = damageModifier;
   _speciesName = speciesName;

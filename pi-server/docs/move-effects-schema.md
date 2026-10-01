@@ -257,6 +257,25 @@ BEFORE the roll.
   deducted in place of the move's own flat `vpCost`). NOT checked: Ice Ball/Rollout's own "also resets
   if speed is reduced to 0" (a narrow edge case) -- surfaced as a plain `note` reminder instead of
   silently dropped.
+- `{type: "self_move_used_this_round", anyOf: [...]}` -- Fusion Bolt/Fusion Flare's own "if [either
+  move in this pair] was already used this round, double the damage". `c.movesUsedThisRound` is
+  WIP-only (`combat-wip.js`'s `_movesUsedThisRound` -- every move name used by ANYONE so far this
+  round, straight off `'move-used'` log entries), same bridging pattern as `activeBuffCount`/
+  `witnessedMoveTypes`/`lastHitMoveStreak`.
+- `{type: "self_last_attack_missed"}` -- Stomping Tantrum's own "if your last attack missed, double
+  the dice". `c.lastAttackMissed` is WIP-only (`_didLastAttackMiss` -- walks the log backward for
+  this participant's own most recent `'damage'` or `'miss'` entry, whichever comes first; not
+  bounded by round, since "your last attack" means whenever that actually was, even earlier the
+  same round).
+- `{type: "target_damaged_me_this_round"}` (target-conditional only) -- Avalanche/Payback's own "if
+  the target has damaged you [since the end of your last turn / earlier this round], double the
+  damage". The one target-conditional check that needs the shared LOG, which
+  `_targetConditionMet`/`targetDamageNoteResult` deliberately never reach into themselves (pure
+  functions over explicit params) -- resolved by the CALLER instead (`target-picker.js` keeps its
+  own one-time `log`/`round` snapshot, taken alongside `_attacker` at `pickTarget`'s own start, and
+  passes a plain computed boolean through as `targetDamagedMeThisRound`). Avalanche's own "since the
+  end of your last turn" is approximated as "this round" -- correct when each combatant acts once
+  per round, a documented simplification rather than tracking exact turn boundaries per participant.
 - `{type: "target_type", any: ["poison"]}` -- Solvent Spray's "double damage to Poison-type
   Pokémon", checked against the target's `type1`/`type2` (case-insensitively), not a live matchup
   chart lookup -- this is about the target's own species type, not effectiveness.
@@ -1649,3 +1668,73 @@ flavor-only -- this app's grid has no vertical/altitude dimension for a
 leap to interact with. **Retaliate** ("When a creature causes an ally to
 faint...") reacts to a "participant just fainted" event, the exact same
 unbuilt reaction trigger Cactus Bloom's own deferral already named.)*
+
+*(Update, 2026-10-01: moved to `potential_damage_increase` (6 moves). 4 of
+the 6 fit two new conditions, both reusing the EXISTING `damage_note`/
+`diceMultiplier` machinery end to end -- no new result field, just two new
+ways to decide whether it applies (`migrate_effects_v54.py`):
+
+- **Avalanche** / **Payback** ("if the target has damaged you [since the
+  end of your last turn / earlier this round], double the damage"): a new
+  TARGET-conditional type, `"target_damaged_me_this_round"`. Unlike every
+  other target-conditional check so far, this needs the shared battle LOG,
+  which `_targetConditionMet`/`targetDamageNoteResult` deliberately never
+  reach into themselves (pure functions over explicit params) -- resolved
+  by the CALLER instead: target-picker.js now keeps its own one-time
+  snapshot of `log`/`round` (captured alongside `_attacker`, same "taken
+  once at pickTarget's own start" limitation those already have) and passes
+  a plain computed boolean through. Avalanche's own "since the end of your
+  last turn" is approximated as "this round" -- correct in the standard
+  case of each combatant acting once per round, called out as a documented
+  simplification rather than tracking exact turn boundaries per
+  participant.
+- **Fusion Bolt** / **Fusion Flare** ("if Fusion Bolt or Fusion Flare was
+  already used this round, double the damage"): a new SELF-conditional
+  type, `"self_move_used_this_round"` (`{anyOf: [...]}`), backed by a new
+  WIP-bridged field, `movesUsedThisRound` (every move name used by ANYONE
+  this round, straight off `'move-used'` log entries, same bridging pattern
+  `lastHitMoveStreak`/`witnessedMoveTypes` already use). Fusion Flare wasn't
+  even tagged `potential_damage_increase` in the original hand-
+  categorization (`fixed_special_damage` instead) -- caught migrating its
+  sibling, since the clause is identical word for word; both get the same
+  effect.
+- **Stomping Tantrum** ("if your last attack missed, double the dice"):
+  another new self-conditional type, `"self_last_attack_missed"`, backed by
+  a new WIP-bridged field, `lastAttackMissed` (walks the log backward for
+  this participant's own most recent `'damage'` or `'miss'` entry,
+  whichever comes first -- not bounded by round, since "your last attack"
+  means whenever that actually was).
+
+Verified with 4 direct calls against `target_damaged_me_this_round`'s own
+threading (`targetDamageNoteResult`), plus 10 against the three log-scan
+helpers themselves (round-matching, attacker/target identity, missing
+attacker/target, which moves count per round, and which log entry "your
+last attack" actually means).
+
+**Round** ("If an ally in range also knows this move, they can join in the
+song as a reaction to add an additional damage dice") needs NO effects
+entry at all -- the reminder is already fully visible in the move's own
+description text shown on the move-popup every time, the same "nothing
+hidden that needs surfacing" reasoning Dig/Dive/U-turn/Volt Switch already
+get. The REAL automation (a live reaction injecting a bonus die into
+someone ELSE's in-progress damage roll, mid-flow) would need a new
+mechanism this app doesn't have anywhere -- the existing dice-bonus-button
+machinery (Sharpen/Growth/Helping Hand) only ever augments the roll's OWN
+holder, on an attack or save roll specifically, never a THIRD PARTY's
+subsequent damage roll -- but there's nothing actually hidden here for a
+reminder to prevent forgetting, so building that isn't needed for the
+"don't let the table forget a damage bonus" goal `damage_note` exists for.
+
+**Echoed Voice** ("if any OTHER creature in range uses this move, they may
+double their damage dice on a hit... stacks to 8x, resetting on a miss")
+stays unmigrated -- a genuinely different, multi-part shape from everything
+else in this category: a CROSS-CREATURE streak (unlike Fury Cutter/Ice
+Ball/Rollout's own same-caster-only counter), gated by a TIME WINDOW tied
+to the ORIGINAL caster's own next turn (which has to be tracked somewhere,
+since the shared log alone has no notion of "is this window still open" --
+a `'move-used'` entry doesn't carry who opened what window or when it
+closes). Would need either a new top-level session field (parallel to
+`pendingReaction`) tracking the window's owner/expiry/current multiplier,
+or a stored per-participant status every potential user has to carry and
+check -- real new infrastructure, not a small increment on
+`_lastHitMoveStreak`.)*

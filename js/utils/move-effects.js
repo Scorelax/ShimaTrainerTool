@@ -723,9 +723,19 @@ function _sizeRank(p) {
  * target-picker.js, which only ever has the RAW structured session
  * participant (`.statuses`, real `apply` values) to work with -- there's no
  * second shape to reconcile with here. */
-function _targetConditionMet(cond, { attacker, target, attackRoll }) {
+function _targetConditionMet(cond, { attacker, target, attackRoll, targetDamagedMeThisRound }) {
   if (!cond) return false;
   switch (cond.type) {
+    // Avalanche/Payback's own "if the target has damaged you [since your
+    // last turn / earlier this round]" -- resolved by the CALLER
+    // (target-picker.js, which has the shared log this pure function
+    // deliberately doesn't reach into itself) as a plain boolean and
+    // passed straight through. Avalanche's own "since the end of your last
+    // turn" is approximated as "this round" -- correct in the standard case
+    // of each combatant acting once per round, a documented simplification
+    // for the general multi-round-delay edge case rather than tracking
+    // exact turn boundaries per participant.
+    case 'target_damaged_me_this_round': return !!targetDamagedMeThisRound;
     // Charge Beam's own "if the natural attack roll is 10 or higher" --
     // attackRoll is the natural d20 already entered in the attack-roll step
     // (target-picker.js's own module state), threaded through here since
@@ -796,11 +806,11 @@ function _targetConditionMagnitude(cond, { attacker, target }) {
  * same "never stacked" rule as the self-conditional side; flatBonus and
  * advantage DO accumulate/OR across every met effect, since nothing here
  * needs Flail's own "only the most severe tier" reasoning. */
-export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null, attackRoll = null }) {
+export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null, attackRoll = null, targetDamagedMeThisRound = false }) {
   let diceMultiplier = 1, diceOverride = null, flatBonus = 0, advantage = false, extraDiceCount = 0;
   const notes = [];
   for (const e of effects || []) {
-    if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target, attackRoll })) continue;
+    if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target, attackRoll, targetDamagedMeThisRound })) continue;
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) diceMultiplier = e.diceMultiplier;
     // Electro Ball's own "roll the next tier's dice, or double at the top
     // tier" -- nextTierDice (the caller's own computeMoveData.nextTierDice,

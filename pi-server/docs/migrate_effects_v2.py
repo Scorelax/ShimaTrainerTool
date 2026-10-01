@@ -333,6 +333,11 @@ def tag_for(e):
         # Wing Buffer's own "on a successful save, you take half damage" --
         # see combat-wip.js's _handleReactiveSave/_handleHalveDamage.
         base = 'halve_damage'
+    elif e['kind'] == 'reposition_near':
+        # Strafe/Pasta Portal's own GRANTED reposition, outside the normal
+        # movement budget -- see combat-wip.js's _handleRepositionNear and
+        # utils/reposition-picker.js.
+        base = 'reposition_near'
     else:
         base = f"{e['roll']}_{e['on']}"
     if not guaranteed:

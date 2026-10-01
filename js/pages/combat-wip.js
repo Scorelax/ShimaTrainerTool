@@ -14,6 +14,7 @@ import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../u
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
+import { pickRepositionCell } from '../utils/reposition-picker.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
@@ -2650,6 +2651,40 @@ async function _handleDisableLastUsedMove({ attackerId, targetId, moveName, ends
   }
 }
 
+/** Strafe/Pasta Portal's own "reposition somewhere specific after/during
+ * this move" -- a GRANTED reposition, explicitly OUTSIDE the normal
+ * movement budget (Strafe's own "ignoring your flying speed", Pasta
+ * Portal's own "disappear and reappear" -- neither is ordinary budgeted
+ * movement), so this calls CombatAPI.setTokenPosition directly (the SAME
+ * unrestricted DM/setup action Ally Switch's own teleport_swap already
+ * reuses) via reposition-picker.js's own click-a-cell popup rather than
+ * move-token/battle-map-popup.js's own ordinary movement flow. `anchorId`
+ * is whoever the `maxFt` radius is measured from -- Strafe's own "within
+ * 30ft of the TARGET" vs Pasta Portal's own "within range" of wherever
+ * the caster currently stands (anchor = the caster themselves). Needs the
+ * battle map actually set up with both tokens placed -- without it,
+ * there's no board to pick a cell on at all, same "tell the table to do
+ * it by hand" fallback every other map-dependent mechanic here already
+ * has. */
+async function _handleRepositionNear({ moverId, anchorId, maxFt, moveName }) {
+  const mover = session?.participants?.[moverId];
+  const anchorName = session?.participants?.[anchorId]?.name || 'the anchor point';
+  const anchorPos = session?.board?.tokens?.[anchorId];
+  if (!mover || !anchorPos) {
+    showCombatAlert(`Couldn't find both tokens on the map -- reposition ${mover?.name || 'your token'} by hand.`, { title: moveName });
+    return;
+  }
+  const result = await pickRepositionCell(session, moverId, anchorPos.col, anchorPos.row, maxFt, {
+    title: `${moveName} — choose where to reposition`,
+    hint: `Click an unoccupied cell within ${maxFt}ft of ${anchorName}.`,
+  });
+  if (!result) return;
+  CombatAPI.logEvent({
+    type: 'save', actorId: moverId, actorName: mover.name,
+    text: `${mover.name} repositions with ${moveName}`,
+  }).catch(() => {});
+}
+
 async function _offerMoveEffects({ attackerId, targetId = null, moveName, computedData, ctx, includeSelf = true }) {
   const effects = moveEffectsFor(moveName);
   if (!effects.length) return;
@@ -2775,6 +2810,15 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
     if (effect.kind === 'swap_item') {
       // Switcheroo/Trick -- attackerId (closure) is the caster, pick.targetId the real target.
       await _handleSwapItem({ attackerId, targetId: pick.targetId, moveName });
+      continue;
+    }
+    if (effect.kind === 'reposition_near') {
+      // Strafe/Pasta Portal -- attackerId (closure) is always the mover;
+      // `effect.anchor` picks whose position the radius is measured from
+      // (closure's own targetId for Strafe's "near the target", attackerId
+      // itself for Pasta Portal's "near where I currently stand").
+      const anchorId = effect.anchor === 'target' ? targetId : attackerId;
+      await _handleRepositionNear({ moverId: attackerId, anchorId, maxFt: effect.maxFt, moveName });
       continue;
     }
     if (effect.kind === 'teleport_swap') {

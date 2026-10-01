@@ -7082,12 +7082,30 @@
       "categories": [
         "positioning",
         "recharge_locked",
-        "trigger_saving_throw"
+        "trigger_saving_throw",
+        "self_reposition_near"
       ],
       "description": "You disappear from view and reappear at an unoccupied point within range, having opened a portal between the two spots. In wild creature battles, this move can be activated to automatically count as a single success in a group DEX check to run away. The portal lingers for 3 turns. Any creature except you attempting to pass through the portal must succeed a DEX save, or be subjected to the move Crunch. Only one pair of portals may be active at any time.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "reposition_near",
+          "anchor": "self",
+          "maxFt": 40,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Self-reposition only -- the lingering portal hazard and the group-flee-check clause both need separate systems this app has nowhere."
+        }
+      ]
     },
     {
       "name": "Photon Pulse",
@@ -11353,12 +11371,29 @@
       "reaction": false,
       "categories": [
         "damage",
-        "positioning"
+        "positioning",
+        "self_reposition_near"
       ],
       "description": "While in the air, you dive at a creature in range, ignoring your flying speed and any opportunity attacks you may incur. Make a melee attack roll, doing 2d8 + MOVE flying damage on a hit. After a successful hit, you may fly to a position within 30ft. of the target or you may immediately switch out as a free action if you're within 60ft. of your trainer.",
       "moveStat": "None",
       "vpCost": "9",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "reposition_near",
+          "anchor": "target",
+          "maxFt": 30,
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Tailwind",

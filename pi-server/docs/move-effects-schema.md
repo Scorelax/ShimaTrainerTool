@@ -2068,3 +2068,63 @@ Psychic Terrain/Purgatory share the exact same blocker as the whole
 still-untouched `field_terrain` category (no structured, query-able
 terrain-effect system) -- fixing them ad hoc here would duplicate that
 category's own eventual pass.)*
+
+*(Update, 2026-10-01: `positioning` built (`migrate_effects_v60.py`, 2 of 5
+-- the other 3 confirmed needing nothing, not deferred).
+
+**Strafe** ("fly to a position within 30ft. of the target" after a hit,
+"ignoring your flying speed and any opportunity attacks") and **Pasta
+Portal**'s own self-reposition half ("disappear ... and reappear at an
+unoccupied point within range") share one real shape: a GRANTED
+reposition explicitly OUTSIDE the normal movement budget -- genuinely
+different from ordinary budgeted movement. Previously deferred (see this
+file's own `protect_negate`-era entry above) specifically because the
+only existing map-click flow, `battle-map-popup.js`'s own stage/confirm
+movement UI, is a live, heavily-used tool built for ordinary budgeted
+movement -- retrofitting a bypass mode directly into it risked a blind
+refactor of something already working (the same reasoning Teleport was
+deferred for).
+
+Built properly this pass instead of deferring again: a brand new, wholly
+separate module, `utils/reposition-picker.js` -- reuses
+`battle-map-grid.js`'s own pure rendering helpers (the same ones
+`battle-map-popup.js` itself uses) but owns its own DOM/state entirely, so
+nothing about ordinary movement can regress. Shows the board read-only,
+highlights every unoccupied cell within a given `maxFt` of a given anchor
+point, and resolves via `CombatAPI.setTokenPosition` -- the SAME
+unrestricted DM/setup action Ally Switch's own `teleport_swap` already
+reuses, since this genuinely isn't a `move-token` call either. New
+`kind:"reposition_near"` effect (`anchor:"target"|"self"` picks whose
+CURRENT position the radius is measured from -- Strafe's own "near the
+target" vs Pasta Portal's own "near wherever I currently stand"),
+`_handleRepositionNear` (combat-wip.js).
+
+Pasta Portal ships PARTIAL (self-reposition only, same "partial, flagged,
+not guessed" precedent as Acid Armor/Elemental Surge) -- its own lingering
+portal pair (a 3-turn, DEX-save-or-Crunch hazard for anyone ELSE passing
+through) needs a persistent MAP HAZARD system this app has nowhere (no
+wall/collision/trap system at all), and its own "counts as a success in a
+group DEX check to flee" PvE clause needs a group-flee-check mechanic that
+also doesn't exist -- both genuinely separate, bigger systems.
+
+**Quick Attack** / **U-turn** / **Volt Switch** confirmed needing NOTHING
+on a fresh read, not newly decided: opportunity attacks aren't automated
+anywhere in this app (so "without provoking an opportunity attack" needs
+no code), the "move away" half of U-turn/Volt Switch is ordinary budgeted
+movement the existing map flow already covers in full, and their own
+"switch out" alternative is blocked on the same already-documented "no
+switch-Pokemon mechanic in the shared system" gap cited everywhere else it
+comes up. **Block** ("stop an opponent's flee/switch-out attempt") has
+nothing to hook into either -- no flee/switch-out ACTION exists anywhere
+for a reaction window to trigger off of.
+
+Verified with a headless-Edge smoke test of `reposition-picker.js` against
+a synthetic 30x30-grid session (no live server needed): renders all 900
+cells, correctly marks exactly 168 as in-range-and-clickable (a 13x13
+Chebyshev disc at 30ft/6-cell radius, minus the one cell occupied by the
+anchor token itself), flags the other 731 as out-of-range, and the full
+click -> stage -> Confirm-button-appears flow fires correctly. Caught and
+fixed one real bug in the test fixture itself (a participant missing
+`visibility`/`side` threw inside the shared `visibleToViewer` helper) --
+not a bug in the new module, confirmed by the SAME fixture working once
+those fields were added.)*

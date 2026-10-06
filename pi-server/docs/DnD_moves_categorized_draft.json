@@ -19391,8 +19391,7 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "potential_damage_increase"
+        "unknown"
       ],
       "description": "You set your mind to protect your allies and strike back against your enemies. A dark purple aura surrounds you. For the duration, every time you take a hit for an ally that deals damage to you, add 1d6 bonus typeless damage to your next attack. This effect can stack up to five times.",
       "moveStat": "None",

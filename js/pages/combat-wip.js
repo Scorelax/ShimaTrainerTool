@@ -823,6 +823,24 @@ function _lastHitMoveStreak(session, pid) {
   return { moveName, count };
 }
 
+/** Blood Shield's own "melee damage you have dealt since the beginning of
+ * your last turn": the sum of this participant's logged 'damage' entries
+ * from the previous round (their last turn) through now whose move's range
+ * is Melee. The log carries no range field, so each entry's move is looked
+ * up in the moves dataset; an entry whose move can't be found is skipped
+ * rather than guessed. WIP-only, same log-dependency limitation as every
+ * other log-derived value here. */
+function _meleeDamageSinceLastTurn(session, pid) {
+  const since = (session.round || 0) - 1;
+  let total = 0;
+  for (const e of session.log || []) {
+    if (e.type !== 'damage' || e.actorId !== pid || e.targetId === pid || e.round < since) continue;
+    if (!e.move || findMoveRow(e.move)?.[6] !== 'Melee') continue;
+    total += Number(e.amount) || 0;
+  }
+  return total;
+}
+
 /** Move names used by ANYONE so far in the CURRENT round, read straight off
  * the shared log -- Fusion Bolt's own "if Fusion Bolt or Fusion Flare was
  * already used this round, double the damage" (a combo move pair almost
@@ -3003,6 +3021,11 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         continue;
       }
       effect = { ...effect, amount: Math.floor(effect.amount.fractionOfMaxHP * holder.maxHP) };
+    }
+    if (effect.kind === 'temp_hp' && effect.amount && typeof effect.amount === 'object' && effect.amount.meleeDamageSinceLastTurn) {
+      // Blood Shield: re-applying replaces the pool (see _apply_status), which
+      // already covers "will not stack if used consecutively".
+      effect = { ...effect, amount: _meleeDamageSinceLastTurn(session, attackerId) };
     }
     const spec = buildStatusSpec(effect, { sourceId: attackerId, sourceName: attacker?.name, moveName, dc, ends: pick.ends });
     if (spec.kind === 'condition' && !(await _confirmNotImmune(pick.targetId, spec.apply))) continue;

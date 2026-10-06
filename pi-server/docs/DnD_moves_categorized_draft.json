@@ -63,12 +63,29 @@
       "reaction": false,
       "categories": [
         "shield_temphp",
-        "stat_buff_self"
+        "self_temp_hp"
       ],
       "description": "You conjure a shield equal to melee damage you have dealt. Gain a shield equal to the damage you dealt since the beginning your last turn. The shield effect will not stack if used consecutively.",
       "moveStat": "None",
       "vpCost": "20",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "temp_hp",
+          "amount": {
+            "meleeDamageSinceLastTurn": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Bug Bite",

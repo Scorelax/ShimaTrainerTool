@@ -18,7 +18,7 @@ export function filterTargetable(participants, moveName) {
   const hidden = [];
   const list = participants.filter((p) => {
     const state = _resolver(p, moveName);
-    if (state) hidden.push(`${p.name} (${state})`);
+    if (state) hidden.push(`${p.name} (${state.replace(/_/g, ' ')})`);
     return !state;
   });
   if (!list.length && hidden.length) {

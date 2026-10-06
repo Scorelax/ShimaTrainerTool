@@ -4392,7 +4392,10 @@
       "description": "You send a gust of swirling wind that tears through a creature. Make a ranged attack on a creature, doing 1d6 + MOVE dragon damage on a hit. If the natural attack roll is 16 or higher, the target flinches.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "hitsStates": [
+        "airborne"
+      ]
     },
     {
       "name": "2. Stun Ray",
@@ -5268,7 +5271,10 @@
       "description": "Powerful electric energy arcs out from you, hitting any creature in a 20 foot radius, centered on you. Creatures caught in the area must make a DEX save against your Move DC, taking 3d10 + MOVE electric damage on a fail, and half as much on a success. Creatures that fail the saving throw by 5 or more become paralyzed. In heavy rain or storms, you may center this move on a point within 60ft instead of on yourself.",
       "moveStat": "STR/DEX",
       "vpCost": "22",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "hitsStates": [
+        "airborne"
+      ]
     },
     {
       "name": "Thunder Fang",
@@ -10900,7 +10906,7 @@
       "moveStat": "DEX",
       "vpCost": "12",
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
-      "semiInvulnerable": "airborne"
+      "semiInvulnerable": "ethereal_plane"
     },
     {
       "name": "Brave Bird",
@@ -11234,7 +11240,10 @@
       "description": "You wrap a creature in a fierce wind. Make a ranged attack against a target, dealing 2d8 + MOVE flying damage on a hit. If this attack is activated during rain, roll the attack with advantage. If used during harsh sunlight, roll the attack with disadvantage. If the natural attack roll is 15 or higher, the target becomes confused.",
       "moveStat": "STR/DEX",
       "vpCost": "9",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "hitsStates": [
+        "airborne"
+      ]
     },
     {
       "name": "Hypersonic Flight",
@@ -14974,7 +14983,10 @@
       "description": "You strike the ground so hard that it ripples outcfrom you in a 15 foot radius. All grounded creatures caught in the area must make a DEX save against your Move DC, taking 2d8 + MOVE ground damage on a failure.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "hitsStates": [
+        "underground"
+      ]
     },
     {
       "name": "Devastating Tremors",
@@ -29862,7 +29874,10 @@
       "description": "You create a wave of water that swirls around a creature in range. Make a ranged attack roll. On a hit, the target takes 1d10 + MOVE water damage and is restrained. At the beginning of each of its turns, it may attempt to escape with a STR save against your Move DC. On each successive turn, if the creature is still restrained, you may use this move again (as an action) and automatically hit.",
       "moveStat": "STR",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "hitsStates": [
+        "underwater"
+      ]
     },
     {
       "name": "Withdraw",

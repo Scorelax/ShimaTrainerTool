@@ -46,7 +46,7 @@ function _conditionRollMode(s, on, ability) {
 
 /** Semi-invulnerable states a move can put its user in (Dig -> underground, ...). Each is a plain
  * condition; see targetability.js and conditions.py's UNTARGETABLE_STATES. */
-export const UNTARGETABLE_STATES = ['underground', 'underwater', 'airborne', 'vanished'];
+export const UNTARGETABLE_STATES = ['underground', 'underwater', 'airborne', 'vanished', 'ethereal_plane'];
 
 /** The state hiding `participant` from a move that can still hit `hitsStates`, or null. */
 export function untargetableState(participant, hitsStates = []) {

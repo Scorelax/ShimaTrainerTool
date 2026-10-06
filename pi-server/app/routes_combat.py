@@ -1949,7 +1949,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         if record:
             hidden = untargetable_state(target, record.get('hitsStates') or ())
             if hidden:
-                raise ValueError(f"{target['name']} is {hidden} and can't be targeted by {move_name}")
+                raise ValueError(f"{target['name']} is {hidden.replace('_', ' ')} and can't be targeted by {move_name}")
 
     _consume_ignore_immunities(state, pid, attacker, move_type, move_name)
     multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target, attacker)

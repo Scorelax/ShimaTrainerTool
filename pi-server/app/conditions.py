@@ -38,10 +38,10 @@ CONDITION_RULES = {
 # failed-roll turn instead of being listed here directly (see
 # combat-wip.js's _promptParalysisCheck/_promptConfusionCheck) -- most of
 # the time they're NOT incapacitated at all, unlike everything in this set.
-# Semi-invulnerable states a move can put its user in (Dig -> underground, Dive -> underwater, Bounce/Fly ->
-# airborne, Phantom Force/Shadow Force/Aqua Phase -> vanished). Each is a plain condition on the user; while it's
+# Semi-invulnerable states a move can put its user in (Dig -> underground, Dive -> underwater, Fly ->
+# airborne, Bounce -> ethereal_plane, Phantom Force/Shadow Force/Aqua Phase -> vanished). Each is a plain condition on the user; while it's
 # held, the user can't be targeted by a move unless that move lists the state in its own `hitsStates`.
-UNTARGETABLE_STATES = ('underground', 'underwater', 'airborne', 'vanished')
+UNTARGETABLE_STATES = ('underground', 'underwater', 'airborne', 'vanished', 'ethereal_plane')
 
 
 def untargetable_state(participant, hits_states=()):

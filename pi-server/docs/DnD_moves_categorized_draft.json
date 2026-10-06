@@ -28782,13 +28782,29 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
+        "self_status_condition_ink_veil",
         "protect_negate"
       ],
       "description": "You surround yourself with a cloud of glowing ink, protecting from any status conditions for the duration. If you a condition is inflicted on you while Ink Veil is active, instead roll 3d10, regenerating that much HP and VP.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": "The regeneration dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17"
+      "scaling": "The regeneration dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "ink_veil",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Muddy Water",

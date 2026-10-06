@@ -136,6 +136,9 @@ def blocking_shield(target, target_id, spec):
         if s.get('kind') != 'condition':
             continue
         apply_name = s.get('apply')
+        if apply_name == 'ink_veil' and spec.get('kind') == 'condition':
+            # Ink Veil: protected from ANY status condition (the regen roll is client-side).
+            return 'ink veil'
         if apply_name == 'mist' and spec.get('kind') == 'stat':
             amount = spec.get('amount')
             if isinstance(amount, (int, float)) and amount < 0:

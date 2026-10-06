@@ -3070,9 +3070,38 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
     try {
       await CombatAPI.applyStatus(pick.targetId, spec);
     } catch (err) {
-      showCombatAlert(err.message, { title: 'Error' });
+      if (/\(Ink Veil\)/.test(err.message)) {
+        await _inkVeilRegen(pick.targetId);
+      } else {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
     }
   }
+}
+
+/** Ink Veil: the server blocked a condition (see conditions.py's blocking_shield), so per the
+ * move "instead roll 3d10, regenerating that much HP and VP". One roll, applied to both pools. */
+async function _inkVeilRegen(holderId) {
+  const holder = session?.participants?.[holderId];
+  if (!holder) return;
+  const rolled = await promptValueRoll({
+    dice: '3d10', moveName: 'Ink Veil',
+    description: `${holder.name}'s Ink Veil blocked a condition -- enter the 3d10 roll (regained as HP and VP)`,
+  });
+  if (rolled === null || rolled <= 0) return;
+  const cap = (cur, max) => Math.min(Number.isFinite(max) ? max : Infinity, cur + rolled);
+  const hp = cap(holder.currentHP, holder.maxHP);
+  const vp = cap(holder.currentVP, holder.maxVP);
+  try {
+    await CombatAPI.updateStats(holderId, { currentHP: hp, currentVP: vp });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  CombatAPI.logEvent({
+    type: 'heal', actorId: holderId, actorName: holder.name, targetId: holderId, targetName: holder.name,
+    text: `${holder.name}'s Ink Veil blocked a condition and regenerated ${hp - holder.currentHP} HP and ${vp - holder.currentVP} VP (3d10 = ${rolled})`,
+  }).catch(() => {});
 }
 
 /** Advisory-only type-immunity check (Fire/Burning, Ice/Frozen, Electric/

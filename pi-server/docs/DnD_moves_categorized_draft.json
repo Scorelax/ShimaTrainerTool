@@ -3219,13 +3219,53 @@
       },
       "reaction": false,
       "categories": [
-        "stat_debuff_enemy",
-        "advantage_on_attack_roll"
+        "self_advantage_attack_rolls",
+        "self_disadvantage_saves_against_its_moves"
       ],
       "description": "You stimulate your brain with nasty thoughts. For the duration, you have advantage on any attacks with the Wisdom move power. If the attack requires a Wisdom saving throw, the target has disadvantage.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "ability": "WIS",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "saves_against_its_moves",
+          "ability": "WIS",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Night Daze",
@@ -21745,13 +21785,33 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self",
-        "advantage_on_attack_roll"
+        "advantage_attack_rolls"
       ],
       "description": "You study a target within 50 feet. For one minute, you have advantage on any ability checks or attack rolls against that target.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "attack_rolls",
+          "against": true,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "Ability-check advantage is not enforced (no ability-check roll exists in this app)."
+        }
+      ]
     },
     {
       "name": "Substitute",

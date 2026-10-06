@@ -120,6 +120,11 @@ let _speciesName = '';
 // does anyone want to react to being targeted by this?") -- combat-wip.js's
 // callers already know it, target-picker.js itself doesn't otherwise need it.
 let _moveName = '';
+// Set by combat-wip.js: move name -> the ability keys its move power uses (['WIS'], ['STR','DEX']),
+// for attack-roll effects scoped to a move ability (Nasty Plot). Injected, not imported, so this
+// module doesn't need the combat page's move table.
+let _moveAbilityResolver = () => [];
+export function setMoveAbilityResolver(fn) { _moveAbilityResolver = typeof fn === 'function' ? fn : () => []; }
 // The name of a move the ATTACKER knows that carries `negatesProtectBlock`
 // (Feint), precomputed by the caller (combat-wip.js's own _feintMoveNameFor
 // -- this module has no dependency on combat.js, see its header comment, so
@@ -396,7 +401,7 @@ function _showStep2(p, name) {
   document.getElementById('targetPickerRollTarget').innerHTML = `
     <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
-  _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget);
+  _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName));
   document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
   _diceBonusExtra = 0;
   _diceBonusConsume = [];

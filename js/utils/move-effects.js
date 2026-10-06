@@ -286,8 +286,12 @@ function _finish(ctx, adv, dis) {
 /** Modifiers for an attack roll by `attacker` against `target` (participant records,
  * either may be missing): the attacker's attack-roll bonus/penalty and advantage/
  * disadvantage, the target's AC change and attacks-against advantage/disadvantage. */
-export function attackRollContext(attacker, target) {
+export function attackRollContext(attacker, target, moveAbilities = []) {
   const ctx = { attackBonus: 0, acDelta: 0, mode: 'normal', notes: [], consume: [] };
+  // An attack-roll effect can be scoped two ways: `ability` (Nasty Plot's "attacks with the
+  // Wisdom move power" -- the move's own stat list must include it) and `against` (Study's
+  // "against that target" -- the recorded target id must be this attack's target).
+  const scopeOk = (s) => (!s.ability || moveAbilities.includes(s.ability)) && (!s.against || s.against === target?.id);
   const adv = [], dis = [];
   const take = (s, holder, list) => {
     list.push(s);
@@ -295,8 +299,8 @@ export function attackRollContext(attacker, target) {
     if (_hasUses(s)) ctx.consume.push({ holderId: holder.id, statusId: s.id });
   };
   for (const s of attacker?.statuses || []) {
-    if (s.kind === 'roll' && (s.on === 'attack_rolls' || s.on === 'all_rolls')) take(s, attacker, s.roll === 'advantage' ? adv : dis);
-    if (s.kind === 'stat' && s.stat === 'attack_rolls' && !_isDiceAmount(s)) {
+    if (s.kind === 'roll' && (s.on === 'attack_rolls' || s.on === 'all_rolls') && scopeOk(s)) take(s, attacker, s.roll === 'advantage' ? adv : dis);
+    if (s.kind === 'stat' && s.stat === 'attack_rolls' && !_isDiceAmount(s) && scopeOk(s)) {
       const a = _statAmount(s, attacker);
       ctx.attackBonus += a;
       ctx.notes.push(_sourceText(s));
@@ -561,7 +565,7 @@ export function saveRollContext(saver, moveUser, ability) {
     }
   }
   for (const s of moveUser?.statuses || []) {
-    if (s.kind === 'roll' && s.on === 'saves_against_its_moves') take(s, moveUser, s.roll === 'advantage' ? adv : dis);
+    if (s.kind === 'roll' && s.on === 'saves_against_its_moves' && _abilityMatches(s, ability)) take(s, moveUser, s.roll === 'advantage' ? adv : dis);
   }
   return _finish(ctx, adv, dis);
 }
@@ -922,7 +926,7 @@ export function describeEnds(ends) {
  * the caller already resolved rolled durations (a {dice} entry given an `n`). */
 export function buildStatusSpec(effect, { sourceId, sourceName, moveName, dc, ends }) {
   const spec = { kind: effect.kind, sourceId, sourceName, moveName, dc, ends: ends || effect.ends || [] };
-  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability']) {
+  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'against']) {
     if (effect[k] !== undefined) spec[k] = effect[k];
   }
   if (effect.stacks) spec.stacks = effect.stacks;

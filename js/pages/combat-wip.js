@@ -9,7 +9,7 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
-import { pickTarget, pickTargetAgain } from '../utils/target-picker.js';
+import { pickTarget, pickTargetAgain, setMoveAbilityResolver } from '../utils/target-picker.js';
 import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
@@ -822,6 +822,9 @@ function _lastHitMoveStreak(session, pid) {
   }
   return { moveName, count };
 }
+
+// Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
+setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.[2] || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
 
 /** Fire Shield's passive retaliation: after a MELEE hit lands on a target holding a
  * `retaliation_on_melee_hit` status (value = damage type, value2 = dice), prompt for the
@@ -2979,6 +2982,18 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         damageDealt: ctx.damageDealt,
         casterLevel: attacker?.level,
       });
+      continue;
+    }
+    if (effect.against) {
+      // Study's "advantage on attack rolls against THAT target": held by the caster, scoped to
+      // the picked target's id (see attackRollContext's `against`).
+      const spec = buildStatusSpec(effect, { sourceId: attackerId, sourceName: attacker?.name, moveName, dc, ends: pick.ends });
+      spec.against = pick.targetId;
+      try {
+        await CombatAPI.applyStatus(attackerId, spec);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
       continue;
     }
     if (effect.kind === 'heal' && effect.repeat && effect.target !== 'self') {

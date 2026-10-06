@@ -1473,7 +1473,7 @@ _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'lon
 # target's) with this field saying who actually receives it. Every other
 # repeat heal (Aqua Ring, Ingrain) is self-only, so holder and recipient
 # were always the same participant before this.
-_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId')
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId', 'against')
 
 
 def _statuses_of(participant):

@@ -15269,6 +15269,9 @@
       "scaling": "For damage rolls, use 2x Dice at level 5, 3x\nDice at level 10, and 4x Dice at level 17.",
       "hitsStates": [
         "underground"
+      ],
+      "doubleDamageVsStates": [
+        "underground"
       ]
     },
     {

@@ -2115,6 +2115,8 @@ def _list_move_categories():
             marks['semiInvulnerable'] = m['semiInvulnerable']
         if m.get('hitsStates'):
             marks['hitsStates'] = m['hitsStates']
+        if m.get('doubleDamageVsStates'):
+            marks['doubleDamageVsStates'] = m['doubleDamageVsStates']
         if marks:
             flags[m['name']] = marks
     return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags}

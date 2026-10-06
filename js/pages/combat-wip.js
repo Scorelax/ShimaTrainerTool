@@ -3936,7 +3936,16 @@ async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
  * actually landed (so a multi_hit_same_target loop knows who to keep
  * hitting), or null otherwise. Shared by the single-hit path, the "hit
  * again?" loop above, and _handleMultiHitAoe's per-target resolution. */
+/** Magnitude's "creatures that are burrowed or in the invulnerable stage of Dig take double damage":
+ * x2 when `moveName` lists (`doubleDamageVsStates`) a semi-invulnerable state the target currently holds. */
+function _stateDamageMultiplier(moveName, targetId) {
+  const states = moveFlagsFor(moveName).doubleDamageVsStates || [];
+  const target = session?.participants?.[targetId];
+  return (target?.statuses || []).some((s) => s.kind === 'condition' && states.includes(s.apply)) ? 2 : 1;
+}
+
 async function _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier = 1 } = {}) {
+  if (picked) damageMultiplier *= _stateDamageMultiplier(moveName, picked.targetId);
   if (!picked) return null; // "no target" / closed -- move's own cost still applied, nothing more to do
   if (picked.blocked) return null; // a reactor's block_attack effect (Protect, ...) ended this attack entirely -- routes_combat.py's own block-pending-attack already logged it (reaction-block), nothing left to do
   if (!picked.hit) {
@@ -4150,7 +4159,8 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
           // doubly true in a loop over several AoE targets, one popup per target.
           // damageMultiplier: see this function's own Wide Guard note above.
           const rawTotal = outcome.rawRoll + damageModifier;
-          const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
+          const targetMultiplier = damageMultiplier * _stateDamageMultiplier(moveName, targetId);
+          const finalDamage = targetMultiplier !== 1 ? Math.floor(rawTotal * targetMultiplier) : rawTotal;
           const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName);
           if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
           await waitForDamagedReactions(targetId, combatantId, moveName);

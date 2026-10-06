@@ -1012,6 +1012,8 @@ function _syncLocalCombatState(session) {
     // function only ever receives this WIP-built `c`, never the raw
     // session participant).
     merged.damageRollBonus = damageRollBonusOf(p);
+    // Spirit Growth: moves using these abilities cost half VP (see combat.js's vpCostOverride).
+    merged.vpHalvedAbilities = (p.statuses || []).filter((s) => s.kind === 'condition' && s.apply === 'vp_cost_halved' && s.value).map((s) => String(s.value).toUpperCase());
     merged.stabMultiplier = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'stab_doubled') ? 2 : 1;
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as

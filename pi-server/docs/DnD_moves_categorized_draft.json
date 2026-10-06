@@ -26383,12 +26383,33 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_vp_cost_halved"
       ],
       "description": "You channel a strong determination from deep within your mind. For the duration, all moves drawing on WIS for move power cost half their normal VP, rounded up.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "vp_cost_halved",
+          "value": "WIS",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "The 5ft radius (allies' WIS moves too) is not modeled -- caster only."
+        }
+      ]
     },
     {
       "name": "Stored Power",

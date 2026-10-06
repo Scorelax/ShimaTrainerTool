@@ -3150,7 +3150,16 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
-    vpCostOverride: _extraVpCost > 0 ? (parseInt(move[4], 10) || 0) + _extraVpCost : undefined,
+    vpCostOverride: (() => {
+      // Escalating streak cost (Fury Cutter/...), then Spirit Growth's "moves drawing on WIS cost
+      // half, rounded up" (WIP-bridged `vpHalvedAbilities`, empty on the legacy engine).
+      const base = parseInt(move[4], 10) || 0;
+      let cost = base + (_extraVpCost > 0 ? _extraVpCost : 0);
+      const halved = c.vpHalvedAbilities || [];
+      const abilities = String(move[2] || '').split('/').map((m) => m.trim().toUpperCase());
+      if (halved.some((a) => abilities.includes(a))) cost = Math.ceil(cost / 2);
+      return cost !== base ? cost : undefined;
+    })(),
     deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave || _willDeferToMultiHitAoe,
     skipConfirm: _isSharedCombat,
     onUseMove: (usedMoveName, vpCost) => {

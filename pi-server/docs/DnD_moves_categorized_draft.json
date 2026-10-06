@@ -2379,8 +2379,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "trigger_saving_throw",
-        "lethal_faint"
+        "trigger_saving_throw"
       ],
       "description": "If the target is a creature, it must succeed on a Dexterity saving throw or take 4d12 MOVE + Dark damage. If this damage reduces the creature to 0 hit points, it dies.",
       "moveStat": "DEX",
@@ -5640,8 +5639,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "trigger_saving_throw",
-        "lethal_faint"
+        "trigger_saving_throw"
       ],
       "description": "You emit a thin, extremely high energy beam at a target. If the target is a creature, it must succeed on a Dexterity saving throw or take 4d12 MOVE + Fairy damage. If this damage reduces the creature to 0 hit points, its body becomes a pile of fine gray dust.",
       "moveStat": "DEX",
@@ -18300,12 +18298,28 @@
       },
       "reaction": false,
       "categories": [
-        "lethal_faint"
+        "faint_on_roll"
       ],
       "description": "You create a sphere of energy that packs a concentrated and devastating explosion. Choose a target within range and roll a d20. On a 20, the explosion goes off and all creature within 5 feet of that point faint. On any other roll, the explosion fails to go off and this move has no effect. If the target's level is 10 more than your own, this move automatically fails. This move may only be attempted once per long rest.",
       "moveStat": "None",
       "vpCost": "20",
-      "scaling": "At level 10, this move may be attempted twice per long rest, and three times per long rest at level 18."
+      "scaling": "At level 10, this move may be attempted twice per long rest, and three times per long rest at level 18.",
+      "effects": [
+        {
+          "kind": "faint_on_roll",
+          "min": 20,
+          "levelGap": 10,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Pick every creature within 5ft of the point. Once-per-long-rest limit not tracked."
+        }
+      ]
     },
     {
       "name": "Extreme Speed",
@@ -18901,12 +18915,27 @@
       },
       "reaction": false,
       "categories": [
-        "lethal_faint"
+        "faint_on_roll"
       ],
       "description": "You are filled with an incredible rage, grabbing the head of a target creature in an attempt to squeeze the life from it. Roll a d20. On a 20, you instantly cause the creature to faint. On any other roll, this move has no effect. If the target's level is 10 more than your own, this move automatically fails.",
       "moveStat": "None",
       "vpCost": "8",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "faint_on_roll",
+          "min": 20,
+          "levelGap": 10,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Happy Hour",
@@ -19259,12 +19288,27 @@
       },
       "reaction": false,
       "categories": [
-        "lethal_faint"
+        "faint_on_roll"
       ],
       "description": "You attempt to drill your horn through a target creature with tremendous strength. Roll a d20. On a 20, the creature is impaled and immediately faints. On any other roll, you miss and this move fails. If the target's level is 10 more than your own, this move automatically fails.",
       "moveStat": "None",
       "vpCost": "8",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "faint_on_roll",
+          "min": 20,
+          "levelGap": 10,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Howl",
@@ -20672,9 +20716,7 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect",
-        "damage",
-        "movement"
+        "unknown"
       ],
       "description": "You rush to avenge a fallen ally. When a creature causes an ally to faint, you may move up to your speed to immediately rush forward and make a melee attack roll on the target, dealing 3d10 + MOVE normal damage on a hit.",
       "moveStat": "STR/DEX",

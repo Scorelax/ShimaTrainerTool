@@ -826,6 +826,42 @@ function _lastHitMoveStreak(session, pid) {
 // Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
 setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.[2] || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
 
+/** Guillotine/Horn Drill/Explosion: "roll a d20; on a 20 the target faints; if the target's level
+ * is 10 more than your own, this automatically fails." One d20 per use (cached on the shared `ctx`
+ * so an AoE like Explosion doesn't re-ask per creature); the level gate is per target. Fainting
+ * sets HP to 0 -- the dying/"death" half of any lethal move is outside this tool by design. */
+async function _handleFaintOnRoll({ attackerId, targetId, moveName, effect, ctx }) {
+  const caster = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  if (!caster || !target) return;
+  const gap = effect.levelGap;
+  const casterLevel = Number(caster.level), targetLevel = Number(target.level);
+  if (gap && Number.isFinite(casterLevel) && Number.isFinite(targetLevel) && targetLevel >= casterLevel + gap) {
+    showCombatAlert(`${target.name} is ${gap}+ levels above ${caster.name} -- ${moveName} automatically fails against them.`, { title: moveName });
+    return;
+  }
+  if (ctx.faintRoll === undefined) {
+    ctx.faintRoll = await promptValueRoll({
+      dice: '1d20', moveName,
+      description: `${moveName} -- roll a d20 (${effect.min} or higher and the target faints).`,
+    });
+  }
+  const roll = ctx.faintRoll;
+  if (roll === null || roll === undefined) return; // closed without entering one
+  const text = roll >= effect.min
+    ? `${caster.name}'s ${moveName} succeeds (d20 = ${roll}) -- ${target.name} faints`
+    : `${caster.name}'s ${moveName} fails (d20 = ${roll}) on ${target.name}`;
+  if (roll >= effect.min && target.currentHP > 0) {
+    try {
+      await CombatAPI.updateStats(targetId, { currentHP: 0 });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+      return;
+    }
+  }
+  CombatAPI.logEvent({ type: 'faint', actorId: attackerId, actorName: caster.name, targetId, targetName: target.name, text }).catch(() => {});
+}
+
 /** Fire Shield's passive retaliation: after a MELEE hit lands on a target holding a
  * `retaliation_on_melee_hit` status (value = damage type, value2 = dice), prompt for the
  * damage roll and apply it to the attacker. Not a reaction -- no window, no floor-grab. The
@@ -2917,6 +2953,12 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // handler above), so pick.targetId here is the real target, same as
       // any other on-hit/save-gated effect.
       await _handleStealItem({ attackerId, targetId: pick.targetId, moveName });
+      continue;
+    }
+    if (effect.kind === 'faint_on_roll') {
+      // Guillotine/Horn Drill/Explosion -- `ctx` is shared across every target of one use, so
+      // the single d20 is only asked for once.
+      await _handleFaintOnRoll({ attackerId, targetId: pick.targetId, moveName, effect, ctx });
       continue;
     }
     if (effect.kind === 'drop_item') {

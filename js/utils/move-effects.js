@@ -158,6 +158,7 @@ function _title(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
  * to 0", "Disadvantage on attack rolls". Stacks (stored statuses only) scale
  * the amount. */
 export function statusLabel(s) {
+  if (s.kind === 'faint_on_roll') return `Faints the target on a d20 of ${s.min}+`;
   if (s.kind === 'condition') {
     if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value2 ? `${s.value}/${s.value2}` : s.value}`;
     if (s.apply === 'resistance_upgrade') return `Resistance upgraded (${s.value === 'all' ? 'all types' : s.value || ''})`;

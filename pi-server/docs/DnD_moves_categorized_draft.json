@@ -11643,12 +11643,34 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_ally"
+        "stat_buff_attack_rolls"
       ],
       "description": "You spread your wings in a majestic display, inspiring allies close by. All allies within range that can see you receive a bonus to their attack rolls equal to 1d6 + your Charisma modifier, lasting until the beginning of your next turn.",
       "moveStat": "CHA",
       "vpCost": "15",
-      "scaling": "The bonus dice granted from this move changes to 1d8 at level 5, 1d10 at level 10 and 2d6 at level 17."
+      "scaling": "The bonus dice granted from this move changes to 1d8 at level 5, 1d10 at level 10 and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": {
+            "dice": "1d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "start",
+              "count": 1
+            }
+          ],
+          "note": "Allies in range that can see the caster."
+        }
+      ]
     },
     {
       "name": "5. Enervation Ray",

@@ -3088,6 +3088,13 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       }
       effect = { ...effect, amount: Math.floor(effect.amount.fractionOfMaxHP * holder.maxHP) };
     }
+    if (effect.kind === 'stat' && effect.amount && typeof effect.amount === 'object' && effect.amount.dice && effect.amount.moveMod && attacker) {
+      // Wing Command's "1d6 + your Charisma modifier": a dice bonus the player rolls later (see
+      // diceBonusOptionsFor); the move's own modifier is folded into the dice label so the total
+      // they type already includes it.
+      const mod = bestMoveStatModifier(findMoveRow(moveName) || [], attacker);
+      effect = { ...effect, amount: { dice: mod ? `${effect.amount.dice}${mod > 0 ? '+' : ''}${mod}` : effect.amount.dice } };
+    }
     if (effect.kind === 'stat' && effect.amount && typeof effect.amount === 'object' && effect.amount.moveModifier) {
       // Fell Stinger's "double your ability modifier": one more copy of the move's own best
       // modifier (the same number a heal's `moveMod` adds), resolved to a flat number now.

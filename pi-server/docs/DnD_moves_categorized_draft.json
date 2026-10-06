@@ -25824,12 +25824,32 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "stat_buff_self"
+        "potential_stat_transfer_average_value"
       ],
       "description": "You use your psychic power to change your offense to match the target's the best you can. Force a creature in range to make a CHA save against your Move DC. On a failure, choose either your STR, DEX, or WIS. For the duration, replace the chosen ability score with the average of your current score and the target's score.",
       "moveStat": "INT/WIS",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "average_value",
+          "field": null,
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Power Swap",
@@ -25885,12 +25905,31 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_stat_transfer_swap_own_ac"
       ],
       "description": "You employ your psychic power to switch your own attack and defense. Until the end of your next turn, switch your AC with an ability score of your choice (Constitution not included)",
       "moveStat": "None",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "swap_own_ac",
+          "field": null,
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Prismatic Laser",

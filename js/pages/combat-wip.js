@@ -2391,6 +2391,50 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
     for (const s of selfStats) await recreate(s, targetId);
     return;
   }
+  if (mode === 'swap_own_ac') {
+    // Power Trick: swap the caster's OWN AC with a chosen ability score (CON excluded -- the
+    // popup's dropdown already omits it). Both become `set` overrides holding the other's
+    // current value, same overlay model as swap_value, just between two fields of one holder.
+    if (!field || field === 'con') {
+      showCombatAlert(`No valid ability chosen for ${moveName} -- nothing to swap.`, { title: moveName });
+      return;
+    }
+    const stats = effectiveStats(attacker);
+    const ac = stats.ac, score = stats[field];
+    if (!Number.isFinite(ac) || !Number.isFinite(score)) {
+      showCombatAlert(`Couldn't read AC and ${field.toUpperCase()} -- swap them by hand.`, { title: moveName });
+      return;
+    }
+    const specFor = (stat, value) => buildStatusSpec(
+      { kind: 'stat', stat, set: value },
+      { sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends },
+    );
+    try {
+      await CombatAPI.applyStatus(attackerId, specFor('ac', score));
+      await CombatAPI.applyStatus(attackerId, specFor(field, ac));
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+    return;
+  }
+  if (mode === 'average_value') {
+    // Power Split: replace the caster's chosen score with the average of their current score and
+    // the target's (rounded down, same as Guard Split).
+    const value = _resolveSetValue({ avgWithTarget: field }, attacker, target);
+    if (!field || value === null) {
+      showCombatAlert(`Couldn't average ${String(field || '?').toUpperCase()} for ${moveName} -- apply it by hand.`, { title: moveName });
+      return;
+    }
+    try {
+      await CombatAPI.applyStatus(attackerId, buildStatusSpec(
+        { kind: 'stat', stat: field, set: value },
+        { sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends },
+      ));
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+    return;
+  }
   if (mode === 'swap_value') {
     // Guard Swap (field:"ac", fixed)/Power Swap (field left null in the
     // move's own data, filled in by the human via effects-popup.js's own

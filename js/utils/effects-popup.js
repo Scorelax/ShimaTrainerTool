@@ -97,13 +97,17 @@ const STAT_CHOICES = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
  * for this ONCE -- the swap itself is computed and applied to BOTH
  * participants inside one handler call, so there's no risk of the caster's
  * and the target's own pick ending up on two different fields. */
+// Per-mode limits on the dropdown: Power Trick swaps AC with an ability score "Constitution not
+// included"; Power Split replaces "STR, DEX, or WIS" only.
+const _MODE_STAT_CHOICES = { swap_own_ac: ['str', 'dex', 'int', 'wis', 'cha'], average_value: ['str', 'dex', 'wis'] };
+
 function _needsStatChoice(effect) {
-  return effect.kind === 'stat_transfer' && effect.mode === 'swap_value' && effect.field === null;
+  return effect.kind === 'stat_transfer' && ['swap_value', 'swap_own_ac', 'average_value'].includes(effect.mode) && effect.field === null;
 }
 
 function _statChoiceInput(effect, id) {
   if (!_needsStatChoice(effect)) return '';
-  const opts = STAT_CHOICES.map(s => `<option value="${esc(s)}">${esc(s.toUpperCase())}</option>`).join('');
+  const opts = (_MODE_STAT_CHOICES[effect.mode] || STAT_CHOICES).map(s => `<option value="${esc(s)}">${esc(s.toUpperCase())}</option>`).join('');
   return `<div class="effects-popup-inline">Stat: <select data-stat-for="${id}">${opts}</select></div>`;
 }
 

@@ -1,6 +1,7 @@
 // Trainer Card Page - Hub with Trainer Image, Party Slots, and Utility Slot
 
 import { showError } from '../utils/notifications.js';
+import { scaledMaxCharges } from '../utils/move-charges.js';
 import { audioManager } from '../utils/audio.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { showCombatConfirm } from '../utils/combat-alert.js';
@@ -72,7 +73,7 @@ function restoreRechargesForRest(pokemonData, restType) {
     if (restType === 'SR' && state.type !== 'SR') return;
     const moveData = allMoves.find(m => m[0] === moveName);
     const maxCharges = moveData
-      ? (_parseRechargeTC(moveData[3] || '')?.maxCharges ?? state.chargesLeft)
+      ? scaledMaxCharges(moveName, _parseRechargeTC(moveData[3] || '')?.maxCharges ?? state.chargesLeft, parseInt(pokemonData[4]) || 1)
       : state.chargesLeft;
     if (state.chargesLeft < maxCharges) {
       knownMoves[moveName] = { ...state, chargesLeft: maxCharges };

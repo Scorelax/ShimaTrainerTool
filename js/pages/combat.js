@@ -7,6 +7,7 @@ import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
 import { multiplyDiceString, addDiceString } from '../utils/move-effects.js';
+import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
@@ -234,7 +235,8 @@ function initializeRechargeStates(state) {
       if (recharge.type === 'DICE') {
         c.rechargeStates[moveName] = { chargesLeft: 1, maxCharges: 1, type: 'DICE', range: recharge.range };
       } else {
-        c.rechargeStates[moveName] = { chargesLeft: recharge.maxCharges, maxCharges: recharge.maxCharges, type: recharge.type };
+        const max = scaledMaxCharges(moveName, recharge.maxCharges, c.level);
+        c.rechargeStates[moveName] = { chargesLeft: max, maxCharges: max, type: recharge.type };
       }
     });
   });
@@ -354,9 +356,10 @@ export function buildPokemonCombatant(pokemonKey) {
         // Dice-recharge moves always start fresh each combat — not persisted
         rechargeStates[moveName] = { chargesLeft: 1, maxCharges: 1, type: 'DICE', range: recharge.range };
       } else if (existingRecharges[moveName] !== undefined) {
-        rechargeStates[moveName] = { chargesLeft: existingRecharges[moveName].chargesLeft, maxCharges: recharge.maxCharges, type: recharge.type };
+        rechargeStates[moveName] = { chargesLeft: existingRecharges[moveName].chargesLeft, maxCharges: scaledMaxCharges(moveName, recharge.maxCharges, level), type: recharge.type };
       } else {
-        rechargeStates[moveName] = { chargesLeft: recharge.maxCharges, maxCharges: recharge.maxCharges, type: recharge.type };
+        const max = scaledMaxCharges(moveName, recharge.maxCharges, level);
+        rechargeStates[moveName] = { chargesLeft: max, maxCharges: max, type: recharge.type };
       }
     });
   }

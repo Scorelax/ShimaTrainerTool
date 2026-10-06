@@ -3,6 +3,7 @@ import { TrainerAPI } from '../api.js';
 import { selectAndPreloadSplashImage } from '../utils/splash.js';
 import { showTapToContinue } from '../utils/idle-splash.js';
 import { prefetchSprite } from '../utils/sprite-media.js';
+import { scaledMaxCharges } from '../utils/move-charges.js';
 
 // ============================================================================
 // KNOWN MOVES SYNC
@@ -137,7 +138,7 @@ function syncKnownMovesForAllPokemon() {
       // If we already track this move keep its current charge count; otherwise start at max
       updated[moveName] = existing[moveName] !== undefined
         ? existing[moveName]
-        : { chargesLeft: recharge.maxCharges, type: recharge.type };
+        : { chargesLeft: scaledMaxCharges(moveName, recharge.maxCharges, level), type: recharge.type };
     });
 
     const oldStr = pokemonData[59] || '';

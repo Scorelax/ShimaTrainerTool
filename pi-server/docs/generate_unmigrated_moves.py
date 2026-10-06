@@ -86,6 +86,14 @@ TAG_NOTES = {
 # never has to reason about them, and so they can't silently reappear as
 # "needs work" the way conditional_damage itself just did.
 HANDLED_OUTSIDE_SCHEMA = {
+    # protect_negate leftovers (2026-10-06): all handled by top-level flags, no `effects` needed.
+    'Aqua Phase', 'Fly', 'Phantom Force', 'Shadow Force',  # `ignoresProtect` (routes_combat.py's _eligible_reactors);
+                                                           # the vanish-then-attack-with-advantage two-turn shape is
+                                                           # deliberately manual, same as Dig/Dive/Bounce.
+    'Astral Jet',  # `ignoresProtect`; the initiative jump is situational_use, announced by the player.
+    'Hyperspace Hole',  # `ignoresProtect` + the `guaranteed_hit` category.
+    'Phantom Tendril',  # `ignoresProtect` + `ignoresTargetStatChanges` (target-picker skips the target's AC mods).
+    'Feint',  # `negatesProtectBlock` -- target-picker.js offers it after a block; no attack of its own.
     'Quick Attack',  # decided with the user (2026-10-06): the bonus-action move is ordinary budgeted
                      # movement + a plain melee attack; opportunity attacks aren't automated anywhere, so
                      # "without taking an attack of opportunity" needs no code.

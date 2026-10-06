@@ -2096,7 +2096,13 @@ def _list_move_categories():
     moves = _load_move_data_file().get('moves', [])
     categories = {m['name']: m.get('categories', []) for m in moves}
     effects = {m['name']: m['effects'] for m in moves if m.get('effects')}
-    flags = {m['name']: {'negatesProtectBlock': True} for m in moves if m.get('negatesProtectBlock')}
+    flags = {}
+    for m in moves:
+        # Only markers a client caller actually reads: Feint's negatesProtectBlock, Phantom Tendril's
+        # ignoresTargetStatChanges (target-picker.js skips the target's AC modifiers).
+        marks = {k: True for k in ('negatesProtectBlock', 'ignoresTargetStatChanges') if m.get(k)}
+        if marks:
+            flags[m['name']] = marks
     return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags}
 
 

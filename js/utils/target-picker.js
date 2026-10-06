@@ -124,6 +124,9 @@ let _moveName = '';
 // for attack-roll effects scoped to a move ability (Nasty Plot). Injected, not imported, so this
 // module doesn't need the combat page's move table.
 let _moveAbilityResolver = () => [];
+// Same injection for a move's top-level flags ({ignoresTargetStatChanges?}).
+let _moveFlagResolver = () => ({});
+export function setMoveFlagResolver(fn) { _moveFlagResolver = typeof fn === 'function' ? fn : () => ({}); }
 export function setMoveAbilityResolver(fn) { _moveAbilityResolver = typeof fn === 'function' ? fn : () => []; }
 // The name of a move the ATTACKER knows that carries `negatesProtectBlock`
 // (Feint), precomputed by the caller (combat-wip.js's own _feintMoveNameFor
@@ -401,7 +404,7 @@ function _showStep2(p, name) {
   document.getElementById('targetPickerRollTarget').innerHTML = `
     <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
-  _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName));
+  _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges });
   document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
   _diceBonusExtra = 0;
   _diceBonusConsume = [];

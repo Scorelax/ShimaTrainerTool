@@ -290,7 +290,7 @@ function _finish(ctx, adv, dis) {
 /** Modifiers for an attack roll by `attacker` against `target` (participant records,
  * either may be missing): the attacker's attack-roll bonus/penalty and advantage/
  * disadvantage, the target's AC change and attacks-against advantage/disadvantage. */
-export function attackRollContext(attacker, target, moveAbilities = []) {
+export function attackRollContext(attacker, target, moveAbilities = [], { ignoreTargetStatChanges = false } = {}) {
   const ctx = { attackBonus: 0, acDelta: 0, mode: 'normal', notes: [], consume: [] };
   // An attack-roll effect can be scoped two ways: `ability` (Nasty Plot's "attacks with the
   // Wisdom move power" -- the move's own stat list must include it) and `against` (Study's
@@ -326,7 +326,8 @@ export function attackRollContext(attacker, target, moveAbilities = []) {
   for (const s of target?.statuses || []) {
     // (a target's own all_rolls status affects ITS rolls, not attacks against it)
     if (s.kind === 'roll' && s.on === 'attacks_against') take(s, target, s.roll === 'advantage' ? adv : dis);
-    if (s.kind === 'stat' && s.stat === 'ac') {
+    // Phantom Tendril: "unaffected by any of the target's stat changes" -- its AC modifiers don't count.
+    if (s.kind === 'stat' && s.stat === 'ac' && !ignoreTargetStatChanges) {
       const a = _statAmount(s, target);
       ctx.acDelta += a;
       ctx.notes.push(_sourceText(s));

@@ -9,7 +9,7 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
-import { pickTarget, pickTargetAgain, setMoveAbilityResolver } from '../utils/target-picker.js';
+import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver } from '../utils/target-picker.js';
 import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
@@ -823,6 +823,7 @@ function _lastHitMoveStreak(session, pid) {
   return { moveName, count };
 }
 
+setMoveFlagResolver((moveName) => moveFlagsFor(moveName));
 // Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
 setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.[2] || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
 

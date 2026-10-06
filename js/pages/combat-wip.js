@@ -28,7 +28,7 @@ import { pickOneStatus, pickOneMoveName } from '../utils/status-picker.js';
 import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed, damageRollBonusOf } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -985,6 +985,7 @@ function _syncLocalCombatState(session) {
     // combatant so computeMoveData's call in combat.js can see it (that
     // function only ever receives this WIP-built `c`, never the raw
     // session participant).
+    merged.damageRollBonus = damageRollBonusOf(p);
     merged.stabMultiplier = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'stab_doubled') ? 2 : 1;
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
@@ -3022,6 +3023,12 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       }
       effect = { ...effect, amount: Math.floor(effect.amount.fractionOfMaxHP * holder.maxHP) };
     }
+    if (effect.kind === 'stat' && effect.amount && typeof effect.amount === 'object' && effect.amount.moveModifier) {
+      // Fell Stinger's "double your ability modifier": one more copy of the move's own best
+      // modifier (the same number a heal's `moveMod` adds), resolved to a flat number now.
+      const bonus = attacker ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker) : 0;
+      effect = { ...effect, amount: bonus };
+    }
     if (effect.kind === 'temp_hp' && effect.amount && typeof effect.amount === 'object' && effect.amount.meleeDamageSinceLastTurn) {
       // Blood Shield: re-applying replaces the pool (see _apply_status), which
       // already covers "will not stack if used consecutively".
@@ -3757,7 +3764,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   const laserFocusId = guaranteedCritStatusId(attacker);
   if (laserFocusId) crit = true;
 
-  let damageDealt;
+  let damageDealt, targetFainted;
   try {
     // No "N damage applied" popup -- it's already in the shared battle log
     // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
@@ -3772,6 +3779,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
     const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit);
     damageDealt = dmgResult?.damageApplied;
+    targetFainted = dmgResult?.targetFainted;
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
     return null;
@@ -3809,7 +3817,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   }
   await _offerMoveEffects({
     attackerId: combatantId, targetId, moveName, computedData,
-    ctx: { hit: true, attackRoll, guaranteedHit, crit, save, damageDealt },
+    ctx: { hit: true, attackRoll, guaranteedHit, crit, save, damageDealt, targetFainted },
   });
   return targetId;
 }

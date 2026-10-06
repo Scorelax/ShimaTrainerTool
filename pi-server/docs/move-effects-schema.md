@@ -2128,3 +2128,13 @@ fixed one real bug in the test fixture itself (a participant missing
 `visibility`/`side` threw inside the shared `visibleToViewer` helper) --
 not a bug in the new module, confirmed by the SAME fixture working once
 those fields were added.)*
+
+*(Update, 2026-10-06: Blood Shield and Fell Stinger built (`migrate_effects_v61.py`/`v62.py`).
+**Blood Shield** -- `temp_hp` with `amount:{meleeDamageSinceLastTurn:true}`, resolved in
+`_offerMoveEffects` by summing the caster's logged `damage` entries (previous round on) whose move
+range is Melee (`findMoveRow(...)[6]`); re-applying replaces the pool, so "won't stack" is free.
+**Fell Stinger** -- new `when:{type:"target_fainted"}` (the server's `_apply_damage_to_target` returns
+`targetFainted`, HP <= 0; ctx key `targetFainted`), a `stat` amount sentinel `{moveModifier:true}`
+(the move's best modifier, resolved to a flat number at apply time), and a live `damage_rolls` stat
+consumer: `damageRollBonusOf` -> `computeMoveData`'s `damageRollBonus` (WIP-bridged, flat numbers
+only). Artifact Light's damage half could now use it but is a proficiency amount, not yet supported.)*

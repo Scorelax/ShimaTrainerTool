@@ -2972,6 +2972,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       // undefined (-> computeMoveData's own default of 1) on the legacy
       // standalone engine.
       stabMultiplier: c.stabMultiplier,
+      // Live `damage_rolls` stat statuses -- WIP-bridged, undefined on the legacy engine.
+      damageRollBonus: c.damageRollBonus,
     },
     { path: trainerPath, level: trainerLevel, specializationsStr },
     heldItemEffects

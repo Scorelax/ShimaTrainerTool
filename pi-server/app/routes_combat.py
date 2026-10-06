@@ -1915,7 +1915,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         actorId=pid, actorName=attacker['name'], targetId=target_id, targetName=target['name'],
         move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier, crit=bool(crit),
     )
-    return {'multiplier': multiplier, 'damageApplied': actual_damage}
+    return {'multiplier': multiplier, 'damageApplied': actual_damage, 'targetFainted': target['currentHP'] <= 0}
 
 
 # ---------------------------------------------------------------------------

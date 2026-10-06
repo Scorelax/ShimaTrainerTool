@@ -119,6 +119,11 @@ export function evaluateEffect(effect, ctx) {
       if (ctx.guaranteedHit) return 'no'; // no roll was made at all
       if (ctx.attackRoll === null || ctx.attackRoll === undefined) return 'manual';
       return ctx.attackRoll <= w.max ? 'yes' : 'no';
+    case 'target_fainted':
+      // Fell Stinger: the hit itself dropped the target to 0 HP or below.
+      if (!hit) return 'no';
+      if (ctx.targetFainted === undefined) return 'manual';
+      return ctx.targetFainted ? 'yes' : 'no';
     case 'crit':
       if (!hit) return 'no';
       if (ctx.crit === undefined) return 'manual';
@@ -345,6 +350,18 @@ export function statDeltas(participant) {
     else if (_SCORE_KEYS.includes(s.stat)) d[s.stat] += amount;
   }
   return d;
+}
+
+/** Sum of a participant's live flat `damage_rolls` stat statuses (Fell Stinger's post-faint
+ * doubling, Artifact Light) -- added to the damage bonus by computeMoveData's `damageRollBonus`.
+ * A dice amount is skipped (rolled by hand, same as attack rolls). */
+export function damageRollBonusOf(participant) {
+  let total = 0;
+  for (const s of participant?.statuses || []) {
+    if (s.kind !== 'stat' || s.stat !== 'damage_rolls' || typeof s.amount !== 'number') continue;
+    total += s.amount * _stackCount(s);
+  }
+  return total;
 }
 
 /** What a participant's live stat statuses currently FORCE to an exact value via `set`

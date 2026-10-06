@@ -198,12 +198,53 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_stat_increase"
+        "self_potential_stat_buff_attack_rolls",
+        "self_potential_stat_buff_damage_rolls"
       ],
       "description": "You lunge at a creature with a devastating sting attack. Make a melee attack on a creature, dealing 2d8 + MOVE bug damage on a hit. If this attack causes the target to faint, double your ability modifier for attack rolls and damage on your next turn.",
       "moveStat": "STR/DEX",
       "vpCost": "7",
-      "scaling": "The damage dice roll for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice roll for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "stat",
+          "stat": "attack_rolls",
+          "amount": {
+            "moveModifier": true
+          },
+          "when": {
+            "type": "target_fainted"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "damage_rolls",
+          "amount": {
+            "moveModifier": true
+          },
+          "when": {
+            "type": "target_fainted"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "First Impression",

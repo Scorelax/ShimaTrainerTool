@@ -116,7 +116,7 @@ export function computeMoveDC(move, stats) {
  * Shared by combat.js (showCombatMoveDetails) and pokemon-card.js (showMoveDetails).
  *
  * @param {Array} move - Move data array [name, type, modifier, actionType, vpCost, duration, range, desc, higherLevels]
- * @param {{ types: string[], strMod: number, dexMod: number, conMod: number, intMod: number, wisMod: number, chaMod: number, proficiency: number, stabBonusValue: number, level: number, stabMultiplier?: number }} pokemonAttrs
+ * @param {{ types: string[], strMod: number, dexMod: number, conMod: number, intMod: number, wisMod: number, chaMod: number, proficiency: number, stabBonusValue: number, level: number, stabMultiplier?: number, damageRollBonus?: number }} pokemonAttrs
  *   `stabMultiplier` (default 1) -- Calm Mind/Tail Glow's own "double your STAB [bonus/damage]"
  *   for the duration, a WIP-only bridged field (see combat-wip.js's _syncLocalCombatState,
  *   reading a held `stab_doubled` condition) -- always 1 on the legacy standalone engine, same
@@ -125,7 +125,7 @@ export function computeMoveDC(move, stats) {
  * @returns {{ hasSTAB: boolean, attackBonus: number, damageBonus: number, attackBreakdown: string, damageBreakdown: string, damageDice: string|null }}
  */
 export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffects = []) {
-  const { types, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level, hasToughClaws, stabMultiplier = 1 } = pokemonAttrs;
+  const { types, strMod, dexMod, conMod, intMod, wisMod, chaMod, proficiency, stabBonusValue, level, hasToughClaws, stabMultiplier = 1, damageRollBonus = 0 } = pokemonAttrs;
   const { path, level: trainerLevel, specializationsStr } = trainerAttrs;
 
   const moveType = move[1];
@@ -199,7 +199,9 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
     }
   }
 
-  const damageBonus = stabBonus + (includeStatInDmg ? highestMod : 0) + aceBonus + typeMasterDamageBonus + heldItemDamageBonus;
+  // `damageRollBonus` -- the sum of the holder's live `damage_rolls` stat statuses (Fell Stinger's
+  // post-faint doubling, Artifact Light); 0 on the legacy standalone engine.
+  const damageBonus = stabBonus + (includeStatInDmg ? highestMod : 0) + aceBonus + typeMasterDamageBonus + heldItemDamageBonus + damageRollBonus;
 
   // Format modifier helper
   const fmt = v => v >= 0 ? `+${v}` : `${v}`;
@@ -224,6 +226,7 @@ export function computeMoveData(move, pokemonAttrs, trainerAttrs, heldItemEffect
   if (aceBonus > 0) dmgParts.push(`Ace Trainer +${aceBonus}`);
   if (typeMasterDamageBonus > 0) dmgParts.push(`Type Master +${typeMasterDamageBonus}`);
   heldItemDmgSources.forEach(s => dmgParts.push(s));
+  if (damageRollBonus !== 0) dmgParts.push(`Status ${fmt(damageRollBonus)}`);
 
   const damageDice = parseDamageDice(desc, move[8] || '', level);
   // Electro Ball's own damage_note nextTierDice field -- null once already

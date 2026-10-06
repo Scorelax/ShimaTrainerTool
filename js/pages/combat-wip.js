@@ -29,7 +29,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed, damageRollBonusOf } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -831,6 +831,30 @@ setTargetabilityResolver((participant, moveName) => untargetableState(participan
 // Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
 setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.[2] || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
 
+/** Throat Chop: "unable to activate sound based attacks for its next 1d4 turns". Rolls the 1d4 (typed in),
+ * then disables every move the target KNOWS that's flagged `soundBased` (the move data's own flag) via the
+ * existing `move_disabled` condition, each ending after that many of the target's own turns. */
+async function _handleDisableSoundMoves({ targetId, moveName, sourceId, sourceName, dc }) {
+  const target = session?.participants?.[targetId];
+  if (!target) return;
+  const sound = (target.moves || []).filter((m) => moveFlagsFor(m).soundBased);
+  if (!sound.length) {
+    showCombatAlert(`${target.name} knows no sound-based moves -- ${moveName} has nothing to silence.`, { title: moveName });
+    return;
+  }
+  const turns = await promptValueRoll({ dice: '1d4', moveName, description: `${moveName} -- roll 1d4: how many of ${target.name}'s turns are they unable to use sound-based moves?` });
+  if (!turns || turns < 1) return;
+  try {
+    for (const name of sound) {
+      await CombatAPI.applyStatus(targetId, buildStatusSpec(
+        { kind: 'condition', apply: 'move_disabled', value: name },
+        { sourceId, sourceName, moveName, dc, ends: [{ type: 'until_turn', whose: 'holder', point: 'end', count: turns }] }));
+    }
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
 /** Entrainment / Role Play / Skill Swap / Simple Beam: temporarily replace one ability with another via
  * `ability_override` statuses (see move-effects.js's effectiveAbilities -- an overlay computed from the
  * session's base abilities, never written back, so it can't outlive the status, the combat or the
@@ -1107,6 +1131,8 @@ function _syncLocalCombatState(session) {
     // witnessedMoveTypes above (quietly reads 0 on the legacy engine, which
     // never populates this field at all).
     merged.activeBuffCount = activeBuffCount(p);
+    merged.activeBuffCountsByStat = activeBuffCountsByStat(p);
+    merged.echoedVoiceMultiplier = echoedVoiceMultiplier(session, p.id);
     // Fury Cutter/Ice Ball/Rollout's own consecutive-hit escalation -- see
     // _lastHitMoveStreak's own docstring. Same WIP-only bridging pattern.
     merged.lastHitMoveStreak = _lastHitMoveStreak(session, p.id);
@@ -3051,6 +3077,10 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleStealItem({ attackerId, targetId: pick.targetId, moveName });
       continue;
     }
+    if (effect.kind === 'disable_sound_moves') {
+      await _handleDisableSoundMoves({ targetId: pick.targetId, moveName, sourceId: attackerId, sourceName: attacker?.name, dc });
+      continue;
+    }
     if (effect.kind === 'ability_swap') {
       await _handleAbilitySwap({ mode: effect.mode, attackerId, targetId: pick.targetId, moveName, ends: pick.ends, dc, replacement: effect.replacement });
       continue;
@@ -3077,7 +3107,14 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // (closure's own targetId for Strafe's "near the target", attackerId
       // itself for Pasta Portal's "near where I currently stand").
       const anchorId = effect.anchor === 'target' ? targetId : attackerId;
-      await _handleRepositionNear({ moverId: attackerId, anchorId, maxFt: effect.maxFt, moveName });
+      // U-turn/Volt Switch: "half your movement speed" instead of a fixed distance.
+      const fastest = maxSpeed(session?.participants?.[attackerId]);
+      const maxFt = effect.maxFtFractionOfSpeed ? Math.floor((fastest || 0) * effect.maxFtFractionOfSpeed) : effect.maxFt;
+      if (!maxFt) {
+        showCombatAlert(`Couldn't work out how far ${moveName} lets you move (no speed on record) -- reposition by hand.`, { title: moveName });
+        continue;
+      }
+      await _handleRepositionNear({ moverId: attackerId, anchorId, maxFt, moveName });
       continue;
     }
     if (effect.kind === 'teleport_swap') {
@@ -4016,7 +4053,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     const targetName = session?.participants?.[picked.targetId]?.name || '?';
     const attackerName = session?.participants?.[combatantId]?.name || '?';
     CombatAPI.logEvent({
-      type: 'miss', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
+      type: 'miss', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName, move: moveName,
       text: `${attackerName} used ${moveName} on ${targetName} -- Miss`,
     }).catch(() => {});
     // No popup here (see the user's own call: the players already know how a Miss reads,

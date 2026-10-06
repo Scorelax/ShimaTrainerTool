@@ -146,7 +146,8 @@
             }
           ]
         }
-      ]
+      ],
+      "soundBased": true
     },
     {
       "name": "Defend Order",
@@ -1091,12 +1092,30 @@
       "categories": [
         "damage",
         "positioning",
-        "switch"
+        "switch",
+        "self_reposition_near"
       ],
       "description": "You lash out with a quick strike before you make a getaway. Make a melee attack, dealing 2d8 + MOVE bug damage on a hit. After this move is activated, if it is possible, you must either move up to half your movement speed away from your target, not provoking opportunity attacks, or your trainer must switch you out as a free action.",
       "moveStat": "DEX",
       "vpCost": "9",
-      "scaling": "The damage dice roll for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice roll for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "reposition_near",
+          "anchor": "self",
+          "maxFtFractionOfSpeed": 0.5,
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Half your speed, away from the target (not enforced). The trainer switch-out alternative has no mechanic."
+        }
+      ]
     },
     {
       "name": "Wing Buffer",
@@ -3606,7 +3625,8 @@
           ],
           "note": "RAW only if that attack targets you -- applied regardless of target"
         }
-      ]
+      ],
+      "soundBased": true
     },
     {
       "name": "Snatch",
@@ -3819,12 +3839,26 @@
       "reaction": false,
       "categories": [
         "damage",
-        "attack_suppression"
+        "attack_suppression",
+        "disable_sound_moves"
       ],
       "description": "You focus in on an attack at the target’s throat. Make a melee attack, dealing 1d10 + MOVE dark damage on a hit. On hit, the target is unable to activate sound based attacks for its next 1d4 turns.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "disable_sound_moves",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Topsy-Turvy",
@@ -4361,7 +4395,8 @@
       "description": "The user lets out a mighty roar. All creatures within 60 feet must make a Wisdom saving throw or be frightened for 1 minute. A creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
       "moveStat": "WIS",
       "vpCost": "8",
-      "scaling": ""
+      "scaling": "",
+      "soundBased": true
     },
     {
       "name": "Twister",
@@ -4636,7 +4671,8 @@
       "description": "Your body generates a strange pulsating sound that can disrupt the target's ability to attack. When you activate this move, any hostile creature within 30 feet of you must make a CON saving throw against your Move DC. On a failure, the target flinches for 1d4 rounds.",
       "moveStat": "DEX/CHA",
       "vpCost": "7",
-      "scaling": ""
+      "scaling": "",
+      "soundBased": true
     },
     {
       "name": "Electric Terrain",
@@ -5483,12 +5519,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "positioning"
+        "positioning",
+        "self_reposition_near"
       ],
       "description": "You lash out with a quick, electric strike before you make a getaway. Make a melee attack, dealing 2d8 + MOVE electric damage on a hit. After this move is activated, if it is possible, you must either move up to half your movement speed away from your target, not provoking opportunity attacks, or your trainer must switch you out as a free action.",
       "moveStat": "DEX",
       "vpCost": "9",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "reposition_near",
+          "anchor": "self",
+          "maxFtFractionOfSpeed": 0.5,
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Half your speed, away from the target (not enforced). The trainer switch-out alternative has no mechanic."
+        }
+      ]
     },
     {
       "name": "Volt Tackle",
@@ -6133,7 +6187,8 @@
       "description": "You let out a charming cry, dealing emotional damage to any opponent in range that can hear you. This move automatically hits for 1d4 + MOVE fairy damage unless a creature is in the invulnerable stages of Fly, Dig, Bounce, etc.",
       "moveStat": "CHA",
       "vpCost": "3",
-      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17."
+      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Divine Noodle Form",
@@ -7432,7 +7487,8 @@
       "description": "You sing an ancient song that damages creatures in range with the chance to put them asleep. Any creature in a 20ft circle, centered on you, must make a CON save against your Move DC, taking 3d10 + MOVE fairy damage on a failure, or half as much ona success. Any creature that fails the save by 5 or more is put to sleep.",
       "moveStat": "CHA/WIS",
       "vpCost": "20",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Song of the Deep",
@@ -7472,7 +7528,8 @@
       "description": "You sing a hauntingly beautiful song that can be heard in a 5 mile radius. Affected creatures have to make a save against your move DC, their minds being captured by you on a failure. You then fall asleep, entering the Dreamscape with your captives.",
       "moveStat": "WIS/CHA",
       "vpCost": "30",
-      "scaling": ""
+      "scaling": "",
+      "soundBased": true
     },
     {
       "name": "Sweet Kiss",
@@ -10958,7 +11015,8 @@
       "description": "You shout a series of disorienting words at an opponent, scrambling their senses. Make a ranged attack. On a hit, deal 1d10 + MOVE flying damage. Natural attack rolls of 18 or higher cause the target to become confused.",
       "moveStat": "WIS/CHA",
       "vpCost": "6",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Defog",
@@ -13651,7 +13709,8 @@
       "description": "You make a shrill sound that has the chance to put a creature to sleep. The target must make a WIS save against your Move DC, falling asleep on a failure.",
       "moveStat": "CON/CHA",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "soundBased": true
     },
     {
       "name": "Grassy Terrain",
@@ -17333,7 +17392,8 @@
       "description": "You generate a powerful shock wave. Any opponent caught in a 40 foot radius, centered on you, must make a CON save against your Move DC, taking 3d10 + MOVE normal damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it becomes deafened for 1 minute.",
       "moveStat": "STR/CHA",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Camouflage",
@@ -18043,12 +18103,24 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_damage_increase"
+        "potential_damage_increase",
+        "damage_note"
       ],
       "description": "You release a shout that echoes across the battlefield towards an opponent. Make a ranged attack, dealing 3d10 + MOVE normal damage on a hit. Until the beginning of your next turn, if any other creature in range uses this move, they may double their damage dice on a hit. This multiplier can continue to stack to a maximum of 8x the damage dice, resetting if any of the attacks miss.",
       "moveStat": "WIS/CHA",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_echoed_voice_multiplier"
+          },
+          "diceMultiplierFromMagnitude": true,
+          "note": "Another creature's Echoed Voice is still echoing: damage dice doubled (max 8x)."
+        }
+      ],
+      "soundBased": true
     },
     {
       "name": "Echoing Screech",
@@ -18087,7 +18159,8 @@
       "description": "The user lets out a piercing screech. Each creature within 30 feet must make a Constitution saving throw. On a failure, a creature takes 2d6 + MOVE normal damage and is deafened for 1 minute. On a success, it takes half damage and isn't deafened.",
       "moveStat": "CON",
       "vpCost": "6",
-      "scaling": "3d6 at level 5, 4d6 at level 10, 5d6 at level 17"
+      "scaling": "3d6 at level 5, 4d6 at level 10, 5d6 at level 17",
+      "soundBased": true
     },
     {
       "name": "Egg Bomb",
@@ -18885,7 +18958,8 @@
             "max": 5
           }
         }
-      ]
+      ],
+      "soundBased": true
     },
     {
       "name": "Growth",
@@ -19396,7 +19470,8 @@
             "max": 5
           }
         }
-      ]
+      ],
+      "soundBased": true
     },
     {
       "name": "Hyper Beam",
@@ -19486,7 +19561,8 @@
       "description": "You release a loud and startling sound that discourages and intimidates your enemies. All enemies within range must succeed a WIS save, suffering 2d8 + MOVE normal damage on a failure, half as much on a success.",
       "moveStat": "DEX/CHA",
       "vpCost": "10",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Imperial Guard",
@@ -20167,7 +20243,8 @@
             }
           ]
         }
-      ]
+      ],
+      "soundBased": true
     },
     {
       "name": "Odor Sleuth",
@@ -20303,7 +20380,8 @@
       "description": "You perform a song with devastating consequences to creatures that hear it. All creatures in range (including you) must make a CON saving throw against your Move DC. For any that fail, they faint in 3 rounds, on their turn, unless fleeing or switched out by their trainer before the end of the three rounds.",
       "moveStat": "CHA",
       "vpCost": "25",
-      "scaling": ""
+      "scaling": "",
+      "soundBased": true
     },
     {
       "name": "Play Nice",
@@ -20842,7 +20920,8 @@
           ],
           "note": "The creature Disengages (free action) and moves up to its own speed in a straight line directly away from you. Allies are unaffected."
         }
-      ]
+      ],
+      "soundBased": true
     },
     {
       "name": "Rock Climb",
@@ -20895,7 +20974,8 @@
       "description": "You attack a creature's mind with a harsh song. Select a target in range and force them to make a WIS save against your Move DC. On a failure, the target takes 1d10 + MOVE normal damage. If an ally in range also knows this move, they can join in the song as a reaction to add an additional damage dice.",
       "moveStat": "WIS/CHA",
       "vpCost": "2",
-      "scaling": "The damage dice roll for this move changes to 2d10 at level 5, 3d10 at level 10, and 4d10 at level 17."
+      "scaling": "The damage dice roll for this move changes to 2d10 at level 5, 3d10 at level 10, and 4d10 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Safeguard",
@@ -21040,7 +21120,8 @@
           ],
           "note": "\"allies add +1 to hit it\" -- represented as the target's own AC dropping"
         }
-      ]
+      ],
+      "soundBased": true
     },
     {
       "name": "Scrub Down",
@@ -21400,7 +21481,8 @@
       "description": "You sing a beautiful song in an attempt to put creatures to sleep. Roll 5d8 + MOVE; the total is how many hit points of creature this move can affect. Creatures within 30 feet of you are affected in ascending order of their current hit points. Starting with the creature that has the lowest current hit points, each creature affected by this move falls asleep. Subtract each creature’s hit points from the total before moving on to the creature with the next lowest hit points. A creature’s hit points must be equal to or less than the remaining total for that creature to be affected.",
       "moveStat": "CHA",
       "vpCost": "4",
-      "scaling": "The number of hit points affected changes to 7d8 at level 5, 6d12 at level 10, and 11d8 at level 17."
+      "scaling": "The number of hit points affected changes to 7d8 at level 5, 6d12 at level 10, and 11d8 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Sketch",
@@ -21660,7 +21742,8 @@
       "description": "While you are asleep, you may activate this move to create a harsh noise that damages all creature within range for 1d8 + MOVE normal damage.",
       "moveStat": "STR/WIS",
       "vpCost": "2",
-      "scaling": "The damage dice roll for this move changes to 2d6 at level 5, 4d4 at level 10, and 3d10 at level 17."
+      "scaling": "The damage dice roll for this move changes to 2d6 at level 5, 4d4 at level 10, and 3d10 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Soft-Boiled",
@@ -21759,7 +21842,8 @@
       "description": "You unleash a deafening sound that harms creature in a 20 foot circle, centered on you. Creatures in range must make a CON save against your Move DC, taking 20 flat normal damage on a fail, or half as much on a success.",
       "moveStat": "STR/DEX",
       "vpCost": "20",
-      "scaling": ""
+      "scaling": "",
+      "soundBased": true
     },
     {
       "name": "Spike Cannon",
@@ -22103,7 +22187,8 @@
       "description": "You emit a high pitched screech heard only by the target. Choose a target in range. The target must pass a WIS saving throw against your Move DC or become confused.",
       "moveStat": "DEX/WIS",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "soundBased": true
     },
     {
       "name": "Swagger",
@@ -22732,7 +22817,8 @@
       "description": "You cause an uproar on the battlefield in a 30 foot circle, centered on you, for three rounds of combat. During the uproar, you cannot use any other Move, and any creature in range wakes and is prevented from falling asleep. (This include creatures that would purposefully fall asleep using moves like Rest) In addition, creatures must make a CON save against your Move DC at the start of each turn. On a fail, the target takes 2d8 + MOVE normal damage.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Vice Grip",
@@ -26725,12 +26811,30 @@
       "reaction": false,
       "categories": [
         "damage",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "description": "You use your psychic energy to attack with stored power. Make a ranged attack, dealing 1d10 + MOVE psychic damage on a hit. Add an additional damage dice for each bonus applied to any of your attack, damage, or AC stats. (For example, if you or an ally has activated moves that are currently boosting your AC, attack, and damage rolls by +1, add three additional damage dice.",
       "moveStat": "STR/WIS",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_active_buff_count",
+            "statFields": [
+              "attack_rolls",
+              "damage_rolls",
+              "ac",
+              "attack_rolls_or_saving_throws"
+            ]
+          },
+          "extraDice": {
+            "amountPerUnit": 1
+          }
+        }
+      ]
     },
     {
       "name": "Synchronoise",
@@ -28423,7 +28527,8 @@
           ],
           "note": "\"+5 to attacks against it\" -- represented as the target's own AC dropping"
         }
-      ]
+      ],
+      "soundBased": true
     },
     {
       "name": "Meteor Mash",
@@ -29592,7 +29697,8 @@
       "description": "You burst into song, unleashing a flurry of bubbles in a 10ft circle, centered on you. All creatures in range must make a DEX save or take 2d8 + MOVE water damage on a fail and half as much on a save. Any creature suffering from the burned condition will be cured upon touching the bubbles.",
       "moveStat": "DEX/CHA",
       "vpCost": "10",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "soundBased": true
     },
     {
       "name": "Steam Eruption",

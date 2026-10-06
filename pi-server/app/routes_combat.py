@@ -180,6 +180,7 @@ def handle(conn, action, params):
             s, params['type'], text=params['text'],
             actorId=params.get('actorId'), actorName=params.get('actorName'),
             targetId=params.get('targetId'), targetName=params.get('targetName'),
+            **({'move': params['move']} if params.get('move') else {}),
         ))
 
     if action == 'add-participant':
@@ -503,6 +504,9 @@ def _log_event(state, event_type, text, actorId=None, actorName=None, targetId=N
     entry = {
         'id': uuid.uuid4().hex[:8],
         'round': state.get('round', 0),
+        # Whose turn it was when this happened -- Echoed Voice's "until the start of your next turn" window
+        # needs the position within a round, not just the round.
+        'turnIndex': state.get('turnIndex', 0),
         'ts': datetime.now(timezone.utc).isoformat(),
         'type': event_type,
         'text': text,
@@ -2119,6 +2123,8 @@ def _list_move_categories():
             marks['semiInvulnerable'] = m['semiInvulnerable']
         if m.get('hitsStates'):
             marks['hitsStates'] = m['hitsStates']
+        if m.get('soundBased'):
+            marks['soundBased'] = True
         if m.get('doubleDamageVsStates'):
             marks['doubleDamageVsStates'] = m['doubleDamageVsStates']
         if marks:

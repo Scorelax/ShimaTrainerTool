@@ -2361,7 +2361,14 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null, move
       // activeBuffCount and combat-wip.js's _syncLocalCombatState), same
       // "quietly reads 0 on the legacy standalone engine" limitation as
       // c.witnessedMoveTypes above it.
-      case 'self_active_buff_count': { const units = c.activeBuffCount || 0; return { met: units > 0, magnitude: units }; }
+      case 'self_active_buff_count': {
+        // Stored Power counts only attack/damage/AC bonuses (`statFields`); Power Trip counts them all.
+        const by = c.activeBuffCountsByStat || {};
+        const units = cond.statFields ? cond.statFields.reduce((n, f) => n + (by[f] || 0), 0) : (c.activeBuffCount || 0);
+        return { met: units > 0, magnitude: units };
+      }
+      // Echoed Voice's chain multiplier (see move-effects.js's echoedVoiceMultiplier), already capped.
+      case 'self_echoed_voice_multiplier': { const m = c.echoedVoiceMultiplier || 1; return { met: m > 1, magnitude: m }; }
       // Fury Cutter/Ice Ball/Rollout's own "double the dice each
       // consecutive [turn/round] you hit [with this move]" -- magnitude
       // here is already the FINAL capped multiplier (not a raw count), fed

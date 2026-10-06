@@ -974,8 +974,8 @@ export class CombatAPI {
    * for a mechanic that only ever happens client-side -- status effects,
    * heal-popup amounts, an attack roll declared a Miss, etc. -- see
    * routes_combat.py's log-event action docstring for the trust model. */
-  static async logEvent({ type, text, actorId, actorName, targetId, targetName }) {
-    return API.request('combat', 'log-event', { type, text, actorId, actorName, targetId, targetName }, { useCache: false });
+  static async logEvent({ type, text, actorId, actorName, targetId, targetName, move }) {
+    return API.request('combat', 'log-event', { type, text, actorId, actorName, targetId, targetName, move }, { useCache: false });
   }
 
   // -- Battle map (see pi-server/app/routes_combat.py's 'board' state) --

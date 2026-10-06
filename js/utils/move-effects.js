@@ -753,6 +753,44 @@ export function addDiceString(dice, extraCount) {
  * override never counts -- no baseline to compare it against (see
  * statSetOverrides's own "always a plain literal, no live delta" reasoning)
  * -- a real, documented simplification rather than an oversight. */
+/** {statName: count} of the participant's active positive `stat` statuses, per stat -- the same counting
+ * rule as activeBuffCount, split by stat so a damage_note condition can sum just the stats it names
+ * (Stored Power: attack, damage and AC). Plain data, so it can ride on the persisted local combatant. */
+export function activeBuffCountsByStat(participant) {
+  const out = {};
+  for (const s of participant?.statuses || []) {
+    if (s.kind !== 'stat') continue;
+    const positive = _isDiceAmount(s) || (typeof s.amount === 'number' && s.amount * _stackCount(s) > 0);
+    if (positive) out[s.stat] = (out[s.stat] || 0) + 1;
+  }
+  return out;
+}
+
+/** Echoed Voice: "until the start of your next turn, any OTHER creature that uses this move may double its
+ * damage dice on a hit; stacks to 8x, resetting if any of the attacks miss". Read off the shared log: walk
+ * the move's hits/misses in order, a chain being the hits since the last miss that each fell inside the
+ * first one's window (which closes when ITS user's next turn begins, `log.turnIndex` gives the position
+ * within a round). Returns the multiplier `pid` gets now: 2^(chain length), capped at 8 -- 1 for the chain's
+ * own opener, or when no window is open. */
+export function echoedVoiceMultiplier(session, pid) {
+  const order = session?.turnOrder || [];
+  const n = order.length || 1;
+  const pos = (round, idx) => (round || 0) * n + (idx || 0);
+  const windowEnd = (root) => {
+    const i = order.indexOf(root.actorId);
+    return i === -1 ? Infinity : pos((root.round || 0) + 1, i);
+  };
+  let chain = [];
+  for (const e of session?.log || []) {
+    if (e.move !== 'Echoed Voice' || (e.type !== 'damage' && e.type !== 'miss')) continue;
+    if (chain.length && pos(e.round, e.turnIndex) >= windowEnd(chain[0])) chain = [];
+    if (e.type === 'miss') { chain = []; continue; }
+    chain.push(e);
+  }
+  if (!chain.length || pos(session.round, session.turnIndex) >= windowEnd(chain[0]) || pid === chain[0].actorId) return 1;
+  return Math.min(8, 2 ** chain.length);
+}
+
 export function activeBuffCount(participant, statFields = null) {
   return (participant?.statuses || []).filter(s => {
     if (s.kind !== 'stat') return false;

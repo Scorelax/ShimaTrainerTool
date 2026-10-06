@@ -1887,12 +1887,30 @@
       },
       "reaction": false,
       "categories": [
-        "movement"
+        "movement",
+        "self_reposition_near"
       ],
       "description": "You temporarily phase out of this plane of existence, becoming partially incorporeal. You may move up to 30ft. through solid matter. You may not end your turn inside solid matter. While phasing, you will not trigger opportunity attacks.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "reposition_near",
+          "anchor": "self",
+          "maxFt": 30,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Through solid matter / no opportunity attacks: neither exists in this app."
+        }
+      ]
     },
     {
       "name": "Probability Storm",
@@ -26677,12 +26695,30 @@
       },
       "reaction": false,
       "categories": [
-        "movement"
+        "movement",
+        "self_reposition_near"
       ],
       "description": "You disappear from view and reappear at an unoccupied point within range. In wild creature battles, this move can be activated to automatically count as a single success in a group DEX check to run away. You may spend 20VP instead of 5 to use this move as a bonus action instead.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "reposition_near",
+          "anchor": "self",
+          "maxFt": 40,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "The wild-battle group-flee success and the 20VP bonus-action variant are not modeled."
+        }
+      ]
     },
     {
       "name": "Treasure Room",

@@ -86,6 +86,11 @@ TAG_NOTES = {
 # never has to reason about them, and so they can't silently reappear as
 # "needs work" the way conditional_damage itself just did.
 HANDLED_OUTSIDE_SCHEMA = {
+    'Quick Attack',  # decided with the user (2026-10-06): the bonus-action move is ordinary budgeted
+                     # movement + a plain melee attack; opportunity attacks aren't automated anywhere, so
+                     # "without taking an attack of opportunity" needs no code.
+    'Extreme Speed',  # same as Quick Attack, just 15ft before and after.
+    'Splash',  # "leap up to 50 feet in the air" -- no elevation exists in this app, nothing to track.
     'Bide',  # two-phase damage-taken-then-retaliate -- see combat.js's _handleBideClick /
              # combat-wip.js's _handleBideResolve / routes_combat.py's _bide_use.
     'Swallow',  # heal dice x Stockpile stacks -- combat.js's _isDirectHeal branch, was already

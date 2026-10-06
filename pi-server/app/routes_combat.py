@@ -681,7 +681,19 @@ def _bump_one_step_better(mult):
     return _MULT_LADDER[min(idx + 1, len(_MULT_LADDER) - 1)]
 
 
-def _type_multiplier(conn, attack_type, defend_type1, defend_type2, target=None):
+def _immunity_ignored(attacker, target, attack_type):
+    """Foresight/Odor Sleuth (an ATTACKER-side `ignore_immunities` condition, value = comma-
+    separated attack types) and Miracle Eye (a TARGET-side `immunities_relinquished`, any type,
+    only meaningful on a Dark/Ghost target) both make a type-chart immunity (0x) not count."""
+    for s in _statuses_of(attacker or {}):
+        if s.get('kind') == 'condition' and s.get('apply') == 'ignore_immunities':
+            types = [t.strip().upper() for t in str(s.get('value') or '').split(',')]
+            if str(attack_type).upper() in types:
+                return True
+    return any(s.get('kind') == 'condition' and s.get('apply') == 'immunities_relinquished' for s in _statuses_of(target or {}))
+
+
+def _type_multiplier(conn, attack_type, defend_type1, defend_type2, target=None, attacker=None):
     """Reuses game-data/type-effectiveness's own chart lookup (routes_gamedata
     .calculate_type_effectiveness), which returns one multiplier per
     attacking type in type_chart_attack's order -- this just also resolves
@@ -717,6 +729,17 @@ def _type_multiplier(conn, attack_type, defend_type1, defend_type2, target=None)
     except ValueError:
         return 1
     raw = values[idx] if idx < len(values) else 1
+    if raw == 0 and (attacker or target) and _immunity_ignored(attacker, target, attack_type):
+        # "...ignore any immunities granted by their type. If the secondary type gives it
+        # vulnerability or resistance, it follows the secondary type for that effect": rate each
+        # defending type on its own and let an immune one count as neutral.
+        raw = 1
+        for single in (defend_type1, defend_type2):
+            if not single:
+                continue
+            single_values = routes_gamedata.calculate_type_effectiveness(conn, single, None)
+            single_raw = single_values[idx] if idx < len(single_values) else 1
+            raw *= single_raw if single_raw != 0 else 1
     result = _clamp_type_multiplier(raw)
     for s in statuses:
         if s.get('kind') != 'condition':
@@ -1654,6 +1677,25 @@ def _remove_status(state, target_id, status_id, reason=''):
                targetId=target_id, targetName=target['name'])
 
 
+def _consume_ignore_immunities(state, pid, attacker, move_type, move_name):
+    """Foresight's "on the NEXT ghost/normal/fighting move" -- a one-move status (`uses` end).
+    Called BEFORE the multiplier: the move that binds it still benefits, a stale one is already gone. It
+    binds to the first matching move + round, so every target of an AoE still ignores
+    immunities; any other matching move (or the same move in a later round) spends it."""
+    for s in list(_statuses_of(attacker)):
+        if s.get('kind') != 'condition' or s.get('apply') != 'ignore_immunities':
+            continue
+        if not any(e.get('type') == 'uses' for e in s.get('ends', [])):
+            continue  # Odor Sleuth's duration-based aura, not a one-shot
+        if str(move_type).upper() not in [t.strip().upper() for t in str(s.get('value') or '').split(',')]:
+            continue
+        bound = s.get('boundMove')
+        if bound is None:
+            s['boundMove'], s['boundRound'] = move_name, state.get('round', 0)
+        elif bound != move_name or s.get('boundRound') != state.get('round', 0):
+            _remove_status(state, pid, s['id'], 'used up')
+
+
 def _use_status(state, target_id, status_id):
     """Consumes one use of a `uses` end (an advantage/disadvantage or bonus that
     lasts "the next attack"); the status goes away once a uses entry runs out."""
@@ -1770,7 +1812,7 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
         if not target:
             raise ValueError('Unknown target: ' + target_id)
         if dice_roll:
-            multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target)
+            multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target, attacker)
             actual_damage = round(dice_roll * multiplier)
             leftover = _absorb_temp_hp(state, target, actual_damage)
             target['currentHP'] -= leftover  # no floor, same reasoning as above
@@ -1897,7 +1939,8 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         raise ValueError('Unknown target: ' + target_id)
     state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
 
-    multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target)
+    _consume_ignore_immunities(state, pid, attacker, move_type, move_name)
+    multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target, attacker)
     actual_damage = round(dice_roll * multiplier)
 
     if pool == 'vp':

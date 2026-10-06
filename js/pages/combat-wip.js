@@ -2310,6 +2310,14 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
     }
     return;
   }
+  if (mode === 'dispel_ac') {
+    // Miracle Eye's own "any modifiers to their AC are reset" -- every AC stat status, buff
+    // or debuff (including a `set` override), nothing else.
+    for (const s of (target.statuses || []).filter((st) => st.kind === 'stat' && st.stat === 'ac')) {
+      await remove(targetId, s, `reset by ${moveName}`);
+    }
+    return;
+  }
   const targetStats = (target.statuses || []).filter(s => s.kind === 'stat');
   if (mode === 'dispel') {
     for (const s of targetStats) await remove(targetId, s, `dispelled by ${moveName}`);

@@ -18480,12 +18480,29 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_ignore_immunities"
       ],
       "description": "You grant yourself a brief but incredible sixth sense. On the next ghost-, normal-, or fighting-type move you activate, ignore any immunities of the target creature(s) granted by their Pokémon type. If the target’s secondary type gives it vulnerability or resistance to the attack, it follows the secondary type for that effect.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "ignore_immunities",
+          "value": "Ghost,Normal,Fighting",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Frustration",
@@ -19921,12 +19938,33 @@
       },
       "reaction": false,
       "categories": [
-        "stat_debuff_enemy"
+        "self_status_condition_ignore_immunities"
       ],
       "description": "When you activate this move, choose a target in range. For the duration, the target cannot activate any move that would increase its AC. If it has already activated such a move, the effect ends immediately. In addition, for the duration, no creature in range has immunity to your Ghost, Normal, or Fighting-type moves.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "ignore_immunities",
+          "value": "Ghost,Normal,Fighting",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "The target's inability to use AC-raising moves, and the range limit, are not enforced."
+        }
+      ]
     },
     {
       "name": "Page Slice",
@@ -25185,12 +25223,43 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "stat_debuff_enemy"
+        "potential_stat_transfer_dispel_ac",
+        "potential_status_condition_immunities_relinquished"
       ],
       "description": "You flash your eyes at the target, stunning them briefly and lowering their defenses. When activating this move, choose a target in range and force them to make a WIS save against your Move DC. On a failure, any modifiers to their AC are reset, and if they are Dark or Ghost-type, their immunities are relinquished for the duration. If, when losing immunity, the target’s secondary type gives it vulnerability or resistance to an attack of that type, it follows the secondary type for that effect.",
       "moveStat": "WIS/INT",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel_ac",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "immunities_relinquished",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "note": "Only meaningful if the target is Dark or Ghost type."
+        }
+      ]
     },
     {
       "name": "Mirror Coat",

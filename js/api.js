@@ -954,6 +954,13 @@ export class CombatAPI {
     return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName, crit, pool }, { useCache: false });
   }
 
+  /** Fire Shield's passive retaliation -- `id` is the shield HOLDER, `targetId` the creature that
+   * just hit them in melee; the server checks the holder really has the status and applies the
+   * rolled damage off-turn (routes_combat.py's _apply_retaliation). */
+  static async applyRetaliation(id, targetId, diceRoll) {
+    return API.request('combat', 'apply-retaliation', { id, targetId, diceRoll }, { useCache: false });
+  }
+
   /** Electrify's own mechanism -- `id` is the REACTOR, retroactively
    * recomputing their own most recent damage entry as if it had been
    * `newType`-typed all along (see routes_combat.py's own

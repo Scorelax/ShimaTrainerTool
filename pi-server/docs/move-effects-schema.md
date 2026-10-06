@@ -2138,3 +2138,5 @@ range is Melee (`findMoveRow(...)[6]`); re-applying replaces the pool, so "won't
 (the move's best modifier, resolved to a flat number at apply time), and a live `damage_rolls` stat
 consumer: `damageRollBonusOf` -> `computeMoveData`'s `damageRollBonus` (WIP-bridged, flat numbers
 only). Artifact Light's damage half could now use it but is a proficiency amount, not yet supported.)*
+
+*(Update, 2026-10-06: **Fire Shield** built (`migrate_effects_v63.py`) -- a passive melee-retaliation condition `retaliation_on_melee_hit` (`value` = damage type, `value2` = dice). `_maybeMeleeRetaliate` (combat-wip.js) runs after a Melee hit lands (single-target and AoE-with-save paths), prompts for the roll on the device that resolved the hit, and calls the new `apply-retaliation` action (`_apply_retaliation`: off-turn, gated on the holder carrying the status). No reaction window. Reusable for Acid Armor's melee clause (that one adds a CON save first).)*

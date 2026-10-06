@@ -294,6 +294,16 @@ def handle(conn, action, params):
             pool=pool if pool == 'vp' else 'hp',
         )
 
+    if action == 'apply-retaliation':
+        # Fire Shield-style passive retaliation (see _apply_retaliation) -- `id` is the shield
+        # HOLDER, `targetId` the creature that just hit them in melee.
+        if not params.get('id') or not params.get('targetId'):
+            raise ValueError('Missing holder id or target id')
+        dice_roll = js_parse_int(params.get('diceRoll'))
+        if dice_roll is None:
+            raise ValueError('Missing diceRoll')
+        return _apply_retaliation(conn, params['id'], params['targetId'], dice_roll)
+
     if action == 'retype-last-damage':
         if not params.get('id') or not params.get('newType'):
             raise ValueError('Missing participant id or newType')
@@ -1775,6 +1785,28 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
     return outcome
 
 
+def _apply_retaliation(conn, holder_id, target_id, dice_roll):
+    """Fire Shield's own "whenever a creature hits you with a melee attack, the shield erupts for
+    2d8 fire damage". A PASSIVE trigger -- not a reaction, no floor-grab -- so it's applied on
+    behalf of a participant who isn't the active turn (turn_check=False). Gated on the holder
+    actually carrying a `retaliation_on_melee_hit` status (value = damage type), so the action
+    can't be used to deal arbitrary off-turn damage."""
+    outcome = {}
+
+    def run(state):
+        holder = state['participants'].get(holder_id)
+        status = next((s for s in _statuses_of(holder or {}) if s.get('kind') == 'condition' and s.get('apply') == 'retaliation_on_melee_hit'), None)
+        if not status:
+            raise ValueError('No retaliation shield active on this participant')
+        outcome.update(_apply_damage_to_target(
+            conn, state, holder_id, target_id, dice_roll, status.get('value') or '', status.get('moveName') or '',
+            turn_check=False))
+
+    result = _mutate(conn, run)
+    result.update(outcome)
+    return result
+
+
 def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name='', crit=False, pool='hp'):
     """The other half of resolving an attack, split out from use-move: that
     action's VP cost was for a single-participant local engine (combat.js's
@@ -1854,11 +1886,11 @@ def _retype_last_damage(conn, state, reactor_id, new_type):
     return {'oldAmount': amount, 'newAmount': new_amount}
 
 
-def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False, pool='hp'):
+def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False, pool='hp', turn_check=True):
     attacker = state['participants'].get(pid)
     if not attacker:
         raise ValueError('Unknown participant: ' + pid)
-    if pid != _active_participant_id(state):
+    if turn_check and pid != _active_participant_id(state):
         raise ValueError("It's not this participant's turn")
     target = state['participants'].get(target_id)
     if not target:

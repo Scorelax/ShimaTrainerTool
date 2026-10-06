@@ -823,6 +823,29 @@ function _lastHitMoveStreak(session, pid) {
   return { moveName, count };
 }
 
+/** Fire Shield's passive retaliation: after a MELEE hit lands on a target holding a
+ * `retaliation_on_melee_hit` status (value = damage type, value2 = dice), prompt for the
+ * damage roll and apply it to the attacker. Not a reaction -- no window, no floor-grab. The
+ * roll prompt appears on the device that resolved the hit (the only one running this flow);
+ * the table rolls physically either way. */
+async function _maybeMeleeRetaliate(attackerId, targetId, moveName) {
+  if (findMoveRow(moveName)?.[6] !== 'Melee') return;
+  const holder = session?.participants?.[targetId];
+  const shield = (holder?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'retaliation_on_melee_hit');
+  if (!shield || holder.currentHP <= 0) return;
+  const attackerName = session?.participants?.[attackerId]?.name || 'the attacker';
+  const rolled = await promptValueRoll({
+    dice: shield.value2, moveName: shield.moveName || 'Retaliation',
+    description: `${holder.name}'s ${shield.moveName || 'shield'} erupts against ${attackerName} -- enter the ${shield.value || ''} damage roll`,
+  });
+  if (rolled === null || rolled <= 0) return;
+  try {
+    await CombatAPI.applyRetaliation(targetId, attackerId, rolled);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
 /** Blood Shield's own "melee damage you have dealt since the beginning of
  * your last turn": the sum of this participant's logged 'damage' entries
  * from the previous round (their last turn) through now whose move's range
@@ -3788,6 +3811,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // right here -- after damage lands, before anything else about this hit is
   // resolved.
   await waitForDamagedReactions(targetId, combatantId, moveName);
+  await _maybeMeleeRetaliate(combatantId, targetId, moveName);
 
   // Some moves land a hit AND separately make the hit creature save against
   // a secondary consequence (e.g. Temporal Fang: damage on the attack roll,
@@ -3921,6 +3945,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
           const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName);
           if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
           await waitForDamagedReactions(targetId, combatantId, moveName);
+          await _maybeMeleeRetaliate(combatantId, targetId, moveName);
           if (outcome.passed) {
             CombatAPI.logEvent({
               type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,

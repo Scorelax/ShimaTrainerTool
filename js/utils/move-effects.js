@@ -161,6 +161,7 @@ export function statusLabel(s) {
   if (s.kind === 'condition') {
     if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value2 ? `${s.value}/${s.value2}` : s.value}`;
     if (s.apply === 'resistance_upgrade') return `Resistance upgraded (${s.value === 'all' ? 'all types' : s.value || ''})`;
+    if (s.apply === 'retaliation_on_melee_hit') return `Retaliates vs melee (${s.value2 || '?'} ${s.value || ''})`;
     if (s.apply === 'granted_immunity') return `Immune to ${s.value || ''}`;
     if (s.apply === 'exhaustion') return `Exhaustion (level ${s.value || 1})`;
     if (s.apply === 'stab_doubled') return 'STAB doubled';

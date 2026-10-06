@@ -9555,12 +9555,31 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_retaliation_on_melee_hit"
       ],
       "description": "Thin, wispy flames dance around you, shedding bright light in a 10-foot radius and dim light for an additional 10 feet. The flames grant resistance to cold temperatures. In addition, whenever a creature within 5 feet of you hits you with a melee attack, the shield erupts with flame. The attacker takes 2d8 fire damage.",
       "moveStat": "STR/WIS",
       "vpCost": "25",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "retaliation_on_melee_hit",
+          "value": "Fire",
+          "value2": "2d8",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 600
+            }
+          ],
+          "note": "Cold-resistance and light flavour not modeled."
+        }
+      ]
     },
     {
       "name": "Fire Spin",

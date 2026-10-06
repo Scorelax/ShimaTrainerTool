@@ -161,6 +161,7 @@ export function statusLabel(s) {
   if (s.kind === 'condition') {
     if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value2 ? `${s.value}/${s.value2}` : s.value}`;
     if (s.apply === 'resistance_upgrade') return `Resistance upgraded (${s.value === 'all' ? 'all types' : s.value || ''})`;
+    if (s.apply === 'power_up') return `Power-Up x${s.stacks || 1}`;
     if (s.apply === 'guaranteed_hit_type') return `${s.value || ''} moves always hit`;
     if (s.apply === 'vp_cost_halved') return `${s.value || ''} moves cost half VP`;
     if (s.apply === 'retaliation_on_melee_hit') return `Retaliates vs melee (${s.value2 || '?'} ${s.value || ''})`;

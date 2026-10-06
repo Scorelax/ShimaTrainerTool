@@ -1012,6 +1012,7 @@ function _syncLocalCombatState(session) {
     // function only ever receives this WIP-built `c`, never the raw
     // session participant).
     merged.damageRollBonus = damageRollBonusOf(p);
+    merged.powerUpStacks = (p.statuses || []).find((s) => s.kind === 'condition' && s.apply === 'power_up')?.stacks || 0;
     // Spirit Growth: moves using these abilities cost half VP (see combat.js's vpCostOverride).
     merged.vpHalvedAbilities = (p.statuses || []).filter((s) => s.kind === 'condition' && s.apply === 'vp_cost_halved' && s.value).map((s) => String(s.value).toUpperCase());
     merged.stabMultiplier = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'stab_doubled') ? 2 : 1;
@@ -3131,6 +3132,10 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         continue;
       }
       effect = { ...effect, amount: Math.floor(effect.amount.fractionOfMaxHP * holder.maxHP) };
+    }
+    if (effect.stacks?.max === 'proficiency') {
+      // Power-Up Punch: "max stacks = proficiency bonus", read from the caster now.
+      effect = { ...effect, stacks: { max: Math.max(1, Number(attacker?.proficiency) || 1) } };
     }
     if (effect.kind === 'stat' && effect.amount && typeof effect.amount === 'object' && effect.amount.dice && effect.amount.moveMod && attacker) {
       // Wing Command's "1d6 + your Charisma modifier": a dice bonus the player rolls later (see

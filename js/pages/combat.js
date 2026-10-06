@@ -3098,6 +3098,16 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     }
   }
 
+  // Power-Up Punch's stacks: "add 1d6 to all your melee damage rolls" per stack (WIP-bridged
+  // `powerUpStacks`, 0 on the legacy engine). Appended as a separate dice term, since the stack
+  // dice (d6) can't merge into whatever the move's own dice are.
+  const _powerUpStacks = c.powerUpStacks || 0;
+  if (_powerUpStacks > 0 && !_isDirectHeal && computedData.damageDice && String(move[6] || '').trim() === 'Melee') {
+    const _current = _diceOverride || (computedData.damageBonus > 0 ? `${computedData.damageDice} + ${computedData.damageBonus}` : computedData.damageDice);
+    _diceOverride = `${_current} + ${_powerUpStacks}d6`;
+    _diceBreakdownOverride = [_diceBreakdownOverride || computedData.damageBreakdown, `+${_powerUpStacks}d6 (Power-Up)`].filter(Boolean).join(' · ');
+  }
+
   // Same "is this an offensive move that will hand off to onDamageResolved"
   // check the onUseMove callback below uses to decide whether to actually
   // call it -- reused here so the popup's own inline battle animation is
@@ -3158,6 +3168,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       const halved = c.vpHalvedAbilities || [];
       const abilities = String(move[2] || '').split('/').map((m) => m.trim().toUpperCase());
       if (halved.some((a) => abilities.includes(a))) cost = Math.ceil(cost / 2);
+      // Power-Up Punch: +1 VP per stack on every melee move.
+      if ((c.powerUpStacks || 0) > 0 && String(move[6] || '').trim() === 'Melee') cost += c.powerUpStacks;
       return cost !== base ? cost : undefined;
     })(),
     deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave || _willDeferToMultiHitAoe,

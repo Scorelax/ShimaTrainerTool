@@ -1620,7 +1620,8 @@ def _apply_status(state, target_id, spec):
         # re-rolled) REPLACES it outright via the existing/statuses[...] = new swap below,
         # same as any other non-stacking status; nothing here carries a partial pool over.
         new['remaining'] = js_parse_int(spec.get('amount')) or 0
-    stack_max = js_parse_int((spec.get('stacks') or {}).get('max')) if spec.get('kind') == 'stat' else None
+    stackable = spec.get('kind') == 'stat' or (spec.get('kind') == 'condition' and spec.get('apply') == 'power_up')
+    stack_max = js_parse_int((spec.get('stacks') or {}).get('max')) if stackable else None
     verb = 'is now'
     if stack_max:
         new['stackMax'] = stack_max
@@ -1631,6 +1632,9 @@ def _apply_status(state, target_id, spec):
         statuses[statuses.index(existing)] = new
     else:
         statuses.append(new)
+    if new.get('kind') == 'condition' and new.get('apply') in INCAPACITATING_CONDITIONS:
+        # Power-Up Punch: "all stacks are lost if you are incapacitated".
+        statuses[:] = [s for s in statuses if s.get('apply') != 'power_up']
     _log_event(state, 'status-apply', text=f"{target['name']} {verb} {_status_label(new)}{from_text}",
                actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
 

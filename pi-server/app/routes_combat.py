@@ -1223,6 +1223,8 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
     moves_by_name = {m['name']: m for m in moves_data.get('moves', [])}
     attacking_move = moves_by_name.get(attacking_move_name) if attacking_move_name else None
     ignores_protect = bool(attacking_move and attacking_move.get('ignoresProtect'))
+    # Psychic Fangs: "ends Light Screen, bypasses Reflect" -- those reaction moves are never offered against it.
+    ignored_reactions = set((attacking_move or {}).get('ignoresReactionMoves') or ())
     result = {}
     for pid, p in state['participants'].items():
         if pid == exclude_id or p.get('status') != 'participating':
@@ -1232,6 +1234,8 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
             if not m or m.get('reactionTrigger') != trigger:
                 continue
             if ignores_protect and _has_block_attack_effect(m):
+                continue
+            if move_name in ignored_reactions:
                 continue
             dist = _grid_distance_ft(state, pid, anchor_id)
             if dist is None or dist > (m.get('reactionRange') or 0):

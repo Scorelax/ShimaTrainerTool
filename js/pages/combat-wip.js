@@ -24,12 +24,12 @@ import { showEffectsPopup } from '../utils/effects-popup.js';
 import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js';
 import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficialReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
-import { pickOneStatus, pickOneMoveName } from '../utils/status-picker.js';
+import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-picker.js';
 import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed, damageRollBonusOf } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed, damageRollBonusOf } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -558,7 +558,7 @@ function _richCombatantFromParticipant(p) {
     strMod: p.strMod, dexMod: p.dexMod, conMod: p.conMod,
     intMod: p.intMod, wisMod: p.wisMod, chaMod: p.chaMod,
     moves: p.moves || [], types: [p.type1, p.type2].filter(Boolean),
-    abilities: p.abilities || '', item: p.item || '',
+    abilities: effectiveAbilities(p) || '', item: p.item || '',
     size: p.size || '', speeds: p.speeds || [],
     rechargeStates: {}, statusEffects: [], isExpanded: false,
     hasStatBlock: true,
@@ -831,6 +831,59 @@ setTargetabilityResolver((participant, moveName) => untargetableState(participan
 // Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
 setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.[2] || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
 
+/** Entrainment / Role Play / Skill Swap / Simple Beam: temporarily replace one ability with another via
+ * `ability_override` statuses (see move-effects.js's effectiveAbilities -- an overlay computed from the
+ * session's base abilities, never written back, so it can't outlive the status, the combat or the
+ * participant). Modes: 'give' (Entrainment: one of THEIR abilities becomes one of YOURS), 'take' (Role
+ * Play: one of YOURS becomes one of THEIRS), 'swap' (Skill Swap: both directions), 'replace_with' (Simple
+ * Beam: one of THEIRS becomes `replacement`, name only). The human picks which abilities. */
+async function _handleAbilitySwap({ mode, attackerId, targetId, moveName, ends, dc, replacement }) {
+  const attacker = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  if (!attacker || !target) return;
+  const mine = parseAbilityList(effectiveAbilities(attacker));
+  const theirs = parseAbilityList(effectiveAbilities(target));
+  const needMine = mode !== 'replace_with';
+  if ((needMine && !mine.length) || !theirs.length) {
+    showCombatAlert(`${moveName} needs both creatures to have an ability on record -- apply it by hand.`, { title: moveName });
+    return;
+  }
+  const body = (a) => `${a.name}${a.desc ? `;${a.desc}` : ''}`;
+  const apply = async (holderId, replacedName, replacementText) => {
+    await CombatAPI.applyStatus(holderId, buildStatusSpec(
+      { kind: 'condition', apply: 'ability_override', value: replacedName, value2: replacementText },
+      { sourceId: attackerId, sourceName: attacker.name, moveName, dc, ends }));
+  };
+  try {
+    if (mode === 'replace_with') {
+      const t = await pickOneAbility(theirs, { title: moveName, message: `Which of ${target.name}'s abilities becomes ${replacement}?` });
+      if (!t) return;
+      await apply(targetId, t.name, replacement);
+    } else if (mode === 'give') {
+      const t = await pickOneAbility(theirs, { title: moveName, message: `Which of ${target.name}'s abilities is replaced?` });
+      if (!t) return;
+      const m = await pickOneAbility(mine, { title: moveName, message: `Which of your abilities do they get?` });
+      if (!m) return;
+      await apply(targetId, t.name, body(m));
+    } else if (mode === 'take') {
+      const m = await pickOneAbility(mine, { title: moveName, message: `Which of your abilities is replaced?` });
+      if (!m) return;
+      const t = await pickOneAbility(theirs, { title: moveName, message: `Which of ${target.name}'s abilities do you copy?` });
+      if (!t) return;
+      await apply(attackerId, m.name, body(t));
+    } else if (mode === 'swap') {
+      const m = await pickOneAbility(mine, { title: moveName, message: `Which of your abilities do you give up?` });
+      if (!m) return;
+      const t = await pickOneAbility(theirs, { title: moveName, message: `Which of ${target.name}'s abilities do you take?` });
+      if (!t) return;
+      await apply(attackerId, m.name, body(t));
+      await apply(targetId, t.name, body(m));
+    }
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
 /** Guillotine/Horn Drill/Explosion: "roll a d20; on a 20 the target faints; if the target's level
  * is 10 more than your own, this automatically fails." One d20 per use (cached on the shared `ctx`
  * so an AoE like Explosion doesn't re-ask per creature); the level gate is per target. Fainting
@@ -1084,6 +1137,9 @@ function _syncLocalCombatState(session) {
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.
     merged.tempHp = tempHpRemaining(p);
+    // Entrainment/Role Play/Skill Swap/Simple Beam: the session's BASE abilities with any live overrides
+    // applied (never persisted, so it reverts with the status / when the combat or the participant ends).
+    if (p.abilities) merged.abilities = effectiveAbilities(p);
     if (resolved) {
       merged.hasStatBlock = true;
       // Live stat statuses (AC -1, all abilities +1, ...) move the card's CURRENT AC and ability
@@ -1703,7 +1759,7 @@ function _foreignCombatantView(p) {
     str: eff.str, dex: eff.dex, con: eff.con, int: eff.int, wis: eff.wis, cha: eff.cha,
     strMod: eff.strMod, dexMod: eff.dexMod, conMod: eff.conMod,
     intMod: eff.intMod, wisMod: eff.wisMod, chaMod: eff.chaMod,
-    proficiency: p.proficiency, abilities: p.abilities, item: p.item,
+    proficiency: p.proficiency, abilities: effectiveAbilities(p), item: p.item,
     savingThrows: p.savingThrows, skills: p.skills, size: p.size,
     moves: p.moves || [], rechargeStates: {}, // this device doesn't track another player's recharge state
     initiativeTotal: p.initiative,
@@ -2993,6 +3049,10 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // handler above), so pick.targetId here is the real target, same as
       // any other on-hit/save-gated effect.
       await _handleStealItem({ attackerId, targetId: pick.targetId, moveName });
+      continue;
+    }
+    if (effect.kind === 'ability_swap') {
+      await _handleAbilitySwap({ mode: effect.mode, attackerId, targetId: pick.targetId, moveName, ends: pick.ends, dc, replacement: effect.replacement });
       continue;
     }
     if (effect.kind === 'faint_on_roll') {

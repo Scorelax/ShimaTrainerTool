@@ -321,6 +321,9 @@ def tag_for(e):
         # Grudge/Spite's own "force the attacker who hit you to save, then
         # drain its VP" -- see combat-wip.js's _handleDrainAttackerVp.
         base = 'drain_attacker_vp'
+    elif e['kind'] == 'ability_swap':
+        # Entrainment/Role Play/Skill Swap/Simple Beam -- see combat-wip.js's _handleAbilitySwap.
+        base = f"ability_swap_{e['mode']}"
     elif e['kind'] == 'faint_on_roll':
         # Guillotine/Horn Drill/Explosion's own "roll a d20, on a 20 the target faints" -- see
         # combat-wip.js's _handleFaintOnRoll.

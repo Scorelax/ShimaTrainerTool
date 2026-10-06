@@ -18309,12 +18309,29 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "potential_ability_swap_give"
       ],
       "description": "You dance with a strange rhythm that causes a creature to mimic you. Choose a target in range and force them to make a WIS save against your Move DC. On a failure, choose one of their abilities to replace with one of your own for the duration.",
       "moveStat": "WIS/CHA",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "ability_swap",
+          "mode": "give",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Explosion",
@@ -21328,12 +21345,30 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "potential_ability_swap_replace_with"
       ],
       "description": "You use a mysterious psychic energy to change a target's ability to Simple. Force a target in range to make a WIS saving throw against your Move DC. On a failure, choose one of the target's abilities and change it to Simple for the duration.",
       "moveStat": "WIS/INT",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "ability_swap",
+          "mode": "replace_with",
+          "replacement": "Simple",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Sing",
@@ -26144,7 +26179,11 @@
       "description": "You materialize a set of large fangs that bite at a creature with psychic energy. Make a ranged attack, dealing 2d8 + MOVE psychic damage on a hit. On a hit, this move automatically ends a creature’s Light Screen, and bypasses Reflect with no effect.",
       "moveStat": "STR/WIS",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "ignoresReactionMoves": [
+        "Reflect",
+        "Light Screen"
+      ]
     },
     {
       "name": "Psychic Terrain",
@@ -26478,12 +26517,29 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "potential_ability_swap_take"
       ],
       "description": "You attempt to copy a creature's abilities for the duration. Select a target in range and force them to make a WIS saving throw against your Move DC. On a failure, replace one of your own current abilities with one of theirs.",
       "moveStat": "WIS",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "ability_swap",
+          "mode": "take",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Royal Guard",
@@ -26550,12 +26606,32 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "steal_disrupt"
+        "steal_disrupt",
+        "potential_ability_swap_swap"
       ],
       "description": "You attempt to swap abilities with a creature for the duration. Select a target in range and force them to make a WIS saving throw against your Move DC. On a failure, choose which abilities to switch for the duration.",
       "moveStat": "WIS",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "ability_swap",
+          "mode": "swap",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Speed Swap",

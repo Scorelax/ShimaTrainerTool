@@ -44,6 +44,38 @@ function _conditionRollMode(s, on, ability) {
   return null;
 }
 
+/** Splits an abilities string ("slot:name;desc|name;desc", slot optional -- see combat.js's
+ * renderAbilitiesForCombat) into [{slot, name, desc, raw}]. `raw` is the entry exactly as written. */
+export function parseAbilityList(raw) {
+  return String(raw || '').split('|').map((a) => a.trim()).filter(Boolean).map((entry) => {
+    const colon = entry.indexOf(':');
+    const slot = colon !== -1 ? entry.substring(0, colon) : '';
+    const body = colon !== -1 ? entry.substring(colon + 1) : entry;
+    const parts = body.split(';');
+    return { slot, name: parts[0].trim(), desc: parts.slice(1).join(';').trim(), raw: entry };
+  });
+}
+
+/** A participant's abilities string with every live `ability_override` status applied (Entrainment,
+ * Role Play, Skill Swap, Simple Beam): each one replaces the entry named `value` with `value2`
+ * ("Name" or "Name;description"), keeping the replaced entry's slot prefix. Computed fresh from the
+ * session's BASE abilities every time and never written back anywhere, so ending the status (or the
+ * combat, or the participant leaving it) restores the originals with nothing to undo. */
+export function effectiveAbilities(participant) {
+  const base = participant?.abilities;
+  if (!base) return base;
+  const list = parseAbilityList(base);
+  for (const s of participant.statuses || []) {
+    if (s.kind !== 'condition' || s.apply !== 'ability_override' || !s.value || !s.value2) continue;
+    const i = list.findIndex((a) => a.name.toLowerCase() === String(s.value).toLowerCase());
+    if (i === -1) continue;
+    const slot = list[i].slot;
+    const replacement = parseAbilityList(s.value2)[0] || { name: s.value2, desc: '' };
+    list[i] = { ...replacement, slot, raw: `${slot ? `${slot}:` : ''}${replacement.raw || replacement.name}` };
+  }
+  return list.map((a) => a.raw).join('|');
+}
+
 /** Semi-invulnerable states a move can put its user in (Dig -> underground, ...). Each is a plain
  * condition; see targetability.js and conditions.py's UNTARGETABLE_STATES. */
 export const UNTARGETABLE_STATES = ['underground', 'underwater', 'airborne', 'vanished', 'ethereal_plane'];
@@ -173,6 +205,7 @@ export function statusLabel(s) {
   if (s.kind === 'condition') {
     if (s.apply === 'type_changed' && s.value) return `Type changed to ${s.value2 ? `${s.value}/${s.value2}` : s.value}`;
     if (s.apply === 'resistance_upgrade') return `Resistance upgraded (${s.value === 'all' ? 'all types' : s.value || ''})`;
+    if (s.apply === 'ability_override') return `${s.value || '?'} → ${parseAbilityList(s.value2)[0]?.name || '?'}`;
     if (s.apply === 'power_up') return `Power-Up x${s.stacks || 1}`;
     if (s.apply === 'guaranteed_hit_type') return `${s.value || ''} moves always hit`;
     if (s.apply === 'vp_cost_halved') return `${s.value || ''} moves cost half VP`;

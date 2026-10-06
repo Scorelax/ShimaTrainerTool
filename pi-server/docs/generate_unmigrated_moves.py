@@ -86,6 +86,7 @@ TAG_NOTES = {
 # never has to reason about them, and so they can't silently reappear as
 # "needs work" the way conditional_damage itself just did.
 HANDLED_OUTSIDE_SCHEMA = {
+    'Psychic Fangs',  # `ignoresReactionMoves` (Reflect, Light Screen never offered against it); the damage is ordinary.
     # protect_negate leftovers (2026-10-06): all handled by top-level flags, no `effects` needed.
     'Aqua Phase', 'Fly', 'Phantom Force', 'Shadow Force',  # `ignoresProtect` (routes_combat.py's _eligible_reactors);
                                                            # the vanish-then-attack-with-advantage two-turn shape is

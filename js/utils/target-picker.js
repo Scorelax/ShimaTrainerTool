@@ -17,6 +17,7 @@ import { getBattleAnimationUrl } from './battle-animation.js';
 import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString } from './move-effects.js';
 import { waitForReactionWindow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
+import { filterTargetable } from './targetability.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -692,7 +693,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
 
-  const participants = Object.values(session.participants).filter(p => p.id !== attackerId);
+  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== attackerId), moveName);
   if (!participants.length) return null;
 
   _ensureDom();

@@ -3171,6 +3171,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       const halved = c.vpHalvedAbilities || [];
       const abilities = String(move[2] || '').split('/').map((m) => m.trim().toUpperCase());
       if (halved.some((a) => abilities.includes(a))) cost = Math.ceil(cost / 2);
+      // Dig/Fly/...: the reappearing second use is free (the VP was paid on the vanishing first use).
+      if ((c.semiHeldMoves || []).includes(moveName)) return 0;
       // Power-Up Punch: +1 VP per stack on every melee move.
       if ((c.powerUpStacks || 0) > 0 && String(move[6] || '').trim() === 'Melee') cost += c.powerUpStacks;
       return cost !== base ? cost : undefined;

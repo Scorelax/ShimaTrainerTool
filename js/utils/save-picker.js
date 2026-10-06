@@ -18,6 +18,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
+import { filterTargetable } from './targetability.js';
 import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, saveAutoFails } from './move-effects.js';
 
 function _injectStyles() {
@@ -507,12 +508,12 @@ export async function confirmSecondarySave(target, targetName, { dc = 0, hasDama
  * {targetId, passed:true}, {targetId, passed:false} (no damage component),
  * {targetId, passed:false, rawRoll} (has one), or null if closed/no target.
  */
-export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null } = {}) {
+export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null, moveName = '' } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
 
-  const participants = Object.values(session.participants).filter(p => p.id !== casterId);
+  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== casterId), moveName);
   if (!participants.length) return null;
 
   _ensureDom();

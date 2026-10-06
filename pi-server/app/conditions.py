@@ -38,6 +38,21 @@ CONDITION_RULES = {
 # failed-roll turn instead of being listed here directly (see
 # combat-wip.js's _promptParalysisCheck/_promptConfusionCheck) -- most of
 # the time they're NOT incapacitated at all, unlike everything in this set.
+# Semi-invulnerable states a move can put its user in (Dig -> underground, Dive -> underwater, Bounce/Fly ->
+# airborne, Phantom Force/Shadow Force/Aqua Phase -> vanished). Each is a plain condition on the user; while it's
+# held, the user can't be targeted by a move unless that move lists the state in its own `hitsStates`.
+UNTARGETABLE_STATES = ('underground', 'underwater', 'airborne', 'vanished')
+
+
+def untargetable_state(participant, hits_states=()):
+    """The semi-invulnerable state keeping `participant` from being targeted by a move that can hit
+    `hits_states`, or None when they're targetable."""
+    for s in (participant or {}).get('statuses', []):
+        if s.get('kind') == 'condition' and s.get('apply') in UNTARGETABLE_STATES and s.get('apply') not in hits_states:
+            return s['apply']
+    return None
+
+
 INCAPACITATING_CONDITIONS = {'incapacitated', 'stunned', 'unconscious', 'petrified', 'frozen', 'asleep'}
 
 # Confused blocks reactions specifically ("loses its ability to take

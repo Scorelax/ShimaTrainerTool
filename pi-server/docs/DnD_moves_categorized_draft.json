@@ -8783,7 +8783,10 @@
       "description": "You unleash a devastating uppercutting fist that continues to strike skyward with force. Make a ranged attack roll against a creature, dealing 2d8 + MOVE fighting damage on a hit. This move can target creatures in the invulnerable stages of Fly, Bounce and Sky Drop, if the target used that move within range.",
       "moveStat": "DEX",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "hitsStates": [
+        "airborne"
+      ]
     },
     {
       "name": "Storm Throw",
@@ -10896,7 +10899,8 @@
       "description": "When you activate this move, you bounce high into the air, disappearing into the Ethereal plane. You may not be targeted by attacks in the Ethereal plane. On your next turn, as an action, you reappear and attempt to slam down on top of an opponent. Make a melee attack roll on an opponent in range, with advantage, doing 2d8 + MOVE flying damage on a hit. On a natural attack roll of 15 or more, the target is paralyzed.",
       "moveStat": "DEX",
       "vpCost": "12",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "semiInvulnerable": "airborne"
     },
     {
       "name": "Brave Bird",
@@ -11121,7 +11125,8 @@
       "moveStat": "STR/DEX",
       "vpCost": "10",
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
-      "ignoresProtect": true
+      "ignoresProtect": true,
+      "semiInvulnerable": "airborne"
     },
     {
       "name": "Gust",
@@ -12383,7 +12388,8 @@
       "moveStat": "DEX/INT/WIS",
       "vpCost": "7",
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
-      "ignoresProtect": true
+      "ignoresProtect": true,
+      "semiInvulnerable": "vanished"
     },
     {
       "name": "Phantom Gate",
@@ -12609,7 +12615,8 @@
       "moveStat": "DEX/WIS",
       "vpCost": "30",
       "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
-      "ignoresProtect": true
+      "ignoresProtect": true,
+      "semiInvulnerable": "vanished"
     },
     {
       "name": "Shadow Punch",
@@ -15039,7 +15046,8 @@
       "description": "Your Pokémon burrows underground, disappearing from view before striking from underneath a foe. When you activate this move, you burrow underground and remain there until your next turn. During this time, you cannot be the target of any attack. On your next turn, make a melee attack on a creature in range, with advantage, doing 1d10 + MOVE ground damage on a successful hit. If the target has Tremorsense, the attack is not rolled with advantage.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "semiInvulnerable": "underground"
     },
     {
       "name": "Drill Run",
@@ -15126,7 +15134,10 @@
       "description": "You create a tremor in the ground in a 10 foot radius, centered on you. Each grounded creature in the area must succeed on a DEX save against your Move DC, or take 3d12 + MOVE ground damage and be knocked prone. On a success, they take half as much damage and are not knocked prone. The area becomes difficult terrain.",
       "moveStat": "STR",
       "vpCost": "20",
-      "scaling": "The damage dice for this move changes to 5d10 at level 5, 6d12 at level 10, and 10d10 at level 17."
+      "scaling": "The damage dice for this move changes to 5d10 at level 5, 6d12 at level 10, and 10d10 at level 17.",
+      "hitsStates": [
+        "underground"
+      ]
     },
     {
       "name": "Fissure",
@@ -15243,7 +15254,10 @@
       "description": "You shake the ground with an earth-shattering quake. All creature in range must make a DEX save against your Move DC, taking half damage on a success and full damage on a fail. Creatures in range that are burrowed or in the invulnerable stage of Dig take double damage from this move. Roll a d100 on the table below to determine damage. 1-5: 1d4+MOVE 6-15: 1d8+MOVE 16-35: 1d10+MOVE 36-65: 1d12+MOVE 66-85: 2d6+MOVE 86-95: 2d8+MOVE 96-100: 2d12+MOVE",
       "moveStat": "STR",
       "vpCost": "15",
-      "scaling": "For damage rolls, use 2x Dice at level 5, 3x\nDice at level 10, and 4x Dice at level 17."
+      "scaling": "For damage rolls, use 2x Dice at level 5, 3x\nDice at level 10, and 4x Dice at level 17.",
+      "hitsStates": [
+        "underground"
+      ]
     },
     {
       "name": "Mud Bomb",
@@ -28765,7 +28779,8 @@
       "moveStat": "WIS/INT",
       "vpCost": "35",
       "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
-      "ignoresProtect": true
+      "ignoresProtect": true,
+      "semiInvulnerable": "vanished"
     },
     {
       "name": "Aqua Ring",
@@ -29003,7 +29018,8 @@
       "description": "When you activate this move, you dive down and disappear into the Ethereal plane. You may not be targeted by attacks in the Ethereal plane. On your next turn, as an action, you reappear and attempt to strike an opponent from below. Make a melee attack roll on an opponent in range, with advantage, doing 2d8 + MOVE water damage on a hit.",
       "moveStat": "DEX",
       "vpCost": "10",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "semiInvulnerable": "underwater"
     },
     {
       "name": "Hydro Cannon",

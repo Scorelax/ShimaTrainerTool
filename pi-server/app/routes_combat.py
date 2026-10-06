@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction
+from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -1943,6 +1943,14 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         raise ValueError('Unknown target: ' + target_id)
     state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
 
+    # A semi-invulnerable target (underground, airborne, ...) can't be hit unless the move lists its state.
+    if move_name:
+        record = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None)
+        if record:
+            hidden = untargetable_state(target, record.get('hitsStates') or ())
+            if hidden:
+                raise ValueError(f"{target['name']} is {hidden} and can't be targeted by {move_name}")
+
     _consume_ignore_immunities(state, pid, attacker, move_type, move_name)
     multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target, attacker)
     actual_damage = round(dice_roll * multiplier)
@@ -2101,6 +2109,12 @@ def _list_move_categories():
         # Only markers a client caller actually reads: Feint's negatesProtectBlock, Phantom Tendril's
         # ignoresTargetStatChanges (target-picker.js skips the target's AC modifiers).
         marks = {k: True for k in ('negatesProtectBlock', 'ignoresTargetStatChanges') if m.get(k)}
+        # Semi-invulnerable states: `semiInvulnerable` (the state Dig/Fly/... puts the user in) and
+        # `hitsStates` (states a move can still hit, e.g. Earthquake -> underground).
+        if m.get('semiInvulnerable'):
+            marks['semiInvulnerable'] = m['semiInvulnerable']
+        if m.get('hitsStates'):
+            marks['hitsStates'] = m['hitsStates']
         if marks:
             flags[m['name']] = marks
     return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags}

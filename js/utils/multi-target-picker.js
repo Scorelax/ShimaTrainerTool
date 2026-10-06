@@ -10,6 +10,7 @@
 import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
+import { filterTargetable } from './targetability.js';
 
 function _injectStyles() {
   if (document.getElementById('multi-target-picker-styles')) return;
@@ -90,12 +91,12 @@ function _cardHtml(p) {
  * participant ids (empty array if confirmed with none checked), or null if
  * closed without confirming.
  */
-export async function pickMultipleTargets(casterId) {
+export async function pickMultipleTargets(casterId, { moveName = '' } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
 
-  const participants = Object.values(session.participants).filter(p => p.id !== casterId);
+  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== casterId), moveName);
   if (!participants.length) return null;
 
   _ensureDom();

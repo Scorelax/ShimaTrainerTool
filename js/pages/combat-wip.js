@@ -28,7 +28,8 @@ import { pickOneStatus, pickOneMoveName } from '../utils/status-picker.js';
 import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { evaluateEffect, buildStatusSpec, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed, damageRollBonusOf } from '../utils/move-effects.js';
+import { setTargetabilityResolver } from '../utils/targetability.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, maxSpeed, damageRollBonusOf } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -824,6 +825,9 @@ function _lastHitMoveStreak(session, pid) {
 }
 
 setMoveFlagResolver((moveName) => moveFlagsFor(moveName));
+// Semi-invulnerable targets (underground, airborne, ...) are hidden from every picker unless the move
+// lists their state in `hitsStates`.
+setTargetabilityResolver((participant, moveName) => untargetableState(participant, moveFlagsFor(moveName).hitsStates || []));
 // Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
 setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.[2] || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
 
@@ -861,6 +865,27 @@ async function _handleFaintOnRoll({ attackerId, targetId, moveName, effect, ctx 
     }
   }
   CombatAPI.logEvent({ type: 'faint', actorId: attackerId, actorName: caster.name, targetId, targetName: target.name, text }).catch(() => {});
+}
+
+/** First half of Dig/Dive/Bounce/Fly/Phantom Force/Shadow Force/Aqua Phase: the user "vanishes" into
+ * `state` (a plain condition -- underground, underwater, airborne or vanished -- that hides them from
+ * every target picker and from apply-damage unless the move lists the state in `hitsStates`), and gets a
+ * one-use advantage on their next attack roll for the reappearing strike. Both end by the end of the
+ * user's next turn. No attack, target or damage this time. */
+async function _enterSemiInvulnerable(combatantId, moveName, state) {
+  const holder = session?.participants?.[combatantId];
+  const ends = [{ type: 'until_turn', whose: 'holder', point: 'end', count: 1 }];
+  const common = { sourceId: combatantId, sourceName: holder?.name, moveName };
+  try {
+    await CombatAPI.applyStatus(combatantId, buildStatusSpec({ kind: 'condition', apply: state }, { ...common, ends }));
+    await CombatAPI.applyStatus(combatantId, buildStatusSpec(
+      { kind: 'roll', roll: 'advantage', on: 'attack_rolls', note: `The reappearing strike from ${moveName}` },
+      { ...common, ends: [{ type: 'uses', n: 1 }, ...ends] }));
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  CombatAPI.logEvent({ type: 'vanish', actorId: combatantId, actorName: holder?.name, text: `${holder?.name || 'Someone'} used ${moveName} and is now ${state} -- can't be targeted until their next turn` }).catch(() => {});
 }
 
 /** Fire Shield's passive retaliation: after a MELEE hit lands on a target holding a
@@ -1049,6 +1074,8 @@ function _syncLocalCombatState(session) {
     // function only ever receives this WIP-built `c`, never the raw
     // session participant).
     merged.damageRollBonus = damageRollBonusOf(p);
+    // Dig/Fly/...'s reappearing second use costs no VP again (see combat.js's vpCostOverride).
+    merged.semiHeldMoves = (p.statuses || []).filter((s) => s.kind === 'condition' && UNTARGETABLE_STATES.includes(s.apply) && s.moveName).map((s) => s.moveName);
     merged.powerUpStacks = (p.statuses || []).find((s) => s.kind === 'condition' && s.apply === 'power_up')?.stacks || 0;
     // Spirit Growth: moves using these abilities cost half VP (see combat.js's vpCostOverride).
     merged.vpHalvedAbilities = (p.statuses || []).filter((s) => s.kind === 'condition' && s.apply === 'vp_cost_halved' && s.value).map((s) => String(s.value).toUpperCase());
@@ -2166,6 +2193,18 @@ function _feintMoveNameFor(combatantId) {
  * top of whatever number it's given, it doesn't know about ability/STAB/
  * proficiency modifiers itself. */
 async function _handleDamageResolved({ combatantId, moveName, move, computedData, speciesName }) {
+  // Dig/Dive/Bounce/Fly/Phantom Force/...: the first use only vanishes the user; the next one (while
+  // still in that state) reappears and attacks, with advantage -- see _enterSemiInvulnerable.
+  const semiState = moveFlagsFor(moveName).semiInvulnerable;
+  if (semiState) {
+    const holder = session?.participants?.[combatantId];
+    const held = (holder?.statuses || []).find((s) => s.kind === 'condition' && s.apply === semiState && s.moveName === moveName);
+    if (!held) {
+      await _enterSemiInvulnerable(combatantId, moveName, semiState);
+      return;
+    }
+    try { await CombatAPI.removeStatus(combatantId, held.id, 'reappeared'); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
+  }
   const attackModifier = computedData.attackBonus || 0;
   const damageModifier = computedData.damageBonus || 0;
   // pickTarget's own popup now covers the whole rest of the flow: pick a
@@ -3883,7 +3922,7 @@ async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
   const pr = session?.pendingReaction;
   const targetIds = (pr && pr.anchorId === combatantId && pr.attackerId)
     ? [pr.attackerId]
-    : await pickMultipleTargets(combatantId);
+    : await pickMultipleTargets(combatantId, { moveName });
   if (!targetIds || !targetIds.length) return;
   for (const targetId of targetIds) {
     await _offerMoveEffects({ attackerId: combatantId, targetId, moveName, computedData, ctx, includeSelf: false });
@@ -4043,7 +4082,7 @@ async function _applyPrimaryDamage(casterId, targetId, diceRoll, moveType, speci
  * (pickTargetAgain + _resolveOneHit) otherwise (Meteor Swarm: "make as
  * many ranged attacks as there are targets"). */
 async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
-  let targetIds = await pickMultipleTargets(combatantId);
+  let targetIds = await pickMultipleTargets(combatantId, { moveName });
   if (!targetIds || !targetIds.length) return; // closed / nobody picked -- move's own cost still applied
 
   // Wide Guard's own reaction: this app has no real blast-center/positional-
@@ -4166,7 +4205,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
   // just for allies. Gated on the move actually having a non-self heal
   // effect, so this extra prompt never shows for any other AoE move.
   if (isSaveTriggered && moveEffectsFor(moveName).some((e) => e.kind === 'heal' && e.target !== 'self')) {
-    const allyIds = await pickMultipleTargets(combatantId);
+    const allyIds = await pickMultipleTargets(combatantId, { moveName });
     if (allyIds && allyIds.length) {
       for (const allyId of allyIds) {
         await _offerMoveEffects({
@@ -4282,7 +4321,7 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   const dc = computedData.moveDC ?? 0;
   const damageModifier = computedData.damageBonus || 0;
   const hasDamage = !!computedData.damageDice;
-  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName) });
+  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName), moveName });
   if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
 
   const attackerName = session?.participants?.[combatantId]?.name || '?';

@@ -44,6 +44,17 @@ function _conditionRollMode(s, on, ability) {
   return null;
 }
 
+/** Semi-invulnerable states a move can put its user in (Dig -> underground, ...). Each is a plain
+ * condition; see targetability.js and conditions.py's UNTARGETABLE_STATES. */
+export const UNTARGETABLE_STATES = ['underground', 'underwater', 'airborne', 'vanished'];
+
+/** The state hiding `participant` from a move that can still hit `hitsStates`, or null. */
+export function untargetableState(participant, hitsStates = []) {
+  const s = (participant?.statuses || []).find(
+    (st) => st.kind === 'condition' && UNTARGETABLE_STATES.includes(st.apply) && !hitsStates.includes(st.apply));
+  return s ? s.apply : null;
+}
+
 /** Exhaustion (level 4+) halves max HP -- level-dependent, same reasoning
  * as _conditionRollMode's own exhaustion special-case. Not yet wired into
  * any display surface (the combat card/HP bar show participant.maxHP

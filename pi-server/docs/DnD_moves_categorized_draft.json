@@ -3822,12 +3822,27 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "stat_debuff_enemy"
+        "potential_stat_transfer_invert"
       ],
       "description": "You unleash a dark energy that has the power to reverse the stat changes of a creature. Force a creature in range to make a CHA save against your Move DC. On a failure, any stat changes (-1 to attack, +2 to AC, etc.) currently affecting the target have the opposite effect.",
       "moveStat": "WIS",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "invert",
+          "when": {
+            "type": "save_fail",
+            "ability": "CHA"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Torment",
@@ -5403,12 +5418,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_guaranteed_hit_type"
       ],
       "description": "You perform a lightning fast dance, ionizing your body. For as long as you maintain concentration, all electric type moves are guaranteed to hit.",
       "moveStat": "None",
       "vpCost": "18",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "guaranteed_hit_type",
+          "value": "Electric",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Volt Switch",
@@ -12572,12 +12607,32 @@
       },
       "reaction": false,
       "categories": [
-        "stat_buff_self"
+        "self_status_condition_silent_approach"
       ],
       "description": "A ghostly darkness envelops you, hiding you, masking your scent and dampening the noise you make. For the duration, gain advantage on stealth checks. Other creatures have disadvantage when attempting to locate you with a perception check using sight, smell or hearing.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "silent_approach",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 100
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "Advantage on stealth checks; others have disadvantage locating you by sight, smell or hearing. Reminder only -- no ability-check roll exists in this app."
+        }
+      ]
     },
     {
       "name": "Soul Drain",

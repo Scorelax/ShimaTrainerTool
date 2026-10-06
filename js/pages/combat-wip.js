@@ -2094,9 +2094,13 @@ async function _handleBideResolve({ combatantId, dealt }) {
  * resolves (see _resolveOneHit), so a multi-hit move's "hit again?" loop
  * must re-evaluate this each time through, not reuse whatever was true
  * before the first hit already spent it. */
-function _guaranteedHitFor(combatantId, categories) {
+function _guaranteedHitFor(combatantId, categories, moveName) {
   if (categories.includes('guaranteed_hit')) return true;
   const attacker = session?.participants?.[combatantId];
+  // Thunderstorm Dance's standing "all electric type moves are guaranteed to hit" -- NOT
+  // consumed (unlike the one-shot flags below), scoped to the move's own type.
+  const moveType = String(findMoveRow(moveName)?.[1] || '').toUpperCase();
+  if (moveType && (attacker?.statuses || []).some((st) => st.kind === 'condition' && st.apply === 'guaranteed_hit_type' && String(st.value || '').toUpperCase() === moveType)) return true;
   return !!guaranteedCritStatusId(attacker) || !!guaranteedHitStatusId(attacker);
 }
 
@@ -2140,7 +2144,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // Target-conditional damage_note effects (Brine, Smelling Salts, Venoshock,
   // ...) -- see move-effects-schema.md and target-picker.js's own use of these.
   const damageNotes = _targetDamageNotes(moveName);
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
 
   const isSameTarget = categories.includes('multi_hit_same_target');
@@ -2167,9 +2171,9 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
       const target = session?.participants?.[hitTargetId];
       if (!target) return; // target left the battle mid-chain
-      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
     } else {
-      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
   }
@@ -2277,6 +2281,9 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
   if (!attacker || !target) return;
   const isPositive = (s) => typeof s.amount === 'number' && s.amount * (s.stacks || 1) > 0;
   const recreate = async (status, destId) => {
+    // A stored status carries `stacks` as a COUNT; an apply spec wants {max}. Passing the count
+    // through would crash the server's stack handling, so convert (the count itself resets to 1).
+    if (typeof status.stacks === 'number') status = { ...status, stacks: status.stackMax ? { max: status.stackMax } : undefined };
     const spec = buildStatusSpec(status, {
       sourceId: status.sourceId, sourceName: status.sourceName, moveName: status.moveName,
       dc: status.dc, ends: status.ends,
@@ -2312,6 +2319,16 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
     // `names` is a plain array of `apply` values, authored on the effect.
     for (const s of (target.statuses || []).filter((st) => st.kind === 'condition' && names.includes(st.apply))) {
       await remove(targetId, s, `cured by ${moveName}`);
+    }
+    return;
+  }
+  if (mode === 'invert') {
+    // Topsy-Turvy's "any stat changes currently affecting the target have the opposite effect":
+    // each flat stat status is replaced by one with the sign flipped (a `set` override or dice
+    // amount has no sign to flip and is left alone). Stacks, ends and source carry over.
+    for (const s of (target.statuses || []).filter((st) => st.kind === 'stat' && typeof st.amount === 'number' && st.amount !== 0)) {
+      await remove(targetId, s, `reversed by ${moveName}`);
+      await recreate({ ...s, amount: -s.amount * (s.stacks || 1) }, targetId); // fold the stack count into the amount
     }
     return;
   }
@@ -3826,7 +3843,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // the category here left those checks falling through to 'manual' for a
   // status-guaranteed hit instead of the correct 'no' (there was never a
   // roll to have crossed a threshold or crit on).
-  const guaranteedHit = _guaranteedHitFor(combatantId, categories);
+  const guaranteedHit = _guaranteedHitFor(combatantId, categories, moveName);
   const attacker = session?.participants?.[combatantId];
   let crit = false; // a guaranteed hit has no roll to crit on
   if (!guaranteedHit) {

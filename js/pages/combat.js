@@ -27,6 +27,11 @@ export function setBattleCardOptions(options) {
 let _moves = null;
 let _moveMap = null; // Map<name, moveData> for O(1) lookups
 
+/** True for a move whose action cost is a bonus action ("1 bonus action", ...). One per round per combatant. */
+function _isBonusActionMove(moveName) {
+  return /bonus action/i.test(_moveMap?.get(moveName)?.[3] || '');
+}
+
 // Move-name -> category tags (see pi-server/docs/DnD_moves_categorized_draft.json
 // and routes_combat.py's list-move-categories action) -- the user's own manual
 // pass over each move's actual effect (damage/save/heal/drain/crit-range/...),
@@ -1180,17 +1185,20 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
             else chargeText = ` (${rs.chargesLeft}/${rs.maxCharges} ${rs.type})`;
           }
           const isDiceLocked = isDice && isLocked;
-          const label = `${moveName}${chargeText}`;
+          // Shared combat only (bonusActionUsed is bridged from the session) -- the one bonus action
+          // per round is spent, so every bonus-action move waits until this combatant's next turn.
+          const bonusSpent = (!!c.bonusActionUsed || !!c.bonusActionBlockedBy) && _isBonusActionMove(moveName);
+          const label = `${moveName}${chargeText}${bonusSpent ? (c.bonusActionBlockedBy ? ' (no bonus actions)' : ' (bonus action used)') : ''}`;
           // No move-use flow wired for a foreign card (see readOnly, above) --
           // a plain row instead of a clickable button, so it doesn't look like
           // it's supposed to do something on click.
           if (readOnly) return `<div class="combat-move-row"><div class="combat-move-item combat-move-item--display">${label}</div></div>`;
           return `<div class="combat-move-row">
-            <button class="combat-move-item ${isLocked ? 'move-locked' : ''} ${isDiceLocked ? 'move-dice-locked' : ''}"
+            <button class="combat-move-item ${isLocked || bonusSpent ? 'move-locked' : ''} ${isDiceLocked ? 'move-dice-locked' : ''}"
               data-move="${moveName}" data-combatant-id="${c.id}"
               data-is-dice-locked="${isDiceLocked ? 'true' : ''}"
               data-recharge-range="${isDice ? (rs.range || '') : ''}"
-              ${isLocked && !isDice ? 'disabled' : ''}
+              ${(isLocked && !isDice) || bonusSpent ? 'disabled' : ''}
             >${label}</button></div>`;
         }).join('')}
       </div>
@@ -2999,6 +3007,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       }).join('')
     : '';
 
+  const _bonusSpent = _isSharedCombat && (!!c.bonusActionUsed || !!c.bonusActionBlockedBy) && _isBonusActionMove(moveName);
   const _rechargeInfo = c.rechargeStates?.[moveName];
   const chargesLeft = _rechargeInfo !== undefined ? _rechargeInfo.chargesLeft : undefined;
 
@@ -3169,8 +3178,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     spriteAlt: c.name,
     speciesName: c.speciesName,
     noteText: _stackNote || _damageNote || undefined,
-    disableUse: _isStackMove && _stacks === 0,
-    disableUseMsg: 'No Stockpile stacks — use Stockpile first',
+    disableUse: (_isStackMove && _stacks === 0) || _bonusSpent,
+    disableUseMsg: _bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first',
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
@@ -3208,6 +3217,11 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       target.currentHp = newHp;
       target.currentVp = newVp;
       logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)` });
+      // Spend the session's one bonus action for the round (the server rejects a second one).
+      if (_isSharedCombat && _isBonusActionMove(usedMoveName)) {
+        target.bonusActionUsed = true;
+        CombatAPI.useBonusAction(target.id, usedMoveName).catch(err => showCombatAlert(err.message, { title: 'Bonus action' }));
+      }
 
       if (target.rechargeStates && target.rechargeStates[usedMoveName]) {
         target.rechargeStates[usedMoveName].chargesLeft =

@@ -815,6 +815,11 @@ export class CombatAPI {
     return API.request('combat', 'reaction-start', { id }, { useCache: false });
   }
 
+  /** Spends the participant's bonus action for the round (refreshed on their next turn); rejects if already spent. */
+  static async useBonusAction(id, move = '') {
+    return API.request('combat', 'use-bonus-action', { id, move }, { useCache: false });
+  }
+
   static async reactionEnd() {
     return API.request('combat', 'reaction-end', {}, { useCache: false });
   }

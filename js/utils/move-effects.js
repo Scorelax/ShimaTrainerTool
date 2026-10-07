@@ -1056,6 +1056,17 @@ export function terrainKindOf(terrain) {
   return TERRAIN_KEYWORDS.find(k => name.includes(k)) || null;
 }
 
+/** Mirrors conditions.py's is_grounded: no flying/hovering speed, Levitate, Magnet Rise or airborne state
+ * (Smack Down's `grounded` condition overrides all of it). */
+export function isGrounded(p) {
+  const statuses = p?.statuses || [];
+  if (statuses.some(s => s.kind === 'condition' && s.apply === 'grounded')) return true;
+  const speeds = [...(p?.speeds || []), ...statuses.filter(s => s.kind === 'condition' && s.apply === 'granted_flight_speed').map(s => ({ type: 'flying', ft: s.value }))];
+  if (speeds.some(sp => ['flying', 'hovering'].includes(String(sp.type).toLowerCase()) && (Number(sp.ft) || 0) > 0)) return false;
+  if (/levitate/i.test(String(effectiveAbilities(p) || ''))) return false;
+  return !statuses.some(s => s.kind === 'condition' && (s.apply === 'airborne' || (s.apply === 'granted_immunity' && String(s.value || '').toLowerCase() === 'ground')));
+}
+
 /** The terrain's "double your MOVE modifier on damage rolls" for a move of `moveType`, as a synthetic
  * self-conditional `damage_note` (so combat.js's _evaluateDamageNotes handles it like Solar Beam's own
  * doubling), or null. Field-wide -- there's no "inside the area" position tracking. */

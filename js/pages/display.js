@@ -147,6 +147,7 @@ function updateStrip(activeId) {
       wrapper.innerHTML = `
         <div class="display-strip-card" data-id="${id}">
           <div class="display-strip-reaction"></div>
+          <div class="display-strip-bonus"></div>
           <div class="display-strip-portrait" id="stripPortrait-${id}"></div>
           <div class="display-strip-name"></div>
           <div class="display-strip-level"></div>
@@ -172,6 +173,11 @@ function updateStrip(activeId) {
     if (reactionEl) {
       reactionEl.textContent = p.status === 'participating' ? '⚡' : '';
       reactionEl.classList.toggle('used', !!p.reactionUsed);
+    }
+    const bonusEl = card.querySelector('.display-strip-bonus');
+    if (bonusEl) {
+      bonusEl.textContent = p.status === 'participating' ? '✦' : '';
+      bonusEl.classList.toggle('used', !!p.bonusActionUsed);
     }
 
     // Reorder without recreating -- insertBefore on a node already in the

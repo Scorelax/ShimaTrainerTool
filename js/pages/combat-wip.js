@@ -29,7 +29,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, isGrounded } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -115,7 +115,8 @@ const WIP_CSS = `
   .wip-turn-reaction-dot {
     width: 9px; height: 9px; border-radius: 50%; background: #2ecc71; box-shadow: 0 0 0 2px #14141f;
   }
-  .wip-turn-reaction.used .wip-turn-reaction-dot { background: #6b6b6b; }
+  .wip-turn-reaction-dot.bonus { background: #f39c12; }
+  .wip-turn-reaction-dot.used { background: #6b6b6b; }
   /* How many live effects (conditions, stat changes, advantage...) this participant has,
      on the portrait's bottom-right corner -- hidden at zero. */
   .wip-turn-status-count {
@@ -1117,6 +1118,9 @@ function _syncLocalCombatState(session) {
     // server that decides "activate" vs "resolve" each time the move is used.
     merged.bideCharging = !!p.bideChargingSinceLogId;
     merged.pendingBideDamage = p.pendingBideDamage ?? null;
+    // Psychic Terrain: grounded creatures can't use bonus actions at all (the server rejects it too).
+    merged.bonusActionBlockedBy = terrainKindOf(session.terrain) === 'psychic' && isGrounded(p) ? session.terrain.name : '';
+    merged.bonusActionUsed = !!p.bonusActionUsed; // one bonus action per round -- see combat.js's _isBonusActionMove
     merged.bideHeld = !!p.bideHeld;
     // Archive Blast's own "every type of move you have witnessed so far
     // during this battle" -- distinct move types from the shared log,
@@ -1621,7 +1625,7 @@ function _syncTurnOrderSidebar(state) {
         <div class="wip-turn-item" data-id="${id}">
           <div class="wip-turn-portrait">
             <div class="wip-turn-portrait-media" data-portrait-id="${id}"></div>
-            <div class="wip-turn-reaction"><div class="wip-turn-reaction-dot"></div></div>
+            <div class="wip-turn-reaction"><div class="wip-turn-reaction-dot" data-kind="reaction" title="Reaction"></div><div class="wip-turn-reaction-dot bonus" data-kind="bonus" title="Bonus action"></div></div>
             <div class="wip-turn-status-count" style="display:none"></div>
           </div>
           <div class="wip-turn-name"></div>
@@ -1641,7 +1645,8 @@ function _syncTurnOrderSidebar(state) {
 
     const reactionEl = node.querySelector('.wip-turn-reaction');
     reactionEl.style.display = p.status === 'participating' ? 'flex' : 'none';
-    reactionEl.classList.toggle('used', !!p.reactionUsed);
+    reactionEl.querySelector('[data-kind="reaction"]').classList.toggle('used', !!p.reactionUsed);
+    reactionEl.querySelector('[data-kind="bonus"]').classList.toggle('used', !!p.bonusActionUsed);
 
     const statuses = p.statuses || [];
     const countEl = node.querySelector('.wip-turn-status-count');

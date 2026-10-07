@@ -26364,7 +26364,7 @@
           "kind": "set_terrain",
           "name": "Psychic Terrain",
           "rounds": 3,
-          "description": "Grounded creatures cannot use bonus actions (not enforced). Psychic moves double their MOVE modifier on damage.",
+          "description": "Grounded creatures cannot use bonus actions. Psychic moves double their MOVE modifier on damage.",
           "when": {
             "type": "always"
           },

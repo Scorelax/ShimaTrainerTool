@@ -212,6 +212,11 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _reaction_start(s, params['id']))
 
+    if action == 'use-bonus-action':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _use_bonus_action(s, params['id'], params.get('move', '')))
+
     if action == 'reaction-end':
         return _mutate(conn, _reaction_end)
 
@@ -894,6 +899,9 @@ def _add_participant(state, data):
         'placed': False,
         'status': status,
         'reactionUsed': False,
+        # One bonus action per round, same cycle as the reaction: spent by use-bonus-action, refreshed when
+        # this participant's own turn comes round again (see _advance_turn).
+        'bonusActionUsed': False,
         # Live effects on this participant (conditions, stat modifiers,
         # advantage/disadvantage) -- see the status section below and
         # move-effects-schema.md. Older participants may lack the key;
@@ -1103,6 +1111,7 @@ def _advance_turn(state):
     next_participant = state['participants'].get(state['turnOrder'][state['turnIndex']])
     if next_participant:
         next_participant['reactionUsed'] = False
+        next_participant['bonusActionUsed'] = False
         next_participant['movementUsed'] = 0
     _log_event(state, 'turn-advance', text=f"Round {state['round']}: {next_participant['name'] if next_participant else '?'}'s turn",
                actorId=state['turnOrder'][state['turnIndex']], actorName=next_participant['name'] if next_participant else None)
@@ -1121,6 +1130,24 @@ def _advance_turn(state):
     starting_id = state['turnOrder'][state['turnIndex']]
     _apply_condition_turn_damage(state, starting_id, 'start')
     _expire_statuses_on_turn_point(state, starting_id, 'start')
+
+
+def _use_bonus_action(state, pid, move_name=''):
+    """Spends `pid`'s one bonus action for this round (it comes back when their own turn starts again --
+    see _advance_turn). The client disables every bonus-action move once it's spent; this is the
+    authoritative check behind that, so a stale screen can't use a second one."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if participant['status'] != 'participating':
+        raise ValueError('Only participating combatants can use a bonus action')
+    if participant.get('bonusActionUsed'):
+        raise ValueError(f"{participant['name']} has already used their bonus action this round")
+    if terrain_kind(state.get('terrain')) == 'psychic' and is_grounded(participant):
+        raise ValueError(f"{participant['name']} can't use bonus actions (Psychic Terrain)")
+    participant['bonusActionUsed'] = True
+    label = f' ({move_name})' if move_name else ''
+    _log_event(state, 'bonus-action', text=f"{participant['name']} used their bonus action{label}", actorId=pid, actorName=participant['name'])
 
 
 def _reaction_start(state, pid):
@@ -1238,6 +1265,8 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
     for pid, p in state['participants'].items():
         if pid == exclude_id or p.get('status') != 'participating':
             continue  # reaction-start itself requires 'participating' -- never offer one nobody could accept
+        if p.get('reactionUsed'):
+            continue  # one reaction per round -- spent until their own turn comes round again, so no popup either
         for move_name in (p.get('moves') or []):
             m = moves_by_name.get(move_name)
             if not m or m.get('reactionTrigger') != trigger:

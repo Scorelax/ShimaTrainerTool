@@ -12,8 +12,8 @@ are exactly what each move's description says, nothing more. What each one does:
   2d8 / 3d8 at level 5 / 4d8 at 10 / 6d8 at 17 (`healTiers`, scaled to the caster once at cast time),
   and Grass moves double their MOVE modifier.
 - **Misty Terrain** -- grounded creatures can't gain new status conditions (terrain_blocked_status).
-- **Psychic Terrain** -- Psychic moves double their MOVE modifier; "grounded creatures can't use bonus
-  actions" is advisory only (the terrain badge shows the text) because this app tracks no bonus actions.
+- **Psychic Terrain** -- Psychic moves double their MOVE modifier on damage, and grounded creatures can't use
+  bonus actions (enforced by routes_combat.py's _use_bonus_action and by disabling the bonus-action move buttons).
 
 "Grounded" is conditions.py's is_grounded (no flying speed / Levitate / Magnet Rise / airborne state;
 Smack Down's `grounded` overrides). No "who's inside the area" tracking exists, so every effect is
@@ -45,7 +45,7 @@ OVERRIDES = {
         terrain('Misty Terrain', 'Grounded creatures cannot suffer new status conditions.'),
     ]},
     'Psychic Terrain': {'effects': [
-        terrain('Psychic Terrain', 'Grounded creatures cannot use bonus actions (not enforced). Psychic moves double their MOVE modifier on damage.'),
+        terrain('Psychic Terrain', 'Grounded creatures cannot use bonus actions. Psychic moves double their MOVE modifier on damage.'),
     ]},
 }
 

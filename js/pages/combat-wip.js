@@ -3369,6 +3369,8 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
           props.hazard = {
             damageType: h.damageType, ability: h.ability, dice: tierAt(h.diceTiers, caster?.level) || h.dice,
             flat: h.addMove && caster ? bestMoveStatModifier(moveRow, caster) : 0, dc,
+            // Uproar hits at the START of a turn only and never its caster -- the server reads these two off the zone.
+            ...(h.only ? { only: h.only } : {}), ...(h.excludeSource ? { excludeSource: true } : {}),
           };
         }
         await CombatAPI.setTerrain(effect.name || moveName, effect.description || '', {

@@ -1020,8 +1020,7 @@ export function targetDamageNoteResult(effects, { attacker, target, moveModValue
     if (e.moveModifierFromTarget) {
       const mods = (moveAbilities || []).map(a => Number(target?.[`${String(a).toLowerCase()}Mod`])).filter(Number.isFinite);
       if (mods.length) {
-        flatBonus += Math.max(...mods) - moveModValue;
-        if (e.note) notes.push(e.note);
+        flatBonus += Math.max(...mods) - moveModValue; // the effect's own note is added once, at the end of the loop
       } else {
         notes.push("No ability data on the target -- use THEIR MOVE modifier instead of yours by hand");
       }

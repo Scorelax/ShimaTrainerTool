@@ -609,6 +609,10 @@ function _showStep3() {
   if (advantage) {
     noteParts.push(`<div class="mode advantage">Advantage: roll damage twice, take the higher${note ? ` — ${note}` : ''}</div>`);
   }
+  // A note that rides on a flat bonus alone (Foul Play's "uses the TARGET's MOVE modifier", Wring Out's doubling) had no branch above
+  // and was computed then silently dropped -- show it whenever one of the branches above hasn't already.
+  const noteShownAbove = (diceOverride && _damageDice) || (diceMultiplier > 1 && _damageDice) || (extraDiceCount > 0 && _damageDice) || advantage;
+  if (note && !noteShownAbove) noteParts.push(`<div class="note">${note}</div>`);
   if (_presetRoll != null) {
     noteParts.push(`<div class="note">Pre-filled with ${_presetRoll} -- not rolled, edit it if it's wrong</div>`);
   }

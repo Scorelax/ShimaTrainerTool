@@ -987,9 +987,17 @@ def _add_participant(state, data):
     _log_event(state, 'join', text=f"{state['participants'][pid]['name']} joined the battle", actorId=pid, actorName=state['participants'][pid]['name'])
 
 
+def _drop_pending_switch_involving(state, ids):
+    """A switch held on a reaction window (see _switch_pokemon) is dropped the moment a Pokemon it involves leaves the battle."""
+    ps = state.get('pendingSwitch')
+    if ps and (ps['outId'] in ids or ps['inId'] in ids):
+        state['pendingSwitch'] = None
+
+
 def _remove_participant(state, pid):
     state['participants'].pop(pid, None)
     state['board']['tokens'].pop(pid, None)
+    _drop_pending_switch_involving(state, {pid})
     _rebuild_turn_order(state)
 
 
@@ -1005,7 +1013,9 @@ def _leave_session(conn, owner):
     if not state.get('active'):
         return {'status': 'success', 'data': state}
     if owner:
-        for pid in [pid for pid, p in state['participants'].items() if p.get('owner') == owner]:
+        leaving = {pid for pid, p in state['participants'].items() if p.get('owner') == owner}
+        _drop_pending_switch_involving(state, leaving)
+        for pid in leaving:
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
         _log_event(state, 'leave', text=f'{owner} left the battle', actorName=owner)
@@ -1166,7 +1176,15 @@ def _perform_switch(state, pending):
     # begins (see _advance_turn). Before the battle starts there is no round to protect, so it just re-sorts straight away.
     order = state['turnOrder']
     if out_id in order:
-        order[order.index(out_id)] = in_id
+        idx = order.index(out_id)
+        if inn.get('lastTurnRound') == state['round'] and idx > state['turnIndex']:
+            # The newcomer already had its turn this round (it was switched out, and the outgoing Pokemon -- whose turn hasn't come yet --
+            # is now being swapped back for it): the slot dissolves rather than handing it a second turn.
+            order.pop(idx)
+        else:
+            order[idx] = in_id
+            if idx == state['turnIndex']:
+                inn['lastTurnRound'] = state['round']  # the turn in progress continues as the newcomer
     state['resortAtRound'] = True
     if state.get('reactingParticipantId') == out_id:
         state['reactingParticipantId'] = in_id
@@ -1328,7 +1346,10 @@ def _rebuild_turn_order(state):
     state['turnOrder'] = list(reversed(rolled + unrolled)) if state.get('trickRoom') else rolled + unrolled
 
     state['turnIndex'] = state['turnOrder'].index(current_id) if current_id in state['turnOrder'] else 0
-    if state['reactingParticipantId'] not in state['participants']:
+    # Whoever holds the floor mid-reaction must still be in the fight: one who left, or was benched/fainted out to spectating
+    # (a switch, set-status), would otherwise hold it forever -- no card left to press End Turn on, and advance-turn refuses.
+    reacting = state['participants'].get(state['reactingParticipantId'])
+    if not reacting or reacting.get('status') != 'participating':
         state['reactingParticipantId'] = None
     # A reaction window whose anchor or attacker left (or stopped participating,
     # e.g. fainted out) mid-window no longer means anything -- close it
@@ -1408,7 +1429,12 @@ def _advance_turn(state):
     # reaction refreshed -- "usable again once their next turn comes up",
     # not a blanket reset for the whole table every lap.
     next_participant = state['participants'].get(state['turnOrder'][state['turnIndex']])
+    # Who has had (or is having) a turn this round -- a Pokemon switched back in later the same round can't act twice (see _perform_switch).
+    ending = state['participants'].get(ending_id) if ending_id else None
+    if ending:
+        ending['lastTurnRound'] = state['round'] - (1 if new_round else 0)
     if next_participant:
+        next_participant['lastTurnRound'] = state['round']
         next_participant['reactionUsed'] = False
         next_participant['bonusActionUsed'] = False
         next_participant['movementUsed'] = 0
@@ -2544,18 +2570,24 @@ def _list_backgrounds():
     return {'status': 'success', 'backgrounds': backgrounds}
 
 
+_MOVE_DATA_CACHE = {'stamp': None, 'data': None}
+
+
 def _load_move_data_file():
-    """Fresh read of upstream.MOVES_FILE (DnD_moves_categorized_draft.json) --
-    the full per-move record (categories, effects, reactionTrigger/
-    reactionRange, ...), not just the raw [name, type, ...] row
-    upstream.fetch_moves returns. No caching, same reasoning as
-    _list_move_categories below: an in-progress editing session on the Pi is
-    picked up on the very next read. {'moves': []} on any read failure --
-    every caller already treats a miss as "nothing special here", never a
-    hard error."""
+    """upstream.MOVES_FILE (DnD_moves_categorized_draft.json) -- the full per-move record (categories, effects,
+    reactionTrigger/reactionRange, ...), not just the raw [name, type, ...] row upstream.fetch_moves returns. Re-read whenever the
+    file changes (its modification time or size), so an in-progress editing session on the Pi is still picked up on the very next
+    read -- but not re-parsed on every call: the file is ~1 MB and this is consulted on every damage application and every token
+    move (False Swipe's flag, Pursuit's reaction check), which on a Pi was real, avoidable work. Callers treat the result as
+    read-only. {'moves': []} on any read failure -- every caller already treats a miss as "nothing special here", never a hard error."""
     try:
-        with open(upstream.MOVES_FILE, encoding='utf-8') as f:
-            return json.load(f)
+        stat = os.stat(upstream.MOVES_FILE)
+        stamp = (stat.st_mtime_ns, stat.st_size)
+        if _MOVE_DATA_CACHE['stamp'] != stamp:
+            with open(upstream.MOVES_FILE, encoding='utf-8') as f:
+                _MOVE_DATA_CACHE['data'] = json.load(f)
+            _MOVE_DATA_CACHE['stamp'] = stamp
+        return _MOVE_DATA_CACHE['data']
     except (OSError, ValueError):
         return {'moves': []}
 
@@ -2607,10 +2639,6 @@ def _list_move_categories():
 
 def _set_board_background(state, url):
     state['board']['backgroundImage'] = url or None
-
-
-def _set_weather(state, name, effect):
-    state['weather'] = {'name': name, 'effect': effect} if name else None
 
 
 # Zone properties a move may attach (see move-effects-schema.md's set_terrain): `rule` names what the zone does for

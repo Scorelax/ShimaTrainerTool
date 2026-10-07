@@ -331,6 +331,9 @@ def tag_for(e):
         # disabled" -- read off the shared log, see combat-wip.js's
         # _handleDisableLastUsedMove.
         base = 'disable_last_used_move'
+    elif e['kind'] == 'cancel_switch':
+        # Block's own "stop its switch-out" -- see routes_combat.py's _cancel_pending_switch (v86).
+        base = 'cancel_switch'
     elif e['kind'] in ('switch_out', 'faint_pass_heal'):
         # Baton Pass/U-turn's switch and Lunar Dance/Healing Wish -- see routes_combat.py's _switch_pokemon / _queue_switch_heal (v85).
         base = e['kind']

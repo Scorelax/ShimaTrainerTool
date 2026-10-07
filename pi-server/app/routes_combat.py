@@ -35,7 +35,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded
+from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -259,7 +259,13 @@ def handle(conn, action, params):
         if not params.get('id') or not params.get('inId'):
             raise ValueError('Missing participant id or inId')
         passing = str(params.get('pass', '')) in ('1', 'true')
-        return _mutate(conn, lambda s: _switch_pokemon(s, params['id'], params['inId'], passing))
+        return _mutate(conn, lambda s: _switch_pokemon(s, params['id'], params['inId'], passing,
+                                                       js_parse_int(params.get('col')), js_parse_int(params.get('row'))))
+
+    if action == 'cancel-pending-switch':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _cancel_pending_switch(s, params['id']))
 
     if action == 'queue-switch-heal':
         if not params.get('id') or params.get('mode') not in ('lunar', 'wish'):
@@ -1027,12 +1033,66 @@ def _note_faint(participant, old_hp):
         participant['hpBeforeFaint'] = old_hp
 
 
-def _switch_pokemon(state, out_id, in_id, pass_statuses=False):
+SWITCH_RANGE_CELLS = 4  # a Pokemon sent out lands within 20ft of its trainer
+
+
+def _switch_placement(state, out, inn, col=None, row=None):
+    """Where the incoming Pokemon appears on the map: a free tile within 20ft of its trainer (the trainer's own token), its whole
+    footprint on the board and clear of every other token. `col`/`row` are the tile the player chose (validated here); without
+    them the free tile nearest the outgoing Pokemon is used. A trainer with no token leaves only the board and occupancy rules.
+    None when nothing is on the map at all (no tokens to place against)."""
+    tokens = state['board']['tokens']
+    out_token = tokens.get(out['id'])
+    trainer = next((p for p in state['participants'].values()
+                    if p.get('owner') == out.get('owner') and p.get('combatantType') == 'trainer' and p['id'] in tokens), None)
+    if not out_token and not trainer and col is None:
+        return None
+    cols, rows = state['board']['grid']['cols'], state['board']['grid']['rows']
+    size = footprint_size(inn.get('size'))
+    occupied = set()
+    for pid, t in tokens.items():
+        if pid == out['id']:
+            continue  # its tile is about to be free
+        occupied.update(footprint_cells(t['col'], t['row'], footprint_size((state['participants'].get(pid) or {}).get('size'))))
+    trainer_token = tokens[trainer['id']] if trainer else None
+
+    def legal(c, r):
+        cells = footprint_cells(c, r, size)
+        if any(not (0 <= cc < cols and 0 <= rr < rows) for cc, rr in cells):
+            return False
+        if any(cell in occupied for cell in cells):
+            return False
+        if trainer_token and min(max(abs(cc - trainer_token['col']), abs(rr - trainer_token['row'])) for cc, rr in cells) > SWITCH_RANGE_CELLS:
+            return False
+        return True
+
+    if col is not None and row is not None:
+        if not legal(col, row):
+            raise ValueError('That tile is more than 20ft from the trainer, occupied, or off the map')
+        return {'col': col, 'row': row}
+    anchor = out_token or trainer_token
+    best = None
+    for c in range(cols):
+        for r in range(rows):
+            if legal(c, r):
+                d = max(abs(c - anchor['col']), abs(r - anchor['row']))
+                if best is None or d < best[0]:
+                    best = (d, c, r)
+    if not best:
+        raise ValueError('There is no free tile within 20ft of the trainer to send the Pokemon out to')
+    return {'col': best[1], 'row': best[2]}
+
+
+def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=None):
     """Swaps one of a trainer's Pokemon out for another: the outgoing one goes to the bench (status 'spectating', keeping its HP,
-    VP and statuses), the incoming one takes its place on the map and, if it was the one acting, its turn. `pass_statuses` is
-    Baton Pass: every status on the outgoing Pokemon -- conditions, stat changes, rolls, temp HP -- goes to the newcomer.
-    A Pokemon that can't be switched out (Ingrain's `trapped`) is refused. A pending Lunar Dance / Healing Wish for this trainer
-    is applied to the newcomer. The shared tool had no switching before this -- only the legacy local combat page did."""
+    VP and statuses), the incoming one is sent out onto a free tile within 20ft of the trainer (chosen by the player, `col`/`row`)
+    and takes the outgoing one's slot in the turn order. `pass_statuses` is Baton Pass: every status on the outgoing Pokemon goes
+    to the newcomer. A Pokemon that can't be switched out (Ingrain's `trapped`) is refused.
+
+    A switch-out is itself a reaction trigger -- Pursuit may attack the Pokemon as it leaves, Block may stop the switch -- so when a
+    hostile creature could react, the swap waits (`pendingSwitch`) while a `switch_out` window is open with the Pokemon still on
+    the map, and happens when the window closes (see _finish_pending_switch). With nobody able to react it happens straight away.
+    The shared tool had no switching before this -- only the legacy local combat page did."""
     out, inn = state['participants'].get(out_id), state['participants'].get(in_id)
     if not out or not inn:
         raise ValueError('Unknown participant')
@@ -1047,10 +1107,60 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False):
         raise ValueError(f"{out['name']} isn't in the battle")
     if inn.get('status') == 'participating':
         raise ValueError(f"{inn['name']} is already in the battle")
+    if state.get('pendingSwitch'):
+        raise ValueError('A switch is already in progress -- wait for its reaction window to close')
     trapped = next((s for s in _statuses_of(out) if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
     if trapped:
         raise ValueError(f"{out['name']} is {trapped['apply']} and can't be switched out")
+    pending = {'outId': out_id, 'inId': in_id, 'pass': bool(pass_statuses), 'place': _switch_placement(state, out, inn, col, row)}
 
+    if state.get('started') and out_id in state['board']['tokens'] and not state.get('pendingReaction'):
+        hostile = {pid for pid, p in state['participants'].items() if pid != out_id and p.get('status') == 'participating' and _hostile(state, out, p)}
+        if hostile:
+            _open_reaction_window(state, 'switch_out', out_id, out_id, '', only_ids=hostile)
+            if state.get('pendingReaction'):
+                state['pendingSwitch'] = pending
+                _log_event(state, 'switch-attempt', text=f"{owner} is switching {out['name']} out -- a chance to react",
+                           actorId=out_id, actorName=out['name'])
+                return
+    _perform_switch(state, pending)
+
+
+def _finish_pending_switch(state):
+    """A reaction window just closed: carry out (or, if a Block stopped it, drop) the switch that was waiting on it."""
+    pending = state.get('pendingSwitch')
+    if not pending:
+        return
+    state['pendingSwitch'] = None
+    out = state['participants'].get(pending['outId'])
+    if pending.get('cancelled'):
+        if out:
+            _log_event(state, 'switch-blocked', text=f"{out['name']} is stopped dead in its tracks -- the switch doesn't happen", actorId=out['id'], actorName=out['name'])
+        return
+    try:
+        _perform_switch(state, pending)
+    except ValueError as e:
+        _log_event(state, 'switch-blocked', text=f"The switch could not be completed: {e}")
+
+
+def _cancel_pending_switch(state, pid):
+    """Block: a reactor that used its reaction on a switch-out stops it. Needs a live `switch_out` window the reactor was eligible
+    for and the floor, like every other reaction effect."""
+    pending, pr = state.get('pendingSwitch'), state.get('pendingReaction')
+    if not pending or not pr or pr.get('trigger') != 'switch_out':
+        raise ValueError('There is no switch to stop')
+    if pid not in pr['eligible'] or state.get('reactingParticipantId') != pid:
+        raise ValueError('Only a reactor holding the floor can stop the switch')
+    pending['cancelled'] = True
+    blocker = state['participants'][pid]
+    _log_event(state, 'switch-block', text=f"{blocker['name']} moves to stop the switch", actorId=pid, actorName=blocker['name'])
+
+
+def _perform_switch(state, pending):
+    out, inn = state['participants'].get(pending['outId']), state['participants'].get(pending['inId'])
+    if not out or not inn or out.get('status') != 'participating' or inn.get('status') == 'participating':
+        raise ValueError('the Pokemon involved changed in the meantime')
+    out_id, in_id, owner = out['id'], inn['id'], out.get('owner')
     # The newcomer takes the outgoing Pokemon's slot for the rest of this round (so nobody's turn is skipped or repeated by a
     # re-sort mid-round) -- including its turn, if it was the one acting; the order is re-sorted by initiative when the next round
     # begins (see _advance_turn). Before the battle starts there is no round to protect, so it just re-sorts straight away.
@@ -1062,11 +1172,12 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False):
         state['reactingParticipantId'] = in_id
 
     out['status'], inn['status'] = 'spectating', 'participating'
-    token = state['board']['tokens'].pop(out_id, None)
-    if token:
-        state['board']['tokens'][in_id] = dict(token)
+    out_token = state['board']['tokens'].pop(out_id, None)
+    place = pending.get('place')
+    if place:
+        state['board']['tokens'][in_id] = {'col': place['col'], 'row': place['row'], 'facing': (out_token or {}).get('facing', 0), 'z': 0}
         inn['placed'] = True
-    if pass_statuses:
+    if pending.get('pass'):
         for s in [s for s in _statuses_of(out) if s.get('kind') in ('condition', 'stat', 'roll', 'temp_hp') and s.get('apply') not in UNTARGETABLE_STATES]:
             copy_ = json.loads(json.dumps(s))
             copy_['id'] = uuid.uuid4().hex[:8]
@@ -1075,7 +1186,7 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False):
     _apply_switch_heal(state, inn)
     if not state.get('started'):
         _rebuild_turn_order(state)
-    _log_event(state, 'switch', text=f"{owner} withdraws {out['name']} and sends out {inn['name']}{' (passing along its effects)' if pass_statuses else ''}",
+    _log_event(state, 'switch', text=f"{owner} withdraws {out['name']} and sends out {inn['name']}{' (passing along its effects)' if pending.get('pass') else ''}",
                actorId=in_id, actorName=inn['name'])
 
 
@@ -1232,12 +1343,14 @@ def _rebuild_turn_order(state):
     if pr:
         if not _still_participating(pr['anchorId']) or not _still_participating(pr['attackerId']):
             state['pendingReaction'] = None
+            _finish_pending_switch(state)
         else:
             for pid in list(pr['eligible']):
                 if not _still_participating(pid):
                     del pr['eligible'][pid]
             if not pr['eligible']:
                 state['pendingReaction'] = None
+                _finish_pending_switch(state)
             else:
                 _maybe_close_reaction_window(state)
 
@@ -1535,7 +1648,8 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
         anchor = state['participants'].get(anchor_id) or {}
         for move_name in (p.get('moves') or []):
             m = moves_by_name.get(move_name)
-            if not m or m.get('reactionTrigger') != trigger:
+            triggers = m.get('reactionTrigger') if m else None
+            if not triggers or trigger not in (triggers if isinstance(triggers, list) else [triggers]):
                 continue
             # Reflect/Counter/... only answer a MELEE attack, Light Screen/Mirror Coat only a ranged one: `reactionAttackRange`
             # is checked against the attacking move's own range ("Melee" is the one melee range in the data).
@@ -1736,6 +1850,7 @@ def _maybe_close_reaction_window(state):
     if all(e['responded'] for e in pr['eligible'].values()):
         state['pendingReaction'] = None
         _log_event(state, 'reaction-window-close', text='Reaction window closed (all answered)')
+        _finish_pending_switch(state)
 
 
 def _close_reaction_window(state):
@@ -1753,6 +1868,7 @@ def _close_reaction_window(state):
         raise ValueError('Someone is still reacting -- try again shortly')
     state['pendingReaction'] = None
     _log_event(state, 'reaction-window-close', text='Reaction window closed (time expired)')
+    _finish_pending_switch(state)
 
 
 def _active_participant_id(state):

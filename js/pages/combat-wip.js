@@ -11,6 +11,8 @@
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setWeatherAttackModeResolver } from '../utils/target-picker.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
+import { pickSwitchTile } from '../utils/token-placement-picker.js';
+import { waitForOpenWindow } from '../utils/reaction-window.js';
 import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
@@ -1088,12 +1090,21 @@ async function _switchPokemonShared(bench, options = {}) {
     return;
   }
   try {
+    // Where it appears: a free tile within 20ft of the trainer, picked on the map. (No trainer or no map tokens: the server places it.)
+    let tile = null;
+    const trainer = Object.values(session.participants).find(p => p.owner === myName && p.combatantType === 'trainer' && session.board?.tokens?.[p.id]);
+    if (trainer && session.board?.tokens?.[out.id]) {
+      tile = await pickSwitchTile({ session, trainerId: trainer.id, outId: out.id, incoming: { name: bench.name, image: bench.image, size: bench.size } });
+      if (!tile) return; // cancelled -- nothing has changed yet
+    }
     let inId = bench.id && session.participants[bench.id] ? bench.id : null;
     if (!inId) {
       inId = `p${Math.random().toString(36).slice(2, 10)}`;
       await CombatAPI.addParticipant({ ..._combatantToParticipant(bench), id: inId, status: 'spectating' });
     }
-    await CombatAPI.switchPokemon(out.id, inId, !!options.pass);
+    const result = await CombatAPI.switchPokemon(out.id, inId, !!options.pass, tile);
+    // A hostile creature may get a chance to react (Pursuit, Block) -- the switch waits on that window; run its clock.
+    if (result?.data?.pendingReaction) waitForOpenWindow();
   } catch (err) {
     showCombatAlert(err.message, { title: 'Switch' });
   }
@@ -3081,6 +3092,15 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // Spiky Shield's own "ignore damage" half -- same no-attackerId-needed
       // reasoning as undo_crit_damage above.
       await _handleNegateDamage({ reactorId: attackerId, moveName });
+      continue;
+    }
+    if (effect.kind === 'cancel_switch') {
+      // Block -- stops the switch-out the open `switch_out` window is holding.
+      try {
+        await CombatAPI.cancelPendingSwitch(attackerId);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Block' });
+      }
       continue;
     }
     if (effect.kind === 'switch_out') {

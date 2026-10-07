@@ -1093,8 +1093,14 @@ export class CombatAPI {
 
   /** Switch Pokemon (shared battle): `id` goes to the bench, `inId` takes its place on the map and in the turn order. `pass`
    * is Baton Pass -- the outgoing Pokemon's statuses go with it. */
-  static async switchPokemon(id, inId, pass = false) {
-    return API.request('combat', 'switch-pokemon', { id, inId, pass: pass ? '1' : '' }, { useCache: false });
+  static async switchPokemon(id, inId, pass = false, tile = null) {
+    // `tile` ({col, row}) is where the newcomer is sent out (within 20ft of its trainer); the server picks the nearest free tile without one.
+    return API.request('combat', 'switch-pokemon', { id, inId, pass: pass ? '1' : '', ...(tile ? { col: tile.col, row: tile.row } : {}) }, { useCache: false });
+  }
+
+  /** Block: stops the switch-out that is waiting on the open `switch_out` reaction window. */
+  static async cancelPendingSwitch(id) {
+    return API.request('combat', 'cancel-pending-switch', { id }, { useCache: false });
   }
 
   /** Lunar Dance / Healing Wish: the trainer's next Pokemon to enter the battle is healed and cured (`mode`: 'lunar' | 'wish'). */

@@ -225,6 +225,7 @@ export function statusLabel(s) {
   if (s.kind === 'reroll_damage') {
     return 'Reroll their damage, take the lower';
   }
+  if (s.kind === 'cancel_switch') return "Stop the opponent's switch-out";
   if (s.kind === 'switch_out') return s.pass ? 'Switch out, passing your effects to the newcomer' : 'Your trainer switches you out';
   if (s.kind === 'faint_pass_heal') return s.mode === 'lunar' ? "Faint -- the next Pokemon is fully healed and cured" : "Faint -- the next Pokemon is cured and healed";
   if (s.kind === 'recoil') return `Take ${s.fraction === 0.5 ? 'half' : s.fraction === 0.25 ? 'a quarter' : `${Math.round((s.fraction || 0) * 100)}%`} of the damage as recoil`;

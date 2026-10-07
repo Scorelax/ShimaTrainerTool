@@ -46,7 +46,16 @@ export async function waitForReactionWindow(trigger, anchorId, attackerId, moveN
     onStatus?.({ opened: false });
     return { blocked: false };
   }
+  return waitForOpenWindow(onStatus);
+}
 
+/**
+ * Waits for the reaction window that is ALREADY open to close, driving its countdown the same way -- for a window the server
+ * opened itself as part of another action (a creature walking away from a hostile one, a trainer switching a Pokemon out) rather
+ * than the attacker's own client opening it. Without a client running the clock, a reactor nobody answers for (a DM's enemy) would
+ * leave it open forever. Same resolve shape as waitForReactionWindow.
+ */
+export async function waitForOpenWindow(onStatus) {
   // Captured from the first poll that sees the window at all, so an outcome
   // reported later (session.reactionBlock / session.reactionDamageMultiplier,
   // each set by a separate call the reactor's own move triggers -- see

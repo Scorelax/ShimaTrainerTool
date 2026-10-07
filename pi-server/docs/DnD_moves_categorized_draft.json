@@ -3647,7 +3647,10 @@
       "moveStat": "STR/DEX",
       "vpCost": "3",
       "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
-      "reactionTrigger": "moved_away",
+      "reactionTrigger": [
+        "moved_away",
+        "switch_out"
+      ],
       "reactionRange": 40
     },
     {
@@ -18027,12 +18030,30 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "positioning"
+        "positioning",
+        "self_cancel_switch"
       ],
       "description": "If an opponent within range attempts to flee or switch out, you may use your reaction to stop it dead in its tracks, keeping this from happening.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "switch_out",
+      "reactionRange": 50,
+      "effects": [
+        {
+          "kind": "cancel_switch",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "The opponent's switch-out doesn't happen. (Fleeing combat has no trigger in this tool -- only the switch half is live.)"
+        }
+      ]
     },
     {
       "name": "Body Slam",

@@ -30,6 +30,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
+import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, canClimb } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, tokenCenter, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 
@@ -296,7 +297,10 @@ function _renderMovePanel() {
     _selectedTokenId = null;
     _stagedDestination = null; _stagedAlt = null;
     _stagedAlt = null;
-    CombatAPI.moveToken(movingId, col, row, altitude === null ? undefined : altitude).catch(err => showCombatAlert(err.message, { title: 'Error' }));
+    CombatAPI.moveToken(movingId, col, row, altitude === null ? undefined : altitude)
+      // Walking away from a hostile creature can open a reaction window (Pursuit) that nobody else is waiting on -- run its clock.
+      .then(res => { if (res?.data?.pendingReaction) waitForOpenWindow(); })
+      .catch(err => showCombatAlert(err.message, { title: 'Error' }));
     _render();
   });
 }

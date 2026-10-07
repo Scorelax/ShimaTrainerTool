@@ -142,7 +142,7 @@ function _requirementMet(requires, ctx) {
  *                unselected and let a human judge
  *   'no'         didn't trigger */
 // Effect kinds that are read in place by the move popup / roll flow, never offered as an apply-this button.
-const NOT_OFFERED_KINDS = new Set(['damage_note', 'requires_weather', 'attack_roll_weather', 'move_type_by_weather']);
+const NOT_OFFERED_KINDS = new Set(['damage_note', 'requires_weather', 'requires_round', 'attack_roll_weather', 'move_type_by_weather']);
 
 export function evaluateEffect(effect, ctx) {
   if (NOT_OFFERED_KINDS.has(effect.kind)) return 'no';
@@ -225,6 +225,10 @@ export function statusLabel(s) {
   if (s.kind === 'reroll_damage') {
     return 'Reroll their damage, take the lower';
   }
+  if (s.kind === 'hp_equalize') return s.mode === 'average' ? 'Both of you go to the average of your current HP' : "Bring the target's HP down to yours";
+  if (s.kind === 'consume_item') return 'Your held item is consumed';
+  if (s.kind === 'quash') return 'Move the target to the bottom of the initiative order this round';
+  if (s.kind === 'secondary_damage') return `Take an equal amount of ${s.damageType || ''} damage`.replace('  ', ' ');
   if (s.kind === 'counter_attack') return `Counter-attack${s.rollMode ? ` with ${s.rollMode}` : ''}, dealing the damage you just took`;
   if (s.kind === 'reduce_damage') return 'Reduce the hit you took (deflect it back if it is wiped out)';
   if (s.kind === 'extra_turn') return 'Grant the damaged ally an extra turn';
@@ -341,7 +345,7 @@ function _finish(ctx, adv, dis) {
 /** Modifiers for an attack roll by `attacker` against `target` (participant records,
  * either may be missing): the attacker's attack-roll bonus/penalty and advantage/
  * disadvantage, the target's AC change and attacks-against advantage/disadvantage. */
-export function attackRollContext(attacker, target, moveAbilities = [], { ignoreTargetStatChanges = false } = {}) {
+export function attackRollContext(attacker, target, moveAbilities = [], { ignoreTargetStatChanges = false, ignoreTargetAcBoosts = false } = {}) {
   const ctx = { attackBonus: 0, acDelta: 0, mode: 'normal', notes: [], consume: [] };
   // An attack-roll effect can be scoped two ways: `ability` (Nasty Plot's "attacks with the
   // Wisdom move power" -- the move's own stat list must include it) and `against` (Study's
@@ -380,8 +384,13 @@ export function attackRollContext(attacker, target, moveAbilities = [], { ignore
     // Phantom Tendril: "unaffected by any of the target's stat changes" -- its AC modifiers don't count.
     if (s.kind === 'stat' && s.stat === 'ac' && !ignoreTargetStatChanges) {
       const a = _statAmount(s, target);
-      ctx.acDelta += a;
-      ctx.notes.push(_sourceText(s));
+      if (ignoreTargetAcBoosts && a > 0) {
+        // Sacred Sword / Secret Sword / Chip Away: "ignores any boosts affecting the target's AC" -- a debuff still counts.
+        ctx.notes.push(`${_sourceText(s)} (AC boost ignored)`);
+      } else {
+        ctx.acDelta += a;
+        ctx.notes.push(_sourceText(s));
+      }
     }
     const condMode = _conditionRollMode(s, 'attacks_against');
     if (condMode) take(s, target, condMode === 'advantage' ? adv : dis);
@@ -872,6 +881,8 @@ function _targetConditionMet(cond, { attacker, target, attackRoll, targetDamaged
     // for the general multi-round-delay edge case rather than tracking
     // exact turn boundaries per participant.
     case 'target_damaged_me_this_round': return !!targetDamagedMeThisRound;
+    // Foul Play: applies to whoever is targeted, no further condition.
+    case 'target_present': return true;
     // Charge Beam's own "if the natural attack roll is 10 or higher" --
     // attackRoll is the natural d20 already entered in the attack-roll step
     // (target-picker.js's own module state), threaded through here since
@@ -942,7 +953,7 @@ function _targetConditionMagnitude(cond, { attacker, target }) {
  * same "never stacked" rule as the self-conditional side; flatBonus and
  * advantage DO accumulate/OR across every met effect, since nothing here
  * needs Flail's own "only the most severe tier" reasoning. */
-export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null, attackRoll = null, targetDamagedMeThisRound = false }) {
+export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null, attackRoll = null, targetDamagedMeThisRound = false, moveAbilities = [] }) {
   let diceMultiplier = 1, diceOverride = null, flatBonus = 0, advantage = false, extraDiceCount = 0;
   const notes = [];
   for (const e of effects || []) {
@@ -968,6 +979,17 @@ export function targetDamageNoteResult(effects, { attacker, target, moveModValue
     // whatever the move-popup already showed for this same move/combatant.
     else if (e.flatBonus === 'moveModifier') flatBonus += moveModValue;
     else if (typeof e.flatBonus === 'number') flatBonus += e.flatBonus;
+    // Foul Play's "using THEIR own MOVE power": the damage's MOVE modifier is the target's (best of the move's own stats),
+    // not the attacker's -- so swap one for the other. No stat data on the target leaves it as it was, with a note saying so.
+    if (e.moveModifierFromTarget) {
+      const mods = (moveAbilities || []).map(a => Number(target?.[`${String(a).toLowerCase()}Mod`])).filter(Number.isFinite);
+      if (mods.length) {
+        flatBonus += Math.max(...mods) - moveModValue;
+        if (e.note) notes.push(e.note);
+      } else {
+        notes.push("No ability data on the target -- use THEIR MOVE modifier instead of yours by hand");
+      }
+    }
     // Heavy Slam's own "+MOVE mod per size level above the target" --
     // target-conditional counterpart to combat.js's self-conditional
     // scalingBonus (Trump Card/Frustration/Return), just reading its
@@ -1241,4 +1263,13 @@ export function moveCostFt(session, p, c0, r0, c1, r1, z0 = 0, z1 = 0) {
  * airborne), or no `speeds` on record at all (a DM's freeform enemy is untracked, same convention as the movement budget). */
 export function canClimb(p) {
   return !(p?.speeds || []).length || !isGrounded(p);
+}
+
+
+/** Endeavor's "this move can not be used in the first round of combat": why `effects` say a move can't be used in `round`
+ * (1-based), or null when it can. An unknown round never blocks. */
+export function roundRequirementUnmet(effects, round) {
+  if (!Number.isFinite(round)) return null;
+  const need = (effects || []).find(e => e.kind === 'requires_round' && round < e.min);
+  return need ? (need.message || `Can't be used before round ${need.min}`) : null;
 }

@@ -2874,12 +2874,30 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "cannot_use_item"
+        "cannot_use_item",
+        "potential_status_condition_embargo"
       ],
       "description": "You surround a creature in range with a dark aura. Force a creature to make a WIS save against your Move DC. On a failure, the target cannot gain the effect of any held item or trainer item given to it for the duration.",
       "moveStat": "WIS",
       "vpCost": "2",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "embargo",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "note": "Held items have no effect on this creature (trainer items are the table's call)."
+        }
+      ]
     },
     {
       "name": "Fake Tears",
@@ -2986,12 +3004,27 @@
       "reaction": false,
       "categories": [
         "damage",
-        "remove_item"
+        "remove_item",
+        "self_consume_item"
       ],
       "description": "Make a ranged attack, dealing 2d6 + MOVE dark damage on hit. The item is consumed. The GM may rule additional effects based on the item thrown.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "consume_item",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Foul Play",
@@ -3007,12 +3040,23 @@
       "reaction": false,
       "categories": [
         "damage",
-        "additional_damage"
+        "additional_damage",
+        "damage_note"
       ],
       "description": "You turn a creature's own power against it. Make a melee attack roll using your MOVE power. On a hit, the target takes 2d8 + MOVE dark damage using their own MOVE power.",
       "moveStat": "STR/WIS",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_present"
+          },
+          "moveModifierFromTarget": true,
+          "note": "Damage uses the TARGET's MOVE modifier instead of yours."
+        }
+      ]
     },
     {
       "name": "Hone Claws",
@@ -3585,12 +3629,27 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "potential_initiative_lowering"
+        "potential_initiative_lowering",
+        "potential_quash"
       ],
       "description": "You send dark energy at a creature in range, reducing their will to fight. The target must make a WIS save against your Move DC. On a failure, it must move to the bottom of the initiative order for this round only. Targets that have already taken their turn in this round are unaffected.",
       "moveStat": "STR/WIS",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "quash",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Snarl",
@@ -4058,12 +4117,46 @@
         "damage",
         "recharge_locked",
         "multi_hit_aoe",
-        "trigger_saving_throw"
+        "trigger_saving_throw",
+        "self_disadvantage_attack_rolls",
+        "self_advantage_saves_against_its_moves"
       ],
       "description": "You summon forth a meteor shower that rains down on your opponents. Choose 3 points within range. Each point has a 10ft radius impact. The points can't be the same, but the impact zones can overlap. All creatures in the impact zones must make a DEX save against your Move DC, taking 4d12 + MOVE dragon damage on a hit, or half as much on a save. If a creature is in multiple impact zones, it makes a saving throw for each zone. After activating this move, your next attack is rolled at disadvantage. If that attack requires a saving throw, the target has advantage. This move may be used once per short rest.",
       "moveStat": "STR",
       "vpCost": "60",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "advantage",
+          "on": "saves_against_its_moves",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "uses",
+              "n": 1
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Dragon Breath",
@@ -8991,7 +9084,8 @@
       "description": "You attempt to pierce a creature with one of your sharp appendages. Make a melee attack, dealing 2d8 + MOVE fighting damage on a hit. This move ignores any boosts affecting the target's AC.",
       "moveStat": "STR/DEX",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "ignoresTargetAcBoosts": true
     },
     {
       "name": "Secret Sword",
@@ -9011,7 +9105,8 @@
       "description": "You attempt to pierce a creature with one of your sharp appendages. Make a melee attack, dealing 3d10 + MOVE fighting damage on a hit. This move ignores any boosts affecting the target's AC.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "ignoresTargetAcBoosts": true
     },
     {
       "name": "Seismic Toss",
@@ -14959,12 +15054,29 @@
       "categories": [
         "damage",
         "trigger_saving_throw_on_hit",
-        "multi_type_damage"
+        "multi_type_damage",
+        "potential_secondary_damage"
       ],
       "description": "You hurl a barrage of hard spuds at a creature in range. Roll a ranged attack, dealing 4d12 MOVE grass damage on a hit. The creature hit must then make a CON save against your move DC, taking an equal amount of MOVE fire damage on a failure.",
       "moveStat": "STR/DEX",
       "vpCost": "33",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "secondary_damage",
+          "damageType": "Fire",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "An equal amount of fire damage on a failed CON save."
+        }
+      ]
     },
     {
       "name": "Strength Sap",
@@ -16127,9 +16239,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
         "field_terrain",
-        "trigger_saving_throw",
         "set_terrain"
       ],
       "description": "You scatter spikes across a 15ft radius area centered on a point within 60ft. The area becomes hazardous terrain for 1 minute. When a creature enters the area or starts its turn there, it takes 1d6 + MOVE ground damage (DEX save for half). A creature can only take this damage once per turn.",
@@ -16178,7 +16288,8 @@
           ],
           "height": 0
         }
-      ]
+      ],
+      "zoneOnly": true
     },
     {
       "name": "Stomping Tantrum",
@@ -17981,7 +18092,8 @@
       "description": "You wait for an opening, striking with speed when the moment is right. Ignoring any boosts to the AC of a target, make a melee attack, dealing 1d10 + MOVE normal damage on a hit.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "ignoresTargetAcBoosts": true
     },
     {
       "name": "Comet Punch",
@@ -18718,12 +18830,34 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "potential_hp_equalize_match_user",
+        "requires_round"
       ],
       "description": "When you activate this move, select a creature in range. the target must make a WIS saving throw against your Move DC. On a failure, the target’s current HP reduced to be equal to your own. This move can not be used in the first round of combat.",
       "moveStat": "WIS/CON",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "hp_equalize",
+          "mode": "match_user",
+          "when": {
+            "type": "save_fail",
+            "ability": "WIS"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "requires_round",
+          "min": 2,
+          "message": "Endeavor cannot be used in the first round of combat"
+        }
+      ]
     },
     {
       "name": "Endure",
@@ -19005,7 +19139,8 @@
       "description": "You swipe at a creature but hold back power slightly. Make a melee attack against a creature, doing 2d8 + MOVE normal damage on a hit. If this attack would normally cause a creature to faint, it is reduced to 1HP instead. On a critical hit, the target becomes dazed, reducing capture DC by 20 until the beginning of your next turn.",
       "moveStat": "STR/DEX",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "leavesAtOneHp": true
     },
     {
       "name": "Feint",
@@ -20757,12 +20892,28 @@
       "reaction": false,
       "categories": [
         "trigger_saving_throw",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "potential_hp_equalize_average"
       ],
       "description": "You split pain from your injuries with your attacker. Target a creature in range, forcing them to make a CON save against your Move DC. On a fail, both you and your attacker change your current health points to the average of the two. If this causes either creature to go above maximum health, they take their maximum health instead.",
       "moveStat": "CON/CHA",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "hp_equalize",
+          "mode": "average",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Pay Day",
@@ -21077,12 +21228,33 @@
         "damage",
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "recharge_locked"
+        "recharge_locked",
+        "self_stat_transfer_cure_named"
       ],
       "description": "You strike out with an incredibly fast spinning move. All creatures within melee range must make a DEX save against your Move DC, taking 1d10 + MOVE normal damage on a failure, or half as much on a success. In addition, this move automatically frees the user from Leech Seed or anything causing it to be grappled or restrained. It is removed from these statuses before the saving throw is made.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "cure_named",
+          "names": [
+            "grappled",
+            "restrained",
+            "seeded"
+          ],
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Razor Wind",
@@ -23244,16 +23416,80 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "trigger_saving_throw",
-        "multi_hit_aoe",
-        "recharge_locked"
+        "recharge_locked",
+        "set_terrain",
+        "self_status_condition_move_locked_to"
       ],
       "description": "You cause an uproar on the battlefield in a 30 foot circle, centered on you, for three rounds of combat. During the uproar, you cannot use any other Move, and any creature in range wakes and is prevented from falling asleep. (This include creatures that would purposefully fall asleep using moves like Rest) In addition, creatures must make a CON save against your Move DC at the start of each turn. On a fail, the target takes 2d8 + MOVE normal damage.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
-      "soundBased": true
+      "soundBased": true,
+      "zoneOnly": true,
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Uproar",
+          "description": "Everyone here is awake and cannot fall asleep; creatures take normal damage (CON save) at the start of their turns.",
+          "rounds": 3,
+          "concentration": true,
+          "radiusFt": 30,
+          "center": "caster",
+          "rule": "uproar",
+          "hazard": {
+            "damageType": "Normal",
+            "ability": "CON",
+            "diceTiers": [
+              [
+                1,
+                "2d8"
+              ],
+              [
+                5,
+                "3d8"
+              ],
+              [
+                10,
+                "4d8"
+              ],
+              [
+                17,
+                "6d8"
+              ]
+            ],
+            "addMove": true,
+            "only": "start",
+            "excludeSource": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "move_locked_to",
+          "value": "Uproar",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            },
+            {
+              "type": "concentration"
+            }
+          ],
+          "note": "During the uproar you cannot use any other move."
+        }
+      ]
     },
     {
       "name": "Vice Grip",
@@ -30409,13 +30645,31 @@
         "damage",
         "trigger_saving_throw",
         "multi_hit_aoe",
-        "recharge_locked"
+        "recharge_locked",
+        "stat_transfer_cure_named"
       ],
       "description": "You burst into song, unleashing a flurry of bubbles in a 10ft circle, centered on you. All creatures in range must make a DEX save or take 2d8 + MOVE water damage on a fail and half as much on a save. Any creature suffering from the burned condition will be cured upon touching the bubbles.",
       "moveStat": "DEX/CHA",
       "vpCost": "10",
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
-      "soundBased": true
+      "soundBased": true,
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "cure_named",
+          "names": [
+            "burned"
+          ],
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Steam Eruption",

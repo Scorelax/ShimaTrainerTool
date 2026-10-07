@@ -220,7 +220,7 @@ GEN_TAG = re.compile(
 
 
 def tag_for(e):
-    if e['kind'] in ('requires_weather', 'attack_roll_weather', 'move_type_by_weather'):
+    if e['kind'] in ('requires_weather', 'requires_round', 'attack_roll_weather', 'move_type_by_weather'):
         # Read in place by the move popup / attack roll (weather-dependent moves, v79) -- never offered as an apply button.
         return e['kind']
     if e['kind'] == 'damage_note':
@@ -331,6 +331,9 @@ def tag_for(e):
         # disabled" -- read off the shared log, see combat-wip.js's
         # _handleDisableLastUsedMove.
         base = 'disable_last_used_move'
+    elif e['kind'] in ('hp_equalize', 'consume_item', 'quash', 'secondary_damage'):
+        # Endeavor/Pain Split, Fling, Quash, Spud Bomb -- see combat-wip.js's _offerMoveEffects dispatch (v83).
+        base = e['kind'] + (f"_{e['mode']}" if e.get('mode') else '')
     elif e['kind'] == 'counter_attack':
         # Revenge's own "attack your attacker with disadvantage, dealing the damage you took" -- see combat-wip.js's _handleCounterAttack (v82).
         base = 'counter_attack'

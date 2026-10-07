@@ -503,9 +503,14 @@ def terrain_blocked_status(terrains, target, spec):
     them (see terrains_affecting). Electric Terrain: no grounded creature can be asleep. Misty Terrain: no
     grounded creature gains a new status condition. Both are standing protections checked at apply time,
     like blocking_shield."""
-    if spec.get('kind') != 'condition' or not is_grounded(target):
+    if spec.get('kind') != 'condition':
         return None
     apply_name = spec.get('apply')
+    # Uproar: "any creature in range wakes and is prevented from falling asleep" -- every creature, flying or not.
+    if apply_name == 'asleep' and any(t.get('rule') == 'uproar' for t in terrains or ()):
+        return 'Uproar'
+    if not is_grounded(target):
+        return None
     for terrain in terrains or ():
         kind = terrain_kind(terrain)
         if kind == 'electric' and apply_name == 'asleep':

@@ -413,7 +413,7 @@ function _showStep2(p, name) {
   document.getElementById('targetPickerRollTarget').innerHTML = `
     <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
-  _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges });
+  _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges, ignoreTargetAcBoosts: !!_moveFlagResolver(_moveName)?.ignoresTargetAcBoosts });
   const weatherMode = _atkCtx ? _weatherModeResolver(_moveName, _attacker?.id) : null;
   if (weatherMode) {
     _atkCtx.mode = mergeRollMode(_atkCtx.mode, weatherMode.mode);
@@ -590,7 +590,7 @@ function _showStep3() {
   // the move-popup's own diceOverride hook) -- flatBonus DOES change the
   // total, folded in below same as _damageModifier.
   const { diceMultiplier, diceOverride, flatBonus, advantage, extraDiceCount, note } =
-    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll, targetDamagedMeThisRound: _targetDamagedMeThisRound() });
+    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll, targetDamagedMeThisRound: _targetDamagedMeThisRound(), moveAbilities: _moveAbilityResolver(_moveName) });
   _targetFlatBonus = flatBonus;
   const noteEl = document.getElementById('targetPickerDamageNote');
   const noteParts = [];

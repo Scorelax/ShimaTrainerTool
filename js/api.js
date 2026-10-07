@@ -1091,6 +1091,11 @@ export class CombatAPI {
     }, { useCache: false });
   }
 
+  /** Quash: moves the target to the bottom of this round's initiative order (restored when the next round begins). */
+  static async quash(id) {
+    return API.request('combat', 'quash', { id }, { useCache: false });
+  }
+
   /** Tragic Hero: the ally gets the floor for an extra turn the moment `id` (the caster) ends their reaction. */
   static async grantExtraTurn(id, targetId, moveName = '') {
     return API.request('combat', 'grant-extra-turn', { id, targetId, moveName }, { useCache: false });

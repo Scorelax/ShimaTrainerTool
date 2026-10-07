@@ -255,6 +255,11 @@ def handle(conn, action, params):
         result.update(outcome)
         return result
 
+    if action == 'quash':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _quash(s, params['id']))
+
     if action == 'grant-extra-turn':
         if not params.get('id') or not params.get('targetId'):
             raise ValueError('Missing participant id or targetId')
@@ -1153,6 +1158,13 @@ def _advance_turn(state):
     new_round = state['turnIndex'] == 0
     if new_round:
         state['round'] += 1
+    if new_round and state.get('quashRestoreOrder'):
+        # Quash moved someone to the bottom "for this round only" -- the real order comes back with the new round.
+        restored = [pid for pid in state['quashRestoreOrder'] if pid in state['turnOrder']]
+        restored += [pid for pid in state['turnOrder'] if pid not in restored]
+        state['turnOrder'] = restored
+        state['turnIndex'] = 0
+        state['quashRestoreOrder'] = None
     if new_round and state.get('trickRoomFlip'):
         # Trick Room: "starting at the beginning of the next round ... the initiative order is permanently reversed"
         # (used again, it reverses back). Reversing the live order is the same as rebuilding it sorted the other way.
@@ -1232,6 +1244,26 @@ def _reaction_start(state, pid):
     if pr and pid in pr['eligible']:
         pr['eligible'][pid]['responded'] = True
     _log_event(state, 'reaction-start', text=f"{participant['name']} used a reaction", actorId=pid, actorName=participant['name'])
+
+
+def _quash(state, target_id):
+    """Quash: a creature that fails the save "must move to the bottom of the initiative order for this round only. Targets
+    that have already taken their turn in this round are unaffected." The pre-Quash order is remembered and put back when
+    the next round begins (see _advance_turn). The creature whose turn it is right now counts as having taken it."""
+    target = state['participants'].get(target_id)
+    if not target:
+        raise ValueError('Unknown participant: ' + target_id)
+    order = state['turnOrder']
+    if target_id not in order:
+        raise ValueError(f"{target['name']} isn't in the turn order")
+    if order.index(target_id) <= state['turnIndex']:
+        raise ValueError(f"{target['name']} has already taken their turn this round -- Quash does nothing")
+    if not state.get('quashRestoreOrder'):
+        state['quashRestoreOrder'] = list(order)
+    order.remove(target_id)
+    order.append(target_id)
+    _log_event(state, 'quash', text=f"{target['name']} is moved to the bottom of the initiative order for this round",
+               targetId=target_id, targetName=target['name'])
 
 
 def _grant_extra_turn(state, caster_id, target_id, move_name=''):
@@ -2131,6 +2163,14 @@ def _retype_last_damage(conn, state, reactor_id, new_type):
     return {'oldAmount': amount, 'newAmount': new_amount}
 
 
+def _move_has_flag(move_name, flag):
+    """Whether the move data marks `move_name` with the top-level `flag` (server-side flags like leavesAtOneHp)."""
+    if not move_name:
+        return False
+    move = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None)
+    return bool(move and move.get(flag))
+
+
 def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False, pool='hp', turn_check=True):
     attacker = state['participants'].get(pid)
     if not attacker:
@@ -2191,9 +2231,16 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
     if flat_reduction:
         actual_damage = max(0, actual_damage - flat_reduction)
     leftover = _absorb_temp_hp(state, target, actual_damage)
+    hp_before = target['currentHP']
     target['currentHP'] -= leftover  # no floor, same reasoning as elsewhere in this module
+    spared = False
+    if hp_before > 1 and target['currentHP'] <= 0 and _move_has_flag(move_name, 'leavesAtOneHp'):
+        # False Swipe: "if this attack would normally cause a creature to faint, it is reduced to 1HP instead".
+        target['currentHP'] = 1
+        spared = True
     move_label = f' with {move_name}' if move_name else ''
     condition_note = ' -- Mat Block/Testudo Formation reduces this' if condition_multiplier != 1 else ''
+    condition_note += ' -- held back, left at 1 HP' if spared else ''
     condition_note += ' -- Harden reduces this' if flat_reduction else ''
     _log_event(
         state, 'damage',
@@ -2307,7 +2354,7 @@ def _list_move_categories():
     for m in moves:
         # Only markers a client caller actually reads: Feint's negatesProtectBlock, Phantom Tendril's
         # ignoresTargetStatChanges (target-picker.js skips the target's AC modifiers).
-        marks = {k: True for k in ('negatesProtectBlock', 'ignoresTargetStatChanges') if m.get(k)}
+        marks = {k: True for k in ('negatesProtectBlock', 'ignoresTargetStatChanges', 'ignoresTargetAcBoosts', 'zoneOnly') if m.get(k)}
         # Semi-invulnerable states: `semiInvulnerable` (the state Dig/Fly/... puts the user in) and
         # `hitsStates` (states a move can still hit, e.g. Earthquake -> underground).
         if m.get('semiInvulnerable'):
@@ -2410,11 +2457,14 @@ def _remove_field_zone(state, kind, zone_id):
 def _wake_electric_sleepers(state):
     """"No grounded creatures inside the area can be asleep" -- wake anyone already asleep who is now standing in an Electric Terrain."""
     for p in state['participants'].values():
-        if not is_grounded(p) or not any(terrain_kind(t) == 'electric' for t in terrains_affecting(state, p['id'])):
+        zones = terrains_affecting(state, p['id'])
+        loud = any(t.get('rule') == 'uproar' for t in zones)
+        electric = is_grounded(p) and any(terrain_kind(t) == 'electric' for t in zones)
+        if not (loud or electric):
             continue
         for st in list(_statuses_of(p)):
             if st.get('kind') == 'condition' and st.get('apply') == 'asleep':
-                _expire_status(state, p, st, 'Electric Terrain')
+                _expire_status(state, p, st, 'Uproar' if loud else 'Electric Terrain')
 
 
 def _expire_fields(state, starting_id=None):
@@ -2491,7 +2541,11 @@ def _queue_hazards(state, pid, trigger):
     mark = [state['round'], state['turnIndex']]
     if participant.get('hazardHitTurn') == mark:
         return
-    zone = next((z for z in terrains_affecting(state, pid) if z.get('hazard')), None)
+    def applies(z):
+        h = z.get('hazard')
+        # `only`: just on one trigger (Uproar hits at the START of a turn, not on entering); `excludeSource`: never the caster.
+        return bool(h) and (not h.get('only') or h['only'] == trigger) and not (h.get('excludeSource') and z.get('sourceId') == pid)
+    zone = next((z for z in terrains_affecting(state, pid) if applies(z)), None)
     if not zone:
         return
     participant['hazardHitTurn'] = mark

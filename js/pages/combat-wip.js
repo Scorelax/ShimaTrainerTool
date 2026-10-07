@@ -1102,6 +1102,7 @@ function _syncLocalCombatState(session) {
     merged.pendingBideDamage = p.pendingBideDamage ?? null;
     // Psychic Terrain: grounded creatures can't use bonus actions at all (the server rejects it too).
     merged.activeTerrains = terrainsAffecting(session, p.id); // only the terrains this combatant is standing in
+    merged.itemsEmbargoed = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'embargo'); // Embargo: held items do nothing
     merged.activeWeathers = weathersAffecting(session, p.id); // ...and the weather (Solar Beam's "in harsh sunlight" reads this)
     const psychic = merged.activeTerrains.find(t => terrainKindOf(t) === 'psychic');
     merged.bonusActionBlockedBy = psychic && isGrounded(p) ? psychic.name : '';
@@ -3025,6 +3026,39 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleNegateDamage({ reactorId: attackerId, moveName });
       continue;
     }
+    if (effect.kind === 'hp_equalize') {
+      // Endeavor / Pain Split -- sets HP from the caster's and the target's current values.
+      await _handleHpEqualize({ casterId: attackerId, targetId: pick.targetId, effect, moveName });
+      continue;
+    }
+    if (effect.kind === 'consume_item') {
+      // Fling -- the caster's thrown item is gone. attackerId (closure) is the caster.
+      await _handleConsumeItem({ casterId: attackerId, moveName });
+      continue;
+    }
+    if (effect.kind === 'quash') {
+      // Quash -- pick.targetId is the creature that failed the save.
+      try {
+        await CombatAPI.quash(pick.targetId);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Quash' });
+      }
+      continue;
+    }
+    if (effect.kind === 'secondary_damage') {
+      // Spud Bomb -- on a failed CON save, the target takes an equal amount of a second damage type.
+      const amount = Number.isFinite(ctx?.rawDamage) ? ctx.rawDamage : null;
+      if (amount === null) {
+        showCombatAlert(`Couldn't find the damage from the hit -- deal ${moveName}'s second-type damage by hand.`, { title: moveName });
+        continue;
+      }
+      try {
+        await CombatAPI.applyDamage(attackerId, pick.targetId, amount, effect.damageType || '', attacker?.name || '', moveName);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
     if (effect.kind === 'counter_attack') {
       // Revenge -- an attack roll back at whoever just hit the reactor, dealing the damage they took on a hit.
       await _handleCounterAttack({ reactorId: attackerId, effect, moveName, computedData });
@@ -3749,6 +3783,54 @@ async function _handleDealDamageToAttacker({ reactorId, effect, moveName }) {
   }
 }
 
+/** Endeavor ("the target's current HP is reduced to be equal to your own") and Pain Split ("both of you change your current
+ * HP to the average of the two, nobody above their max") -- run once the save has failed. HP is the client-authoritative
+ * `update-stats` correction every other HP change here uses. */
+async function _handleHpEqualize({ casterId, targetId, effect, moveName }) {
+  const caster = session?.participants?.[casterId];
+  const target = session?.participants?.[targetId];
+  if (!caster || !target) return;
+  const capped = (p, hp) => Math.min(Number.isFinite(p.maxHP) ? p.maxHP : Infinity, hp);
+  try {
+    if (effect.mode === 'average') {
+      const avg = Math.floor((caster.currentHP + target.currentHP) / 2);
+      await CombatAPI.updateStats(casterId, { currentHP: capped(caster, avg) });
+      await CombatAPI.updateStats(targetId, { currentHP: capped(target, avg) });
+      CombatAPI.logEvent({ type: 'save', actorId: casterId, actorName: caster.name, targetId, targetName: target.name,
+        text: `${caster.name} and ${target.name} both go to ${avg} HP -- ${moveName}` }).catch(() => {});
+    } else {
+      if (target.currentHP <= caster.currentHP) {
+        showCombatAlert(`${target.name} (${target.currentHP} HP) isn't above ${caster.name} (${caster.currentHP} HP) -- nothing for ${moveName} to bring down.`, { title: moveName });
+        return;
+      }
+      await CombatAPI.updateStats(targetId, { currentHP: caster.currentHP });
+      CombatAPI.logEvent({ type: 'save', actorId: casterId, actorName: caster.name, targetId, targetName: target.name,
+        text: `${target.name}'s HP is brought down to ${caster.currentHP} -- ${moveName}` }).catch(() => {});
+    }
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+/** Fling's "the item is consumed": the caster's first-listed held item is removed (same first-listed convention as
+ * steal_item). The thrown item's own extra effects are the GM's call, per the move text. */
+async function _handleConsumeItem({ casterId, moveName }) {
+  const caster = session?.participants?.[casterId];
+  if (!caster) return;
+  const items = String(caster.item || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!items.length) {
+    showCombatAlert(`${caster.name} isn't holding an item to throw with ${moveName}.`, { title: moveName });
+    return;
+  }
+  try {
+    await CombatAPI.updateItem(casterId, items.slice(1).join(', '));
+    CombatAPI.logEvent({ type: 'save', actorId: casterId, actorName: caster.name,
+      text: `${caster.name} flings ${items[0]} -- consumed (the GM may rule extra effects)` }).catch(() => {});
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
 /** Revenge's own mechanism -- "make a melee attack roll against your attacker, with disadvantage. On a hit, deal the same
  * amount of fighting type damage back." The attacker and the amount both come off the shared log (the hit that opened this
  * reaction); the attack roll runs through target-picker's normal step against that attacker with the damage pre-filled (still
@@ -4298,7 +4380,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   const laserFocusId = guaranteedCritStatusId(attacker);
   if (laserFocusId) crit = true;
 
-  let damageDealt, targetFainted;
+  let damageDealt, targetFainted, rawDamageDealt;
   try {
     // No "N damage applied" popup -- it's already in the shared battle log
     // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
@@ -4314,6 +4396,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit);
     damageDealt = dmgResult?.damageApplied;
     targetFainted = dmgResult?.targetFainted;
+    rawDamageDealt = finalDamage; // before the type chart -- Spud Bomb's "an equal amount" of fire damage
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
     return null;
@@ -4352,7 +4435,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   }
   await _offerMoveEffects({
     attackerId: combatantId, targetId, moveName, computedData,
-    ctx: { hit: true, attackRoll, guaranteedHit, crit, save, damageDealt, targetFainted },
+    ctx: { hit: true, attackRoll, guaranteedHit, crit, save, damageDealt, targetFainted, rawDamage: rawDamageDealt },
   });
   return targetId;
 }

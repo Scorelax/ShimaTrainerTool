@@ -6,7 +6,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
-import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, zoneRuleActive } from '../utils/move-effects.js';
+import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, zoneRuleActive } from '../utils/move-effects.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
@@ -2955,8 +2955,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   const _zones = c.activeTerrains || (state.terrain ? [state.terrain] : []);
   // Ion Deluge: "any normal-type move activated within 50 feet of you is considered electric-type".
   if (zoneRuleActive(_zones, 'ion_deluge') && move[1] === 'Normal') { move = [...move]; move[1] = 'Electric'; }
-  // Storm Surge ("only while it is raining"), Aurora Veil ("only while it is hailing").
-  const _weatherBlock = weatherRequirementUnmet(moveEffectsFor(moveName), _weathers);
+  // Storm Surge ("only while it is raining"), Aurora Veil ("only while it is hailing"), Endeavor ("not in the first round").
+  const _weatherBlock = weatherRequirementUnmet(moveEffectsFor(moveName), _weathers) || roundRequirementUnmet(moveEffectsFor(moveName), state.round);
 
   // Bide -- a genuinely different shape from every other move: no dice at
   // all, its payoff is computed server-side from damage actually taken
@@ -2988,8 +2988,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   const trainerLevel = parseInt(trainerData[2]) || 1;
   const specializationsStr = trainerData[24] || '';
 
-  // Magic Room suppresses held items for everyone inside it.
-  const _itemsSuppressed = zoneRuleActive(_zones, 'magic_room');
+  // Magic Room suppresses held items for everyone inside it; Embargo for the one it hit.
+  const _itemsSuppressed = zoneRuleActive(_zones, 'magic_room') || !!c.itemsEmbargoed;
   const heldItemNames = _itemsSuppressed ? [] : (c.item || '').split(',').map(s => s.trim()).filter(Boolean);
   const cachedItems = getCachedItems();
   const heldItemEffects = heldItemNames.map(name => {
@@ -3020,8 +3020,12 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     heldItemEffects
   );
 
+  // zoneOnly moves (Spikes, Uproar): the dice in their text are what the ZONE does to creatures later (a hazard popup), not a
+  // damage roll made when the move is cast -- so the cast must not open the single-target damage flow.
+  if (moveFlagsFor(moveName).zoneOnly) { computedData.damageDice = null; computedData.nextTierDice = null; }
+
   const heldItemsHTML = _itemsSuppressed && (c.item || '').trim()
-    ? '<strong>Held Items:</strong><div style="margin-top:0.3rem;opacity:0.8;">Suppressed by Magic Room.</div>'
+    ? '<strong>Held Items:</strong><div style="margin-top:0.3rem;opacity:0.8;">Suppressed (Magic Room or Embargo).</div>'
     : heldItemNames.length > 0
     ? '<strong>Held Items:</strong>' + heldItemNames.map(name => {
         const dbItem = cachedItems.find(i => i.name === name);

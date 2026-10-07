@@ -110,14 +110,10 @@
     background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.14), rgba(8,10,22,0.7) 75%);
     box-shadow: 0 0 0 3px rgba(var(--ring), 0.9), 0 0 14px rgba(var(--ring), 0.7), inset 0 0 10px rgba(0,0,0,0.5);
   }
-  .map-token-portrait img, .map-token-portrait video { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
-  /* Facing arrowhead on the tile's edge/corner (battle-map.js positions it and adds 90deg: this board is shown rotated). */
-  .map-facing { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 2; }
-  .map-facing span {
-    position: absolute; left: -8px; top: -8px; width: 0; height: 0;
-    border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 14px solid rgb(var(--ring));
-    filter: drop-shadow(0 0 1px #000);
-  }
+  /* The sprite turns inside its fixed frame to show the facing (battle-map.js sets the transform, +90deg because
+     this board is shown rotated). */
+  .map-sprite { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transition: transform 0.25s ease; }
+  .map-sprite img, .map-sprite video { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
 </style>
 </head>
 <body>

@@ -10,7 +10,7 @@ import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { footprintForSize } from '../utils/battle-map-grid.js';
-import { zoneKindsByCell, legendHtml, activeTerrainSummary, facingMarkerStyle } from '../utils/battle-map-view.js';
+import { zoneKindsByCell, legendHtml, activeTerrainSummary, spriteTransform, unwrapAngle } from '../utils/battle-map-view.js';
 
 let session = { active: false, participants: {}, board: null };
 
@@ -144,8 +144,7 @@ function updateTokens() {
       wrapper.innerHTML = `
         <div class="map-token" data-id="${id}">
           <div class="map-disk">
-            <div class="map-token-portrait"></div>
-            <div class="map-facing"><span></span></div>
+            <div class="map-token-portrait"><div class="map-sprite"></div></div>
           </div>
         </div>`;
       el = wrapper.firstElementChild;
@@ -156,9 +155,13 @@ function updateTokens() {
     Object.assign(el.style, screenCellRect(session.board, pos.col, pos.row, footprintForSize(p.size)));
     el.className = `map-token ${p.side}`;
     el.title = name;
-    patchPortraitMedia(el.querySelector('.map-token-portrait'), p.image, name);
+    const sprite = el.querySelector('.map-sprite');
+    patchPortraitMedia(sprite, p.image, name);
     // The board is shown rotated 90deg clockwise, so a token facing "up" on the board points right on this screen.
-    el.querySelector('.map-facing').style.cssText = facingMarkerStyle(pos.facing || 0, 90);
+    // Kept unwrapped on the element so a turn animates the short way round (315 -> 0 is +45, not a full spin).
+    const target = (pos.facing || 0) + 90;
+    el._angle = el._angle === undefined ? target : unwrapAngle(el._angle, target);
+    sprite.style.transform = spriteTransform(el._angle);
   });
 }
 

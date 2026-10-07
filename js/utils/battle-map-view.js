@@ -4,7 +4,7 @@
 // a separate static page and carries its own lighter copy of the same palette.
 //
 // Class names are the long-standing .bmap-* / .placement-* ones, restyled here: thin glowing grid lines
-// instead of boxed cells, square tokens with a side-coloured frame and a facing arrowhead on their edge, and
+// instead of boxed cells, square tokens with a side-coloured frame whose sprite turns to face the way the token faces, and
 // colour-coded terrain zones. Nothing here knows about game rules beyond the terrain kinds' colours.
 import { terrainKindOf } from './move-effects.js';
 
@@ -87,18 +87,20 @@ export function coneCells(board, cx, cy, facing, lengthCells) {
   return out;
 }
 
-/** Inline style for a token's facing arrowhead: it sits on the tile's edge (or corner, for a diagonal facing) in the
- * facing direction and points that way. `offset` is added to the facing (the kiosk shows the board rotated 90deg).
- * The sprite itself never rotates -- only this does. */
-export function facingMarkerStyle(facing = 0, offset = 0) {
-  const deg = (((facing + offset) % 360) + 360) % 360;
+/** CSS transform that turns a token's sprite to face `deg` (clockwise from up; the sprite as drawn is "facing up").
+ * A square turned off the 90-degree grid sticks out of its tile, so it's scaled down to still fit -- 1 at 0/90/180/270,
+ * about 0.71 at the 45-degree diagonals. `deg` may be any real angle (see unwrapAngle). */
+export function spriteTransform(deg) {
   const rad = (deg * Math.PI) / 180;
-  const dx = Math.round(Math.sin(rad)), dy = -Math.round(Math.cos(rad)); // each -1, 0 or 1
-  return `left:${50 + dx * 50}%;top:${50 + dy * 50}%;transform:translate(-50%,-50%) rotate(${deg}deg)`;
+  const fit = 1 / (Math.abs(Math.cos(rad)) + Math.abs(Math.sin(rad)));
+  return `rotate(${deg}deg) scale(${fit.toFixed(4)})`;
 }
 
-export function facingMarkerHtml(facing = 0, offset = 0) {
-  return `<div class="bmap-facing" style="${facingMarkerStyle(facing, offset)}"><span></span></div>`;
+/** The angle equivalent to `target` (mod 360) that is nearest `prev`, so a CSS transition turns the short way round
+ * (315 -> 0 is a +45 turn, not a -315 spin). Callers keep the unwrapped value for the next call. */
+export function unwrapAngle(prev, target) {
+  const delta = ((((target - prev) % 360) + 540) % 360) - 180;
+  return prev + delta;
 }
 
 export function injectBattleMapStyles() {
@@ -195,13 +197,8 @@ export function injectBattleMapStyles() {
       0%, 100% { box-shadow: 0 0 0 2px rgb(255,215,0), 0 0 12px 1px rgba(255,215,0,0.7), inset 0 0 10px rgba(0,0,0,0.6); }
       50% { box-shadow: 0 0 0 3px rgb(255,215,0), 0 0 24px 5px rgba(255,215,0,0.85), inset 0 0 10px rgba(0,0,0,0.6); }
     }
-    /* the facing arrowhead sits on the tile's edge/corner in the facing direction; the sprite stays upright */
-    .bmap-facing { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 2; transition: left 0.2s ease, top 0.2s ease, transform 0.2s ease; }
-    .bmap-facing span {
-      position: absolute; left: -6px; top: -6px; width: 0; height: 0;
-      border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 11px solid rgb(var(--ring));
-      filter: drop-shadow(0 0 4px rgba(var(--ring), 0.95)) drop-shadow(0 0 1px #000);
-    }
+    /* the sprite turns inside its (fixed) frame to show which way the token faces */
+    .bmap-sprite { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transition: transform 0.25s ease; }
 
     /* ---- floating action bar over a selected token ---- */
     .bmap-toolbar {

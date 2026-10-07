@@ -30,7 +30,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
-import { injectBattleMapStyles, zoneKindsByCell, legendHtml, tokenCenter, coneCells, facingMarkerHtml, activeTerrainSummary } from './battle-map-view.js';
+import { injectBattleMapStyles, zoneKindsByCell, legendHtml, tokenCenter, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 
 const CONE_LENGTHS_FT = [0, 15, 30, 60]; // 0 = preview off
 
@@ -76,6 +76,8 @@ let _selectedTokenId = null;
 let _stagedDestination = null;
 // Index into CONE_LENGTHS_FT -- the cone preview length for the selected token (0 = off). Kept across selections.
 let _coneIdx = 0;
+// participantId -> the sprite's last drawn angle, unwrapped (see unwrapAngle), so a turn animates the short way round.
+const _spriteAngles = new Map();
 
 function _ensureDom() {
   if (_overlay) return;
@@ -362,8 +364,15 @@ function _renderTokens() {
     const name = visibleToViewer(p, 'name') ? p.name : '???';
     el.title = name;
     Object.assign(el.style, cellRect(_session.board, pos.col, pos.row, footprintForSize(p.size)));
-    el.innerHTML = `<div class="bmap-token-portrait"></div>${facingMarkerHtml(pos.facing || 0)}`;
-    patchPortraitMedia(el.querySelector('.bmap-token-portrait'), p.image, name);
+    el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>`;
+    const sprite = el.querySelector('.bmap-sprite');
+    patchPortraitMedia(sprite, p.image, name);
+    // The tokens are rebuilt every render, so start at the last drawn angle and let the transition carry it to the new one.
+    const previous = _spriteAngles.has(id) ? _spriteAngles.get(id) : (pos.facing || 0);
+    const angle = unwrapAngle(previous, pos.facing || 0);
+    _spriteAngles.set(id, angle);
+    sprite.style.transform = spriteTransform(previous);
+    if (angle !== previous) requestAnimationFrame(() => requestAnimationFrame(() => { sprite.style.transform = spriteTransform(angle); }));
 
     if (isMyTurn) {
       el.addEventListener('click', () => {

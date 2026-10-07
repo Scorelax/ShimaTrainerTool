@@ -10,7 +10,7 @@
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
-import { injectBattleMapStyles, circleCells, tokenCenter, ZONE_RGB, facingMarkerHtml } from './battle-map-view.js';
+import { injectBattleMapStyles, circleCells, tokenCenter, ZONE_RGB, spriteTransform } from './battle-map-view.js';
 
 /** First distance in a move's range text -- "Self (30ft. radius)" -> 30, "Self (60ft. circle)" -> 60. null if none. */
 export function radiusFtFromRange(rangeText) {
@@ -108,8 +108,8 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt }) {
       Object.assign(el.style, cellRect(board, pos.col, pos.row, footprintForSize(p.size)));
       const name = visibleToViewer(p, 'name') ? p.name : '???';
       el.title = name;
-      el.innerHTML = `<div class="bmap-token-portrait"></div>${facingMarkerHtml(pos.facing || 0)}`;
-      patchPortraitMedia(el.querySelector('.bmap-token-portrait'), p.image, name);
+      el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
+      patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
       tokenLayer.appendChild(el);
     });
 

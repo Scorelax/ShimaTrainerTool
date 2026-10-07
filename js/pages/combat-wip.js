@@ -9,7 +9,7 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
-import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver } from '../utils/target-picker.js';
+import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setWeatherAttackModeResolver } from '../utils/target-picker.js';
 import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
@@ -31,7 +31,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, isGrounded } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -799,6 +799,8 @@ function _lastHitMoveStreak(session, pid) {
 }
 
 setMoveFlagResolver((moveName) => moveFlagsFor(moveName));
+// Hurricane's advantage in rain / disadvantage in harsh sunlight, read off the weather the attacker stands in.
+setWeatherAttackModeResolver((moveName, attackerId) => weatherAttackMode(moveEffectsFor(moveName), weathersAffecting(session, attackerId)));
 // Semi-invulnerable targets (underground, airborne, ...) are hidden from every picker unless the move
 // lists their state in `hitsStates`.
 setTargetabilityResolver((participant, moveName) => untargetableState(participant, moveFlagsFor(moveName).hitsStates || []));
@@ -2943,7 +2945,10 @@ async function _handleRepositionNear({ moverId, anchorId, maxFt, moveName }) {
 }
 
 async function _offerMoveEffects({ attackerId, targetId = null, moveName, computedData, ctx, includeSelf = true }) {
-  const effects = moveEffectsFor(moveName);
+  // Weather variants (Surface Glide's "if raining, all surfaces are water", Shore Up's "doubled in a Sandstorm") are
+  // resolved against the weather the user stands in, once, as the effects are offered.
+  const userWeathers = weathersAffecting(session, attackerId);
+  const effects = moveEffectsFor(moveName).map(e => applyWeatherVariants(e, userWeathers));
   if (!effects.length) return;
   const attacker = session?.participants?.[attackerId];
   const target = targetId ? session?.participants?.[targetId] : null;
@@ -3247,7 +3252,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         // Trainer/Type Master/held-item bonuses a heal's "+MOVE" text was
         // never talking about. See bestMoveStatModifier's own docstring.
         moveModBonus: effect.amount?.moveMod && attacker
-          ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker)
+          ? bestMoveStatModifier(findMoveRow(moveName) || [], attacker) * (effect.amount.moveModMultiplier || 1)
           : 0,
         damageDealt: ctx.damageDealt,
         casterLevel: attacker?.level,

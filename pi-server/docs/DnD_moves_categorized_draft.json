@@ -5284,12 +5284,22 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "variable_move_type"
+        "variable_move_type",
+        "requires_weather"
       ],
       "description": "You create strong winds that hurl electrified water droplets at an incredible speed in an 80ft. line, 5 feet wide. Announce if you intend to deal electric or water damage. All creatures caught in the line is forced to make a DEX save against your move DC, taking 2d8 MOVE + electric OR water damage on a failure. This move can only be used while it is raining.",
       "moveStat": "STR/DEX",
       "vpCost": "10",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "requires_weather",
+          "any": [
+            "rain"
+          ],
+          "message": "Storm Surge can only be used while it is raining"
+        }
+      ]
     },
     {
       "name": "Thunder",
@@ -5308,7 +5318,8 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "potential_status_condition_paralyzed"
+        "potential_status_condition_paralyzed",
+        "damage_note"
       ],
       "effects": [
         {
@@ -5319,6 +5330,18 @@
             "ability": "DEX",
             "failBy": 5
           }
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_weather_contains",
+            "any": [
+              "rain",
+              "storm"
+            ]
+          },
+          "noteOnly": true,
+          "note": "Heavy rain or storm: you may center this move on a point within 60ft instead of on yourself"
         }
       ],
       "description": "Powerful electric energy arcs out from you, hitting any creature in a 20 foot radius, centered on you. Creatures caught in the area must make a DEX save against your Move DC, taking 3d10 + MOVE electric damage on a fail, and half as much on a success. Creatures that fail the saving throw by 5 or more become paralyzed. In heavy rain or storms, you may center this move on a point within 60ft instead of on yourself.",
@@ -11334,7 +11357,8 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_status_condition_confused"
+        "potential_status_condition_confused",
+        "attack_roll_weather"
       ],
       "effects": [
         {
@@ -11344,6 +11368,25 @@
             "type": "natural_roll",
             "min": 15
           }
+        },
+        {
+          "kind": "attack_roll_weather",
+          "rules": [
+            {
+              "any": [
+                "rain"
+              ],
+              "mode": "advantage",
+              "note": "Raining: advantage on the attack roll"
+            },
+            {
+              "any": [
+                "sun"
+              ],
+              "mode": "disadvantage",
+              "note": "Harsh sunlight: disadvantage on the attack roll"
+            }
+          ]
         }
       ],
       "description": "You wrap a creature in a fierce wind. Make a ranged attack against a target, dealing 2d8 + MOVE flying damage on a hit. If this attack is activated during rain, roll the attack with advantage. If used during harsh sunlight, roll the attack with disadvantage. If the natural attack roll is 15 or higher, the target becomes confused.",
@@ -15837,7 +15880,17 @@
               "type": "instant"
             }
           ],
-          "target": "self"
+          "target": "self",
+          "ifWeather": [
+            {
+              "any": [
+                "sand"
+              ],
+              "set": {
+                "amount.moveModMultiplier": 2
+              }
+            }
+          ]
         }
       ]
     },
@@ -16021,7 +16074,8 @@
       },
       "reaction": false,
       "categories": [
-        "self_status_condition_aurora_veil"
+        "self_status_condition_aurora_veil",
+        "requires_weather"
       ],
       "description": "You use the environment to create a shield of ice around your body. Only able to be activated while it is hailing, this move can be used as a bonus action to halve all damage dealt to you for three rounds.",
       "moveStat": "None",
@@ -16041,6 +16095,13 @@
               "n": 3
             }
           ]
+        },
+        {
+          "kind": "requires_weather",
+          "any": [
+            "hail"
+          ],
+          "message": "Aurora Veil can only be activated while it is hailing"
         }
       ]
     },
@@ -22981,12 +23042,51 @@
       "reaction": false,
       "categories": [
         "damage",
-        "variable_move_type"
+        "variable_move_type",
+        "move_type_by_weather"
       ],
       "description": "You send a powerful ball of energy that changes type based on the surrounding weather, dealing 1d10 + MOVE damage of that type. Harsh Sunlight: Fire Rain: Water Sandstorm: Rock Hail or Snow: Ice Foggy: Fairy Cloudy: Normal",
       "moveStat": "STR/DEX",
       "vpCost": "4",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "move_type_by_weather",
+          "types": [
+            {
+              "any": [
+                "sun"
+              ],
+              "type": "Fire"
+            },
+            {
+              "any": [
+                "rain"
+              ],
+              "type": "Water"
+            },
+            {
+              "any": [
+                "sand"
+              ],
+              "type": "Rock"
+            },
+            {
+              "any": [
+                "hail",
+                "snow"
+              ],
+              "type": "Ice"
+            },
+            {
+              "any": [
+                "fog"
+              ],
+              "type": "Fairy"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Whirlwind",
@@ -29737,7 +29837,7 @@
         "multi_hit_aoe",
         "potential_status_condition_paralyzed",
         "potential_status_condition_frightened",
-        "stat_buff_self",
+        "damage_note",
         "recharge_locked"
       ],
       "effects": [
@@ -29770,6 +29870,17 @@
               "n": 3
             }
           ]
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_weather_contains",
+            "any": [
+              "rain"
+            ]
+          },
+          "noteOnly": true,
+          "note": "Heavy rain: this move does not need charging -- release it right away"
         }
       ],
       "description": "You begin circling in the air at incredible speeds, creating a vortex of energy fed by atmospheric water for one turn. While charging this attack, your AC is temporarily increased by 5. On your next turn, the accumulated water is released all at once in a sparkling sapphire torrent in a 50 foot line. Any creature caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE water damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it is paralyzed, and frightened for three turns. During heavy rain, this move does not need charging.",
@@ -29978,7 +30089,17 @@
               "type": "concentration"
             }
           ],
-          "note": "Duration is \"1 + MOVE minutes\" -- approximated as concentration-only (removed manually), no fixed round count authored."
+          "note": "Duration is \"1 + MOVE minutes\" -- approximated as concentration-only (removed manually). Doubles speed on/in water; when used while it is raining every surface counts as water, so it doubles every movement type.",
+          "ifWeather": [
+            {
+              "any": [
+                "rain"
+              ],
+              "set": {
+                "appliesTo": "all"
+              }
+            }
+          ]
         }
       ]
     },

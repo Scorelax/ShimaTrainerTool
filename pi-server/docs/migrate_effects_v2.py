@@ -220,6 +220,9 @@ GEN_TAG = re.compile(
 
 
 def tag_for(e):
+    if e['kind'] in ('requires_weather', 'attack_roll_weather', 'move_type_by_weather'):
+        # Read in place by the move popup / attack roll (weather-dependent moves, v79) -- never offered as an apply button.
+        return e['kind']
     if e['kind'] == 'damage_note':
         # Evaluated at move-popup display time against the attacker's own
         # known HP/status (see combat.js's showCombatMoveDetails), never

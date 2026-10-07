@@ -14,7 +14,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString } from './move-effects.js';
+import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode } from './move-effects.js';
 import { waitForReactionWindow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 import { filterTargetable } from './targetability.js';
@@ -126,6 +126,11 @@ let _moveName = '';
 // module doesn't need the combat page's move table.
 let _moveAbilityResolver = () => [];
 // Same injection for a move's top-level flags ({ignoresTargetStatChanges?}).
+// (moveName, attackerId) -> { mode, note } | null: a weather rule on the attack roll itself (Hurricane: advantage in
+// rain, disadvantage in harsh sunlight). Injected by combat-wip.js, which knows the session and so which weather the
+// attacker is actually standing in.
+let _weatherModeResolver = () => null;
+export function setWeatherAttackModeResolver(fn) { _weatherModeResolver = typeof fn === 'function' ? fn : () => null; }
 let _moveFlagResolver = () => ({});
 export function setMoveFlagResolver(fn) { _moveFlagResolver = typeof fn === 'function' ? fn : () => ({}); }
 export function setMoveAbilityResolver(fn) { _moveAbilityResolver = typeof fn === 'function' ? fn : () => []; }
@@ -406,6 +411,11 @@ function _showStep2(p, name) {
     <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
   _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges });
+  const weatherMode = _atkCtx ? _weatherModeResolver(_moveName, _attacker?.id) : null;
+  if (weatherMode) {
+    _atkCtx.mode = mergeRollMode(_atkCtx.mode, weatherMode.mode);
+    if (weatherMode.note) _atkCtx.notes.push(weatherMode.note);
+  }
   document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
   _diceBonusExtra = 0;
   _diceBonusConsume = [];

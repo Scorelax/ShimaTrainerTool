@@ -141,7 +141,11 @@ function _requirementMet(requires, ctx) {
  *                special condition, or a roll that wasn't entered) -- offer it
  *                unselected and let a human judge
  *   'no'         didn't trigger */
+// Effect kinds that are read in place by the move popup / roll flow, never offered as an apply-this button.
+const NOT_OFFERED_KINDS = new Set(['damage_note', 'requires_weather', 'attack_roll_weather', 'move_type_by_weather']);
+
 export function evaluateEffect(effect, ctx) {
+  if (NOT_OFFERED_KINDS.has(effect.kind)) return 'no';
   const w = effect.when || {};
   const hit = !!ctx.hit;
   switch (w.type) {
@@ -1013,7 +1017,7 @@ export function describeEnds(ends) {
  * the caller already resolved rolled durations (a {dice} entry given an `n`). */
 export function buildStatusSpec(effect, { sourceId, sourceName, moveName, dc, ends }) {
   const spec = { kind: effect.kind, sourceId, sourceName, moveName, dc, ends: ends || effect.ends || [] };
-  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'against']) {
+  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'against', 'appliesTo']) {
     if (effect[k] !== undefined) spec[k] = effect[k];
   }
   if (effect.stacks) spec.stacks = effect.stacks;
@@ -1113,4 +1117,72 @@ export function terrainHealDice(effect, level) {
   let dice = null;
   for (const [minLevel, d] of effect?.healTiers || []) if ((Number(level) || 1) >= minLevel) dice = d;
   return dice;
+}
+
+
+// ---------------------------------------------------------------------------
+// Weather-dependent moves. `weathers` is always the list of weathers the USER is standing in (see
+// weathersAffecting -- a tile-limited weather only counts for whoever is on it), matched loosely by name
+// substring like every other weather check here ("rain" finds "Heavy Rain", "sun" finds "Harsh Sunlight").
+// ---------------------------------------------------------------------------
+
+/** True when any of `weathers` has a name containing one of the keywords in `any`. */
+export function weatherMatches(weathers, any) {
+  const names = (weathers || []).map(w => String(w?.name || '').toLowerCase());
+  return (any || []).some(kw => names.some(n => n.includes(String(kw).toLowerCase())));
+}
+
+/** A copy of `effect` with its `ifWeather` variants applied: each `{any, set}` whose weather is active assigns the
+ * `set` values (dotted paths allowed -- 'amount.moveModMultiplier') onto it. Surface Glide's "if it is raining, all
+ * surfaces are water" (appliesTo -> 'all') and Shore Up's "in a Sandstorm, your MOVE modifier is doubled" use this.
+ * Resolved once, when the effect is offered -- a status already applied doesn't change if the weather does. */
+export function applyWeatherVariants(effect, weathers) {
+  if (!Array.isArray(effect?.ifWeather)) return effect;
+  const out = JSON.parse(JSON.stringify(effect));
+  delete out.ifWeather;
+  for (const v of effect.ifWeather) {
+    if (!weatherMatches(weathers, v.any)) continue;
+    for (const [path, value] of Object.entries(v.set || {})) {
+      const keys = path.split('.');
+      let node = out;
+      for (const k of keys.slice(0, -1)) node = node[k] = node[k] || {};
+      node[keys[keys.length - 1]] = value;
+    }
+  }
+  return out;
+}
+
+/** Why `effects` say a move can't be used right now (Storm Surge "only while it is raining", Aurora Veil "only while
+ * it is hailing"), or null when it can. */
+export function weatherRequirementUnmet(effects, weathers) {
+  const need = (effects || []).find(e => e.kind === 'requires_weather' && !weatherMatches(weathers, e.any));
+  return need ? (need.message || `Needs ${need.any.join(' / ')} weather`) : null;
+}
+
+/** Hurricane's "advantage in rain, disadvantage in harsh sunlight": { mode, note } for the attack roll, or null. Both
+ * rules matching cancel out like any other advantage/disadvantage pair. */
+export function weatherAttackMode(effects, weathers) {
+  const rules = (effects || []).filter(e => e.kind === 'attack_roll_weather').flatMap(e => e.rules || []);
+  const hit = rules.filter(r => weatherMatches(weathers, r.any));
+  if (!hit.length) return null;
+  const adv = hit.some(r => r.mode === 'advantage'), dis = hit.some(r => r.mode === 'disadvantage');
+  const note = hit.map(r => r.note).filter(Boolean).join('; ');
+  return { mode: adv && dis ? 'normal' : adv ? 'advantage' : 'disadvantage', note };
+}
+
+/** Weather Ball's type for the weather the user is in, or null (use the move's own type). */
+export function weatherMoveType(effects, weathers) {
+  for (const e of effects || []) {
+    if (e.kind !== 'move_type_by_weather') continue;
+    const hit = (e.types || []).find(t => weatherMatches(weathers, t.any));
+    if (hit) return hit.type;
+  }
+  return null;
+}
+
+/** Combines the attack roll's existing mode with a weather rule's: equal modes stay, opposite ones cancel. */
+export function mergeRollMode(current, extra) {
+  if (!extra || extra === 'normal') return current;
+  if (!current || current === 'normal') return extra;
+  return current === extra ? current : 'normal';
 }

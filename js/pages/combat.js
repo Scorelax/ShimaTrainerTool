@@ -6,7 +6,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
-import { multiplyDiceString, addDiceString, terrainDamageNote } from '../utils/move-effects.js';
+import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet } from '../utils/move-effects.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
@@ -2418,9 +2418,13 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weathers = [], moveN
 
   let diceMultiplier = 1, diceNote = '', totalNote = '', flatBonus = 0, advantage = false, extraDiceCount = 0;
   const flatNotes = [];
+  const infoNotes = [];
   for (const e of effects) {
     const { met, magnitude } = evalCondition(e.condition);
     if (!met) continue;
+    // A note-only effect (Thunder's "in rain you may center this on a point within 60ft", Sapphire Torrent's "no
+    // charging in heavy rain") just shows its text -- it changes no dice.
+    if (e.noteOnly) { if (e.note) infoNotes.push(e.note); continue; }
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) { diceMultiplier = e.diceMultiplier; diceNote = e.note || ''; }
     // Fury Cutter/Ice Ball/Rollout's own escalating multiplier -- magnitude
     // IS the final capped multiplier already (see self_consecutive_move_hits
@@ -2456,7 +2460,7 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weathers = [], moveN
     // Cross Poison/Hex; this is its self-conditional counterpart.
     if (e.advantage) advantage = true;
   }
-  return { diceMultiplier, diceNote, totalNote, flatBonus, flatNote: flatNotes.join('; '), advantage, extraDiceCount };
+  return { diceMultiplier, diceNote, totalNote, flatBonus, flatNote: flatNotes.join('; '), advantage, extraDiceCount, infoNote: infoNotes.join('; ') };
 }
 
 function showIngrainHealPopup(combatant, ingrainEffect, state, onConfirm) {
@@ -2934,11 +2938,21 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // there and that page's own confirm-popup step is unaffected.
   const _isSharedCombat = !!(onDamageResolved || onSaveTriggered || onReactiveSave || onMultiHitAoe || onEffectsOnly);
   if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
-  const move = _moveMap.get(moveName);
+  let move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
 
   const c = state.combatants.find(x => x.id === combatantId);
   if (!c) return;
+
+  // The weather the user is standing in (a tile-limited weather only counts for whoever is on it); the legacy local
+  // engine has no zones, so it falls back to its one global weather.
+  const _weathers = c.activeWeathers || (state.weather ? [state.weather] : []);
+  // Weather Ball: the move's type follows the weather. Overriding `move` here carries the new type everywhere
+  // downstream -- STAB, the popup colour/label, and the damage handed to the shared-combat callbacks below.
+  const _weatherType = weatherMoveType(moveEffectsFor(moveName), _weathers);
+  if (_weatherType && _weatherType !== move[1]) { move = [...move]; move[1] = _weatherType; }
+  // Storm Surge ("only while it is raining"), Aurora Veil ("only while it is hailing").
+  const _weatherBlock = weatherRequirementUnmet(moveEffectsFor(moveName), _weathers);
 
   // Bide -- a genuinely different shape from every other move: no dice at
   // all, its payoff is computed server-side from damage actually taken
@@ -3091,7 +3105,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     const _terrainNote = terrainDamageNote(c.activeTerrains || (state.terrain ? [state.terrain] : []), move[1]);
     if (_terrainNote) _dmgNoteEffects.push(_terrainNote);
     if (_dmgNoteEffects.length) {
-      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, c.activeWeathers || (state.weather ? [state.weather] : []), moveName);
+      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount, infoNote } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, _weathers, moveName);
       // Fury Cutter/Ice Ball/Rollout's own escalating VP cost -- the exact
       // same streak position the damage multiplier above was just computed
       // from (see _consecutiveHitPosition's own docstring), so the two
@@ -3119,6 +3133,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       }
       if (totalNote) _damageNote = totalNote;
       else if (advantage) _damageNote = 'Roll damage with advantage — roll twice, take the higher';
+      if (infoNote) _damageNote = [_damageNote, infoNote].filter(Boolean).join(' · ');
     }
   }
 
@@ -3179,8 +3194,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     spriteAlt: c.name,
     speciesName: c.speciesName,
     noteText: _stackNote || _damageNote || undefined,
-    disableUse: (_isStackMove && _stacks === 0) || _bonusSpent,
-    disableUseMsg: _bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first',
+    disableUse: (_isStackMove && _stacks === 0) || _bonusSpent || !!_weatherBlock,
+    disableUseMsg: _weatherBlock || (_bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first'),
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,

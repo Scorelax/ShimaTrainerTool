@@ -4846,7 +4846,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -5149,7 +5150,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -6965,7 +6967,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -7378,7 +7381,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -11026,7 +11030,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -11515,7 +11520,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -14269,7 +14275,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -15820,7 +15827,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -16210,7 +16218,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -16440,7 +16449,8 @@
               "type": "instant"
             }
           ],
-          "height": 0
+          "height": 0,
+          "target": "self"
         }
       ],
       "zoneOnly": true
@@ -16983,7 +16993,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -23714,7 +23725,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         },
         {
           "kind": "condition",
@@ -26505,7 +26517,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -27396,7 +27409,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -28183,7 +28197,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -28283,7 +28298,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -28804,7 +28820,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },
@@ -30726,7 +30743,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ]
     },

@@ -276,8 +276,40 @@ export function statusLabel(s) {
     }
     return stat;
   }
-  const onText = s.on === 'saving_throws' && s.ability ? `${s.ability} saving throws` : (ON_TEXT[s.on] || String(s.on || '').replace(/_/g, ' '));
-  return `${_title(s.roll)} on ${onText}`;
+  if (s.kind === 'roll') {
+    const onText = s.on === 'saving_throws' && s.ability ? `${s.ability} saving throws` : (ON_TEXT[s.on] || String(s.on || '').replace(/_/g, ' '));
+    return `${_title(s.roll)} on ${onText}`;
+  }
+  return _effectKindLabel(s);
+}
+
+// What an effect that is NOT a plain status is called in the "apply these effects?" popup (and anywhere else statusLabel is shown).
+// Several of these kinds had no label at all and rendered as "undefined on" -- the fallback at the bottom keeps any future kind readable.
+const STAT_TRANSFER_LABELS = {
+  copy: "Copy the target's stat changes", swap: 'Swap stat changes with the target', steal: "Steal the target's stat boosts",
+  steal_choice: "Steal one of the target's boosts", swap_value: 'Swap values with the target', swap_fastest_speed: 'Swap speeds with the target',
+  transfer_condition: 'Pass a condition to the target', dispel: "Remove all of the target's stat changes", dispel_one: 'Remove one stat change',
+  dispel_all: 'Remove every stat change', dispel_conditions: 'Cure every condition', dispel_ac: "Remove the target's AC changes",
+  cure_named: 'Cure specific conditions', invert: "Invert the target's stat changes", average_value: 'Average values with the target', swap_own_ac: 'Swap two of your own stats',
+};
+const ABILITY_SWAP_LABELS = { give: 'Give the target an ability', take: "Take the target's ability", swap: 'Swap abilities with the target', replace_with: "Replace the target's ability" };
+const KIND_LABELS = {
+  reposition_near: 'Move near / away from the target', halve_damage: 'Take half damage from the hit', drop_item: "Knock the target's item away",
+  steal_buff: 'Steal the stat boost', swap_item: 'Swap held items', steal_item: "Take the target's item", disable_sound_moves: 'Disable its sound-based moves',
+  retype_damage: "Change the attack's type", drain_attacker_vp: "Drain the attacker's VP", clear_field: 'Clear all weather and terrain',
+  redirect_avoided_damage: 'Redirect the damage you avoided', negate_damage: 'Ignore the damage', deal_damage: 'Deal damage back', disable_move: 'Disable one of its moves',
+  undo_crit_damage: 'Treat the crit as a normal hit', teleport_swap: 'Swap places', disable_overlapping_moves: 'Disable the moves you share',
+  disable_last_used_move: 'Disable the move it just used', damage_multiplier: 'Reduce the damage of the attack', trick_room: 'Twist the turn order (Trick Room)',
+  faint_on_roll: 'Faints the target', cancel_switch: "Stop the opponent's switch-out",
+};
+
+function _effectKindLabel(s) {
+  if (s.kind === 'set_terrain') return `Place ${s.name || 'a terrain'}${s.rounds ? ` for ${s.rounds} round${s.rounds === 1 ? '' : 's'}` : ''}`;
+  if (s.kind === 'set_weather') return `Set the weather: ${s.name || 'a weather'}${s.rounds ? ` for ${s.rounds} rounds` : ''}`;
+  if (s.kind === 'stat_transfer') return STAT_TRANSFER_LABELS[s.mode] || _title(String(s.mode || 'stat change').replace(/_/g, ' '));
+  if (s.kind === 'ability_swap') return ABILITY_SWAP_LABELS[s.mode] || 'Change an ability';
+  if (s.kind === 'damage_multiplier') return s.multiplier === 0.5 ? 'Halve the damage of the attack' : KIND_LABELS.damage_multiplier;
+  return KIND_LABELS[s.kind] || _title(String(s.kind || 'effect').replace(/_/g, ' '));
 }
 
 const TIMING_TEXT = { start_of_turn: 'start of its turn', end_of_turn: 'end of its turn', action: 'as an action' };

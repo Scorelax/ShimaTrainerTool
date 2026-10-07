@@ -50,7 +50,7 @@
   .map-stage.has-bg .map-bg { display: block; }
 
   /* Same look as the in-app map (js/utils/battle-map-view.js), minus the costly bits (no blur, no looping
-     animations) -- this page runs on a weak TV-stick renderer. Hairline grid, round side-coloured tokens with a
+     animations) -- this page runs on a weak TV-stick renderer. Hairline grid, square side-framed tokens with a
      facing arrowhead, tinted terrain zones. */
   .map-stage { background: radial-gradient(ellipse at 50% 35%, #161a33 0%, #0a0c1c 60%, #05060e 100%); }
   .map-grid { position: absolute; inset: 0; display: grid; gap: 0; background: transparent; }
@@ -95,8 +95,8 @@
   .map-stage:not(.active) .map-empty-bg { display: block; }
 
   .map-tokens { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-  /* This screen's cells aren't square (the board stretches to fill the TV), so the round disk is sized off the
-     token box's smaller side (container query) instead of filling it -- otherwise it would squash into an oval. */
+  /* This screen's cells aren't square (the board stretches to fill the TV), so the token tile is sized off the
+     token box's smaller side (container query) instead of filling it -- otherwise the sprite would stretch. */
   .map-token {
     position: absolute; display: flex; align-items: center; justify-content: center; container-type: size;
     padding: 4px; box-sizing: border-box; --ring: 200,200,220; transition: left 0.28s ease, top 0.28s ease;
@@ -106,16 +106,17 @@
   .map-token.enemy { --ring: 231,115,115; }
   /* Portrait is a round disk with a side-coloured ring; the sprite inside stays upright. Side used to be an outline. */
   .map-token-portrait {
-    position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.18), rgba(8,10,22,0.82) 70%);
-    box-shadow: 0 0 0 3px rgba(var(--ring), 0.9), 0 0 14px rgba(var(--ring), 0.7), inset 0 0 10px rgba(0,0,0,0.6);
+    position: absolute; inset: 0; border-radius: 14%; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.14), rgba(8,10,22,0.7) 75%);
+    box-shadow: 0 0 0 3px rgba(var(--ring), 0.9), 0 0 14px rgba(var(--ring), 0.7), inset 0 0 10px rgba(0,0,0,0.5);
   }
-  .map-token-portrait img, .map-token-portrait video { width: 92%; height: 92%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
-  /* Facing arrowhead orbiting the ring (battle-map.js adds 90deg: this board is shown rotated). */
-  .map-facing { position: absolute; inset: 0; pointer-events: none; transition: transform 0.28s ease; }
+  .map-token-portrait img, .map-token-portrait video { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
+  /* Facing arrowhead on the tile's edge/corner (battle-map.js positions it and adds 90deg: this board is shown rotated). */
+  .map-facing { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 2; }
   .map-facing span {
-    position: absolute; top: -2px; left: 50%; margin-left: -8px; width: 0; height: 0;
-    border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 13px solid rgb(var(--ring));
+    position: absolute; left: -8px; top: -8px; width: 0; height: 0;
+    border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 14px solid rgb(var(--ring));
+    filter: drop-shadow(0 0 1px #000);
   }
 </style>
 </head>

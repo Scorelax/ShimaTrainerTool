@@ -4,7 +4,7 @@
 // a separate static page and carries its own lighter copy of the same palette.
 //
 // Class names are the long-standing .bmap-* / .placement-* ones, restyled here: thin glowing grid lines
-// instead of boxed cells, round tokens with a side-coloured ring and a rotating facing marker, and
+// instead of boxed cells, square tokens with a side-coloured frame and a facing arrowhead on their edge, and
 // colour-coded terrain zones. Nothing here knows about game rules beyond the terrain kinds' colours.
 import { terrainKindOf } from './move-effects.js';
 
@@ -87,10 +87,18 @@ export function coneCells(board, cx, cy, facing, lengthCells) {
   return out;
 }
 
-/** The turning marker for a token: a small glowing arrowhead on the ring, rotated to `facing` degrees (+ `offset`,
- * for the kiosk's rotated board). The sprite itself never rotates -- only this does. */
+/** Inline style for a token's facing arrowhead: it sits on the tile's edge (or corner, for a diagonal facing) in the
+ * facing direction and points that way. `offset` is added to the facing (the kiosk shows the board rotated 90deg).
+ * The sprite itself never rotates -- only this does. */
+export function facingMarkerStyle(facing = 0, offset = 0) {
+  const deg = (((facing + offset) % 360) + 360) % 360;
+  const rad = (deg * Math.PI) / 180;
+  const dx = Math.round(Math.sin(rad)), dy = -Math.round(Math.cos(rad)); // each -1, 0 or 1
+  return `left:${50 + dx * 50}%;top:${50 + dy * 50}%;transform:translate(-50%,-50%) rotate(${deg}deg)`;
+}
+
 export function facingMarkerHtml(facing = 0, offset = 0) {
-  return `<div class="bmap-facing" style="transform: rotate(${(facing + offset) % 360}deg)"><span></span></div>`;
+  return `<div class="bmap-facing" style="${facingMarkerStyle(facing, offset)}"><span></span></div>`;
 }
 
 export function injectBattleMapStyles() {
@@ -173,25 +181,26 @@ export function injectBattleMapStyles() {
     .bmap-token.mine { --ring: 255,215,0; }
     .bmap-token.my-turn { pointer-events: auto; cursor: pointer; }
     .bmap-token-portrait, .placement-token-portrait {
-      position: relative; width: 100%; height: 100%; border-radius: 50%;
+      position: relative; width: 100%; height: 100%; border-radius: 14%;
       display: flex; align-items: center; justify-content: center;
-      background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.18), rgba(8,10,22,0.82) 70%);
-      box-shadow: 0 0 0 2px rgba(var(--ring), 0.9), 0 0 14px -1px rgba(var(--ring), 0.75), inset 0 0 10px rgba(0,0,0,0.6);
+      background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.14), rgba(8,10,22,0.7) 75%);
+      box-shadow: 0 0 0 2px rgba(var(--ring), 0.9), 0 0 14px -1px rgba(var(--ring), 0.75), inset 0 0 10px rgba(0,0,0,0.5);
     }
+    /* the sprite fills its square tile, so animated sprites keep their full shape */
     .bmap-token-portrait img, .bmap-token-portrait video, .placement-token-portrait img, .placement-token-portrait video {
-      width: 92%; height: 92%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.85));
+      width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.85));
     }
     .bmap-token.selected .bmap-token-portrait { animation: bmapPulse 1.5s ease-in-out infinite; }
     @keyframes bmapPulse {
       0%, 100% { box-shadow: 0 0 0 2px rgb(255,215,0), 0 0 12px 1px rgba(255,215,0,0.7), inset 0 0 10px rgba(0,0,0,0.6); }
       50% { box-shadow: 0 0 0 3px rgb(255,215,0), 0 0 24px 5px rgba(255,215,0,0.85), inset 0 0 10px rgba(0,0,0,0.6); }
     }
-    /* the facing arrowhead orbits the ring; the sprite stays upright */
-    .bmap-facing { position: absolute; inset: 0; pointer-events: none; transition: transform 0.28s cubic-bezier(.3,1.5,.5,1); }
+    /* the facing arrowhead sits on the tile's edge/corner in the facing direction; the sprite stays upright */
+    .bmap-facing { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 2; transition: left 0.2s ease, top 0.2s ease, transform 0.2s ease; }
     .bmap-facing span {
-      position: absolute; top: -1px; left: 50%; margin-left: -6px; width: 0; height: 0;
-      border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 10px solid rgb(var(--ring));
-      filter: drop-shadow(0 0 4px rgba(var(--ring), 0.95));
+      position: absolute; left: -6px; top: -6px; width: 0; height: 0;
+      border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 11px solid rgb(var(--ring));
+      filter: drop-shadow(0 0 4px rgba(var(--ring), 0.95)) drop-shadow(0 0 1px #000);
     }
 
     /* ---- floating action bar over a selected token ---- */

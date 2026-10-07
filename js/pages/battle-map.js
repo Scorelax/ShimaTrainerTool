@@ -10,7 +10,7 @@ import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { footprintForSize } from '../utils/battle-map-grid.js';
-import { zoneKindsByCell, legendHtml, activeTerrainSummary } from '../utils/battle-map-view.js';
+import { zoneKindsByCell, legendHtml, activeTerrainSummary, facingMarkerStyle } from '../utils/battle-map-view.js';
 
 let session = { active: false, participants: {}, board: null };
 
@@ -158,7 +158,7 @@ function updateTokens() {
     el.title = name;
     patchPortraitMedia(el.querySelector('.map-token-portrait'), p.image, name);
     // The board is shown rotated 90deg clockwise, so a token facing "up" on the board points right on this screen.
-    el.querySelector('.map-facing').style.transform = `rotate(${((pos.facing || 0) + 90) % 360}deg)`;
+    el.querySelector('.map-facing').style.cssText = facingMarkerStyle(pos.facing || 0, 90);
   });
 }
 

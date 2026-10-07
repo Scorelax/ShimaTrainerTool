@@ -1069,9 +1069,22 @@ export class CombatAPI {
     return API.request('combat', 'set-weather', { name, effect }, { useCache: false });
   }
 
-  /** `extra` is only passed by a terrain MOVE: { rounds, healDice, sourceId, sourceName } (see routes_combat.py's _set_terrain). */
+  /** `extra` is only passed by a terrain MOVE: { rounds, healDice, sourceId, sourceName, cells } (see
+   * routes_combat.py's _set_terrain). `cells` (["col,row", ...]) limits it to those tiles; without it the
+   * terrain covers the whole map. */
   static async setTerrain(name, effect, extra = {}) {
-    return API.request('combat', 'set-terrain', { name, effect, ...extra }, { useCache: false });
+    const { cells, ...rest } = extra;
+    return API.request('combat', 'set-terrain', { name, effect, ...rest, ...(cells?.length ? { cells: JSON.stringify(cells) } : {}) }, { useCache: false });
+  }
+
+  /** Removes every tile-limited terrain zone (Defog's clear_field also clears the whole-map terrain). */
+  static async clearTerrainZones() {
+    return API.request('combat', 'clear-terrain-zones', {}, { useCache: false });
+  }
+
+  /** Turns a token on the spot (degrees clockwise from up, snapped to 45) -- turn-gated like moveToken, no movement cost. */
+  static async rotateToken(id, facing) {
+    return API.request('combat', 'rotate-token', { id, facing }, { useCache: false });
   }
 }
 

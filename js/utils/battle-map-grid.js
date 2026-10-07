@@ -8,15 +8,17 @@
 /**
  * HTML for every cell in board.grid, in row-major order, each carrying a
  * data-cell="col,row" attribute for a caller to attach click handlers to.
- * Marked (terrain) cells get the 'marked' class and show the terrain text.
+ * Marked (terrain) cells get the 'marked' class and show the terrain text; `classFor(col, row)` may add more classes.
  */
-export function gridCellsHtml(board, cellClass = 'bmap-cell') {
+export function gridCellsHtml(board, cellClass = 'bmap-cell', classFor = null) {
   const { cols, rows } = board.grid;
   const cells = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const terrain = board.cells[`${col},${row}`]?.terrain || '';
-      const classes = terrain ? `${cellClass} marked` : cellClass;
+      // classFor(col, row) -> extra classes for this cell (terrain zones, reach/cone overlays, ...), or ''.
+      const extra = classFor ? classFor(col, row) : '';
+      const classes = [cellClass, terrain ? 'marked' : '', extra].filter(Boolean).join(' ');
       cells.push(`<div class="${classes}" data-cell="${col},${row}"${terrain ? ` title="${terrain}"` : ''}>${terrain}</div>`);
     }
   }

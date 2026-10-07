@@ -10,6 +10,7 @@ import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { footprintForSize } from '../utils/battle-map-grid.js';
+import { zoneKindsByCell, legendHtml, activeTerrainSummary } from '../utils/battle-map-view.js';
 
 let session = { active: false, participants: {}, board: null };
 
@@ -48,6 +49,18 @@ function render() {
   updateBackground();
   updateGrid();
   updateTokens();
+  updateTerrainOverlay();
+}
+
+/** Whole-map terrain washes the stage; the legend lists everything active and for how long. */
+function updateTerrainOverlay() {
+  const stage = document.getElementById('mapStage');
+  const legend = document.getElementById('mapLegend');
+  if (!stage || !legend) return;
+  stage.className = stage.className.replace(/\bglobal-\w+/g, '').trim();
+  const globalKind = activeTerrainSummary(session).find(t => t.scope === 'all')?.kind;
+  if (globalKind) stage.classList.add(`global-${globalKind}`);
+  legend.innerHTML = legendHtml(session);
 }
 
 /** See battle-map.html's own comment on .map-bg/.map-empty-bg for why the
@@ -98,10 +111,12 @@ function updateGrid() {
   // board's own -- screen row = board col (ascending), screen col = board
   // row (descending), same mapping screenCellRect() uses.
   const cells = [];
+  const zones = zoneKindsByCell(session);
   for (let col = 0; col < cols; col++) {
     for (let row = rows - 1; row >= 0; row--) {
       const terrain = session.board.cells[`${col},${row}`]?.terrain || '';
-      const classes = terrain ? 'map-cell marked' : 'map-cell';
+      const zone = zones.get(`${col},${row}`);
+      const classes = ['map-cell', terrain ? 'marked' : '', zone ? `zone-${zone[0]}` : ''].filter(Boolean).join(' ');
       cells.push(`<div class="${classes}"${terrain ? ` title="${terrain}"` : ''}>${terrain}</div>`);
     }
   }
@@ -128,7 +143,10 @@ function updateTokens() {
       const wrapper = document.createElement('div');
       wrapper.innerHTML = `
         <div class="map-token" data-id="${id}">
-          <div class="map-token-portrait"></div>
+          <div class="map-disk">
+            <div class="map-token-portrait"></div>
+            <div class="map-facing"><span></span></div>
+          </div>
         </div>`;
       el = wrapper.firstElementChild;
       layer.appendChild(el);
@@ -139,6 +157,8 @@ function updateTokens() {
     el.className = `map-token ${p.side}`;
     el.title = name;
     patchPortraitMedia(el.querySelector('.map-token-portrait'), p.image, name);
+    // The board is shown rotated 90deg clockwise, so a token facing "up" on the board points right on this screen.
+    el.querySelector('.map-facing').style.transform = `rotate(${((pos.facing || 0) + 90) % 360}deg)`;
   });
 }
 

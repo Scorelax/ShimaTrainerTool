@@ -1067,14 +1067,32 @@ export function isGrounded(p) {
   return !statuses.some(s => s.kind === 'condition' && (s.apply === 'airborne' || (s.apply === 'granted_immunity' && String(s.value || '').toLowerCase() === 'ground')));
 }
 
-/** The terrain's "double your MOVE modifier on damage rolls" for a move of `moveType`, as a synthetic
+/** Every terrain affecting participant `pid`: the whole-map terrain (`session.terrain`, also what a DM-typed
+ * one is) plus every tile-limited zone (`session.terrainZones`) overlapping any cell of their token's footprint.
+ * Mirrors conditions.py's terrains_affecting; a participant with no token is only affected by the whole-map one. */
+export function terrainsAffecting(session, pid) {
+  const found = session?.terrain ? [session.terrain] : [];
+  const token = session?.board?.tokens?.[pid];
+  const zones = session?.terrainZones || [];
+  if (token && zones.length) {
+    const s = String(session.participants?.[pid]?.size || '').trim().toLowerCase();
+    const size = s === 'large' ? 2 : s === 'huge' ? 3 : 1;
+    const covered = new Set();
+    for (let dc = 0; dc < size; dc++) for (let dr = 0; dr < size; dr++) covered.add(`${token.col + dc},${token.row - dr}`);
+    found.push(...zones.filter(z => (z.cells || []).some(c => covered.has(c))));
+  }
+  return found;
+}
+
+/** The terrains' "double your MOVE modifier on damage rolls" for a move of `moveType`, as a synthetic
  * self-conditional `damage_note` (so combat.js's _evaluateDamageNotes handles it like Solar Beam's own
- * doubling), or null. Field-wide -- there's no "inside the area" position tracking. */
-export function terrainDamageNote(terrain, moveType) {
-  const kind = terrainKindOf(terrain);
-  const boosted = TERRAIN_BOOSTED_TYPE[kind];
-  if (!boosted || String(moveType || '').toLowerCase() !== boosted.toLowerCase()) return null;
-  return { kind: 'damage_note', condition: { type: 'self_always' }, flatBonus: 'moveModifier', note: `${terrain.name}: MOVE modifier doubled` };
+ * doubling), or null. `terrains` are the ones affecting the attacker (see terrainsAffecting). */
+export function terrainDamageNote(terrains, moveType) {
+  const hit = (terrains || []).find(t => {
+    const boosted = TERRAIN_BOOSTED_TYPE[terrainKindOf(t)];
+    return boosted && String(moveType || '').toLowerCase() === boosted.toLowerCase();
+  });
+  return hit ? { kind: 'damage_note', condition: { type: 'self_always' }, flatBonus: 'moveModifier', note: `${hit.name}: MOVE modifier doubled` } : null;
 }
 
 /** A `set_terrain` effect's heal dice (Grassy Terrain) at the caster's level -- the last tier whose level is reached. */

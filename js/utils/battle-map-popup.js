@@ -1,116 +1,69 @@
-// Interactive in-app battle map popup -- lets a player VIEW the same board
-// the table kiosk screen (battle-map.html) shows, and MOVE their own token:
-// click it, click a destination cell to STAGE a move (a distance preview,
-// no server call yet), then Confirm to actually commit it -- a deliberate
-// extra step so a misclick can't burn real movement (the user's own call:
-// hard-enforce the movement budget below, but only after an explicit
-// confirm). Turn-gating is enforced both ways -- a token is only selectable
-// when it's both yours (`owner` field, set by combat-wip.js's "Join as
-// yourself" flow) AND the current turn holder, and the server re-checks the
-// same thing (move-token in routes_combat.py, same authority model as
-// use-move) so neither check can be bypassed from the client.
+// Interactive in-app battle map popup -- lets a player VIEW the same board the table kiosk screen
+// (battle-map.html) shows, and MOVE / TURN their own token. Click your token (it's the only clickable one, and
+// only on your turn) and a small floating bar appears next to it: rotate left/right in 45-degree steps (or Q / E),
+// and a cone/line preview so you can see what a facing would hit. Click a cell to STAGE a move (a distance preview,
+// no server call yet), then Confirm to actually commit it -- a deliberate extra step so a misclick can't burn real
+// movement (the user's own call: hard-enforce the movement budget below, but only after an explicit confirm).
+// Cells the token can still reach with the movement it has left are tinted while it's selected.
 //
-// Movement budget: each participant carries `speeds` ([{type, ft}, ...],
-// see combat.js's buildTrainerCombatant/buildPokemonCombatant) and a
-// server-tracked `movementUsed` (feet moved so far this turn, reset when
-// their next turn starts -- see routes_combat.py's _advance_turn). A
-// participant with no `speeds` at all (a DM's freeform enemy, or anyone
-// added before this existed) gets no budget UI and no enforcement --
-// move-token skips the check entirely for them. This never asks (or cares)
-// WHICH movement type a move actually uses -- the user's own call: that
-// decision (walkable ground vs. a burrow, say) happens at the table, not in
-// the app, so the numbers here are purely informational per-type reference
-// points, not a selection the player has to make to move at all.
+// Turn-gating is enforced both ways -- a token is only selectable when it's both yours (`owner` field, set by
+// combat-wip.js's "Join as yourself" flow) AND the current turn holder, and the server re-checks the same thing
+// (move-token / rotate-token in routes_combat.py, same authority model as use-move) so neither check can be
+// bypassed from the client. Moving also turns the token toward where it went (server side); rotating is free.
 //
-// Mirrors move-popup.js's overlay pattern (create the DOM once, reuse
-// across calls) and target-picker.js's self-contained-styles approach
-// (injects its own copy of the shared .combat-popup-* base rules rather
-// than assuming another module already did).
+// Movement budget: each participant carries `speeds` ([{type, ft}, ...], see combat.js's
+// buildTrainerCombatant/buildPokemonCombatant) and a server-tracked `movementUsed` (feet moved so far this turn,
+// reset when their next turn starts -- see routes_combat.py's _advance_turn). A participant with no `speeds` at all
+// (a DM's freeform enemy, or anyone added before this existed) gets no budget UI and no enforcement -- move-token
+// skips the check entirely for them. This never asks (or cares) WHICH movement type a move actually uses -- the
+// user's own call: that decision happens at the table, so the numbers here are purely informational per-type
+// reference points.
+//
+// Terrain moves show up here too: tile-limited zones tint their tiles (colour per terrain), a whole-map terrain
+// washes the whole stage, and a legend under the map lists what's active and for how long (battle-map-view.js).
+//
+// Mirrors move-popup.js's overlay pattern (create the DOM once, reuse across calls) and target-picker.js's
+// self-contained-styles approach (injects its own copy of the shared .combat-popup-* base rules rather than
+// assuming another module already did).
 import { CombatAPI } from '../api.js';
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
+import { injectBattleMapStyles, zoneKindsByCell, legendHtml, tokenCenter, coneCells, facingMarkerHtml, activeTerrainSummary } from './battle-map-view.js';
+
+const CONE_LENGTHS_FT = [0, 15, 30, 60]; // 0 = preview off
 
 function _injectStyles() {
   if (document.getElementById('battle-map-popup-styles')) return;
+  injectBattleMapStyles();
   const style = document.createElement('style');
   style.id = 'battle-map-popup-styles';
   style.textContent = `
-    .combat-popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
-    .combat-popup-content { background: #1e1e34; border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; max-width: 640px; width: 94%; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.6); color: #e0e0e0; }
-    .combat-move-popup-header { padding: 1.1rem 1.2rem; border-radius: 16px 16px 0 0; border-bottom: 2px solid rgba(0,0,0,0.3); display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; position: relative; background: rgba(255,255,255,0.05); }
-    .combat-move-popup-header h2 { margin: 0; font-size: 1.4rem; font-weight: 900; text-transform: uppercase; }
-    .combat-popup-close { position: absolute; top: 0.8rem; right: 0.8rem; background: rgba(0,0,0,0.3); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; color: inherit; }
-    .combat-move-popup-body { padding: 1rem 1.2rem; }
+    .combat-popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(2,3,10,0.82); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+    .combat-popup-content { background: linear-gradient(180deg, #1a1d36, #11132a); border: 1px solid rgba(140,170,255,0.22); border-radius: 18px; max-width: 680px; width: 94%; max-height: 92vh; overflow-y: auto; position: relative; box-shadow: 0 14px 50px rgba(0,0,0,0.7); color: #e0e0e0; }
+    .combat-move-popup-header { padding: 1rem 1.2rem; border-radius: 18px 18px 0 0; border-bottom: 1px solid rgba(140,170,255,0.18); display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; position: relative; background: rgba(255,255,255,0.03); }
+    .combat-move-popup-header h2 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+    .bmap-round { margin-left: auto; margin-right: 2.4rem; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.65rem; border-radius: 999px; background: rgba(140,170,255,0.14); border: 1px solid rgba(140,170,255,0.35); color: #b9c8ff; }
+    .combat-popup-close { position: absolute; top: 0.8rem; right: 0.8rem; background: rgba(255,255,255,0.08); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; color: inherit; }
+    .combat-popup-close:hover { background: rgba(255,255,255,0.18); }
+    .combat-move-popup-body { padding: 1rem 1.2rem 1.2rem; }
 
-    .bmap-hint { font-size: 0.8rem; color: #a0a0c0; margin-bottom: 0.6rem; }
+    .bmap-hint { font-size: 0.8rem; color: #a0a8d0; margin-bottom: 0.6rem; min-height: 1.1em; }
 
     .bmap-move-panel {
       display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 8px; padding: 0.55rem 0.7rem; margin-bottom: 0.6rem; font-size: 0.85rem;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(140,170,255,0.2);
+      border-radius: 12px; padding: 0.55rem 0.7rem; margin-bottom: 0.7rem; font-size: 0.85rem;
     }
-    .bmap-move-chip { background: rgba(255,255,255,0.08); border-radius: 6px; padding: 0.2rem 0.55rem; }
-    .bmap-move-chip.depleted { color: #e77373; }
+    .bmap-move-chip { background: rgba(93,173,226,0.14); border: 1px solid rgba(93,173,226,0.4); border-radius: 999px; padding: 0.2rem 0.65rem; font-weight: 600; }
+    .bmap-move-chip.depleted { color: #e77373; background: rgba(231,115,115,0.1); border-color: rgba(231,115,115,0.4); }
     .bmap-stage-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; width: 100%; }
-    .bmap-stage-row button {
-      border: none; border-radius: 6px; padding: 0.3rem 0.75rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
-    }
-    .bmap-confirm-btn { background: linear-gradient(135deg, #27ae60, #1e8449); color: #fff; }
-    .bmap-confirm-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+    .bmap-stage-row button { border: none; border-radius: 999px; padding: 0.35rem 0.95rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+    .bmap-confirm-btn { background: linear-gradient(135deg, #2ecc71, #1e8449); color: #fff; box-shadow: 0 0 14px rgba(46,204,113,0.4); }
+    .bmap-confirm-btn:disabled { background: #444; color: #888; cursor: not-allowed; box-shadow: none; }
     .bmap-cancel-btn { background: rgba(255,255,255,0.12); color: #e0e0e0; }
     .bmap-stage-warning { color: #e77373; }
-
-    /* aspect-ratio is set inline per-render from the board's own cols/rows
-       (see _applyStageAspect) -- gridTemplateStyle only ever divides this
-       box into equal fractions, it doesn't know or care about shape, so
-       nothing here keeps cells square for a grid size other than whatever
-       one aspect-ratio value happened to be hardcoded. */
-    .bmap-stage { position: relative; width: 100%; background: #0a0a12; border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; }
-    .bmap-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
-    /* Translucent instead of solid once a background image is set, so the
-       artwork actually shows through the grid instead of being fully
-       covered by it -- unmarked cells only; .marked/.taken stay opaque
-       since those are meaningful state, not "empty ground". */
-    .bmap-stage.has-bg .bmap-grid { background: rgba(26,26,36,0.35); }
-    .bmap-cell { background: #20202e; cursor: pointer; }
-    .bmap-stage.has-bg .bmap-cell { background: rgba(32,32,46,0.35); }
-    .bmap-cell:hover { outline: 1px solid rgba(255,215,0,0.5); outline-offset: -1px; }
-    .bmap-cell.marked {
-      background: #4a3520; display: flex; align-items: center; justify-content: center;
-      font-size: 0.6rem; color: #e0c080; overflow: hidden; text-align: center; padding: 1px; box-sizing: border-box;
-    }
-    /* The staged-but-not-yet-confirmed destination cell. */
-    .bmap-cell.staged { outline: 2px solid #FFD700; outline-offset: -2px; }
-    /* pointer-events:none on the container (not just the default-none
-       individual tokens below) -- without it, this full-stage layer sits on
-       top of .bmap-grid in paint order and, having no click handler of its
-       own, silently swallows every click meant for a cell underneath except
-       where it exactly overlaps a .my-turn token (which opts back in below).
-       That's what made clicking a destination cell to move to do nothing --
-       selecting your own token still worked since that click landed on the
-       token itself. See .placement-tokens for the same fix already applied
-       to the placement screen's equivalent layer. */
-    .bmap-tokens { position: absolute; inset: 0; pointer-events: none; }
-    .bmap-token {
-      position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 3px; box-sizing: border-box; pointer-events: none;
-    }
-    /* .my-turn is the only clickable state -- .mine alone (yours, but not
-       your turn right now) is shown (gold portrait outline) but not
-       interactive. */
-    .bmap-token.my-turn { pointer-events: auto; cursor: pointer; }
-    .bmap-token.my-turn:not(.selected) { outline: 2px solid rgba(255,215,0,0.55); outline-offset: -2px; border-radius: 4px; }
-    .bmap-token.selected { outline: 2px solid #FFD700; outline-offset: -2px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,215,0,0.6); }
-    /* Portrait fills the whole cell now that there's no name label to leave
-       room for -- side/ownership, previously conveyed by the name's text
-       color, moves to an outline on the portrait itself instead. */
-    .bmap-token-portrait { width: 100%; height: 100%; }
-    .bmap-token-portrait img, .bmap-token-portrait video { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(0,0,0,0.9)); }
-    .bmap-token.player .bmap-token-portrait { outline: 2px solid rgba(93,173,226,0.55); outline-offset: -2px; border-radius: 4px; }
-    .bmap-token.enemy .bmap-token-portrait { outline: 2px solid rgba(231,115,115,0.55); outline-offset: -2px; border-radius: 4px; }
-    .bmap-token.mine .bmap-token-portrait { outline: 2px solid rgba(255,215,0,0.55); outline-offset: -2px; border-radius: 4px; }
   `;
   document.head.appendChild(style);
 }
@@ -121,6 +74,8 @@ let _ownerName = null;
 let _selectedTokenId = null;
 // A clicked-but-not-yet-confirmed destination for _selectedTokenId.
 let _stagedDestination = null;
+// Index into CONE_LENGTHS_FT -- the cone preview length for the selected token (0 = off). Kept across selections.
+let _coneIdx = 0;
 
 function _ensureDom() {
   if (_overlay) return;
@@ -134,6 +89,7 @@ function _ensureDom() {
       <div class="combat-move-popup-header">
         <button id="battleMapClose" class="combat-popup-close">×</button>
         <h2>🗺️ Battle Map</h2>
+        <span class="bmap-round" id="bmapRound"></span>
       </div>
       <div class="combat-move-popup-body">
         <div class="bmap-hint" id="bmapHint"></div>
@@ -142,6 +98,7 @@ function _ensureDom() {
           <div class="bmap-grid" id="bmapGrid"></div>
           <div class="bmap-tokens" id="bmapTokens"></div>
         </div>
+        <div class="bmap-legend" id="bmapLegend"></div>
       </div>
     </div>
   `;
@@ -149,6 +106,12 @@ function _ensureDom() {
 
   document.getElementById('battleMapClose').addEventListener('click', _close);
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(); });
+  document.addEventListener('keydown', (e) => {
+    if (!_overlay || _overlay.style.display === 'none' || !_selectedTokenId) return;
+    if (e.key === 'q' || e.key === 'Q') _rotate(-45);
+    else if (e.key === 'e' || e.key === 'E') _rotate(45);
+    else if (e.key === 'Escape') { _selectedTokenId = null; _stagedDestination = null; _render(); }
+  });
 }
 
 function _close() {
@@ -207,27 +170,50 @@ function _distanceFt(fromCol, fromRow, toCol, toRow) {
   return Math.max(Math.abs(toCol - fromCol), Math.abs(toRow - fromRow)) * 5;
 }
 
+/** Turns the selected token by `delta` degrees (a multiple of 45). Applied locally right away so it feels instant;
+ * the server's push confirms it, and a rejection puts it back. */
+function _rotate(delta) {
+  const id = _selectedTokenId;
+  const token = id && _session?.board?.tokens?.[id];
+  if (!token) return;
+  const before = token.facing || 0;
+  const next = (((before + delta) % 360) + 360) % 360;
+  token.facing = next;
+  _render();
+  CombatAPI.rotateToken(id, next).catch(err => {
+    token.facing = before;
+    _render();
+    showCombatAlert(err.message, { title: 'Error' });
+  });
+}
+
 function _render() {
   if (!_session || !_session.board) return;
+
+  const roundEl = document.getElementById('bmapRound');
+  if (roundEl) roundEl.textContent = _session.started || _session.round ? `Round ${_session.round ?? 1}` : '';
 
   const hint = document.getElementById('bmapHint');
   if (hint) {
     if (_stagedDestination) {
       hint.textContent = 'Confirm the move below, or click a different cell.';
     } else if (_selectedTokenId) {
-      hint.textContent = 'Click a cell to move there.';
+      hint.textContent = 'Click a cell to move there · ⟲ ⟳ (or Q / E) to turn · the cone shows what a facing would hit.';
     } else {
       const activeId = _activeParticipantId(_session);
       const activeIsMine = !!activeId && _session.participants[activeId]?.owner === _ownerName;
       hint.textContent = activeIsMine
-        ? 'Click your active token (gold outline) to select it, then click a cell to move it.'
-        : "It's not your turn -- you can only move a token on your own turn.";
+        ? 'Click your active token (gold ring) to move or turn it.'
+        : "It's not your turn -- you can only move or turn a token on your own turn.";
     }
   }
   _renderMovePanel();
   _renderStage();
   _renderGrid();
   _renderTokens();
+  _renderToolbar();
+  const legend = document.getElementById('bmapLegend');
+  if (legend) legend.innerHTML = legendHtml(_session);
 }
 
 /** Shows the active mover's remaining-movement chips (whenever it's your
@@ -292,8 +278,8 @@ function _renderMovePanel() {
 /** Keeps cells square for WHATEVER grid size is currently set (not just the
  * default) -- gridTemplateStyle divides the stage into equal fractions
  * regardless of shape, so the stage's own aspect-ratio has to be kept in
- * sync by hand here. Also applies/clears the background image + its
- * has-bg translucency hook on the cells (see the CSS). */
+ * sync by hand here. Also applies/clears the background image and the
+ * whole-map terrain wash. */
 function _renderStage() {
   const stageEl = document.getElementById('bmapStage');
   if (!stageEl) return;
@@ -302,19 +288,48 @@ function _renderStage() {
   const url = _session.board.backgroundImage;
   stageEl.classList.toggle('has-bg', !!url);
   stageEl.style.backgroundImage = url ? `url(${url})` : '';
+  const globalKind = activeTerrainSummary(_session).find(t => t.scope === 'all')?.kind;
+  stageEl.className = stageEl.className.replace(/\bglobal-\w+/g, '').trim();
+  if (globalKind) stageEl.classList.add(`global-${globalKind}`);
+}
+
+/** The selected token (if any) as { id, p, pos, size } -- the one thing the reach/cone overlays and toolbar key off. */
+function _selected() {
+  const id = _selectedTokenId;
+  const pos = id && _session.board.tokens[id];
+  const p = id && _session.participants[id];
+  return pos && p ? { id, p, pos, size: footprintForSize(p.size) } : null;
 }
 
 function _renderGrid() {
   const gridEl = document.getElementById('bmapGrid');
   if (!gridEl) return;
+  const sel = _selected();
+  const zones = zoneKindsByCell(_session);
+
+  // Reach: cells the selected mover can still afford (Chebyshev distance x 5ft, same as the server's budget check).
+  const bestRemaining = sel && (sel.p.speeds || []).length ? Math.max(...sel.p.speeds.map(s => _remainingFt(sel.p, s.type))) : null;
+  const coneFt = CONE_LENGTHS_FT[_coneIdx];
+  let cone = null;
+  if (sel && coneFt) {
+    const c = tokenCenter(sel.pos, sel.size);
+    cone = coneCells(_session.board, c.x, c.y, sel.pos.facing || 0, coneFt / 5);
+  }
+
   gridEl.setAttribute('style', gridTemplateStyle(_session.board));
-  gridEl.innerHTML = gridCellsHtml(_session.board, 'bmap-cell');
+  gridEl.innerHTML = gridCellsHtml(_session.board, 'bmap-cell', (col, row) => {
+    const key = `${col},${row}`;
+    const classes = [];
+    const zone = zones.get(key);
+    if (zone) classes.push(`zone-${zone[0]}`);
+    if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row) <= bestRemaining) classes.push('reach');
+    if (cone?.has(key)) classes.push('cone');
+    if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) classes.push('staged');
+    return classes.join(' ');
+  });
 
   gridEl.querySelectorAll('[data-cell]').forEach(cell => {
     const [col, row] = cell.dataset.cell.split(',').map(Number);
-    if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) {
-      cell.classList.add('staged');
-    }
     cell.addEventListener('click', () => {
       if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
       _stagedDestination = { col, row };
@@ -347,7 +362,7 @@ function _renderTokens() {
     const name = visibleToViewer(p, 'name') ? p.name : '???';
     el.title = name;
     Object.assign(el.style, cellRect(_session.board, pos.col, pos.row, footprintForSize(p.size)));
-    el.innerHTML = `<div class="bmap-token-portrait"></div>`;
+    el.innerHTML = `<div class="bmap-token-portrait"></div>${facingMarkerHtml(pos.facing || 0)}`;
     patchPortraitMedia(el.querySelector('.bmap-token-portrait'), p.image, name);
 
     if (isMyTurn) {
@@ -360,4 +375,38 @@ function _renderTokens() {
 
     layer.appendChild(el);
   });
+}
+
+/** The floating rotate / cone bar next to the selected token -- below it, or above when the token sits low on the map. */
+function _renderToolbar() {
+  const stage = document.getElementById('bmapStage');
+  if (!stage) return;
+  stage.querySelector('#bmapToolbar')?.remove();
+  const sel = _selected();
+  if (!sel) return;
+
+  const { cols, rows } = _session.board.grid;
+  const topRow = sel.pos.row - sel.size + 1;
+  const above = (sel.pos.row + 1) / rows > 0.62;
+  const bar = document.createElement('div');
+  bar.id = 'bmapToolbar';
+  bar.className = `bmap-toolbar${above ? ' above' : ''}`;
+  bar.style.left = `${Math.min(88, Math.max(12, ((sel.pos.col + sel.size / 2) / cols) * 100))}%`;
+  bar.style.top = `${above ? (topRow / rows) * 100 : ((sel.pos.row + 1) / rows) * 100}%`;
+  const coneFt = CONE_LENGTHS_FT[_coneIdx];
+  bar.innerHTML = `
+    <button type="button" data-act="left" title="Turn left 45° (Q)">⟲</button>
+    <button type="button" data-act="right" title="Turn right 45° (E)">⟳</button>
+    <span class="tb-sep"></span>
+    <button type="button" data-act="cone" class="${coneFt ? 'on' : ''}" title="Cone preview from this facing">◔ ${coneFt ? coneFt + 'ft' : 'Cone'}</button>
+    <button type="button" data-act="close" title="Deselect (Esc)">✕</button>`;
+  bar.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const act = e.target.closest('button')?.dataset.act;
+    if (act === 'left') _rotate(-45);
+    else if (act === 'right') _rotate(45);
+    else if (act === 'cone') { _coneIdx = (_coneIdx + 1) % CONE_LENGTHS_FT.length; _render(); }
+    else if (act === 'close') { _selectedTokenId = null; _stagedDestination = null; _render(); }
+  });
+  stage.appendChild(bar);
 }

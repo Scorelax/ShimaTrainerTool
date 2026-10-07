@@ -3087,7 +3087,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   if (!_isDirectHeal && computedData.damageDice) {
     const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
     // Electric/Grassy/Psychic Terrain's doubled MOVE modifier applies to every move of its type, not just ones carrying effects.
-    const _terrainNote = terrainDamageNote(state.terrain, move[1]);
+    const _terrainNote = terrainDamageNote(c.activeTerrains || (state.terrain ? [state.terrain] : []), move[1]);
     if (_terrainNote) _dmgNoteEffects.push(_terrainNote);
     if (_dmgNoteEffects.length) {
       const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather, moveName);

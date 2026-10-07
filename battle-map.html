@@ -49,15 +49,38 @@
   .map-bg { display: none; }
   .map-stage.has-bg .map-bg { display: block; }
 
-  .map-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
-  .map-stage.has-bg .map-grid { background: rgba(26,26,36,0.35); }
-  .map-cell { background: #20202e; }
-  .map-stage.has-bg .map-cell { background: rgba(32,32,46,0.35); }
+  /* Same look as the in-app map (js/utils/battle-map-view.js), minus the costly bits (no blur, no looping
+     animations) -- this page runs on a weak TV-stick renderer. Hairline grid, round side-coloured tokens with a
+     facing arrowhead, tinted terrain zones. */
+  .map-stage { background: radial-gradient(ellipse at 50% 35%, #161a33 0%, #0a0c1c 60%, #05060e 100%); }
+  .map-grid { position: absolute; inset: 0; display: grid; gap: 0; background: transparent; }
+  .map-cell { box-shadow: inset 0 0 0 0.5px rgba(140,170,255,0.13); }
+  .map-stage.has-bg .map-cell { box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.22); }
   .map-cell.marked {
-    background: #4a3520; display: flex; align-items: center; justify-content: center;
-    font-size: 0.7rem; color: #e0c080; overflow: hidden; text-overflow: ellipsis;
-    padding: 2px; text-align: center; box-sizing: border-box;
+    background: rgba(214,160,70,0.2); display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; color: #f0d090; overflow: hidden; text-overflow: ellipsis;
+    padding: 2px; text-align: center; box-sizing: border-box; box-shadow: inset 0 0 0 1px rgba(214,160,70,0.5);
   }
+  .map-cell[class*="zone-"] {
+    background: repeating-linear-gradient(45deg, rgba(var(--zc), 0.16) 0 6px, rgba(var(--zc), 0.05) 6px 12px);
+    box-shadow: inset 0 0 0 1px rgba(var(--zc), 0.5), inset 0 0 10px rgba(var(--zc), 0.25);
+  }
+  .map-cell.zone-electric { --zc: 247,208,44; } .map-cell.zone-grassy { --zc: 82,200,90; }
+  .map-cell.zone-misty { --zc: 242,154,200; } .map-cell.zone-psychic { --zc: 232,80,156; } .map-cell.zone-other { --zc: 127,166,255; }
+  .map-stage.global-electric { --zc: 247,208,44; } .map-stage.global-grassy { --zc: 82,200,90; }
+  .map-stage.global-misty { --zc: 242,154,200; } .map-stage.global-psychic { --zc: 232,80,156; } .map-stage.global-other { --zc: 127,166,255; }
+  .map-stage[class*="global-"].active::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    box-shadow: inset 0 0 50px rgba(var(--zc), 0.45); background: rgba(var(--zc), 0.06);
+  }
+  .bmap-legend { position: absolute; left: 12px; bottom: 12px; z-index: 5; display: flex; flex-wrap: wrap; gap: 0.4rem; max-width: 80%; }
+  .bmap-legend:empty { display: none; }
+  .bmap-legend-chip {
+    display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.95rem; font-weight: 600; padding: 0.3rem 0.8rem; border-radius: 999px;
+    color: #e8ecff; background: rgba(10,12,28,0.82); border: 1px solid rgba(var(--zc), 0.65);
+  }
+  .bmap-legend-chip i { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--zc)); }
+  .bmap-legend-chip small { font-weight: 500; opacity: 0.7; }
 
   /* Idle state -- no active battle, shown in place of the grid/tokens (see
      js/pages/battle-map.js's render, which just toggles .map-stage's own
@@ -71,21 +94,29 @@
   }
   .map-stage:not(.active) .map-empty-bg { display: block; }
 
-  .map-tokens { position: absolute; inset: 0; pointer-events: none; }
+  .map-tokens { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  /* This screen's cells aren't square (the board stretches to fill the TV), so the round disk is sized off the
+     token box's smaller side (container query) instead of filling it -- otherwise it would squash into an oval. */
   .map-token {
-    position: absolute; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; padding: 4px; box-sizing: border-box;
+    position: absolute; display: flex; align-items: center; justify-content: center; container-type: size;
+    padding: 4px; box-sizing: border-box; --ring: 200,200,220; transition: left 0.28s ease, top 0.28s ease;
   }
-  /* Portrait fills the whole footprint -- no name label to leave room for
-     (see js/pages/battle-map.js, a title attribute covers identification
-     for anyone actually interacting with this screen). Side, previously
-     conveyed by the name's text color, moves to an outline instead. */
-  .map-token-portrait { width: 100%; height: 100%; }
-  .map-token-portrait img, .map-token-portrait video {
-    width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 6px rgba(0,0,0,0.8));
+  .map-disk { position: relative; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); }
+  .map-token.player { --ring: 93,173,226; }
+  .map-token.enemy { --ring: 231,115,115; }
+  /* Portrait is a round disk with a side-coloured ring; the sprite inside stays upright. Side used to be an outline. */
+  .map-token-portrait {
+    position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.18), rgba(8,10,22,0.82) 70%);
+    box-shadow: 0 0 0 3px rgba(var(--ring), 0.9), 0 0 14px rgba(var(--ring), 0.7), inset 0 0 10px rgba(0,0,0,0.6);
   }
-  .map-token.player .map-token-portrait { outline: 2px solid rgba(93,173,226,0.55); outline-offset: -2px; border-radius: 4px; }
-  .map-token.enemy .map-token-portrait { outline: 2px solid rgba(231,115,115,0.55); outline-offset: -2px; border-radius: 4px; }
+  .map-token-portrait img, .map-token-portrait video { width: 92%; height: 92%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
+  /* Facing arrowhead orbiting the ring (battle-map.js adds 90deg: this board is shown rotated). */
+  .map-facing { position: absolute; inset: 0; pointer-events: none; transition: transform 0.28s ease; }
+  .map-facing span {
+    position: absolute; top: -2px; left: 50%; margin-left: -8px; width: 0; height: 0;
+    border-left: 8px solid transparent; border-right: 8px solid transparent; border-bottom: 13px solid rgb(var(--ring));
+  }
 </style>
 </head>
 <body>
@@ -94,6 +125,7 @@
       <div class="map-bg" id="mapBg"></div>
       <div class="map-grid" id="mapGrid"></div>
       <div class="map-tokens" id="mapTokens"></div>
+      <div class="bmap-legend" id="mapLegend"></div>
       <div class="map-empty-bg" id="mapEmptyBg"></div>
     </div>
   </div>

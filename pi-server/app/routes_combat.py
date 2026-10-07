@@ -388,7 +388,7 @@ def handle(conn, action, params):
     if action == 'set-terrain':
         return _mutate(conn, lambda s: _set_terrain(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
                                                     params.get('healDice'), params.get('sourceId'), params.get('sourceName'),
-                                                    params.get('cells')))
+                                                    json.loads(params['cells']) if params.get('cells') else None))
 
     if action == 'clear-terrain-zones':
         return _mutate(conn, lambda s: s.__setitem__('terrainZones', []))

@@ -14,6 +14,8 @@ import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../u
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
+import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
+import { injectBattleMapStyles } from '../utils/battle-map-view.js';
 import { pickRepositionCell } from '../utils/reposition-picker.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
@@ -29,7 +31,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, isGrounded } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, isGrounded } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -258,22 +260,8 @@ const PLACEMENT_CSS = `
     background: linear-gradient(135deg, #27ae60, #1e8449); border: none; border-radius: 6px;
     color: #fff; font-weight: 700; font-size: 0.95rem; padding: 0.55rem 1.4rem; cursor: pointer;
   }
-  /* aspect-ratio is set inline from the board's own cols/rows (see
-     renderPlacementPhase) so cells stay square for whatever grid size is
-     actually set, not just the default -- see .bmap-stage's own comment in
-     battle-map-popup.js for the same reasoning. */
-  .placement-stage { position: relative; width: 100%; background: #0a0a12; border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; }
-  .placement-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
-  .placement-stage.has-bg .placement-grid { background: rgba(26,26,36,0.35); }
-  .bmap-cell { background: #20202e; cursor: pointer; }
-  .placement-stage.has-bg .bmap-cell { background: rgba(32,32,46,0.35); }
-  .bmap-cell:hover { outline: 1px solid rgba(255,215,0,0.5); outline-offset: -1px; }
-  .bmap-cell.marked {
-    background: #4a3520; display: flex; align-items: center; justify-content: center;
-    font-size: 0.6rem; color: #e0c080; overflow: hidden; text-align: center; padding: 1px; box-sizing: border-box;
-  }
-  .bmap-cell.taken { background: #3a1f1f; cursor: not-allowed; }
-  .bmap-cell.taken:hover { outline: 1px solid rgba(231,76,60,0.6); outline-offset: -1px; }
+  /* Stage, grid, cells and tokens are styled by battle-map-view.js (shared with the in-app map popup), injected in
+     renderPlacementPhase. aspect-ratio is set inline from the board's own cols/rows so cells stay square. */
   .placement-bg-picker { margin-top: 1rem; text-align: center; }
   .placement-bg-picker label { display: block; font-size: 0.8rem; color: #a0a0c0; margin-bottom: 0.4rem; }
   .placement-bg-picker select {
@@ -290,25 +278,10 @@ const PLACEMENT_CSS = `
     background: linear-gradient(135deg, #8e44ad, #5b2c6f); border: none; color: #fff;
     border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
   }
-  .placement-tokens { position: absolute; inset: 0; pointer-events: none; }
-  .placement-token {
-    position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 3px; box-sizing: border-box;
-  }
-  /* Portrait fills the whole footprint now that there's no name label to
-     leave room for -- side, previously conveyed by the name's text color,
-     moves to an outline on the portrait itself instead (name's still
-     available as a title tooltip, see _renderPlacementTokens). */
-  .placement-token-portrait { width: 100%; height: 100%; }
-  .placement-token-portrait img, .placement-token-portrait video {
-    width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 4px rgba(0,0,0,0.9));
-  }
-  .placement-token.player .placement-token-portrait { outline: 2px solid rgba(93,173,226,0.55); outline-offset: -2px; border-radius: 4px; }
-  .placement-token.enemy .placement-token-portrait { outline: 2px solid rgba(231,115,115,0.55); outline-offset: -2px; border-radius: 4px; }
   .placement-token.ghost { opacity: 0.5; }
   .placement-token.ghost .placement-token-portrait { outline-color: rgba(255,215,0,0.55); }
   .placement-token.staged { opacity: 0.85; }
-  .placement-token.staged .placement-token-portrait { outline: 2px dashed #27ae60; outline-offset: 2px; border-radius: 6px; animation: placementPulse 1.1s ease-in-out infinite; }
+  .placement-token.staged .placement-token-portrait { outline: 2px dashed #27ae60; outline-offset: 3px; animation: placementPulse 1.1s ease-in-out infinite; }
   @keyframes placementPulse { 0%, 100% { outline-color: #27ae60; } 50% { outline-color: rgba(39,174,96,0.3); } }
 `;
 
@@ -1119,7 +1092,9 @@ function _syncLocalCombatState(session) {
     merged.bideCharging = !!p.bideChargingSinceLogId;
     merged.pendingBideDamage = p.pendingBideDamage ?? null;
     // Psychic Terrain: grounded creatures can't use bonus actions at all (the server rejects it too).
-    merged.bonusActionBlockedBy = terrainKindOf(session.terrain) === 'psychic' && isGrounded(p) ? session.terrain.name : '';
+    merged.activeTerrains = terrainsAffecting(session, p.id); // only the terrains this combatant is standing in
+    const psychic = merged.activeTerrains.find(t => terrainKindOf(t) === 'psychic');
+    merged.bonusActionBlockedBy = psychic && isGrounded(p) ? psychic.name : '';
     merged.bonusActionUsed = !!p.bonusActionUsed; // one bonus action per round -- see combat.js's _isBonusActionMove
     merged.bideHeld = !!p.bideHeld;
     // Archive Blast's own "every type of move you have witnessed so far
@@ -1213,6 +1188,7 @@ function _syncLocalCombatState(session) {
 // ---------------------------------------------------------------------------
 
 function renderPlacementPhase(state, currentId) {
+  injectBattleMapStyles();
   const current = state.participants[currentId];
   const { cols, rows } = state.board.grid;
   const bg = state.board.backgroundImage;
@@ -3154,6 +3130,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       try {
         await CombatAPI.setWeather('', '');
         await CombatAPI.setTerrain('', '');
+        await CombatAPI.clearTerrainZones();
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });
       }
@@ -3166,8 +3143,15 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // terrain for _promptTurnHeals to roll at each creature's turn end. attackerId (closure) is the caster.
       const caster = session?.participants?.[attackerId];
       try {
+        // Where does it go? The caster marks tiles on the map (pre-filled with the move's own radius around
+        // them) or takes the whole map; only creatures standing on marked tiles are affected.
+        const area = await pickTerrainArea({
+          session, casterId: attackerId, title: effect.name || moveName, kind: terrainKindOf({ name: effect.name || moveName }),
+          radiusFt: radiusFtFromRange((findMoveRow(moveName) || [])[6]),
+        });
         await CombatAPI.setTerrain(effect.name || moveName, effect.description || '', {
           rounds: effect.rounds, healDice: terrainHealDice(effect, caster?.level), sourceId: attackerId, sourceName: caster?.name,
+          cells: area.cells,
         });
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });
@@ -4684,8 +4668,8 @@ async function _promptTurnHeals(participantId, timing) {
   const holder = session?.participants?.[participantId];
   if (!holder) return;
   // Grassy Terrain: "all creatures in the affected area heal ... at the end of their turn" (field-wide -- no area tracking).
-  const terrain = session?.terrain;
-  if (timing === 'end_of_turn' && terrainKindOf(terrain) === 'grassy' && terrain.healDice && holder.status === 'participating') {
+  const terrain = terrainsAffecting(session, participantId).find(t => terrainKindOf(t) === 'grassy' && t.healDice);
+  if (timing === 'end_of_turn' && terrain && holder.status === 'participating') {
     try {
       await _handleApplyHeal({
         targetId: participantId, effect: { amount: { dice: terrain.healDice, pool: 'HP' } }, moveName: terrain.name,

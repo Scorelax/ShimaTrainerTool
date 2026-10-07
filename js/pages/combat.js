@@ -2324,7 +2324,7 @@ function _consecutiveHitPosition(rawCount, cond) {
  * names (`Poison`, `Paralysis`, `Burn`, ...) both engines' own status badges
  * already use (see combat-wip.js's LEGACY_BADGE_NAMES), so this works
  * identically whether `c` came from the old local engine or the shared one. */
-function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null, moveName = '') {
+function _evaluateDamageNotes(effects, c, moveModValue = 0, weathers = [], moveName = '') {
   const hpFrac = (c.maxHp || 0) > 0 ? (c.currentHp || 0) / c.maxHp : null;
   const statusNames = new Set((c.statusEffects || []).map(se => se.name));
   // VP "spent" is approximated as maxVp - currentVp (Trump Card's own
@@ -2332,7 +2332,8 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null, move
   // same approximation level as every other derived number in this app.
   const vpSpent = Math.max(0, (c.maxVp || 0) - (c.currentVp || 0));
   const loyalty = c.loyalty || 0;
-  const weatherName = (weather?.name || '').toLowerCase();
+  // Every weather the attacker is standing in (a tile-limited zone only counts for whoever is on it), joined for the loose substring match below.
+  const weatherName = (weathers || []).map(w => (w?.name || '').toLowerCase()).join(' | ');
 
   // {met, magnitude} -- magnitude is only meaningful for a scalingBonus
   // effect (how many "units" of it apply); boolean-only conditions report 1
@@ -3090,7 +3091,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     const _terrainNote = terrainDamageNote(c.activeTerrains || (state.terrain ? [state.terrain] : []), move[1]);
     if (_terrainNote) _dmgNoteEffects.push(_terrainNote);
     if (_dmgNoteEffects.length) {
-      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather, moveName);
+      const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, c.activeWeathers || (state.weather ? [state.weather] : []), moveName);
       // Fury Cutter/Ice Ball/Rollout's own escalating VP cost -- the exact
       // same streak position the damage multiplier above was just computed
       // from (see _consecutiveHitPosition's own docstring), so the two

@@ -261,6 +261,10 @@ def tag_for(e):
         # redirect it into a ranged attack" -- see combat-wip.js's
         # _handleRedirectAvoidedDamage.
         base = 'redirect_avoided_damage'
+    elif e['kind'] == 'set_weather':
+        # Sunny Day/Rain Dance/Sandstorm/Hail -- sets the shared weather over a marked area, see combat-wip.js's own
+        # branch in _offerMoveEffects (v78).
+        base = 'set_weather'
     elif e['kind'] == 'set_terrain':
         # Electric/Grassy/Misty/Psychic Terrain -- sets the shared session terrain, see
         # combat-wip.js's own branch in _offerMoveEffects (v77).

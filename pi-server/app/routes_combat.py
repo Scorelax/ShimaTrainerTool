@@ -35,7 +35,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, terrains_affecting, is_grounded
+from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -104,6 +104,8 @@ _EMPTY_STATE = {
     # map): [{id, name, effect, cells:['col,row',...], expiresRound, healDice, sourceId, sourceName}]. The
     # whole-map terrain above stays as it was; conditions.py's terrains_affecting merges both for a participant.
     'terrainZones': [],
+    # Same idea for weather (Sunny Day / Rain Dance / Sandstorm / Hail cast over a marked area).
+    'weatherZones': [],
     # The shared battle log -- one chronological list of everything that's
     # happened this session, oldest first, visible to every viewer (see
     # battle-log-popup.js) and readable by future move-logic that needs to
@@ -383,7 +385,13 @@ def handle(conn, action, params):
         return _mutate(conn, lambda s: _set_board_background(s, params.get('url', '')))
 
     if action == 'set-weather':
-        return _mutate(conn, lambda s: _set_weather(s, params.get('name', ''), params.get('effect', '')))
+        return _mutate(conn, lambda s: _set_weather(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
+                                                    params.get('sourceId'), params.get('sourceName'),
+                                                    json.loads(params['cells']) if params.get('cells') else None,
+                                                    js_parse_int(params.get('casterLevel')), str(params.get('concentration', '')) in ('1', 'true')))
+
+    if action == 'remove-field-zone':
+        return _mutate(conn, lambda s: _remove_field_zone(s, params.get('kind', ''), params.get('id', '')))
 
     if action == 'set-terrain':
         return _mutate(conn, lambda s: _set_terrain(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
@@ -391,7 +399,7 @@ def handle(conn, action, params):
                                                     json.loads(params['cells']) if params.get('cells') else None))
 
     if action == 'clear-terrain-zones':
-        return _mutate(conn, lambda s: s.__setitem__('terrainZones', []))
+        return _mutate(conn, lambda s: (s.__setitem__('terrainZones', []), s.__setitem__('weatherZones', [])))
 
     if action == 'rotate-token':
         facing = js_parse_int(params.get('facing'))
@@ -1138,9 +1146,10 @@ def _advance_turn(state):
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
         _expire_statuses_by_round(state)
-    _expire_terrains(state)
+    _expire_fields(state)
     starting_id = state['turnOrder'][state['turnIndex']]
     _apply_condition_turn_damage(state, starting_id, 'start')
+    _apply_weather_damage(state, starting_id)
     _expire_statuses_on_turn_point(state, starting_id, 'start')
 
 
@@ -2189,35 +2198,63 @@ def _set_weather(state, name, effect):
     state['weather'] = {'name': name, 'effect': effect} if name else None
 
 
-def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None):
-    """`rounds`/`healDice`/source only come from a terrain MOVE (see move-effects-schema.md's
-    set_terrain): `rounds` schedules the expiry (checked in _advance_turn), `healDice` is
-    Grassy Terrain's already-level-scaled end-of-turn heal. A DM-typed terrain carries none of
-    them and just stays until cleared. `cells` (a list of "col,row") limits the terrain to those
-    tiles as a zone in state['terrainZones'] -- who it affects is whoever stands on them; without
-    it the terrain covers the whole map (state['terrain'])."""
+def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None,
+               caster_level=None, concentration=False):
+    """Shared by terrain and weather ('terrain' / 'weather'). `rounds`/`healDice`/source only come from a MOVE (see
+    move-effects-schema.md's set_terrain / set_weather): `rounds` schedules the expiry (_expire_fields, run from
+    _advance_turn), `healDice` is Grassy Terrain's already-level-scaled end-of-turn heal, `casterLevel` is what
+    Hail/Sandstorm's "half your level" reads. A DM-typed one carries none of them and just stays until cleared.
+    `cells` (a list of "col,row") limits it to those tiles as a zone in state[key + 'Zones'] -- who it affects is
+    whoever stands on them; without it it covers the whole map (state[key])."""
     if not name:
-        state['terrain'] = None
+        state[key] = None
         return
-    terrain = {'name': name, 'effect': effect}
+    field = {'name': name, 'effect': effect}
     n = js_parse_int(rounds)
     if n and n > 0:
-        terrain['expiresRound'] = state['round'] + n
+        field['expiresRound'] = state['round'] + n
     if heal_dice:
-        terrain['healDice'] = str(heal_dice)
+        field['healDice'] = str(heal_dice)
+    if caster_level:
+        field['casterLevel'] = caster_level
+    if concentration:
+        field['concentration'] = True
     if source_id:
-        terrain['sourceId'] = source_id
-        terrain['sourceName'] = source_name
+        field['sourceId'] = source_id
+        field['sourceName'] = source_name
     if cells:
-        terrain['id'] = uuid.uuid4().hex[:8]
-        terrain['cells'] = sorted({str(c) for c in cells})
-        zones = state.setdefault('terrainZones', [])
-        # Recasting the same terrain replaces its previous zone rather than stacking duplicates.
+        field['id'] = uuid.uuid4().hex[:8]
+        field['cells'] = sorted({str(c) for c in cells})
+        zones = state.setdefault(key + 'Zones', [])
+        # Recasting the same one replaces its previous zone rather than stacking duplicates.
         zones[:] = [z for z in zones if z['name'] != name]
-        zones.append(terrain)
+        zones.append(field)
     else:
-        state['terrain'] = terrain
-    _wake_electric_sleepers(state)
+        state[key] = field
+    if key == 'terrain':
+        _wake_electric_sleepers(state)
+
+
+def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None):
+    _set_field(state, 'terrain', name, effect, rounds, heal_dice, source_id, source_name, cells)
+
+
+def _set_weather(state, name, effect, rounds=None, source_id=None, source_name=None, cells=None, caster_level=None,
+                 concentration=False):
+    _set_field(state, 'weather', name, effect, rounds, None, source_id, source_name, cells, caster_level, concentration)
+
+
+def _remove_field_zone(state, kind, zone_id):
+    """Ends one tile-limited zone by hand -- how a concentration weather (Hail, Sandstorm) is dropped when the
+    caster loses concentration, since concentration itself isn't tracked as game state."""
+    if kind not in ('terrain', 'weather'):
+        raise ValueError('kind must be terrain or weather')
+    zones = state.get(kind + 'Zones') or []
+    zone = next((z for z in zones if z.get('id') == zone_id), None)
+    if not zone:
+        raise ValueError('No such zone')
+    zones.remove(zone)
+    _log_event(state, 'terrain-end', text=f"{zone['name']} ended")
 
 
 def _wake_electric_sleepers(state):
@@ -2230,17 +2267,43 @@ def _wake_electric_sleepers(state):
                 _expire_status(state, p, st, 'Electric Terrain')
 
 
-def _expire_terrains(state):
-    """Terrain moves last a set number of rounds -- drop whole-map and zone terrains whose round has come."""
-    def over(t):
-        return t.get('expiresRound') is not None and state['round'] >= t['expiresRound']
-    if state.get('terrain') and over(state['terrain']):
-        _log_event(state, 'terrain-end', text=f"{state['terrain']['name']} fades")
-        state['terrain'] = None
-    zones = state.get('terrainZones') or []
-    for z in [z for z in zones if over(z)]:
-        _log_event(state, 'terrain-end', text=f"{z['name']} fades")
-        zones.remove(z)
+def _expire_fields(state):
+    """Terrain and weather moves last a set number of rounds -- drop whole-map and zone ones whose round has come."""
+    def over(f):
+        return f.get('expiresRound') is not None and state['round'] >= f['expiresRound']
+    for key in ('terrain', 'weather'):
+        if state.get(key) and over(state[key]):
+            _log_event(state, 'terrain-end', text=f"{state[key]['name']} fades")
+            state[key] = None
+        zones = state.get(key + 'Zones') or []
+        for z in [z for z in zones if over(z)]:
+            _log_event(state, 'terrain-end', text=f"{z['name']} fades")
+            zones.remove(z)
+
+
+def _apply_weather_damage(state, pid):
+    """Hail / Sandstorm: a creature standing in it at the start of its turn, or walking into it on its turn, takes
+    typed damage of half the caster's level (rounded up) -- once per turn however it got there. Typeless in the
+    sense of no type-chart multiplier: the move says "an amount ... equal to half your level", so it's flat.
+    Same temp-HP-absorbs-first, no-floor-at-0 path as every other automatic damage tick."""
+    participant = state['participants'].get(pid)
+    if not participant or participant.get('status') != 'participating':
+        return
+    mark = [state['round'], state['turnIndex']]
+    if participant.get('weatherHitTurn') == mark:
+        return
+    for weather in weathers_affecting(state, pid):
+        source = state['participants'].get(weather.get('sourceId'))
+        hit = weather_damage_for(weather, participant, (source or {}).get('level'))
+        if not hit:
+            continue
+        damage_type, amount = hit
+        participant['weatherHitTurn'] = mark
+        leftover = _absorb_temp_hp(state, participant, amount)
+        participant['currentHP'] -= leftover
+        _log_event(state, 'status-damage', text=f"{participant['name']} takes {amount} {damage_type} damage from the {weather['name']}",
+                   actorId=pid, actorName=participant['name'])
+        return
 
 
 def _set_token_position(state, pid, col, row):
@@ -2428,6 +2491,8 @@ def _move_token(state, pid, col, row):
         facing = (round(math.degrees(math.atan2(col - previous['col'], previous['row'] - row)) / 45) * 45) % 360
     state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing}
     _wake_electric_sleepers(state)
+    if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
+        _apply_weather_damage(state, pid)  # walked into Hail/Sandstorm on their own turn
     _log_event(state, 'move', text=f"{participant['name']} moved to ({col}, {row})",
                actorId=pid, actorName=participant['name'], col=col, row=row)
 

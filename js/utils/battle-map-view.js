@@ -6,7 +6,7 @@
 // Class names are the long-standing .bmap-* / .placement-* ones, restyled here: thin glowing grid lines
 // instead of boxed cells, square tokens with a side-coloured frame whose sprite turns to face the way the token faces, and
 // colour-coded terrain zones. Nothing here knows about game rules beyond the terrain kinds' colours.
-import { terrainKindOf } from './move-effects.js';
+import { terrainKindOf, weatherKindOf } from './move-effects.js';
 
 /** RGB triples (not hex) so CSS can use them at any alpha: rgba(var(--zc), .2). */
 export const ZONE_RGB = {
@@ -14,17 +14,22 @@ export const ZONE_RGB = {
   grassy: '82,200,90',
   misty: '242,154,200',
   psychic: '232,80,156',
+  sunny: '255,170,60',
+  rain: '80,150,255',
+  sandstorm: '214,176,100',
+  hail: '170,225,255',
   other: '127,166,255',
 };
 
-export function zoneKind(terrain) {
-  return terrainKindOf(terrain) || 'other';
+/** Colour/class key for a terrain or weather (or a zone of either). */
+export function zoneKind(field) {
+  return terrainKindOf(field) || weatherKindOf(field) || 'other';
 }
 
-/** "col,row" -> the kinds of every tile-limited terrain zone covering that cell (first one paints it). */
+/** "col,row" -> the kinds of every tile-limited terrain/weather zone covering that cell (first one paints it). */
 export function zoneKindsByCell(session) {
   const map = new Map();
-  for (const z of session?.terrainZones || []) {
+  for (const z of [...(session?.terrainZones || []), ...(session?.weatherZones || [])]) {
     const kind = zoneKind(z);
     for (const c of z.cells || []) {
       if (!map.has(c)) map.set(c, []);
@@ -34,21 +39,30 @@ export function zoneKindsByCell(session) {
   return map;
 }
 
-/** One entry per active terrain for the legend/banner: { name, kind, scope: 'all' | 'zone', roundsLeft }. */
+/** One entry per active terrain/weather for the legend and the whole-map wash:
+ * { name, kind, scope: 'all' | 'zone', roundsLeft, concentration, id, key: 'terrain' | 'weather' }. */
 export function activeTerrainSummary(session) {
   const out = [];
   const left = (t) => (t.expiresRound != null && session.round != null ? Math.max(0, t.expiresRound - session.round) : null);
-  if (session?.terrain) out.push({ name: session.terrain.name, kind: zoneKind(session.terrain), scope: 'all', roundsLeft: left(session.terrain) });
-  for (const z of session?.terrainZones || []) out.push({ name: z.name, kind: zoneKind(z), scope: 'zone', roundsLeft: left(z) });
+  for (const key of ['terrain', 'weather']) {
+    if (session?.[key]) out.push({ name: session[key].name, kind: zoneKind(session[key]), scope: 'all', roundsLeft: left(session[key]), key });
+    for (const z of session?.[key + 'Zones'] || []) {
+      out.push({ name: z.name, kind: zoneKind(z), scope: 'zone', roundsLeft: left(z), concentration: !!z.concentration, id: z.id, key });
+    }
+  }
   return out;
 }
 
-export function legendHtml(session) {
+/** The legend chips. `removable` (the in-app popup only) adds an ✕ on each marked-area chip to end it by hand --
+ * how a concentration weather is dropped when its caster loses concentration. */
+export function legendHtml(session, { removable = false } = {}) {
   const items = activeTerrainSummary(session);
   if (!items.length) return '';
   return items.map(t => {
     const rounds = t.roundsLeft == null ? '' : ` · ${t.roundsLeft} round${t.roundsLeft === 1 ? '' : 's'} left`;
-    return `<span class="bmap-legend-chip" style="--zc:${ZONE_RGB[t.kind]}"><i></i>${t.name} <small>${t.scope === 'all' ? 'whole map' : 'marked area'}${rounds}</small></span>`;
+    const conc = t.concentration ? ' · concentration' : '';
+    const x = removable && t.id ? `<button type="button" class="bmap-legend-x" data-key="${t.key}" data-id="${t.id}" title="End this">✕</button>` : '';
+    return `<span class="bmap-legend-chip" style="--zc:${ZONE_RGB[t.kind]}"><i></i>${t.name} <small>${t.scope === 'all' ? 'whole map' : 'marked area'}${rounds}${conc}</small>${x}</span>`;
   }).join('');
 }
 
@@ -145,20 +159,13 @@ export function injectBattleMapStyles() {
         repeating-linear-gradient(45deg, rgba(var(--zc), 0.16) 0 6px, rgba(var(--zc), 0.05) 6px 12px);
       box-shadow: inset 0 0 0 1px rgba(var(--zc), 0.5), inset 0 0 10px rgba(var(--zc), 0.25);
     }
-    .bmap-cell.zone-electric { --zc: ${ZONE_RGB.electric}; }
-    .bmap-cell.zone-grassy { --zc: ${ZONE_RGB.grassy}; }
-    .bmap-cell.zone-misty { --zc: ${ZONE_RGB.misty}; }
-    .bmap-cell.zone-psychic { --zc: ${ZONE_RGB.psychic}; }
-    .bmap-cell.zone-other { --zc: ${ZONE_RGB.other}; }
+    ${Object.entries(ZONE_RGB).map(([k, rgb]) => `.bmap-cell.zone-${k} { --zc: ${rgb}; }`).join('\n    ')}
     /* whole-map terrain: one tinted wash over the whole stage instead of per cell */
-    .bmap-stage.global-electric::after, .bmap-stage.global-grassy::after, .bmap-stage.global-misty::after,
-    .bmap-stage.global-psychic::after, .bmap-stage.global-other::after {
+    ${Object.keys(ZONE_RGB).map(k => `.bmap-stage.global-${k}::after`).join(', ')} {
       content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
       box-shadow: inset 0 0 50px rgba(var(--zc), 0.45); background: rgba(var(--zc), 0.06);
     }
-    .bmap-stage.global-electric { --zc: ${ZONE_RGB.electric}; } .bmap-stage.global-grassy { --zc: ${ZONE_RGB.grassy}; }
-    .bmap-stage.global-misty { --zc: ${ZONE_RGB.misty}; } .bmap-stage.global-psychic { --zc: ${ZONE_RGB.psychic}; }
-    .bmap-stage.global-other { --zc: ${ZONE_RGB.other}; }
+    ${Object.entries(ZONE_RGB).map(([k, rgb]) => `.bmap-stage.global-${k} { --zc: ${rgb}; }`).join('\n    ')}
     .bmap-cell.painting { background: rgba(var(--zc, 255,215,0), 0.38); box-shadow: inset 0 0 0 1px rgba(var(--zc, 255,215,0), 0.9); }
 
     .bmap-legend { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
@@ -170,6 +177,8 @@ export function injectBattleMapStyles() {
     }
     .bmap-legend-chip i { width: 9px; height: 9px; border-radius: 50%; background: rgb(var(--zc)); box-shadow: 0 0 8px rgb(var(--zc)); }
     .bmap-legend-chip small { font-weight: 500; opacity: 0.7; }
+    .bmap-legend-x { border: none; background: rgba(255,255,255,0.12); color: #e8ecff; width: 1.2rem; height: 1.2rem; border-radius: 50%; font-size: 0.7rem; cursor: pointer; padding: 0; line-height: 1; }
+    .bmap-legend-x:hover { background: rgba(231,76,60,0.6); }
 
     /* ---- tokens ---- */
     .bmap-tokens, .placement-tokens { position: absolute; inset: 0; pointer-events: none; z-index: 3; }

@@ -12,9 +12,11 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { injectBattleMapStyles, circleCells, tokenCenter, ZONE_RGB, spriteTransform } from './battle-map-view.js';
 
-/** First distance in a move's range text -- "Self (30ft. radius)" -> 30, "Self (60ft. circle)" -> 60. null if none. */
+/** A move's area radius from its range text: the distance next to "radius"/"circle" if there is one ("Self (30ft. radius)"
+ * -> 30, "100ft., 50ft. radius" -> 50), otherwise the first distance ("Self, 50ft." -> 50). null if none. */
 export function radiusFtFromRange(rangeText) {
-  const m = /(\d+)\s*(?:ft|feet|foot)/i.exec(String(rangeText || ''));
+  const text = String(rangeText || '');
+  const m = /(\d+)\s*(?:ft|feet|foot)\.?\s*(?:radius|circle)/i.exec(text) || /(\d+)\s*(?:ft|feet|foot)/i.exec(text);
   return m ? Number(m[1]) : null;
 }
 
@@ -37,6 +39,7 @@ function _injectStyles() {
     .tap-actions .tap-confirm { margin-left: auto; background: linear-gradient(135deg, rgb(var(--zc)), rgba(var(--zc), 0.6)); color: #0b0d1a; box-shadow: 0 0 16px rgba(var(--zc), 0.45); }
     .tap-actions .tap-confirm:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
     .tap-count { font-size: 0.8rem; color: #a0a8d0; }
+    .tap-actions button.on { background: rgba(var(--zc), 0.55); color: #0b0d1a; }
   `;
   document.head.appendChild(style);
 }
@@ -47,9 +50,11 @@ function _injectStyles() {
  * @param {string} title     e.g. "Grassy Terrain"
  * @param {string} kind      terrain kind for the colour ('electric' | 'grassy' | 'misty' | 'psychic')
  * @param {number|null} radiusFt  the move's own radius, to pre-paint (null = start empty)
+ * @param {boolean} centeredOnCaster  false for a move "centered on a point in range" (Hail, Sandstorm): starts empty
+ *                                    with the circle stamp armed, so the caster clicks where the centre goes
  * @returns {Promise<{cells: string[]} | {all: true}>}
  */
-export function pickTerrainArea({ session, casterId, title, kind, radiusFt }) {
+export function pickTerrainArea({ session, casterId, title, kind, radiusFt, centeredOnCaster = true }) {
   _injectStyles();
   return new Promise((resolve) => {
     const board = session.board;
@@ -64,20 +69,22 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt }) {
       const c = tokenCenter(casterPos, footprintForSize(caster?.size));
       return circleCells(board, c.x, c.y, radiusFt / 5);
     };
-    circle().forEach(c => painted.add(c));
+    if (centeredOnCaster) circle().forEach(c => painted.add(c));
+    let stamp = !centeredOnCaster && !!radiusFt; // click = drop a circle of radiusFt centred on that tile
 
     const overlay = document.createElement('div');
     overlay.className = 'tap-overlay';
     overlay.innerHTML = `
       <div class="tap-card" style="--zc:${rgb}">
         <h3 class="tap-title">${title}</h3>
-        <div class="tap-sub">Mark where it takes effect${radiusFt ? ` — pre-filled with a ${radiusFt}ft circle around ${caster?.name || 'the caster'}` : ''}. Click or drag to paint tiles; start a drag on a painted tile to erase. Only creatures standing on these tiles are affected.</div>
+        <div class="tap-sub">Mark where it takes effect${radiusFt && centeredOnCaster ? ` — pre-filled with a ${radiusFt}ft circle around ${caster?.name || 'the caster'}` : ''}. ${radiusFt ? 'Use the circle stamp to drop a circle on a tile, or ' : ''}click or drag to paint tiles; start a drag on a painted tile to erase. Only creatures standing on these tiles are affected.</div>
         <div class="bmap-stage tap-stage" style="aspect-ratio:${cols} / ${rows}; --zc:${rgb}">
           <div class="bmap-grid"></div>
           <div class="bmap-tokens"></div>
         </div>
         <div class="tap-actions">
-          ${radiusFt && casterPos ? `<button type="button" data-act="circle">⭕ ${radiusFt}ft circle</button>` : ''}
+          ${radiusFt ? `<button type="button" data-act="stamp" class="${stamp ? 'on' : ''}">⭕ Stamp ${radiusFt}ft circle</button>` : ''}
+          ${radiusFt && casterPos ? `<button type="button" data-act="circle">Around ${caster?.name || 'caster'}</button>` : ''}
           <button type="button" data-act="all">🗺️ All map</button>
           <button type="button" data-act="clear">Clear</button>
           <span class="tap-count"></span>
@@ -140,6 +147,12 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt }) {
       const key = e.target.closest('[data-cell]')?.dataset.cell;
       if (!key) return;
       e.preventDefault();
+      if (stamp) {
+        const [col, row] = key.split(',').map(Number);
+        circleCells(board, col, row, radiusFt / 5).forEach(c => painted.add(c));
+        refresh();
+        return;
+      }
       mode = painted.has(key) ? 'remove' : 'add';
       paintAt(e.clientX, e.clientY);
     });
@@ -150,7 +163,8 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt }) {
     overlay.addEventListener('click', (e) => {
       const act = e.target.closest('button')?.dataset.act;
       if (!act) return;
-      if (act === 'circle') { painted.clear(); circle().forEach(c => painted.add(c)); refresh(); }
+      if (act === 'stamp') { stamp = !stamp; e.target.closest('button').classList.toggle('on', stamp); }
+      else if (act === 'circle') { painted.clear(); circle().forEach(c => painted.add(c)); refresh(); }
       else if (act === 'clear') { painted.clear(); refresh(); }
       else if (act === 'all') done({ all: true });
       else if (act === 'confirm' && painted.size) done({ cells: [...painted] });

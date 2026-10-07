@@ -438,20 +438,61 @@ def footprint_size(size_text):
     return 2 if s == 'large' else 3 if s == 'huge' else 1
 
 
-def terrains_affecting(state, pid):
-    """Every terrain currently affecting participant `pid`: the whole-map terrain (state['terrain'], also what a
-    DM-typed terrain is) plus every tile-limited zone (state['terrainZones']) that overlaps any cell of their
-    token's footprint. A participant with no token on the map is only affected by the whole-map terrain."""
+def fields_affecting(state, pid, key):
+    """Every `key` ('terrain' or 'weather') effect currently affecting participant `pid`: the whole-map one
+    (state[key], also what a DM-typed one is) plus every tile-limited zone (state[key + 'Zones']) that overlaps any
+    cell of their token's footprint. A participant with no token on the map is only affected by the whole-map one."""
     found = []
-    if state.get('terrain'):
-        found.append(state['terrain'])
+    if state.get(key):
+        found.append(state[key])
     token = state.get('board', {}).get('tokens', {}).get(pid)
-    zones = state.get('terrainZones') or []
+    zones = state.get(key + 'Zones') or []
     if token and zones:
         size = footprint_size(state.get('participants', {}).get(pid, {}).get('size'))
         covered = {f"{c},{r}" for c, r in footprint_cells(token['col'], token['row'], size)}
         found.extend(z for z in zones if covered & set(z.get('cells') or ()))
     return found
+
+
+def terrains_affecting(state, pid):
+    return fields_affecting(state, pid, 'terrain')
+
+
+def weathers_affecting(state, pid):
+    return fields_affecting(state, pid, 'weather')
+
+
+# Hail / Sandstorm: "when a non <types> creature enters the area for the first time on their turn, or begins their turn
+# inside the area, they take [damage type] damage equal to half your level, rounded up". Keyed by a loose name match,
+# like terrain_kind, so a DM-typed "Hailstorm" behaves the same as the move's own.
+WEATHER_DAMAGE = {
+    'hail': {'type': 'Ice', 'immune': {'ice'}},
+    'sandstorm': {'type': 'Rock', 'immune': {'rock', 'steel', 'ground'}},
+}
+
+
+def weather_damage_kind(weather):
+    name = ((weather or {}).get('name') or '').lower()
+    if 'hail' in name:
+        return 'hail'
+    if 'sand' in name:
+        return 'sandstorm'
+    return None
+
+
+def weather_damage_for(weather, participant, fallback_level=None):
+    """(damage type, amount) this weather deals `participant` when they start/enter on their turn, or None --
+    none when it isn't a damaging weather, the creature has an immune type, or no caster level is known."""
+    kind = weather_damage_kind(weather)
+    if not kind:
+        return None
+    types = {str(participant.get(k) or '').strip().lower() for k in ('type1', 'type2')}
+    if types & WEATHER_DAMAGE[kind]['immune']:
+        return None
+    level = weather.get('casterLevel') or fallback_level
+    if not isinstance(level, (int, float)) or level <= 0:
+        return None
+    return WEATHER_DAMAGE[kind]['type'], -(-int(level) // 2)  # half the level, rounded up
 
 
 def terrain_blocked_status(terrains, target, spec):

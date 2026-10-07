@@ -107,6 +107,10 @@ function _ensureDom() {
   document.body.appendChild(_overlay);
 
   document.getElementById('battleMapClose').addEventListener('click', _close);
+  document.getElementById('bmapLegend').addEventListener('click', (e) => {
+    const x = e.target.closest('.bmap-legend-x');
+    if (x) CombatAPI.removeFieldZone(x.dataset.key, x.dataset.id).catch(err => showCombatAlert(err.message, { title: 'Error' }));
+  });
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(); });
   document.addEventListener('keydown', (e) => {
     if (!_overlay || _overlay.style.display === 'none' || !_selectedTokenId) return;
@@ -215,7 +219,7 @@ function _render() {
   _renderTokens();
   _renderToolbar();
   const legend = document.getElementById('bmapLegend');
-  if (legend) legend.innerHTML = legendHtml(_session);
+  if (legend) legend.innerHTML = legendHtml(_session, { removable: true });
 }
 
 /** Shows the active mover's remaining-movement chips (whenever it's your

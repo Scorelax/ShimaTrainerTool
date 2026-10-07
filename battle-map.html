@@ -67,8 +67,10 @@
   }
   .map-cell.zone-electric { --zc: 247,208,44; } .map-cell.zone-grassy { --zc: 82,200,90; }
   .map-cell.zone-misty { --zc: 242,154,200; } .map-cell.zone-psychic { --zc: 232,80,156; } .map-cell.zone-other { --zc: 127,166,255; }
+  .map-cell.zone-sunny { --zc: 255,170,60; } .map-cell.zone-rain { --zc: 80,150,255; } .map-cell.zone-sandstorm { --zc: 214,176,100; } .map-cell.zone-hail { --zc: 170,225,255; }
   .map-stage.global-electric { --zc: 247,208,44; } .map-stage.global-grassy { --zc: 82,200,90; }
   .map-stage.global-misty { --zc: 242,154,200; } .map-stage.global-psychic { --zc: 232,80,156; } .map-stage.global-other { --zc: 127,166,255; }
+  .map-stage.global-sunny { --zc: 255,170,60; } .map-stage.global-rain { --zc: 80,150,255; } .map-stage.global-sandstorm { --zc: 214,176,100; } .map-stage.global-hail { --zc: 170,225,255; }
   .map-stage[class*="global-"].active::after {
     content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
     box-shadow: inset 0 0 50px rgba(var(--zc), 0.45); background: rgba(var(--zc), 0.06);

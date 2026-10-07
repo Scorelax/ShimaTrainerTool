@@ -10609,12 +10609,29 @@
       },
       "reaction": false,
       "categories": [
-        "field_weather"
+        "field_weather",
+        "set_weather"
       ],
       "description": "You change the weather around you to harsh sunlight for 5 rounds.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_weather",
+          "name": "Harsh Sunlight",
+          "rounds": 5,
+          "description": "Harsh sunlight.",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Superheat",
@@ -16348,12 +16365,37 @@
       },
       "reaction": false,
       "categories": [
-        "field_weather"
+        "field_weather",
+        "set_weather"
       ],
       "description": "You stir up a massive hail storm in a 50 foot radius, centered on a point in range. When a non ice-type creature enters the area for the first time on their turn, or begins their turn inside the area, they take an amount of ice damage equal to half your level, rounded up. The hail storm lasts for 5 rounds.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_weather",
+          "name": "Hail",
+          "rounds": 5,
+          "description": "Non ice-type creatures take ice damage (half the caster's level, rounded up) when they enter or start their turn here.",
+          "concentration": true,
+          "damage": {
+            "type": "Ice",
+            "halfCasterLevel": true,
+            "immuneTypes": [
+              "Ice"
+            ]
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Haze",
@@ -27679,12 +27721,39 @@
       },
       "reaction": false,
       "categories": [
-        "field_weather"
+        "field_weather",
+        "set_weather"
       ],
       "description": "You stir up a massive sandstorm in a 50 foot radius, centered on a point in range. When a non rock-, steel-, or ground-type creature enters the area for the first time on their turn, or begins their turn inside the area, they take an amount of rock damage equal to half your level, rounded up. The Sandstorm lasts for 5 rounds.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_weather",
+          "name": "Sandstorm",
+          "rounds": 5,
+          "description": "Non rock-, steel- or ground-type creatures take rock damage (half the caster's level, rounded up) when they enter or start their turn here.",
+          "concentration": true,
+          "damage": {
+            "type": "Rock",
+            "halfCasterLevel": true,
+            "immuneTypes": [
+              "Rock",
+              "Steel",
+              "Ground"
+            ]
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Smack Down",
@@ -29585,12 +29654,29 @@
       },
       "reaction": false,
       "categories": [
-        "field_weather"
+        "field_weather",
+        "set_weather"
       ],
       "description": "You summon a heavy rainfall that covers the battlefield for 5 rounds.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_weather",
+          "name": "Heavy Rain",
+          "rounds": 5,
+          "description": "Heavy rainfall.",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Razor Shell",

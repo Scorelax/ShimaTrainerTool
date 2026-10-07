@@ -1065,8 +1065,16 @@ export class CombatAPI {
 
   /** Sets the shared session's weather/terrain (see routes_combat.py's
    * set-weather/set-terrain) -- empty name clears it. */
-  static async setWeather(name, effect) {
-    return API.request('combat', 'set-weather', { name, effect }, { useCache: false });
+  /** `extra` is only passed by a weather MOVE: { rounds, sourceId, sourceName, casterLevel, concentration, cells }
+   * (see routes_combat.py's _set_weather) -- `cells` limits it to those tiles, otherwise it covers the whole map. */
+  static async setWeather(name, effect, extra = {}) {
+    const { cells, ...rest } = extra;
+    return API.request('combat', 'set-weather', { name, effect, ...rest, ...(cells?.length ? { cells: JSON.stringify(cells) } : {}) }, { useCache: false });
+  }
+
+  /** Ends one tile-limited zone by hand (kind: 'terrain' | 'weather') -- e.g. a Hail whose caster lost concentration. */
+  static async removeFieldZone(kind, id) {
+    return API.request('combat', 'remove-field-zone', { kind, id }, { useCache: false });
   }
 
   /** `extra` is only passed by a terrain MOVE: { rounds, healDice, sourceId, sourceName, cells } (see

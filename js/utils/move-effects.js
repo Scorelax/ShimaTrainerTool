@@ -1067,13 +1067,23 @@ export function isGrounded(p) {
   return !statuses.some(s => s.kind === 'condition' && (s.apply === 'airborne' || (s.apply === 'granted_immunity' && String(s.value || '').toLowerCase() === 'ground')));
 }
 
-/** Every terrain affecting participant `pid`: the whole-map terrain (`session.terrain`, also what a DM-typed
- * one is) plus every tile-limited zone (`session.terrainZones`) overlapping any cell of their token's footprint.
- * Mirrors conditions.py's terrains_affecting; a participant with no token is only affected by the whole-map one. */
-export function terrainsAffecting(session, pid) {
-  const found = session?.terrain ? [session.terrain] : [];
+/** 'sunny' | 'rain' | 'sandstorm' | 'hail' for a session weather, or null -- the same loose name match as terrains. */
+export function weatherKindOf(weather) {
+  const name = String(weather?.name || '').toLowerCase();
+  if (name.includes('sun')) return 'sunny';
+  if (name.includes('rain')) return 'rain';
+  if (name.includes('sand')) return 'sandstorm';
+  if (name.includes('hail')) return 'hail';
+  return null;
+}
+
+/** Every `key` ('terrain' | 'weather') effect affecting participant `pid`: the whole-map one (`session[key]`, also what a
+ * DM-typed one is) plus every tile-limited zone (`session[key + 'Zones']`) overlapping any cell of their token's
+ * footprint. Mirrors conditions.py's fields_affecting; a participant with no token is only affected by the whole-map one. */
+export function fieldsAffecting(session, pid, key) {
+  const found = session?.[key] ? [session[key]] : [];
   const token = session?.board?.tokens?.[pid];
-  const zones = session?.terrainZones || [];
+  const zones = session?.[key + 'Zones'] || [];
   if (token && zones.length) {
     const s = String(session.participants?.[pid]?.size || '').trim().toLowerCase();
     const size = s === 'large' ? 2 : s === 'huge' ? 3 : 1;
@@ -1083,6 +1093,9 @@ export function terrainsAffecting(session, pid) {
   }
   return found;
 }
+
+export const terrainsAffecting = (session, pid) => fieldsAffecting(session, pid, 'terrain');
+export const weathersAffecting = (session, pid) => fieldsAffecting(session, pid, 'weather');
 
 /** The terrains' "double your MOVE modifier on damage rolls" for a move of `moveType`, as a synthetic
  * self-conditional `damage_note` (so combat.js's _evaluateDamageNotes handles it like Solar Beam's own

@@ -31,7 +31,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, isGrounded } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, isGrounded } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -1093,6 +1093,7 @@ function _syncLocalCombatState(session) {
     merged.pendingBideDamage = p.pendingBideDamage ?? null;
     // Psychic Terrain: grounded creatures can't use bonus actions at all (the server rejects it too).
     merged.activeTerrains = terrainsAffecting(session, p.id); // only the terrains this combatant is standing in
+    merged.activeWeathers = weathersAffecting(session, p.id); // ...and the weather (Solar Beam's "in harsh sunlight" reads this)
     const psychic = merged.activeTerrains.find(t => terrainKindOf(t) === 'psychic');
     merged.bonusActionBlockedBy = psychic && isGrounded(p) ? psychic.name : '';
     merged.bonusActionUsed = !!p.bonusActionUsed; // one bonus action per round -- see combat.js's _isBonusActionMove
@@ -3130,7 +3131,29 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       try {
         await CombatAPI.setWeather('', '');
         await CombatAPI.setTerrain('', '');
-        await CombatAPI.clearTerrainZones();
+        await CombatAPI.clearTerrainZones(); // also clears the weather zones
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
+    if (effect.kind === 'set_weather') {
+      // Sunny Day / Rain Dance / Sandstorm / Hail -- sets the shared weather, over a marked area or the whole map
+      // like a terrain move. Hail/Sandstorm's damage is server-side (routes_combat.py's _apply_weather_damage) and
+      // reads the caster's level, passed here. attackerId (closure) is the caster.
+      const caster = session?.participants?.[attackerId];
+      try {
+        const rangeText = String((findMoveRow(moveName) || [])[6] || '');
+        const area = await pickTerrainArea({
+          session, casterId: attackerId, title: effect.name || moveName, kind: weatherKindOf({ name: effect.name || moveName }),
+          radiusFt: radiusFtFromRange(rangeText),
+          // "Self, 50ft" is around the caster; "centered on a point in range" is placed by the caster instead.
+          centeredOnCaster: /\bself\b/i.test(rangeText),
+        });
+        await CombatAPI.setWeather(effect.name || moveName, effect.description || '', {
+          rounds: effect.rounds, sourceId: attackerId, sourceName: caster?.name, casterLevel: caster?.level,
+          concentration: effect.concentration ? '1' : '', cells: area.cells,
+        });
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });
       }

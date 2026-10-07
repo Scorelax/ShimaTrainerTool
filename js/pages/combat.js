@@ -3044,9 +3044,10 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     heldItemEffects
   );
 
-  // zoneOnly moves (Spikes, Uproar): the dice in their text are what the ZONE does to creatures later (a hazard popup), not a
-  // damage roll made when the move is cast -- so the cast must not open the single-target damage flow.
-  if (moveFlagsFor(moveName).zoneOnly) { computedData.damageDice = null; computedData.nextTierDice = null; }
+  // noCastDamage moves: the dice in their text aren't a damage roll made when the move is cast -- they belong to what it does LATER
+  // (Spikes/Uproar's zone hazard, Mirror Coat's reduction and return hit, Etheric Discharge's VP multiplier) -- so casting must not open
+  // the single-target damage flow, which would otherwise be triggered just by NdM appearing in the description.
+  if (moveFlagsFor(moveName).noCastDamage) { computedData.damageDice = null; computedData.nextTierDice = null; }
 
   const heldItemsHTML = _itemsSuppressed && (c.item || '').trim()
     ? '<strong>Held Items:</strong><div style="margin-top:0.3rem;opacity:0.8;">Suppressed (Magic Room or Embargo).</div>'

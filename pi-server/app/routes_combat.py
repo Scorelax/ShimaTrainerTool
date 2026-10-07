@@ -2621,7 +2621,7 @@ def _list_move_categories():
     for m in moves:
         # Only markers a client caller actually reads: Feint's negatesProtectBlock, Phantom Tendril's
         # ignoresTargetStatChanges (target-picker.js skips the target's AC modifiers).
-        marks = {k: True for k in ('negatesProtectBlock', 'ignoresTargetStatChanges', 'ignoresTargetAcBoosts', 'zoneOnly') if m.get(k)}
+        marks = {k: True for k in ('negatesProtectBlock', 'ignoresTargetStatChanges', 'ignoresTargetAcBoosts', 'noCastDamage') if m.get(k)}
         # Semi-invulnerable states: `semiInvulnerable` (the state Dig/Fly/... puts the user in) and
         # `hitsStates` (states a move can still hit, e.g. Earthquake -> underground).
         if m.get('semiInvulnerable'):

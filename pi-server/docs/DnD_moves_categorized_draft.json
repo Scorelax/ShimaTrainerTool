@@ -5046,7 +5046,6 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "trigger_saving_throw",
         "potential_drain_attacker_vp"
       ],
       "description": "When hit by a melee attack, you may use this reaction to zap your attacker, forcing it to attempt a DEX save. On a failure, the VP cost is multiplied by 1d4.",
@@ -5074,7 +5073,8 @@
           "healFraction": 0,
           "note": "On a failed DEX save the attacker's move VP cost is multiplied by 1d4: it loses cost x (d4 - 1) more, having already paid it once."
         }
-      ]
+      ],
+      "noCastDamage": true
     },
     {
       "name": "Fusion Bolt",
@@ -10175,7 +10175,8 @@
           ],
           "note": "Cold-resistance and light flavour not modeled."
         }
-      ]
+      ],
+      "noCastDamage": true
     },
     {
       "name": "Fire Spin",
@@ -15274,7 +15275,8 @@
         }
       ],
       "reactionTrigger": "beneficial",
-      "reactionRange": 15
+      "reactionRange": 15,
+      "noCastDamage": true
     },
     {
       "name": "Stun Spore",
@@ -15345,7 +15347,8 @@
           ],
           "target": "self"
         }
-      ]
+      ],
+      "noCastDamage": true
     },
     {
       "name": "Tera Drain",
@@ -16387,7 +16390,8 @@
             }
           ]
         }
-      ]
+      ],
+      "noCastDamage": true
     },
     {
       "name": "Spikes",
@@ -16453,7 +16457,7 @@
           "target": "self"
         }
       ],
-      "zoneOnly": true
+      "noCastDamage": true
     },
     {
       "name": "Stomping Tantrum",
@@ -23682,7 +23686,6 @@
       "vpCost": "15",
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
       "soundBased": true,
-      "zoneOnly": true,
       "effects": [
         {
           "kind": "set_terrain",
@@ -23747,7 +23750,8 @@
           ],
           "note": "During the uproar you cannot use any other move."
         }
-      ]
+      ],
+      "noCastDamage": true
     },
     {
       "name": "Vice Grip",
@@ -26686,7 +26690,6 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "damage",
         "self_reduce_damage"
       ],
       "description": "When subject to a ranged attack, you can attempt to decrease the damage and send some back at the attacker in range. Using this reaction, the damage is decreased by 1d6 + MOVE. If this causes the damage to fall below zero, the attack is deflected and you may make a ranged attack roll to send it back at the attacker for 1d6 + MOVE psychic damage.",
@@ -26751,7 +26754,8 @@
           ],
           "note": "Reduces the hit by the roll; if that wipes it out, you may roll a ranged attack to send it back at the attacker."
         }
-      ]
+      ],
+      "noCastDamage": true
     },
     {
       "name": "Mist Ball",

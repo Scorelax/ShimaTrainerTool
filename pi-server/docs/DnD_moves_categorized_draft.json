@@ -597,8 +597,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "damage_activated_by_fire_move"
+        "unknown"
       ],
       "description": "You coat a creature in an explosive powder, which will ignite if exposed to fire. The powder remains on the target until the target washes it off with water or spends 1 minute cleaning it off manually, but becomes neutralized after 1 hour. When this powder expodes, it automatically deals 3d10 fire damage to the creature coated by it. When a creature in range other than yourself activates a damaging fire-type move, you may use your reaction to release a spray of flammable powder that explodes as it hits either the user or a creature affected by the fire move. In the case of this move being used as a reaction, the target may attempt a Dexterity saving throw, taking half damage on a success.",
       "moveStat": "CON",
@@ -618,9 +617,7 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "recharge_locked",
-        "damage_activated_by_fire_move"
+        "unknown"
       ],
       "description": "You emit a cloud of fine, explosive powder in a 20ft. radius around you, respecting physical boundaries, which will ignite on contact with fire. When this powder expodes, all creatures affected must succeed a Dexterity saving throw, taking 4d12 fire damage on a failed save, half as much on a success. After the initial use of this move, it will spread out by 5 feet per round until the cloud covers a 40ft. radius. The powder lingers in the air for 1 hour before it settles and becomes neutralized.",
       "moveStat": "CON",
@@ -5742,12 +5739,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You rush forward in a flash of electricity with extended reach, slamming into a creature. When activating this move, you flash forward 15 feet and make a melee attack roll against a creature, dealing 2d8 + Move electric damage on a hit. On a hit, you also take a quarter of the total (rounded down) in typeless recoil damage.",
       "moveStat": "STR/DEX",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.25,
+          "basis": "damage_dealt",
+          "damageType": "",
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take a quarter of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Wild Charge",
@@ -5763,12 +5779,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You shroud yourself in electricity and charge at a creature. Make a melee attack, dealing 2d8 + MOVE electric damage on a hit, but taking 1/4 of the damage (rounded down) in recoil damage.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.25,
+          "basis": "damage_dealt",
+          "damageType": "",
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take a quarter of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Zap Cannon",
@@ -7041,12 +7076,31 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You draw forth a powerful natural essence, concentrating it into a beam of light 80ft long and 5 feet wide. All creatures caught in the blast must make DEX saving throw against your Move DC, taking 4d12 + MOVE fairy damage on a failure, or half as much on a success. The user takes recoil damage equal to half the damage rolled.",
       "moveStat": "DEX/CHA",
       "vpCost": "35",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.5,
+          "basis": "damage_rolled",
+          "damageType": "",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take half of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Light Spike",
@@ -11311,12 +11365,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You tuck in your wings and dive at an opponent. Make a melee attack, dealing 3d10 + MOVE flying damage on a hit. On a hit, you also take a quarter of the total (rounded down) in recoil damage.",
       "moveStat": "STR/DEX",
       "vpCost": "15",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.25,
+          "basis": "damage_dealt",
+          "damageType": "",
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take a quarter of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Chatter",
@@ -15323,12 +15396,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You slam your rough body against a creature, taking serious recoil damage. Make an attack roll against a target, dealing 2d10 + MOVE grass damage on a hit. On a hit, you also take a quarter of the damage dealt in typeless recoil damage.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d10 at level 5, 4d10 at level 10, and 6d10 at level 17."
+      "scaling": "The damage dice for this move changes to 3d10 at level 5, 4d10 at level 10, and 6d10 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.25,
+          "basis": "damage_dealt",
+          "damageType": "",
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take a quarter of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Worry Seed",
@@ -18629,12 +18721,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You commit a massive attack against an opponent. Make a melee attack against a target, doing 3d8 + MOVE normal damage on a hit, but taking a quarter of the total damage (rounded down) in recoil.",
       "moveStat": "STR/DEX",
       "vpCost": "6",
-      "scaling": "The damage dice for this move changes to 4d8 at level 5, 5d8 at level 10, and 8d8 at level 17."
+      "scaling": "The damage dice for this move changes to 4d8 at level 5, 5d8 at level 10, and 8d8 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.25,
+          "basis": "damage_dealt",
+          "damageType": "",
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take a quarter of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Echoed Voice",
@@ -19703,12 +19814,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You lower your head and charge at a creature. Make a melee attack. On a hit, you deal 3d8 + MOVE normal damage, taking a quarter of the total damage (rounded down) in typeless recoil.",
       "moveStat": "STR",
       "vpCost": "6",
-      "scaling": "The damage dice for this move changes to 4d8 at level 5, 5d8 at level 10, and 8d8 at level 17."
+      "scaling": "The damage dice for this move changes to 4d8 at level 5, 5d8 at level 10, and 8d8 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.25,
+          "basis": "damage_dealt",
+          "damageType": "",
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take a quarter of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Headbutt",
@@ -23045,12 +23175,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You sacrifice your own position to take down a creature. Roll a melee attack roll. On a hit, you deal 2d8 + MOVE normal damage, taking a quarter of the total damage (rounded down) in typeless recoil.",
       "moveStat": "STR",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.25,
+          "basis": "damage_dealt",
+          "damageType": "",
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take a quarter of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Tearful Look",
@@ -25361,9 +25510,7 @@
       },
       "reaction": false,
       "categories": [
-        "trigger_saving_throw",
-        "multi_hit_aoe",
-        "situational_use"
+        "unknown"
       ],
       "description": "You attempt to suppress strong emotions in a group of creatures. Each creature in a 20-foot-radius sphere centered on a point you choose within range must make a Charisma saving throw; a creature can choose to fail this saving throw if it wishes. If a creature fails its saving throw, choose one of the following two effects. You can suppress any effect causing a target to be charmed or frightened. When this spell ends, any suppressed effect resumes, provided that its duration has not expired in the meantime. Alternatively, you can make a target indifferent about creatures of your choice that it is hostile toward. This indifference ends if the target is attacked or harmed by, or if it witnesses any of its friends being harmed. When the effect ends, the creature becomes hostile again, unless the DM rules otherwise.",
       "moveStat": "WIS/CHA",
@@ -28183,12 +28330,31 @@
       "reaction": false,
       "categories": [
         "damage",
-        "recoil"
+        "recoil",
+        "self_recoil"
       ],
       "description": "You lower your head to deliver a dangerous headbutt. Make a melee attack, dealing 3d10 + MOVE rock damage on a hit. On a hit, the user takes 1/2 the damage dealt in typeless recoil.",
       "moveStat": "STR",
       "vpCost": "10",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "recoil",
+          "fraction": 0.5,
+          "basis": "damage_dealt",
+          "damageType": "",
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take half of the damage as typeless recoil (rounded down)."
+        }
+      ]
     },
     {
       "name": "Petrifying Gaze",

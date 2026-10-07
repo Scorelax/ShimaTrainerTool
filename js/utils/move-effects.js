@@ -225,6 +225,7 @@ export function statusLabel(s) {
   if (s.kind === 'reroll_damage') {
     return 'Reroll their damage, take the lower';
   }
+  if (s.kind === 'recoil') return `Take ${s.fraction === 0.5 ? 'half' : s.fraction === 0.25 ? 'a quarter' : `${Math.round((s.fraction || 0) * 100)}%`} of the damage as recoil`;
   if (s.kind === 'hp_equalize') return s.mode === 'average' ? 'Both of you go to the average of your current HP' : "Bring the target's HP down to yours";
   if (s.kind === 'consume_item') return 'Your held item is consumed';
   if (s.kind === 'quash') return 'Move the target to the bottom of the initiative order this round';

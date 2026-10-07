@@ -331,6 +331,9 @@ def tag_for(e):
         # disabled" -- read off the shared log, see combat-wip.js's
         # _handleDisableLastUsedMove.
         base = 'disable_last_used_move'
+    elif e['kind'] == 'recoil':
+        # Volt Tackle/Brave Bird/Head Smash/... -- typeless self-damage, see combat-wip.js's _handleRecoil (v84).
+        base = 'recoil'
     elif e['kind'] in ('hp_equalize', 'consume_item', 'quash', 'secondary_damage'):
         # Endeavor/Pain Split, Fling, Quash, Spud Bomb -- see combat-wip.js's _offerMoveEffects dispatch (v83).
         base = e['kind'] + (f"_{e['mode']}" if e.get('mode') else '')

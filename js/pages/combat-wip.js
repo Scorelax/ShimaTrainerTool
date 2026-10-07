@@ -3026,6 +3026,11 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleNegateDamage({ reactorId: attackerId, moveName });
       continue;
     }
+    if (effect.kind === 'recoil') {
+      // Volt Tackle, Brave Bird, Head Smash, ... -- typeless self-damage, a fraction of what the hit did.
+      await _handleRecoil({ casterId: attackerId, effect, moveName, ctx });
+      continue;
+    }
     if (effect.kind === 'hp_equalize') {
       // Endeavor / Pain Split -- sets HP from the caster's and the target's current values.
       await _handleHpEqualize({ casterId: attackerId, targetId: pick.targetId, effect, moveName });
@@ -3778,6 +3783,28 @@ async function _handleDealDamageToAttacker({ reactorId, effect, moveName }) {
   if (!amount) return;
   try {
     await CombatAPI.applyDamage(reactorId, original.actorId, amount, effect.damageType || '', reactor.name, moveName);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+/** Recoil -- "you take a quarter/half of the damage dealt in typeless recoil, rounded down". `basis: 'damage_dealt'` reads what the
+ * hit just did (the same number a drain heal uses); `'damage_rolled'` (Light of Ruin: an area move with a per-target save, so
+ * there's no single dealt number) asks the table for the rolled total. Applied through the ordinary damage path against the user
+ * themself with no damage type (so no type-chart multiplier, and temp HP absorbs first). */
+async function _handleRecoil({ casterId, effect, moveName, ctx }) {
+  const caster = session?.participants?.[casterId];
+  if (!caster) return;
+  let base = Number.isFinite(ctx?.damageDealt) ? ctx.damageDealt : null;
+  if (effect.basis === 'damage_rolled' || base === null) {
+    const typed = await showCombatPrompt(`${moveName}: what was the damage rolled? ${caster.name} takes ${effect.fraction === 0.5 ? 'half' : 'a quarter'} of it as recoil.`, { title: 'Recoil', min: 0 });
+    if (typed === null || typed === undefined || typed === '') return;
+    base = parseInt(typed, 10);
+  }
+  const recoil = Math.floor((Number(base) || 0) * (effect.fraction || 0));
+  if (!(recoil > 0)) return;
+  try {
+    await CombatAPI.applyDamage(casterId, casterId, recoil, effect.damageType || '', caster.name, moveName);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }

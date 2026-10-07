@@ -2603,6 +2603,8 @@ def _move_token(state, pid, col, row, z=None):
     current = state['board']['tokens'].get(pid)
     z0 = (current or {}).get('z', 0)
     z1 = z0 if z is None else z
+    if current and (col, row, z1) == (current['col'], current['row'], z0):
+        raise ValueError(f"{participant['name']} is already there -- movement comes in 5ft steps")
     if z1 != z0 or z1 < 0:
         # Leaving the ground needs a way to fly (a flying/hovering speed, Levitate, Magnet Rise, ...); a creature with no
         # `speeds` recorded at all (a DM's freeform enemy) is untracked, same convention as the movement budget below.

@@ -13437,7 +13437,7 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "heal_target_or_aoe"
+        "unknown"
       ],
       "description": "When a creature in range falls in battle, you may cause a cactus to grow out of it, draining its remaining life force as it sprouts 1d4 + MOVE cactus fruit. The fallen creature now has one failed death save. The cactus fruit may be picked and consumed to heal 2d4 +2 HP.",
       "moveStat": "None",

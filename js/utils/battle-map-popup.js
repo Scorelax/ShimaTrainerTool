@@ -359,6 +359,9 @@ function _renderGrid() {
     const [col, row] = cell.dataset.cell.split(',').map(Number);
     cell.addEventListener('click', () => {
       if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
+      const own = _selected();
+      // Standing still isn't a move (movement comes in 5ft steps) -- unless an altitude change is staged with it.
+      if (own && own.pos.col === col && own.pos.row === row && (_stagedAlt === null || _stagedAlt === (own.pos.z || 0))) return;
       _stagedDestination = { col, row };
       _render();
     });

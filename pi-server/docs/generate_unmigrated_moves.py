@@ -179,6 +179,20 @@ def main():
     for m in sorted(unknown_only, key=lambda m: m['name']):
         lines.append(f"- **{m['name']}** -- {m['description'][:140]}")
 
+    # A direct check that does NOT go through the category buckets above: every reaction move (the data's own
+    # `action` says so) that has neither structured `effects` nor a top-level reaction flag. The buckets only look at
+    # category tags, and `counter_reaction_effect` was never one of the tags that marks a move as needing work -- so
+    # Reflect, Counter, Mirror Coat & co. sat in section 4 looking "done" (found 2026-10-07).
+    unautomated_reactions = [
+        m for m in moves
+        if str(m.get('action', '')).lower().startswith('1 reaction') and not m.get('effects') and not m.get('reactionTrigger')
+        and 'unknown' not in m.get('categories', []) and m['name'] not in HANDLED_OUTSIDE_SCHEMA
+    ]
+    lines.append(f'\n## 3b. Reaction moves with no `effects` and no reaction flag ({len(unautomated_reactions)}) -- REAL GAPS\n')
+    lines.append('Checked straight off each move\'s own `action` text, independent of the category buckets above.\n')
+    for m in sorted(unautomated_reactions, key=lambda m: m['name']):
+        lines.append(f"- **{m['name']}** -- {m['description'][:140]}")
+
     lines.append(f'\n## 4. Pure mechanical shape -- correctly has no `effects`, nothing to do ({len(fine_as_is)})\n')
     lines.append(
         'Plain damage / save-for-damage / multi-hit / recharge / conditional-damage-formula moves '

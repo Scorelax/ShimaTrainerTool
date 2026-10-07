@@ -1431,7 +1431,7 @@
       "reaction": false,
       "categories": [
         "damage",
-        "field_terrain",
+        "unknown",
         "recharge_locked"
       ],
       "description": "You call down the combined light of every star it has ever seen. This devastating attack affects all hostile creatures within range. All creatures in the affected zone must make a Dexterity saving throw, taking 20d12 + MOVE Cosmic damage on a failure or half on a success. Additionally, the intense stellar energy permanently changes the landscape within the area (creating crystal formations, changing terrain type, etc.). Friendly creatures in the area are protected from the blast. This move can only be used when Jirachi's third eye is fully open.",
@@ -4964,12 +4964,32 @@
       },
       "reaction": false,
       "categories": [
-        "field_terrain"
+        "field_terrain",
+        "set_terrain"
       ],
       "description": "You disperse electric particles that charge the battlefield. Until the beginning of your next turn, any normal-type move activated within 50 feet of you is considered electric-type.",
       "moveStat": "None",
       "vpCost": "6",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Ion Deluge",
+          "description": "Normal-type moves used here are electric-type until the caster's next turn.",
+          "radiusFt": 50,
+          "center": "caster",
+          "rule": "ion_deluge",
+          "untilSourceTurn": true,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Magnet Rise",
@@ -6686,12 +6706,47 @@
       },
       "reaction": false,
       "categories": [
-        "field_terrain"
+        "field_terrain",
+        "set_terrain"
       ],
       "description": "You create a magical ring on the ground that encircles a 15ft. radius. For the duration, the DC for critical hits is lowered by 1 for any move activated within the circle.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": "The DC is lowered by 2 at level 10, and 3 at level 17."
+      "scaling": "The DC is lowered by 2 at level 10, and 3 at level 17.",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Fortune Ring",
+          "description": "Moves used from inside the ring have a lower critical hit DC.",
+          "rounds": 3,
+          "concentration": true,
+          "radiusFt": 15,
+          "center": "point",
+          "rule": "fortune_ring",
+          "critTiers": [
+            [
+              1,
+              1
+            ],
+            [
+              10,
+              2
+            ],
+            [
+              17,
+              3
+            ]
+          ],
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Geomancy",
@@ -15351,12 +15406,32 @@
       },
       "reaction": false,
       "categories": [
-        "field_terrain"
+        "field_terrain",
+        "set_terrain"
       ],
       "description": "You crack open the ground with devastating force. Choose a target in range and roll a d20. On a 20, the target falls into the crack and vanishes into the abyss. On any other roll, or if targeting a flying creature, this move has no effect. The area in a 20 foot radius around the target becomes difficult terrain. If the target's level is 10 more than your own, this move automatically fails.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Fissure",
+          "description": "Difficult terrain: grounded creatures pay double movement here. On a d20 of 20 the target falls into the abyss.",
+          "radiusFt": 20,
+          "center": "point",
+          "rule": "fissure",
+          "difficult": true,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Fossilize",
@@ -15721,12 +15796,32 @@
       },
       "reaction": false,
       "categories": [
-        "field_terrain"
+        "field_terrain",
+        "set_terrain"
       ],
       "description": "You imbue the ground around you with a mystical layer of natural energy, like tilling fresh soil. For three rounds, grass-type creatures double their STAB bonus when activating a grass-type move within the affected area.",
       "moveStat": "None",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Rototiller",
+          "description": "Grass-type creatures here double their STAB bonus on grass-type moves.",
+          "rounds": 3,
+          "radiusFt": 50,
+          "center": "caster",
+          "rule": "rototiller",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Sand Attack",
@@ -15909,12 +16004,55 @@
       "categories": [
         "damage",
         "field_terrain",
-        "trigger_saving_throw"
+        "trigger_saving_throw",
+        "set_terrain"
       ],
       "description": "You scatter spikes across a 15ft radius area centered on a point within 60ft. The area becomes hazardous terrain for 1 minute. When a creature enters the area or starts its turn there, it takes 1d6 + MOVE ground damage (DEX save for half). A creature can only take this damage once per turn.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Spikes",
+          "description": "Hazardous ground: a creature that enters or starts its turn here takes ground damage (DEX save for half), once per turn.",
+          "rounds": 10,
+          "radiusFt": 15,
+          "center": "point",
+          "rule": "spikes",
+          "hazard": {
+            "damageType": "Ground",
+            "ability": "DEX",
+            "diceTiers": [
+              [
+                1,
+                "1d6"
+              ],
+              [
+                5,
+                "1d8"
+              ],
+              [
+                10,
+                "1d10"
+              ],
+              [
+                17,
+                "2d6"
+              ]
+            ],
+            "addMove": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Stomping Tantrum",
@@ -25680,12 +25818,33 @@
       "reaction": false,
       "categories": [
         "cannot_use_item",
-        "field_terrain"
+        "field_terrain",
+        "set_terrain"
       ],
       "description": "You employ your psychic power to suppress the effect of all held items in a 50 foot circle, centered on you.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Magic Room",
+          "description": "Held items have no effect for creatures here.",
+          "rounds": 5,
+          "concentration": true,
+          "radiusFt": 50,
+          "center": "caster",
+          "rule": "magic_room",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Meditate",
@@ -27266,12 +27425,25 @@
       "reaction": false,
       "categories": [
         "field_terrain",
-        "unknown"
+        "trick_room"
       ],
       "description": "The world around you seems to spin for a moment, and the whole battlefield is hit with a bizarre feeling. Starting at the beginning of the next round of combat after you activate this move, the initiative order is permanently reversed.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "trick_room",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Vertigo Blast",
@@ -27346,12 +27518,32 @@
       "reaction": false,
       "categories": [
         "field_terrain",
-        "unknown"
+        "set_terrain"
       ],
       "description": "You create a bizarre vibe in the air in a 50ft circle, centered on you. For the duration, all WIS saves become CON saves and all CON saves become WIS saves.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Wonder Room",
+          "description": "For creatures here, WIS saves become CON saves and CON saves become WIS saves.",
+          "rounds": 10,
+          "concentration": true,
+          "radiusFt": 50,
+          "center": "caster",
+          "rule": "wonder_room",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Zen Headbutt",
@@ -28955,8 +29147,7 @@
       },
       "reaction": false,
       "categories": [
-        "protect_negate",
-        "field_terrain"
+        "unknown"
       ],
       "description": "You emit a strong vibration, creating a dome barrier in a 15ft. radius around you. For the duration, creatures must succeed a Strength check against your move DC in order to pass through the barrier, and ranged attacks can't pass through it. You may allow a creature to pass through, automatically succeeding the saving throw.",
       "moveStat": "STR/WIS",

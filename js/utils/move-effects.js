@@ -1186,3 +1186,45 @@ export function mergeRollMode(current, extra) {
   if (!current || current === 'normal') return extra;
   return current === extra ? current : 'normal';
 }
+
+
+// ---------------------------------------------------------------------------
+// Zone rules (Spikes, Fissure, Rototiller, Fortune Ring, Ion Deluge, Magic Room, Wonder Room). A zone cast by one of
+// those moves carries a `rule` (and rule-specific data) -- conditions.py / routes_combat.py enforce the server half
+// (hazards, difficult-terrain movement cost); these helpers are the client half, always applied to the zones
+// affecting the creature in question (see terrainsAffecting).
+// ---------------------------------------------------------------------------
+
+/** True when any of `terrains` is a zone with this `rule`. */
+export function zoneRuleActive(terrains, rule) {
+  return (terrains || []).some(t => t?.rule === rule);
+}
+
+/** The value of the last tier `[[minLevel, value], ...]` the level has reached (Grassy Terrain's heal dice, Spikes' dice, Fortune Ring's crit drop). */
+export function tierAt(tiers, level) {
+  let out = null;
+  for (const [minLevel, value] of tiers || []) if ((Number(level) || 1) >= minLevel) out = value;
+  return out;
+}
+
+/** Fortune Ring: how much lower the crit DC is for a move used inside it -- the best of any ring the attacker stands in. */
+export function critReductionFrom(terrains) {
+  return Math.max(0, ...(terrains || []).filter(t => t?.rule === 'fortune_ring').map(t => Number(t.critReduction) || 0));
+}
+
+/** The cells a straight move from (c0, r0) to (c1, r1) enters, start excluded. Mirrors routes_combat.py's _path_cells
+ * exactly (floor(x + 0.5) on both sides so ties break identically). */
+export function pathCells(c0, r0, c1, r1) {
+  const n = Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0));
+  const out = [];
+  for (let i = 1; i <= n; i++) out.push([c0 + Math.floor((c1 - c0) * i / n + 0.5), r0 + Math.floor((r1 - r0) * i / n + 0.5)]);
+  return out;
+}
+
+/** Feet a move costs the participant `p`: 5 per cell entered, 10 for a cell in a `difficult` zone (Fissure) unless `p`
+ * isn't grounded. Mirrors routes_combat.py's _move_cost_ft -- the map previews exactly what the server will charge. */
+export function moveCostFt(session, p, c0, r0, c1, r1) {
+  const difficult = new Set();
+  if (isGrounded(p)) for (const z of session?.terrainZones || []) if (z.difficult) (z.cells || []).forEach(c => difficult.add(c));
+  return pathCells(c0, r0, c1, r1).reduce((ft, [c, r]) => ft + (difficult.has(`${c},${r}`) ? 10 : 5), 0);
+}

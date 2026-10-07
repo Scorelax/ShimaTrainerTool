@@ -30,6 +30,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
+import { moveCostFt } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, tokenCenter, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 
 const CONE_LENGTHS_FT = [0, 15, 30, 60]; // 0 = preview off
@@ -172,8 +173,10 @@ function _remainingFt(p, type) {
  * Matches routes_combat.py's own _move_token calc exactly (kept in sync
  * manually, same as _activeParticipantId above) since the client needs to
  * preview the same number the server will actually enforce. */
-function _distanceFt(fromCol, fromRow, toCol, toRow) {
-  return Math.max(Math.abs(toCol - fromCol), Math.abs(toRow - fromRow)) * 5;
+function _distanceFt(fromCol, fromRow, toCol, toRow, p = null) {
+  // Difficult ground (Fissure) doubles the cost of the tiles entered -- see move-effects.js's moveCostFt, which mirrors
+  // the server's charge exactly. Without a participant to judge groundedness it's the plain straight-line distance.
+  return p ? moveCostFt(_session, p, fromCol, fromRow, toCol, toRow) : Math.max(Math.abs(toCol - fromCol), Math.abs(toRow - fromRow)) * 5;
 }
 
 /** Turns the selected token by `delta` degrees (a multiple of 45). Applied locally right away so it feels instant;
@@ -249,7 +252,7 @@ function _renderMovePanel() {
   let stageRow = '';
   if (_stagedDestination && _selectedTokenId === activeId) {
     const current = _session.board.tokens[activeId];
-    const distance = current ? _distanceFt(current.col, current.row, _stagedDestination.col, _stagedDestination.row) : 0;
+    const distance = current ? _distanceFt(current.col, current.row, _stagedDestination.col, _stagedDestination.row, p) : 0;
     const bestRemaining = Math.max(...p.speeds.map(s => _remainingFt(p, s.type)));
     const canMove = distance <= bestRemaining;
 
@@ -328,7 +331,7 @@ function _renderGrid() {
     const classes = [];
     const zone = zones.get(key);
     if (zone) classes.push(`zone-${zone[0]}`);
-    if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row) <= bestRemaining) classes.push('reach');
+    if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row, sel.p) <= bestRemaining) classes.push('reach');
     if (cone?.has(key)) classes.push('cone');
     if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) classes.push('staged');
     return classes.join(' ');

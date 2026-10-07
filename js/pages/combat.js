@@ -6,7 +6,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
-import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet } from '../utils/move-effects.js';
+import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, zoneRuleActive } from '../utils/move-effects.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
@@ -2951,6 +2951,10 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // downstream -- STAB, the popup colour/label, and the damage handed to the shared-combat callbacks below.
   const _weatherType = weatherMoveType(moveEffectsFor(moveName), _weathers);
   if (_weatherType && _weatherType !== move[1]) { move = [...move]; move[1] = _weatherType; }
+  // The zones this combatant is standing in (a tile-limited zone only counts for whoever is on it).
+  const _zones = c.activeTerrains || (state.terrain ? [state.terrain] : []);
+  // Ion Deluge: "any normal-type move activated within 50 feet of you is considered electric-type".
+  if (zoneRuleActive(_zones, 'ion_deluge') && move[1] === 'Normal') { move = [...move]; move[1] = 'Electric'; }
   // Storm Surge ("only while it is raining"), Aurora Veil ("only while it is hailing").
   const _weatherBlock = weatherRequirementUnmet(moveEffectsFor(moveName), _weathers);
 
@@ -2984,7 +2988,9 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   const trainerLevel = parseInt(trainerData[2]) || 1;
   const specializationsStr = trainerData[24] || '';
 
-  const heldItemNames = (c.item || '').split(',').map(s => s.trim()).filter(Boolean);
+  // Magic Room suppresses held items for everyone inside it.
+  const _itemsSuppressed = zoneRuleActive(_zones, 'magic_room');
+  const heldItemNames = _itemsSuppressed ? [] : (c.item || '').split(',').map(s => s.trim()).filter(Boolean);
   const cachedItems = getCachedItems();
   const heldItemEffects = heldItemNames.map(name => {
     const dbItem = cachedItems.find(i => i.name === name);
@@ -3005,7 +3011,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       // WIP-only bridged field (combat-wip.js's _syncLocalCombatState),
       // undefined (-> computeMoveData's own default of 1) on the legacy
       // standalone engine.
-      stabMultiplier: c.stabMultiplier,
+      // Rototiller: grass-type creatures inside it double their STAB bonus on grass-type moves.
+      stabMultiplier: (c.stabMultiplier || 1) * (zoneRuleActive(_zones, 'rototiller') && move[1] === 'Grass' && (c.types || []).includes('Grass') ? 2 : 1),
       // Live `damage_rolls` stat statuses -- WIP-bridged, undefined on the legacy engine.
       damageRollBonus: c.damageRollBonus,
     },
@@ -3013,7 +3020,9 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     heldItemEffects
   );
 
-  const heldItemsHTML = heldItemNames.length > 0
+  const heldItemsHTML = _itemsSuppressed && (c.item || '').trim()
+    ? '<strong>Held Items:</strong><div style="margin-top:0.3rem;opacity:0.8;">Suppressed by Magic Room.</div>'
+    : heldItemNames.length > 0
     ? '<strong>Held Items:</strong>' + heldItemNames.map(name => {
         const dbItem = cachedItems.find(i => i.name === name);
         return dbItem

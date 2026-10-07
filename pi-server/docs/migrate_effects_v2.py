@@ -264,6 +264,9 @@ def tag_for(e):
         # redirect it into a ranged attack" -- see combat-wip.js's
         # _handleRedirectAvoidedDamage.
         base = 'redirect_avoided_damage'
+    elif e['kind'] == 'trick_room':
+        # Trick Room -- reverses the initiative order from the next round, see routes_combat.py's _trick_room (v80).
+        base = 'trick_room'
     elif e['kind'] == 'set_weather':
         # Sunny Day/Rain Dance/Sandstorm/Hail -- sets the shared weather over a marked area, see combat-wip.js's own
         # branch in _offerMoveEffects (v78).

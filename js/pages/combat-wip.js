@@ -10,12 +10,14 @@
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setWeatherAttackModeResolver } from '../utils/target-picker.js';
+import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
-import { injectBattleMapStyles } from '../utils/battle-map-view.js';
+import { injectBattleMapStyles, zoneKind } from '../utils/battle-map-view.js';
+import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { pickRepositionCell } from '../utils/reposition-picker.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
@@ -31,7 +33,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -799,6 +801,11 @@ function _lastHitMoveStreak(session, pid) {
 }
 
 setMoveFlagResolver((moveName) => moveFlagsFor(moveName));
+// Wonder Room: WIS saves become CON saves and CON saves become WIS saves for creatures standing in it.
+setSaveAbilityResolver((ability, saver) => {
+  if (!saver?.id || !zoneRuleActive(terrainsAffecting(session, saver.id), 'wonder_room')) return ability;
+  return ability === 'WIS' ? 'CON' : ability === 'CON' ? 'WIS' : ability;
+});
 // Hurricane's advantage in rain / disadvantage in harsh sunlight, read off the weather the attacker stands in.
 setWeatherAttackModeResolver((moveName, attackerId) => weatherAttackMode(moveEffectsFor(moveName), weathersAffecting(session, attackerId)));
 // Semi-invulnerable targets (underground, airborne, ...) are hidden from every picker unless the move
@@ -2043,6 +2050,7 @@ export function attachCombatWipListeners() {
       updateBattleMap(session);
       updateBattleLog(session);
       _maybePromptStartOfTurnSaves(session);
+      _maybePromptHazards(session);
       _maybeShowReactionPrompt(session);
       return;
     }
@@ -2055,6 +2063,7 @@ export function attachCombatWipListeners() {
     updateBattleMap(session); // no-ops if the popup isn't currently open
     updateBattleLog(session); // no-ops if the popup isn't currently open
     _maybePromptStartOfTurnSaves(session);
+    _maybePromptHazards(session);
     _maybeShowReactionPrompt(session);
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
@@ -3164,6 +3173,15 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       }
       continue;
     }
+    if (effect.kind === 'trick_room') {
+      // Trick Room -- the server flips the initiative order at the start of the next round (used again, it flips back).
+      try {
+        await CombatAPI.trickRoom();
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
     if (effect.kind === 'set_terrain') {
       // Electric/Grassy/Misty/Psychic Terrain -- sets the shared session terrain (like Defog's
       // clear_field, not a status and no target), scheduled to expire after `effect.rounds`.
@@ -3173,13 +3191,31 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       try {
         // Where does it go? The caster marks tiles on the map (pre-filled with the move's own radius around
         // them) or takes the whole map; only creatures standing on marked tiles are affected.
+        const moveRow = findMoveRow(moveName) || [];
         const area = await pickTerrainArea({
-          session, casterId: attackerId, title: effect.name || moveName, kind: terrainKindOf({ name: effect.name || moveName }),
-          radiusFt: radiusFtFromRange((findMoveRow(moveName) || [])[6]),
+          session, casterId: attackerId, title: effect.name || moveName, kind: zoneKind({ name: effect.name || moveName, rule: effect.rule }),
+          // The move's own radius wins over parsing its range text ("60ft." is Spikes' reach, not its 15ft radius);
+          // `center: 'point'` moves are placed by the caster, the rest are centered on them.
+          radiusFt: effect.radiusFt ?? radiusFtFromRange(moveRow[6]),
+          centeredOnCaster: effect.center !== 'point',
         });
+        // What the zone does for whoever stands on it (routes_combat.py's _ZONE_PROPS), resolved at the caster's level now.
+        const props = {};
+        if (effect.rule) props.rule = effect.rule;
+        if (effect.difficult) props.difficult = true;
+        if (effect.concentration) props.concentration = true;
+        if (effect.untilSourceTurn) props.untilSourceTurn = true;
+        if (effect.critTiers) props.critReduction = tierAt(effect.critTiers, caster?.level);
+        if (effect.hazard) {
+          const h = effect.hazard;
+          props.hazard = {
+            damageType: h.damageType, ability: h.ability, dice: tierAt(h.diceTiers, caster?.level) || h.dice,
+            flat: h.addMove && caster ? bestMoveStatModifier(moveRow, caster) : 0, dc,
+          };
+        }
         await CombatAPI.setTerrain(effect.name || moveName, effect.description || '', {
           rounds: effect.rounds, healDice: terrainHealDice(effect, caster?.level), sourceId: attackerId, sourceName: caster?.name,
-          cells: area.cells,
+          cells: area.cells, props: Object.keys(props).length ? props : undefined,
         });
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });
@@ -4126,7 +4162,8 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     // undefined (not false) when the roll wasn't entered, so a crit-only effect asks a human.
     // effectiveStats, not the raw record -- a live crit-range status (Focus Energy) has to
     // actually change whether this roll counts, not just show up as a number on the card.
-    crit = attackRoll === null ? undefined : attackRoll >= critThreshold(effectiveStats(attacker).critMod, categories.includes('base_crit'));
+    // Fortune Ring: a move used from inside one lowers the crit DC by its level-scaled amount.
+    crit = attackRoll === null ? undefined : attackRoll >= critThreshold(effectiveStats(attacker).critMod + critReductionFrom(terrainsAffecting(session, combatantId)), categories.includes('base_crit'));
   }
   // Laser Focus overrides whatever the roll says (there may be no roll at all, see
   // guaranteedHit above) -- computed here too (consumed further down, only once the
@@ -4727,6 +4764,29 @@ const WIP_SAVE_PROMPT_KEY = 'combatWipLastSavePrompt';
  * Ingrain, see _promptTurnHeals). Remembered per battle/round/turn in sessionStorage so a
  * repeated push or a page refresh mid-turn doesn't ask twice. Participants nobody owns (a
  * DM's enemies) aren't prompted here -- anyone can roll their save from the status badge. */
+const _hazardsPrompted = new Set();
+
+/** Spikes-style hits the server queued (see routes_combat.py's _queue_hazards): the creature's owner is asked for the damage
+ * roll and the save. A creature nobody owns (a DM's enemy) is asked on whichever device is looking -- the first to answer
+ * resolves it and the rest are taken down by the next push. */
+function _maybePromptHazards(state) {
+  const pending = state?.pendingHazards || [];
+  const liveIds = new Set(pending.map(h => h.id));
+  for (const id of [..._hazardsPrompted]) {
+    if (!liveIds.has(id)) { closeHazardPopup(id); _hazardsPrompted.delete(id); }
+  }
+  const me = _currentTrainerName();
+  for (const h of pending) {
+    if (_hazardsPrompted.has(h.id) || isHazardPopupOpen(h.id)) continue;
+    const p = state.participants?.[h.participantId];
+    if (!p || (p.owner && p.owner !== me)) continue;
+    _hazardsPrompted.add(h.id);
+    promptHazard(h).then(res => {
+      if (res) return CombatAPI.resolveHazard(h.id, res.roll, res.saved);
+    }).catch(err => showCombatAlert(err.message, { title: 'Error' }));
+  }
+}
+
 async function _maybePromptStartOfTurnSaves(state) {
   if (_promptingSaves || !state?.active || !state.started) return;
   const activeId = state.turnOrder?.[state.turnIndex];

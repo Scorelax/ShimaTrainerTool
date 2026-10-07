@@ -1081,8 +1081,23 @@ export class CombatAPI {
    * routes_combat.py's _set_terrain). `cells` (["col,row", ...]) limits it to those tiles; without it the
    * terrain covers the whole map. */
   static async setTerrain(name, effect, extra = {}) {
-    const { cells, ...rest } = extra;
-    return API.request('combat', 'set-terrain', { name, effect, ...rest, ...(cells?.length ? { cells: JSON.stringify(cells) } : {}) }, { useCache: false });
+    const { cells, props, ...rest } = extra;
+    return API.request('combat', 'set-terrain', {
+      name, effect, ...rest,
+      ...(cells?.length ? { cells: JSON.stringify(cells) } : {}),
+      // Zone rules a move attaches: { rule, hazard, difficult, critReduction, concentration, untilSourceTurn } (routes_combat.py's _ZONE_PROPS).
+      ...(props ? { props: JSON.stringify(props) } : {}),
+    }, { useCache: false });
+  }
+
+  /** Trick Room: reverses (or, used again, un-reverses) the initiative order from the start of the next round. */
+  static async trickRoom() {
+    return API.request('combat', 'trick-room', {}, { useCache: false });
+  }
+
+  /** Resolves a queued Spikes-style hazard hit: `roll` is the damage total, halved when `saved`; no roll dismisses it. */
+  static async resolveHazard(id, roll, saved) {
+    return API.request('combat', 'resolve-hazard', { id, roll: roll ?? '', saved: saved ? '1' : '' }, { useCache: false });
   }
 
   /** Removes every tile-limited terrain zone (Defog's clear_field also clears the whole-map terrain). */

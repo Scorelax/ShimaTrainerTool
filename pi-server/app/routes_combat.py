@@ -106,6 +106,14 @@ _EMPTY_STATE = {
     'terrainZones': [],
     # Same idea for weather (Sunny Day / Rain Dance / Sandstorm / Hail cast over a marked area).
     'weatherZones': [],
+    # Spikes' "enters the area or starts its turn there" hits, waiting for the creature's owner to enter the damage roll
+    # and DEX save: [{id, participantId, participantName, zoneId, zoneName, trigger, damageType, ability, dice, flat, dc, sourceId}].
+    # Queued by _queue_hazards, resolved (or dismissed) by resolve-hazard.
+    'pendingHazards': [],
+    # Trick Room: the initiative order is reversed from the NEXT round after it's used, until the battle ends or it is
+    # used again. `trickRoom` is whether it's reversed right now; `trickRoomFlip` that a cast is waiting for the next round.
+    'trickRoom': False,
+    'trickRoomFlip': False,
     # The shared battle log -- one chronological list of everything that's
     # happened this session, oldest first, visible to every viewer (see
     # battle-log-popup.js) and readable by future move-logic that needs to
@@ -396,7 +404,18 @@ def handle(conn, action, params):
     if action == 'set-terrain':
         return _mutate(conn, lambda s: _set_terrain(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
                                                     params.get('healDice'), params.get('sourceId'), params.get('sourceName'),
-                                                    json.loads(params['cells']) if params.get('cells') else None))
+                                                    json.loads(params['cells']) if params.get('cells') else None,
+                                                    json.loads(params['props']) if params.get('props') else None))
+
+    if action == 'trick-room':
+        return _mutate(conn, _trick_room)
+
+    if action == 'resolve-hazard':
+        if not params.get('id'):
+            raise ValueError('Missing hazard id')
+        roll = js_parse_int(params.get('roll'))
+        saved = str(params.get('saved', '')) in ('1', 'true')
+        return _mutate(conn, lambda s: _resolve_hazard(conn, s, params['id'], roll, saved))
 
     if action == 'clear-terrain-zones':
         return _mutate(conn, lambda s: (s.__setitem__('terrainZones', []), s.__setitem__('weatherZones', [])))
@@ -1071,7 +1090,7 @@ def _rebuild_turn_order(state):
         reverse=True,
     )
     unrolled = [pid for pid in live_ids if state['participants'][pid].get('initiative') is None]
-    state['turnOrder'] = rolled + unrolled
+    state['turnOrder'] = list(reversed(rolled + unrolled)) if state.get('trickRoom') else rolled + unrolled
 
     state['turnIndex'] = state['turnOrder'].index(current_id) if current_id in state['turnOrder'] else 0
     if state['reactingParticipantId'] not in state['participants']:
@@ -1128,6 +1147,14 @@ def _advance_turn(state):
     new_round = state['turnIndex'] == 0
     if new_round:
         state['round'] += 1
+    if new_round and state.get('trickRoomFlip'):
+        # Trick Room: "starting at the beginning of the next round ... the initiative order is permanently reversed"
+        # (used again, it reverses back). Reversing the live order is the same as rebuilding it sorted the other way.
+        state['trickRoom'] = not state.get('trickRoom')
+        state['trickRoomFlip'] = False
+        state['turnOrder'] = list(reversed(state['turnOrder']))
+        state['turnIndex'] = 0
+        _log_event(state, 'trick-room', text='Trick Room ' + ('twists the turn order -- initiative is reversed' if state['trickRoom'] else 'ends -- initiative is back to normal'))
     # Only the combatant whose normal turn is now starting gets their
     # reaction refreshed -- "usable again once their next turn comes up",
     # not a blanket reset for the whole table every lap.
@@ -1146,10 +1173,11 @@ def _advance_turn(state):
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
         _expire_statuses_by_round(state)
-    _expire_fields(state)
     starting_id = state['turnOrder'][state['turnIndex']]
+    _expire_fields(state, starting_id)
     _apply_condition_turn_damage(state, starting_id, 'start')
     _apply_weather_damage(state, starting_id)
+    _queue_hazards(state, starting_id, 'start')
     _expire_statuses_on_turn_point(state, starting_id, 'start')
 
 
@@ -2198,8 +2226,15 @@ def _set_weather(state, name, effect):
     state['weather'] = {'name': name, 'effect': effect} if name else None
 
 
+# Zone properties a move may attach (see move-effects-schema.md's set_terrain): `rule` names what the zone does for
+# creatures on it (rototiller, fortune_ring, ion_deluge, magic_room, wonder_room, spikes, fissure), `hazard` is Spikes'
+# damage, `difficult` doubles the movement cost of its tiles, `critReduction` is Fortune Ring's level-scaled crit DC drop,
+# and `untilSourceTurn` ends it when the caster's next turn begins (Ion Deluge).
+_ZONE_PROPS = ('rule', 'hazard', 'difficult', 'critReduction', 'concentration')
+
+
 def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None,
-               caster_level=None, concentration=False):
+               caster_level=None, concentration=False, props=None):
     """Shared by terrain and weather ('terrain' / 'weather'). `rounds`/`healDice`/source only come from a MOVE (see
     move-effects-schema.md's set_terrain / set_weather): `rounds` schedules the expiry (_expire_fields, run from
     _advance_turn), `healDice` is Grassy Terrain's already-level-scaled end-of-turn heal, `casterLevel` is what
@@ -2222,12 +2257,20 @@ def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=
     if source_id:
         field['sourceId'] = source_id
         field['sourceName'] = source_name
+    props = props or {}
+    for k in _ZONE_PROPS:
+        if props.get(k) not in (None, False, ''):
+            field[k] = props[k]
+    if props.get('untilSourceTurn') and source_id:
+        field['untilTurnOf'] = source_id
     if cells:
         field['id'] = uuid.uuid4().hex[:8]
         field['cells'] = sorted({str(c) for c in cells})
         zones = state.setdefault(key + 'Zones', [])
-        # Recasting the same one replaces its previous zone rather than stacking duplicates.
-        zones[:] = [z for z in zones if z['name'] != name]
+        # Recasting the same one replaces its previous zone rather than stacking duplicates -- except hazards and
+        # difficult ground, which are separate patches that can overlap.
+        if not (field.get('hazard') or field.get('difficult')):
+            zones[:] = [z for z in zones if z['name'] != name]
         zones.append(field)
     else:
         state[key] = field
@@ -2235,8 +2278,8 @@ def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=
         _wake_electric_sleepers(state)
 
 
-def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None):
-    _set_field(state, 'terrain', name, effect, rounds, heal_dice, source_id, source_name, cells)
+def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None, props=None):
+    _set_field(state, 'terrain', name, effect, rounds, heal_dice, source_id, source_name, cells, props=props)
 
 
 def _set_weather(state, name, effect, rounds=None, source_id=None, source_name=None, cells=None, caster_level=None,
@@ -2267,9 +2310,12 @@ def _wake_electric_sleepers(state):
                 _expire_status(state, p, st, 'Electric Terrain')
 
 
-def _expire_fields(state):
-    """Terrain and weather moves last a set number of rounds -- drop whole-map and zone ones whose round has come."""
+def _expire_fields(state, starting_id=None):
+    """Terrain and weather moves last a set number of rounds -- drop whole-map and zone ones whose round has come, and
+    those cast "until the beginning of your next turn" (Ion Deluge) once that participant's turn starts."""
     def over(f):
+        if f.get('untilTurnOf') and f['untilTurnOf'] == starting_id:
+            return True
         return f.get('expiresRound') is not None and state['round'] >= f['expiresRound']
     for key in ('terrain', 'weather'):
         if state.get(key) and over(state[key]):
@@ -2306,11 +2352,79 @@ def _apply_weather_damage(state, pid):
         return
 
 
+def _path_cells(c0, r0, c1, r1):
+    """The cells a straight move from (c0, r0) to (c1, r1) enters, in order (the start excluded). Mirrored exactly by
+    battle-map-view.js's pathCells -- floor(x + 0.5), not round(), so both sides break ties the same way."""
+    n = max(abs(c1 - c0), abs(r1 - r0))
+    return [(c0 + math.floor((c1 - c0) * i / n + 0.5), r0 + math.floor((r1 - r0) * i / n + 0.5)) for i in range(1, n + 1)]
+
+
+def _move_cost_ft(state, participant, c0, r0, c1, r1):
+    """Feet of movement a move costs: 5ft per cell entered, double for a cell in a `difficult` zone (Fissure) -- except
+    for creatures that aren't grounded, who fly over it. Chebyshev, like the rest of this module's distances."""
+    difficult = set()
+    if is_grounded(participant):
+        for z in state.get('terrainZones') or []:
+            if z.get('difficult'):
+                difficult.update(z.get('cells') or ())
+    return sum(10 if f"{c},{r}" in difficult else 5 for c, r in _path_cells(c0, r0, c1, r1))
+
+
+def _queue_hazards(state, pid, trigger):
+    """Spikes: a creature that enters the zone or starts its turn there takes damage -- once per turn. Queues the hit
+    for the creature's owner to resolve (the damage roll and the DEX save are entered by hand, like every other roll
+    here) rather than applying it, since neither the roll nor the save is the server's to make."""
+    participant = state['participants'].get(pid)
+    if not participant or participant.get('status') != 'participating':
+        return
+    mark = [state['round'], state['turnIndex']]
+    if participant.get('hazardHitTurn') == mark:
+        return
+    zone = next((z for z in terrains_affecting(state, pid) if z.get('hazard')), None)
+    if not zone:
+        return
+    participant['hazardHitTurn'] = mark
+    h = zone['hazard']
+    state.setdefault('pendingHazards', []).append({
+        'id': uuid.uuid4().hex[:8], 'participantId': pid, 'participantName': participant['name'], 'zoneId': zone.get('id'),
+        'zoneName': zone['name'], 'trigger': trigger, 'damageType': h.get('damageType', ''), 'ability': h.get('ability', ''),
+        'dice': h.get('dice', ''), 'flat': h.get('flat', 0), 'dc': h.get('dc'), 'sourceId': zone.get('sourceId'),
+    })
+    _log_event(state, 'hazard', text=f"{participant['name']} {'enters' if trigger == 'enter' else 'starts their turn in'} the {zone['name']}",
+               targetId=pid, targetName=participant['name'])
+
+
+def _resolve_hazard(conn, state, hazard_id, roll, saved):
+    """Applies (or, with no roll, dismisses) a queued hazard hit: `roll` is the damage total the player rolled, halved
+    (rounded down) when they passed the save. Goes through the ordinary typed-damage path, so type effectiveness and
+    temp HP apply; the zone's caster is the attacker (the target itself if they've left the battle)."""
+    pending = state.setdefault('pendingHazards', [])
+    entry = next((h for h in pending if h['id'] == hazard_id), None)
+    if not entry:
+        raise ValueError('That hazard was already resolved')
+    pending.remove(entry)
+    if roll is None or roll <= 0:
+        return
+    amount = roll // 2 if saved else roll
+    source_id = entry['sourceId'] if entry.get('sourceId') in state['participants'] else entry['participantId']
+    _apply_damage_to_target(conn, state, source_id, entry['participantId'], amount, entry['damageType'], '', turn_check=False)
+
+
+def _trick_room(state):
+    """Using Trick Room schedules the reversal for the start of the next round; using it again while it's active
+    schedules the reversal back (see _advance_turn). Cast twice before a round passes, the casts cancel."""
+    state['trickRoomFlip'] = not state.get('trickRoomFlip')
+    _log_event(state, 'trick-room', text='The world seems to spin -- the turn order will twist at the start of the next round'
+               if state['trickRoomFlip'] else 'Trick Room cancelled before it took hold')
+
+
 def _set_token_position(state, pid, col, row):
     if pid not in state['participants']:
         raise ValueError('Unknown participant: ' + pid)
     state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid)}
     _wake_electric_sleepers(state)
+    if state.get('started'):
+        _queue_hazards(state, pid, 'enter')  # forced movement (a swap, a push) into a hazard counts too
 
 
 def _facing_of(state, pid):
@@ -2476,7 +2590,7 @@ def _move_token(state, pid, col, row):
     # remaining number together afterwards.
     if participant.get('speeds'):
         current = state['board']['tokens'].get(pid)
-        distance_ft = max(abs(col - current['col']), abs(row - current['row'])) * 5 if current else 0
+        distance_ft = _move_cost_ft(state, participant, current['col'], current['row'], col, row) if current else 0
         _, best_remaining = _movement_budget(participant)
         best_remaining = _fmt_ft(best_remaining)
         if distance_ft > best_remaining:
@@ -2493,6 +2607,7 @@ def _move_token(state, pid, col, row):
     _wake_electric_sleepers(state)
     if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
         _apply_weather_damage(state, pid)  # walked into Hail/Sandstorm on their own turn
+    _queue_hazards(state, pid, 'enter')
     _log_event(state, 'move', text=f"{participant['name']} moved to ({col}, {row})",
                actorId=pid, actorName=participant['name'], col=col, row=row)
 

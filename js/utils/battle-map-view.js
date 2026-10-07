@@ -18,12 +18,19 @@ export const ZONE_RGB = {
   rain: '80,150,255',
   sandstorm: '214,176,100',
   hail: '170,225,255',
+  spikes: '214,120,70',
+  fissure: '160,120,80',
+  rototiller: '140,200,70',
+  fortune_ring: '255,214,120',
+  ion_deluge: '110,200,255',
+  magic_room: '190,120,255',
+  wonder_room: '120,130,255',
   other: '127,166,255',
 };
 
 /** Colour/class key for a terrain or weather (or a zone of either). */
 export function zoneKind(field) {
-  return terrainKindOf(field) || weatherKindOf(field) || 'other';
+  return terrainKindOf(field) || weatherKindOf(field) || (ZONE_RGB[field?.rule] ? field.rule : 'other');
 }
 
 /** "col,row" -> the kinds of every tile-limited terrain/weather zone covering that cell (first one paints it). */
@@ -50,6 +57,9 @@ export function activeTerrainSummary(session) {
       out.push({ name: z.name, kind: zoneKind(z), scope: 'zone', roundsLeft: left(z), concentration: !!z.concentration, id: z.id, key });
     }
   }
+  // Trick Room isn't a place on the map but it is a rule of the battlefield worth showing next to the zones.
+  if (session?.trickRoom) out.push({ name: 'Trick Room', kind: 'psychic', scope: 'rule', roundsLeft: null, key: 'rule', note: 'initiative reversed' });
+  else if (session?.trickRoomFlip) out.push({ name: 'Trick Room', kind: 'psychic', scope: 'rule', roundsLeft: null, key: 'rule', note: 'twists the turn order next round' });
   return out;
 }
 
@@ -62,7 +72,7 @@ export function legendHtml(session, { removable = false } = {}) {
     const rounds = t.roundsLeft == null ? '' : ` · ${t.roundsLeft} round${t.roundsLeft === 1 ? '' : 's'} left`;
     const conc = t.concentration ? ' · concentration' : '';
     const x = removable && t.id ? `<button type="button" class="bmap-legend-x" data-key="${t.key}" data-id="${t.id}" title="End this">✕</button>` : '';
-    return `<span class="bmap-legend-chip" style="--zc:${ZONE_RGB[t.kind]}"><i></i>${t.name} <small>${t.scope === 'all' ? 'whole map' : 'marked area'}${rounds}${conc}</small>${x}</span>`;
+    return `<span class="bmap-legend-chip" style="--zc:${ZONE_RGB[t.kind]}"><i></i>${t.name} <small>${t.scope === 'rule' ? t.note : (t.scope === 'all' ? 'whole map' : 'marked area') + rounds + conc}</small>${x}</span>`;
   }).join('');
 }
 

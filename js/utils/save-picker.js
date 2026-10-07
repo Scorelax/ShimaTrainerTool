@@ -88,6 +88,10 @@ function _injectStyles() {
 
 let _overlay = null;
 let _resolve = null;
+// (ability, saver) -> the ability the saver actually rolls: Wonder Room turns WIS saves into CON saves and CON saves into
+// WIS saves for creatures standing in it. Injected by combat-wip.js, which knows the session and so who is in the zone.
+let _saveAbilityResolver = (ability) => ability;
+export function setSaveAbilityResolver(fn) { _saveAbilityResolver = typeof fn === 'function' ? fn : (ability) => ability; }
 let _saveAbility = null;   // "STR".."CHA" when the caller knows which save this is (drives the auto modifier)
 let _saveModifier = null;  // the target's save modifier for that ability, null when their sheet has no data
 let _moveUser = null;      // the participant whose move this is (their "saves against its moves" statuses apply)
@@ -203,9 +207,10 @@ function _showStep2(p, name) {
   document.getElementById('savePickerStep2').hidden = false;
   document.getElementById('savePickerStep3').hidden = true;
   document.getElementById('savePickerTitle').textContent = 'Saving Throw';
-  _saveCtx = saveRollContext(_selectedTarget, _moveUser, _saveAbility);
-  _saveAutoFail = saveAutoFails(_selectedTarget, _saveAbility);
-  const baseModifier = saveModifierFor(_selectedTarget, _saveAbility);
+  const ability = _saveAbility ? _saveAbilityResolver(_saveAbility, _selectedTarget) : _saveAbility;
+  _saveCtx = saveRollContext(_selectedTarget, _moveUser, ability);
+  _saveAutoFail = saveAutoFails(_selectedTarget, ability);
+  const baseModifier = saveModifierFor(_selectedTarget, ability);
   // Live changes only mean something on top of a known modifier; with no sheet data the human types the total.
   _saveModifier = baseModifier === null ? null : baseModifier + _saveCtx.modifierDelta;
   _diceBonusExtra = 0;
@@ -215,9 +220,9 @@ function _showStep2(p, name) {
   const autoFailNote = _saveAutoFail ? `<div class="mode disadvantage">Automatically fails this save</div>` : '';
   document.getElementById('savePickerRollNotes').innerHTML =
     `${autoFailNote}${modeText ? `<div class="mode ${_saveCtx.mode}">${modeText}</div>` : ''}${_saveCtx.notes.map(n => `<div class="note">${n}</div>`).join('')}`;
-  const abilityText = _saveAbility ? ` (${_saveAbility})` : '';
+  const abilityText = ability ? ` (${ability}${ability !== _saveAbility ? `, swapped from ${_saveAbility} by Wonder Room` : ''})` : '';
   const modText = _saveModifier === null
-    ? (_saveAbility ? ' — no ability data, enter the total' : '')
+    ? (ability ? ' — no ability data, enter the total' : '')
     : ` (${_saveModifier >= 0 ? '+' : ''}${_saveModifier} modifier added automatically)`;
   document.getElementById('savePickerSaveLabel').textContent = `Saving throw roll${abilityText}${modText}`;
   document.getElementById('savePickerSaveInput').value = '';

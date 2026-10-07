@@ -1004,8 +1004,9 @@ export class CombatAPI {
   /** A player moving their own token during combat -- server rejects this
    * unless id is whoever currently has the floor (active turn or
    * mid-reaction), same authority check as useMove. */
-  static async moveToken(id, col, row) {
-    return API.request('combat', 'move-token', { id, col, row }, { useCache: false });
+  static async moveToken(id, col, row, z) {
+    // z (altitude in feet, 5ft steps) is only sent when it changes; omitted = stay at the current altitude.
+    return API.request('combat', 'move-token', { id, col, row, ...(z === undefined ? {} : { z }) }, { useCache: false });
   }
 
   /** Prone's own escape action -- stands up (ending Prone), costing half the

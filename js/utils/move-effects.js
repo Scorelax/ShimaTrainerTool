@@ -1093,7 +1093,9 @@ export function fieldsAffecting(session, pid, key) {
     const size = s === 'large' ? 2 : s === 'huge' ? 3 : 1;
     const covered = new Set();
     for (let dc = 0; dc < size; dc++) for (let dr = 0; dr < size; dr++) covered.add(`${token.col + dc},${token.row - dr}`);
-    found.push(...zones.filter(z => (z.cells || []).some(c => covered.has(c))));
+    // A zone with a `height` (ft above the ground) only reaches creatures at or below it; none = every altitude.
+    const altitude = token.z || 0;
+    found.push(...zones.filter(z => (z.cells || []).some(c => covered.has(c)) && (z.height == null || altitude <= z.height)));
   }
   return found;
 }
@@ -1221,10 +1223,19 @@ export function pathCells(c0, r0, c1, r1) {
   return out;
 }
 
-/** Feet a move costs the participant `p`: 5 per cell entered, 10 for a cell in a `difficult` zone (Fissure) unless `p`
- * isn't grounded. Mirrors routes_combat.py's _move_cost_ft -- the map previews exactly what the server will charge. */
-export function moveCostFt(session, p, c0, r0, c1, r1) {
+/** Feet a move costs: 5 per cell entered, 10 for a cell in a `difficult` zone (Fissure) -- but only when the move ends on
+ * the ground (z1 === 0), since a flyer overhead isn't slowed by the ground. Climbing/descending is 1ft per foot, and a
+ * diagonal costs the larger of its horizontal and vertical parts. Mirrors routes_combat.py's _move_cost_ft -- the map
+ * previews exactly what the server will charge. `p` is unused (altitude decides), kept so callers read naturally. */
+export function moveCostFt(session, p, c0, r0, c1, r1, z0 = 0, z1 = 0) {
   const difficult = new Set();
-  if (isGrounded(p)) for (const z of session?.terrainZones || []) if (z.difficult) (z.cells || []).forEach(c => difficult.add(c));
-  return pathCells(c0, r0, c1, r1).reduce((ft, [c, r]) => ft + (difficult.has(`${c},${r}`) ? 10 : 5), 0);
+  if (z1 === 0) for (const z of session?.terrainZones || []) if (z.difficult) (z.cells || []).forEach(c => difficult.add(c));
+  const horizontal = pathCells(c0, r0, c1, r1).reduce((ft, [c, r]) => ft + (difficult.has(`${c},${r}`) ? 10 : 5), 0);
+  return Math.max(horizontal, Math.abs(z1 - z0));
+}
+
+/** Whether `p` can leave the ground on the map: a way to fly (not grounded -- flying/hovering speed, Levitate, Magnet Rise,
+ * airborne), or no `speeds` on record at all (a DM's freeform enemy is untracked, same convention as the movement budget). */
+export function canClimb(p) {
+  return !(p?.speeds || []).length || !isGrounded(p);
 }

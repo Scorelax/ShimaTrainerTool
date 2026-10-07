@@ -52,9 +52,13 @@ function _injectStyles() {
  * @param {number|null} radiusFt  the move's own radius, to pre-paint (null = start empty)
  * @param {boolean} centeredOnCaster  false for a move "centered on a point in range" (Hail, Sandstorm): starts empty
  *                                    with the circle stamp armed, so the caster clicks where the centre goes
- * @returns {Promise<{cells: string[]} | {all: true}>}
+ * @param {number|null} heightFt  only shown in the prompt ("40ft high") -- who a cylinder actually reaches is decided by the caller
+ * @param {boolean} allowCancel  adds a Cancel button (resolves null). Off for a move whose VP is already spent; on for
+ *                               "select targets from the map", where backing out costs nothing
+ * @param {string} confirmLabel  the confirm button's text
+ * @returns {Promise<{cells: string[]} | {all: true} | null>}
  */
-export function pickTerrainArea({ session, casterId, title, kind, radiusFt, centeredOnCaster = true }) {
+export function pickTerrainArea({ session, casterId, title, kind, radiusFt, centeredOnCaster = true, heightFt = null, allowCancel = false, confirmLabel = 'Confirm area' }) {
   _injectStyles();
   return new Promise((resolve) => {
     const board = session.board;
@@ -77,7 +81,7 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
     overlay.innerHTML = `
       <div class="tap-card" style="--zc:${rgb}">
         <h3 class="tap-title">${title}</h3>
-        <div class="tap-sub">Mark where it takes effect${radiusFt && centeredOnCaster ? ` — pre-filled with a ${radiusFt}ft circle around ${caster?.name || 'the caster'}` : ''}. ${radiusFt ? 'Use the circle stamp to drop a circle on a tile, or ' : ''}click or drag to paint tiles; start a drag on a painted tile to erase. Only creatures standing on these tiles are affected.</div>
+        <div class="tap-sub">Mark where it takes effect${heightFt ? ` (${heightFt}ft high)` : ''}${radiusFt && centeredOnCaster ? ` — pre-filled with a ${radiusFt}ft circle around ${caster?.name || 'the caster'}` : ''}. ${radiusFt ? 'Use the circle stamp to drop a circle on a tile, or ' : ''}click or drag to paint tiles; start a drag on a painted tile to erase. Only creatures standing on these tiles are affected.</div>
         <div class="bmap-stage tap-stage" style="aspect-ratio:${cols} / ${rows}; --zc:${rgb}">
           <div class="bmap-grid"></div>
           <div class="bmap-tokens"></div>
@@ -87,8 +91,9 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
           ${radiusFt && casterPos ? `<button type="button" data-act="circle">Around ${caster?.name || 'caster'}</button>` : ''}
           <button type="button" data-act="all">🗺️ All map</button>
           <button type="button" data-act="clear">Clear</button>
+          ${allowCancel ? '<button type="button" data-act="cancel">Cancel</button>' : ''}
           <span class="tap-count"></span>
-          <button type="button" class="tap-confirm" data-act="confirm">Confirm area</button>
+          <button type="button" class="tap-confirm" data-act="confirm">${confirmLabel}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -111,12 +116,13 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
       const p = session.participants[id];
       if (!p) return;
       const el = document.createElement('div');
-      el.className = `bmap-token ${p.side}${id === casterId ? ' mine' : ''}`;
+      el.className = `bmap-token ${p.side}${id === casterId ? ' mine' : ''}${(pos.z || 0) > 0 ? ' airborne' : ''}`;
       Object.assign(el.style, cellRect(board, pos.col, pos.row, footprintForSize(p.size)));
       const name = visibleToViewer(p, 'name') ? p.name : '???';
       el.title = name;
       el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
       patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
+      if ((pos.z || 0) > 0) el.insertAdjacentHTML('beforeend', `<span class="bmap-alt">↑${pos.z}ft</span>`);
       tokenLayer.appendChild(el);
     });
 
@@ -167,6 +173,7 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
       else if (act === 'circle') { painted.clear(); circle().forEach(c => painted.add(c)); refresh(); }
       else if (act === 'clear') { painted.clear(); refresh(); }
       else if (act === 'all') done({ all: true });
+      else if (act === 'cancel') done(null);
       else if (act === 'confirm' && painted.size) done({ cells: [...painted] });
     });
   });

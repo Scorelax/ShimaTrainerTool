@@ -3205,6 +3205,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         if (effect.difficult) props.difficult = true;
         if (effect.concentration) props.concentration = true;
         if (effect.untilSourceTurn) props.untilSourceTurn = true;
+        if (effect.height !== undefined) props.height = effect.height; // ft above the ground the zone reaches (0 = the floor only)
         if (effect.critTiers) props.critReduction = tierAt(effect.critTiers, caster?.level);
         if (effect.hazard) {
           const h = effect.hazard;
@@ -4087,7 +4088,7 @@ async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
   const pr = session?.pendingReaction;
   const targetIds = (pr && pr.anchorId === combatantId && pr.attackerId)
     ? [pr.attackerId]
-    : await pickMultipleTargets(combatantId, { moveName });
+    : await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName) });
   if (!targetIds || !targetIds.length) return;
   for (const targetId of targetIds) {
     await _offerMoveEffects({ attackerId: combatantId, targetId, moveName, computedData, ctx, includeSelf: false });
@@ -4257,7 +4258,7 @@ async function _applyPrimaryDamage(casterId, targetId, diceRoll, moveType, speci
  * (pickTargetAgain + _resolveOneHit) otherwise (Meteor Swarm: "make as
  * many ranged attacks as there are targets"). */
 async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
-  let targetIds = await pickMultipleTargets(combatantId, { moveName });
+  let targetIds = await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName) });
   if (!targetIds || !targetIds.length) return; // closed / nobody picked -- move's own cost still applied
 
   // Wide Guard's own reaction: this app has no real blast-center/positional-
@@ -4381,7 +4382,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
   // just for allies. Gated on the move actually having a non-self heal
   // effect, so this extra prompt never shows for any other AoE move.
   if (isSaveTriggered && moveEffectsFor(moveName).some((e) => e.kind === 'heal' && e.target !== 'self')) {
-    const allyIds = await pickMultipleTargets(combatantId, { moveName });
+    const allyIds = await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName) });
     if (allyIds && allyIds.length) {
       for (const allyId of allyIds) {
         await _offerMoveEffects({
@@ -4764,6 +4765,19 @@ const WIP_SAVE_PROMPT_KEY = 'combatWipLastSavePrompt';
  * Ingrain, see _promptTurnHeals). Remembered per battle/round/turn in sessionStorage so a
  * repeated push or a page refresh mid-turn doesn't ask twice. Participants nobody owns (a
  * DM's enemies) aren't prompted here -- anyone can roll their save from the status badge. */
+/** A blast move's area for the multi-target picker's "select from the map": radius from its range text ("Self (20ft. radius)",
+ * "50ft., 10ft. radius"), height from its description ("40ft. high cylinder"), and whether it's centered on the caster or
+ * on a point the caster places. null for moves with no circular area (lines and cones aren't supported yet). */
+function _aoeAreaFor(moveName) {
+  const row = findMoveRow(moveName) || [];
+  const range = String(row[6] || '');
+  if (!/radius|circle|cylinder/i.test(range)) return null;
+  const radiusFt = radiusFtFromRange(range);
+  if (!radiusFt) return null;
+  const high = /(\d+)\s*(?:ft|feet|foot)\.?\s*high/i.exec(String(row[7] || ''));
+  return { radiusFt, heightFt: high ? Number(high[1]) : null, centeredOnCaster: /\bself\b/i.test(range) };
+}
+
 const _hazardsPrompted = new Set();
 
 /** Spikes-style hits the server queued (see routes_combat.py's _queue_hazards): the creature's owner is asked for the damage

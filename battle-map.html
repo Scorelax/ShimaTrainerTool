@@ -112,6 +112,16 @@
     background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.14), rgba(8,10,22,0.7) 75%);
     box-shadow: 0 0 0 3px rgba(var(--ring), 0.9), 0 0 14px rgba(var(--ring), 0.7), inset 0 0 10px rgba(0,0,0,0.5);
   }
+  /* Altitude: a flyer is drawn lifted off its tile with a shadow below and a badge (battle-map.js). */
+  .map-token.airborne .map-token-portrait { transform: translateY(-14%); }
+  .map-token.airborne .map-disk::before {
+    content: ''; position: absolute; left: 14%; right: 14%; bottom: 3%; height: 16%; border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.65), rgba(0,0,0,0) 70%);
+  }
+  .map-alt {
+    position: absolute; top: -2px; right: -2px; z-index: 3; font-size: 0.8rem; font-weight: 800; line-height: 1;
+    padding: 0.2rem 0.45rem; border-radius: 999px; color: #0b0d1a; background: rgb(var(--ring));
+  }
   /* The sprite turns inside its fixed frame to show the facing (battle-map.js sets the transform, +90deg because
      this board is shown rotated). */
   .map-sprite { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transition: transform 0.25s ease; }

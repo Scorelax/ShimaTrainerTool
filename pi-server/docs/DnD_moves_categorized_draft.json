@@ -10485,13 +10485,28 @@
         "damage_vp",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "stat_debuff_enemy",
+        "potential_stat_transfer_dispel",
         "recharge_locked"
       ],
       "description": "You conjure a vortex of blue ethereal flames that superheats the air in a 10ft. radius, 40ft. high cylinder from a point within range. All creatures caught in the vortex are forced to make a CON save against your move DC. On a successful save, the creatures lose 4d12 + MOVE VP, and on a failure, they lose 4d12 + MOVE VP and all stat changes are removed. This move must be recharged by using Ether Pyre after its first use in a battle.",
       "moveStat": "STR/INT",
       "vpCost": "25",
-      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17."
+      "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
+      "effects": [
+        {
+          "kind": "stat_transfer",
+          "mode": "dispel",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Sacred Fire",
@@ -16050,7 +16065,8 @@
             {
               "type": "instant"
             }
-          ]
+          ],
+          "height": 0
         }
       ]
     },

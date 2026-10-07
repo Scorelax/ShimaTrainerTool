@@ -438,7 +438,8 @@ def handle(conn, action, params):
         row = js_parse_int(params.get('row'))
         if not params.get('id') or col is None or row is None:
             raise ValueError('Missing participant id, col, or row')
-        return _mutate(conn, lambda s: _move_token(s, params['id'], col, row))
+        z = js_parse_int(params.get('z'))  # altitude in feet; omitted = stay at the current altitude
+        return _mutate(conn, lambda s: _move_token(s, params['id'], col, row, z))
 
     if action == 'stand-up':
         if not params.get('id'):
@@ -2230,7 +2231,7 @@ def _set_weather(state, name, effect):
 # creatures on it (rototiller, fortune_ring, ion_deluge, magic_room, wonder_room, spikes, fissure), `hazard` is Spikes'
 # damage, `difficult` doubles the movement cost of its tiles, `critReduction` is Fortune Ring's level-scaled crit DC drop,
 # and `untilSourceTurn` ends it when the caster's next turn begins (Ion Deluge).
-_ZONE_PROPS = ('rule', 'hazard', 'difficult', 'critReduction', 'concentration')
+_ZONE_PROPS = ('rule', 'hazard', 'difficult', 'critReduction', 'concentration')  # `height` (may be 0) is handled separately below
 
 
 def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None,
@@ -2263,6 +2264,8 @@ def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=
             field[k] = props[k]
     if props.get('untilSourceTurn') and source_id:
         field['untilTurnOf'] = source_id
+    if props.get('height') is not None:
+        field['height'] = int(props['height'])  # ft above the ground the zone reaches; 0 = the floor only
     if cells:
         field['id'] = uuid.uuid4().hex[:8]
         field['cells'] = sorted({str(c) for c in cells})
@@ -2359,15 +2362,19 @@ def _path_cells(c0, r0, c1, r1):
     return [(c0 + math.floor((c1 - c0) * i / n + 0.5), r0 + math.floor((r1 - r0) * i / n + 0.5)) for i in range(1, n + 1)]
 
 
-def _move_cost_ft(state, participant, c0, r0, c1, r1):
-    """Feet of movement a move costs: 5ft per cell entered, double for a cell in a `difficult` zone (Fissure) -- except
-    for creatures that aren't grounded, who fly over it. Chebyshev, like the rest of this module's distances."""
+def _move_cost_ft(state, participant, c0, r0, c1, r1, z0=0, z1=0):
+    """Feet of movement a move costs: 5ft per cell entered, double for a cell in a `difficult` zone (Fissure) -- but only
+    for a creature that finishes the move on the ground, since a flyer overhead isn't slowed by the ground. Climbing or
+    descending costs 1ft of movement per foot, and a diagonal costs the larger of its horizontal and vertical parts
+    (Chebyshev again, like the rest of this module's distances). The `participant` argument is kept for the callers'
+    signature; what matters is the altitude."""
     difficult = set()
-    if is_grounded(participant):
+    if z1 == 0:
         for z in state.get('terrainZones') or []:
             if z.get('difficult'):
                 difficult.update(z.get('cells') or ())
-    return sum(10 if f"{c},{r}" in difficult else 5 for c, r in _path_cells(c0, r0, c1, r1))
+    horizontal = sum(10 if f"{c},{r}" in difficult else 5 for c, r in _path_cells(c0, r0, c1, r1))
+    return max(horizontal, abs(z1 - z0))
 
 
 def _queue_hazards(state, pid, trigger):
@@ -2421,7 +2428,7 @@ def _trick_room(state):
 def _set_token_position(state, pid, col, row):
     if pid not in state['participants']:
         raise ValueError('Unknown participant: ' + pid)
-    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid)}
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid), 'z': _altitude_of(state, pid)}
     _wake_electric_sleepers(state)
     if state.get('started'):
         _queue_hazards(state, pid, 'enter')  # forced movement (a swap, a push) into a hazard counts too
@@ -2430,6 +2437,11 @@ def _set_token_position(state, pid, col, row):
 def _facing_of(state, pid):
     """A token's facing in degrees clockwise from up, always a multiple of 45 (0 for one never rotated)."""
     return (state['board']['tokens'].get(pid) or {}).get('facing', 0)
+
+
+def _altitude_of(state, pid):
+    """A token's altitude in feet above the ground (0 = on the ground, which every token starts at)."""
+    return (state['board']['tokens'].get(pid) or {}).get('z', 0)
 
 
 def _rotate_token(state, pid, facing):
@@ -2549,7 +2561,7 @@ def _stand_up(state, pid):
     _remove_status(state, pid, prone['id'], 'stood up')
 
 
-def _move_token(state, pid, col, row):
+def _move_token(state, pid, col, row, z=None):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
@@ -2588,9 +2600,18 @@ def _move_token(state, pid, col, row):
     # the most left, and the single shared movementUsed counter (see
     # `speeds`' own comment) is what actually drops every type's own
     # remaining number together afterwards.
+    current = state['board']['tokens'].get(pid)
+    z0 = (current or {}).get('z', 0)
+    z1 = z0 if z is None else z
+    if z1 != z0 or z1 < 0:
+        # Leaving the ground needs a way to fly (a flying/hovering speed, Levitate, Magnet Rise, ...); a creature with no
+        # `speeds` recorded at all (a DM's freeform enemy) is untracked, same convention as the movement budget below.
+        if z1 < 0 or z1 % 5:
+            raise ValueError('Altitude must be a whole number of 5ft steps, at or above the ground')
+        if z1 > 0 and participant.get('speeds') and is_grounded(participant):
+            raise ValueError(f"{participant['name']} can't leave the ground (no flying speed)")
     if participant.get('speeds'):
-        current = state['board']['tokens'].get(pid)
-        distance_ft = _move_cost_ft(state, participant, current['col'], current['row'], col, row) if current else 0
+        distance_ft = _move_cost_ft(state, participant, current['col'], current['row'], col, row, z0, z1) if current else 0
         _, best_remaining = _movement_budget(participant)
         best_remaining = _fmt_ft(best_remaining)
         if distance_ft > best_remaining:
@@ -2603,7 +2624,7 @@ def _move_token(state, pid, col, row):
     facing = _facing_of(state, pid)
     if previous and (col, row) != (previous['col'], previous['row']):
         facing = (round(math.degrees(math.atan2(col - previous['col'], previous['row'] - row)) / 45) * 45) % 360
-    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing}
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing, 'z': z1}
     _wake_electric_sleepers(state)
     if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
         _apply_weather_damage(state, pid)  # walked into Hail/Sandstorm on their own turn
@@ -2631,7 +2652,7 @@ def _confirm_placement(state, pid, col, row):
     for other_id, pos in state['board']['tokens'].items():
         if other_id != pid and pos['col'] == col and pos['row'] == row:
             raise ValueError('That square is already taken')
-    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid)}
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid), 'z': _altitude_of(state, pid)}
     participant['placed'] = True
     _log_event(state, 'placement', text=f"{participant['name']} placed at ({col}, {row})",
                actorId=pid, actorName=participant['name'], col=col, row=row)

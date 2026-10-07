@@ -450,7 +450,10 @@ def fields_affecting(state, pid, key):
     if token and zones:
         size = footprint_size(state.get('participants', {}).get(pid, {}).get('size'))
         covered = {f"{c},{r}" for c, r in footprint_cells(token['col'], token['row'], size)}
-        found.extend(z for z in zones if covered & set(z.get('cells') or ()))
+        altitude = token.get('z', 0)
+        # A zone with a `height` (ft above the ground) only reaches creatures at or below it -- Spikes sits on the floor
+        # (height 0), a Purgatory-style cylinder reaches 40ft up. No `height` means it reaches every altitude.
+        found.extend(z for z in zones if covered & set(z.get('cells') or ()) and (z.get('height') is None or altitude <= z['height']))
     return found
 
 

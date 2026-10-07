@@ -219,6 +219,17 @@ export function injectBattleMapStyles() {
     /* the sprite turns inside its (fixed) frame to show which way the token faces */
     .bmap-sprite { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transition: transform 0.25s ease; }
 
+    /* ---- altitude: a flyer is drawn lifted off its tile with a shadow on the ground and an altitude badge ---- */
+    .bmap-token.airborne .bmap-token-portrait { transform: translateY(-14%); box-shadow: 0 0 0 2px rgba(var(--ring), 0.9), 0 0 14px -1px rgba(var(--ring), 0.75); }
+    .bmap-token.airborne::before {
+      content: ''; position: absolute; left: 14%; right: 14%; bottom: 3%; height: 16%; border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.65), rgba(0,0,0,0) 70%);
+    }
+    .bmap-alt {
+      position: absolute; top: -2px; right: -2px; z-index: 3; font-size: 0.62rem; font-weight: 800; line-height: 1;
+      padding: 0.15rem 0.35rem; border-radius: 999px; color: #0b0d1a; background: rgb(var(--ring)); box-shadow: 0 0 6px rgba(var(--ring), 0.8);
+    }
+
     /* ---- floating action bar over a selected token ---- */
     .bmap-toolbar {
       position: absolute; z-index: 6; display: flex; align-items: center; gap: 0.25rem; padding: 0.3rem;

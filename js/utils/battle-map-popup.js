@@ -30,7 +30,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
-import { moveCostFt } from './move-effects.js';
+import { moveCostFt, canClimb } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, tokenCenter, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 
 const CONE_LENGTHS_FT = [0, 15, 30, 60]; // 0 = preview off
@@ -77,6 +77,9 @@ let _selectedTokenId = null;
 let _stagedDestination = null;
 // Index into CONE_LENGTHS_FT -- the cone preview length for the selected token (0 = off). Kept across selections.
 let _coneIdx = 0;
+// The altitude (ft) the selected token is being sent to, or null to stay where it is -- changed by the toolbar's ▲ ▼,
+// confirmed together with the staged cell (a pure climb stages the token's own cell).
+let _stagedAlt = null;
 // participantId -> the sprite's last drawn angle, unwrapped (see unwrapAngle), so a turn animates the short way round.
 const _spriteAngles = new Map();
 
@@ -117,14 +120,14 @@ function _ensureDom() {
     if (!_overlay || _overlay.style.display === 'none' || !_selectedTokenId) return;
     if (e.key === 'q' || e.key === 'Q') _rotate(-45);
     else if (e.key === 'e' || e.key === 'E') _rotate(45);
-    else if (e.key === 'Escape') { _selectedTokenId = null; _stagedDestination = null; _render(); }
+    else if (e.key === 'Escape') { _selectedTokenId = null; _stagedDestination = null; _stagedAlt = null; _render(); }
   });
 }
 
 function _close() {
   if (_overlay) _overlay.style.display = 'none';
   _selectedTokenId = null;
-  _stagedDestination = null;
+  _stagedDestination = null; _stagedAlt = null;
 }
 
 /** Opens the popup for `trainerName` (whoever's using this device) showing
@@ -134,7 +137,7 @@ export function showBattleMap(session, trainerName) {
   _session = session;
   _ownerName = trainerName;
   _selectedTokenId = null;
-  _stagedDestination = null;
+  _stagedDestination = null; _stagedAlt = null;
   _ensureDom();
   _render();
   _overlay.style.display = 'flex';
@@ -173,10 +176,20 @@ function _remainingFt(p, type) {
  * Matches routes_combat.py's own _move_token calc exactly (kept in sync
  * manually, same as _activeParticipantId above) since the client needs to
  * preview the same number the server will actually enforce. */
-function _distanceFt(fromCol, fromRow, toCol, toRow, p = null) {
-  // Difficult ground (Fissure) doubles the cost of the tiles entered -- see move-effects.js's moveCostFt, which mirrors
-  // the server's charge exactly. Without a participant to judge groundedness it's the plain straight-line distance.
-  return p ? moveCostFt(_session, p, fromCol, fromRow, toCol, toRow) : Math.max(Math.abs(toCol - fromCol), Math.abs(toRow - fromRow)) * 5;
+function _distanceFt(fromCol, fromRow, toCol, toRow, p = null, z0 = 0, z1 = 0) {
+  // Difficult ground (Fissure) doubles the cost of the tiles entered, and climbing costs 1ft per foot -- see move-effects.js's
+  // moveCostFt, which mirrors the server's charge exactly.
+  return p ? moveCostFt(_session, p, fromCol, fromRow, toCol, toRow, z0, z1) : Math.max(Math.abs(toCol - fromCol), Math.abs(toRow - fromRow)) * 5;
+}
+
+/** Steps the selected token's target altitude by `delta` ft (never below the ground) and stages the move there. */
+function _stepAltitude(delta) {
+  const sel = _selected();
+  if (!sel) return;
+  const next = Math.max(0, (_stagedAlt ?? (sel.pos.z || 0)) + delta);
+  _stagedAlt = next === (sel.pos.z || 0) && !_stagedDestination ? null : next;
+  if (_stagedAlt !== null && !_stagedDestination) _stagedDestination = { col: sel.pos.col, row: sel.pos.row };
+  _render();
 }
 
 /** Turns the selected token by `delta` degrees (a multiple of 45). Applied locally right away so it feels instant;
@@ -252,13 +265,15 @@ function _renderMovePanel() {
   let stageRow = '';
   if (_stagedDestination && _selectedTokenId === activeId) {
     const current = _session.board.tokens[activeId];
-    const distance = current ? _distanceFt(current.col, current.row, _stagedDestination.col, _stagedDestination.row, p) : 0;
+    const z0 = current?.z || 0;
+    const z1 = _stagedAlt ?? z0;
+    const distance = current ? _distanceFt(current.col, current.row, _stagedDestination.col, _stagedDestination.row, p, z0, z1) : 0;
     const bestRemaining = Math.max(...p.speeds.map(s => _remainingFt(p, s.type)));
     const canMove = distance <= bestRemaining;
 
     stageRow = canMove ? `
         <div class="bmap-stage-row">
-          <span>Move ${distance}ft</span>
+          <span>Move ${distance}ft${z1 !== z0 ? ` · altitude ${z0} → ${z1}ft` : ''}</span>
           <button type="button" class="bmap-confirm-btn" id="bmapConfirmMove">Confirm Move</button>
           <button type="button" class="bmap-cancel-btn" id="bmapCancelStage">Cancel</button>
         </div>` : `
@@ -271,15 +286,17 @@ function _renderMovePanel() {
   panel.innerHTML = `${chips}${stageRow}`;
 
   document.getElementById('bmapCancelStage')?.addEventListener('click', () => {
-    _stagedDestination = null;
+    _stagedDestination = null; _stagedAlt = null;
     _render();
   });
   document.getElementById('bmapConfirmMove')?.addEventListener('click', () => {
     const movingId = _selectedTokenId;
     const { col, row } = _stagedDestination;
+    const altitude = _stagedAlt;
     _selectedTokenId = null;
-    _stagedDestination = null;
-    CombatAPI.moveToken(movingId, col, row).catch(err => showCombatAlert(err.message, { title: 'Error' }));
+    _stagedDestination = null; _stagedAlt = null;
+    _stagedAlt = null;
+    CombatAPI.moveToken(movingId, col, row, altitude === null ? undefined : altitude).catch(err => showCombatAlert(err.message, { title: 'Error' }));
     _render();
   });
 }
@@ -331,7 +348,8 @@ function _renderGrid() {
     const classes = [];
     const zone = zones.get(key);
     if (zone) classes.push(`zone-${zone[0]}`);
-    if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row, sel.p) <= bestRemaining) classes.push('reach');
+    const z0 = sel?.pos.z || 0;
+    if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row, sel.p, z0, _stagedAlt ?? z0) <= bestRemaining) classes.push('reach');
     if (cone?.has(key)) classes.push('cone');
     if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) classes.push('staged');
     return classes.join(' ');
@@ -364,6 +382,7 @@ function _renderTokens() {
     if (isMine) classes.push('mine');
     if (isMyTurn) classes.push('my-turn');
     if (id === _selectedTokenId) classes.push('selected');
+    if ((pos.z || 0) > 0) classes.push('airborne');
 
     const el = document.createElement('div');
     el.className = classes.join(' ');
@@ -371,7 +390,7 @@ function _renderTokens() {
     const name = visibleToViewer(p, 'name') ? p.name : '???';
     el.title = name;
     Object.assign(el.style, cellRect(_session.board, pos.col, pos.row, footprintForSize(p.size)));
-    el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>`;
+    el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>${(pos.z || 0) > 0 ? `<span class="bmap-alt">↑${pos.z}ft</span>` : ''}`;
     const sprite = el.querySelector('.bmap-sprite');
     patchPortraitMedia(sprite, p.image, name);
     // The tokens are rebuilt every render, so start at the last drawn angle and let the transition carry it to the new one.
@@ -384,7 +403,7 @@ function _renderTokens() {
     if (isMyTurn) {
       el.addEventListener('click', () => {
         _selectedTokenId = _selectedTokenId === id ? null : id;
-        _stagedDestination = null;
+        _stagedDestination = null; _stagedAlt = null;
         _render();
       });
     }
@@ -414,6 +433,7 @@ function _renderToolbar() {
     <button type="button" data-act="left" title="Turn left 45° (Q)">⟲</button>
     <button type="button" data-act="right" title="Turn right 45° (E)">⟳</button>
     <span class="tb-sep"></span>
+    ${canClimb(sel.p) ? `<button type="button" data-act="down" title="Descend 5ft">▼</button><span class="tb-label">${_stagedAlt ?? (sel.pos.z || 0)}ft</span><button type="button" data-act="up" title="Climb 5ft">▲</button><span class="tb-sep"></span>` : ''}
     <button type="button" data-act="cone" class="${coneFt ? 'on' : ''}" title="Cone preview from this facing">◔ ${coneFt ? coneFt + 'ft' : 'Cone'}</button>
     <button type="button" data-act="close" title="Deselect (Esc)">✕</button>`;
   bar.addEventListener('click', (e) => {
@@ -421,8 +441,10 @@ function _renderToolbar() {
     const act = e.target.closest('button')?.dataset.act;
     if (act === 'left') _rotate(-45);
     else if (act === 'right') _rotate(45);
+    else if (act === 'up') _stepAltitude(5);
+    else if (act === 'down') _stepAltitude(-5);
     else if (act === 'cone') { _coneIdx = (_coneIdx + 1) % CONE_LENGTHS_FT.length; _render(); }
-    else if (act === 'close') { _selectedTokenId = null; _stagedDestination = null; _render(); }
+    else if (act === 'close') { _selectedTokenId = null; _stagedDestination = null; _stagedAlt = null; _render(); }
   });
   stage.appendChild(bar);
 }

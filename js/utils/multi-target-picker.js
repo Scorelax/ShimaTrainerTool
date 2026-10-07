@@ -11,6 +11,8 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { filterTargetable } from './targetability.js';
+import { pickTerrainArea } from './terrain-area-picker.js';
+import { footprintCells, footprintForSize } from './battle-map-grid.js';
 
 function _injectStyles() {
   if (document.getElementById('multi-target-picker-styles')) return;
@@ -26,6 +28,8 @@ function _injectStyles() {
     .combat-use-move-btn { width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
     .combat-use-move-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .mtp-hint { font-size: 0.8rem; color: #a0a0c0; margin-bottom: 0.7rem; }
+    .mtp-map-btn { width: 100%; margin-bottom: 0.7rem; padding: 0.55rem; border: 1px solid rgba(140,170,255,0.45); border-radius: 8px; background: rgba(140,170,255,0.12); color: #cfd8ff; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+    .mtp-map-btn:hover { background: rgba(140,170,255,0.25); }
     .mtp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.6rem; margin-bottom: 1rem; }
     .mtp-card {
       background: rgba(255,255,255,0.06); border: 2px solid transparent; border-radius: 10px;
@@ -59,7 +63,8 @@ function _ensureDom() {
         <h2>Who's Caught In It?</h2>
       </div>
       <div class="combat-move-popup-body">
-        <div class="mtp-hint">Tap everyone this move actually hit -- the app doesn't track blast range automatically.</div>
+        <div class="mtp-hint">Tap everyone this move actually hit, or mark the blast on the map and adjust from there.</div>
+        <button type="button" class="mtp-map-btn" id="mtpMapBtn" hidden>🗺️ Select from the map</button>
         <div class="mtp-grid" id="mtpGrid"></div>
         <button class="combat-use-move-btn" id="mtpConfirm" disabled>Confirm Targets</button>
       </div>
@@ -90,8 +95,12 @@ function _cardHtml(p) {
  * Shows the checkbox target grid, resolves to an array of selected
  * participant ids (empty array if confirmed with none checked), or null if
  * closed without confirming.
+ *
+ * `area` ({ radiusFt, heightFt, centeredOnCaster }, from the move's own range/description) adds a "Select from the map"
+ * button: the caster marks the blast on the battle map and everyone whose token overlaps it -- and, for a cylinder with a
+ * height, is at or below that altitude -- is ticked for them, to adjust by hand before confirming.
  */
-export async function pickMultipleTargets(casterId, { moveName = '' } = {}) {
+export async function pickMultipleTargets(casterId, { moveName = '', area = null } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -105,14 +114,34 @@ export async function pickMultipleTargets(casterId, { moveName = '' } = {}) {
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
   const confirmBtn = document.getElementById('mtpConfirm');
   confirmBtn.disabled = true;
+  const toggle = (card, on) => {
+    const id = card.dataset.targetId;
+    if (on) { _selected.add(id); card.classList.add('selected'); } else { _selected.delete(id); card.classList.remove('selected'); }
+    confirmBtn.disabled = _selected.size === 0;
+  };
   grid.querySelectorAll('[data-target-id]').forEach(card => {
-    card.addEventListener('click', () => {
-      const id = card.dataset.targetId;
-      if (_selected.has(id)) { _selected.delete(id); card.classList.remove('selected'); }
-      else { _selected.add(id); card.classList.add('selected'); }
-      confirmBtn.disabled = _selected.size === 0;
-    });
+    card.addEventListener('click', () => toggle(card, !_selected.has(card.dataset.targetId)));
   });
+
+  const mapBtn = document.getElementById('mtpMapBtn');
+  const hasBoard = !!session.board?.tokens?.[casterId] || Object.keys(session.board?.tokens || {}).length > 0;
+  mapBtn.hidden = !(area && hasBoard);
+  mapBtn.onclick = async () => {
+    const res = await pickTerrainArea({
+      session, casterId, title: moveName || 'Blast area', kind: 'other', radiusFt: area.radiusFt,
+      centeredOnCaster: area.centeredOnCaster, heightFt: area.heightFt, allowCancel: true, confirmLabel: 'Select targets inside',
+    });
+    if (!res) return;
+    const inArea = new Set(res.cells || []);
+    participants.forEach(p => {
+      const token = session.board.tokens[p.id];
+      if (!token) return;
+      const inside = res.all || footprintCells(token.col, token.row, footprintForSize(p.size)).some(c => inArea.has(`${c.col},${c.row}`));
+      const reachesHeight = area.heightFt == null || (token.z || 0) <= area.heightFt;
+      const card = grid.querySelector(`[data-target-id="${p.id}"]`);
+      if (card) toggle(card, inside && reachesHeight);
+    });
+  };
 
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });

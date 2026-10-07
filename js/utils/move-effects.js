@@ -225,6 +225,9 @@ export function statusLabel(s) {
   if (s.kind === 'reroll_damage') {
     return 'Reroll their damage, take the lower';
   }
+  if (s.kind === 'counter_attack') return `Counter-attack${s.rollMode ? ` with ${s.rollMode}` : ''}, dealing the damage you just took`;
+  if (s.kind === 'reduce_damage') return 'Reduce the hit you took (deflect it back if it is wiped out)';
+  if (s.kind === 'extra_turn') return 'Grant the damaged ally an extra turn';
   if (s.kind === 'block_attack') {
     return 'Block the attack entirely';
   }

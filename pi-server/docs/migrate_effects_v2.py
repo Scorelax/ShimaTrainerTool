@@ -331,6 +331,15 @@ def tag_for(e):
         # disabled" -- read off the shared log, see combat-wip.js's
         # _handleDisableLastUsedMove.
         base = 'disable_last_used_move'
+    elif e['kind'] == 'counter_attack':
+        # Revenge's own "attack your attacker with disadvantage, dealing the damage you took" -- see combat-wip.js's _handleCounterAttack (v82).
+        base = 'counter_attack'
+    elif e['kind'] == 'reduce_damage':
+        # Mirror Coat's own "reduce the hit by a roll, deflect it back if it's wiped out" -- see combat-wip.js's _handleReduceDamage (v82).
+        base = 'reduce_damage'
+    elif e['kind'] == 'extra_turn':
+        # Tragic Hero's own "a new turn for the ally right after this reaction" -- see routes_combat.py's _grant_extra_turn (v82).
+        base = 'extra_turn'
     elif e['kind'] == 'drain_attacker_vp':
         # Grudge/Spite's own "force the attacker who hit you to save, then
         # drain its VP" -- see combat-wip.js's _handleDrainAttackerVp.

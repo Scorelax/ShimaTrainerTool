@@ -952,7 +952,10 @@
       "description": "You resist an attack, fighting back against a creature. When hit by a melee attack, you may use a reaction to immediately retaliate with an attack roll of your own, dealing 1d6 + MOVE bug damage on a hit.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice roll for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice roll for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee"
     },
     {
       "name": "Swarm",
@@ -3564,7 +3567,9 @@
       "description": "As a reaction, when a creature moves away from you or is switched out by their trainer, you may make a ranged attack roll against it, doing 1d6 + MOVE dark damage on a hit. If the creature is fleeing combat or being switched out, double the damage dice.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "reactionTrigger": "moved_away",
+      "reactionRange": 40
     },
     {
       "name": "Quash",
@@ -3707,7 +3712,10 @@
       "description": "You lay in a quick punch before a creature has a chance to attack. When targeted by a melee attack, you may use your reaction to attempt to strike a creature before its attack is rolled. Make a melee attack, dealing 2d8 + MOVE dark damage on a hit.",
       "moveStat": "STR/DEX",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee"
     },
     {
       "name": "Switcheroo",
@@ -4906,12 +4914,35 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "trigger_saving_throw"
+        "trigger_saving_throw",
+        "potential_drain_attacker_vp"
       ],
       "description": "When hit by a melee attack, you may use this reaction to zap your attacker, forcing it to attempt a DEX save. On a failure, the VP cost is multiplied by 1d4.",
       "moveStat": "WIS/INT",
       "vpCost": "7",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee",
+      "effects": [
+        {
+          "kind": "drain_attacker_vp",
+          "when": {
+            "type": "special"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "ability": "DEX",
+          "vpCostFromLog": true,
+          "vpCostMultiplierDice": "1d4",
+          "healPool": "VP",
+          "healFraction": 0,
+          "note": "On a failed DEX save the attacker's move VP cost is multiplied by 1d4: it loses cost x (d4 - 1) more, having already paid it once."
+        }
+      ]
     },
     {
       "name": "Fusion Bolt",
@@ -7687,12 +7718,32 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "self_extra_turn"
       ],
       "description": "You grant a divine second wind to a willing creature in range that has just fallen to less than one third of its maximum HP, rounded down. The creature is granted a new turn immediately after this reaction. This can be used once per creature per battle.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "damaged",
+      "reactionRange": 40,
+      "reactionAnchorHpBelowOneOver": 3,
+      "oncePerCreature": true,
+      "effects": [
+        {
+          "kind": "extra_turn",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "The damaged ally takes a new turn right after this reaction ends (once per creature per battle)."
+        }
+      ]
     },
     {
       "name": "Treaty Bind",
@@ -8017,7 +8068,10 @@
       "description": "When you are hit by a melee attack, you can use your reaction to make a melee attack of opportunity against your foe, doing 1d4 + MOVE fighting damage on a successful hit.",
       "moveStat": "DEX/STR",
       "vpCost": "1",
-      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17."
+      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17.",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee"
     },
     {
       "name": "Cross Chop",
@@ -8053,12 +8107,29 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "recoil"
+        "recoil",
+        "self_block_attack"
       ],
       "description": "You sense incoming danger and are able to quickly avoid it. When targeted, before the attack roll, or when forced to make a saving throw, you may automatically avoid taking damage on the first instance of this reaction. On future reactions in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful. Unless the successful roll is 20, the damage you take instead drains your VP for half the damage amount.",
       "moveStat": "None",
       "vpCost": "25",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "block_attack",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Double Kick",
@@ -8781,12 +8852,34 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "self_counter_attack"
       ],
       "description": "You invoke a fight within to retaliate against a creature that damages you. As a reaction, when you are hit with a melee attack that deals damage, make a melee attack roll against your attacker, with disadvantage. On a hit, deal the same amount of fighting type damage back at your attacker.",
       "moveStat": "STR/DEX",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee",
+      "effects": [
+        {
+          "kind": "counter_attack",
+          "damageType": "Fighting",
+          "damageFrom": "damage_taken",
+          "rollMode": "disadvantage",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Attack roll against your attacker with disadvantage; on a hit, the damage you just took is dealt back as fighting damage."
+        }
+      ]
     },
     {
       "name": "Reversal",
@@ -13131,12 +13224,29 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "self_block_attack"
       ],
       "description": "You foresee the next move of a creature, allowing you to react immediately. When targeted by a move, or forced to make a saving throw, you may automatically avoid the damage/effects on the first instance of this reaction, and then use a move you know, targeting your attacker. You must pay the VP cost of both this move and the move you choose to activate as a reaction. On future instances of this move in the same combat, you must roll higher than a 15 on a d20 roll for the reaction to be successful.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "block_attack",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Spirit Shackle",
@@ -25751,12 +25861,31 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "self_damage_multiplier"
       ],
       "description": "When you are subject to a ranged attack, use your reaction to take half the damage dealt.",
       "moveStat": "None",
       "vpCost": "12",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "reactionAttackRange": "ranged",
+      "effects": [
+        {
+          "kind": "damage_multiplier",
+          "multiplier": 0.5,
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Luster Purge",
@@ -25813,12 +25942,33 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "self_status_condition_magic_coat"
       ],
       "description": "A flash of magical energy forms between you and a creature, reflecting negative energy back at an attacker in range. When an attack from a creature causes you to suffer from a negative status condition, they are also affected by the same condition.",
       "moveStat": "WIS/CON",
       "vpCost": "1",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "magic_coat",
+          "value": 50,
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 1
+            }
+          ],
+          "note": "Any negative condition an attacker in range inflicts on you this round is reflected onto them too."
+        }
+      ]
     },
     {
       "name": "Magic Room",
@@ -26026,12 +26176,72 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "damage"
+        "damage",
+        "self_reduce_damage"
       ],
       "description": "When subject to a ranged attack, you can attempt to decrease the damage and send some back at the attacker in range. Using this reaction, the damage is decreased by 1d6 + MOVE. If this causes the damage to fall below zero, the attack is deflected and you may make a ranged attack roll to send it back at the attacker for 1d6 + MOVE psychic damage.",
       "moveStat": "CON/WIS",
       "vpCost": "3",
-      "scaling": "The damage dice roll for this move changes\nto 1d12 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice roll for this move changes\nto 1d12 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0,
+      "reactionAttackRange": "ranged",
+      "effects": [
+        {
+          "kind": "reduce_damage",
+          "diceTiers": [
+            [
+              1,
+              "1d6"
+            ],
+            [
+              5,
+              "1d12"
+            ],
+            [
+              10,
+              "2d8"
+            ],
+            [
+              17,
+              "4d6"
+            ]
+          ],
+          "addMove": true,
+          "reflect": {
+            "damageType": "Psychic",
+            "diceTiers": [
+              [
+                1,
+                "1d6"
+              ],
+              [
+                5,
+                "1d12"
+              ],
+              [
+                10,
+                "2d8"
+              ],
+              [
+                17,
+                "4d6"
+              ]
+            ],
+            "addMove": true
+          },
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Reduces the hit by the roll; if that wipes it out, you may roll a ranged attack to send it back at the attacker."
+        }
+      ]
     },
     {
       "name": "Mist Ball",
@@ -26952,12 +27162,31 @@
       },
       "reaction": true,
       "categories": [
-        "counter_reaction_effect"
+        "counter_reaction_effect",
+        "self_damage_multiplier"
       ],
       "description": "When you are subject to a melee attack, use your reaction to take half the damage dealt.",
       "moveStat": "None",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee",
+      "effects": [
+        {
+          "kind": "damage_multiplier",
+          "multiplier": 0.5,
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Rest",

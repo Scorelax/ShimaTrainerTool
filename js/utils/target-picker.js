@@ -154,6 +154,9 @@ let _guaranteedHit = false;
 // human can always override it), just saves the common case a manual
 // type-in. null everywhere else.
 let _presetRoll = null;
+// A roll mode the move itself imposes on the attack roll (Revenge: "with disadvantage"), merged with whatever the statuses say.
+let _forcedRollMode = null;
+let _forcedRollNote = '';
 // A snapshot of the shared log/round, captured once at pickTarget's own
 // start (same one-time-snapshot limitation _attacker/_selectedTarget
 // already have -- this module has no live SSE-updated session the way
@@ -415,6 +418,10 @@ function _showStep2(p, name) {
   if (weatherMode) {
     _atkCtx.mode = mergeRollMode(_atkCtx.mode, weatherMode.mode);
     if (weatherMode.note) _atkCtx.notes.push(weatherMode.note);
+  }
+  if (_forcedRollMode && _atkCtx) {
+    _atkCtx.mode = mergeRollMode(_atkCtx.mode, _forcedRollMode);
+    if (_forcedRollNote) _atkCtx.notes.push(_forcedRollNote);
   }
   document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
   _diceBonusExtra = 0;
@@ -720,6 +727,8 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _moveModValue = moveModValue;
   _nextTierDice = nextTierDice;
   _presetRoll = presetRoll;
+  _forcedRollMode = null;
+  _forcedRollNote = '';
   _feintMoveName = feintMoveName;
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
@@ -754,7 +763,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * null if closed. With guaranteedHit (see pickTarget) it opens directly at
  * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null, forcedRollMode = null, forcedRollNote = '' } = {}) {
   _ensureDom();
   _attacker = attacker;
   _attackModifier = attackModifier;
@@ -767,6 +776,8 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   _moveModValue = moveModValue;
   _nextTierDice = nextTierDice;
   _presetRoll = presetRoll;
+  _forcedRollMode = forcedRollMode;
+  _forcedRollNote = forcedRollNote;
   _feintMoveName = ''; // never reaches _afterTargetSelected from here -- see this function's own header
   _targetFlatBonus = 0;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';

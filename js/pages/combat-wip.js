@@ -3025,6 +3025,30 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleNegateDamage({ reactorId: attackerId, moveName });
       continue;
     }
+    if (effect.kind === 'counter_attack') {
+      // Revenge -- an attack roll back at whoever just hit the reactor, dealing the damage they took on a hit.
+      await _handleCounterAttack({ reactorId: attackerId, effect, moveName, computedData });
+      continue;
+    }
+    if (effect.kind === 'reduce_damage') {
+      // Mirror Coat -- reduces the hit the reactor just took; if that wipes it out, an attack back at the attacker.
+      await _handleReduceDamage({ reactorId: attackerId, effect, moveName, computedData });
+      continue;
+    }
+    if (effect.kind === 'extra_turn') {
+      // Tragic Hero -- the ally this window is about (the anchor) takes the floor once the caster ends the reaction.
+      const anchorId = session?.pendingReaction?.anchorId;
+      if (!anchorId) {
+        showCombatAlert(`${moveName} needs a live reaction window to know who to grant the turn to.`, { title: moveName });
+        continue;
+      }
+      try {
+        await CombatAPI.grantExtraTurn(attackerId, anchorId, moveName);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
     if (effect.kind === 'deal_damage') {
       // Spiky Shield's own "...dealing grass damage instead" half -- a flat
       // guaranteed counter-hit, same no-attackerId-needed reasoning as the
@@ -3063,6 +3087,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         reactorId: attackerId, originalAttackerId: pick.targetId, moveName, dc,
         dice: effect.dice, vpCostFromLog: !!effect.vpCostFromLog,
         healPool: effect.healPool, healFraction: effect.healFraction, requireZeroHp: !!effect.requireZeroHp,
+        ability: effect.ability || 'WIS', vpCostMultiplierDice: effect.vpCostMultiplierDice || null,
       });
       continue;
     }
@@ -3724,6 +3749,100 @@ async function _handleDealDamageToAttacker({ reactorId, effect, moveName }) {
   }
 }
 
+/** Revenge's own mechanism -- "make a melee attack roll against your attacker, with disadvantage. On a hit, deal the same
+ * amount of fighting type damage back." The attacker and the amount both come off the shared log (the hit that opened this
+ * reaction); the attack roll runs through target-picker's normal step against that attacker with the damage pre-filled (still
+ * editable) and the move's own roll mode forced on top of whatever the statuses say. */
+async function _handleCounterAttack({ reactorId, effect, moveName, computedData }) {
+  const reactor = session?.participants?.[reactorId];
+  const original = _lastDamageAgainst(reactorId);
+  if (!reactor || !original || !Number.isFinite(original.amount) || !original.actorId) {
+    showCombatAlert(`Couldn't find the hit to answer -- make ${moveName}'s attack by hand.`, { title: moveName });
+    return;
+  }
+  const attacker = session?.participants?.[original.actorId];
+  if (!attacker) return;
+  const name = visibleToViewer(attacker, 'name') ? attacker.name : '???';
+  const picked = await pickTargetAgain(attacker, name, {
+    attackModifier: computedData?.attackBonus || 0, speciesName: reactor.name, attacker: reactor, moveName,
+    damageDice: '', presetRoll: original.amount,
+    forcedRollMode: effect.rollMode || null, forcedRollNote: effect.rollMode ? `${moveName}: ${effect.rollMode} on the attack roll` : '',
+  });
+  if (!picked || picked.blocked) return;
+  if (!picked.hit) {
+    CombatAPI.logEvent({
+      type: 'miss', actorId: reactorId, actorName: reactor.name, targetId: original.actorId, targetName: attacker.name,
+      text: `${reactor.name} used ${moveName} on ${attacker.name} -- Miss`,
+    }).catch(() => {});
+    return;
+  }
+  try {
+    await CombatAPI.applyDamage(reactorId, original.actorId, picked.rawRoll, effect.damageType || '', reactor.name, moveName);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+/** Mirror Coat's own mechanism -- "the damage is decreased by 1d6 + MOVE. If this causes the damage to fall below zero, the
+ * attack is deflected and you may make a ranged attack roll to send it back at the attacker for 1d6 + MOVE psychic damage."
+ * A retroactive correction against the hit that opened this reaction (same family as _handleNegateDamage): the reduction is
+ * rolled by hand and refunded as HP, capped at the hit; wiping it out entirely offers the attack back. */
+async function _handleReduceDamage({ reactorId, effect, moveName, computedData }) {
+  const reactor = session?.participants?.[reactorId];
+  const original = _lastDamageAgainst(reactorId);
+  if (!reactor || !original || !Number.isFinite(original.amount)) {
+    showCombatAlert(`Couldn't find the damage roll to reduce -- refund it by hand if needed.`, { title: moveName });
+    return;
+  }
+  const row = findMoveRow(moveName) || [];
+  const dice = tierAt(effect.diceTiers, reactor.level) || '1d6';
+  const moveMod = effect.addMove ? bestMoveStatModifier(row, reactor) : 0;
+  const reduction = await promptValueRoll({
+    dice, moveModBonus: moveMod, moveName,
+    description: `${moveName} -- roll ${dice}${moveMod ? ` + ${moveMod}` : ''} to reduce the ${original.amount} damage you took.`,
+  });
+  if (reduction === null) return; // closed without entering one
+  const refund = Math.min(original.amount, Math.max(0, reduction));
+  if (refund > 0) {
+    const maxHp = Number.isFinite(reactor.maxHP) ? reactor.maxHP : Infinity;
+    try {
+      await CombatAPI.updateStats(reactorId, { currentHP: Math.min(maxHp, reactor.currentHP + refund) });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+      return;
+    }
+  }
+  const deflected = reduction > original.amount;
+  CombatAPI.logEvent({
+    type: 'save', actorId: reactorId, actorName: reactor.name, targetId: original.actorId, targetName: original.actorName || '?',
+    text: `${reactor.name} used ${moveName} -- the hit is reduced by ${refund}${deflected ? ' and deflected entirely' : ''}`,
+  }).catch(() => {});
+  if (!deflected || !effect.reflect || !original.actorId) return;
+
+  const attacker = session?.participants?.[original.actorId];
+  if (!attacker) return;
+  const name = visibleToViewer(attacker, 'name') ? attacker.name : '???';
+  const returnDice = tierAt(effect.reflect.diceTiers, reactor.level) || dice;
+  const returnMod = effect.reflect.addMove ? moveMod : 0;
+  const picked = await pickTargetAgain(attacker, name, {
+    attackModifier: computedData?.attackBonus || 0, damageModifier: returnMod, speciesName: reactor.name, attacker: reactor, moveName,
+    damageDice: returnDice, moveModValue: computedData?.highestMod || 0,
+  });
+  if (!picked || picked.blocked) return;
+  if (!picked.hit) {
+    CombatAPI.logEvent({
+      type: 'miss', actorId: reactorId, actorName: reactor.name, targetId: original.actorId, targetName: attacker.name,
+      text: `${reactor.name} sent the deflected attack back at ${attacker.name} with ${moveName} -- Miss`,
+    }).catch(() => {});
+    return;
+  }
+  try {
+    await CombatAPI.applyDamage(reactorId, original.actorId, picked.rawRoll + returnMod, effect.reflect.damageType || '', reactor.name, moveName);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
 /** Nature's Embrace's own mechanism -- "whenever you sustain damage of a
  * type you are vulnerable to, you may discount the extra damage. Make a
  * ranged attack roll, redirecting the damage you avoided to a creature in
@@ -3914,7 +4033,7 @@ function _vpCostOfMoveUsed(pid, moveName) {
  * one set per move. Grudge's own "subsequent uses this encounter need a
  * DC15 d20 roll for the healing to land" escalating cost is left manual,
  * same precedent as the whole Protect family's own escalating cost. */
-async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName, dc, dice, vpCostFromLog, healPool, healFraction, requireZeroHp }) {
+async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName, dc, dice, vpCostFromLog, healPool, healFraction, requireZeroHp, ability = 'WIS', vpCostMultiplierDice = null }) {
   const reactor = session?.participants?.[reactorId];
   const originalAttacker = session?.participants?.[originalAttackerId];
   if (!reactor || !originalAttacker) return;
@@ -3923,7 +4042,7 @@ async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName,
     return;
   }
   const outcome = await confirmSecondarySave(originalAttacker, originalAttacker.name, {
-    dc, ability: 'WIS', title: 'Saving Throw', moveUser: reactor,
+    dc, ability, title: 'Saving Throw', moveUser: reactor,
   });
   if (!outcome) return;
   CombatAPI.logEvent({
@@ -3939,6 +4058,13 @@ async function _handleDrainAttackerVp({ reactorId, originalAttackerId, moveName,
     if (!Number.isFinite(drained)) {
       showCombatAlert(`Couldn't find how much VP ${originalAttacker.name}'s move cost -- apply ${moveName}'s drain by hand.`, { title: moveName });
       return;
+    }
+    if (vpCostMultiplierDice) {
+      // Etheric Discharge: "the VP cost is multiplied by 1d4" -- it already paid the cost once, so it loses the rest of
+      // cost x roll (a 1 changes nothing).
+      const multiplier = await promptValueRoll({ dice: vpCostMultiplierDice, moveName, description: `${moveName} -- roll ${vpCostMultiplierDice}: ${originalAttacker.name}'s move VP cost is multiplied by it (it already paid once).` });
+      if (multiplier === null) return; // closed without entering one
+      drained = drained * Math.max(0, multiplier - 1);
     }
   } else {
     const rolled = await promptDrainRoll({ dice, targetName: originalAttacker.name, moveName });

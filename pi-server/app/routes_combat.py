@@ -35,7 +35,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded
+from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -254,6 +254,11 @@ def handle(conn, action, params):
             s, trigger, params['anchorId'], params['attackerId'], params.get('moveName', ''))))
         result.update(outcome)
         return result
+
+    if action == 'grant-extra-turn':
+        if not params.get('id') or not params.get('targetId'):
+            raise ValueError('Missing participant id or targetId')
+        return _mutate(conn, lambda s: _grant_extra_turn(s, params['id'], params['targetId'], params.get('moveName', '')))
 
     if action == 'decline-reaction':
         if not params.get('id'):
@@ -1229,6 +1234,54 @@ def _reaction_start(state, pid):
     _log_event(state, 'reaction-start', text=f"{participant['name']} used a reaction", actorId=pid, actorName=participant['name'])
 
 
+def _grant_extra_turn(state, caster_id, target_id, move_name=''):
+    """Tragic Hero: a willing creature that has just fallen below a third of its max HP (rounded down) is granted a new turn
+    right after this reaction, once per creature per battle. Only records the grant (and the once-per-creature mark); the
+    hand-over itself happens in _reaction_end, when the caster releases the floor."""
+    caster = state['participants'].get(caster_id)
+    target = state['participants'].get(target_id)
+    if not caster or not target:
+        raise ValueError('Unknown participant')
+    if target.get('status') != 'participating':
+        raise ValueError('Only a participating combatant can take an extra turn')
+    if move_name in (target.get('usedOncePerCreature') or []):
+        raise ValueError(f"{target['name']} has already been granted that this battle")
+    if not (target.get('currentHP', 0) < (target.get('maxHP') or 0) // 3):
+        raise ValueError(f"{target['name']} isn't below a third of their max HP")
+    target.setdefault('usedOncePerCreature', []).append(move_name)
+    state['pendingExtraTurn'] = target_id
+    _log_event(state, 'extra-turn', text=f"{caster['name']} grants {target['name']} a second wind -- an extra turn right after this reaction",
+               actorId=caster_id, actorName=caster['name'], targetId=target_id, targetName=target['name'])
+
+
+def _hostile(state, a, b):
+    """Whether two participants are on opposite sides: different `side`, or -- in PvP, where everyone is a 'player' -- different owners."""
+    if a.get('side') != b.get('side'):
+        return True
+    return state.get('battleType') == 'pvp' and (a.get('owner') or '') != (b.get('owner') or '')
+
+
+def _open_moved_away_window(state, mover_id, previous):
+    """Pursuit: "when a creature moves away from you" -- called from _move_token once a move has landed. Every hostile creature
+    that was nearer to the mover's old tile than to its new one becomes a candidate (their own range and reaction state are
+    checked by _eligible_reactors). A switch-out has no trigger in this tool, so only walking away opens it."""
+    if state.get('pendingReaction'):
+        return  # one window at a time
+    mover = state['participants'][mover_id]
+    now = state['board']['tokens'][mover_id]
+    away = set()
+    for pid, p in state['participants'].items():
+        tok = state['board']['tokens'].get(pid)
+        if pid == mover_id or not tok or p.get('status') != 'participating' or not _hostile(state, mover, p):
+            continue
+        before = max(abs(previous['col'] - tok['col']), abs(previous['row'] - tok['row']))
+        after = max(abs(now['col'] - tok['col']), abs(now['row'] - tok['row']))
+        if after > before:
+            away.add(pid)
+    if away:
+        _open_reaction_window(state, 'moved_away', mover_id, mover_id, '', only_ids=away)
+
+
 def _reaction_end(state):
     if not state['reactingParticipantId']:
         raise ValueError('No reaction in progress')
@@ -1242,6 +1295,16 @@ def _reaction_end(state):
     # them specifically -- now that they've released the floor, see if
     # everyone eligible has answered and it can close.
     _maybe_close_reaction_window(state)
+    # Tragic Hero: "granted a new turn immediately after this reaction" -- the ally takes the floor right now, with a fresh
+    # movement budget and bonus action, and gives it back the usual way (End Turn -> reaction-end).
+    extra_id = state.get('pendingExtraTurn')
+    state['pendingExtraTurn'] = None
+    extra = state['participants'].get(extra_id) if extra_id else None
+    if extra and extra.get('status') == 'participating':
+        extra['movementUsed'] = 0
+        extra['bonusActionUsed'] = False
+        state['reactingParticipantId'] = extra_id
+        _log_event(state, 'extra-turn', text=f"{extra['name']} takes an extra turn", actorId=extra_id, actorName=extra['name'])
 
 
 # ---------------------------------------------------------------------------
@@ -1282,7 +1345,7 @@ def _has_block_attack_effect(move_data):
     return any(e.get('kind') == 'block_attack' for e in (move_data.get('effects') or []))
 
 
-def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attacking_move_name=None):
+def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attacking_move_name=None, only_ids=None):
     """{participantId: [moveName, ...]} for every OTHER participant (never the
     attacker themselves) who knows at least one move flagged with this exact
     `trigger` ('targeted' | 'damaged') and is within that move's own
@@ -1317,9 +1380,25 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
             continue  # reaction-start itself requires 'participating' -- never offer one nobody could accept
         if p.get('reactionUsed'):
             continue  # one reaction per round -- spent until their own turn comes round again, so no popup either
+        if only_ids is not None and pid not in only_ids:
+            continue
+        anchor = state['participants'].get(anchor_id) or {}
         for move_name in (p.get('moves') or []):
             m = moves_by_name.get(move_name)
             if not m or m.get('reactionTrigger') != trigger:
+                continue
+            # Reflect/Counter/... only answer a MELEE attack, Light Screen/Mirror Coat only a ranged one: `reactionAttackRange`
+            # is checked against the attacking move's own range ("Melee" is the one melee range in the data).
+            want = m.get('reactionAttackRange')
+            if want and attacking_move is not None:
+                is_melee = str(attacking_move.get('range', '')).strip().lower() == 'melee'
+                if (want == 'melee') != is_melee:
+                    continue
+            # Tragic Hero: only once the anchor is below 1/N of its max HP (rounded down), and only once per creature per battle.
+            one_over = m.get('reactionAnchorHpBelowOneOver')
+            if one_over and not (anchor.get('currentHP', 0) < (anchor.get('maxHP') or 0) // one_over):
+                continue
+            if m.get('oncePerCreature') and move_name in (anchor.get('usedOncePerCreature') or []):
                 continue
             if ignores_protect and _has_block_attack_effect(m):
                 continue
@@ -1332,12 +1411,12 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
     return result
 
 
-def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name):
+def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name, only_ids=None):
     if state['pendingReaction']:
         raise ValueError('A reaction window is already open')
     if anchor_id not in state['participants']:
         raise ValueError('Unknown anchor participant: ' + anchor_id)
-    eligible = _eligible_reactors(state, _load_move_data_file(), trigger, anchor_id, attacker_id, move_name)
+    eligible = _eligible_reactors(state, _load_move_data_file(), trigger, anchor_id, attacker_id, move_name, only_ids)
     if not eligible:
         return {'opened': False}  # nothing to wait for -- caller's flow proceeds immediately
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
@@ -1732,6 +1811,31 @@ def _apply_status(state, target_id, spec):
         statuses[:] = [s for s in statuses if s.get('apply') != 'power_up']
     _log_event(state, 'status-apply', text=f"{target['name']} {verb} {_status_label(new)}{from_text}",
                actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
+    _mirror_magic_coat(state, target, target_id, source, source_id, spec, new)
+
+
+def _mirror_magic_coat(state, target, target_id, source, source_id, spec, new):
+    """Magic Coat: "when an attack from a creature causes you to suffer from a negative status condition, they are also
+    affected by the same condition." Runs after a condition lands on a target holding a `magic_coat` status, whenever it came
+    from a different creature in range (the coat's `value`, in feet -- skipped when either has no token). The copy is applied
+    through the ordinary path (so Safeguard/Misty Terrain/immunities can still stop it) and never mirrors again."""
+    if spec.get('mirrored') or not source or source_id == target_id:
+        return
+    if new.get('kind') != 'condition' or new.get('apply') not in MISTY_BLOCKED_CONDITIONS:
+        return
+    coat = next((s for s in _statuses_of(target) if s.get('kind') == 'condition' and s.get('apply') == 'magic_coat'), None)
+    if not coat:
+        return
+    dist = _grid_distance_ft(state, target_id, source_id)
+    if dist is not None and isinstance(coat.get('value'), (int, float)) and dist > coat['value']:
+        return
+    mirror = {k: v for k, v in spec.items() if k not in ('sourceId', 'sourceName', 'moveName')}
+    mirror.update({'sourceId': target_id, 'sourceName': target['name'], 'moveName': 'Magic Coat', 'mirrored': True})
+    try:
+        _apply_status(state, source_id, mirror)
+    except ValueError as e:
+        _log_event(state, 'status-apply', text=f"Magic Coat reflects the condition at {source['name']}, but it fails: {e}",
+                   actorId=target_id, actorName=target['name'], targetId=source_id, targetName=source['name'])
 
 
 def _apply_exhaustion(state, target, new, increment, from_text, source_id, source_name):
@@ -2631,6 +2735,8 @@ def _move_token(state, pid, col, row, z=None):
     if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
         _apply_weather_damage(state, pid)  # walked into Hail/Sandstorm on their own turn
     _queue_hazards(state, pid, 'enter')
+    if previous and (col, row) != (previous['col'], previous['row']):
+        _open_moved_away_window(state, pid, previous)
     _log_event(state, 'move', text=f"{participant['name']} moved to ({col}, {row})",
                actorId=pid, actorName=participant['name'], col=col, row=row)
 

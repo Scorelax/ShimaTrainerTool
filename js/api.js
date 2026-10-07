@@ -1091,6 +1091,11 @@ export class CombatAPI {
     }, { useCache: false });
   }
 
+  /** Tragic Hero: the ally gets the floor for an extra turn the moment `id` (the caster) ends their reaction. */
+  static async grantExtraTurn(id, targetId, moveName = '') {
+    return API.request('combat', 'grant-extra-turn', { id, targetId, moveName }, { useCache: false });
+  }
+
   /** Trick Room: reverses (or, used again, un-reverses) the initiative order from the start of the next round. */
   static async trickRoom() {
     return API.request('combat', 'trick-room', {}, { useCache: false });

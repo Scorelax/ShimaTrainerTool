@@ -134,7 +134,7 @@ def _dispatch(params):
                     'music': ['sync', 'leave'],
                     'combat': ['get-state', 'create-session', 'end-session', 'leave-session', 'add-participant',
                                'remove-participant', 'set-status', 'set-visibility',
-                               'advance-turn', 'reaction-start', 'use-bonus-action', 'rotate-token', 'clear-terrain-zones', 'remove-field-zone', 'trick-room', 'resolve-hazard', 'reaction-end', 'play-animation',
+                               'advance-turn', 'reaction-start', 'use-bonus-action', 'rotate-token', 'clear-terrain-zones', 'remove-field-zone', 'trick-room', 'resolve-hazard', 'grant-extra-turn', 'reaction-end', 'play-animation',
                                'use-move', 'apply-damage', 'update-stats', 'set-board-template', 'set-cell-terrain',
                                'set-token-position', 'move-token', 'clear-token-position',
                                'confirm-placement', 'hover-token', 'list-backgrounds', 'set-board-background'],

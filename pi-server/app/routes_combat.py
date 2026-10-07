@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction
+from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, is_grounded
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -376,7 +376,8 @@ def handle(conn, action, params):
         return _mutate(conn, lambda s: _set_weather(s, params.get('name', ''), params.get('effect', '')))
 
     if action == 'set-terrain':
-        return _mutate(conn, lambda s: _set_terrain(s, params.get('name', ''), params.get('effect', '')))
+        return _mutate(conn, lambda s: _set_terrain(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
+                                                    params.get('healDice'), params.get('sourceId'), params.get('sourceName')))
 
     if action == 'set-token-position':
         col = js_parse_int(params.get('col'))
@@ -1113,6 +1114,10 @@ def _advance_turn(state):
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
         _expire_statuses_by_round(state)
+    terrain = state.get('terrain')
+    if terrain and terrain.get('expiresRound') is not None and state['round'] >= terrain['expiresRound']:
+        _log_event(state, 'terrain-end', text=f"{terrain['name']} fades")
+        state['terrain'] = None
     starting_id = state['turnOrder'][state['turnIndex']]
     _apply_condition_turn_damage(state, starting_id, 'start')
     _expire_statuses_on_turn_point(state, starting_id, 'start')
@@ -1583,6 +1588,9 @@ def _apply_status(state, target_id, spec):
         # fixed this session, see move-effects-schema.md's review-pass note)
         # already shows it correctly with no client changes needed.
         raise ValueError(f"{target['name']} is immune to that ({shield.title()})")
+    terrain_block = terrain_blocked_status(state.get('terrain'), target, spec)
+    if terrain_block:
+        raise ValueError(f"{target['name']} is immune to that ({terrain_block})")
     raw_ends = spec.get('ends') or []
     for e in raw_ends:
         if not isinstance(e, dict) or e.get('type') not in _END_TYPES:
@@ -2140,8 +2148,32 @@ def _set_weather(state, name, effect):
     state['weather'] = {'name': name, 'effect': effect} if name else None
 
 
-def _set_terrain(state, name, effect):
-    state['terrain'] = {'name': name, 'effect': effect} if name else None
+def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None):
+    """`rounds`/`healDice`/source only come from a terrain MOVE (see move-effects-schema.md's
+    set_terrain): `rounds` schedules the expiry (checked in _advance_turn), `healDice` is
+    Grassy Terrain's already-level-scaled end-of-turn heal. A DM-typed terrain carries none of
+    them and just stays until cleared."""
+    if not name:
+        state['terrain'] = None
+        return
+    terrain = {'name': name, 'effect': effect}
+    n = js_parse_int(rounds)
+    if n and n > 0:
+        terrain['expiresRound'] = state['round'] + n
+    if heal_dice:
+        terrain['healDice'] = str(heal_dice)
+    if source_id:
+        terrain['sourceId'] = source_id
+        terrain['sourceName'] = source_name
+    state['terrain'] = terrain
+    if terrain_kind(terrain) == 'electric':
+        # "No grounded creatures inside the area can be asleep" -- wake anyone already asleep.
+        for p in state['participants'].values():
+            if not is_grounded(p):
+                continue
+            for st in list(_statuses_of(p)):
+                if st.get('kind') == 'condition' and st.get('apply') == 'asleep':
+                    _expire_status(state, p, st, 'Electric Terrain')
 
 
 def _set_token_position(state, pid, col, row):

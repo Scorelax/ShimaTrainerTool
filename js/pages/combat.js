@@ -6,7 +6,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
-import { multiplyDiceString, addDiceString } from '../utils/move-effects.js';
+import { multiplyDiceString, addDiceString, terrainDamageNote } from '../utils/move-effects.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
@@ -2332,6 +2332,7 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weather = null, move
   const evalCondition = (cond) => {
     if (!cond) return { met: false, magnitude: 0 };
     switch (cond.type) {
+      case 'self_always': return { met: true, magnitude: 1 };
       case 'self_hp_below': return { met: hpFrac !== null && hpFrac < cond.fraction, magnitude: 1 };
       case 'self_hp_at_or_below': return { met: hpFrac !== null && hpFrac <= cond.fraction, magnitude: 1 };
       // Eruption's own "if at full health" -- the self-conditional side's
@@ -3076,6 +3077,9 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   let _extraVpCost = 0;
   if (!_isDirectHeal && computedData.damageDice) {
     const _dmgNoteEffects = moveEffectsFor(moveName).filter(e => e.kind === 'damage_note');
+    // Electric/Grassy/Psychic Terrain's doubled MOVE modifier applies to every move of its type, not just ones carrying effects.
+    const _terrainNote = terrainDamageNote(state.terrain, move[1]);
+    if (_terrainNote) _dmgNoteEffects.push(_terrainNote);
     if (_dmgNoteEffects.length) {
       const { diceMultiplier, diceNote, totalNote, flatBonus, flatNote, advantage, extraDiceCount } = _evaluateDamageNotes(_dmgNoteEffects, c, computedData.highestMod, state.weather, moveName);
       // Fury Cutter/Ice Ball/Rollout's own escalating VP cost -- the exact

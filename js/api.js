@@ -1064,8 +1064,9 @@ export class CombatAPI {
     return API.request('combat', 'set-weather', { name, effect }, { useCache: false });
   }
 
-  static async setTerrain(name, effect) {
-    return API.request('combat', 'set-terrain', { name, effect }, { useCache: false });
+  /** `extra` is only passed by a terrain MOVE: { rounds, healDice, sourceId, sourceName } (see routes_combat.py's _set_terrain). */
+  static async setTerrain(name, effect, extra = {}) {
+    return API.request('combat', 'set-terrain', { name, effect, ...extra }, { useCache: false });
   }
 }
 

@@ -29,7 +29,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -3154,6 +3154,21 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       }
       continue;
     }
+    if (effect.kind === 'set_terrain') {
+      // Electric/Grassy/Misty/Psychic Terrain -- sets the shared session terrain (like Defog's
+      // clear_field, not a status and no target), scheduled to expire after `effect.rounds`.
+      // Grassy Terrain's heal dice are scaled to the caster's level here, once, and stored on the
+      // terrain for _promptTurnHeals to roll at each creature's turn end. attackerId (closure) is the caster.
+      const caster = session?.participants?.[attackerId];
+      try {
+        await CombatAPI.setTerrain(effect.name || moveName, effect.description || '', {
+          rounds: effect.rounds, healDice: terrainHealDice(effect, caster?.level), sourceId: attackerId, sourceName: caster?.name,
+        });
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
     if (effect.kind === 'block_attack') {
       // Not a status either -- a one-shot signal to the ATTACKER's own
       // client (mid waitForReactionWindow) that this attack is blocked
@@ -4663,6 +4678,19 @@ async function _applyRecurringHeal(holderId, status) {
 async function _promptTurnHeals(participantId, timing) {
   const holder = session?.participants?.[participantId];
   if (!holder) return;
+  // Grassy Terrain: "all creatures in the affected area heal ... at the end of their turn" (field-wide -- no area tracking).
+  const terrain = session?.terrain;
+  if (timing === 'end_of_turn' && terrainKindOf(terrain) === 'grassy' && terrain.healDice && holder.status === 'participating') {
+    try {
+      await _handleApplyHeal({
+        targetId: participantId, effect: { amount: { dice: terrain.healDice, pool: 'HP' } }, moveName: terrain.name,
+        casterId: terrain.sourceId || participantId, casterName: terrain.sourceName || holder.name,
+        moveModBonus: 0, damageDealt: undefined, casterLevel: holder.level,
+      });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Error' });
+    }
+  }
   for (const due of pendingTurnHeals(holder, timing)) {
     // Fresh lookup each time: an earlier prompt (or the server) may already have ended it.
     const status = (session?.participants?.[participantId]?.statuses || []).find(st => st.id === due.id);

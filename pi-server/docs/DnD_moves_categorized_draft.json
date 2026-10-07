@@ -4687,12 +4687,29 @@
       },
       "reaction": false,
       "categories": [
-        "field_terrain"
+        "field_terrain",
+        "set_terrain"
       ],
       "description": "You electrify the ground around you to create a static field of electricity. For 3 turns, no grounded creatures inside the area can be asleep. In addition, creatures may double their MOVE modifier on damage rolls from electric-type moves activated inside the area",
       "moveStat": "None",
       "vpCost": "7",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Electric Terrain",
+          "rounds": 3,
+          "description": "Grounded creatures cannot be asleep. Electric moves double their MOVE modifier on damage.",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Electrify",
@@ -7023,12 +7040,29 @@
       },
       "reaction": false,
       "categories": [
-        "field_terrain"
+        "field_terrain",
+        "set_terrain"
       ],
       "description": "You cover the ground in a thin, healing mist that surrounds a 60 foot circle, centered on you. For 3 turns, no grounded creatures inside the mist can suffer from new status conditions. Grounded creatures are those that do not have a flying speed or Levitate, Magnet Rise, or similar ability.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Misty Terrain",
+          "rounds": 3,
+          "description": "Grounded creatures cannot suffer new status conditions.",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Moonblast",
@@ -13727,13 +13761,47 @@
       "categories": [
         "field_terrain",
         "heal_target_or_aoe",
-        "boosted_damage_rolls",
+        "set_terrain",
         "recharge_locked"
       ],
       "description": "Grass sprouts from the ground in a circle around you, coating the earth with healing energy. For 3 turns, all creatures in the affected area heal for 2d8 hit points at the end of their turn. In addition, creatures may double their MOVE modifier on damage rolls from grass-type moves activated inside the area.",
       "moveStat": "None",
       "vpCost": "20",
-      "scaling": "The healiinig dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The healiinig dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Grassy Terrain",
+          "rounds": 3,
+          "description": "All creatures heal at the end of their turn. Grass moves double their MOVE modifier on damage.",
+          "healTiers": [
+            [
+              1,
+              "2d8"
+            ],
+            [
+              5,
+              "3d8"
+            ],
+            [
+              10,
+              "4d8"
+            ],
+            [
+              17,
+              "6d8"
+            ]
+          ],
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Horn Leech",
@@ -26285,12 +26353,28 @@
       "reaction": false,
       "categories": [
         "field_terrain",
-        "boosted_damage_rolls"
+        "set_terrain"
       ],
       "description": "Psychic energy emerges from the ground in a 40ft, centered on you. Begininng at the end of your turn, for three rounds, all grounded creatures in the affected area are unable to use bonus actions. Grounded creatures are those that do not have a flying speed or Levitate, Magnet Rise, or similar ability. In addition, creatures may double their MOVE modifier on damage rolls from psychic-type moves activated inside the area.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Psychic Terrain",
+          "rounds": 3,
+          "description": "Grounded creatures cannot use bonus actions (not enforced). Psychic moves double their MOVE modifier on damage.",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Psycho Boost",

@@ -1039,3 +1039,36 @@ export function groupEffects(entries) {
   }
   return rows;
 }
+
+
+// ---------------------------------------------------------------------------
+// Terrain moves (Electric/Grassy/Misty/Psychic Terrain). The shared session terrain is a freeform
+// {name, effect} pair (plus expiresRound/healDice when a move cast it), so which one is active is a
+// loose name match -- same trust level as the weather checks, and a DM-typed "Grassy Terrain" behaves
+// exactly like one the move set. Mirrors conditions.py's terrain_kind (server-side enforcement lives there).
+// ---------------------------------------------------------------------------
+const TERRAIN_KEYWORDS = ['electric', 'grassy', 'misty', 'psychic'];
+const TERRAIN_BOOSTED_TYPE = { electric: 'Electric', grassy: 'Grass', psychic: 'Psychic' };
+
+/** 'electric' | 'grassy' | 'misty' | 'psychic' for a session terrain, or null. */
+export function terrainKindOf(terrain) {
+  const name = String(terrain?.name || '').toLowerCase();
+  return TERRAIN_KEYWORDS.find(k => name.includes(k)) || null;
+}
+
+/** The terrain's "double your MOVE modifier on damage rolls" for a move of `moveType`, as a synthetic
+ * self-conditional `damage_note` (so combat.js's _evaluateDamageNotes handles it like Solar Beam's own
+ * doubling), or null. Field-wide -- there's no "inside the area" position tracking. */
+export function terrainDamageNote(terrain, moveType) {
+  const kind = terrainKindOf(terrain);
+  const boosted = TERRAIN_BOOSTED_TYPE[kind];
+  if (!boosted || String(moveType || '').toLowerCase() !== boosted.toLowerCase()) return null;
+  return { kind: 'damage_note', condition: { type: 'self_always' }, flatBonus: 'moveModifier', note: `${terrain.name}: MOVE modifier doubled` };
+}
+
+/** A `set_terrain` effect's heal dice (Grassy Terrain) at the caster's level -- the last tier whose level is reached. */
+export function terrainHealDice(effect, level) {
+  let dice = null;
+  for (const [minLevel, d] of effect?.healTiers || []) if ((Number(level) || 1) >= minLevel) dice = d;
+  return dice;
+}

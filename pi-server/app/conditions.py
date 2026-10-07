@@ -378,3 +378,65 @@ def incoming_flat_reduction(participant):
             if isinstance(value, (int, float)):
                 best = max(best, value)
     return best
+
+
+# ---------------------------------------------------------------------------
+# Terrain moves (Electric/Grassy/Misty/Psychic Terrain). The shared session
+# terrain is still a freeform {name, effect} pair (plus expiresRound/healDice
+# when a move cast it), so which terrain is active is a loose name match --
+# same trust level as the weather checks -- which keeps a DM-typed "Misty
+# Terrain" working exactly like one the move set. There's no "who's standing
+# in the area" concept anywhere in this app, so every effect applies
+# field-wide (a documented simplification).
+# ---------------------------------------------------------------------------
+
+TERRAIN_KEYWORDS = ('electric', 'grassy', 'misty', 'psychic')
+
+
+def terrain_kind(terrain):
+    """'electric' | 'grassy' | 'misty' | 'psychic' for the active session terrain, or None."""
+    name = ((terrain or {}).get('name') or '').lower()
+    return next((k for k in TERRAIN_KEYWORDS if k in name), None)
+
+
+def is_grounded(participant):
+    """The terrain moves' own definition: "those that do not have a flying speed or Levitate,
+    Magnet Rise, or similar ability". Smack Down's `grounded` condition overrides all of it."""
+    statuses = (participant or {}).get('statuses', [])
+    if any(s.get('kind') == 'condition' and s.get('apply') == 'grounded' for s in statuses):
+        return True
+    speeds = list((participant or {}).get('speeds') or []) + granted_speed_entries(participant)
+    if any(str(sp.get('type', '')).lower() in ('flying', 'hovering') and (sp.get('ft') or 0) > 0 for sp in speeds):
+        return False
+    if 'levitate' in str((participant or {}).get('abilities') or '').lower():
+        return False
+    for s in statuses:
+        if s.get('kind') != 'condition':
+            continue
+        if s.get('apply') == 'airborne':
+            return False
+        if s.get('apply') == 'granted_immunity' and str(s.get('value') or '').lower() == 'ground':
+            return False  # Magnet Rise
+    return True
+
+
+# Misty Terrain's "new status conditions" -- every rulebook condition that is an affliction
+# (see condition-rules.js), not the bookkeeping conditions moves also use (type_changed, mat_block, ...).
+MISTY_BLOCKED_CONDITIONS = SAFEGUARD_BLOCKED_CONDITIONS | {
+    'blinded', 'deafened', 'flinched', 'frightened', 'charmed', 'grappled', 'restrained', 'stunned', 'unconscious', 'exhaustion',
+}
+
+
+def terrain_blocked_status(terrain, target, spec):
+    """The terrain name blocking an incoming status `spec` on `target`, or None. Electric Terrain:
+    no grounded creature can be asleep. Misty Terrain: no grounded creature gains a new status
+    condition. Both are standing protections checked at apply time, like blocking_shield."""
+    kind = terrain_kind(terrain)
+    if kind not in ('electric', 'misty') or spec.get('kind') != 'condition' or not is_grounded(target):
+        return None
+    apply_name = spec.get('apply')
+    if kind == 'electric' and apply_name == 'asleep':
+        return 'Electric Terrain'
+    if kind == 'misty' and apply_name in MISTY_BLOCKED_CONDITIONS:
+        return 'Misty Terrain'
+    return None

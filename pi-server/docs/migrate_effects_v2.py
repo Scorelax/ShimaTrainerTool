@@ -261,6 +261,10 @@ def tag_for(e):
         # redirect it into a ranged attack" -- see combat-wip.js's
         # _handleRedirectAvoidedDamage.
         base = 'redirect_avoided_damage'
+    elif e['kind'] == 'set_terrain':
+        # Electric/Grassy/Misty/Psychic Terrain -- sets the shared session terrain, see
+        # combat-wip.js's own branch in _offerMoveEffects (v77).
+        base = 'set_terrain'
     elif e['kind'] == 'clear_field':
         # Defog's own "sweeps away any active field effect" -- clears the
         # shared weather/terrain session fields, see combat-wip.js's own

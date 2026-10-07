@@ -1091,6 +1091,17 @@ export class CombatAPI {
     }, { useCache: false });
   }
 
+  /** Switch Pokemon (shared battle): `id` goes to the bench, `inId` takes its place on the map and in the turn order. `pass`
+   * is Baton Pass -- the outgoing Pokemon's statuses go with it. */
+  static async switchPokemon(id, inId, pass = false) {
+    return API.request('combat', 'switch-pokemon', { id, inId, pass: pass ? '1' : '' }, { useCache: false });
+  }
+
+  /** Lunar Dance / Healing Wish: the trainer's next Pokemon to enter the battle is healed and cured (`mode`: 'lunar' | 'wish'). */
+  static async queueSwitchHeal(id, mode) {
+    return API.request('combat', 'queue-switch-heal', { id, mode }, { useCache: false });
+  }
+
   /** Quash: moves the target to the bottom of this round's initiative order (restored when the next round begins). */
   static async quash(id) {
     return API.request('combat', 'quash', { id }, { useCache: false });

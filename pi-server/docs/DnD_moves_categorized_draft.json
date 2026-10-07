@@ -1093,7 +1093,8 @@
         "damage",
         "positioning",
         "switch",
-        "self_reposition_near"
+        "self_reposition_near",
+        "self_switch_out"
       ],
       "description": "You lash out with a quick strike before you make a getaway. Make a melee attack, dealing 2d8 + MOVE bug damage on a hit. After this move is activated, if it is possible, you must either move up to half your movement speed away from your target, not provoking opportunity attacks, or your trainer must switch you out as a free action.",
       "moveStat": "DEX",
@@ -1113,7 +1114,27 @@
               "type": "instant"
             }
           ],
-          "note": "Half your speed, away from the target (not enforced). The trainer switch-out alternative has no mechanic."
+          "note": "Half your speed, away from the target (not enforced). Pick this OR the trainer switch-out.",
+          "choice": {
+            "kind": "chosen"
+          }
+        },
+        {
+          "kind": "switch_out",
+          "pass": false,
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "choice": {
+            "kind": "chosen"
+          },
+          "note": "Your trainer switches you out as a free action."
         }
       ]
     },
@@ -1844,12 +1865,29 @@
       "reaction": false,
       "categories": [
         "self_faint",
-        "fully_heal_new_pokemon"
+        "fully_heal_new_pokemon",
+        "self_faint_pass_heal"
       ],
       "description": "You sacrifice yourself for another one of your trainer's Pokémon. When activating this move, the user faints, but the next creature released by its trainer is fully healed and cured of any status effects.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "faint_pass_heal",
+          "mode": "lunar",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You faint; the next Pokemon your trainer sends out is fully healed and cured."
+        }
+      ]
     },
     {
       "name": "Meteor Swarm",
@@ -5701,7 +5739,8 @@
       "categories": [
         "damage",
         "positioning",
-        "self_reposition_near"
+        "self_reposition_near",
+        "self_switch_out"
       ],
       "description": "You lash out with a quick, electric strike before you make a getaway. Make a melee attack, dealing 2d8 + MOVE electric damage on a hit. After this move is activated, if it is possible, you must either move up to half your movement speed away from your target, not provoking opportunity attacks, or your trainer must switch you out as a free action.",
       "moveStat": "DEX",
@@ -5721,7 +5760,27 @@
               "type": "instant"
             }
           ],
-          "note": "Half your speed, away from the target (not enforced). The trainer switch-out alternative has no mechanic."
+          "note": "Half your speed, away from the target (not enforced). Pick this OR the trainer switch-out.",
+          "choice": {
+            "kind": "chosen"
+          }
+        },
+        {
+          "kind": "switch_out",
+          "pass": false,
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "choice": {
+            "kind": "chosen"
+          },
+          "note": "Your trainer switches you out as a free action."
         }
       ]
     },
@@ -17754,12 +17813,29 @@
       },
       "reaction": false,
       "categories": [
-        "switch"
+        "switch",
+        "self_switch_out"
       ],
       "description": "As a bonus action, you may switch a Pokémon out with another Pokémon, passing along all negative status effects or stat changes to the new Pokémon. This includes existing substitutes, critical hit bonuses, AC increases, etc.",
       "moveStat": "None",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "switch_out",
+          "pass": true,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Switch out; every status on you goes to the Pokemon that replaces you."
+        }
+      ]
     },
     {
       "name": "Belly Drum",
@@ -26004,12 +26080,29 @@
       "reaction": false,
       "categories": [
         "self_faint",
-        "fully_heal_new_pokemon"
+        "fully_heal_new_pokemon",
+        "self_faint_pass_heal"
       ],
       "description": "You sacrifice yourself for another one of your trainer's Pokémon. When activating this move, the user faints, but the next conscious creature released by its trainer is healed of all status effects and recovers an amount of HP equal to what the user lost by fainting.",
       "moveStat": "None",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "faint_pass_heal",
+          "mode": "wish",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You faint; the next Pokemon your trainer sends out is cured and recovers the HP you lost."
+        }
+      ]
     },
     {
       "name": "Heart Stamp",

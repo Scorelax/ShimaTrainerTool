@@ -35,7 +35,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded
+from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -254,6 +254,17 @@ def handle(conn, action, params):
             s, trigger, params['anchorId'], params['attackerId'], params.get('moveName', ''))))
         result.update(outcome)
         return result
+
+    if action == 'switch-pokemon':
+        if not params.get('id') or not params.get('inId'):
+            raise ValueError('Missing participant id or inId')
+        passing = str(params.get('pass', '')) in ('1', 'true')
+        return _mutate(conn, lambda s: _switch_pokemon(s, params['id'], params['inId'], passing))
+
+    if action == 'queue-switch-heal':
+        if not params.get('id') or params.get('mode') not in ('lunar', 'wish'):
+            raise ValueError('Missing participant id, or mode must be lunar/wish')
+        return _mutate(conn, lambda s: _queue_switch_heal(s, params['id'], params['mode']))
 
     if action == 'quash':
         if not params.get('id'):
@@ -964,6 +975,8 @@ def _add_participant(state, data):
         # to their own team. DM toggles these per-enemy from the DM module.
         'visibility': {'hp': True, 'vp': True, 'name': True},
     }
+    if status == 'participating':
+        _apply_switch_heal(state, state['participants'][pid])
     _rebuild_turn_order(state)
     _log_event(state, 'join', text=f"{state['participants'][pid]['name']} joined the battle", actorId=pid, actorName=state['participants'][pid]['name'])
 
@@ -1002,7 +1015,105 @@ def _set_status(state, pid, status):
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
     participant['status'] = status
+    if status == 'participating':
+        _apply_switch_heal(state, participant)
     _rebuild_turn_order(state)
+
+
+def _note_faint(participant, old_hp):
+    """Remembers how much HP a participant had when it dropped to 0 or below -- Healing Wish passes on "an amount of HP equal to
+    what the user lost by fainting"."""
+    if old_hp is not None and old_hp > 0 and participant.get('currentHP', 0) <= 0:
+        participant['hpBeforeFaint'] = old_hp
+
+
+def _switch_pokemon(state, out_id, in_id, pass_statuses=False):
+    """Swaps one of a trainer's Pokemon out for another: the outgoing one goes to the bench (status 'spectating', keeping its HP,
+    VP and statuses), the incoming one takes its place on the map and, if it was the one acting, its turn. `pass_statuses` is
+    Baton Pass: every status on the outgoing Pokemon -- conditions, stat changes, rolls, temp HP -- goes to the newcomer.
+    A Pokemon that can't be switched out (Ingrain's `trapped`) is refused. A pending Lunar Dance / Healing Wish for this trainer
+    is applied to the newcomer. The shared tool had no switching before this -- only the legacy local combat page did."""
+    out, inn = state['participants'].get(out_id), state['participants'].get(in_id)
+    if not out or not inn:
+        raise ValueError('Unknown participant')
+    if out_id == in_id:
+        raise ValueError("That Pokemon is already in the battle")
+    owner = out.get('owner')
+    if not owner or inn.get('owner') != owner:
+        raise ValueError('Both Pokemon must belong to the same trainer')
+    if out.get('combatantType') != 'pokemon' or inn.get('combatantType') != 'pokemon':
+        raise ValueError('Only Pokemon can be switched')
+    if out.get('status') != 'participating':
+        raise ValueError(f"{out['name']} isn't in the battle")
+    if inn.get('status') == 'participating':
+        raise ValueError(f"{inn['name']} is already in the battle")
+    trapped = next((s for s in _statuses_of(out) if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
+    if trapped:
+        raise ValueError(f"{out['name']} is {trapped['apply']} and can't be switched out")
+
+    # The newcomer takes the outgoing Pokemon's slot for the rest of this round (so nobody's turn is skipped or repeated by a
+    # re-sort mid-round) -- including its turn, if it was the one acting; the order is re-sorted by initiative when the next round
+    # begins (see _advance_turn). Before the battle starts there is no round to protect, so it just re-sorts straight away.
+    order = state['turnOrder']
+    if out_id in order:
+        order[order.index(out_id)] = in_id
+    state['resortAtRound'] = True
+    if state.get('reactingParticipantId') == out_id:
+        state['reactingParticipantId'] = in_id
+
+    out['status'], inn['status'] = 'spectating', 'participating'
+    token = state['board']['tokens'].pop(out_id, None)
+    if token:
+        state['board']['tokens'][in_id] = dict(token)
+        inn['placed'] = True
+    if pass_statuses:
+        for s in [s for s in _statuses_of(out) if s.get('kind') in ('condition', 'stat', 'roll', 'temp_hp') and s.get('apply') not in UNTARGETABLE_STATES]:
+            copy_ = json.loads(json.dumps(s))
+            copy_['id'] = uuid.uuid4().hex[:8]
+            _statuses_of(inn).append(copy_)
+            _statuses_of(out).remove(s)
+    _apply_switch_heal(state, inn)
+    if not state.get('started'):
+        _rebuild_turn_order(state)
+    _log_event(state, 'switch', text=f"{owner} withdraws {out['name']} and sends out {inn['name']}{' (passing along its effects)' if pass_statuses else ''}",
+               actorId=in_id, actorName=inn['name'])
+
+
+def _queue_switch_heal(state, pid, mode):
+    """Lunar Dance ("the next creature released by its trainer is fully healed and cured of any status effects") and Healing Wish
+    (cured, and recovers HP equal to what the user lost by fainting): remembered per trainer, applied to the next of their Pokemon
+    to enter the battle -- through a switch, a new join, or being set participating."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    owner = participant.get('owner')
+    if not owner:
+        raise ValueError('That Pokemon has no trainer to pass its sacrifice to')
+    state.setdefault('switchHeals', {})[owner] = {'mode': mode, 'sourceId': pid}
+    _log_event(state, 'switch-heal', text=f"{participant['name']} sacrifices itself -- {owner}'s next Pokemon will be {'fully healed' if mode == 'lunar' else 'healed'}",
+               actorId=pid, actorName=participant['name'])
+
+
+def _apply_switch_heal(state, participant):
+    """If this participant's trainer has a pending Lunar Dance / Healing Wish and this is a different Pokemon entering the
+    battle, applies it: every condition is cured, and HP (and, for Lunar Dance, VP) is restored -- Lunar Dance to full, Healing
+    Wish by the HP the sacrificed Pokemon had when it fainted."""
+    pending = (state.get('switchHeals') or {}).get(participant.get('owner'))
+    if not pending or participant.get('combatantType') != 'pokemon' or participant['id'] == pending['sourceId']:
+        return
+    del state['switchHeals'][participant['owner']]
+    source = state['participants'].get(pending['sourceId']) or {}
+    participant['statuses'] = [s for s in _statuses_of(participant) if s.get('kind') != 'condition']
+    if pending['mode'] == 'lunar':
+        participant['currentHP'] = participant['maxHP']
+        participant['currentVP'] = participant['maxVP']
+        note = 'fully healed and cured'
+    else:
+        gained = source.get('hpBeforeFaint') or 0
+        participant['currentHP'] = min(participant['maxHP'], participant['currentHP'] + gained)
+        note = f'cured and healed for {gained} HP'
+    _log_event(state, 'switch-heal', text=f"{participant['name']} is {note} by {source.get('name', 'a fallen ally')}'s sacrifice",
+               actorId=participant['id'], actorName=participant['name'])
 
 
 def _update_stats(state, pid, current_hp, current_vp):
@@ -1015,8 +1126,10 @@ def _update_stats(state, pid, current_hp, current_vp):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
+    old_hp = participant['currentHP']
     if current_hp is not None:
         participant['currentHP'] = current_hp
+        _note_faint(participant, old_hp)
     if current_vp is not None:
         participant['currentVP'] = current_vp
 
@@ -1158,6 +1271,11 @@ def _advance_turn(state):
     new_round = state['turnIndex'] == 0
     if new_round:
         state['round'] += 1
+    if new_round and state.get('resortAtRound'):
+        # A switch happened this round: put the order back in initiative order for the new round.
+        state['resortAtRound'] = False
+        _rebuild_turn_order(state)
+        state['turnIndex'] = 0
     if new_round and state.get('quashRestoreOrder'):
         # Quash moved someone to the bottom "for this round only" -- the real order comes back with the new round.
         restored = [pid for pid in state['quashRestoreOrder'] if pid in state['turnOrder']]
@@ -2238,6 +2356,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         # False Swipe: "if this attack would normally cause a creature to faint, it is reduced to 1HP instead".
         target['currentHP'] = 1
         spared = True
+    _note_faint(target, hp_before)
     move_label = f' with {move_name}' if move_name else ''
     condition_note = ' -- Mat Block/Testudo Formation reduces this' if condition_multiplier != 1 else ''
     condition_note += ' -- held back, left at 1 HP' if spared else ''

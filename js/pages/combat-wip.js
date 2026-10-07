@@ -40,7 +40,7 @@ import {
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
-  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
+  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
   buildKnownMovesString,
 } from './combat.js';
 
@@ -559,6 +559,7 @@ function _enterBattleSync() {
   setCombatStateKey(WIP_COMBAT_STATE_KEY);
   setOnCombatStateSave(_onLocalCombatStateSave);
   setOnLogEvent((event) => CombatAPI.logEvent(event).catch(() => {}));
+  setOnSwitchPokemon((bench, options) => _switchPokemonShared(bench, options)); // swaps on the server, not the local mirror
 }
 
 function _exitBattleSync() {
@@ -572,6 +573,7 @@ function _exitBattleSync() {
   setCombatStateKey('combatState');
   setOnCombatStateSave(null);
   setOnLogEvent(null);
+  setOnSwitchPokemon(null); // the legacy local combat page switches in its own local state again
   _focusedParticipantId = null;
   _focusManuallySet = false;
 }
@@ -1044,6 +1046,59 @@ function _lastMoveUsedBy(session, pid) {
   return null;
 }
 
+/** The viewer's party Pokemon (party slots 1-6) that aren't currently fighting. One that has been in the battle before (benched
+ * or fainted) keeps its session record -- id, HP, VP, initiative -- so switching back resumes it instead of starting fresh;
+ * one that hasn't has to roll initiative when it's first sent out (combat.js's switch popup asks for it). */
+function _benchFor(session, myName) {
+  if (!myName) return [];
+  const mine = Object.values(session.participants || {}).filter(p => p.owner === myName && p.combatantType === 'pokemon');
+  const keys = [];
+  for (const key of Object.keys(sessionStorage)) {
+    if (!key.startsWith('pokemon_')) continue;
+    try {
+      const slot = parseInt(JSON.parse(sessionStorage.getItem(key))[38], 10);
+      if (slot >= 1 && slot <= 6) keys.push({ key, slot });
+    } catch { /* an unreadable cache entry is just not a party member */ }
+  }
+  keys.sort((a, b) => a.slot - b.slot);
+  return keys.map(({ key }) => {
+    const bench = { ...buildPokemonCombatant(key) };
+    const existing = mine.find(p => p.name === bench.name);
+    if (existing && existing.status === 'participating') return null; // already out there
+    if (existing) {
+      bench.id = existing.id;
+      bench.currentHp = existing.currentHP; bench.currentVp = existing.currentVP;
+      bench.hasRolledInitiative = true;
+      bench.initiativeTotal = existing.initiative ?? bench.initiativeTotal;
+    } else {
+      bench.hasRolledInitiative = false;
+    }
+    return bench;
+  }).filter(Boolean);
+}
+
+/** Switches the viewer's active Pokemon for `bench` in the shared battle: a Pokemon new to the fight is added to the session
+ * first (as a spectator, with its freshly rolled initiative), then the server swaps the two -- map token, turn, and (Baton Pass)
+ * statuses -- see routes_combat.py's _switch_pokemon. */
+async function _switchPokemonShared(bench, options = {}) {
+  const myName = _currentTrainerName();
+  const out = Object.values(session?.participants || {}).find(p => p.owner === myName && p.combatantType === 'pokemon' && p.status === 'participating');
+  if (!out) {
+    showCombatAlert('You have no Pokémon in the battle to switch out.', { title: 'Switch' });
+    return;
+  }
+  try {
+    let inId = bench.id && session.participants[bench.id] ? bench.id : null;
+    if (!inId) {
+      inId = `p${Math.random().toString(36).slice(2, 10)}`;
+      await CombatAPI.addParticipant({ ..._combatantToParticipant(bench), id: inId, status: 'spectating' });
+    }
+    await CombatAPI.switchPokemon(out.id, inId, !!options.pass);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Switch' });
+  }
+}
+
 function _syncLocalCombatState(session) {
   _enterBattleSync();
 
@@ -1178,6 +1233,8 @@ function _syncLocalCombatState(session) {
     phase: 'battle', round: session.round,
     activeTurnIndex: foundIdx,
     combatants,
+    // The trainer's party Pokemon that aren't in the battle right now -- what the "⇄ Switch Pokémon" picker offers.
+    bench: _benchFor(session, myName),
     // Read off the server session, not this device's own local cache
     // (existing) -- weather/terrain are shared session state now (see
     // routes_combat.py's set-weather/set-terrain), so every device sees
@@ -3024,6 +3081,22 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // Spiky Shield's own "ignore damage" half -- same no-attackerId-needed
       // reasoning as undo_crit_damage above.
       await _handleNegateDamage({ reactorId: attackerId, moveName });
+      continue;
+    }
+    if (effect.kind === 'switch_out') {
+      // Baton Pass, and U-turn / Volt Switch's "your trainer switches you out": the bench picker, then the server swap.
+      openSwitchPopup({ pass: !!effect.pass });
+      continue;
+    }
+    if (effect.kind === 'faint_pass_heal') {
+      // Lunar Dance / Healing Wish -- the user has fainted (the self_faint tag set its HP); the trainer's NEXT Pokemon out is healed.
+      try {
+        await CombatAPI.queueSwitchHeal(attackerId, effect.mode);
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+        continue;
+      }
+      openSwitchPopup({ pass: false });
       continue;
     }
     if (effect.kind === 'recoil') {

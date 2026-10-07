@@ -331,6 +331,9 @@ def tag_for(e):
         # disabled" -- read off the shared log, see combat-wip.js's
         # _handleDisableLastUsedMove.
         base = 'disable_last_used_move'
+    elif e['kind'] in ('switch_out', 'faint_pass_heal'):
+        # Baton Pass/U-turn's switch and Lunar Dance/Healing Wish -- see routes_combat.py's _switch_pokemon / _queue_switch_heal (v85).
+        base = e['kind']
     elif e['kind'] == 'recoil':
         # Volt Tackle/Brave Bird/Head Smash/... -- typeless self-damage, see combat-wip.js's _handleRecoil (v84).
         base = 'recoil'

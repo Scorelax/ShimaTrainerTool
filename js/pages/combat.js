@@ -438,6 +438,22 @@ export function setOnLogEvent(fn) {
   _onLogEvent = fn || null;
 }
 
+// The shared battle (combat-wip.js) swaps Pokemon on the SERVER (participants, the map token, the turn order), not in this local
+// mirror, so it registers a handler here that executePokemonSwitch calls instead of reshuffling the local combatants. The
+// options say how the switch was started: { pass: true } is Baton Pass (statuses go with it).
+let _onSwitchPokemon = null;
+let _switchOptions = { pass: false };
+export function setOnSwitchPokemon(fn) {
+  _onSwitchPokemon = fn || null;
+}
+
+/** Opens the bench picker for a move-driven switch (Baton Pass, U-turn / Volt Switch's trainer switch, Lunar Dance, Healing
+ * Wish). The normal "⇄ Switch Pokémon" button opens the same picker with no options. */
+export function openSwitchPopup(options = {}) {
+  _switchOptions = { pass: !!options.pass };
+  if (_battleState) showSwitchPopup(_battleState);
+}
+
 function logBattleEvent(event) {
   if (_onLogEvent) _onLogEvent(event);
 }
@@ -2182,6 +2198,14 @@ function showSwitchInitiativePopup(benchPokemon) {
 }
 
 function executePokemonSwitch(benchPokemon, state) {
+  if (_onSwitchPokemon) {
+    const options = _switchOptions;
+    _switchOptions = { pass: false };
+    document.getElementById('combatSwitchPopup').style.display = 'none';
+    document.getElementById('combatSwitchInitPopup').style.display = 'none';
+    _onSwitchPokemon(benchPokemon, options);
+    return;
+  }
   // Find the currently active pokemon (first non-trainer)
   const activePokIdx = state.combatants.findIndex(c => c.type === 'pokemon');
   if (activePokIdx === -1) return;

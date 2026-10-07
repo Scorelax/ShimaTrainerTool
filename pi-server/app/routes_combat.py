@@ -28,13 +28,14 @@ moves dataset) and the target's stored type(s), the same type-chart data
 game-data/type-effectiveness already exposes.
 """
 import json
+import math
 import os
 import re
 import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, is_grounded
+from .conditions import untargetable_state, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, terrains_affecting, is_grounded
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -99,6 +100,10 @@ _EMPTY_STATE = {
     # just the DM's own screen. See _set_weather/_set_terrain below.
     'weather': None,
     'terrain': None,
+    # Tile-limited terrains (Electric/Grassy/Misty/Psychic Terrain cast over a marked area instead of the whole
+    # map): [{id, name, effect, cells:['col,row',...], expiresRound, healDice, sourceId, sourceName}]. The
+    # whole-map terrain above stays as it was; conditions.py's terrains_affecting merges both for a participant.
+    'terrainZones': [],
     # The shared battle log -- one chronological list of everything that's
     # happened this session, oldest first, visible to every viewer (see
     # battle-log-popup.js) and readable by future move-logic that needs to
@@ -382,7 +387,17 @@ def handle(conn, action, params):
 
     if action == 'set-terrain':
         return _mutate(conn, lambda s: _set_terrain(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
-                                                    params.get('healDice'), params.get('sourceId'), params.get('sourceName')))
+                                                    params.get('healDice'), params.get('sourceId'), params.get('sourceName'),
+                                                    params.get('cells')))
+
+    if action == 'clear-terrain-zones':
+        return _mutate(conn, lambda s: s.__setitem__('terrainZones', []))
+
+    if action == 'rotate-token':
+        facing = js_parse_int(params.get('facing'))
+        if not params.get('id') or facing is None:
+            raise ValueError('Missing participant id or facing')
+        return _mutate(conn, lambda s: _rotate_token(s, params['id'], facing))
 
     if action == 'set-token-position':
         col = js_parse_int(params.get('col'))
@@ -1123,10 +1138,7 @@ def _advance_turn(state):
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
         _expire_statuses_by_round(state)
-    terrain = state.get('terrain')
-    if terrain and terrain.get('expiresRound') is not None and state['round'] >= terrain['expiresRound']:
-        _log_event(state, 'terrain-end', text=f"{terrain['name']} fades")
-        state['terrain'] = None
+    _expire_terrains(state)
     starting_id = state['turnOrder'][state['turnIndex']]
     _apply_condition_turn_damage(state, starting_id, 'start')
     _expire_statuses_on_turn_point(state, starting_id, 'start')
@@ -1143,7 +1155,7 @@ def _use_bonus_action(state, pid, move_name=''):
         raise ValueError('Only participating combatants can use a bonus action')
     if participant.get('bonusActionUsed'):
         raise ValueError(f"{participant['name']} has already used their bonus action this round")
-    if terrain_kind(state.get('terrain')) == 'psychic' and is_grounded(participant):
+    if terrain_blocks_bonus_actions(terrains_affecting(state, pid), participant):
         raise ValueError(f"{participant['name']} can't use bonus actions (Psychic Terrain)")
     participant['bonusActionUsed'] = True
     label = f' ({move_name})' if move_name else ''
@@ -1617,7 +1629,7 @@ def _apply_status(state, target_id, spec):
         # fixed this session, see move-effects-schema.md's review-pass note)
         # already shows it correctly with no client changes needed.
         raise ValueError(f"{target['name']} is immune to that ({shield.title()})")
-    terrain_block = terrain_blocked_status(state.get('terrain'), target, spec)
+    terrain_block = terrain_blocked_status(terrains_affecting(state, target_id), target, spec)
     if terrain_block:
         raise ValueError(f"{target['name']} is immune to that ({terrain_block})")
     raw_ends = spec.get('ends') or []
@@ -2177,11 +2189,13 @@ def _set_weather(state, name, effect):
     state['weather'] = {'name': name, 'effect': effect} if name else None
 
 
-def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None):
+def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None):
     """`rounds`/`healDice`/source only come from a terrain MOVE (see move-effects-schema.md's
     set_terrain): `rounds` schedules the expiry (checked in _advance_turn), `healDice` is
     Grassy Terrain's already-level-scaled end-of-turn heal. A DM-typed terrain carries none of
-    them and just stays until cleared."""
+    them and just stays until cleared. `cells` (a list of "col,row") limits the terrain to those
+    tiles as a zone in state['terrainZones'] -- who it affects is whoever stands on them; without
+    it the terrain covers the whole map (state['terrain'])."""
     if not name:
         state['terrain'] = None
         return
@@ -2194,21 +2208,64 @@ def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=Non
     if source_id:
         terrain['sourceId'] = source_id
         terrain['sourceName'] = source_name
-    state['terrain'] = terrain
-    if terrain_kind(terrain) == 'electric':
-        # "No grounded creatures inside the area can be asleep" -- wake anyone already asleep.
-        for p in state['participants'].values():
-            if not is_grounded(p):
-                continue
-            for st in list(_statuses_of(p)):
-                if st.get('kind') == 'condition' and st.get('apply') == 'asleep':
-                    _expire_status(state, p, st, 'Electric Terrain')
+    if cells:
+        terrain['id'] = uuid.uuid4().hex[:8]
+        terrain['cells'] = sorted({str(c) for c in cells})
+        zones = state.setdefault('terrainZones', [])
+        # Recasting the same terrain replaces its previous zone rather than stacking duplicates.
+        zones[:] = [z for z in zones if z['name'] != name]
+        zones.append(terrain)
+    else:
+        state['terrain'] = terrain
+    _wake_electric_sleepers(state)
+
+
+def _wake_electric_sleepers(state):
+    """"No grounded creatures inside the area can be asleep" -- wake anyone already asleep who is now standing in an Electric Terrain."""
+    for p in state['participants'].values():
+        if not is_grounded(p) or not any(terrain_kind(t) == 'electric' for t in terrains_affecting(state, p['id'])):
+            continue
+        for st in list(_statuses_of(p)):
+            if st.get('kind') == 'condition' and st.get('apply') == 'asleep':
+                _expire_status(state, p, st, 'Electric Terrain')
+
+
+def _expire_terrains(state):
+    """Terrain moves last a set number of rounds -- drop whole-map and zone terrains whose round has come."""
+    def over(t):
+        return t.get('expiresRound') is not None and state['round'] >= t['expiresRound']
+    if state.get('terrain') and over(state['terrain']):
+        _log_event(state, 'terrain-end', text=f"{state['terrain']['name']} fades")
+        state['terrain'] = None
+    zones = state.get('terrainZones') or []
+    for z in [z for z in zones if over(z)]:
+        _log_event(state, 'terrain-end', text=f"{z['name']} fades")
+        zones.remove(z)
 
 
 def _set_token_position(state, pid, col, row):
     if pid not in state['participants']:
         raise ValueError('Unknown participant: ' + pid)
-    state['board']['tokens'][pid] = {'col': col, 'row': row}
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid)}
+    _wake_electric_sleepers(state)
+
+
+def _facing_of(state, pid):
+    """A token's facing in degrees clockwise from up, always a multiple of 45 (0 for one never rotated)."""
+    return (state['board']['tokens'].get(pid) or {}).get('facing', 0)
+
+
+def _rotate_token(state, pid, facing):
+    """Turns a token on the spot, in 45-degree steps (0 = up, 90 = right, ...). Free -- no movement cost --
+    but turn-gated exactly like move-token, so only the participant holding the floor can turn."""
+    if pid not in state['participants']:
+        raise ValueError('Unknown participant: ' + pid)
+    if pid != _active_participant_id(state):
+        raise ValueError("It's not this participant's turn")
+    token = state['board']['tokens'].get(pid)
+    if not token:
+        raise ValueError('That participant has no token on the map')
+    token['facing'] = (round(facing / 45) * 45) % 360
 
 
 # Conditions that block voluntary movement entirely, checked below -- a
@@ -2364,7 +2421,13 @@ def _move_token(state, pid, col, row):
         participant['movementUsed'] = participant.get('movementUsed', 0) + distance_ft
 
     state['started'] = True  # see _rebuild_turn_order -- acting on-turn means turn order is now live
-    state['board']['tokens'][pid] = {'col': col, 'row': row}
+    # Moving turns the token toward where it's heading (snapped to 45 degrees); rotate-token adjusts it after.
+    previous = state['board']['tokens'].get(pid)
+    facing = _facing_of(state, pid)
+    if previous and (col, row) != (previous['col'], previous['row']):
+        facing = (round(math.degrees(math.atan2(col - previous['col'], previous['row'] - row)) / 45) * 45) % 360
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing}
+    _wake_electric_sleepers(state)
     _log_event(state, 'move', text=f"{participant['name']} moved to ({col}, {row})",
                actorId=pid, actorName=participant['name'], col=col, row=row)
 
@@ -2388,7 +2451,7 @@ def _confirm_placement(state, pid, col, row):
     for other_id, pos in state['board']['tokens'].items():
         if other_id != pid and pos['col'] == col and pos['row'] == row:
             raise ValueError('That square is already taken')
-    state['board']['tokens'][pid] = {'col': col, 'row': row}
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid)}
     participant['placed'] = True
     _log_event(state, 'placement', text=f"{participant['name']} placed at ({col}, {row})",
                actorId=pid, actorName=participant['name'], col=col, row=row)

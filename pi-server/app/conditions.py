@@ -427,16 +427,50 @@ MISTY_BLOCKED_CONDITIONS = SAFEGUARD_BLOCKED_CONDITIONS | {
 }
 
 
-def terrain_blocked_status(terrain, target, spec):
-    """The terrain name blocking an incoming status `spec` on `target`, or None. Electric Terrain:
-    no grounded creature can be asleep. Misty Terrain: no grounded creature gains a new status
-    condition. Both are standing protections checked at apply time, like blocking_shield."""
-    kind = terrain_kind(terrain)
-    if kind not in ('electric', 'misty') or spec.get('kind') != 'condition' or not is_grounded(target):
+def footprint_cells(col, row, size):
+    """Mirror of battle-map-grid.js's footprintCells: an NxN footprint anchored at its bottom-left cell."""
+    return [(col + dc, row - dr) for dc in range(size) for dr in range(size)]
+
+
+def footprint_size(size_text):
+    """Large = 2x2, Huge = 3x3, everything else 1x1 (same table as battle-map-grid.js's footprintForSize)."""
+    s = str(size_text or '').strip().lower()
+    return 2 if s == 'large' else 3 if s == 'huge' else 1
+
+
+def terrains_affecting(state, pid):
+    """Every terrain currently affecting participant `pid`: the whole-map terrain (state['terrain'], also what a
+    DM-typed terrain is) plus every tile-limited zone (state['terrainZones']) that overlaps any cell of their
+    token's footprint. A participant with no token on the map is only affected by the whole-map terrain."""
+    found = []
+    if state.get('terrain'):
+        found.append(state['terrain'])
+    token = state.get('board', {}).get('tokens', {}).get(pid)
+    zones = state.get('terrainZones') or []
+    if token and zones:
+        size = footprint_size(state.get('participants', {}).get(pid, {}).get('size'))
+        covered = {f"{c},{r}" for c, r in footprint_cells(token['col'], token['row'], size)}
+        found.extend(z for z in zones if covered & set(z.get('cells') or ()))
+    return found
+
+
+def terrain_blocked_status(terrains, target, spec):
+    """The terrain name blocking an incoming status `spec` on `target`, or None, given the terrains affecting
+    them (see terrains_affecting). Electric Terrain: no grounded creature can be asleep. Misty Terrain: no
+    grounded creature gains a new status condition. Both are standing protections checked at apply time,
+    like blocking_shield."""
+    if spec.get('kind') != 'condition' or not is_grounded(target):
         return None
     apply_name = spec.get('apply')
-    if kind == 'electric' and apply_name == 'asleep':
-        return 'Electric Terrain'
-    if kind == 'misty' and apply_name in MISTY_BLOCKED_CONDITIONS:
-        return 'Misty Terrain'
+    for terrain in terrains or ():
+        kind = terrain_kind(terrain)
+        if kind == 'electric' and apply_name == 'asleep':
+            return 'Electric Terrain'
+        if kind == 'misty' and apply_name in MISTY_BLOCKED_CONDITIONS:
+            return 'Misty Terrain'
     return None
+
+
+def terrain_blocks_bonus_actions(terrains, participant):
+    """Psychic Terrain: grounded creatures standing in it can't use bonus actions."""
+    return is_grounded(participant) and any(terrain_kind(t) == 'psychic' for t in terrains or ())

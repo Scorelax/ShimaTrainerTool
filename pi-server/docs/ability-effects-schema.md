@@ -228,7 +228,7 @@ Amounts: `{"dice":"1d4","timesLevel":true}`, `{"flat":10,"proficiencyMultiple":2
 | `negate_condition` / `reflect_condition` | the incoming condition doesn't apply / goes to `target` instead |
 | `pass_save` | a failed save becomes a pass |
 | `invert_condition_damage` | `conditions` -- their damage heals instead (Poison Heal) |
-| `invert_stat_changes` | stat changes from moves are reversed (Contrary) |
+| `invert_stat_changes` | `filter: {"fromMoves": true}` -- stat changes from moves are reversed (Contrary) |
 | `clear_stat_changes` | reverts stat changes in effect (Balance Keeper) |
 | `swap_stats` | `stats` -- swap two stats (Stance Change) |
 | `ignore_target_abilities` | its moves ignore abilities that would weaken or block them (Mold Breaker) |

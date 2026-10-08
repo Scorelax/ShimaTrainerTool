@@ -31,7 +31,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
-import { moveCostFt, canClimb } from './move-effects.js';
+import { moveCostFt, altitudeLimits } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 
 const CONE_FT = 15; // the cone preview is just a visual of where the token faces -- one size is enough
@@ -69,6 +69,7 @@ function _injectStyles() {
     /* a staged move: the token is drawn at its destination, the tile it left keeps a faint dashed outline */
     .bmap-token.moving { opacity: 0.9; pointer-events: none; }
     .bmap-token.moving .bmap-token-portrait { outline: 2px dashed #FFD700; outline-offset: 2px; }
+    .bmap-toolbar button:disabled { opacity: 0.35; cursor: not-allowed; }
     .bmap-token-origin { position: absolute; box-sizing: border-box; pointer-events: none; border-radius: 14%; border: 2px dashed rgba(255,215,0,0.45); background: rgba(255,215,0,0.06); }
     /* the selected token's toolbar lives in this strip above the map, so it never covers the board */
     .bmap-toolbar-slot { display: flex; justify-content: center; min-height: 2.8rem; margin-bottom: 0.5rem; }
@@ -196,7 +197,12 @@ function _distanceFt(fromCol, fromRow, toCol, toRow, p = null, z0 = 0, z1 = 0) {
 function _stepAltitude(delta) {
   const sel = _selected();
   if (!sel) return;
-  const next = Math.max(0, (_stagedAlt ?? (sel.pos.z || 0)) + delta);
+  // Flyers go as high as they like, hover-only creatures stay within 5ft, burrowers can go below the ground.
+  const [low, high] = altitudeLimits(sel.p);
+  const z0 = sel.pos.z || 0;
+  let next = (_stagedAlt ?? z0) + delta;
+  if (low !== null) next = Math.max(Math.min(low, z0), next);
+  if (high !== null) next = Math.min(Math.max(high, z0), next);
   _stagedAlt = next === (sel.pos.z || 0) && !_stagedDestination ? null : next;
   if (_stagedAlt !== null && !_stagedDestination) _stagedDestination = { col: sel.pos.col, row: sel.pos.row };
   _render();
@@ -283,7 +289,7 @@ function _renderMovePanel() {
 
     stageRow = canMove ? `
         <div class="bmap-stage-row">
-          <span>Move ${distance}ft${z1 !== z0 ? ` · altitude ${z0} → ${z1}ft` : ''}</span>
+          <span>Move ${distance}ft${z1 !== z0 ? ` · ${_altText(z0)} → ${_altText(z1)}` : ''}</span>
           <button type="button" class="bmap-confirm-btn" id="bmapConfirmMove">Confirm Move</button>
           <button type="button" class="bmap-cancel-btn" id="bmapCancelStage">Cancel</button>
         </div>` : `
@@ -405,6 +411,9 @@ function _renderTokens() {
     const staged = id === _selectedTokenId && _stagedDestination;
     const shownAt = staged ? _stagedDestination : pos;
     const shownZ = staged && _stagedAlt !== null ? _stagedAlt : (pos.z || 0);
+    const burrowedClass = classes.indexOf('burrowed');
+    if (burrowedClass >= 0) classes.splice(burrowedClass, 1);
+    if (shownZ < 0) classes.push('burrowed');
     if (staged) {
       classes.push('moving');
       const origin = document.createElement('div');
@@ -421,7 +430,7 @@ function _renderTokens() {
     const name = visibleToViewer(p, 'name') ? p.name : '???';
     el.title = name;
     Object.assign(el.style, cellRect(_session.board, shownAt.col, shownAt.row, footprintForSize(p.size)));
-    el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>${shownZ > 0 ? `<span class="bmap-alt">↑${shownZ}ft</span>` : ''}`;
+    el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>${shownZ > 0 ? `<span class="bmap-alt">↑${shownZ}ft</span>` : shownZ < 0 ? `<span class="bmap-alt">↓${-shownZ}ft</span>` : ''}`;
     const sprite = el.querySelector('.bmap-sprite');
     patchPortraitMedia(sprite, p.image, name);
     // The tokens are rebuilt every render, so start at the last drawn angle and let the transition carry it to the new one.
@@ -444,6 +453,25 @@ function _renderTokens() {
   });
 }
 
+/** "20ft up" / "15ft underground" / "the ground". */
+function _altText(z) {
+  return z > 0 ? `${z}ft up` : z < 0 ? `${-z}ft underground` : 'the ground';
+}
+
+/** ▼ / altitude / ▲ for a creature that can leave the ground level -- fly, hover (5ft), or burrow (below 0). */
+function _altitudeControlsHtml(sel) {
+  const [low, high] = altitudeLimits(sel.p);
+  const z = _stagedAlt ?? (sel.pos.z || 0);
+  if (low === 0 && high === 0 && z === 0) return '';
+  const label = z > 0 ? `↑${z}ft` : z < 0 ? `↓${-z}ft` : 'ground';
+  const canDown = low === null || z > low;
+  const canUp = high === null || z < high;
+  const downTitle = z <= 0 ? 'Burrow 5ft deeper' : 'Descend 5ft';
+  const upTitle = z < 0 ? 'Dig 5ft up' : high === 5 ? 'Hover up (5ft at most)' : 'Climb 5ft';
+  return `<button type="button" data-act="down" title="${downTitle}"${canDown ? '' : ' disabled'}>▼</button><span class="tb-label">${label}</span>`
+    + `<button type="button" data-act="up" title="${upTitle}"${canUp ? '' : ' disabled'}>▲</button><span class="tb-sep"></span>`;
+}
+
 /** The rotate / climb / cone bar for the selected token, in the strip above the map (it used to float next to the token,
  * which covered the middle of the board). The strip keeps its height when nothing is selected, so the map doesn't jump. */
 function _renderToolbar() {
@@ -462,7 +490,7 @@ function _renderToolbar() {
     <button type="button" data-act="left" title="Turn left 45° (Q)">⟲</button>
     <button type="button" data-act="right" title="Turn right 45° (E)">⟳</button>
     <span class="tb-sep"></span>
-    ${canClimb(sel.p) ? `<button type="button" data-act="down" title="Descend 5ft">▼</button><span class="tb-label">${_stagedAlt ?? (sel.pos.z || 0)}ft</span><button type="button" data-act="up" title="Climb 5ft">▲</button><span class="tb-sep"></span>` : ''}
+    ${_altitudeControlsHtml(sel)}
     <button type="button" data-act="cone" class="${_coneOn ? 'on' : ''}" title="Show a ${CONE_FT}ft cone from this facing">◔ Cone</button>
     <button type="button" data-act="close" title="Deselect (Esc)">✕</button>`;
   bar.addEventListener('click', (e) => {

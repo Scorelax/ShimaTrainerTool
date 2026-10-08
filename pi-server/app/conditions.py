@@ -440,6 +440,25 @@ def footprint_size(size_text):
     return 2 if s == 'large' else 3 if s == 'huge' else 1
 
 
+def altitude_limits(participant):
+    """(lowest, highest) altitude in ft a creature can move to on the map; None = no limit that way. Below the ground only
+    with a burrowing speed (no depth limit). Above it with a flying speed (no limit); a creature that can only hover -- a
+    hovering speed, Levitate, Magnet Rise, but no flying speed -- stays within 5ft of the ground. A creature with no `speeds`
+    recorded at all (a DM's freeform enemy) is untracked upward, as before. Mirrored by move-effects.js's altitudeLimits."""
+    p = participant or {}
+    if not p.get('speeds'):
+        return (0, None)
+    types = {str(s.get('type', '')).lower() for s in list(p['speeds']) + granted_speed_entries(p) if (s.get('ft') or 0) > 0}
+    low = None if 'burrowing' in types else 0
+    if is_grounded(p):
+        high = 0
+    elif 'flying' in types:
+        high = None
+    else:
+        high = 5
+    return (low, high)
+
+
 def fields_affecting(state, pid, key):
     """Every `key` ('terrain' or 'weather') effect currently affecting participant `pid`: the whole-map one
     (state[key], also what a DM-typed one is) plus every tile-limited zone (state[key + 'Zones']) that overlaps any
@@ -455,7 +474,8 @@ def fields_affecting(state, pid, key):
         altitude = token.get('z', 0)
         # A zone with a `height` (ft above the ground) only reaches creatures at or below it -- Spikes sits on the floor
         # (height 0), a Purgatory-style cylinder reaches 40ft up. No `height` means it reaches every altitude.
-        found.extend(z for z in zones if covered & set(z.get('cells') or ()) and (z.get('height') is None or altitude <= z['height']))
+        # A creature burrowed underground (altitude below 0) is out of every zone on the surface.
+        found.extend(z for z in zones if altitude >= 0 and covered & set(z.get('cells') or ()) and (z.get('height') is None or altitude <= z['height']))
     return found
 
 

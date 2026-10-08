@@ -154,9 +154,9 @@ function updateTokens() {
     const name = visibleToViewer(p, 'name') ? p.name : '???';
     Object.assign(el.style, screenCellRect(session.board, pos.col, pos.row, footprintForSize(p.size)));
     const altitude = pos.z || 0;
-    el.className = `map-token ${p.side}${altitude > 0 ? ' airborne' : ''}`;
+    el.className = `map-token ${p.side}${altitude > 0 ? ' airborne' : altitude < 0 ? ' burrowed' : ''}`;
     el.querySelector('.map-alt')?.remove();
-    if (altitude > 0) el.querySelector('.map-disk').insertAdjacentHTML('beforeend', `<span class="map-alt">↑${altitude}ft</span>`);
+    if (altitude) el.querySelector('.map-disk').insertAdjacentHTML('beforeend', `<span class="map-alt">${altitude > 0 ? '↑' : '↓'}${Math.abs(altitude)}ft</span>`);
     el.title = name;
     const sprite = el.querySelector('.map-sprite');
     patchPortraitMedia(sprite, p.image, name);

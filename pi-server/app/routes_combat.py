@@ -35,7 +35,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded, grounded_in
+from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded, grounded_in, altitude_limits
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -3247,13 +3247,18 @@ def _move_token(state, pid, col, row, z=None):
     z1 = z0 if z is None else z
     if current and (col, row, z1) == (current['col'], current['row'], z0):
         raise ValueError(f"{participant['name']} is already there -- movement comes in 5ft steps")
-    if z1 != z0 or z1 < 0:
-        # Leaving the ground needs a way to fly (a flying/hovering speed, Levitate, Magnet Rise, ...); a creature with no
-        # `speeds` recorded at all (a DM's freeform enemy) is untracked, same convention as the movement budget below.
-        if z1 < 0 or z1 % 5:
-            raise ValueError('Altitude must be a whole number of 5ft steps, at or above the ground')
-        if z1 > 0 and participant.get('speeds') and is_grounded(participant):
-            raise ValueError(f"{participant['name']} can't leave the ground (no flying speed)")
+    if z1 != z0:
+        # Leaving the ground needs a way to fly (a flying speed goes as high as it likes, a hover-only creature stays within
+        # 5ft); going below it needs a burrowing speed -- see conditions.py's altitude_limits. Coming back toward the ground
+        # is always allowed.
+        if z1 % 5:
+            raise ValueError('Altitude must be a whole number of 5ft steps')
+        low, high = altitude_limits(participant)
+        if low is not None and z1 < low and z1 < z0:
+            raise ValueError(f"{participant['name']} can't burrow (no burrowing speed)")
+        if high is not None and z1 > high and z1 > z0:
+            raise ValueError(f"{participant['name']} can't leave the ground (no flying speed)" if high == 0
+                             else f"{participant['name']} can only hover {high}ft above the ground (no flying speed)")
     if z1 > 0 and _in_gravity_at(state, participant, col, row):
         if z1 > z0:
             raise ValueError(f"{participant['name']} can't fly inside the Gravity field")

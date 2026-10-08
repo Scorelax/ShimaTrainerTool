@@ -340,7 +340,8 @@ let _stagedPosition = null; // {col, row} | null
 // on every re-render, the same way the legacy combat.js page does. Only
 // meaningful for the current trainer's own cards; every other participant's
 // card is a lightweight stand-in (see _syncLocalCombatState below).
-let _myPokemonKey = null;
+// Pokemon name -> its sessionStorage pokemon_* key. One per Pokemon: a trainer can switch between several in one battle.
+const _myPokemonKeys = new Map();
 
 // ---------------------------------------------------------------------------
 // Battle view -- once placement is done, the normal view renders combat.js's
@@ -699,17 +700,19 @@ function _pushStatsSync(id, hp, vp) {
 }
 
 /** Which sessionStorage pokemon_* key backs a participant this trainer
- * owns, by matching its name -- _myPokemonKey is set directly the moment
+ * owns, by matching its name -- _myPokemonKeys is filled directly the moment
  * this device rolls initiative for it (see the initiative onComplete
  * handler below), but a page reload mid-battle loses that module var, so
  * this re-derives it from the party list the same way Setup does. */
 function _resolveMyPokemonKey(participantName) {
-  if (_myPokemonKey) return _myPokemonKey;
+  // Cached per NAME -- it used to remember only the first Pokemon it found, so a Pokemon switched in later was built from
+  // the first one's data (its card showed the Pokemon that had left).
+  if (_myPokemonKeys.has(participantName)) return _myPokemonKeys.get(participantName);
   for (const key of Object.keys(sessionStorage)) {
     if (!key.startsWith('pokemon_')) continue;
     const pData = JSON.parse(sessionStorage.getItem(key) || '[]');
     if ((pData[36] || pData[2]) === participantName) {
-      _myPokemonKey = key;
+      _myPokemonKeys.set(participantName, key);
       return key;
     }
   }
@@ -2394,7 +2397,7 @@ export function attachCombatWipListeners() {
         _rerenderFull();
       },
       onComplete: async (combatants) => {
-        _myPokemonKey = combatants[1]?.id || null;
+        if (combatants[1]?.id) _myPokemonKeys.set(combatants[1].name, combatants[1].id);
         try {
           for (const c of combatants) {
             await CombatAPI.addParticipant(_combatantToParticipant(c));

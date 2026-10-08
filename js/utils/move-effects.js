@@ -1193,7 +1193,8 @@ export function fieldsAffecting(session, pid, key) {
     for (let dc = 0; dc < size; dc++) for (let dr = 0; dr < size; dr++) covered.add(`${token.col + dc},${token.row - dr}`);
     // A zone with a `height` (ft above the ground) only reaches creatures at or below it; none = every altitude.
     const altitude = token.z || 0;
-    found.push(...zones.filter(z => (z.cells || []).some(c => covered.has(c)) && (z.height == null || altitude <= z.height)));
+    // Burrowed underground (below 0): out of every zone on the surface.
+    if (altitude >= 0) found.push(...zones.filter(z => (z.cells || []).some(c => covered.has(c)) && (z.height == null || altitude <= z.height)));
   }
   return found;
 }
@@ -1336,6 +1337,18 @@ export function moveCostFt(session, p, c0, r0, c1, r1, z0 = 0, z1 = 0) {
  * airborne), or no `speeds` on record at all (a DM's freeform enemy is untracked, same convention as the movement budget). */
 export function canClimb(p) {
   return !(p?.speeds || []).length || !isGrounded(p);
+}
+
+/** [lowest, highest] altitude in ft `p` can move to on the map (null = no limit that way): below the ground only with a
+ * burrowing speed; above it with a flying speed, or at most 5ft for a creature that can only hover (hovering speed,
+ * Levitate, Magnet Rise). No `speeds` recorded = untracked upward. Mirrors conditions.py's altitude_limits. */
+export function altitudeLimits(p) {
+  if (!(p?.speeds || []).length) return [0, null];
+  const granted = (p.statuses || []).filter(s => s.kind === 'condition' && s.apply === 'granted_flight_speed').map(s => ({ type: 'flying', ft: s.value }));
+  const types = new Set([...p.speeds, ...granted].filter(s => (Number(s.ft) || 0) > 0).map(s => String(s.type).toLowerCase()));
+  const low = types.has('burrowing') ? null : 0;
+  const high = isGrounded(p) ? 0 : types.has('flying') ? null : 5;
+  return [low, high];
 }
 
 

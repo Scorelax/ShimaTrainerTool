@@ -243,6 +243,12 @@ export function injectBattleMapStyles() {
       content: ''; position: absolute; left: 14%; right: 14%; bottom: 3%; height: 16%; border-radius: 50%;
       background: radial-gradient(ellipse at center, rgba(0,0,0,0.65), rgba(0,0,0,0) 70%);
     }
+    /* ---- burrowed: sunk into its tile, earthy and dimmed, with a depth badge ---- */
+    .bmap-token.burrowed .bmap-token-portrait {
+      transform: translateY(10%); filter: sepia(0.6) brightness(0.65);
+      box-shadow: 0 0 0 2px rgba(150,110,60,0.95), inset 0 -10px 14px rgba(70,45,20,0.8);
+    }
+    .bmap-token.burrowed .bmap-alt { background: rgb(176,130,72); }
     .bmap-alt {
       position: absolute; top: -2px; right: -2px; z-index: 3; font-size: 0.62rem; font-weight: 800; line-height: 1;
       padding: 0.15rem 0.35rem; border-radius: 999px; color: #0b0d1a; background: rgb(var(--ring)); box-shadow: 0 0 6px rgba(var(--ring), 0.8);

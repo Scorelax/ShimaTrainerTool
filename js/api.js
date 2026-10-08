@@ -1037,8 +1037,8 @@ export class CombatAPI {
 
   /** The per-player placement step -- sets position AND marks the
    * participant placed in one call. Not turn-gated (happens pre-battle). */
-  static async confirmPlacement(id, col, row) {
-    return API.request('combat', 'confirm-placement', { id, col, row }, { useCache: false });
+  static async confirmPlacement(id, col, row, facing = null) {
+    return API.request('combat', 'confirm-placement', { id, col, row, ...(facing === null ? {} : { facing }) }, { useCache: false });
   }
 
   /** Fire-and-forget live preview of where a player is currently considering

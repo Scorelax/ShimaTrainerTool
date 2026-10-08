@@ -18,7 +18,7 @@ import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
-import { injectBattleMapStyles, zoneKind } from '../utils/battle-map-view.js';
+import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { pickRepositionCell } from '../utils/reposition-picker.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
@@ -282,6 +282,13 @@ const PLACEMENT_CSS = `
     background: linear-gradient(135deg, #8e44ad, #5b2c6f); border: none; color: #fff;
     border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;
   }
+  .placement-actions { display: flex; align-items: center; justify-content: center; gap: 0.6rem; flex-wrap: wrap; }
+  .placement-rotate { display: inline-flex; gap: 0.3rem; }
+  .placement-rotate-btn {
+    border: none; border-radius: 999px; min-width: 2.4rem; height: 2.4rem; font-size: 1.1rem; font-weight: 700; cursor: pointer;
+    background: rgba(255,255,255,0.1); color: #e8ecff;
+  }
+  .placement-rotate-btn:hover { background: rgba(255,215,0,0.28); }
   .placement-token.ghost { opacity: 0.5; }
   .placement-token.ghost .placement-token-portrait { outline-color: rgba(255,215,0,0.55); }
   .placement-token.staged { opacity: 0.85; }
@@ -319,6 +326,7 @@ let _placementQueue = []; // participant ids this trainer still needs to place, 
 let _hoverGhosts = {}; // participantId -> {col,row} live previews from OTHER players, while in 'placement'
 let _hoverThrottle = null;
 let _placementHoverHandler = null;
+let _placementKeyHandler = null;
 // The cell the player has clicked but not yet confirmed for the CURRENT
 // placement-queue entry -- placement no longer locks in on click; clicking
 // a cell only stages a preview (which can be changed by clicking elsewhere)
@@ -1547,12 +1555,26 @@ function _syncPlacementBackground(state) {
   if (rowsInput && document.activeElement !== rowsInput) rowsInput.value = state.board.grid.rows;
 }
 
+// Which way the token being placed faces (degrees clockwise from up, 45-degree steps) -- turned with the buttons next to
+// Confirm (or Q / E) and sent with confirm-placement.
+let _stagedFacing = 0;
+
 function _renderPlacementActions(currentId) {
   const el = document.getElementById('placementActions');
   if (!el) return;
   el.innerHTML = _stagedPosition
-    ? `<button class="placement-confirm-btn" id="placementConfirmBtn">✅ Confirm Placement</button>`
+    ? `<div class="placement-rotate">
+         <button type="button" class="placement-rotate-btn" data-turn="-45" title="Turn left 45° (Q)">⟲</button>
+         <button type="button" class="placement-rotate-btn" data-turn="45" title="Turn right 45° (E)">⟳</button>
+       </div>
+       <button class="placement-confirm-btn" id="placementConfirmBtn">✅ Confirm Placement</button>`
     : '';
+}
+
+function _turnStagedPlacement(delta, currentId) {
+  if (!_stagedPosition) return;
+  _stagedFacing = (((_stagedFacing + delta) % 360) + 360) % 360;
+  _renderPlacementTokens(session, currentId);
 }
 
 function _refreshCellTakenStates(state, currentId) {
@@ -1577,7 +1599,7 @@ function _renderPlacementTokens(state, currentId) {
     const rect = cellRect(state.board, pos.col, pos.row, footprintForSize(p.size));
     html.push(`
       <div class="placement-token ${p.side}" data-token-id="${id}" title="${name}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
-        <div class="placement-token-portrait" data-portrait-id="${id}"></div>
+        <div class="placement-token-portrait"><div class="bmap-sprite" data-portrait-id="${id}" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>
       </div>`);
   });
 
@@ -1601,7 +1623,7 @@ function _renderPlacementTokens(state, currentId) {
       const rect = cellRect(state.board, _stagedPosition.col, _stagedPosition.row, footprintForSize(current.size));
       html.push(`
         <div class="placement-token staged ${current.side}" title="${name}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
-          <div class="placement-token-portrait" data-portrait-id="${currentId}"></div>
+          <div class="placement-token-portrait"><div class="bmap-sprite" data-portrait-id="${currentId}" style="transform:${spriteTransform(_stagedFacing)}"></div></div>
         </div>`);
     }
   }
@@ -1616,6 +1638,7 @@ function _renderPlacementTokens(state, currentId) {
 
 function attachPlacementListeners(state, currentId) {
   _stagedPosition = null;
+  _stagedFacing = 0;
   _renderPlacementActions(currentId);
   _renderPlacementTokens(state, currentId);
   _refreshCellTakenStates(state, currentId);
@@ -1669,10 +1692,12 @@ function attachPlacementListeners(state, currentId) {
   });
 
   document.getElementById('placementActions')?.addEventListener('click', async (e) => {
+    const turn = e.target.closest('.placement-rotate-btn');
+    if (turn) { _turnStagedPlacement(Number(turn.dataset.turn), currentId); return; }
     if (!e.target.closest('#placementConfirmBtn') || !_stagedPosition) return;
     const { col, row } = _stagedPosition;
     try {
-      await CombatAPI.confirmPlacement(currentId, col, row);
+      await CombatAPI.confirmPlacement(currentId, col, row, _stagedFacing);
     } catch (err) {
       showCombatAlert(err.message, { title: 'Error' });
       // Someone else likely just took it -- drop the stale preview and let
@@ -1686,6 +1711,7 @@ function attachPlacementListeners(state, currentId) {
     }
     CombatAPI.hoverToken(currentId).catch(() => {}); // clear our own hover reservation for others
     _stagedPosition = null;
+    _stagedFacing = 0;
     _placementQueue.shift();
     if (!_placementQueue.length) _joinStage = null;
     _rerenderFull();
@@ -1705,6 +1731,15 @@ function attachPlacementListeners(state, currentId) {
     if (_stagedPosition) return; // still reserved until confirmed or restaged elsewhere
     CombatAPI.hoverToken(currentId).catch(() => {});
   });
+
+  // Q / E turn the staged token, same keys as the battle map.
+  if (_placementKeyHandler) document.removeEventListener('keydown', _placementKeyHandler);
+  _placementKeyHandler = (e) => {
+    if (_joinStage !== 'placement' || !_stagedPosition || e.target.closest?.('input, select, textarea')) return;
+    if (e.key === 'q' || e.key === 'Q') _turnStagedPlacement(-45, _placementQueue[0]);
+    else if (e.key === 'e' || e.key === 'E') _turnStagedPlacement(45, _placementQueue[0]);
+  };
+  document.addEventListener('keydown', _placementKeyHandler);
 
   if (_placementHoverHandler) window.removeEventListener('app:combat-hover', _placementHoverHandler);
   _placementHoverHandler = (e) => {

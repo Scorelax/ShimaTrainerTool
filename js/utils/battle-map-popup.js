@@ -1,6 +1,6 @@
 // Interactive in-app battle map popup -- lets a player VIEW the same board the table kiosk screen
 // (battle-map.html) shows, and MOVE / TURN their own token. Click your token (it's the only clickable one, and
-// only on your turn) and a small floating bar appears next to it: rotate left/right in 45-degree steps (or Q / E),
+// only on your turn) and a toolbar appears in the strip above the map (never over it): rotate left/right in 45-degree steps (or Q / E),
 // and a cone/line preview so you can see what a facing would hit. Click a cell to STAGE a move (a distance preview,
 // no server call yet), then Confirm to actually commit it -- a deliberate extra step so a misclick can't burn real
 // movement (the user's own call: hard-enforce the movement budget below, but only after an explicit confirm).
@@ -66,6 +66,10 @@ function _injectStyles() {
     .bmap-confirm-btn:disabled { background: #444; color: #888; cursor: not-allowed; box-shadow: none; }
     .bmap-cancel-btn { background: rgba(255,255,255,0.12); color: #e0e0e0; }
     .bmap-stage-warning { color: #e77373; }
+    /* the selected token's toolbar lives in this strip above the map, so it never covers the board */
+    .bmap-toolbar-slot { display: flex; justify-content: center; min-height: 2.8rem; margin-bottom: 0.5rem; }
+    .bmap-toolbar-slot .bmap-toolbar { position: static; transform: none; }
+    .bmap-toolbar .tb-name { font-size: 0.8rem; font-weight: 700; padding: 0 0.5rem 0 0.4rem; color: #ffd76a; }
   `;
   document.head.appendChild(style);
 }
@@ -101,6 +105,7 @@ function _ensureDom() {
       <div class="combat-move-popup-body">
         <div class="bmap-hint" id="bmapHint"></div>
         <div class="bmap-move-panel" id="bmapMovePanel" hidden></div>
+        <div class="bmap-toolbar-slot" id="bmapToolbarSlot"></div>
         <div class="bmap-stage" id="bmapStage">
           <div class="bmap-grid" id="bmapGrid"></div>
           <div class="bmap-tokens" id="bmapTokens"></div>
@@ -419,24 +424,22 @@ function _renderTokens() {
   });
 }
 
-/** The floating rotate / cone bar next to the selected token -- below it, or above when the token sits low on the map. */
+/** The rotate / climb / cone bar for the selected token, in the strip above the map (it used to float next to the token,
+ * which covered the middle of the board). The strip keeps its height when nothing is selected, so the map doesn't jump. */
 function _renderToolbar() {
-  const stage = document.getElementById('bmapStage');
-  if (!stage) return;
-  stage.querySelector('#bmapToolbar')?.remove();
+  const slot = document.getElementById('bmapToolbarSlot');
+  if (!slot) return;
+  slot.innerHTML = '';
   const sel = _selected();
   if (!sel) return;
 
-  const { cols, rows } = _session.board.grid;
-  const topRow = sel.pos.row - sel.size + 1;
-  const above = (sel.pos.row + 1) / rows > 0.62;
   const bar = document.createElement('div');
   bar.id = 'bmapToolbar';
-  bar.className = `bmap-toolbar${above ? ' above' : ''}`;
-  bar.style.left = `${Math.min(88, Math.max(12, ((sel.pos.col + sel.size / 2) / cols) * 100))}%`;
-  bar.style.top = `${above ? (topRow / rows) * 100 : ((sel.pos.row + 1) / rows) * 100}%`;
+  bar.className = 'bmap-toolbar';
   const coneFt = CONE_LENGTHS_FT[_coneIdx];
+  const name = visibleToViewer(sel.p, 'name') ? sel.p.name : '???';
   bar.innerHTML = `
+    <span class="tb-name">${name}</span>
     <button type="button" data-act="left" title="Turn left 45° (Q)">⟲</button>
     <button type="button" data-act="right" title="Turn right 45° (E)">⟳</button>
     <span class="tb-sep"></span>
@@ -453,5 +456,5 @@ function _renderToolbar() {
     else if (act === 'cone') { _coneIdx = (_coneIdx + 1) % CONE_LENGTHS_FT.length; _render(); }
     else if (act === 'close') { _selectedTokenId = null; _stagedDestination = null; _stagedAlt = null; _render(); }
   });
-  stage.appendChild(bar);
+  slot.appendChild(bar);
 }

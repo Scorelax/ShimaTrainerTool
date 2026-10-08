@@ -508,7 +508,8 @@ def handle(conn, action, params):
         row = js_parse_int(params.get('row'))
         if not params.get('id') or col is None or row is None:
             raise ValueError('Missing participant id, col, or row')
-        return _mutate(conn, lambda s: _confirm_placement(s, params['id'], col, row))
+        facing = js_parse_int(params.get('facing'))  # optional: which way the token faces as it's placed
+        return _mutate(conn, lambda s: _confirm_placement(s, params['id'], col, row, facing))
 
     if action == 'hover-token':
         if not params.get('id'):
@@ -3286,7 +3287,7 @@ def _clear_token_position(state, pid):
     state['board']['tokens'].pop(pid, None)
 
 
-def _confirm_placement(state, pid, col, row):
+def _confirm_placement(state, pid, col, row, facing=None):
     """The per-player placement step (see combat-wip.js's placement screen):
     like set-token-position (unrestricted, not turn-gated -- this happens
     before battle even starts), but also marks the participant placed so
@@ -3301,7 +3302,8 @@ def _confirm_placement(state, pid, col, row):
     for other_id, pos in state['board']['tokens'].items():
         if other_id != pid and pos['col'] == col and pos['row'] == row:
             raise ValueError('That square is already taken')
-    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid), 'z': _altitude_of(state, pid)}
+    facing = _facing_of(state, pid) if facing is None else (round(facing / 45) * 45) % 360
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing, 'z': _altitude_of(state, pid)}
     participant['placed'] = True
     _log_event(state, 'placement', text=f"{participant['name']} placed at ({col}, {row})",
                actorId=pid, actorName=participant['name'], col=col, row=row)

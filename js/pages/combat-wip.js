@@ -403,6 +403,32 @@ const WIP_CSS = `
     background: rgba(255,215,0,0.2); color: #FFD700;
   }
 
+
+  /* ---- HP / VP / AC / Crit edited in place (replaces the Adjust Stats section) ---- */
+  #wipBattlePhase .stat-bar-toggle {
+    all: unset; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.35rem; cursor: pointer;
+    padding: 0.3rem 0.45rem; margin: -0.3rem -0.45rem; border-radius: 10px; color: #a9b0d6; font-size: 0.8rem; border: 1px solid transparent;
+  }
+  #wipBattlePhase .stat-bar-toggle:hover { background: rgba(255,215,0,0.06); border-color: rgba(255,215,0,0.35); }
+  #wipBattlePhase .stat-bar-toggle.editing { background: rgba(255,215,0,0.08); border-color: #FFD700; }
+  #wipBattlePhase .stat-bar-toggle .mini-bar { flex-basis: 100%; }
+  #wipBattlePhase .stat-bar-label strong { color: #f4f6ff; font-size: 0.95rem; }
+  #wipBattlePhase .combat-card-portrait-col .combat-card-ac-line--under-portrait {
+    display: inline-flex; flex-direction: row; align-items: center; gap: 0.25rem; white-space: nowrap; line-height: 1.2;
+    font-family: inherit; font-size: 0.72rem; color: #cfd6ff; padding: 0.18rem 0.6rem; border-radius: 999px;
+    background: rgba(140,170,255,0.12); border: 1px solid rgba(140,170,255,0.28); margin-top: 0.3rem;
+  }
+  #wipBattlePhase .combat-card-portrait-col .combat-card-ac-line--under-portrait strong { color: #f4f6ff; }
+  #wipBattlePhase .stat-chip-toggle { cursor: pointer; }
+  #wipBattlePhase .stat-chip-toggle:hover { border-color: rgba(255,215,0,0.55); background: rgba(255,215,0,0.1); }
+  #wipBattlePhase .stat-chip-toggle.editing { border-color: #FFD700; box-shadow: 0 0 0 2px rgba(255,215,0,0.22); }
+  #wipBattlePhase .chip-crit::before { content: '🎯 '; }
+  #wipBattlePhase .combat-card-portrait-col .combat-card-ac-line + .combat-card-ac-line { margin-top: 0.25rem; }
+  #wipBattlePhase .stat-tile-editor { margin-top: 0.5rem; }
+  #wipBattlePhase .stat-tile-editor .hpvp-input { width: 58px; text-align: center; }
+  #wipBattlePhase .card-tools { display: flex; justify-content: flex-end; margin-top: 0.55rem; }
+  #wipBattlePhase .card-tools .combat-type-calc-btn { width: auto; padding: 0.3rem 0.9rem; font-size: 0.78rem; border-radius: 999px; }
+
   /* AC under Init */
   #wipBattlePhase .combat-card-ac-line--under-portrait { align-self: center; margin-top: 0.3rem; white-space: nowrap; font-size: 0.72rem; padding: 0.15rem 0.5rem; }
 

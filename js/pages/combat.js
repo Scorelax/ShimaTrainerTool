@@ -905,6 +905,23 @@ export function renderBattlePhase(state, cardOptions = {}) {
 // every +/- triggers so the editor stays open while you adjust.
 let _editingStat = null;
 
+/** HP / VP with its bar. On your own shared battle card the whole thing is a button that opens its editor. */
+function _barHtml(c, key, label, pct, editable) {
+  const editing = editable && _editingStat === `${c.id}:${key}`;
+  const inner = `<span class="stat-bar-label">${label}</span><div class="mini-bar"><div class="mini-bar-fill ${key}-bar" style="width:${pct}%"></div></div>`;
+  return editable
+    ? `<button type="button" class="stat-bar-wrap stat-tile-toggle stat-bar-toggle${editing ? ' editing' : ''}" data-combatant-id="${c.id}" data-stat="${key}" title="Change ${key.toUpperCase()}">${inner}</button>`
+    : `<span class="stat-bar-wrap">${inner}</span>`;
+}
+
+/** The AC / Crit chip under the portrait -- a button that opens its editor on your own card, plain text otherwise. */
+function _chipHtml(c, key, label, readOnly) {
+  const editing = _editingStat === `${c.id}:${key}`;
+  return readOnly
+    ? `<div class="combat-card-ac-line combat-card-ac-line--under-portrait chip-${key}">${label}</div>`
+    : `<button type="button" class="combat-card-ac-line combat-card-ac-line--under-portrait chip-${key} stat-tile-toggle stat-chip-toggle${editing ? ' editing' : ''}" data-combatant-id="${c.id}" data-stat="${key}" title="Change ${key === 'ac' ? 'AC' : 'the crit modifier'}">${label}</button>`;
+}
+
 /** The six ability scores. The shared battle card (compactWip) shows them as tiles you click to edit in place -- the
  * separate "Modify Stats" section repeated the same numbers. The legacy page keeps the plain row. */
 function _abilityScoresHtml(c, modTag, { compactWip, readOnly }) {
@@ -915,26 +932,55 @@ function _abilityScoresHtml(c, modTag, { compactWip, readOnly }) {
             ${keys.map(([k, m]) => `<span>${k.toUpperCase()} ${c[k]}<small>(${formatMod(c[m])})</small>${modTag(k)}</span>`).join('\n            ')}
           </div>`;
   }
-  let editor = '';
   const tiles = keys.map(([k, m]) => {
     const label = `${k.toUpperCase()} ${c[k]}<small>(${formatMod(c[m])})</small>${modTag(k)}`;
     if (readOnly) return `<span class="stat-tile">${label}</span>`;
     const editing = _editingStat === `${c.id}:${k}`;
-    if (editing) {
-      // The tiles stay where they are; the open one is highlighted and its stepper sits on a strip under the row.
-      editor = `<div class="stat-tile-editor">
-              <span class="stat-tile-editor-label">${k.toUpperCase()}</span>
-              <button class="stat-delta-btn" data-combatant-id="${c.id}" data-stat="${k}" data-delta="-1">−</button>
-              <input type="number" class="stat-adjust-val" value="${c[k]}" data-combatant-id="${c.id}" data-stat="${k}">
-              <button class="stat-delta-btn" data-combatant-id="${c.id}" data-stat="${k}" data-delta="1">+</button>
-              <button type="button" class="stat-tile-toggle stat-tile-done" data-combatant-id="${c.id}" data-stat="${k}">Done</button>
-            </div>`;
-    }
     return `<div class="stat-tile stat-tile--editable${editing ? ' editing' : ''}">
               <button type="button" class="stat-tile-toggle" data-combatant-id="${c.id}" data-stat="${k}" title="${editing ? 'Done' : `Change ${k.toUpperCase()}`}">${label}</button>
             </div>`;
   }).join('');
-  return `<div class="combat-card-stats-row combat-mods-row stat-tiles">${tiles}${editor}</div>`;
+  return `<div class="combat-card-stats-row combat-mods-row stat-tiles">${tiles}</div>`;
+}
+
+/** The one editing strip on the shared battle card, under the stats: whichever value is open (an ability score, HP, VP,
+ * AC or Crit -- see _editingStat) gets a − / value / + stepper and Done. The steppers and inputs carry the same classes and
+ * data-* the old Adjust Stats / Modify Stats sections used, so the existing handlers do the work. */
+function _statEditorHtml(c) {
+  if (!_editingStat || !_editingStat.startsWith(`${c.id}:`)) return '';
+  const k = _editingStat.slice(c.id.length + 1);
+  const done = `<button type="button" class="stat-tile-toggle stat-tile-done" data-combatant-id="${c.id}" data-stat="${k}">Done</button>`;
+  if (['str', 'dex', 'con', 'int', 'wis', 'cha'].includes(k)) {
+    return `<div class="stat-tile-editor">
+            <span class="stat-tile-editor-label">${k.toUpperCase()}</span>
+            <button class="stat-delta-btn" data-combatant-id="${c.id}" data-stat="${k}" data-delta="-1">−</button>
+            <input type="number" class="stat-adjust-val" value="${c[k]}" data-combatant-id="${c.id}" data-stat="${k}">
+            <button class="stat-delta-btn" data-combatant-id="${c.id}" data-stat="${k}" data-delta="1">+</button>
+            ${done}
+          </div>`;
+  }
+  const spec = {
+    hp: { label: 'HP', value: c.currentHp, max: c.maxHp, attrs: `min="0" max="${c.maxHp}"` },
+    vp: { label: 'VP', value: c.currentVp, max: c.maxVp, attrs: `min="0" max="${c.maxVp}"` },
+    ac: { label: 'AC', value: c.ac, max: c.baseAc, attrs: '' },
+    crit: { label: 'Crit', value: c.critMod || 0, max: null, attrs: '' },
+  }[k];
+  if (!spec) return '';
+  return `<div class="stat-tile-editor">
+          <span class="stat-tile-editor-label">${spec.label}</span>
+          <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="${k}" data-delta="-1">−</button>
+          <input type="number" class="hpvp-input" value="${spec.value}" ${spec.attrs} data-combatant-id="${c.id}" data-stat="${k}">
+          ${spec.max !== null ? `<span class="hpvp-max">/ ${spec.max}</span>` : ''}
+          <button class="hpvp-btn" data-combatant-id="${c.id}" data-stat="${k}" data-delta="1">+</button>
+          ${done}
+        </div>`;
+}
+
+/** The Damage Calculator (a Pokemon) or HP/VP Calculator (a trainer) button -- same classes/handlers wherever it sits. */
+function _calcButtonHtml(c, compactWip) {
+  return c.type === 'pokemon'
+    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮${compactWip ? ' Damage Calculator' : '<br>Damage<br>Calculator'}</button>`
+    : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}" style="background:rgba(76,175,80,0.12);border-color:rgba(76,175,80,0.5);color:#4CAF50;">HP/VP${compactWip ? ' Calculator' : '<br>Calculator'}</button>`;
 }
 
 export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom, readOnly } = {}) {
@@ -981,7 +1027,8 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
         <div class="combat-card-portrait-col">
           ${spriteMediaHtml(c.image, c.name, 'combat-card-img')}
           ${compactWip ? `<span class="combat-initiative-badge combat-initiative-badge--under-portrait">Init ${c.initiativeTotal}</span>` : ''}
-          ${compactWip && c.hasStatBlock !== false ? `<div class="combat-card-ac-line combat-card-ac-line--under-portrait">AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}</div>` : ''}
+          ${compactWip && c.hasStatBlock !== false ? _chipHtml(c, 'ac', `AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}`, readOnly) : ''}
+          ${compactWip && c.hasStatBlock !== false && c.type === 'pokemon' ? _chipHtml(c, 'crit', `Crit <strong>${formatMod(c.critMod || 0)}</strong>`, readOnly) : ''}
         </div>
         <div class="combat-card-body">
           <div class="combat-card-name-row">
@@ -995,15 +1042,12 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
           <div class="combat-card-stats-group">
             ${c.hasStatBlock === false || compactWip ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}</div>`}
             <div class="combat-card-stats-row">
-              <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>${c.tempHp ? `<sup class="temp-hp-tag" title="Temporary HP -- absorbs damage before real HP">+${c.tempHp}</sup>` : ''}
-                <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
-              </span>
-              <span class="stat-bar-wrap">VP: <strong>${c.currentVp}/${c.maxVp}</strong>
-                <div class="mini-bar"><div class="mini-bar-fill vp-bar" style="width:${vpPct}%"></div></div>
-              </span>
+              ${_barHtml(c, 'hp', `HP: <strong>${c.currentHp}/${c.maxHp}</strong>${c.tempHp ? `<sup class="temp-hp-tag" title="Temporary HP -- absorbs damage before real HP">+${c.tempHp}</sup>` : ''}`, hpPct, compactWip && !readOnly)}
+              ${_barHtml(c, 'vp', `VP: <strong>${c.currentVp}/${c.maxVp}</strong>`, vpPct, compactWip && !readOnly)}
             </div>
           </div>
           ${c.hasStatBlock === false ? '' : _abilityScoresHtml(c, modTag, { compactWip, readOnly })}
+          ${compactWip && !readOnly ? `${_statEditorHtml(c)}<div class="card-tools">${_calcButtonHtml(c, true)}</div>` : ''}
         </div>
       </div>
       <div class="combat-card-footer">
@@ -1104,9 +1148,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
     </div>`;
 
   // --- HP / VP adjusters ---
-  const typeCalcBtn = c.type === 'pokemon'
-    ? `<button class="combat-type-calc-btn" data-combatant-id="${c.id}">🧮${compactWip ? ' Damage Calculator' : '<br>Damage<br>Calculator'}</button>`
-    : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}" style="background:rgba(76,175,80,0.12);border-color:rgba(76,175,80,0.5);color:#4CAF50;">HP/VP${compactWip ? ' Calculator' : '<br>Calculator'}</button>`;
+  const typeCalcBtn = _calcButtonHtml(c, compactWip);
   const critRow = c.type === 'pokemon' ? `
       <div class="hpvp-adjust-row" style="margin-top:0.35rem;">
         <span class="hpvp-stat-label">Crit</span>
@@ -1119,7 +1161,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
   // card at all times, so a readOnly viewer loses nothing but the edit widgets
   // themselves by skipping this -- except crit modifier, which only lives here,
   // so that alone gets a plain informational line.
-  const hpvpSection = readOnly
+  const hpvpSection = compactWip ? '' : readOnly
     ? (c.type === 'pokemon' ? `
     <div class="expanded-hpvp-section">
       <div class="hpvp-adjust-row"><span class="hpvp-stat-label">Crit Modifier</span><span>${formatMod(c.critMod || 0)}</span></div>
@@ -2041,7 +2083,7 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
         const key = `${statToggle.dataset.combatantId}:${statToggle.dataset.stat}`;
         _editingStat = _editingStat === key ? null : key;
         rerenderBattle(state);
-        if (_editingStat) document.querySelector(`.stat-adjust-val[data-combatant-id="${statToggle.dataset.combatantId}"][data-stat="${statToggle.dataset.stat}"]`)?.select();
+        if (_editingStat) document.querySelector(`.stat-tile-editor input[data-combatant-id="${statToggle.dataset.combatantId}"][data-stat="${statToggle.dataset.stat}"]`)?.select();
         return;
       }
       if (e.target.closest('.stat-tile, .stat-tile-editor')) return; // the editor's own input

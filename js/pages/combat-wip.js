@@ -426,15 +426,35 @@ const WIP_CSS = `
   #wipBattlePhase .combat-card-portrait-col .combat-card-ac-line + .combat-card-ac-line { margin-top: 0.25rem; }
   #wipBattlePhase .stat-tile-editor { margin-top: 0.5rem; }
   #wipBattlePhase .stat-tile-editor .hpvp-input { width: 58px; text-align: center; }
-  #wipBattlePhase .card-tools { display: flex; justify-content: flex-end; margin-top: 0.55rem; }
-  #wipBattlePhase .card-tools .combat-type-calc-btn { width: auto; padding: 0.3rem 0.9rem; font-size: 0.78rem; border-radius: 999px; }
+  /* the calculator: a small tile under the AC / Crit chips */
+  #wipBattlePhase .combat-card-portrait-col .calc-tile {
+    margin-top: 0.45rem; width: 100%; min-width: 0; align-self: stretch; display: flex; flex-direction: row; align-items: center;
+    justify-content: center; gap: 0.4rem; padding: 0.35rem 0.5rem; border-radius: 12px; line-height: 1.15; text-align: left;
+    font-family: inherit; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.03em; cursor: pointer;
+    transition: transform 0.08s, filter 0.12s, box-shadow 0.12s;
+  }
+  #wipBattlePhase .calc-tile--damage {
+    color: #ffd8a8; background: linear-gradient(135deg, rgba(243,156,18,0.28), rgba(211,84,0,0.22));
+    border: 1px solid rgba(243,156,18,0.6); box-shadow: 0 0 12px rgba(243,156,18,0.18);
+  }
+  #wipBattlePhase .calc-tile--hpvp {
+    color: #c8f7d4; background: linear-gradient(135deg, rgba(46,204,113,0.26), rgba(30,132,73,0.2));
+    border: 1px solid rgba(46,204,113,0.6); box-shadow: 0 0 12px rgba(46,204,113,0.16);
+  }
+  #wipBattlePhase .calc-tile:hover { filter: brightness(1.18); transform: translateY(-1px); }
+  #wipBattlePhase .calc-tile:active { transform: scale(0.96); }
+  #wipBattlePhase .calc-tile-icon { font-size: 1.05rem; }
 
   /* AC under Init */
   #wipBattlePhase .combat-card-ac-line--under-portrait { align-self: center; margin-top: 0.3rem; white-space: nowrap; font-size: 0.72rem; padding: 0.15rem 0.5rem; }
 
   /* compact moves: three to a row */
   #wipBattlePhase .expanded-moves-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem; }
-  #wipBattlePhase .combat-move-item { padding: 0.38rem 0.5rem; font-size: 0.78rem; border-radius: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #wipBattlePhase .combat-move-item {
+    min-height: 2.7rem; padding: 0.6rem 0.55rem; font-size: 0.84rem; border-radius: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    box-shadow: 0 5px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -3px 0 rgba(0,0,0,0.18);
+  }
+  #wipBattlePhase .combat-move-item:not(:disabled):not(.combat-move-item--display):active { transform: translateY(1px); box-shadow: 0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
   @media (max-width: 560px) {
     #wipBattlePhase .expanded-moves-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }

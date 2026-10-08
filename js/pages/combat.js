@@ -976,6 +976,14 @@ function _statEditorHtml(c) {
         </div>`;
 }
 
+/** The shared battle card's calculator, under the AC/Crit chips: a small icon tile. Same classes as the old button
+ * (combat-type-calc-btn / combat-trainer-hpvp-btn), so the same handlers open the same calculators. */
+function _calcTileHtml(c) {
+  return c.type === 'pokemon'
+    ? `<button class="combat-type-calc-btn calc-tile calc-tile--damage" data-combatant-id="${c.id}" title="Damage Calculator"><span class="calc-tile-icon">🧮</span><span class="calc-tile-label">Damage<br>Calculator</span></button>`
+    : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn calc-tile calc-tile--hpvp" data-combatant-id="${c.id}" title="HP/VP Calculator"><span class="calc-tile-icon">❤️</span><span class="calc-tile-label">HP / VP<br>Calculator</span></button>`;
+}
+
 /** The Damage Calculator (a Pokemon) or HP/VP Calculator (a trainer) button -- same classes/handlers wherever it sits. */
 function _calcButtonHtml(c, compactWip) {
   return c.type === 'pokemon'
@@ -1029,6 +1037,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
           ${compactWip ? `<span class="combat-initiative-badge combat-initiative-badge--under-portrait">Init ${c.initiativeTotal}</span>` : ''}
           ${compactWip && c.hasStatBlock !== false ? _chipHtml(c, 'ac', `AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}`, readOnly) : ''}
           ${compactWip && c.hasStatBlock !== false && c.type === 'pokemon' ? _chipHtml(c, 'crit', `Crit <strong>${formatMod(c.critMod || 0)}</strong>`, readOnly) : ''}
+          ${compactWip && !readOnly ? _calcTileHtml(c) : ''}
         </div>
         <div class="combat-card-body">
           <div class="combat-card-name-row">
@@ -1047,7 +1056,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
             </div>
           </div>
           ${c.hasStatBlock === false ? '' : _abilityScoresHtml(c, modTag, { compactWip, readOnly })}
-          ${compactWip && !readOnly ? `${_statEditorHtml(c)}<div class="card-tools">${_calcButtonHtml(c, true)}</div>` : ''}
+          ${compactWip && !readOnly ? _statEditorHtml(c) : ''}
         </div>
       </div>
       <div class="combat-card-footer">

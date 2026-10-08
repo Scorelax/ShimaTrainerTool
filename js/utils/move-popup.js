@@ -146,7 +146,12 @@ function _createPopupDOM() {
     const moveName = btn.dataset.moveName;
     const vpCost = parseInt(btn.dataset.vpCost) || 0;
 
-    if (!overlay._deferAnimation) await _playBattleAnimation(overlay._speciesName);
+    // The shared battle (skipConfirm) never waits on the clip: it plays in a small floating window while the move's next
+    // popup opens straight away -- waiting for it held up every effects-only move (Smog, a buff, a heal) by the clip's length.
+    if (!overlay._deferAnimation) {
+      if (overlay._skipConfirm) _playBattleAnimationFloating(overlay._speciesName);
+      else await _playBattleAnimation(overlay._speciesName);
+    }
 
     if (overlay._onUseMove) overlay._onUseMove(moveName, vpCost);
     confirmOverlay.style.display = 'none';
@@ -271,6 +276,38 @@ async function _playBattleAnimation(speciesName) {
     video.addEventListener('error', resolve, { once: true });
     setTimeout(resolve, 8000); // safety cap -- never hang on a stuck clip
   });
+}
+
+/** The same clip as _playBattleAnimation, in a small floating window at the top of the screen that doesn't block anything
+ * (no clicks caught) and removes itself when the clip ends -- for the shared battle, where the next popup shouldn't wait. */
+async function _playBattleAnimationFloating(speciesName) {
+  const url = await getBattleAnimationUrl(speciesName);
+  if (!url) return;
+  if (!document.getElementById('floating-battle-anim-styles')) {
+    const style = document.createElement('style');
+    style.id = 'floating-battle-anim-styles';
+    style.textContent = `
+      .floating-battle-anim { position: fixed; top: 0.8rem; left: 50%; transform: translateX(-50%); z-index: 2000; pointer-events: none;
+        width: min(260px, 50vw); border-radius: 14px; overflow: hidden; background: rgba(8,10,22,0.85);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.6); transition: opacity 0.25s ease; }
+      .floating-battle-anim video { display: block; width: 100%; }
+    `;
+    document.head.appendChild(style);
+  }
+  document.querySelector('.floating-battle-anim')?.remove();
+  const box = document.createElement('div');
+  box.className = 'floating-battle-anim';
+  const video = document.createElement('video');
+  video.src = url;
+  video.playsInline = true;
+  video.disablePictureInPicture = true;
+  box.appendChild(video);
+  document.body.appendChild(box);
+  const remove = () => { box.style.opacity = '0'; setTimeout(() => box.remove(), 300); };
+  video.addEventListener('ended', remove, { once: true });
+  video.addEventListener('error', remove, { once: true });
+  setTimeout(remove, 8000); // safety cap
+  try { await video.play(); } catch { remove(); }
 }
 
 // ── Trainer path sections ─────────────────────────────────────────────────────

@@ -1,0 +1,3253 @@
+{
+ "count": 348,
+ "abilities": [
+  {
+   "name": "Abyssal Presence",
+   "description": "The area within 60 feet of this Pokémon is considered difficult terrain for creatures it chooses. Additionally, dim light within this area is treated as darkness.",
+   "pokemon": [
+    "Noctugatr"
+   ]
+  },
+  {
+   "name": "Adaptability",
+   "description": "When this Pokémon uses a move of its own type, it may roll the damage twice and choose either total.",
+   "pokemon": [
+    "Salo",
+    "Aurus",
+    "Aroarus"
+   ]
+  },
+  {
+   "name": "Adaptive Cells",
+   "description": "At the start of its turn, this Pokémon can gain resistance to one damage type it was damaged by since its last turn. This lasts until it uses this ability again.",
+   "pokemon": [
+    "Deoxys",
+    "Protoxys"
+   ]
+  },
+  {
+   "name": "Aftermath",
+   "description": "This Pokémon deals damage to an attacker equal to half of the damage received when knocked out by a melee move.",
+   "pokemon": [
+    "Lunus",
+    "Umbrost",
+    "Protoxys"
+   ]
+  },
+  {
+   "name": "Air Lock",
+   "description": "While this Pokémon is in battle, weather-related abilities have no effect on the Pokémon that have them.",
+   "pokemon": [
+    "Chirquill",
+    "Stratosoar",
+    "Rayquaza"
+   ]
+  },
+  {
+   "name": "Amorphous",
+   "description": "This Pokémon can move through spaces that are as narrow as 1 inch wide without squeezing.",
+   "pokemon": [
+    "Moldite"
+   ]
+  },
+  {
+   "name": "Analytic",
+   "description": "After this Pokémon misses an attack, its next attack is done at advantage.",
+   "pokemon": [
+    "Datagus",
+    "Compizard",
+    "Didoss",
+    "Lunus",
+    "Umbrost"
+   ]
+  },
+  {
+   "name": "Ancient Connection",
+   "description": "While this Pokémon is within 60ft. of an ancient artifact, it gains advantage on WIS saving throws.",
+   "pokemon": [
+    "Lanfae",
+    "Lumifae"
+   ]
+  },
+  {
+   "name": "Ancient Ward",
+   "description": "This Pokémon gains resistance to Cosmic type damage, and can predict stellar events that will happen within a 5 mile radius. Within the same area it is able to sense when Cosmic, Psychic, Ghost or Dark energy is used.",
+   "pokemon": [
+    "Jiehtanas"
+   ]
+  },
+  {
+   "name": "Anger Point",
+   "description": "After suffering a critical hit, this Pokémon doubles the damage dice for a single move it activates on the following turn.",
+   "pokemon": [
+    "Angish",
+    "Agonish",
+    "Milkattle",
+    "Kobull",
+    "Finchap",
+    "Falcinch",
+    "Raptinch",
+    "Noirow",
+    "Lunus",
+    "Umbrost",
+    "Silian",
+    "Groundilla",
+    "Terrilla",
+    "Voltey",
+    "Dynape",
+    "Silvolt"
+   ]
+  },
+  {
+   "name": "Anticipation",
+   "description": "When this Pokémon enters the battle, an opponent must reveal if it has a move that the Pokémon is vulnerable to. The move does not have to be revealed - only that there is such a move.",
+   "pokemon": [
+    "Hatenna",
+    "Hattrem",
+    "Hatterene"
+   ]
+  },
+  {
+   "name": "Aqua Camoflauge",
+   "description": "Once per short rest, this Pokémon gains temporary hit points equal to its level when battling in coastal and swampy areas, or in rainy conditions",
+   "pokemon": [
+    "Jelleem",
+    "Hugeem",
+    "Kraqua"
+   ]
+  },
+  {
+   "name": "Arena Trap",
+   "description": "Grounded creatures within 50 feet of this Pokémon may not flee or switch out, except by item, Move, or ability.",
+   "pokemon": [
+    "Wormole",
+    "Jormungandr",
+    "Barron",
+    "Ceano",
+    "Pitios",
+    "Maroz",
+    "Vena",
+    "Scarpea",
+    "Cruscarex"
+   ]
+  },
+  {
+   "name": "Aroma Veil",
+   "description": "Any ally within 15 feet of this Pokémon automatically passes any WIS save they are required to make.",
+   "pokemon": [
+    "Stelluna",
+    "Stellumina"
+   ]
+  },
+  {
+   "name": "Aura Break",
+   "description": "When this Pokémon is in battle, the boost of Fairy Aura and Dark Aura abilities is reversed, Any applicable move type activated within 100 feet deals half damage instead of double.",
+   "pokemon": [
+    "Kortier",
+    "Noblier"
+   ]
+  },
+  {
+   "name": "Bad Dreams",
+   "description": "If an opponent in battle with this Pokémon falls asleep, they take an amount of damage equal to this Pokémon's proficeincy bonus at the end of each of their turns.",
+   "pokemon": [
+    "Spectro",
+    "Beorkub",
+    "Grizzerker",
+    "Beluhe",
+    "Whail",
+    "Whailossus",
+    "Lumorm",
+    "Shadorm"
+   ]
+  },
+  {
+   "name": "Balance Keeper",
+   "description": "At the end of every turn, revert any stat changes in effect. For every instance nullified, regain 2d10 of either HP or VP.",
+   "pokemon": [
+    "Equilibra"
+   ]
+  },
+  {
+   "name": "Battery",
+   "description": "Allies that activate electric-type moves within 20 feet of this Pokémon double their damage dice.",
+   "pokemon": [
+    "Energem"
+   ]
+  },
+  {
+   "name": "Battle Armor",
+   "description": "This Pokémon is immune to extra damage dealt by a Critical Hit.",
+   "pokemon": [
+    "Falinks",
+    "Testurion",
+    "Gladirena",
+    "Hadean",
+    "Styxxil",
+    "Destrix",
+    "Ceano",
+    "Pitios",
+    "Maroz",
+    "Vena",
+    "Skarling",
+    "Skarmory",
+    "Scaracross"
+   ]
+  },
+  {
+   "name": "Battle Tactics",
+   "description": "This Pokémon gains an additional action when its hit points drop below 50% of its maximum.",
+   "pokemon": [
+    "Centurvus"
+   ]
+  },
+  {
+   "name": "Beast Boost",
+   "description": "Upon causing an opponent to faint, this Pokémon increases the ability scores of its saving throw proficiencies by 2 until the end of combat. This is stackable up to a maximum of +10 to any one ability score.",
+   "pokemon": [
+    "Energem"
+   ]
+  },
+  {
+   "name": "Berry Sense",
+   "description": "This Pokémon has advantage on Perception checks to locate berry plants, and can identify berry types by their flowers alone.",
+   "pokemon": [
+    "Nectini",
+    "Dustwig"
+   ]
+  },
+  {
+   "name": "Berserk",
+   "description": "When this Pokémon falls below 25% of its maximum health, all of its attacks are rolled with disadvantage, but deal double their damage. If a move activated requires a saving throw, the target(s) have advantage on the roll.",
+   "pokemon": [
+    "Boradin",
+    "Tremboar",
+    "Pathoplague",
+    "Werewool",
+    "Corshail"
+   ]
+  },
+  {
+   "name": "Between Worlds",
+   "description": "As a bonus action, this Pokémon can phase partially into the Depths of Twilight, gaining resistance to all damage except psychic and fairy until the start of its next turn.",
+   "pokemon": [
+    "Swampadow"
+   ]
+  },
+  {
+   "name": "Big Pecks",
+   "description": "This Pokémon's AC cannot be reduced by an opponent's moves.",
+   "pokemon": [
+    "Chirquill",
+    "Stratosoar",
+    "Finchap",
+    "Falcinch",
+    "Raptinch"
+   ]
+  },
+  {
+   "name": "Blaze",
+   "description": "When this Pokémon falls below 25% of its maximum HP, add 50% more dice to damage rolls for its fire-type moves, and damaging fire moves cost 50% more VP.",
+   "pokemon": [
+    "Moltling",
+    "Scorab",
+    "Igniscairn",
+    "Solatrice",
+    "Heatike",
+    "Heataze",
+    "Blazion"
+   ]
+  },
+  {
+   "name": "Bloodhound",
+   "description": "This Pokémon can detect living creatures within a 90ft range. It gets advantage on perception checks to locate living creatures in range, and can't suffer reduced accuracy when attacking living creatures.",
+   "pokemon": [
+    "Buzzlet",
+    "Mosqaegis"
+   ]
+  },
+  {
+   "name": "Bulletproof",
+   "description": "This Pokémon is immune to damage from moves with Bullet, Ball, or Bomb in their name.",
+   "pokemon": [
+    "Maiskern",
+    "Popkern"
+   ]
+  },
+  {
+   "name": "Burrower",
+   "description": "This Pokémon can burrow underground traveling a distance equal to its walking speed before re-emerging.",
+   "pokemon": [
+    "Socroach"
+   ]
+  },
+  {
+   "name": "Cacophony",
+   "description": "This Pokémon is immune to sound-based moves.",
+   "pokemon": [
+    "Albawk",
+    "Albaross",
+    "Finchap",
+    "Falcinch",
+    "Raptinch"
+   ]
+  },
+  {
+   "name": "Camouflage",
+   "description": "This Pokémon has advantage on Stealth checks while in its natural habitat, or in a fitting habitat (GM's discretion).",
+   "pokemon": [
+    "Mushusk"
+   ]
+  },
+  {
+   "name": "Centurion's Honor",
+   "description": "This Pokémon can be wielded as a +2 longsword, dealing 2d6 + STR steel type damage. While equipped, grants the wielder proficiency in longswords if they don't already have it. When wielded, grants +2 AC, and allows the user to channel the Pokémon's moves as a bonus action, using the Pokémon's ability scores. Additionally, the wielder gains resistance to ghost type damage. It can also manifest a spectral cape behind its wielder, granting it advantage on intimidation rolls. If separated from its chosen wielder, will teleport back to them as a bonus action. While bonded, trainer and Pokémon can communicate telepathically within 120 feet. If the trainer is knocked unconscious, this Pokémon automatically detaches and fights to protect them.",
+   "pokemon": [
+    "Duoblade"
+   ]
+  },
+  {
+   "name": "Cheek Pouch",
+   "description": "When this Pokémon eats any type of berry, is heals for an additional 10% of its maximum HP (rounded up to the nearest whole number).",
+   "pokemon": [
+    "Armles"
+   ]
+  },
+  {
+   "name": "Chlorophyll",
+   "description": "This Pokémon’s speed is doubled in harsh sunlight. In harsh sunlight, this Pokémon regenerates HP equal to its proficiency bonus at the start each turn.",
+   "pokemon": [
+    "Seedo",
+    "Tangela",
+    "Plankril",
+    "Shkril",
+    "Bulbasaur",
+    "Ivysaur",
+    "Venusaur",
+    "Nacleaf",
+    "Crystalga"
+   ]
+  },
+  {
+   "name": "Chronoshift",
+   "description": "When this Pokémon takes damage, roll a d20. On an 18-20, it glimpses an alternate timeline and avoids the attack.",
+   "pokemon": [
+    "Tempus",
+    "Chronus"
+   ]
+  },
+  {
+   "name": "Circuit Break",
+   "description": "This Pokémon's attacks can deal electrical damage to Ground-type Pokémon.",
+   "pokemon": [
+    "Bolking",
+    "Voltey",
+    "Dynape",
+    "Silvolt"
+   ]
+  },
+  {
+   "name": "Clear Body",
+   "description": "Other Pokémon's moves or abilities cannot lower this Pokémon stats.",
+   "pokemon": [
+    "Wormole",
+    "Jormungandr"
+   ]
+  },
+  {
+   "name": "Cloud Nine",
+   "description": "While this Pokémon is in battle, weather-related abilities have no effect on the Pokémon that have them.",
+   "pokemon": [
+    "Flignit",
+    "Flareblit"
+   ]
+  },
+  {
+   "name": "Colony Mind",
+   "description": "This Pokémon can telepathically communicate with other members of the same species within 30 feet and has advantage on Wisdom checks when within 5 feet of another member of the same species.",
+   "pokemon": [
+    "Veerulent (Stable Form)",
+    "Mushusk",
+    "Moldite"
+   ]
+  },
+  {
+   "name": "Color Change",
+   "description": "When hit by a damaging attack, this Pokémon's type changes to the type that hit it. It takes on the new type's resistances, vulnerabilities, and immunities.",
+   "pokemon": [
+    "Salo",
+    "Ananansi"
+   ]
+  },
+  {
+   "name": "Comforting Presence",
+   "description": "Creatures within 10ft of this Pokémon have advantage on saves against fear.",
+   "pokemon": [
+    "Starcub",
+    "Stellursa"
+   ]
+  },
+  {
+   "name": "Competitive",
+   "description": "This Pokémon adds its proficiency bonus to damage rolls while poisoned, burned, confused, or paralyzed.",
+   "pokemon": [
+    "Chirquill",
+    "Stratosoar",
+    "Noirow",
+    "Charmander",
+    "Charmeleon"
+   ]
+  },
+  {
+   "name": "Compound Eyes",
+   "description": "This Pokémon gets an additional +1 to attack rolls.",
+   "pokemon": [
+    "Caterpie",
+    "Metapod",
+    "Butterfree",
+    "Delwing",
+    "Agiluzz",
+    "Silkonat",
+    "Silkomoth",
+    "Weavoth"
+   ]
+  },
+  {
+   "name": "Contrary",
+   "description": "Moves that affect this Pokémon's stats have the opposite effect. (For example, Defense Curl would lower AC by 4. Growl would increase its attack by +1)",
+   "pokemon": [
+    "Jelleem",
+    "Hugeem",
+    "Mergato",
+    "Grovyle",
+    "Sceptile"
+   ]
+  },
+  {
+   "name": "Corrosion",
+   "description": "This Pokémon's moves ignore poison immunity, and can inflict the poisoned status on steel and poison-type Pokémon.",
+   "pokemon": [
+    "Toxchick",
+    "Toxiclaw",
+    "Toxeak"
+   ]
+  },
+  {
+   "name": "Cosmic Core",
+   "description": "You are immune to ground-type moves. When hit by a damaging move, roll a d12. On a roll of 8 or higher, half of the damage dealt is reflected back in a 15ft. radius as typeless damage.",
+   "pokemon": [
+    "Stellavorii",
+    "Stellarchon"
+   ]
+  },
+  {
+   "name": "Cosmic Slumber",
+   "description": "Jirachi is always asleep. While asleep (its normal state), Jirachi regenerates 10 + 2x its proficiency modifier hit points at the start of its turn. It can still sense its surroundings and make decisions, but can only use a limited set of moves.",
+   "pokemon": [
+    "Jirachi"
+   ]
+  },
+  {
+   "name": "Crystal Reservoir",
+   "description": "You are immune to the effects of intense heat, like heat exhaustion.",
+   "pokemon": [
+    "Crystamel",
+    "Quamel"
+   ]
+  },
+  {
+   "name": "Curiosity",
+   "description": "Moves requiring an attack roll that have not previously been used in the same encounter deal 2d10 typeless bonus damage on a hit the first time they are used.",
+   "pokemon": [
+    "Wyngir",
+    "Faevern"
+   ]
+  },
+  {
+   "name": "Cursed Body",
+   "description": "When hit by a melee attack, this Pokémon may roll 1d4. On a result of 4, the opponent who made the attack cannot use the same move on its next turn.",
+   "pokemon": [
+    "Flignit",
+    "Flareblit",
+    "Asfire",
+    "Aspyre"
+   ]
+  },
+  {
+   "name": "Cute Charm",
+   "description": "Once per short rest, you can impose disadvantage on an enemy attack roll of your choice.",
+   "pokemon": [
+    "Oasand",
+    "Oasylph",
+    "Chicklet"
+   ]
+  },
+  {
+   "name": "Damp",
+   "description": "This Pokémon is unaffected by Self Destruct and Explosion moves.",
+   "pokemon": [
+    "Platypara",
+    "Platypulse"
+   ]
+  },
+  {
+   "name": "Dancer",
+   "description": "If any creature within sight of this Pokémon activates a move with Dance in its name, this Pokémon may immediately use one of its moves as a reaction.",
+   "pokemon": [
+    "Shimmeral",
+    "Dansaic",
+    "Brillore"
+   ]
+  },
+  {
+   "name": "Dark Aura",
+   "description": "When this Pokémon is in battle, all dark-type moves by allies or opponents within 100 feet deal double their damage.",
+   "pokemon": [
+    "Glovish",
+    "Globyss",
+    "Glowiathan",
+    "Umbro",
+    "Tangela",
+    "Gaupus",
+    "Vargpus",
+    "Froscyyr",
+    "Tangela (Stalker Form)",
+    "Tangrowth"
+   ]
+  },
+  {
+   "name": "Dark Native",
+   "description": "This Pokémon is proficient with Dark type moves. If it is also Dark type, double its proficiency bonus.",
+   "pokemon": [
+    "Mudow",
+    "Marshade",
+    "Swampadow",
+    "Treecko",
+    "Grovyle",
+    "Sceptile",
+    "Torchick",
+    "Combusken",
+    "Blaziken"
+   ]
+  },
+  {
+   "name": "Dazzling",
+   "description": "Bonus action moves activated by any creature within sight of this Pokémon become standard actions.",
+   "pokemon": [
+    "Dumplood",
+    "Ponster",
+    "Lunatrice",
+    "Aurette",
+    "Luminarch"
+   ]
+  },
+  {
+   "name": "Defeatist",
+   "description": "When this Pokémon drops below 25% of its maximum HP, all of its attacks are rolled with disadvantage.",
+   "pokemon": [
+    "Promush",
+    "Mallusk",
+    "Conchail"
+   ]
+  },
+  {
+   "name": "Defiant",
+   "description": "When this Pokémon is subject to a move that gives it a status condition, it has advantage on the next attack.",
+   "pokemon": [
+    "Falinks",
+    "Testurion",
+    "Gulorine",
+    "Felverine"
+   ]
+  },
+  {
+   "name": "Desert Adaptation",
+   "description": "This Pokémon has resistance to fire type damage regardless of typing, and suffers no penalty from extreme heat. Additionally, it is proficient with Ground type moves.",
+   "pokemon": [
+    "Evaptor",
+    "Voltey",
+    "Dynape",
+    "Silvolt"
+   ]
+  },
+  {
+   "name": "Diplomat",
+   "description": "This Pokémon can cast Calm Emotions once per short rest without consuming energy.",
+   "pokemon": [
+    "Faeling",
+    "Drairy"
+   ]
+  },
+  {
+   "name": "Disguise",
+   "description": "This Pokémon has a disguise which gives it a temporary hp boost equal to twice its level. When the temporary hit points fall to zero, the disguise breaks and requires a short rest to repair.",
+   "pokemon": [
+    "Socroach",
+    "Ananansi"
+   ]
+  },
+  {
+   "name": "Download",
+   "description": "Once per short rest, this Pokémon can choose a different damage type for one of their normal attacks.",
+   "pokemon": [
+    "Datagus",
+    "Compizard",
+    "Didoss"
+   ]
+  },
+  {
+   "name": "Dream Walker",
+   "description": "This Pokémon can perceive both the Material Plane and Sea of Dreams simultaneously. As an action, it can attempt to step between planes (DC 15 Wisdom check). On a success, it enters the Sea of Dreams or returns to the Material Plane. It can bring its trainer with it, but doing so increases the DC to 18. The Pokémon can't use this ability again until it completes a short or long rest.",
+   "pokemon": [
+    "Tempus",
+    "Chronus",
+    "Starcub",
+    "Stellursa"
+   ]
+  },
+  {
+   "name": "Dreamscape",
+   "description": "When causing a creature to fall asleep, their spirits are transported to a dreamlike plane in the mind of this Pokémon. Creatures in the Dreamscape can't wake up unless they wake the dreamer.",
+   "pokemon": [
+    "Whailossus"
+   ]
+  },
+  {
+   "name": "Drizzle",
+   "description": "When this Pokémon enters an outside battle, the weather immediately changes to light rain for 5 rounds. In the case of another Pokémon with a similar weather ability, the tie goes to the Pokémon with the highest DEX score.",
+   "pokemon": [
+    "Kyogre",
+    "Quetzalair",
+    "Quetzatlas"
+   ]
+  },
+  {
+   "name": "Drought",
+   "description": "When this Pokémon enters an outside battle, the weather immediately changes to bright sunlight for 5 rounds. In the case of another Pokémon with a similar weather ability, the tie goes to the Pokémon with the highest DEX score.",
+   "pokemon": [
+    "Vulpix",
+    "Ninetales",
+    "Groudon",
+    "Heliosol",
+    "Horusol",
+    "Blazion"
+   ]
+  },
+  {
+   "name": "Dry Skin",
+   "description": "At the end of each of this Pokémon's turns, it takes an amount of damage equal to its proficiency modifier in harsh sunlight, or heals for the same amount during rain.",
+   "pokemon": [
+    "Armles",
+    "Armful"
+   ]
+  },
+  {
+   "name": "Early Bird",
+   "description": "This Pokémon has advantage on rolls to wake from sleep.",
+   "pokemon": [
+    "Grostarch",
+    "Caloburn",
+    "Clucky"
+   ]
+  },
+  {
+   "name": "Effect Spore",
+   "description": "When hit by a melee attack, roll a d4. On a 4, deal an amount of grass damage equal to your proficiency modifier to your attacker.",
+   "pokemon": [
+    "Foongus",
+    "Amoonguss"
+   ]
+  },
+  {
+   "name": "Emberflame",
+   "description": "The tips of this Pokémon’s feathers emit a constant ember-glow. While conscious, it sheds dim light in a 10-foot radius. Any creature that grapples or hits this Pokémon with a melee attack while within 5 feet takes 1d4 + proficiency modifier fire damage.",
+   "pokemon": [
+    "Torchick",
+    "Combusken"
+   ]
+  },
+  {
+   "name": "Emergency Exit",
+   "description": "At any time this Pokémon is damaged when it is at or below 50% of its maximum HP, it may disengage and move up to its speed as a free action, and its trainer may switch it out as a free action.",
+   "pokemon": [
+    "Secto"
+   ]
+  },
+  {
+   "name": "Energy Intensive",
+   "description": "This Pokémon's metal exoskeleton requires constant mental energy to maintain. At the start of this Pokémon's turn in combat, it loses VP equal to its proficiency bonus. Additionally, this Pokémon becomes weak to psychic type damage, and whenever it takes psychic damage, it also loses VP equal to the HP damage taken.",
+   "pokemon": [
+    "Mekko"
+   ]
+  },
+  {
+   "name": "Eternal Radiance",
+   "description": "This Pokémon is immune to blindness. Creatures that look directly at it must make a CON save or be blinded for 1 round. Additionally, it can manipulate light as an action to create illusions, reveal invisible creatures, or temporarily blind enemies in a 60 ft radius. Finally, at the start of its turn, this Pokémon restores 1d8 HP to all allies within 30 ft. This healing is enhanced near sources of magical or ancient light.",
+   "pokemon": [
+    "Luminarch"
+   ]
+  },
+  {
+   "name": "Ether Dawn",
+   "description": "This Pokémon radiates ether energy. All damage dealt by this Pokémon is rolled with advantage. However, every time it uses a move, roll a d20. On a roll of 1, it enters into the Ether Overload status condition. On any other result, the Ether Overload count increases by 1. When the Ether Overload passes, this Pokémon loses 1d4 levels. If levels go beyond 1, this Pokémon dies.",
+   "pokemon": [
+    "Fluffire",
+    "Pyronimbus"
+   ]
+  },
+  {
+   "name": "Ether Mirror",
+   "description": "Ranged move attacks against this Pokémon are reflected back at the attacker after a successful hit. All damage and effects rolled apply to the attacker.",
+   "pokemon": [
+    "Lumo"
+   ]
+  },
+  {
+   "name": "Fairy Aura",
+   "description": "When this Pokémon is in battle, all fairy-type moves by other creatures within 100 feet of it deal double their damage.",
+   "pokemon": [
+    "Felichim",
+    "Tigriffon",
+    "Clingae",
+    "Chimae"
+   ]
+  },
+  {
+   "name": "Fairy Breath",
+   "description": "All breath moves deal fairy-type damage.",
+   "pokemon": [
+    "Wyngir",
+    "Faevern"
+   ]
+  },
+  {
+   "name": "Fairy Wings",
+   "description": "Flying-type moves deal fairy-type damage.",
+   "pokemon": [
+    "Wyngir",
+    "Faevern"
+   ]
+  },
+  {
+   "name": "Ferocity",
+   "description": "When this Pokémon's hit points falls below 50% of its maximum, VP costs for attacking moves are doubled, and all successful attacks deal an additional 2d6 + proficiency bonus damage. When it falls below 25%, VP cost is tripled, and bonus damage increases to 4d6 + proficiency bonus.",
+   "pokemon": [
+    "Hydling",
+    "Pluraling",
+    "Plurorm",
+    "Plurydra",
+    "Plurofera",
+    "Veerulent (Stable Form)",
+    "Totodile",
+    "Croconaw",
+    "Feraligatr",
+    "Noctugatr"
+   ]
+  },
+  {
+   "name": "Filter",
+   "description": "When hit by a move type this Pokémon is vulnerable to, it may roll a d4. In a result of 4, it does not take the additional damage.",
+   "pokemon": [
+    "Swinicorn",
+    "Porque"
+   ]
+  },
+  {
+   "name": "Filter System",
+   "description": "As an action, this Pokémon may attempt to cure a status condition for itself or a creature it can touch by making a successful medicine check. If successful, this Pokémon heals for 1/16 of its maximum HP. This ability may be used three times per long rest.",
+   "pokemon": [
+    "Reclaimant",
+    "Purifax"
+   ]
+  },
+  {
+   "name": "Fireproof",
+   "description": "This Pokémon covers itself in a web of fire retardant silk fiber that grants resistance to fire damage. When hit by a fire move, roll 1d4. On a 1, the web is burnt away. On any other result, this Pokémon retains its resistance to fire. On subsequent rolls, the result that burns away the web increases by 1. Resets on a long rest.",
+   "pokemon": [
+    "Silkonat",
+    "Silkomoth",
+    "Weavoth"
+   ]
+  },
+  {
+   "name": "Flame Body",
+   "description": "The flames from this Pokémon's body shine dim light in a 15 ft radius. In addition, when hit by a melee attack, roll a d10. On a 10, the attacker is burned.",
+   "pokemon": [
+    "Charachnid",
+    "Lavachnid",
+    "Magmoar",
+    "Heataze"
+   ]
+  },
+  {
+   "name": "Flare Boost",
+   "description": "This Pokémon adds proficiency to its damage rolls while burned.",
+   "pokemon": [
+    "Ailorance",
+    "Fulgironce"
+   ]
+  },
+  {
+   "name": "Flash Fire",
+   "description": "This Pokémon takes no damage from fire or fire-type attacks. Instead, immediately after taking a hit from a fire-type move, or in open flames, double the STAB bonus on the next fire type move. While this ability's damage boost is active, this Pokémon's fire attacks ignore resistance.",
+   "pokemon": [
+    "Vulpix",
+    "Ninetales",
+    "Fuego",
+    "Caloburn",
+    "Lunatrice",
+    "Growlithe",
+    "Arcanine"
+   ]
+  },
+  {
+   "name": "Flower Gift",
+   "description": "During harsh sunlight, ally Pokémon within 30 feet of this Pokémon add their proficiency bonus to damage rolls.",
+   "pokemon": [
+    "Stelluna",
+    "Stellumina",
+    "Blossomini"
+   ]
+  },
+  {
+   "name": "Flower Mimic",
+   "description": "This Pokémon can spend 1 minute changing its appearance to match any common flower. Requires a DC 15 Intelligence (Investigation) check to identify it as a Pokémon while mimicking.",
+   "pokemon": [
+    "Blossomini"
+   ]
+  },
+  {
+   "name": "Flower Veil",
+   "description": "Any grass-type ally within 15 feet of this Pokémon is immune to new status effects, and grass-type allies within the range also have advantage on saving throws.",
+   "pokemon": [
+    "Seedo",
+    "Maiskern",
+    "Blossomini"
+   ]
+  },
+  {
+   "name": "Fluffy",
+   "description": "This Pokemon is vulnerable to fire-type moves, but takes half damage from any melee attack (that isn't fire-type).",
+   "pokemon": [
+    "Swarmy",
+    "Ordus",
+    "Woolworth",
+    "Spoolworth",
+    "Grazeep"
+   ]
+  },
+  {
+   "name": "Forecast",
+   "description": "This Pokémon changes form with the weather. In rain it becomes water-type, in harsh sunlight it becomes fire-type, in cold and snowy conditions it becomes ice-type. In all other conditions it is normal-type. Its STAB, resistance, immunities, and vulnerabilities change to match the form it takes.",
+   "pokemon": [
+    "Cirrux"
+   ]
+  },
+  {
+   "name": "Forest Blessing",
+   "description": "Active effect: This Pokémon can heal a plant or grass type Pokémon for 2d4 HP + its Wisdom modifier as an action. At level 5, the healing dice changes to 2d6, 2d8 at level 10, and 2d12 at level 17. This ability may be used three times per long rest. Passive effect: Plants within 20 ft grow more vigorously and are resistant to disease.",
+   "pokemon": [
+    "Sylvix",
+    "Verdiane",
+    "Sylvestra"
+   ]
+  },
+  {
+   "name": "Forest Sovereign",
+   "description": "This Pokémon commands plants and plant-based creatures. Plants will part to create paths and can be commanded to entangle foes.",
+   "pokemon": [
+    "Monstearth",
+    "Sylvestra"
+   ]
+  },
+  {
+   "name": "Forewarn",
+   "description": "When this Pokémon enters battle, it selects a target to reveal the move it knows with the most damage output. In the case of a tie, the target can choose which move it reveals.",
+   "pokemon": [
+    "Caredevil",
+    "Faredevil",
+    "Infernity"
+   ]
+  },
+  {
+   "name": "Formation Leader",
+   "description": "Allies of this Pokémon may stand in formation with it. This Pokémon may use a bonus action to enter formation with 5 + half its level creatures of large size or smaller, that each are within 5 feet of the next. A formation must consist of at least 5 individuals. While in formation, all creatures gain advantage on Strength saves, and AC is increased by 2. To maintain formation, everyone's movement is held until the Formation Leader moves the entire formation, unless an individual wants to break it. This effect will not stack with more creatures with the same ability. The formation breaks if a gap is created between individuals.",
+   "pokemon": [
+    "Gladirena",
+    "Centurvus"
+   ]
+  },
+  {
+   "name": "Forme Change",
+   "description": "Deoxys can change between its four forms as a bonus action.",
+   "pokemon": [
+    "Deoxys"
+   ]
+  },
+  {
+   "name": "Fortune's Favor",
+   "description": "This pokémon gains a number of Luck Points equal to half their level. Every time they or their trainer, as long as this pokémon is active, rolls a 1, they may spend a Luck Point to re-roll that die.",
+   "pokemon": [
+    "Denarius",
+    "Aureus",
+    "Krassemoth"
+   ]
+  },
+  {
+   "name": "Freezing Aura",
+   "description": "The very air around this creature is freezing. When ending itsturn within 30ft. of this creature, any creature that is not immune to being frozen is forced to make a dc12 CON save, becoming frozen on a failure.",
+   "pokemon": [
+    "Blizzgarr",
+    "Snogon",
+    "Avalgon",
+    "Fryoon",
+    "Froscyyr"
+   ]
+  },
+  {
+   "name": "Friend Guard",
+   "description": "Once per long rest, when an ally within 15 feet of this Pokémon is hit by an attack, it may choose to halve the damage dealt.",
+   "pokemon": [
+    "Caredevil",
+    "Faredevil",
+    "Infernity"
+   ]
+  },
+  {
+   "name": "Frigid Aura",
+   "description": "Enemies that start their turn within 10 feet of this Pokémon have their speed reduced by 10 feet. Enemies making melee attacks against this Pokémon must succeed a CON save or become slowed (half speed, -2 AC) until the end of their next turn.",
+   "pokemon": [
+    "Subsiro"
+   ]
+  },
+  {
+   "name": "Frisk",
+   "description": "Upon entering a battle, a single opponent’s held item is revealed, if it has one.",
+   "pokemon": [
+    "Delwing",
+    "Agiluzz",
+    "Caredevil",
+    "Faredevil"
+   ]
+  },
+  {
+   "name": "Full Metal Body",
+   "description": "Other Pokémon's moves or abilities cannot lower this Pokémon stats.",
+   "pokemon": [
+    "Ferrem",
+    "Steelix",
+    "Clingae",
+    "Chimae"
+   ]
+  },
+  {
+   "name": "Fur Coat",
+   "description": "Once per long rest, this Pokémon may halve the damage dealt to it from any one attack.",
+   "pokemon": [
+    "Woolworth",
+    "Spoolworth"
+   ]
+  },
+  {
+   "name": "Gale Wings",
+   "description": "This Pokémon adds an additional +1 to hit when using flying type attacks.",
+   "pokemon": [
+    "Aero",
+    "Seraphlyte"
+   ]
+  },
+  {
+   "name": "Galvanize",
+   "description": "All of this Pokémon's normal-type moves are electric-type. When this Pokémon deals electric damage, it stores a charge. After 3 charges, its next electric attack deals double damage, costs double VP and consumes all charges. A charge lasts for 1 minute, whlie in combat.",
+   "pokemon": [
+    "Volto",
+    "Ohmen"
+   ]
+  },
+  {
+   "name": "Gemcrafter",
+   "description": "This Pokémon can consume gems, changing its secondary type changes to the type of the gem it consumed.",
+   "pokemon": [
+    "Diverigem"
+   ]
+  },
+  {
+   "name": "Gluttony",
+   "description": "This Pokémon must eat its held berry when it falls below ½ of its maximum HP.",
+   "pokemon": [
+    "Dumplood",
+    "Ponster",
+    "Leefdot",
+    "Bigleef",
+    "Hugleef"
+   ]
+  },
+  {
+   "name": "Gooey",
+   "description": "When this Pokémon is hit with a melee attack, roll 1d4. On a result of 4, the attacker's speed is reduced to 0 until the end of its next turn.",
+   "pokemon": [
+    "Mudow",
+    "Marshade",
+    "Swampadow"
+   ]
+  },
+  {
+   "name": "Grass Pelt",
+   "description": "This Pokémon gains +1 to AC while in grassy terrain.",
+   "pokemon": [
+    "Elkrince",
+    "Elking",
+    "Elkrincess",
+    "Elqueen"
+   ]
+  },
+  {
+   "name": "Grassy Surge",
+   "description": "If the move is known, this Pokémon may use the Grassy Terrain move as a bonus action.",
+   "pokemon": [
+    "Snarepent"
+   ]
+  },
+  {
+   "name": "Gravity Well",
+   "description": "Gravity is stronger in a 100ft. radius around you. Flying speed is halved, and maintaining flight requires 20VP per turn. Rock-type moves deal 50% more damage, rounded down.",
+   "pokemon": [
+    "Stellarchon"
+   ]
+  },
+  {
+   "name": "Great Archive",
+   "description": "This Pokémon can permanently learn one ability it has recorded. If it loses consciousness, it loses 1d4 of its permanent records, except when healed at a PokéCenter. If this Pokémon faints due to fire damage, it loses 1d12 of its permanent records. This ability can be used once per long rest.",
+   "pokemon": [
+    "Scrollix",
+    "Codex"
+   ]
+  },
+  {
+   "name": "Guts",
+   "description": "When this Pokémon is burned or poisoned, they are not affected by the disadvantage or reduced damage effects. They still take damage at the end of each of their turns.",
+   "pokemon": [
+    "Taillow",
+    "Swellow",
+    "Redent",
+    "Sargent",
+    "Equitrix"
+   ]
+  },
+  {
+   "name": "Hard Worker",
+   "description": "This Pokémon has advantage on Constitution saving throws against exhaustion from manual labor. Can work twice as long as other Pokémon before requiring rest.",
+   "pokemon": [
+    "Smudgel"
+   ]
+  },
+  {
+   "name": "Harvest",
+   "description": "At the end of this Pokémon's turn, if it used a berry, roll 1d4. On a result of 3 or 4, it regains that berry as a held item.",
+   "pokemon": [
+    "Swinicorn",
+    "Porque"
+   ]
+  },
+  {
+   "name": "Healer",
+   "description": "As an action, this Pokemon may touch a creature to heal poison, burn, or paralysis. When it uses this ability, roll a d4. On the a result of 1 or 2, the status effect is moved to itself.",
+   "pokemon": [
+    "Pixee",
+    "Wispee"
+   ]
+  },
+  {
+   "name": "Healing Rain",
+   "description": "This Pokémon can use its action to heal hit points equal to its level, in rainy conditions.",
+   "pokemon": [
+    "Albawk",
+    "Albaross"
+   ]
+  },
+  {
+   "name": "Heatproof",
+   "description": "This Pokemon takes half the damage it otherwise would from Fire damage, and is immune to the burning condition.",
+   "pokemon": [
+    "Lodoth",
+    "Pelsdoth"
+   ]
+  },
+  {
+   "name": "Heavy Metal",
+   "description": "This Pokémon is especially heavy. Once per long rest, after being targeted by an attack, it may increase its AC by 2 if it would cause an attack to miss.",
+   "pokemon": [
+    "Triceros",
+    "Rhinaurus",
+    "Ferrem"
+   ]
+  },
+  {
+   "name": "Hematophage",
+   "description": "When this Pokémon deals melee damage, it regains hit points equal to half the damage dealt.",
+   "pokemon": [
+    "Pathoplague",
+    "Buzzlet",
+    "Mosqaegis"
+   ]
+  },
+  {
+   "name": "Honey Gather",
+   "description": "At the end of each battle, this Pokémon may roll a d20. On a result of 20, its trainer adds a Honey to its inventory",
+   "pokemon": [
+    "Larvasp"
+   ]
+  },
+  {
+   "name": "Honorable",
+   "description": "After hitting level 10, as long as it has 50% or more of its max HP, this Pokémon does half damage against creatures below level 10. Attacks against other Pokémon do an additional 1d12 + proficiency modifier typeless damage.",
+   "pokemon": [
+    "Charizard",
+    "Scaracross"
+   ]
+  },
+  {
+   "name": "Huge Power",
+   "description": "Once per short rest, this Pokémon may double the damage it does on a single move that requires an attack roll. The player must announce that they are using this ability before the attack roll.",
+   "pokemon": [
+    "Beorkub",
+    "Grizzerker"
+   ]
+  },
+  {
+   "name": "Hustle",
+   "description": "When you score a critical hit, you may immediately gain an additional action on your turn. If this action is used to make an attack, you have disadvantage on the roll. You may only ever have one additional action per round.",
+   "pokemon": [
+    "Redent",
+    "Sargent",
+    "Rockard",
+    "Crolder",
+    "Felichim",
+    "Tigriffon"
+   ]
+  },
+  {
+   "name": "Hydra's Resilience",
+   "description": "At the start of this Pokémon's turn, it may regain equal to 1d4 times its level. If it is suffering from a status condition, it may not regenerate health. It instead has to roll a DC 15 Constitution save, healing from the status contidion on a success, and gaining 1d4 rounds of immunity to status conditions.",
+   "pokemon": [
+    "Pluraling",
+    "Plurorm",
+    "Plurydra",
+    "Plurofera"
+   ]
+  },
+  {
+   "name": "Hydration",
+   "description": "This Pokémon is unaffected by negative status ailments in water or during rainy conditions.",
+   "pokemon": [
+    "Albawk",
+    "Albaross"
+   ]
+  },
+  {
+   "name": "Hyper Cutter",
+   "description": "This Pokémon’s attack or damage bonuses cannot be decreased by an opponent’s moves.",
+   "pokemon": [
+    "Prayblade",
+    "Veerulent",
+    "Laborant",
+    "Soldiant",
+    "Veerulent (Stable Form)"
+   ]
+  },
+  {
+   "name": "Ice Body",
+   "description": "While it is snowing or hailing, this Pokémon heals for an amount of HP equal to its proficiency modifier at the end of each of its turns.",
+   "pokemon": [
+    "Frizard",
+    "Savagice",
+    "Frosticle",
+    "Glacicle"
+   ]
+  },
+  {
+   "name": "Illuminate",
+   "description": "This Pokémon knows the Daylight move and can cast a light that exudes bright light for 15ft, and dim light for an additional 15ft, at will.",
+   "pokemon": [
+    "Aurette"
+   ]
+  },
+  {
+   "name": "Illusion",
+   "description": "This Pokémon can take the visual form of any Pokémon it can see. It can do this a number of times per long rest equal to its level. This illusion lasts for one hour or until the Pokémon is hit by a damaging move.",
+   "pokemon": [
+    "Vamprat",
+    "Vladacabra",
+    "Prankis",
+    "Trixen"
+   ]
+  },
+  {
+   "name": "Immunity",
+   "description": "This Pokémon is immune to becoming poisoned.",
+   "pokemon": [
+    "Sandem"
+   ]
+  },
+  {
+   "name": "Imperial Authority",
+   "description": "This Pokémon has advantage on intimidation and persuation checks, and may use an action to automatically frighten enemies that can see it for 1d4 rounds. Additionally, three times per long rest, this Pokémon may use its bonus action to override the ability of another Pokémon it can see.",
+   "pokemon": [
+    "Praetorvus"
+   ]
+  },
+  {
+   "name": "Imperion's Honor",
+   "description": "This Pokémon can be wielded as a +3 greatsword, dealing 3d6 + STR steel type damage. While equipped, grants the wielder proficiency in longswords if they don't already have it. When wielded, grants +3 AC, and allows the user to channel the Pokémon's moves as a bonus action, using the Pokémon's ability scores. Additionally, the wielder gains immunity to ghost type damage. It can also manifest a spectral cape behind its wielder, granting it advantage on intimidation rolls. If separated from its chosen wielder, will teleport back to them as a bonus action. While bonded, trainer and Pokémon can communicate telepathically within 240 feet. If the trainer is knocked unconscious, this Pokémon automatically detaches and fights to protect them.",
+   "pokemon": [
+    "Aegislash"
+   ]
+  },
+  {
+   "name": "Imposter",
+   "description": "This Pokémon can use Transform as a bonus action.",
+   "pokemon": [
+    "Ditto"
+   ]
+  },
+  {
+   "name": "Incorporeal Body",
+   "description": "This Pokémon may move through solid walls. Walls are considered difficult terrain. While inside a wall, this Pokémon may still be targeted by moves, taking half damage. Entering a wall costs 5VP, and an additional 5VP at the start of every turn while inside the wall.",
+   "pokemon": [
+    "Custospirit",
+    "Protecter",
+    "Wecter",
+    "Spectrout",
+    "Horrish"
+   ]
+  },
+  {
+   "name": "Infiltrator",
+   "description": "This Pokémon bypasses Light Screen and Reflect, and its attacks ignore resistance when targeting sleeping or frightened foes.",
+   "pokemon": [
+    "Spectro",
+    "Ceano",
+    "Pitios",
+    "Maroz",
+    "Vena",
+    "Asfire",
+    "Aspyre",
+    "Torchick",
+    "Combusken",
+    "Blaziken"
+   ]
+  },
+  {
+   "name": "Innards Out",
+   "description": "When this Pokémon is knocked out by a damaging move, the attacker takes an amount of typeless damage equal to the amount of HP lost.",
+   "pokemon": [
+    "Croager",
+    "Laborant",
+    "Soldiant"
+   ]
+  },
+  {
+   "name": "Inner Focus",
+   "description": "This Pokémon is immune to flinching.",
+   "pokemon": [
+    "Grypple",
+    "Krestler",
+    "Solatrice",
+    "Lunatrice",
+    "Tecturrow",
+    "Minerox"
+   ]
+  },
+  {
+   "name": "Insomnia",
+   "description": "This Pokémon is immune to sleep.",
+   "pokemon": [
+    "Sandem"
+   ]
+  },
+  {
+   "name": "Intimidate",
+   "description": "Once per short rest, you can impose disadvantage on an enemy attack roll of your choice.",
+   "pokemon": [
+    "Venomire",
+    "Venolisk",
+    "Gyarados",
+    "Poochyena",
+    "Mightyena",
+    "Destrix",
+    "Noirow",
+    "Veraptini",
+    "Velociroar",
+    "Scarpea",
+    "Cruscarex",
+    "Aurus",
+    "Aroarus",
+    "Hugleef"
+   ]
+  },
+  {
+   "name": "Iron Barbs",
+   "description": "When this Pokémon is hit by a melee attack, it may roll a d4. On a 4, deal an amount of damage equal to its proficiency modifier to its attacker.",
+   "pokemon": [
+    "Moltling",
+    "Scorab",
+    "Igniscairn",
+    "Laborant",
+    "Soldiant",
+    "Thornug",
+    "Thohorn"
+   ]
+  },
+  {
+   "name": "Iron Fist",
+   "description": "When attacking with a punch-based move (Mega Punch, Dynamic Punch, Ice/Fire/Thunder Punch, etc.), this Pokémon may roll the damage twice and choose either total.",
+   "pokemon": [
+    "Fisto"
+   ]
+  },
+  {
+   "name": "Justified",
+   "description": "When this Pokémon is hit by a dark-type move, it gets advantage on its next attack.",
+   "pokemon": [
+    "Fisto",
+    "Serony",
+    "Surgasus",
+    "Solatrice",
+    "Charmander",
+    "Charmeleon"
+   ]
+  },
+  {
+   "name": "Keen Eye",
+   "description": "This Pokémon ignores disadvantage when it relates to sight.",
+   "pokemon": [
+    "Wormole",
+    "Jormungandr",
+    "Clucky",
+    "Asfire",
+    "Aspyre",
+    "Skarling",
+    "Skarmory",
+    "Corscout"
+   ]
+  },
+  {
+   "name": "Klutz",
+   "description": "This Pokémon cannot hold an item.",
+   "pokemon": [
+    "Chicklet"
+   ]
+  },
+  {
+   "name": "Leaf Guard",
+   "description": "This Pokémon does not suffer from any negative status ailments in harsh sunlight.",
+   "pokemon": [
+    "Snarepent"
+   ]
+  },
+  {
+   "name": "Legion's Honor",
+   "description": "This Pokémon can be wielded as a +1 short sword, dealing 1d6 + STR/DEX steel type damage. While equipped, grants the wielder proficiency in shortswords if they don't already have it. When wielded, grants +1 AC, and allows the user to channel the Pokémon's moves as a bonus action, using the Pokémon's ability scores. If separated from its chosen wielder, will teleport back to them as a bonus action. While bonded, trainer and Pokémon can communicate telepathically within 60 feet. If the trainer is knocked unconscious, this Pokémon automatically detaches and fights to protect them.",
+   "pokemon": [
+    "Honedge"
+   ]
+  },
+  {
+   "name": "Levitate",
+   "description": "This Pokémon is immune to ground moves.",
+   "pokemon": [
+    "Veerum",
+    "Custospirit",
+    "Protecter",
+    "Wecter"
+   ]
+  },
+  {
+   "name": "Light Armor",
+   "description": "This Pokémon takes 25% reduced damage from super effective moves, rounded down.",
+   "pokemon": [
+    "Destrix",
+    "Corscout",
+    "Centurvus",
+    "Praetorvus"
+   ]
+  },
+  {
+   "name": "Lightning Rod",
+   "description": "If this Pokemon or an ally within 30 feet is targeted with a direct electric-type, damage-dealing move, the Pokemon may use a reaction to redirect the target to itself and take half damage from it if it hits.",
+   "pokemon": [
+    "Pikachu",
+    "Raichu",
+    "Granito",
+    "Ohmen"
+   ]
+  },
+  {
+   "name": "Limber",
+   "description": "This Pokémon is immune to being paralyzed.",
+   "pokemon": [
+    "Meowser",
+    "Preowlith"
+   ]
+  },
+  {
+   "name": "Liquid Ooze",
+   "description": "If an enemy uses a leeching or absorb move against this Pokémon, the Pokémon must make a DC 12 CON save or become poisoned.",
+   "pokemon": [
+    "Platypara",
+    "Platypulse"
+   ]
+  },
+  {
+   "name": "Liquid Voice",
+   "description": "Any sound-based move activated by this Pokémon is watertype.",
+   "pokemon": [
+    "Cherpish",
+    "Scalareph",
+    "Beluhe",
+    "Whail",
+    "Whailossus"
+   ]
+  },
+  {
+   "name": "Living Wall",
+   "description": "This Pokémon may spend a day to take root in a solid surface. While rooted, the following effects take hold: This Pokémon's speed becomes 0, it can't be recalled into a Pokéball, and it automatically fails DEX saving throws. It gains HP depending on the type of surface (DMs discretion), and has advantage on STR and CON saving throws. While rooted, Mossling may merge with this Pokémon to cause it to grow larger. For every size it grows to above Large, it deals an additional 2d8 damage when using moves. It can spend another day to uproot itself.",
+   "pokemon": [
+    "Mossaic"
+   ]
+  },
+  {
+   "name": "Long Reach",
+   "description": "This Pokémon has an additional 5 feet of reach with all melee attacks and Attacks of Opportunity",
+   "pokemon": [
+    "Grypple",
+    "Krestler",
+    "Dumplood",
+    "Ponster",
+    "Bulbasaur",
+    "Ivysaur",
+    "Venusaur",
+    "Tangela (Stalker Form)",
+    "Tangrowth"
+   ]
+  },
+  {
+   "name": "Magic Bounce",
+   "description": "Once per long rest, when succumbing to a negative status effect, this Pokémon can instead reflect the effect back on the attacker.",
+   "pokemon": [
+    "Hatenna",
+    "Hattrem",
+    "Hatterene",
+    "Harbeak",
+    "Storican"
+   ]
+  },
+  {
+   "name": "Magic Guard",
+   "description": "If this Pokémon is subjected to a move that forces it to make a saving throw to take only half damage, it instead takes no damage on a success.",
+   "pokemon": [
+    "Glovish",
+    "Globyss",
+    "Glowiathan",
+    "Veraptini",
+    "Velociroar",
+    "Leefdot",
+    "Bigleef",
+    "Hugleef",
+    "Starcub",
+    "Stellursa"
+   ]
+  },
+  {
+   "name": "Magician",
+   "description": "If not already holding an item, this Pokémon steals the held item of any Pokémon it hits with a melee attack.",
+   "pokemon": [
+    "Datagus",
+    "Compizard",
+    "Didoss"
+   ]
+  },
+  {
+   "name": "Magma Armor",
+   "description": "This Pokémon is immune to freezing.",
+   "pokemon": [
+    "Charachnid",
+    "Lavachnid",
+    "Heatike",
+    "Flintle",
+    "Flaretortle",
+    "Eruptoise"
+   ]
+  },
+  {
+   "name": "Magnet Pull",
+   "description": "Steel opponents in battle with this Pokémon may not switch out or flee. This Pokémon's electric attacks deal bonus damage equal to its proficiency bonus to steel-type targets.",
+   "pokemon": [
+    "Volto",
+    "Ferrem"
+   ]
+  },
+  {
+   "name": "Magnetic Polarity",
+   "description": "When hit by an electric-type move, roll a d4. On a 1, this Pokémon takes damage as usual. On 2-3, the damage is split between HP and VP. On a 4, damage taken is added to this Pokémon's next damaging move as bonus electric damage.",
+   "pokemon": [
+    "Ferrarg",
+    "Stellavorii",
+    "Stellarchon"
+   ]
+  },
+  {
+   "name": "Maritime Prowler",
+   "description": "Water and dark type moves made by this Pokémon cause flinching on natural attack rolls of 18 or more.",
+   "pokemon": [
+    "Mergato"
+   ]
+  },
+  {
+   "name": "Marvel Scale",
+   "description": "This Pokémon's AC increase by 2 when suffering from a negative status condition.",
+   "pokemon": [
+    "Stakerel",
+    "Osphrone",
+    "Osphronent"
+   ]
+  },
+  {
+   "name": "Mega Launcher",
+   "description": "Aura and Pulse moves made by this Pokémon deal additional damage equal to this Pokémon's proficiency bonus.",
+   "pokemon": [
+    "Kroraleef",
+    "Krabemone"
+   ]
+  },
+  {
+   "name": "Merciless",
+   "description": "This Pokémon doubles their damage dice when dealing damage to an opponent that is poisoned.",
+   "pokemon": [
+    "Vespair",
+    "Umbro",
+    "Osphrone",
+    "Osphronent",
+    "Clucky",
+    "Totodile",
+    "Croconaw",
+    "Feraligatr"
+   ]
+  },
+  {
+   "name": "Mercury's Blessing",
+   "description": "This pokémon may use the move Thief as a bonus action.",
+   "pokemon": [
+    "Denarius",
+    "Aureus",
+    "Krassemoth"
+   ]
+  },
+  {
+   "name": "Mimic",
+   "description": "This Pokémon may assume the form of any object it has seen. Any creature that attempts to interact with this Pokémon will be ambushed.",
+   "pokemon": [
+    "Ditto",
+    "Redoute",
+    "Fantome",
+    "Ananansi"
+   ]
+  },
+  {
+   "name": "Mineral Refinery",
+   "description": "Once per long rest, you may spend 50 VP in order to attempt to craft an evolution stone, proper materials are needed as well. 1: Dawn Stone 2: Dusk Stone 3: Fire Stone 4: Ice Stone 5: Leaf Stone 6: Moon Stone 7: Shiny Stone 8: Sun Stone 9: Thunder Stone 10: Water Stone 11: Dawn Stone 12: Dusk Stone 13: Fire Stone 14: Ice Stone 15: Leaf Stone 16: Moon Stone 17: Shiny Stone 18: Sun Stone 19: Thunder Stone 20: Water Stone",
+   "pokemon": [
+    "Diverigem",
+    "Heatike",
+    "Heataze",
+    "Blazion"
+   ]
+  },
+  {
+   "name": "Minus",
+   "description": "This Pokémon boosts its attack and damage rolls by 2 if an ally also has a Plus or Minus ability",
+   "pokemon": [
+    "Triceros",
+    "Rhinaurus",
+    "Sparcupine",
+    "Erethizic"
+   ]
+  },
+  {
+   "name": "Mischief Maker",
+   "description": "Each new round of initiative, this Pokémon may take its turn whenever it wants.",
+   "pokemon": [
+    "Prankis",
+    "Trixen"
+   ]
+  },
+  {
+   "name": "Mold Breaker",
+   "description": "This Pokémon's moves ignore any abilities or moves that would lessen their effect or ability to hit an opponent (Due to things like Water Absorb, Snow Cloak, Thick Fat, etc.)",
+   "pokemon": [
+    "Prayblade",
+    "Gabyz",
+    "Gabyztare",
+    "Reagle",
+    "Argonael"
+   ]
+  },
+  {
+   "name": "Molten Armor",
+   "description": "When exposed to extreme heat, as in being hit with a fire-type attack or being sprayed by lava, this Pokémon's exterior becomes superheated for 1 round. While superheated, all melee attacks deal 1d6 + proficiency bonus as additional fire damage. The damage for this effect increases with 1d6 at every odd numbered level above 10.",
+   "pokemon": [
+    "Onix",
+    "Granix",
+    "Steelix"
+   ]
+  },
+  {
+   "name": "Moody",
+   "description": "At the end of each long rest, this Pokémon rerolls on the nature table, replacing its nature with the result until the next long rest.",
+   "pokemon": [
+    "Grell",
+    "Groll",
+    "Heimskroll",
+    "Charizard",
+    "Pollish",
+    "Wandrish"
+   ]
+  },
+  {
+   "name": "Motor Drive",
+   "description": "When hit by an electric-type move, if not immune, this Pokémon's speed increases by 10 feet until the end of combat (up to a max of 50 additional feet).",
+   "pokemon": [
+    "Circuitail",
+    "Amplifuzz",
+    "Flarelex",
+    "Mekko"
+   ]
+  },
+  {
+   "name": "Moxie",
+   "description": "Upon causing an opponent to faint, this Pokémon may immediately take another action.",
+   "pokemon": [
+    "Gyarados",
+    "Poochyena",
+    "Mightyena",
+    "Veerulent",
+    "Nemeon"
+   ]
+  },
+  {
+   "name": "Multiple Heads",
+   "description": "This Pokémon's many heads are specialized to different move types. At the start of this Pokémon's turn, it chooses an active head, and gains its type as a secondary type for the next round. If one head takes more than 25 damage a single turn, it dies. At the end of this Pokémon's next turn, it may roll a 1d6 for every head it has lost as a bonus action, regrowing one lost head on a 5, or two heads on a 6.",
+   "pokemon": [
+    "Plurorm",
+    "Plurydra",
+    "Plurofera"
+   ]
+  },
+  {
+   "name": "Multiscale",
+   "description": "If this Pokémon is at full health, the first damage dealt to it is halved.",
+   "pokemon": [
+    "Glovish",
+    "Globyss",
+    "Glowiathan",
+    "Gildrake",
+    "Plundrake",
+    "Treasuroth",
+    "Silvaroth",
+    "Reginant",
+    "Reagle",
+    "Argonael"
+   ]
+  },
+  {
+   "name": "Multitype",
+   "description": "This Pokémon's type and form change to match the type of Elemental Plate this Pokémon holds. The Plate cannot be effected by any item-removing ability or move.",
+   "pokemon": [
+    "Carvechno",
+    "Technedo"
+   ]
+  },
+  {
+   "name": "Mummy",
+   "description": "When this Pokémon is hit by a melee attack, one random ability of its attacker changes to Mummy until the remainder of the encounter.",
+   "pokemon": [
+    "Hadean",
+    "Styxxil"
+   ]
+  },
+  {
+   "name": "Mystical Presence",
+   "description": "This Pokémon may use its Charisma modifier instead of the regular modifier for all saving throws.",
+   "pokemon": [
+    "Fluffire",
+    "Pyronimbus",
+    "Prankis",
+    "Trixen",
+    "Sylvix",
+    "Verdiane",
+    "Sylvestra",
+    "Luminarch"
+   ]
+  },
+  {
+   "name": "Natural Cure",
+   "description": "This Pokémon is cured of negative status ailments upon returning to its Pokeball.",
+   "pokemon": [
+    "Hydro"
+   ]
+  },
+  {
+   "name": "Negating Cone",
+   "description": "The beholder's central eye creates an area of energy nullification, in a 150-foot cone. As a bonus action, the beholder decides which way the cone faces and whether the cone is active. All moves that are not normal type are negated within the affected area. The beholder's moves are not affected by this.",
+   "pokemon": [
+    "Gabyz",
+    "Gabyztare"
+   ]
+  },
+  {
+   "name": "Neuroforce",
+   "description": "When this Pokémon damages a creature with a super effective move, it may roll the damage dice twice and use the higher result.",
+   "pokemon": [
+    "Platypara",
+    "Platypulse"
+   ]
+  },
+  {
+   "name": "Night Watch",
+   "description": "During the night or in darkness, this Pokémon's lantern creates a 15ft radius of dim light around it. This light grants this Pokémon +1/3 AC and +7 to STR and DEX saving throws. Within the range of its lantern, immunity to ghost type damage is negated.",
+   "pokemon": [
+    "Knighturn"
+   ]
+  },
+  {
+   "name": "No Guard",
+   "description": "Any attack made by or against this Pokémon has advantage.",
+   "pokemon": [
+    "Promush",
+    "Underoath",
+    "Werewool",
+    "Osphrone",
+    "Osphronent"
+   ]
+  },
+  {
+   "name": "Noble Presence",
+   "description": "At the beginning of each turn during initiative, this Pokémon can grant advantage on one roll to an ally within 60ft.",
+   "pokemon": [
+    "Noblier"
+   ]
+  },
+  {
+   "name": "Normalize",
+   "description": "Every move this Pokémon activates is Normal type.",
+   "pokemon": [
+    "Gulorine",
+    "Felverine"
+   ]
+  },
+  {
+   "name": "Oblivious",
+   "description": "This Pokémon is immune to moves that attempt to charm or taunt it.",
+   "pokemon": [
+    "Pebbling"
+   ]
+  },
+  {
+   "name": "Ossein Hunter",
+   "description": "This Pokémon can feed on a creature's remains as a bonus action, gaining 1d10 + its Wisdom modifier as temporary HP. This temporary HP lasts until the end of its next long rest. It can feed on a single target's remains one time + one more per size level above tiny. This effect caps out when the pool of temporary HP is equal to 50% of its max HP.",
+   "pokemon": [
+    "Vultear",
+    "Gyptor",
+    "Barbature"
+   ]
+  },
+  {
+   "name": "Overcoat",
+   "description": "This Pokémon does not take damage from weather-related moves like Hail, Weather Ball, etc.",
+   "pokemon": [
+    "Crystamel",
+    "Quamel"
+   ]
+  },
+  {
+   "name": "Overgrow",
+   "description": "When this Pokémon falls below 25% of its maximum HP, add 50% more dice to damage rolls for its grass-type moves, and damaging water moves cost 50% more VP.",
+   "pokemon": [
+    "Octodendron",
+    "Octuber",
+    "Yukinarbor",
+    "Loreleaf",
+    "Foliarch",
+    "Bulbasaur",
+    "Ivysaur"
+   ]
+  },
+  {
+   "name": "Own Tempo",
+   "description": "This Pokémon is immune to becoming confused",
+   "pokemon": [
+    "Lotad",
+    "Lombre",
+    "Ludicolo"
+   ]
+  },
+  {
+   "name": "Pack Tactics",
+   "description": "This Pokémon has advantage on attack rolls against a target if an ally is within 5ft. of it.",
+   "pokemon": [
+    "Evaptor",
+    "Growlithe",
+    "Arcanine",
+    "Growlarc",
+    "Sparcanine"
+   ]
+  },
+  {
+   "name": "Paper Thin",
+   "description": "This Pokémon is vulnerable to fire damage, and critical hit against this Pokémon always deals max damage.",
+   "pokemon": [
+    "Scrollix",
+    "Codex"
+   ]
+  },
+  {
+   "name": "Peace Aura",
+   "description": "At the beginning of each turn, hostile creatures within 30ft. must succeed a Wisdom saving throw or have disadvantage on attack rolls until the start of their next turn.",
+   "pokemon": [
+    "Faeling",
+    "Drairy"
+   ]
+  },
+  {
+   "name": "Perfect Memory",
+   "description": "After witnessing a creature use an action, bonus action, or reaction, this Pokémon can use its reaction to record that ability. It can record three abilities per long rest, and will lose all recorded abilities if it loses consciousness. The process of healing at a PokéCenter will also wipe these records.",
+   "pokemon": [
+    "Scrollix",
+    "Codex"
+   ]
+  },
+  {
+   "name": "Phantom Body",
+   "description": "Once per short rest, when this pokemon would be reduced to 0 HP, it instead becomes incorporeal until the start of its next turn. While incorporeal, it can't attack and is immune to physical damage. It reappears with HP equal to its level, in an unstable form, and can't be safely held in a Poké Ball until it has finished a long rest.",
+   "pokemon": [
+    "Spectro"
+   ]
+  },
+  {
+   "name": "Pickpocket",
+   "description": "As a bonus action, this Pokémon can make a DEX check contested by the opponent’s WIS to attempt to steal a held item. After the first attempt, all other attempts against the same opponent are rolled at disadvantage.",
+   "pokemon": [
+    "Sandit",
+    "Snift",
+    "Bedouwara"
+   ]
+  },
+  {
+   "name": "Pickup",
+   "description": "If an opponent uses a consumable held item in battle, this Pokémon gains a copy of it if it is not currently holding an item.",
+   "pokemon": [
+    "Gulorine",
+    "Felverine"
+   ]
+  },
+  {
+   "name": "Pixilate",
+   "description": "All of this Pokémon's normal-type moves become fairy-type.",
+   "pokemon": [
+    "Lumo"
+   ]
+  },
+  {
+   "name": "Plus",
+   "description": "This Pokémon boosts its attack and damage rolls by 2 if an ally also has a Plus or Minus ability",
+   "pokemon": [
+    "Pikachu",
+    "Raichu",
+    "Hagechu",
+    "Serony",
+    "Surgasus",
+    "Sparcupine",
+    "Erethizic"
+   ]
+  },
+  {
+   "name": "Poison Heal",
+   "description": "If this Pokémon is poisoned, the amount of damage dealt by the poison heals the Pokémon instead.",
+   "pokemon": [
+    "Plankril",
+    "Shkril"
+   ]
+  },
+  {
+   "name": "Poison Point",
+   "description": "When this Pokémon is hit with a melee attack, roll a 1d4. On a result of 4, the attacker takes an amount of poison damage equal to this Pokémon’s proficiency modifier.",
+   "pokemon": [
+    "Larvasp",
+    "Vespair",
+    "Venomire",
+    "Venolisk",
+    "Loreleaf",
+    "Foliarch"
+   ]
+  },
+  {
+   "name": "Poison Touch",
+   "description": "On melee attacks made by this Pokémon, roll a d10 on a hit. On a result of a 10, the target is poisoned.",
+   "pokemon": [
+    "Toxchick",
+    "Toxiclaw",
+    "Toxeak",
+    "Mushusk"
+   ]
+  },
+  {
+   "name": "Pollinator",
+   "description": "This Pokémon can detect flowering plants within 30 feet. Has advantage on Survival checks to find plants and water sources.",
+   "pokemon": [
+    "Nectini",
+    "Dustwig"
+   ]
+  },
+  {
+   "name": "Potential",
+   "description": "Once per day, this Pokémon may change its secondary type by spending a short rest absorbing energy from a type gem.",
+   "pokemon": [
+    "Dragem",
+    "Zoragon"
+   ]
+  },
+  {
+   "name": "Powder Master",
+   "description": "Powder moves made by this Pokémon increase their saving throw DC by the user's level.",
+   "pokemon": [
+    "Silkonat",
+    "Silkomoth",
+    "Weavoth"
+   ]
+  },
+  {
+   "name": "Power Surge",
+   "description": "This Pokémon takes no damage from electricity or electric-type attacks. Instead, immediately after taking a hit from a electric-type move, or in an electric current, double the STAB bonus on the next electric type move.",
+   "pokemon": [
+    "Growlarc",
+    "Sparcanine"
+   ]
+  },
+  {
+   "name": "Praetorian Guard",
+   "description": "This Pokémon may take hits for allies that are within its range of movement. If an ally in range is targeted by an attack, this Pokémon may spend unspent movement to move next to its ally out of turn without provoking attacks of opportunity. The attack against the ally will be rolled against this Pokémon's AC instead of the intended target.",
+   "pokemon": [
+    "Praetorvus"
+   ]
+  },
+  {
+   "name": "Prankster",
+   "description": "Once per short rest, this Pokémon can move to the top of initiative order in a single round, but must use a statusaffecting move on its turn.",
+   "pokemon": [
+    "Broosbuck",
+    "Rifractal",
+    "Sheenat"
+   ]
+  },
+  {
+   "name": "Predator",
+   "description": "During a long rest, this Pokémon may assign a creature it knows about as Prey. Double proficiency bonus is added to attack rolls, and damage rolls are done with advantage against Prey creatures.",
+   "pokemon": [
+    "Growlithe",
+    "Arcanine",
+    "Growlarc",
+    "Sparcanine"
+   ]
+  },
+  {
+   "name": "Pressure",
+   "description": "Any move targeting this Pokémon directly (non-area of effect moves) reduces its VP by double when activated.",
+   "pokemon": [
+    "Blizzgarr",
+    "Seraphlyte",
+    "Razard",
+    "Groudon",
+    "Kyogre",
+    "Rayquaza",
+    "Magmoar",
+    "Ferrarg",
+    "Kraqua",
+    "Feyer",
+    "Monstearth",
+    "Bolking",
+    "Quetzalair",
+    "Quetzatlas",
+    "Heliosol",
+    "Horusol",
+    "Nemeon",
+    "Equilibra",
+    "Jiehtanas"
+   ]
+  },
+  {
+   "name": "Prey Stalker",
+   "description": "This Pokémon has advantage on attack rolls against all creatures that are one or more levels smaller than itself, and rolls damage against these creatures twice, taking the higher result.",
+   "pokemon": [
+    "Meowser",
+    "Preowlith",
+    "Mergato"
+   ]
+  },
+  {
+   "name": "Primordial Shift",
+   "description": "At the beginning of every round of combat, you may draw on ancient power to change your type to that of either psychic, dark, water, ground or dragon.",
+   "pokemon": [
+    "Equilibra"
+   ]
+  },
+  {
+   "name": "Prism Armor",
+   "description": "When this Pokémon is subject to damage in its vulnerabilities list, roll the damage dice twice and use the lower result for the damage calculation.",
+   "pokemon": [
+    "Razard",
+    "Shimmeral",
+    "Dansaic",
+    "Brillore",
+    "Plankril",
+    "Shkril"
+   ]
+  },
+  {
+   "name": "Proper Form",
+   "description": "When attacked, this Pokémon can impose disadvantage on an attack roll, correcting the attacker's \"improper form\".",
+   "pokemon": [
+    "Kortier"
+   ]
+  },
+  {
+   "name": "Protean",
+   "description": "This Pokémon's primary type changes to the type of move it uses, just before the move is used. It takes on the new type's resistances, vulnerabilities, and immunities.",
+   "pokemon": [
+    "Snarepent",
+    "Gabyz",
+    "Gabyztare",
+    "Nemeon",
+    "Pluraling",
+    "Dragem",
+    "Zoragon",
+    "Moldite"
+   ]
+  },
+  {
+   "name": "Protector",
+   "description": "If an allied creature in a lower stage of the same family as this Pokémon is in danger, this Pokémon gains +5 to its attack rolls and adds its proficiency bonus to all damage dealt (once per move).",
+   "pokemon": [
+    "Terrilla",
+    "Aroarus"
+   ]
+  },
+  {
+   "name": "Psychic Barrier",
+   "description": "At the start of each turn, this Pokémon gains temporary HP equal to its INT modifier + proficiency bonus. This stacks up to a maximum equal to 2x its level.",
+   "pokemon": [
+    "Psycho"
+   ]
+  },
+  {
+   "name": "Psychic Boost",
+   "description": "This Pokémon treats using psychic type moves as if it had the psychic type.",
+   "pokemon": [
+    "Storican"
+   ]
+  },
+  {
+   "name": "Pure Power",
+   "description": "Once per short rest, this Pokémon may double the damage it does on a single move that requires an attack roll. The player must announce that they are using this ability before the attack roll.",
+   "pokemon": [
+    "Ailorance",
+    "Fulgironce",
+    "Fricub",
+    "Ursnow",
+    "Glaciear"
+   ]
+  },
+  {
+   "name": "Pure Waters",
+   "description": "Damaging water moves used by other creatures within 50ft of this Pokémon have their secondary effects removed, but deal 20% more damage, rounded down.",
+   "pokemon": [
+    "Purifax"
+   ]
+  },
+  {
+   "name": "Queen Majesty",
+   "description": "Bonus action moves activated by any creature within sight of this Pokémon become standard actions.",
+   "pokemon": [
+    "Reginant"
+   ]
+  },
+  {
+   "name": "Quick Feet",
+   "description": "When suffering from a negative status condition, this Pokémon’s speed increases by 15 ft.",
+   "pokemon": [
+    "Gaupus",
+    "Vargpus",
+    "Vaultile",
+    "Vaultargo",
+    "Tecturrow",
+    "Minerox",
+    "Merchent",
+    "Hoppit"
+   ]
+  },
+  {
+   "name": "Radiant Being",
+   "description": "This Pokémon provides light in a 20ft. radius, adjustable as a bonus action. Additionally, it can absorb light sources within 30ft. as a bonus action, gaining 1d12 temporary HP, but having disadvantage on stealth checks until the temporary HP is gone.",
+   "pokemon": [
+    "Aurette"
+   ]
+  },
+  {
+   "name": "Rain Dish",
+   "description": "In rainy conditions, this Pokémon heals for an amount of HP equal to its proficiency bonus at the end of each of its turns.",
+   "pokemon": [
+    "Lotad",
+    "Lombre",
+    "Ludicolo",
+    "Squirtle",
+    "Wartortle",
+    "Blastoise"
+   ]
+  },
+  {
+   "name": "Ram",
+   "description": "If this Pokémon has charges for at least 15ft. going into a melee attack, it has advantage on the attack and damage rolls.",
+   "pokemon": [
+    "Mountelder"
+   ]
+  },
+  {
+   "name": "Rattled",
+   "description": "When this Pokémon is hit by a damaging Dark, Bug, or Ghost move, it makes its next attack at advantage.",
+   "pokemon": [
+    "Magikarp",
+    "Psycho"
+   ]
+  },
+  {
+   "name": "Reality Ripper",
+   "description": "This Pokémon's slashing attacks ignore resistances and immunities and can hit creatures in the Ethereal Plane.",
+   "pokemon": [
+    "Scyther",
+    "Razcor"
+   ]
+  },
+  {
+   "name": "Reality Weaver",
+   "description": "When Jirachi's third eye is open, it can manipulate probability in a 60-foot radius. As a reaction, it can force a reroll on any d20 roll made within this area.",
+   "pokemon": [
+    "Jirachi"
+   ]
+  },
+  {
+   "name": "Reckless",
+   "description": "When attacking with moves with recoil damage, this Pokémon doubles its STAB bonus.",
+   "pokemon": [
+    "Ailorance",
+    "Fulgironce"
+   ]
+  },
+  {
+   "name": "Refrigerate",
+   "description": "All of this Pokémon's normal-type moves become ice-type. Additionally, ice-type moves freeze water surfaces and create difficult terrain in a 10ft radius around the target.",
+   "pokemon": [
+    "Subsiro"
+   ]
+  },
+  {
+   "name": "Regenerator",
+   "description": "Once per long rest, this Pokémon regains hit points equal to its level when it returns to its Pokéball.",
+   "pokemon": [
+    "Foongus",
+    "Amoonguss",
+    "Pixee",
+    "Wispee",
+    "Veerum",
+    "Hydling"
+   ]
+  },
+  {
+   "name": "Reinforced Form",
+   "description": "This Pokémon has Resistance to Normal and Steel-type damage, and gains a +2 AC bonus when defending a location it has maintained for at least one day Immunity to being moved against its will while standing on ground it has cleaned.",
+   "pokemon": [
+    "Squeagle"
+   ]
+  },
+  {
+   "name": "Revealing Light",
+   "description": "As an action, this Pokémon can emit light in a 60 ft radius that dispels illusions and reveals invisible creatures by succeeding a Charisma check (GM discretion).",
+   "pokemon": [
+    "Feyer",
+    "Lanfae",
+    "Lumifae"
+   ]
+  },
+  {
+   "name": "Rivalry",
+   "description": "This Pokémon adds its proficiency bonus to damage when attacking a Pokémon of the same type.",
+   "pokemon": [
+    "Prayblade",
+    "Mounteer",
+    "Mounteen"
+   ]
+  },
+  {
+   "name": "RKS System",
+   "description": "This Pokémon's type is determined by the memory disc it holds.",
+   "pokemon": [
+    "Mekko"
+   ]
+  },
+  {
+   "name": "Rock Head",
+   "description": "This Pokémon takes no recoil damage.",
+   "pokemon": [
+    "Elkrince",
+    "Elking",
+    "Granito",
+    "Mounteer",
+    "Mounteen",
+    "Mountelder"
+   ]
+  },
+  {
+   "name": "Rough Skin",
+   "description": "When this Pokémon is hit by a melee attack, it may roll a d4. On a 4, deal an amount of damage equal to its proficiency modifier to its attacker.",
+   "pokemon": [
+    "Angish",
+    "Agonish",
+    "Stakerel",
+    "Shredator",
+    "Armles",
+    "Armful",
+    "Pelagos",
+    "Archilagos",
+    "Pelarchilagos",
+    "Carvechno",
+    "Technedo"
+   ]
+  },
+  {
+   "name": "Royal Decree",
+   "description": "Once per long rest, this Pokémon can issue a command that creatures within 30 ft must obey unless they succeed on a WIS save.",
+   "pokemon": [
+    "Noblier"
+   ]
+  },
+  {
+   "name": "Run Away",
+   "description": "This Pokémon cannot be the target of an attack of opportunity.",
+   "pokemon": [
+    "Redent",
+    "Sargent",
+    "Caterpie",
+    "Metapod",
+    "Butterfree",
+    "Swarmy",
+    "Ordus",
+    "Equitrix",
+    "Hoppit"
+   ]
+  },
+  {
+   "name": "Saline Syntesis",
+   "description": "While in water, or during rainfall, this Pokémon is resistant to all damage types it is not naturally weak to, and takes no additional damage from types it is weak to. If submerged in salt water, this Pokemon regenerates 1/16 HP every turn.",
+   "pokemon": [
+    "Nacleaf",
+    "Crystalga"
+   ]
+  },
+  {
+   "name": "Salvager",
+   "description": "Once per long rest, this Pokémon can make a survival check to spend a minute to attempt temporarily increase AC between 1 and 3 points, based on available materials in the environment. This AC increase lasts until it takes a hit.",
+   "pokemon": [
+    "Scrabshell",
+    "Reclaimant",
+    "Purifax"
+   ]
+  },
+  {
+   "name": "Sand Force",
+   "description": "During a Sandstorm, this Pokémon can double its STAB when it hits an opponent.",
+   "pokemon": [
+    "Silico",
+    "Barron",
+    "Wryggle",
+    "Slythir",
+    "Vyphyss"
+   ]
+  },
+  {
+   "name": "Sand Rush",
+   "description": "This Pokémon is immune to Sandstorm damage, and its speed is doubled in desert terrain, or during a Sandstorm.",
+   "pokemon": [
+    "Sandit",
+    "Snift",
+    "Bedouwara",
+    "Oasand",
+    "Oasylph",
+    "Wryggle",
+    "Slythir",
+    "Vyphyss",
+    "Evaptor"
+   ]
+  },
+  {
+   "name": "Sand Stream",
+   "description": "When this Pokémon enters an outside battle, the weather immediately changes to a Sandstorm for 5 rounds. In the case of another Pokémon with a similar weather ability, the tie goes to the Pokémon with the highest DEX score.",
+   "pokemon": [
+    "Barron"
+   ]
+  },
+  {
+   "name": "Sand Veil",
+   "description": "This Pokémon is immune to Sandstorm damage. In addition, its AC increases by 2 in desert terrain, or during a Sandstorm.",
+   "pokemon": [
+    "Sandygast",
+    "Palossand",
+    "Silico",
+    "Terratops",
+    "Terrarex",
+    "Terradon",
+    "Dustwig"
+   ]
+  },
+  {
+   "name": "Sap Sipper",
+   "description": "This Pokémon takes no damage from grass-type attacks. If hit by a grass type move, it takes no damage and instead absorbs the energy, granting advantage on its next attack.",
+   "pokemon": [
+    "Croager"
+   ]
+  },
+  {
+   "name": "Schooling",
+   "description": "Beginning at level 5, this Pokémon may change to School Form as a free action when it begins its turn above 25% of its maximum health. In School Form, the Pokémon adds 5 to its AC and Strength, Dexterity, and Constitution ability scores (Additional CON does not alter this Pokemon's HP in this form). The Pokémon reverts back to Solo Form when it falls below 25% of maximum health, and must complete a short rest before activating this ability again.",
+   "pokemon": [
+    "Stakerel",
+    "Shredator"
+   ]
+  },
+  {
+   "name": "Scrappy",
+   "description": "This Pokémon's Normal and Fighting type moves hit Ghost type Pokémon.",
+   "pokemon": [
+    "Taillow",
+    "Swellow"
+   ]
+  },
+  {
+   "name": "Seasonal Coat",
+   "description": "During winter months, this Pokémon gains resistance to ice damage and has advantage on stealth checks in their natural environment. In summer months, it gains resistance to fire damage, and has advantage on Constitution checks.",
+   "pokemon": [
+    "Grazeep",
+    "Hoppit",
+    "Mounteer",
+    "Mounteen",
+    "Mountelder"
+   ]
+  },
+  {
+   "name": "Sedative Spines",
+   "description": "Any creature coming into physical contact with this Pokémon needs to make a DC 15 Constitution saving throw, or become drowsy for 1d4 minutes. While drowsy, the creature suffers disadvantage on saving throws and attack rolls, and other craetures have advantage on saving throws induced by this Pokémon. At the end of the drowsiness, the creature becomes unconscious for 1d12 hours. For the duration, the creature can't be awakened by normal means unless it completes a long rest. They are, however, considered asleep, and can be damaged by Bad Dreams, Dream Eater or similar moves.",
+   "pokemon": [
+    "Lumorm",
+    "Shadorm"
+   ]
+  },
+  {
+   "name": "Self-Destructor",
+   "description": "Upon being reduced to 0 HP, this Pokémon activates the move Self-Destruct as if it had full HP, at no cost.",
+   "pokemon": [
+    "Sandem",
+    "Protoxys"
+   ]
+  },
+  {
+   "name": "Sentinel's Vigil",
+   "description": "This Pokémon can't unwillingly fall asleep.",
+   "pokemon": [
+    "Kraqua",
+    "Feyer",
+    "Monstearth",
+    "Bolking",
+    "Knighturn"
+   ]
+  },
+  {
+   "name": "Serene Grace",
+   "description": "The DC to avoid a negative status condition from this Pokémon is increased by 1.",
+   "pokemon": [
+    "Vaxicure",
+    "Fryoon",
+    "Kortier"
+   ]
+  },
+  {
+   "name": "Shadow Shield",
+   "description": "If this Pokémon is at full health, the first damage dealt to it is halved.",
+   "pokemon": [
+    "Octodendron",
+    "Octuber",
+    "Yukinarbor"
+   ]
+  },
+  {
+   "name": "Shadow Tag",
+   "description": "Creatures within 50 feet of this Pokémon may not flee or switch out, except by item, Move, or ability.",
+   "pokemon": [
+    "Phobee"
+   ]
+  },
+  {
+   "name": "Shadow Veil",
+   "description": "When in dim light or darkness, This Pokémon gains a +2 bonus to AC.",
+   "pokemon": [
+    "Mudow",
+    "Marshade"
+   ]
+  },
+  {
+   "name": "Shed Skin",
+   "description": "If this Pokémon is affected by a negative status ailment, they can roll a d4 at the end of each of their turns. On a result of 4, they are cured.",
+   "pokemon": [
+    "Venomire",
+    "Venolisk"
+   ]
+  },
+  {
+   "name": "Sheer Force",
+   "description": "This Pokémon adds its proficiency bonus to damage rolls while poisoned, burned, confused, or paralyzed.",
+   "pokemon": [
+    "Grell",
+    "Groll",
+    "Heimskroll",
+    "Silian",
+    "Groundilla",
+    "Terrilla"
+   ]
+  },
+  {
+   "name": "Shell Armor",
+   "description": "This Pokémon is immune to extra damage dealt by a Critical Hit.",
+   "pokemon": [
+    "Dwebble",
+    "Crustle",
+    "Mountitan",
+    "Turmerald",
+    "Shelmerald",
+    "Squirtle",
+    "Wartortle",
+    "Blastoise"
+   ]
+  },
+  {
+   "name": "Shield Dust",
+   "description": "Once per long rest, this Pokémon can ignore a negative status condition that results from an enemy move.",
+   "pokemon": [
+    "Caterpie",
+    "Metapod",
+    "Butterfree"
+   ]
+  },
+  {
+   "name": "Skill Link",
+   "description": "Combo moves that have the ability to hit more than once, after the same attack roll, are guaranteed to hit at least twice. (Fury Swipes, Double Slap, Water Shuriken, etc.)",
+   "pokemon": [
+    "Clawine",
+    "Thornug",
+    "Thohorn"
+   ]
+  },
+  {
+   "name": "Slow Start",
+   "description": "This Pokémon's speed is halved and its attacks are made at disadvantage for the first two rounds of every combat.",
+   "pokemon": [
+    "Conflagirant",
+    "Lodoth",
+    "Pelsdoth"
+   ]
+  },
+  {
+   "name": "Slush Rush",
+   "description": "This Pokémon is immune to Hail damage, and its speed is doubled in arctic conditions, or during a hailstorm.",
+   "pokemon": [
+    "Subsiro"
+   ]
+  },
+  {
+   "name": "Sniper",
+   "description": "On a critical hit made by this Pokémon, triple the dice roll instead of doubling it.",
+   "pokemon": [
+    "Vaxicure"
+   ]
+  },
+  {
+   "name": "Snow Cloak",
+   "description": "This Pokémon is immune to Hail damage. It's AC is increased by 2 in arctic conditions, or when it is snowing or hailing.",
+   "pokemon": [
+    "Elkrincess",
+    "Elqueen",
+    "Lodoth",
+    "Pelsdoth",
+    "Snogon",
+    "Avalgon",
+    "Fricub",
+    "Ursnow",
+    "Glaciear"
+   ]
+  },
+  {
+   "name": "Snow Warning",
+   "description": "When this Pokémon enters an outside battle, the weather immediately changes to hail for 5 rounds. In the case of another Pokémon with a similar weather ability, the tie goes to the Pokémon with the highest DEX score.",
+   "pokemon": [
+    "Frizard",
+    "Savagice"
+   ]
+  },
+  {
+   "name": "Solid Gold",
+   "description": "This pokémon is immune to the following damage types: poison, electric, ice, grass. Additionally, it takes no extra damage from damage types it is weak to.",
+   "pokemon": [
+    "Denarius",
+    "Aureus",
+    "Krassemoth"
+   ]
+  },
+  {
+   "name": "Solid Rock",
+   "description": "This Pokémon does not take any additional damage from a critical hit.",
+   "pokemon": [
+    "Rockard",
+    "Crolder",
+    "Onix",
+    "Granix"
+   ]
+  },
+  {
+   "name": "Solvent Tail",
+   "description": "The fluid from This Pokémon's tail deals +1d4 damage against Poison and Steel-type Pokémon. The damage dice for this ability increase to 1d6 at level 5, 2d6 at level 10, and 2d8 at level 17. Can use a bonus action to coat an ally's weapon, granting them this bonus for 1 minute.",
+   "pokemon": [
+    "Smudgel",
+    "Squeagle"
+   ]
+  },
+  {
+   "name": "Soul-Heart",
+   "description": "Upon seeing an ally faint, this Pokémon increases the ability scores of its saving throw proficiencies by 2 until the end of combat. This is stackable up to a maximum of +10 to any one ability score.",
+   "pokemon": [
+    "Pixee",
+    "Wispee"
+   ]
+  },
+  {
+   "name": "Soundproof",
+   "description": "This Pokémon is immune to sound-based moves.",
+   "pokemon": [
+    "Mograyn",
+    "Hedeikeel"
+   ]
+  },
+  {
+   "name": "Spectral Sight",
+   "description": "As an action, this Pokémon can see into the Depths of Twilight, and detect the presence of ghosts and spirits within 30 ft.",
+   "pokemon": [
+    "Treecko",
+    "Grovyle",
+    "Sceptile"
+   ]
+  },
+  {
+   "name": "Speed Boost",
+   "description": "While this Pokémon is active and in an environment related to its type (DM Discretion), its trainer gets advantage on initiative rolls.",
+   "pokemon": [
+    "Vespair",
+    "Delwing",
+    "Agiluzz",
+    "Serony",
+    "Surgasus",
+    "Equitrix",
+    "Labbit",
+    "Rappid",
+    "Reagle",
+    "Argonael"
+   ]
+  },
+  {
+   "name": "Spirit Guide",
+   "description": "Ghost type moves used by this Pokémon can hit normal and fighting type Pokémon, and are treated as if this Pokémon has the ghost type. Dying creatures in the presence of this Pokémon, within 15ft., can see and communicate telepathically with it. While in range of a dying creature, this Pokémon may use a reaction to change the outcome of a death saving throw. If a creature dies in range of this Pokémon, its spirit will travel safely.",
+   "pokemon": [
+    "Infernity"
+   ]
+  },
+  {
+   "name": "Spotless",
+   "description": "Once per day, this Pokémon can use its action to remove all mundane dirt, grime, and stains from a 10-foot radius area. This ability can also neutralize Poison-type residue and removes the Poisoned condition from allies in range.",
+   "pokemon": [
+    "Smudgel"
+   ]
+  },
+  {
+   "name": "Stakeout",
+   "description": "When an opponent is switched out in battle, this Pokémon doubles the damage dealt if it targets the replacement on the first turn immediately following the switch.",
+   "pokemon": [
+    "Beorkub",
+    "Grizzerker"
+   ]
+  },
+  {
+   "name": "Stall",
+   "description": "This Pokémon is always last in initiative order.",
+   "pokemon": [
+    "Grostarch"
+   ]
+  },
+  {
+   "name": "Stamina",
+   "description": "When this Pokémon is damaged by a move, increase its AC by 2 until the start of its next turn. This ability does not stack and will remain in effect if the Pokémon is successfully attacked multiple turns in a row.",
+   "pokemon": [
+    "Boradin",
+    "Tremboar"
+   ]
+  },
+  {
+   "name": "Stance Change",
+   "description": "Mossworn has two forms. When Mossworn uses King's Shield, it changes to Shield Forme, swapping its AC and DEX stats. When it uses a damaging move, Mossworn immediately returns to Blade Forme, returning its stats to normal.",
+   "pokemon": [
+    "Mossworn"
+   ]
+  },
+  {
+   "name": "Static",
+   "description": "When this Pokémon is hit by a melee attack, roll a d4. On a result of 4, the attacker takes an amount of electric damage equal to this Pokemon's proficiency bonus.",
+   "pokemon": [
+    "Circuitail",
+    "Amplifuzz",
+    "Flarelex",
+    "Pikachu",
+    "Raichu",
+    "Hagechu",
+    "Gaupus",
+    "Vargpus"
+   ]
+  },
+  {
+   "name": "Static Wool",
+   "description": "When hit by a melee attack, this Pokémon discharges static electricity. The attacker must succeed a DC 10 Constitution saving throw or take 1d6 electric damage and be shocked, suffering disadvantage on attack rolls until the end of its next turn.",
+   "pokemon": [
+    "Grazeep"
+   ]
+  },
+  {
+   "name": "Steadfast",
+   "description": "Once per long rest, when this Pokémon fails a saving throw against a negative status condition, it can choose to pass instead.",
+   "pokemon": [
+    "Underoath",
+    "Broosbuck"
+   ]
+  },
+  {
+   "name": "Stench",
+   "description": "When this Pokémon is hit by a melee attack, roll a d10. On a 10, the attacker flinches.",
+   "pokemon": [
+    "Secto"
+   ]
+  },
+  {
+   "name": "Sticky Hold",
+   "description": "Held items cannot be stolen or knocked away from this Pokémon.",
+   "pokemon": [
+    "Maiskern",
+    "Mallusk",
+    "Conchail",
+    "Corshail"
+   ]
+  },
+  {
+   "name": "Stone Veil",
+   "description": "This Pokémon's AC is increased by 2 in rocky terrain, or during a Sandstorm.",
+   "pokemon": [
+    "Pebbling",
+    "Onix",
+    "Granix",
+    "Steelix"
+   ]
+  },
+  {
+   "name": "Storm Drain",
+   "description": "If this Pokemon or an ally within 30 feet is targeted with a direct water-type, damage-dealing move, the Pokemon may use a reaction to redirect the target to itself and take half damage from it if it hits.",
+   "pokemon": [
+    "Turmerald",
+    "Shelmerald"
+   ]
+  },
+  {
+   "name": "Storm Warning",
+   "description": "Has advantage and expertise on nature checks to predict incoming weather.",
+   "pokemon": [
+    "Harbeak",
+    "Storican"
+   ]
+  },
+  {
+   "name": "Strong Jaw",
+   "description": "For biting moves activated by this Pokémon (Bite, Thunder Fang, Crunch, etc.), they may roll the damage twice and choose either total.",
+   "pokemon": [
+    "Shredator",
+    "Armful",
+    "Merchent"
+   ]
+  },
+  {
+   "name": "Sturdy",
+   "description": "When taking damage equal to half or more of your current HP, roll a d4. On a result of 3 of 4, halve the damage dealt.",
+   "pokemon": [
+    "Dwebble",
+    "Crustle",
+    "Mountitan",
+    "Vaultile",
+    "Vaultargo",
+    "Skarling",
+    "Skarmory",
+    "Aurus",
+    "Knighturn"
+   ]
+  },
+  {
+   "name": "Suction Cups",
+   "description": "This Pokémon cannot be forced out of battle by an opponent’s moves.",
+   "pokemon": [
+    "Swarmy",
+    "Ordus"
+   ]
+  },
+  {
+   "name": "Super Luck",
+   "description": "This Pokémon increases its critical hit range by 1 (20 to 19+, etc.)",
+   "pokemon": [
+    "Felichim",
+    "Tigriffon",
+    "Popkern",
+    "Labbit",
+    "Rappid"
+   ]
+  },
+  {
+   "name": "Supervisor",
+   "description": "This Pokémon can direct up to 4 Smudgel or other worker Pokémon as a bonus action. Allies within 30 feet gain advantage on ability checks related to their work. Once per long rest, can inspire allies to ignore one level of exhaustion.",
+   "pokemon": [
+    "Squeagle"
+   ]
+  },
+  {
+   "name": "Surface Tension",
+   "description": "This Pokémon can walk on water, and is immune to any entry hazard effects.",
+   "pokemon": [
+    "Driftling",
+    "Aquider"
+   ]
+  },
+  {
+   "name": "Surge Surfer",
+   "description": "When this Pokémon begins its turn in the area of effect from Electric Terrain, its speed is doubled.",
+   "pokemon": [
+    "Sparcupine",
+    "Erethizic"
+   ]
+  },
+  {
+   "name": "Swamp Stalker",
+   "description": "This Pokémon has advantage on Stealth checks made while in a swampy environment.",
+   "pokemon": [
+    "Totodile",
+    "Croconaw",
+    "Feraligatr",
+    "Noctugatr"
+   ]
+  },
+  {
+   "name": "Swarm",
+   "description": "When this Pokémon falls below 25% of its maximum HP, add 50% more dice to damage rolls for its bug-type moves, and damaging bug moves cost 50% more VP.",
+   "pokemon": [
+    "Moltling",
+    "Scorab",
+    "Igniscairn",
+    "Larvasp",
+    "Thornug",
+    "Thohorn",
+    "Nectini"
+   ]
+  },
+  {
+   "name": "Sweet Veil",
+   "description": "Any ally within 15 feet of this Pokémon is immune to the sleep condition.",
+   "pokemon": [
+    "Popkern"
+   ]
+  },
+  {
+   "name": "Swift Post",
+   "description": "When carrying an item, your speed out of combat is increased by 10 feet, and constitution rolls related to travel are done with advantage. Additionally, you have advantage when attempting to flee from battles.",
+   "pokemon": [
+    "Corscout"
+   ]
+  },
+  {
+   "name": "Swift Swim",
+   "description": "This Pokémon's swim speed is doubled in rainy conditions.",
+   "pokemon": [
+    "Lotad",
+    "Lombre",
+    "Ludicolo",
+    "Magikarp",
+    "Turmerald",
+    "Shelmerald",
+    "Pelagos",
+    "Archilagos",
+    "Pelarchilagos"
+   ]
+  },
+  {
+   "name": "Symbiosis",
+   "description": "This Pokémon may swap held items with an ally as a free action, as long as they are within 15 feet of each other.",
+   "pokemon": [
+    "Mograyn",
+    "Hedeikeel"
+   ]
+  },
+  {
+   "name": "Synchronize",
+   "description": "If this Pokémon becomes burned, paralyzed, or poisoned, its attacker receives the negative status condition as well (even if otherwise immune).",
+   "pokemon": [
+    "Psycho",
+    "Loreleaf",
+    "Foliarch"
+   ]
+  },
+  {
+   "name": "Tangling Hair",
+   "description": "Opponents within melee range of this Pokémon cannot take the Disengage action to move away.",
+   "pokemon": [
+    "Tangela",
+    "Tangela (Stalker Form)",
+    "Tangrowth"
+   ]
+  },
+  {
+   "name": "Technician",
+   "description": "For damaging moves activated by this Pokémon with a VP cost of 6 or less, they may roll the damage twice and choose either total.",
+   "pokemon": [
+    "Fuego",
+    "Broosbuck"
+   ]
+  },
+  {
+   "name": "Telepathy",
+   "description": "This Pokémon cannot be damaged by its allies' attacks.",
+   "pokemon": [
+    "Frosticle",
+    "Glacicle"
+   ]
+  },
+  {
+   "name": "Temporal Collapse",
+   "description": "When Temporis is reduced to 0 hit points, the temporal wound it embodies begins to unravel. The following effects occur: - A rift in space-time opens in Temporis's space - Each creature within 100 feet must succeed on a DC 18 Constitution saving throw - On a failed save, a creature takes 10d10 psychic damage and is moved 1d4 × 10 feet in a random direction as time distorts around them - On a successful save, a creature takes half damage and isn't moved - The area within 1000 feet becomes a temporary temporal anomaly zone for 24 hours, where: - Time moves unpredictably - Creatures that end their turn in the zone must make a DC 15 Wisdom saving throw or experience a random temporal effect - The Lorekeepers may be drawn to the area to contain the anomaly",
+   "pokemon": [
+    "Temporis"
+   ]
+  },
+  {
+   "name": "Teravolt",
+   "description": "This Pokémon’s moves completely ignore any ability that would hinder or prevent their effect on the target or the user's ability to hit the target.",
+   "pokemon": [
+    "Hagechu"
+   ]
+  },
+  {
+   "name": "Thick Fat",
+   "description": "This Pokemon takes half the damage it otherwise would from Ice and Fire damage.",
+   "pokemon": [
+    "Triceros",
+    "Rhinaurus",
+    "Milkattle",
+    "Kobull",
+    "Swinicorn",
+    "Porque"
+   ]
+  },
+  {
+   "name": "Time Vision",
+   "description": "Temporis exists across multiple moments simultaneously. It has advantage on attack rolls and saving throws, and can't be surprised. Additionally, opportunity attacks against it are made with disadvantage.",
+   "pokemon": [
+    "Temporis"
+   ]
+  },
+  {
+   "name": "Time Warp",
+   "description": "Any creature that starts its turn within 50 feet of Temporis must succeed on a DC 21 Wisdom saving throw. On a failed save, the creature takes 4d10 psychic damage and has its speed halved until the start of its next turn as it experiences temporal displacement. On a successful save, the creature takes half damage and suffers no other effects.",
+   "pokemon": [
+    "Temporis"
+   ]
+  },
+  {
+   "name": "Tinted Lens",
+   "description": "This Pokémon’s moves ignore resistances.",
+   "pokemon": [
+    "Conflagirant",
+    "Rifractal",
+    "Sheenat"
+   ]
+  },
+  {
+   "name": "Torrent",
+   "description": "When this Pokémon falls below 25% of its maximum hp, add 50% more dice to damage rolls for its water-type moves, and damaging water moves cost 50% more VP.",
+   "pokemon": [
+    "Salamandrop",
+    "Hydrasylph",
+    "Dracquatic",
+    "Pelagos",
+    "Archilagos",
+    "Pelarchilagos",
+    "Squirtle",
+    "Wartortle"
+   ]
+  },
+  {
+   "name": "Tough Claws",
+   "description": "A successful melee attack by this Pokémon automatically gets STAB, regardless of its type. If it would normally get STAB, double the STAB bonus when adding to damage.",
+   "pokemon": [
+    "Clawine",
+    "Terratops",
+    "Terrarex",
+    "Terradon",
+    "Reginant",
+    "Scarpea",
+    "Cruscarex"
+   ]
+  },
+  {
+   "name": "Toxic Aura",
+   "description": "At the start of this Pokémon's turn, it may use the move Smog as a bonus action, costing no VP.",
+   "pokemon": [
+    "Venusaur"
+   ]
+  },
+  {
+   "name": "Toxic Boost",
+   "description": "When this Pokémon is hit by a poison-type attack, its next attack is rolled at advantage.",
+   "pokemon": [
+    "Lumo"
+   ]
+  },
+  {
+   "name": "Toxic Surge",
+   "description": "When this Pokémon enters combat, all enemies within 15 feet must make a CON save (DC = 8 + proficiency + CON mod) or become badly poisoned. While an enemy is poisoned, this Pokémon's attacks deal an additional 1d6 + proficiency bonus poison damage.",
+   "pokemon": [
+    "Secto"
+   ]
+  },
+  {
+   "name": "Trace",
+   "description": "This Pokémon copies a random ability of an opponent when entering battle. The ability cannot be Flower Gift, Forecast, Illusion, Imposter, Multitype, Trace, Wonder Guard, or Zen Mode.",
+   "pokemon": [
+    "Drago",
+    "Aero"
+   ]
+  },
+  {
+   "name": "Transformer",
+   "description": "This Pokémon has a standard Normal form from which all stats are based, but may change forms as a bonus action to drastically change its abilities. The forms it can take are Attack, Defense, and Speed. In Attack form, it adds an additional +5 to its attack rolls, but all attacks against it has advantage. In Defense form, its AC increases by 3, but its attacks are rolled at disadvantage. If the activated move requires a save, the target(s) have advantage. In Speed form, it gains an additional attack action each turn, but the attack is done at disadvantage. If it is a move that requires a save, the target(s) have advantage.",
+   "pokemon": [
+    "Ditto"
+   ]
+  },
+  {
+   "name": "Treasure Hoarder",
+   "description": "While travelling, this Pokémon may stumble upon valuable items that it will store inside its shell. When defeated, a character attempting to loot this Pokémon must succeed a DC 8 + level INT check in order to unlock the vault.",
+   "pokemon": [
+    "Vaultile",
+    "Vaultargo"
+   ]
+  },
+  {
+   "name": "Triage",
+   "description": "This Pokémon's healing or draining moves have a move time of 1 bonus action.",
+   "pokemon": [
+    "Vamprat",
+    "Vladacabra"
+   ]
+  },
+  {
+   "name": "Truant",
+   "description": "This Pokémon cannot use the same move in back to back rounds.",
+   "pokemon": [
+    "Grell",
+    "Groll",
+    "Heimskroll"
+   ]
+  },
+  {
+   "name": "Turboblaze",
+   "description": "This Pokémon’s moves completely ignore any ability that would hinder or prevent their effect on the target or the user's ability to hit the target.",
+   "pokemon": [
+    "Gildrake",
+    "Plundrake",
+    "Treasuroth",
+    "Silvaroth"
+   ]
+  },
+  {
+   "name": "Unaware",
+   "description": "When this Pokémon attacks an opponent, it ignores any stat boosts the opponent has been affected with after the start of battle. This includes boosts to AC or saving throws the Pokémon has to make.",
+   "pokemon": [
+    "Drago"
+   ]
+  },
+  {
+   "name": "Unburden",
+   "description": "While this Pokémon is active and not holding an item, its trainer gets advantage on initiative rolls.",
+   "pokemon": [
+    "Rifractal",
+    "Sheenat"
+   ]
+  },
+  {
+   "name": "Unnerve",
+   "description": "Opponents in combat with this Pokémon must succeed a DC15 Wisdom saving throw in order to consume items.",
+   "pokemon": [
+    "Poochyena",
+    "Mightyena",
+    "Redoute",
+    "Fantome"
+   ]
+  },
+  {
+   "name": "Vector",
+   "description": "After landing a hit, this Pokémon can impose one of the following status conditions after a failed Constitution save: Poisoned, Paralyzed or Slowed (half movement). If the target fails the save by 5 or more, this ability bypasses defenses like Safeguard. The effect lasts until the next long rest.",
+   "pokemon": [
+    "Veerum",
+    "Veerulent",
+    "Pathoplague",
+    "Buzzlet",
+    "Mosqaegis"
+   ]
+  },
+  {
+   "name": "Victory Star",
+   "description": "While this Pokémon is in battle, all allied Pokémon within 50 feet add an additional +1 to their attack rolls.",
+   "pokemon": [
+    "Terratops",
+    "Terrarex",
+    "Terradon",
+    "Gildrake",
+    "Plundrake",
+    "Treasuroth",
+    "Silvaroth",
+    "Stelluna",
+    "Stellumina"
+   ]
+  },
+  {
+   "name": "Vital Spirit",
+   "description": "This Pokémon cannot be put to sleep.",
+   "pokemon": [
+    "Boradin",
+    "Tremboar"
+   ]
+  },
+  {
+   "name": "Void Manifest",
+   "description": "This Pokémon may as a free action assume the Void Form or Watcher's Guise. While in Void Form, this Pokémon creates a field of supernatural darkness in a 30ft. radius that nullifies natural light, and dims ether based light. The field moves with the Pokémon. Unless illuminated by ether based light, or otherwise identified, this Pokémon is untargetable. All attacks against this Pokémon while obscured by this darkness are made with disadvantage, and it has advantage on all saving throws caused by AoE moves.",
+   "pokemon": [
+    "Jiehtanas"
+   ]
+  },
+  {
+   "name": "Void Shift",
+   "description": "Once per short rest, when this Pokémon would take damage, it can use its reaction to briefly phase out of reality, reducing the damage by half.",
+   "pokemon": [
+    "Scyther",
+    "Razcor",
+    "Treecko"
+   ]
+  },
+  {
+   "name": "Void Traversal",
+   "description": "Once per day, Deoxys can transport itself and up to 8 willing creatures within 30 feet to any location on the same plane that Deoxys has previously visited.",
+   "pokemon": [
+    "Deoxys"
+   ]
+  },
+  {
+   "name": "Volcanic Shell",
+   "description": "When this Pokémon is hit by a meelee attack, it may use its reaction to emit waves of heat that deal fire damage all creatures within 5ft of this Pokémon. Roll damage dice according to this Pokémon's size: Tiny: 1d4, Small: 2d4, Medium: 3d4, Large: 4d4, Huge: 5d4, Gigantic: 6d4.",
+   "pokemon": [
+    "Flintle",
+    "Flaretortle",
+    "Eruptoise"
+   ]
+  },
+  {
+   "name": "Volt Absorb",
+   "description": "This Pokémon takes no damage from electricity or electrictype attacks. Instead, half of any electric damage done is absorbed, restoring the Pokémon's HP.",
+   "pokemon": [
+    "Blizzgarr",
+    "Magmoar",
+    "Ferrarg",
+    "Ohmen",
+    "Wandrish",
+    "Energem"
+   ]
+  },
+  {
+   "name": "Warning Chime",
+   "description": "This Pokémon can't be surprised. Allies within 60ft. also can't be surprised. After level 10, the range of this ability increases to 100ft.",
+   "pokemon": [
+    "Clingae",
+    "Chimae"
+   ]
+  },
+  {
+   "name": "Water Absorb",
+   "description": "This Pokémon takes no damage from water or water-type attacks. Instead, half of any water damage done is absorbed, restoring the Pokémon's HP.",
+   "pokemon": [
+    "Salamandrop",
+    "Hydrasylph",
+    "Dracquatic",
+    "Jelleem",
+    "Hugeem",
+    "Oasand",
+    "Oasylph",
+    "Mossling",
+    "Mossaic"
+   ]
+  },
+  {
+   "name": "Water Bubble",
+   "description": "This Pokémon is resistant to fire-type damage and immune to the burned condition.",
+   "pokemon": [
+    "Hydro",
+    "Spectrout",
+    "Horrish"
+   ]
+  },
+  {
+   "name": "Water Compaction",
+   "description": "After being damaged by a water-type move, any other damage dealt to this Pokémon until the beginning of its next turn is halved.",
+   "pokemon": [
+    "Sandygast",
+    "Palossand",
+    "Scaracross",
+    "Morbit",
+    "Darbit"
+   ]
+  },
+  {
+   "name": "Water Veil",
+   "description": "This Pokémon is immune to burning.",
+   "pokemon": [
+    "Cherpish",
+    "Scalareph",
+    "Driftling",
+    "Aquider"
+   ]
+  },
+  {
+   "name": "Water Vein",
+   "description": "Using water moves restores 1/16 of this Pokémon's max HP.",
+   "pokemon": [
+    "Morbit",
+    "Darbit"
+   ]
+  },
+  {
+   "name": "Water Weight",
+   "description": "Once per short rest, this Pokémon gains temporary hit points equal to its level when battling in coastal and swampy areas, or in rainy conditions.",
+   "pokemon": [
+    "Cirrux",
+    "Blastoise",
+    "Mossling",
+    "Mossaic"
+   ]
+  },
+  {
+   "name": "Weak Armor",
+   "description": "When an attack hits this Pokémon, its speed increases by 5 feet, but its AC is temporarily reduced by 1 until the end of battle (for a maximum reduction of -5).",
+   "pokemon": [
+    "Dwebble",
+    "Crustle",
+    "Mountitan",
+    "Kroraleef",
+    "Krabemone",
+    "Hadean",
+    "Styxxil"
+   ]
+  },
+  {
+   "name": "White Smoke",
+   "description": "Other Pokémon's moves or abilities cannot lower this Pokémon stats.",
+   "pokemon": [
+    "Conflagirant",
+    "Charizard",
+    "Custospirit",
+    "Protecter",
+    "Wecter"
+   ]
+  },
+  {
+   "name": "Wimp Out",
+   "description": "When a damaging move causes this Pokémon to fall below 50% of its maximum HP, it MUST disengage and move up to its speed in a straight line towards its trainer as a free action. If this would put the Pokémon in range of switching out, it must do so as another free action if another Pokémon is available to replace it.",
+   "pokemon": [
+    "Chicklet",
+    "Pollish"
+   ]
+  },
+  {
+   "name": "Winter Roots",
+   "description": "This Pokémon gains proficiency with ice-type moves. If an allied creature within 30 feet uses a move that would restore HP based on damage dealt, this Pokémon restores HP equal to 50% of the healing its ally receives.",
+   "pokemon": [
+    "Octodendron",
+    "Octuber",
+    "Yukinarbor"
+   ]
+  },
+  {
+   "name": "Wishmaker",
+   "description": "Once awake, Jirachi can grant a wish to a creature within 30 feet. Jirachi cannot grant wishes that would directly harm others or drastically alter reality's fundamental nature.",
+   "pokemon": [
+    "Jirachi"
+   ]
+  },
+  {
+   "name": "Wonder Guard",
+   "description": "This Pokémon is immune to damaging attacks from types that are not in its vulnerabilities list.",
+   "pokemon": [
+    "Phobee",
+    "Cirrux",
+    "Labbit",
+    "Rappid"
+   ]
+  },
+  {
+   "name": "Wonder Skin",
+   "description": "This Pokémon has advantage on all saving throws against being burned, frozen, poisoned, or paralyzed.",
+   "pokemon": [
+    "Phobee",
+    "Hydling",
+    "Wryggle",
+    "Slythir",
+    "Vyphyss"
+   ]
+  },
+  {
+   "name": "Wreath of Ash",
+   "description": "A dark, smoldering aura surrounds this Pokémon. At the start of each of its turns, each creature within 5 feet of it takes 1d10 + proficiency modifier fire damage. This damage ignores resistance to fire.",
+   "pokemon": [
+    "Blaziken"
+   ]
+  }
+ ]
+}

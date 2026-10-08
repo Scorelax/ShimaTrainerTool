@@ -1,7 +1,9 @@
 // "Where does the terrain go?" -- shown when a terrain move (Electric/Grassy/Misty/Psychic Terrain) is used. The
-// caster sees the battle map with a circle around themselves pre-painted from the move's range, and can click or
-// drag to paint/erase tiles (so a platform, a boat, an island can get the effect and the sea around it doesn't), or
-// press "All map" for the whole battlefield. Resolves to { cells: ["col,row", ...] } for a marked area or
+// caster sees the battle map with the move's area around themselves pre-marked, can stamp the area onto another tile
+// (a new stamp replaces the last one), and with the stamp off can click or drag to paint/erase tiles by hand (so a
+// platform, a boat, an island can get the effect and the sea around it doesn't), or press "All map" for the whole
+// battlefield. The area is a square: diagonals cost the same as straight moves, so "within 15ft" is 3 squares out on every
+// side, diagonals included. Resolves to { cells: ["col,row", ...] } for a marked area or
 // { all: true } for the whole map. There is deliberately no cancel: by the time this opens the move's VP is already
 // spent, so the caster has to say where it goes.
 //
@@ -10,7 +12,7 @@
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
-import { injectBattleMapStyles, circleCells, tokenCenter, ZONE_RGB, spriteTransform } from './battle-map-view.js';
+import { injectBattleMapStyles, squareCells, ZONE_RGB, spriteTransform } from './battle-map-view.js';
 
 /** A move's area radius from its range text: the distance next to "radius"/"circle" if there is one ("Self (30ft. radius)"
  * -> 30, "100ft., 50ft. radius" -> 50), otherwise the first distance ("Self, 50ft." -> 50). null if none. */
@@ -46,12 +48,12 @@ function _injectStyles() {
 
 /**
  * @param {object} session   the shared combat session (needs board + participants)
- * @param {string} casterId  participant using the move -- the circle is centred on their token
+ * @param {string} casterId  participant using the move -- the area is centred on their token
  * @param {string} title     e.g. "Grassy Terrain"
  * @param {string} kind      terrain kind for the colour ('electric' | 'grassy' | 'misty' | 'psychic')
  * @param {number|null} radiusFt  the move's own radius, to pre-paint (null = start empty)
  * @param {boolean} centeredOnCaster  false for a move "centered on a point in range" (Hail, Sandstorm): starts empty
- *                                    with the circle stamp armed, so the caster clicks where the centre goes
+ *                                    with the stamp armed, so the caster clicks where the centre goes
  * @param {number|null} heightFt  only shown in the prompt ("40ft high") -- who a cylinder actually reaches is decided by the caller
  * @param {boolean} allowCancel  adds a Cancel button (resolves null). Off for a move whose VP is already spent; on for
  *                               "select targets from the map", where backing out costs nothing
@@ -67,27 +69,30 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
     const casterPos = board.tokens[casterId];
     const rgb = ZONE_RGB[kind] || ZONE_RGB.other;
 
+    // The marked area is the stamped one plus whatever was painted by hand. A new stamp REPLACES the last stamp (it moves
+    // the move's area); hand-painted tiles stay until erased or cleared.
+    let stamped = new Set();
+    const manual = new Set();
     const painted = new Set();
-    const circle = () => {
-      if (!casterPos || !radiusFt) return new Set();
-      const c = tokenCenter(casterPos, footprintForSize(caster?.size));
-      return circleCells(board, c.x, c.y, radiusFt / 5);
-    };
-    if (centeredOnCaster) circle().forEach(c => painted.add(c));
-    let stamp = !centeredOnCaster && !!radiusFt; // click = drop a circle of radiusFt centred on that tile
+    const rebuild = () => { painted.clear(); stamped.forEach(c => painted.add(c)); manual.forEach(c => painted.add(c)); };
+    const aroundCaster = () => (casterPos && radiusFt
+      ? squareCells(board, casterPos.col, casterPos.row, footprintForSize(caster?.size), radiusFt / 5) : new Set());
+    if (centeredOnCaster) stamped = aroundCaster();
+    rebuild();
+    let stamp = !centeredOnCaster && !!radiusFt; // click = drop the move's area centred on that tile
 
     const overlay = document.createElement('div');
     overlay.className = 'tap-overlay';
     overlay.innerHTML = `
       <div class="tap-card" style="--zc:${rgb}">
         <h3 class="tap-title">${title}</h3>
-        <div class="tap-sub">Mark where it takes effect${heightFt ? ` (${heightFt}ft high)` : ''}${radiusFt && centeredOnCaster ? ` — pre-filled with a ${radiusFt}ft circle around ${caster?.name || 'the caster'}` : ''}. ${radiusFt ? 'Use the circle stamp to drop a circle on a tile, or ' : ''}click or drag to paint tiles; start a drag on a painted tile to erase. Only creatures standing on these tiles are affected.</div>
+        <div class="tap-sub">Mark where it takes effect${heightFt ? ` (${heightFt}ft high)` : ''}${radiusFt && centeredOnCaster ? ` — pre-filled with the ${radiusFt}ft area around ${caster?.name || 'the caster'}` : ''}. ${radiusFt ? `With the stamp on, a click drops the ${radiusFt}ft area centred on that tile (a new click moves it); turn the stamp off to ` : ''}${radiusFt ? 'click' : 'Click'} or drag to paint tiles by hand; start a drag on a marked tile to erase. Only creatures standing on these tiles are affected.</div>
         <div class="bmap-stage tap-stage" style="aspect-ratio:${cols} / ${rows}; --zc:${rgb}">
           <div class="bmap-grid"></div>
           <div class="bmap-tokens"></div>
         </div>
         <div class="tap-actions">
-          ${radiusFt ? `<button type="button" data-act="stamp" class="${stamp ? 'on' : ''}">⭕ Stamp ${radiusFt}ft circle</button>` : ''}
+          ${radiusFt ? `<button type="button" data-act="stamp" class="${stamp ? 'on' : ''}">Stamp ${radiusFt}ft</button>` : ''}
           ${radiusFt && casterPos ? `<button type="button" data-act="circle">Around ${caster?.name || 'caster'}</button>` : ''}
           <button type="button" data-act="all">🗺️ All map</button>
           <button type="button" data-act="clear">Clear</button>
@@ -146,7 +151,8 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
     const paintAt = (x, y) => {
       const key = document.elementFromPoint(x, y)?.closest?.('[data-cell]')?.dataset.cell;
       if (!key || !cellEls.has(key)) return;
-      if (mode === 'add') painted.add(key); else painted.delete(key);
+      if (mode === 'add') manual.add(key); else { manual.delete(key); stamped.delete(key); }
+      rebuild();
       refresh();
     };
     grid.addEventListener('pointerdown', (e) => {
@@ -155,7 +161,8 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
       e.preventDefault();
       if (stamp) {
         const [col, row] = key.split(',').map(Number);
-        circleCells(board, col, row, radiusFt / 5).forEach(c => painted.add(c));
+        stamped = squareCells(board, col, row, 1, radiusFt / 5); // replaces the previous stamp
+        rebuild();
         refresh();
         return;
       }
@@ -170,8 +177,8 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
       const act = e.target.closest('button')?.dataset.act;
       if (!act) return;
       if (act === 'stamp') { stamp = !stamp; e.target.closest('button').classList.toggle('on', stamp); }
-      else if (act === 'circle') { painted.clear(); circle().forEach(c => painted.add(c)); refresh(); }
-      else if (act === 'clear') { painted.clear(); refresh(); }
+      else if (act === 'circle') { stamped = aroundCaster(); rebuild(); refresh(); }
+      else if (act === 'clear') { stamped = new Set(); manual.clear(); rebuild(); refresh(); }
       else if (act === 'all') done({ all: true });
       else if (act === 'cancel') done(null);
       else if (act === 'confirm' && painted.size) done({ cells: [...painted] });

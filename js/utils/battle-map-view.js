@@ -76,19 +76,17 @@ export function legendHtml(session, { removable = false } = {}) {
   }).join('');
 }
 
-/** Centre of an NxN footprint anchored at its bottom-left cell, in (fractional) cell coordinates. */
-export function tokenCenter(pos, size = 1) {
-  return { x: pos.col + (size - 1) / 2, y: pos.row - (size - 1) / 2 };
-}
-
-/** Cells (as a Set of "col,row") whose centre lies within `radiusCells` of the given centre. */
-export function circleCells(board, cx, cy, radiusCells) {
+/** Cells (as a Set of "col,row") within `radiusCells` squares of a tile or a creature's footprint. */
+export function squareCells(board, col, row, size, radiusCells) {
+  // Diagonals cost the same as straight moves on this grid, so "everything within N squares" is a square: a 15ft area
+  // around a single tile is 7x7 (3 squares out on every side, diagonals included). Around a bigger creature it's measured
+  // from the edge of its footprint (`col`/`row` = the footprint's bottom-left cell, `size` its width in cells).
   const { cols, rows } = board.grid;
   const out = new Set();
-  for (let c = 0; c < cols; c++) {
-    for (let r = 0; r < rows; r++) {
-      if (Math.hypot(c - cx, r - cy) <= radiusCells + 0.35) out.add(`${c},${r}`);
-    }
+  const left = col - radiusCells, right = col + (size || 1) - 1 + radiusCells;
+  const top = row - (size || 1) + 1 - radiusCells, bottom = row + radiusCells;
+  for (let c = Math.max(0, left); c <= Math.min(cols - 1, right); c++) {
+    for (let r = Math.max(0, top); r <= Math.min(rows - 1, bottom); r++) out.add(`${c},${r}`);
   }
   return out;
 }

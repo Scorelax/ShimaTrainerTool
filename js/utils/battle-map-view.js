@@ -94,18 +94,25 @@ export function circleCells(board, cx, cy, radiusCells) {
 }
 
 /** The cells a cone of `lengthCells` covers from a token at `pos` (its footprint's bottom-left cell) of `size` cells, facing
- * `facing` degrees clockwise from up. Grid cones, the table's rule: facing straight, row k in front is 2k-1 cells wider than
- * the token's edge (a 15ft cone from a 1x1 token: 1, 3, 5 = 9 squares); facing a diagonal, it's the lengthCells x lengthCells
- * block off that corner (3x3 = 9 squares). Cells off the board are dropped. */
+ * `facing` degrees clockwise from up. Grid cones, the table's rule: facing straight, row k in front is 2k-1 cells wide
+ * (a 15ft cone: 1, 3, 5 = 9 squares); facing a diagonal, it's the lengthCells x lengthCells block off that corner (3x3 = 9
+ * squares). A bigger creature casts the same cone, from the footprint cell it faces out of: the corner cell for a diagonal,
+ * the middle of the facing edge otherwise (left/top of the two middle cells on an even-sized edge). Cells off the board are
+ * dropped. */
 export function coneCells(board, pos, size, facing, lengthCells) {
   const { cols, rows } = board.grid;
   const out = new Set();
   const add = (c, r) => { if (c >= 0 && r >= 0 && c < cols && r < rows) out.add(`${c},${r}`); };
   const n = size || 1;
-  const x0 = pos.col, x1 = pos.col + n - 1, y0 = pos.row - n + 1, y1 = pos.row;
   const dir = ((Math.round((facing || 0) / 45) % 8) + 8) % 8; // 0 up, 1 up-right, 2 right, ... 7 up-left
   const dx = [0, 1, 1, 1, 0, -1, -1, -1][dir];
   const dy = [-1, -1, 0, 1, 1, 1, 0, -1][dir];
+  // The one footprint cell the cone comes out of.
+  const mid = Math.floor((n - 1) / 2);
+  const left = pos.col, top = pos.row - n + 1;
+  const ox = dx > 0 ? left + n - 1 : dx < 0 ? left : left + mid;
+  const oy = dy > 0 ? top + n - 1 : dy < 0 ? top : top + mid;
+  const x0 = ox, x1 = ox, y0 = oy, y1 = oy;
   for (let k = 1; k <= lengthCells; k++) {
     if (dx === 0) {
       const r = dy < 0 ? y0 - k : y1 + k;

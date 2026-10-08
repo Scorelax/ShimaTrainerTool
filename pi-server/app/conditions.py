@@ -498,6 +498,12 @@ def weather_damage_for(weather, participant, fallback_level=None):
     return WEATHER_DAMAGE[kind]['type'], -(-int(level) // 2)  # half the level, rounded up
 
 
+def grounded_in(participant, terrains):
+    """is_grounded, plus Gravity's zone: "any creature in the area loses their flying/hovering speed ... and the Levitate
+    ability is suppressed" -- everyone standing in one is grounded. Mirrored by move-effects.js's isGroundedIn."""
+    return is_grounded(participant) or any(t.get('rule') == 'gravity' for t in terrains or ())
+
+
 def terrain_blocked_status(terrains, target, spec):
     """The terrain name blocking an incoming status `spec` on `target`, or None, given the terrains affecting
     them (see terrains_affecting). Electric Terrain: no grounded creature can be asleep. Misty Terrain: no
@@ -509,7 +515,7 @@ def terrain_blocked_status(terrains, target, spec):
     # Uproar: "any creature in range wakes and is prevented from falling asleep" -- every creature, flying or not.
     if apply_name == 'asleep' and any(t.get('rule') == 'uproar' for t in terrains or ()):
         return 'Uproar'
-    if not is_grounded(target):
+    if not grounded_in(target, terrains):
         return None
     for terrain in terrains or ():
         kind = terrain_kind(terrain)
@@ -522,4 +528,4 @@ def terrain_blocked_status(terrains, target, spec):
 
 def terrain_blocks_bonus_actions(terrains, participant):
     """Psychic Terrain: grounded creatures standing in it can't use bonus actions."""
-    return is_grounded(participant) and any(terrain_kind(t) == 'psychic' for t in terrains or ())
+    return grounded_in(participant, terrains) and any(terrain_kind(t) == 'psychic' for t in terrains or ())

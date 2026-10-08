@@ -302,6 +302,7 @@ const KIND_LABELS = {
   undo_crit_damage: 'Treat the crit as a normal hit', teleport_swap: 'Swap places', disable_overlapping_moves: 'Disable the moves you share',
   disable_last_used_move: 'Disable the move it just used', damage_multiplier: 'Reduce the damage of the attack', trick_room: 'Twist the turn order (Trick Room)',
   faint_on_roll: 'Faints the target', cancel_switch: "Stop the opponent's switch-out", push: 'Move the target',
+  ground_target: 'Bring it down to the ground', set_altitude: 'Rise into the air',
 };
 
 function _effectKindLabel(s) {
@@ -1135,6 +1136,12 @@ export function isGrounded(p) {
   if (speeds.some(sp => ['flying', 'hovering'].includes(String(sp.type).toLowerCase()) && (Number(sp.ft) || 0) > 0)) return false;
   if (/levitate/i.test(String(effectiveAbilities(p) || ''))) return false;
   return !statuses.some(s => s.kind === 'condition' && (s.apply === 'airborne' || (s.apply === 'granted_immunity' && String(s.value || '').toLowerCase() === 'ground')));
+}
+
+/** isGrounded plus Gravity's zone (everyone standing in it is grounded) -- mirrors conditions.py's grounded_in. `terrains`
+ * are the zones affecting `p` (terrainsAffecting). */
+export function isGroundedIn(p, terrains) {
+  return isGrounded(p) || (terrains || []).some(t => t?.rule === 'gravity');
 }
 
 /** 'sunny' | 'rain' | 'sandstorm' | 'hail' for a session weather, or null -- the same loose name match as terrains. */

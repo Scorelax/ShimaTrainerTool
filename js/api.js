@@ -997,6 +997,11 @@ export class CombatAPI {
   }
 
   /** DM/setup placement -- NOT turn-gated, moves any token any time. */
+  /** Forced altitude change (Smack Down to the ground, Skyward Soar 60ft up) -- not the creature's own movement. */
+  static async setTokenAltitude(id, z) {
+    return API.request('combat', 'set-token-altitude', { id, z }, { useCache: false });
+  }
+
   static async setTokenPosition(id, col, row) {
     return API.request('combat', 'set-token-position', { id, col, row }, { useCache: false });
   }

@@ -35,7 +35,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -819,7 +819,13 @@ setWeatherAttackModeResolver((moveName, attackerId) => {
 });
 // Semi-invulnerable targets (underground, airborne, ...) are hidden from every picker unless the move
 // lists their state in `hitsStates`.
-setTargetabilityResolver((participant, moveName) => untargetableState(participant, moveFlagsFor(moveName).hitsStates || []));
+setTargetabilityResolver((participant, moveName) => {
+  const hidden = untargetableState(participant, moveFlagsFor(moveName).hitsStates || []);
+  if (hidden) return hidden;
+  // Earthquake, Bulldoze, Land's Wrath, ...: "each grounded creature" -- a flyer (or anything up in the air) isn't hit.
+  if (moveFlagsFor(moveName).affectsGroundedOnly && !_groundedNow(participant.id)) return 'not grounded';
+  return null;
+});
 // Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
 setMoveAbilityResolver((moveName) => String(findMoveRow(moveName)?.[2] || '').split('/').map((m) => m.trim().toUpperCase()).filter(Boolean));
 
@@ -1237,7 +1243,7 @@ function _syncLocalCombatState(session) {
     merged.itemsEmbargoed = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'embargo'); // Embargo: held items do nothing
     merged.activeWeathers = weathersAffecting(session, p.id); // ...and the weather (Solar Beam's "in harsh sunlight" reads this)
     const psychic = merged.activeTerrains.find(t => terrainKindOf(t) === 'psychic');
-    merged.bonusActionBlockedBy = psychic && isGrounded(p) ? psychic.name : '';
+    merged.bonusActionBlockedBy = psychic && isGroundedIn(p, merged.activeTerrains) ? psychic.name : '';
     merged.bonusActionUsed = !!p.bonusActionUsed; // one bonus action per round -- see combat.js's _isBonusActionMove
     merged.bideHeld = !!p.bideHeld;
     // Archive Blast's own "every type of move you have witnessed so far
@@ -3323,6 +3329,19 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       await _handleSwapItem({ attackerId, targetId: pick.targetId, moveName });
       continue;
     }
+    if (effect.kind === 'ground_target') {
+      await _handleGroundTarget({ casterId: attackerId, targetId: pick.targetId, effect, moveName });
+      continue;
+    }
+    if (effect.kind === 'set_altitude') {
+      // Skyward Soar: "you're now 60ft. up in the air".
+      try {
+        await CombatAPI.setTokenAltitude(pick.targetId, effect.z || 0);
+      } catch (err) {
+        showCombatAlert(err.message, { title: moveName });
+      }
+      continue;
+    }
     if (effect.kind === 'push') {
       // Strength, Roar, Lava Cannon, Circle Throw, ... -- the caster moves the TARGET's token (forced movement: no movement spent,
       // no Pursuit window; a hazard on the landing tile still counts).
@@ -4540,7 +4559,42 @@ async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
 function _stateDamageMultiplier(moveName, targetId) {
   const states = moveFlagsFor(moveName).doubleDamageVsStates || [];
   const target = session?.participants?.[targetId];
-  return (target?.statuses || []).some((s) => s.kind === 'condition' && states.includes(s.apply)) ? 2 : 1;
+  if ((target?.statuses || []).some((s) => s.kind === 'condition' && states.includes(s.apply))) return 2;
+  // Cyclone Charge: "creatures in range that are not grounded ... take double damage".
+  if (target && moveFlagsFor(moveName).doubleDamageVsAirborne && !_groundedNow(targetId)) return 2;
+  return 1;
+}
+
+/** Grounded right now: no way to fly (or standing in a Gravity field) and not up in the air on the map. */
+function _groundedNow(pid) {
+  const p = session?.participants?.[pid];
+  if (!p) return true;
+  if ((session?.board?.tokens?.[pid]?.z || 0) > 0) return false;
+  return isGroundedIn(p, terrainsAffecting(session, pid));
+}
+
+/** Smack Down / Thousand Arrows / Graviton Beam / Roost (`ground_target`): the creature comes down to the ground; with
+ * `fallDice` it takes "1d6 fall damage per 10 feet fallen" (capped at `fallMax` dice), rolled by the table. */
+async function _handleGroundTarget({ casterId, targetId, effect, moveName }) {
+  const target = session?.participants?.[targetId];
+  const z = session?.board?.tokens?.[targetId]?.z || 0;
+  if (!target || !z) return; // already on the ground (or not on the map) -- nothing to fall from
+  try {
+    await CombatAPI.setTokenAltitude(targetId, 0);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+    return;
+  }
+  const n = Math.min(effect.fallMax || 20, Math.floor(z / 10));
+  if (!effect.fallDice || n < 1) return;
+  const die = String(effect.fallDice).replace(/^1d/, 'd');
+  const rolled = await promptValueRoll({ dice: `${n}${die}`, moveName, description: `${target.name} falls ${z}ft -- enter the ${n}${die} fall damage` });
+  if (rolled === null || rolled <= 0) return;
+  try {
+    await CombatAPI.applyDamage(casterId, targetId, rolled, '', session?.participants?.[casterId]?.name || '', moveName);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
 }
 
 async function _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier = 1 } = {}) {

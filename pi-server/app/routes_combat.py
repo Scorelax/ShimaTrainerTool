@@ -35,7 +35,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded
+from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded, grounded_in
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -460,6 +460,12 @@ def handle(conn, action, params):
         if not params.get('id') or col is None or row is None:
             raise ValueError('Missing participant id, col, or row')
         return _mutate(conn, lambda s: _set_token_position(s, params['id'], col, row))
+
+    if action == 'set-token-altitude':
+        z = js_parse_int(params.get('z'))
+        if not params.get('id') or z is None:
+            raise ValueError('Missing participant id or altitude')
+        return _mutate(conn, lambda s: _set_token_altitude(s, params['id'], z))
 
     if action == 'move-token':
         col = js_parse_int(params.get('col'))
@@ -2654,6 +2660,10 @@ def _list_move_categories():
             marks['attackRollMode'] = m['attackRollMode']
         if m.get('critBonus'):
             marks['critBonus'] = m['critBonus']
+        # Earthquake & co. only hit grounded creatures; Cyclone Charge hits the ones that aren't twice as hard.
+        for k in ('affectsGroundedOnly', 'doubleDamageVsAirborne'):
+            if m.get(k):
+                marks[k] = True
         if marks:
             flags[m['name']] = marks
     return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags}
@@ -2715,6 +2725,11 @@ def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=
         state[key] = field
     if key == 'terrain':
         _wake_electric_sleepers(state)
+        if field.get('rule') == 'gravity':
+            # Gravity: every creature in the area "loses their flying/hovering speed" -- whoever is airborne in it lands.
+            for pid, tok in state['board']['tokens'].items():
+                if tok.get('z') and any(t.get('rule') == 'gravity' for t in terrains_affecting(state, pid)):
+                    tok['z'] = 0
 
 
 def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None, props=None):
@@ -2744,7 +2759,7 @@ def _wake_electric_sleepers(state):
     for p in state['participants'].values():
         zones = terrains_affecting(state, p['id'])
         loud = any(t.get('rule') == 'uproar' for t in zones)
-        electric = is_grounded(p) and any(terrain_kind(t) == 'electric' for t in zones)
+        electric = grounded_in(p, zones) and any(terrain_kind(t) == 'electric' for t in zones)
         if not (loud or electric):
             continue
         for st in list(_statuses_of(p)):
@@ -2917,10 +2932,42 @@ def _trick_room(state):
                if state['trickRoomFlip'] else 'Trick Room cancelled before it took hold')
 
 
+def _in_gravity_at(state, participant, col, row):
+    """Whether a creature standing at (col, row) would be inside a Gravity zone (any tile of its footprint)."""
+    if (state.get('terrain') or {}).get('rule') == 'gravity':
+        return True
+    cells = {f"{c},{r}" for c, r in footprint_cells(col, row, footprint_size(participant.get("size")))}
+    return any(z.get('rule') == 'gravity' and cells & set(z.get('cells') or ()) for z in state.get('terrainZones') or ())
+
+
+def _set_token_altitude(state, pid, z):
+    """Forced altitude change -- Smack Down / Thousand Arrows / Graviton Beam / Roost bring a creature to the ground (0),
+    Skyward Soar takes it 60ft up. Like set-token-position this isn't the creature's own movement: no budget, no turn gate.
+    Landing in a hazard counts as entering it."""
+    tok = state['board']['tokens'].get(pid)
+    if pid not in state['participants'] or not tok:
+        raise ValueError('That participant has no token on the map')
+    z = int(z)
+    if z < 0 or z % 5:
+        raise ValueError('Altitude must be a whole number of 5ft steps, at or above the ground')
+    if z > 0 and _in_gravity_at(state, state['participants'][pid], tok['col'], tok['row']):
+        z = 0
+    previous = tok.get('z', 0)
+    tok['z'] = z
+    if z != previous:
+        _log_event(state, 'move', text=f"{state['participants'][pid]['name']} {'falls to the ground' if z == 0 else f'is now {z}ft up'}",
+                   actorId=pid, actorName=state['participants'][pid]['name'])
+    if state.get('started') and z < previous:
+        _queue_hazards(state, pid, 'enter')
+
+
 def _set_token_position(state, pid, col, row):
     if pid not in state['participants']:
         raise ValueError('Unknown participant: ' + pid)
-    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid), 'z': _altitude_of(state, pid)}
+    z = _altitude_of(state, pid)
+    if z and _in_gravity_at(state, state['participants'][pid], col, row):
+        z = 0  # pushed or placed into a Gravity field: it can't stay up there
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': _facing_of(state, pid), 'z': z}
     _wake_electric_sleepers(state)
     if state.get('started'):
         _queue_hazards(state, pid, 'enter')  # forced movement (a swap, a push) into a hazard counts too
@@ -3104,6 +3151,10 @@ def _move_token(state, pid, col, row, z=None):
             raise ValueError('Altitude must be a whole number of 5ft steps, at or above the ground')
         if z1 > 0 and participant.get('speeds') and is_grounded(participant):
             raise ValueError(f"{participant['name']} can't leave the ground (no flying speed)")
+    if z1 > 0 and _in_gravity_at(state, participant, col, row):
+        if z1 > z0:
+            raise ValueError(f"{participant['name']} can't fly inside the Gravity field")
+        z0 = z1 = 0  # flying into it: it lands (the fall itself costs no movement)
     if participant.get('speeds'):
         distance_ft = _move_cost_ft(state, participant, current['col'], current['row'], col, row, z0, z1) if current else 0
         _, best_remaining = _movement_budget(participant)

@@ -1778,6 +1778,19 @@
             }
           ],
           "note": "movement speed halved"
+        },
+        {
+          "kind": "ground_target",
+          "fallDice": "1d6",
+          "fallMax": 20,
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "You emit a concentrated beam of gravitational energy at a target within range. Make a ranged attack, dealing 3d10 + MOVE psychic damage on a hit. The target must then make a STR saving throw, falling prone with movement speed halved for 1 minute on a failure. While under the effect of this move, the target can't leave the ground, flee or be switched out. Flying or hovering creatures fall to the ground on a hit, taking fall damage when appropriate.",
@@ -1798,16 +1811,29 @@
       },
       "reaction": false,
       "categories": [
-        "status_condition_grounded"
+        "status_condition_grounded",
+        "field_terrain",
+        "set_terrain"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "grounded",
+          "kind": "set_terrain",
+          "name": "Gravity",
+          "description": "Everyone inside is grounded: no flying or hovering, Levitate suppressed.",
+          "radiusFt": 40,
+          "center": "caster",
+          "rounds": 10,
+          "concentration": true,
+          "rule": "gravity",
           "when": {
             "type": "always"
           },
-          "note": "every creature in the 40 ft sphere loses its flying/hovering speed; Levitate is suppressed"
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
         }
       ],
       "description": "You strengthen gravity in a 40 foot sphere, centered on you. Any creature in the area loses their flying/hovering speed, cannot use moves like Fly or Bounce, flying types lose their ground type resistance, and the Levitate ability is suppressed.",
@@ -4850,7 +4876,14 @@
       "description": "You generate a cyclone charged with lightning in a 30 foot radius around yourself. All creatures in range must make a DEX save against your Move DC, taking half damage on a success and full damage on a fail. Creatures in range that are not grounded or in the invulnerable stage of Fly or Bounce take double damage from this move. Roll a d6 on the table below to determine damage. 1: 2d6+MOVE 2-3: 3d6+MOVE 4-5: 4d6+MOVE 6: 5d6+MOVE",
       "moveStat": "STR/DEX",
       "vpCost": "50",
-      "scaling": "For damage rolls, use 2x Dice at level 5, 4x Dice at level 10, and 8x Dice at level 17."
+      "scaling": "For damage rolls, use 2x Dice at level 5, 4x Dice at level 10, and 8x Dice at level 17.",
+      "doubleDamageVsAirborne": true,
+      "hitsStates": [
+        "airborne"
+      ],
+      "doubleDamageVsStates": [
+        "airborne"
+      ]
     },
     {
       "name": "Discharge",
@@ -12291,6 +12324,35 @@
             }
           ],
           "target": "self"
+        },
+        {
+          "kind": "condition",
+          "apply": "grounded",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start",
+              "count": 1
+            }
+          ],
+          "note": "also loses its ground-type resistance; it cannot move again this turn"
+        },
+        {
+          "kind": "ground_target",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ]
     },
@@ -12408,6 +12470,20 @@
               "n": 1
             }
           ]
+        },
+        {
+          "kind": "set_altitude",
+          "z": 60,
+          "when": {
+            "type": "special"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "only if the AC boost made the attack miss"
         }
       ]
     },
@@ -16039,7 +16115,8 @@
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
       "hitsStates": [
         "underground"
-      ]
+      ],
+      "affectsGroundedOnly": true
     },
     {
       "name": "Devastating Tremors",
@@ -16130,7 +16207,8 @@
       "description": "You slam into the ground with immense force, creating tremors that break the ground in a 100ft. radius centered on you. All grounded creatures within the affected area must succeed a STR saving throw or take 10d12 + MOVE ground damage and are knocked prone. On a success, they take half damage and are not knocked prone. After doing this move, you must succeed a DC 20 CON saving throw, or become incapacitated for 1 round while recovering. The ground becomes difficult rocky terrain, and in a 15ft. radius centered on you, the ground becomes hazardous difficult terrain, dealing 2d6 typeless damage to creatures attempting to move through it. This move can be used once per long rest.",
       "moveStat": "STR",
       "vpCost": "75",
-      "scaling": "The damage dice for this move changes to 12d12 at level 5, 15d12 at level 10, and 20d12 at level 17."
+      "scaling": "The damage dice for this move changes to 12d12 at level 5, 15d12 at level 10, and 20d12 at level 17.",
+      "affectsGroundedOnly": true
     },
     {
       "name": "Dig",
@@ -16203,7 +16281,8 @@
       "description": "You cause the ground beneath a grounded opponent to erupt with power. Make a ranged attack, dealing 2d8 + MOVE ground damage on a hit. If the natural attack roll is 19 or 20, the target is burned and the next attack against it is rolled at advantage.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "affectsGroundedOnly": true
     },
     {
       "name": "Earthquake",
@@ -16258,7 +16337,8 @@
       "scaling": "The damage dice for this move changes to 5d10 at level 5, 6d12 at level 10, and 10d10 at level 17.",
       "hitsStates": [
         "underground"
-      ]
+      ],
+      "affectsGroundedOnly": true
     },
     {
       "name": "Fissure",
@@ -16373,7 +16453,8 @@
       "description": "You gather in the natural energy of the land around you and focus it into a sudden eruption of earth in a 40ft. radius, centered on a point within range. All grounded creatures caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. Creatures that fail the save have their speed halved until the end of their next turn as the ground clings to them.",
       "moveStat": "STR",
       "vpCost": "40",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "affectsGroundedOnly": true
     },
     {
       "name": "Magnitude",
@@ -17005,6 +17086,18 @@
               "type": "until_turn",
               "whose": "source",
               "point": "end"
+            }
+          ]
+        },
+        {
+          "kind": "ground_target",
+          "when": {
+            "type": "save_fail",
+            "ability": "DEX"
+          },
+          "ends": [
+            {
+              "type": "instant"
             }
           ]
         }
@@ -29561,8 +29654,35 @@
           "apply": "prone",
           "when": {
             "type": "on_hit"
+          }
+        },
+        {
+          "kind": "condition",
+          "apply": "grounded",
+          "when": {
+            "type": "on_hit"
           },
-          "note": "also loses any flying speed and ground-type immunity until the end of your next turn"
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "source",
+              "point": "end"
+            }
+          ],
+          "note": "loses any flying speed and its ground-type immunity"
+        },
+        {
+          "kind": "ground_target",
+          "fallDice": "1d6",
+          "fallMax": 20,
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "You throw a solid piece of stone at a creature in an attempt to bring them to the ground. Make a ranged attack, dealing 1d10 + MOVE rock damage on a hit. On a hit, the target is knocked prone, losing any flying speed and immunity to ground-type moves until the end of your next turn. If the target was in the air, it falls to the ground, taking 1d6 fall damage per 10 feet fallen, to a maximum of 20d6.",

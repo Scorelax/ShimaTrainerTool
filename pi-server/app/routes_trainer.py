@@ -84,10 +84,31 @@ def handle(conn, action, params):
 def get_trainers(conn):
     return [{
         'id': i,
-        'image': row[0],
+        'image': upstream.local_character_image_url(row[1]) or row[0],
         'name': row[1],
         'pinCode': row[22],
     } for i, (_, row) in enumerate(db.fetch_rows(conn, 'trainers', T), start=1)]
+
+
+def _with_character_image(row):
+    """Swap in the self-made portrait (upstream.local_character_image_url) for
+    the trainer row's image field, if one exists -- the stored URL stays in
+    the DB untouched as the fallback."""
+    portrait = upstream.local_character_image_url(row[1])
+    if not portrait:
+        return row
+    row = list(row)
+    row[0] = portrait
+    return row
+
+
+def _keep_stored_image(new_row, stored_row):
+    """The client sends back the whole row it was given, portrait URL
+    included -- never persist that; keep whatever image was stored."""
+    if str(new_row[0] or '').startswith(upstream.CHARACTER_IMAGE_URL_PREFIX):
+        new_row = list(new_row)
+        new_row[0] = stored_row[0] if stored_row is not None else ''
+    return new_row
 
 
 def _with_local_sprite(row, animated=True):
@@ -117,7 +138,7 @@ def store_trainer_and_pokemon_data(conn, trainer_name, animated=True):
         _with_local_sprite(row, animated) for _, row in db.fetch_rows(conn, 'pokemon', P)
         if str(row[0]).lower() == trainer_name.lower()
     ]
-    return {'trainerData': trainer_entry, 'pokemonData': pokemon_entries}
+    return {'trainerData': _with_character_image(trainer_entry), 'pokemonData': pokemon_entries}
 
 
 def load_trainer_full_bundle(conn, trainer_name, animated=True):
@@ -223,7 +244,7 @@ def create_trainer(conn, trainer):
         ]
 
         db.insert_row(conn, 'trainers', T, row_data)
-        return {'status': 'success', 'message': 'Trainer created successfully!', 'rowData': row_data}
+        return {'status': 'success', 'message': 'Trainer created successfully!', 'rowData': _with_character_image(row_data)}
     except Exception:
         return {'status': 'error', 'message': 'Failed to create trainer. Please try again.'}
 
@@ -232,7 +253,7 @@ def update_trainer_data(conn, new_trainer_data):
     name = str(new_trainer_data[1]).lower()
     for rowid, row in db.fetch_rows(conn, 'trainers', T):
         if str(row[1]).lower() == name:
-            db.update_row(conn, 'trainers', rowid, T, new_trainer_data)
+            db.update_row(conn, 'trainers', rowid, T, _keep_stored_image(new_trainer_data, row))
             return {'status': 'success'}
     return {'status': 'error', 'message': 'Trainer not found.'}
 

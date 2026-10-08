@@ -9,6 +9,7 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 import httpx
 
@@ -78,6 +79,18 @@ BATTLE_ANIMATION_DIR = os.path.expanduser(
 # filesystem-check, no-caching-layer reasoning as the others.
 BATTLE_IMAGE_DIR = os.path.expanduser(
     os.environ.get('BATTLE_IMAGE_DIR', '~/pokemon-dnd/battle-images'))
+
+# Self-made trainer portraits, e.g. Joey.png -- named after the trainer (case-
+# insensitive), used instead of the trainer's stored image URL whenever one
+# exists (local_character_image_url). Same live-filesystem-check reasoning as
+# the dirs above, so dropping a new file in shows up on the next load.
+CHARACTER_IMAGE_DIR = os.path.expanduser(
+    os.environ.get('CHARACTER_IMAGE_DIR', '~/pokemon-dnd/images/characters'))
+
+# Every local_character_image_url() return value starts with this -- like
+# SPRITE_URL_PREFIX, used to refuse persisting one into the trainers table.
+CHARACTER_IMAGE_URL_PREFIX = '/character-images/'
+_CHARACTER_IMAGE_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.gif')
 
 # Apps Script upstreams can be slow (cold starts)
 _FETCH_TIMEOUT = 120.0
@@ -308,6 +321,22 @@ def local_evolution_video_url(pre_evolved_name, evolved_name):
         # See the matching comment in local_sprite_url() above -- same
         # mtime-stamped-URL reasoning.
         return f'/evolution-videos/{filename}?t={int(os.path.getmtime(path))}'
+    return None
+
+
+def local_character_image_url(trainer_name):
+    """Self-made portrait for trainer_name in CHARACTER_IMAGE_DIR (file name =
+    the trainer's name, any case, any of _CHARACTER_IMAGE_EXTS), or None.
+    Same mtime-stamped-URL reasoning as local_sprite_url()."""
+    wanted = str(trainer_name or '').strip().lower()
+    if not wanted or not os.path.isdir(CHARACTER_IMAGE_DIR):
+        return None
+    for filename in sorted(os.listdir(CHARACTER_IMAGE_DIR)):
+        stem, ext = os.path.splitext(filename)
+        if stem.lower() == wanted and ext.lower() in _CHARACTER_IMAGE_EXTS:
+            path = os.path.join(CHARACTER_IMAGE_DIR, filename)
+            if os.path.isfile(path):
+                return f'{CHARACTER_IMAGE_URL_PREFIX}{quote(filename)}?t={int(os.path.getmtime(path))}'
     return None
 
 

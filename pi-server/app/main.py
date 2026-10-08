@@ -50,7 +50,7 @@ db.init()
 # stamp a `?t=<mtime>` onto the URL itself, so a replaced file gets a brand
 # new URL automatically -- nothing for the browser to revalidate, nothing to
 # ever go stale, nothing to manually clear.
-_VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/')
+_VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', upstream.CHARACTER_IMAGE_URL_PREFIX)
 
 # Benjakronk's splash mirror and the bundled PWA assets aren't stamped with a
 # version (their filenames stay constant even when the content behind them
@@ -239,6 +239,11 @@ if os.path.isdir(upstream.CRY_DIR):
 if os.path.isdir(upstream.BATTLE_ANIMATION_DIR):
     app.mount('/battle-animations', StaticFiles(directory=upstream.BATTLE_ANIMATION_DIR),
               name='battle-animations')
+
+# Self-made trainer portraits (see upstream.CHARACTER_IMAGE_DIR / upstream.local_character_image_url)
+if os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
+    app.mount(upstream.CHARACTER_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=upstream.CHARACTER_IMAGE_DIR),
+              name='character-images')
 
 # Battle-map background images (see upstream.BATTLE_IMAGE_DIR / routes_combat.py's list-backgrounds)
 if os.path.isdir(upstream.BATTLE_IMAGE_DIR):

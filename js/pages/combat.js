@@ -2366,6 +2366,8 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weathers = [], moveN
     if (!cond) return { met: false, magnitude: 0 };
     switch (cond.type) {
       case 'self_always': return { met: true, magnitude: 1 };
+      // Pursuit: "if the creature is ... being switched out, double the damage dice" -- what the reaction is answering.
+      case 'self_reacting_to': return { met: !!c.reactingToTrigger && (cond.any || []).includes(c.reactingToTrigger), magnitude: 1 };
       case 'self_hp_below': return { met: hpFrac !== null && hpFrac < cond.fraction, magnitude: 1 };
       case 'self_hp_at_or_below': return { met: hpFrac !== null && hpFrac <= cond.fraction, magnitude: 1 };
       // Eruption's own "if at full health" -- the self-conditional side's
@@ -2983,7 +2985,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // Limit Break (below 50% HP), Dawn Burst (above 75%), Snore (asleep), Recompose (no enemy in melee range). Statuses and the
   // nearest enemy are only known in the shared battle (bridged onto `c` by combat-wip.js); unknowns never block.
   const _weatherBlock = weatherRequirementUnmet(moveEffectsFor(moveName), _weathers) || roundRequirementUnmet(moveEffectsFor(moveName), state.round)
-    || selfRequirementUnmet(moveEffectsFor(moveName), { hp: c.currentHp, maxHp: c.maxHp, statuses: c.liveStatuses, nearestHostileFt: c.nearestHostileFt });
+    || selfRequirementUnmet(moveEffectsFor(moveName), { hp: c.currentHp, maxHp: c.maxHp, statuses: c.liveStatuses, nearestHostileFt: c.nearestHostileFt,
+      round: c.enteredRound != null ? state.round : null, enteredRound: c.enteredRound });
 
   // Bide -- a genuinely different shape from every other move: no dice at
   // all, its payoff is computed server-side from damage actually taken

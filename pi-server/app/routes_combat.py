@@ -990,6 +990,7 @@ def _add_participant(state, data):
     }
     if status == 'participating':
         _apply_switch_heal(state, state['participants'][pid])
+        _entered_battle(state, state['participants'][pid])
     _rebuild_turn_order(state)
     _log_event(state, 'join', text=f"{state['participants'][pid]['name']} joined the battle", actorId=pid, actorName=state['participants'][pid]['name'])
 
@@ -1001,7 +1002,24 @@ def _drop_pending_switch_involving(state, ids):
         state['pendingSwitch'] = None
 
 
+def _end_source_leaves(state, pid):
+    """`pid` left the battle (switched out, benched, removed): every status it put on someone that lasts "while the user remains
+    in battle" (`ends: [{type: 'source_leaves'}]` -- Spirit Shackle, Thousand Waves) ends."""
+    name = (state['participants'].get(pid) or {}).get('name') or 'its source'
+    for p in state['participants'].values():
+        for s in list(_statuses_of(p)):
+            if s.get('sourceId') == pid and any(e.get('type') == 'source_leaves' for e in s.get('ends') or []):
+                _expire_status(state, p, s, f'{name} left the battle')
+
+
+def _entered_battle(state, participant):
+    """Remembers the round a creature came into the battle (Fake Out / First Impression: "only usable in the first round you
+    are in combat"). Before the battle starts that is round 1."""
+    participant['enteredRound'] = state['round'] if state.get('started') else 1
+
+
 def _remove_participant(state, pid):
+    _end_source_leaves(state, pid)
     state['participants'].pop(pid, None)
     state['board']['tokens'].pop(pid, None)
     _drop_pending_switch_involving(state, {pid})
@@ -1023,6 +1041,8 @@ def _leave_session(conn, owner):
         leaving = {pid for pid, p in state['participants'].items() if p.get('owner') == owner}
         _drop_pending_switch_involving(state, leaving)
         for pid in leaving:
+            _end_source_leaves(state, pid)
+        for pid in leaving:
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
         _log_event(state, 'leave', text=f'{owner} left the battle', actorName=owner)
@@ -1037,9 +1057,14 @@ def _set_status(state, pid, status):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
+    was = participant.get('status')
     participant['status'] = status
     if status == 'participating':
         _apply_switch_heal(state, participant)
+        if was != 'participating':
+            _entered_battle(state, participant)
+    elif was == 'participating':
+        _end_source_leaves(state, pid)
     _rebuild_turn_order(state)
 
 
@@ -1213,10 +1238,19 @@ def _perform_switch(state, pending):
             _statuses_of(inn).append(copy_)
             _statuses_of(out).remove(s)
     _apply_switch_heal(state, inn)
+    _entered_battle(state, inn)
+    _end_source_leaves(state, out_id)
     if not state.get('started'):
         _rebuild_turn_order(state)
     _log_event(state, 'switch', text=f"{owner} withdraws {out['name']} and sends out {inn['name']}{' (passing along its effects)' if pending.get('pass') else ''}",
                actorId=in_id, actorName=inn['name'])
+    if state.get('started') and in_id in state['board']['tokens']:
+        _queue_hazards(state, in_id, 'enter')  # sent out onto Spikes
+        # Sticky Web / Toxic Spikes: "when a creature is switched into battle, you may use your reaction".
+        if not state.get('pendingReaction'):
+            hostile = {pid for pid, p in state['participants'].items() if pid != in_id and p.get('status') == 'participating' and _hostile(state, inn, p)}
+            if hostile:
+                _open_reaction_window(state, 'switch_in', in_id, in_id, '', only_ids=hostile)
 
 
 def _queue_switch_heal(state, pid, mode):
@@ -1939,7 +1973,7 @@ def _active_participant_id(state):
 # ---------------------------------------------------------------------------
 
 _STATUS_KINDS = ('condition', 'stat', 'roll', 'temp_hp', 'heal')
-_END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'long_rest', 'uses', 'instant', 'other')
+_END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'long_rest', 'uses', 'instant', 'other', 'source_leaves')
 # value2: a type_changed condition's optional second type (Reflect Type copying a
 # dual-type creature) -- every other condition/kind only ever uses `value`.
 # repeat: a `heal` status only (Aqua Ring/Ingrain's heal-over-time) -- 'start_of_turn' |

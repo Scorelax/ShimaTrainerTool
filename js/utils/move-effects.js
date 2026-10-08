@@ -335,6 +335,7 @@ export function describeEnd(e) {
     case 'save': return `${e.ability} save (${TIMING_TEXT[e.timing] || e.timing})`;
     case 'concentration': return 'while concentrating';
     case 'encounter': return 'rest of the battle';
+    case 'source_leaves': return 'while its user stays in the battle';
     case 'long_rest': return 'until a long rest';
     case 'uses': return e.left != null ? `${e.left} use${e.left === 1 ? '' : 's'} left` : `next ${e.n === 1 ? 'use' : e.n + ' uses'}`;
     case 'instant': return 'instant';
@@ -1333,6 +1334,8 @@ export function selfRequirementUnmet(effects, self) {
     if (e.hpAbove != null && frac !== null && !(frac > e.hpAbove)) return e.message || `Needs to be above ${Math.round(e.hpAbove * 100)}% HP`;
     if (e.status && Array.isArray(self?.statuses) && !self.statuses.some(s => s.kind === 'condition' && s.apply === e.status)) return e.message || `Only while ${e.status}`;
     if (e.noHostileWithinFt != null && Number.isFinite(self?.nearestHostileFt) && self.nearestHostileFt <= e.noHostileWithinFt) return e.message || `Not with an enemy within ${e.noHostileWithinFt}ft`;
+    // Fake Out / First Impression: only in the first round this creature is in the battle (a switch-in starts it over).
+    if (e.firstRoundInBattle && Number.isFinite(self?.round) && self.round > (Number(self?.enteredRound) || 1)) return e.message || 'Only in your first round in the battle';
   }
   return null;
 }

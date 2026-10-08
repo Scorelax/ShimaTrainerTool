@@ -109,7 +109,7 @@ export function showReactionPromptIfEligible(session, myParticipantIds, { getNam
     _shownWindowId = pr.id;
     _declinedThisWindow = new Set();
     const anchorName = getName?.(pr.anchorId) || 'a participant';
-    const triggerText = pr.trigger === 'damaged' ? `${anchorName} just took damage` : pr.trigger === 'moved_away' ? `${anchorName} is moving away` : pr.trigger === 'switch_out' ? `${anchorName} is being switched out` : `${anchorName} is being targeted`;
+    const triggerText = pr.trigger === 'damaged' ? `${anchorName} just took damage` : pr.trigger === 'moved_away' ? `${anchorName} is moving away` : pr.trigger === 'switch_out' ? `${anchorName} is being switched out` : pr.trigger === 'switch_in' ? `${anchorName} was just sent out` : `${anchorName} is being targeted`;
     document.getElementById('reactionPromptDesc').textContent = `${triggerText}. You may react.`;
     document.getElementById('reactionPromptOptions').innerHTML = mine.map(id => `
       <div class="reaction-prompt-option" data-participant-id="${id}">

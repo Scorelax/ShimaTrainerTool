@@ -1289,6 +1289,9 @@ function _syncLocalCombatState(session) {
     merged.stabMultiplier = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'stab_doubled') ? 2 : 1;
     // Move gates on the user's own state (combat.js's selfRequirementUnmet): Snore needs `asleep`, Recompose no enemy in reach.
     merged.liveStatuses = p.statuses || [];
+    merged.enteredRound = p.enteredRound ?? null; // Fake Out / First Impression
+    // Pursuit's doubled dice against a switch-out: the trigger of the window this participant is reacting to.
+    merged.reactingToTrigger = session.reactingParticipantId === p.id ? (session.pendingReaction?.trigger || null) : null;
     merged.nearestHostileFt = _nearestHostileFt(session, p.id);
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as

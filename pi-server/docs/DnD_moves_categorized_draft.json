@@ -266,7 +266,14 @@
       "description": "You make quite the entrance, quickly attacking a creature. This attack can only be used on the first turn that the user has entered combat. Make a melee attack on a creature, doing 2d8 + MOVE bug damage on a hit. This move may go first the initiative order if you have a valid target.",
       "moveStat": "DEX",
       "vpCost": "7",
-      "scaling": "The damage dice roll for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice roll for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "requires_self",
+          "firstRoundInBattle": true,
+          "message": "First Impression can only be used on your first turn in the battle"
+        }
+      ]
     },
     {
       "name": "Fury Cutter",
@@ -922,7 +929,9 @@
       "description": "You quickly fire a sticky web at a creature entering the battle. When a creature is switched into battle, you may use your reaction to make a ranged attack on the creature. On a hit, the target is restrained The creature may make a STR save against your Move DC at the beginning of each of its turns to escape the web.",
       "moveStat": "DEX",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "switch_in",
+      "reactionRange": 50
     },
     {
       "name": "String Shot",
@@ -3743,7 +3752,8 @@
       "categories": [
         "damage",
         "counter_reaction_effect",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "damage_note"
       ],
       "description": "As a reaction, when a creature moves away from you or is switched out by their trainer, you may make a ranged attack roll against it, doing 1d6 + MOVE dark damage on a hit. If the creature is fleeing combat or being switched out, double the damage dice.",
       "moveStat": "STR/DEX",
@@ -3753,7 +3763,20 @@
         "moved_away",
         "switch_out"
       ],
-      "reactionRange": 40
+      "reactionRange": 40,
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_reacting_to",
+            "any": [
+              "switch_out"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "It is being switched out -- damage dice doubled"
+        }
+      ]
     },
     {
       "name": "Quash",
@@ -13942,8 +13965,7 @@
           },
           "ends": [
             {
-              "type": "other",
-              "text": "until the attacker leaves the battle"
+              "type": "source_leaves"
             }
           ],
           "note": "Blocks grid movement and switching out."
@@ -17136,7 +17158,7 @@
           },
           "ends": [
             {
-              "type": "encounter"
+              "type": "source_leaves"
             }
           ]
         }
@@ -19940,6 +19962,11 @@
         "status_condition_flinched"
       ],
       "effects": [
+        {
+          "kind": "requires_self",
+          "firstRoundInBattle": true,
+          "message": "Fake Out can only be used in your first round in the battle"
+        },
         {
           "kind": "condition",
           "apply": "flinched",
@@ -25892,7 +25919,9 @@
       "description": "You quickly summon a trap of poisonous spikes around a creature that enters the battle. When a creature is switched into battle, you may use your reaction to force a creature to make a CON save against your Move DC, becoming poisoned on a failure.",
       "moveStat": "CON/DEX",
       "vpCost": "3",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "switch_in",
+      "reactionRange": 50
     },
     {
       "name": "Toxic Thread",

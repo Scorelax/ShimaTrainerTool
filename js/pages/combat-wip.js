@@ -377,6 +377,42 @@ const WIP_CSS = `
   }
   #wipBattlePhase .combat-end-turn-bottom { margin: 0.4rem auto 1rem; }
 
+
+  /* ---- ability tiles you click to edit (replaces the separate Modify Stats section) ---- */
+  #wipBattlePhase .stat-tiles { align-items: start; }
+  #wipBattlePhase .stat-tile {
+    display: flex; flex-direction: column; align-items: center; line-height: 1.2; padding: 0.3rem 0.1rem; border-radius: 10px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(140,170,255,0.14); font-weight: 700;
+  }
+  #wipBattlePhase .stat-tile--editable { padding: 0; }
+  #wipBattlePhase .stat-tile-toggle {
+    all: unset; box-sizing: border-box; width: 100%; padding: 0.3rem 0.1rem; cursor: pointer; border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; line-height: 1.2; font-weight: 700; font-size: 0.74rem; color: #d7dcff;
+  }
+  #wipBattlePhase .stat-tile-toggle small { color: #8f97c4; font-weight: 600; }
+  #wipBattlePhase .stat-tile--editable:hover { border-color: rgba(255,215,0,0.55); background: rgba(255,215,0,0.08); }
+  #wipBattlePhase .stat-tile.editing { border-color: #FFD700; box-shadow: 0 0 0 2px rgba(255,215,0,0.22); background: rgba(255,215,0,0.1); }
+  #wipBattlePhase .stat-tile-editor {
+    grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 0.45rem; padding: 0.35rem 0.5rem;
+    border-radius: 12px; background: rgba(255,215,0,0.06); border: 1px solid rgba(255,215,0,0.35);
+  }
+  #wipBattlePhase .stat-tile-editor-label { font-weight: 800; font-size: 0.78rem; color: #FFD700; letter-spacing: 0.06em; }
+  #wipBattlePhase .stat-tile-editor .stat-adjust-val { width: 54px; text-align: center; }
+  #wipBattlePhase .stat-tile-editor .stat-tile-done {
+    all: unset; cursor: pointer; margin-left: 0.3rem; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 999px;
+    background: rgba(255,215,0,0.2); color: #FFD700;
+  }
+
+  /* AC under Init */
+  #wipBattlePhase .combat-card-ac-line--under-portrait { align-self: center; margin-top: 0.3rem; white-space: nowrap; font-size: 0.72rem; padding: 0.15rem 0.5rem; }
+
+  /* compact moves: three to a row */
+  #wipBattlePhase .expanded-moves-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem; }
+  #wipBattlePhase .combat-move-item { padding: 0.38rem 0.5rem; font-size: 0.78rem; border-radius: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 560px) {
+    #wipBattlePhase .expanded-moves-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
   @media (max-width: 560px) {
     #wipBattlePhase .combat-mods-row { grid-template-columns: repeat(3, 1fr); }
     #wipBattlePhase .combat-card-img { width: 84px; height: 84px; }

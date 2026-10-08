@@ -901,6 +901,42 @@ export function renderBattlePhase(state, cardOptions = {}) {
 // COMBAT CARD
 // ============================================================================
 
+// The ability score whose inline editor is open on the shared battle card ("combatantId:stat"), kept across the re-render
+// every +/- triggers so the editor stays open while you adjust.
+let _editingStat = null;
+
+/** The six ability scores. The shared battle card (compactWip) shows them as tiles you click to edit in place -- the
+ * separate "Modify Stats" section repeated the same numbers. The legacy page keeps the plain row. */
+function _abilityScoresHtml(c, modTag, { compactWip, readOnly }) {
+  const keys = [['str', 'strMod'], ['dex', 'dexMod'], ['con', 'conMod'], ['int', 'intMod'], ['wis', 'wisMod'], ['cha', 'chaMod']];
+  if (!compactWip) {
+    return `
+          <div class="combat-card-stats-row combat-mods-row">
+            ${keys.map(([k, m]) => `<span>${k.toUpperCase()} ${c[k]}<small>(${formatMod(c[m])})</small>${modTag(k)}</span>`).join('\n            ')}
+          </div>`;
+  }
+  let editor = '';
+  const tiles = keys.map(([k, m]) => {
+    const label = `${k.toUpperCase()} ${c[k]}<small>(${formatMod(c[m])})</small>${modTag(k)}`;
+    if (readOnly) return `<span class="stat-tile">${label}</span>`;
+    const editing = _editingStat === `${c.id}:${k}`;
+    if (editing) {
+      // The tiles stay where they are; the open one is highlighted and its stepper sits on a strip under the row.
+      editor = `<div class="stat-tile-editor">
+              <span class="stat-tile-editor-label">${k.toUpperCase()}</span>
+              <button class="stat-delta-btn" data-combatant-id="${c.id}" data-stat="${k}" data-delta="-1">−</button>
+              <input type="number" class="stat-adjust-val" value="${c[k]}" data-combatant-id="${c.id}" data-stat="${k}">
+              <button class="stat-delta-btn" data-combatant-id="${c.id}" data-stat="${k}" data-delta="1">+</button>
+              <button type="button" class="stat-tile-toggle stat-tile-done" data-combatant-id="${c.id}" data-stat="${k}">Done</button>
+            </div>`;
+    }
+    return `<div class="stat-tile stat-tile--editable${editing ? ' editing' : ''}">
+              <button type="button" class="stat-tile-toggle" data-combatant-id="${c.id}" data-stat="${k}" title="${editing ? 'Done' : `Change ${k.toUpperCase()}`}">${label}</button>
+            </div>`;
+  }).join('');
+  return `<div class="combat-card-stats-row combat-mods-row stat-tiles">${tiles}${editor}</div>`;
+}
+
 export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom, readOnly } = {}) {
   const fainted = c.currentHp <= 0;
   const hpPct = c.maxHp > 0 ? Math.round((c.currentHp / c.maxHp) * 100) : 0;
@@ -945,6 +981,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
         <div class="combat-card-portrait-col">
           ${spriteMediaHtml(c.image, c.name, 'combat-card-img')}
           ${compactWip ? `<span class="combat-initiative-badge combat-initiative-badge--under-portrait">Init ${c.initiativeTotal}</span>` : ''}
+          ${compactWip && c.hasStatBlock !== false ? `<div class="combat-card-ac-line combat-card-ac-line--under-portrait">AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}</div>` : ''}
         </div>
         <div class="combat-card-body">
           <div class="combat-card-name-row">
@@ -956,7 +993,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
               : `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>`}
           </div>
           <div class="combat-card-stats-group">
-            ${c.hasStatBlock === false ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}</div>`}
+            ${c.hasStatBlock === false || compactWip ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}</div>`}
             <div class="combat-card-stats-row">
               <span class="stat-bar-wrap">HP: <strong>${c.currentHp}/${c.maxHp}</strong>${c.tempHp ? `<sup class="temp-hp-tag" title="Temporary HP -- absorbs damage before real HP">+${c.tempHp}</sup>` : ''}
                 <div class="mini-bar"><div class="mini-bar-fill hp-bar" style="width:${hpPct}%"></div></div>
@@ -966,15 +1003,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
               </span>
             </div>
           </div>
-          ${c.hasStatBlock === false ? '' : `
-          <div class="combat-card-stats-row combat-mods-row">
-            <span>STR ${c.str}<small>(${formatMod(c.strMod)})</small>${modTag('str')}</span>
-            <span>DEX ${c.dex}<small>(${formatMod(c.dexMod)})</small>${modTag('dex')}</span>
-            <span>CON ${c.con}<small>(${formatMod(c.conMod)})</small>${modTag('con')}</span>
-            <span>INT ${c.int}<small>(${formatMod(c.intMod)})</small>${modTag('int')}</span>
-            <span>WIS ${c.wis}<small>(${formatMod(c.wisMod)})</small>${modTag('wis')}</span>
-            <span>CHA ${c.cha}<small>(${formatMod(c.chaMod)})</small>${modTag('cha')}</span>
-          </div>`}
+          ${c.hasStatBlock === false ? '' : _abilityScoresHtml(c, modTag, { compactWip, readOnly })}
         </div>
       </div>
       <div class="combat-card-footer">
@@ -1147,7 +1176,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
 
   // Purely an editing widget -- the same scores + modifiers it edits are already
   // shown in the base card's mods row, so readOnly just drops it, no info lost.
-  const statSection = readOnly ? '' : `
+  const statSection = readOnly || compactWip ? '' : `
     <div class="expanded-stats-adj-section">
       <div class="expanded-section-label">Modify Stats</div>
       <div class="stat-adjust-grid">
@@ -2007,6 +2036,15 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
       if (e.target.closest('.combat-switch-open-btn')) {
         showSwitchPopup(state); return;
       }
+      const statToggle = e.target.closest('.stat-tile-toggle');
+      if (statToggle) {
+        const key = `${statToggle.dataset.combatantId}:${statToggle.dataset.stat}`;
+        _editingStat = _editingStat === key ? null : key;
+        rerenderBattle(state);
+        if (_editingStat) document.querySelector(`.stat-adjust-val[data-combatant-id="${statToggle.dataset.combatantId}"][data-stat="${statToggle.dataset.stat}"]`)?.select();
+        return;
+      }
+      if (e.target.closest('.stat-tile, .stat-tile-editor')) return; // the editor's own input
       const moveItem = e.target.closest('.combat-move-item');
       if (moveItem && !moveItem.disabled) {
         if (moveItem.dataset.isDiceLocked === 'true') {

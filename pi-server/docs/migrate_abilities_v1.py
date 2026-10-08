@@ -122,7 +122,7 @@ STATUS_FOUR = ['poisoned', 'burned', 'confused', 'paralyzed']
 # --- batch A effects ----------------------------------------------------------------
 EFFECTS = {
     # pinch boosts (below 25% HP)
-    'Overgrow': pinch('Grass', 'Water', note='Text says WATER moves cost more (Blaze/Torrent/Swarm use their own type) -- kept as written, see open questions.'),
+    'Overgrow': pinch('Grass', 'Grass', note="The dex text says WATER moves cost more -- a typo for grass (user's call, 2026-10-08)."),
     'Blaze': pinch('Fire', 'Fire'),
     'Torrent': pinch('Water', 'Water'),
     'Swarm': pinch('Bug', 'Bug'),

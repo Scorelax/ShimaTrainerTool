@@ -3220,11 +3220,11 @@
      "multiplier": 1.5,
      "filter": {
       "moveTypes": [
-       "Water"
+       "Grass"
       ],
       "damaging": true
      },
-     "note": "Text says WATER moves cost more (Blaze/Torrent/Swarm use their own type) -- kept as written, see open questions."
+     "note": "The dex text says WATER moves cost more -- a typo for grass (user's call, 2026-10-08)."
     }
    ]
   },

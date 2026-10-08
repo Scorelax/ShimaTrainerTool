@@ -1078,7 +1078,7 @@ export function describeEnds(ends) {
  * the caller already resolved rolled durations (a {dice} entry given an `n`). */
 export function buildStatusSpec(effect, { sourceId, sourceName, moveName, dc, ends }) {
   const spec = { kind: effect.kind, sourceId, sourceName, moveName, dc, ends: ends || effect.ends || [] };
-  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'against', 'appliesTo', 'noSwitch']) {
+  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'against', 'appliesTo', 'noSwitch', 'tick']) {
     if (effect[k] !== undefined) spec[k] = effect[k];
   }
   if (effect.stacks) spec.stacks = effect.stacks;

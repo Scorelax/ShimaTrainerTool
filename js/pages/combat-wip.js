@@ -811,7 +811,12 @@ setSaveAbilityResolver((ability, saver) => {
   return ability === 'WIS' ? 'CON' : ability === 'CON' ? 'WIS' : ability;
 });
 // Hurricane's advantage in rain / disadvantage in harsh sunlight, read off the weather the attacker stands in.
-setWeatherAttackModeResolver((moveName, attackerId) => weatherAttackMode(moveEffectsFor(moveName), weathersAffecting(session, attackerId)));
+setWeatherAttackModeResolver((moveName, attackerId) => {
+  // Smog: "any attacks made from inside it are done at disadvantage" -- a zone rule on the attacker's own tile.
+  const smog = terrainsAffecting(session, attackerId).find(t => t.rule === 'smog');
+  if (smog) return { mode: 'disadvantage', note: `Attacking from inside ${smog.name}: disadvantage` };
+  return weatherAttackMode(moveEffectsFor(moveName), weathersAffecting(session, attackerId));
+});
 // Semi-invulnerable targets (underground, airborne, ...) are hidden from every picker unless the move
 // lists their state in `hitsStates`.
 setTargetabilityResolver((participant, moveName) => untargetableState(participant, moveFlagsFor(moveName).hitsStates || []));
@@ -3392,7 +3397,10 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
             flat: h.addMove && caster ? bestMoveStatModifier(moveRow, caster) : 0, dc,
             // Uproar hits at the START of a turn only and never its caster -- the server reads these two off the zone.
             ...(h.only ? { only: h.only } : {}), ...(h.excludeSource ? { excludeSource: true } : {}),
+            // Quicksand Trap / Poison Gas / Smog: what a failed save inflicts, and how a pass changes the damage.
+            ...(h.onSave ? { onSave: h.onSave } : {}), ...(h.condition ? { condition: h.condition } : {}),
           };
+          if (!props.hazard.dice) { delete props.hazard.dice; props.hazard.flat = 0; }
         }
         await CombatAPI.setTerrain(effect.name || moveName, effect.description || '', {
           rounds: effect.rounds, healDice: terrainHealDice(effect, caster?.level), sourceId: attackerId, sourceName: caster?.name,
@@ -3567,6 +3575,18 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         description: `${moveName}: roll ${effect.amount.rollOnApply} -- ${effect.amount.sign < 0 ? 'subtracted from' : 'added to'} ${String(effect.stat).replace(/_/g, ' ')}` });
       if (rolled === null) continue;
       effect = { ...effect, amount: (effect.amount.sign < 0 ? -1 : 1) * rolled };
+    }
+    if (effect.tick) {
+      // Leech Seed / Infestation / Fire Spin: a damage tick the server queues at the holder's turn boundary (routes_combat.py's
+      // _queue_status_ticks) -- its dice, MOVE bonus and save DC are fixed now, from the caster.
+      const t = effect.tick;
+      const moveRow = findMoveRow(moveName) || [];
+      effect = { ...effect, tick: {
+        timing: t.timing || 'end', damageType: t.damageType || '', dice: tierAt(t.diceTiers, attacker?.level) || t.dice || '',
+        flat: t.addMove && attacker ? bestMoveStatModifier(moveRow, attacker) : (t.flat || 0),
+        ...(t.ability ? { ability: t.ability, dc } : {}), ...(t.onSave ? { onSave: t.onSave } : {}),
+        ...(t.pool ? { pool: t.pool } : {}), ...(t.drain ? { drain: t.drain } : {}),
+      } };
     }
     if (effect.stacks?.max === 'proficiency') {
       // Power-Up Punch: "max stacks = proficiency bonus", read from the caster now.
@@ -5162,7 +5182,7 @@ function _maybePromptHazards(state) {
     if (!p || (p.owner && p.owner !== me)) continue;
     _hazardsPrompted.add(h.id);
     promptHazard(h).then(res => {
-      if (res) return CombatAPI.resolveHazard(h.id, res.roll, res.saved);
+      if (res) return CombatAPI.resolveHazard(h.id, res.roll, res.saved, res.failedBy);
     }).catch(err => showCombatAlert(err.message, { title: 'Error' }));
   }
 }

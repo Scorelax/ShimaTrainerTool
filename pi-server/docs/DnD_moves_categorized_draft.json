@@ -371,7 +371,31 @@
               "dice": "1d4"
             }
           ],
-          "note": "CON save at the start of each of its turns, taking 1d4 + MOVE bug damage on a failure"
+          "tick": {
+            "timing": "start",
+            "damageType": "Bug",
+            "ability": "CON",
+            "onSave": "none",
+            "addMove": true,
+            "diceTiers": [
+              [
+                1,
+                "1d4"
+              ],
+              [
+                5,
+                "1d6"
+              ],
+              [
+                10,
+                "1d8"
+              ],
+              [
+                17,
+                "1d10"
+              ]
+            ]
+          }
         }
       ],
       "description": "You summon an infestation of tiny insects to attack a creature for multiple turns. Make a ranged attack on a target. On a hit, the target takes 1d4 + MOVE bug damage and becomes infested for 1d4 rounds. An infested creature must make a CON save against your Move DC at the beginning of each of its turns, taking 1d4 + MOVE bug damage on a failed save.",
@@ -1805,16 +1829,33 @@
       "reaction": false,
       "categories": [
         "field_terrain",
-        "potential_status_condition_prone"
+        "potential_status_condition_prone",
+        "set_terrain"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "prone",
+          "kind": "set_terrain",
+          "name": "Gravity Well",
+          "description": "Difficult terrain; a creature that enters or starts its turn here makes a STR save or falls prone.",
+          "radiusFt": 30,
+          "center": "point",
+          "difficult": true,
+          "untilSourceTurn": true,
+          "hazard": {
+            "ability": "STR",
+            "condition": {
+              "apply": "prone"
+            }
+          },
           "when": {
-            "type": "save_fail",
-            "ability": "STR"
-          }
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
         }
       ],
       "description": "The user manipulates gravity in a 30-foot radius sphere centered on a point within 100 feet. The area becomes difficult terrain until the beginning of the user's next turn, and any creature that enters the area or starts its turn there must succeed on a Strength saving throw or be knocked prone.",
@@ -10370,7 +10411,30 @@
       "description": "You release a series of moving flames that dance around a target. Make a ranged attack roll, doing 1d10 + MOVE fire damage on a hit. As long as you maintain concentration, the target takes an additional 1d10 fire damage at the end of each of its next three turns.",
       "moveStat": "DEX",
       "vpCost": "4",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "condition",
+          "apply": "fire_spin",
+          "when": {
+            "type": "on_hit"
+          },
+          "tick": {
+            "timing": "end",
+            "damageType": "Fire",
+            "dice": "1d10"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            },
+            {
+              "type": "concentration"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Flame Burst",
@@ -10791,14 +10855,58 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "multi_hit_aoe",
-        "trigger_saving_throw"
+        "field_terrain",
+        "set_terrain"
       ],
       "description": "You stir up a maelstrom of fire in a 20ft radius, 15ft tall, centered on a point within range, that continues to rage as long as you hold your concentration. Any creature that enters this area for the first time on their turn, or is in that area at the beginning of their turn must make a CON save against your Move DC, taking 3d10 + MOVE fire damage on a failure, or half as much on a success.",
       "moveStat": "STR",
       "vpCost": "30",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "effects": [
+        {
+          "kind": "set_terrain",
+          "name": "Magma Storm",
+          "description": "Enter or start a turn here: CON save, fire damage (half on a pass).",
+          "radiusFt": 20,
+          "center": "point",
+          "rounds": 10,
+          "concentration": true,
+          "height": 15,
+          "hazard": {
+            "damageType": "Fire",
+            "ability": "CON",
+            "addMove": true,
+            "diceTiers": [
+              [
+                1,
+                "3d10"
+              ],
+              [
+                5,
+                "5d8"
+              ],
+              [
+                10,
+                "6d10"
+              ],
+              [
+                17,
+                "10d8"
+              ]
+            ]
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        }
+      ],
+      "noCastDamage": true
     },
     {
       "name": "Meatball Meteor",
@@ -14052,25 +14160,41 @@
       "reaction": false,
       "categories": [
         "field_terrain",
-        "trigger_saving_throw",
-        "multi_hit_aoe",
-        "potential_status_condition_restrained"
+        "potential_status_condition_restrained",
+        "set_terrain"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "restrained",
+          "kind": "set_terrain",
+          "name": "Constricting Vines",
+          "description": "Difficult terrain; enter or start a turn here: DEX save or restrained until the end of its next turn.",
+          "radiusFt": 20,
+          "center": "caster",
+          "rounds": 3,
+          "concentration": true,
+          "difficult": true,
+          "hazard": {
+            "ability": "DEX",
+            "condition": {
+              "apply": "restrained",
+              "ends": [
+                {
+                  "type": "until_turn",
+                  "whose": "holder",
+                  "point": "end"
+                }
+              ]
+            }
+          },
           "when": {
-            "type": "save_fail",
-            "ability": "DEX"
+            "type": "always"
           },
           "ends": [
             {
-              "type": "until_turn",
-              "whose": "holder",
-              "point": "end"
+              "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ],
       "description": "Vines sprout from the ground in a 20-foot radius centered on the user. The area becomes difficult terrain, and any creature that enters the area or starts its turn there must succeed on a Dexterity saving throw or be restrained until the end of its next turn.",
@@ -14750,7 +14874,29 @@
               "text": "until it faints or is switched out"
             }
           ],
-          "note": "1d4 grass damage at the end of each of its turns; half is restored to the attacker"
+          "tick": {
+            "timing": "end",
+            "damageType": "Grass",
+            "drain": 0.5,
+            "diceTiers": [
+              [
+                1,
+                "1d4"
+              ],
+              [
+                5,
+                "2d4"
+              ],
+              [
+                10,
+                "2d6"
+              ],
+              [
+                17,
+                "2d8"
+              ]
+            ]
+          }
         }
       ],
       "description": "You send a seed at a creature in range that implants itself in their hide. Make a ranged attack roll. On a hit, a seed implants into their skin. The target takes 1d4 grass damage at the end of each of its subsequent turns until it faints or is switched out. Half of the damage is restored by the attacker, or any other active creature the trainer has in battle, even if the original attacker faints or is returned to its Pokéball. Only one creature can be seeded by the attacker at a time.",
@@ -15904,6 +16050,45 @@
             }
           ],
           "note": "DC 20 CON save the user makes after using the move"
+        },
+        {
+          "kind": "set_terrain",
+          "name": "Broken ground",
+          "description": "Difficult rocky terrain.",
+          "radiusFt": 100,
+          "center": "caster",
+          "difficult": true,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
+        },
+        {
+          "kind": "set_terrain",
+          "name": "Shattered ground",
+          "description": "Hazardous difficult terrain: 2d6 typeless damage to a creature moving through it.",
+          "radiusFt": 15,
+          "center": "caster",
+          "difficult": true,
+          "hazard": {
+            "damageType": "",
+            "dice": "2d6",
+            "only": "enter"
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
         }
       ],
       "description": "You slam into the ground with immense force, creating tremors that break the ground in a 100ft. radius centered on you. All grounded creatures within the affected area must succeed a STR saving throw or take 10d12 + MOVE ground damage and are knocked prone. On a success, they take half damage and are not knocked prone. After doing this move, you must succeed a DC 20 CON saving throw, or become incapacitated for 1 round while recovering. The ground becomes difficult rocky terrain, and in a 15ft. radius centered on you, the ground becomes hazardous difficult terrain, dealing 2d6 typeless damage to creatures attempting to move through it. This move can be used once per long rest.",
@@ -16012,6 +16197,23 @@
             "type": "save_fail",
             "ability": "DEX"
           }
+        },
+        {
+          "kind": "set_terrain",
+          "name": "Earthquake rubble",
+          "description": "Difficult terrain.",
+          "radiusFt": 10,
+          "center": "caster",
+          "difficult": true,
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
         }
       ],
       "description": "You create a tremor in the ground in a 10 foot radius, centered on you. Each grounded creature in the area must succeed on a DEX save against your Move DC, or take 3d12 + MOVE ground damage and be knocked prone. On a success, they take half as much damage and are not knocked prone. The area becomes difficult terrain.",
@@ -16388,24 +16590,41 @@
       "reaction": false,
       "categories": [
         "field_terrain",
-        "trigger_saving_throw",
-        "potential_status_condition_restrained"
+        "potential_status_condition_restrained",
+        "set_terrain"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "restrained",
+          "kind": "set_terrain",
+          "name": "Quicksand Trap",
+          "description": "Difficult terrain; enter or start a turn here: STR save or restrained until the end of its next turn.",
+          "radiusFt": 20,
+          "center": "point",
+          "rounds": 10,
+          "concentration": true,
+          "difficult": true,
+          "hazard": {
+            "ability": "STR",
+            "condition": {
+              "apply": "restrained",
+              "ends": [
+                {
+                  "type": "until_turn",
+                  "whose": "holder",
+                  "point": "end"
+                }
+              ]
+            }
+          },
           "when": {
-            "type": "save_fail",
-            "ability": "STR"
+            "type": "always"
           },
           "ends": [
             {
-              "type": "until_turn",
-              "whose": "holder",
-              "point": "end"
+              "type": "instant"
             }
-          ]
+          ],
+          "target": "self"
         }
       ],
       "description": "The user creates a 20-foot-radius area of quicksand centered on a point within 60 feet. The area becomes difficult terrain, and any creature that enters the area or starts its turn there must succeed on a Strength saving throw or be restrained until the end of its next turn.",
@@ -24921,26 +25140,63 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "trigger_saving_throw",
-        "multi_hit_aoe",
-        "potential_status_condition_poisoned"
+        "potential_status_condition_poisoned",
+        "field_terrain",
+        "set_terrain"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "poisoned",
-          "when": {
-            "type": "save_fail",
+          "kind": "set_terrain",
+          "name": "Poison Gas",
+          "description": "Start a turn here: CON save, poison damage (half on a pass); poisoned on a fail by 5 or more.",
+          "radiusFt": 10,
+          "center": "point",
+          "rounds": 10,
+          "concentration": true,
+          "hazard": {
+            "damageType": "Poison",
             "ability": "CON",
-            "failBy": 5
-          }
+            "addMove": true,
+            "only": "start",
+            "diceTiers": [
+              [
+                1,
+                "1d6"
+              ],
+              [
+                5,
+                "2d4"
+              ],
+              [
+                10,
+                "3d4"
+              ],
+              [
+                17,
+                "4d6"
+              ]
+            ],
+            "condition": {
+              "apply": "poisoned",
+              "failBy": 5
+            }
+          },
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
         }
       ],
       "description": "You release a toxic cloud of poisonous gas in a 10 foot radius, centered on a point within range. Any creature that starts their turn in this area must succeed on a CON save against your Move DC, taking 1d6 + MOVE poison damage on a failure, or half as much on a success. Creatures that fail this save by 5 or more become poisoned.",
       "moveStat": "CON",
       "vpCost": "12",
-      "scaling": "The damage dice roll for this move changes to 2d4 at level 5, 3d4 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice roll for this move changes to 2d4 at level 5, 3d4 at level 10, and 4d6 at level 17.",
+      "noCastDamage": true
     },
     {
       "name": "Poison Jab",
@@ -25248,16 +25504,33 @@
       "reaction": false,
       "categories": [
         "damage",
-        "potential_status_condition_poisoned"
+        "potential_status_condition_poisoned",
+        "field_terrain",
+        "set_terrain"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "poisoned",
+          "kind": "set_terrain",
+          "name": "Sludge",
+          "description": "Covered in sludge until the caster's next turn; enter or start a turn here: CON save or poisoned.",
+          "radiusFt": 5,
+          "center": "point",
+          "untilSourceTurn": true,
           "when": {
-            "type": "save_fail",
-            "ability": "CON"
-          }
+            "type": "on_hit"
+          },
+          "hazard": {
+            "ability": "CON",
+            "condition": {
+              "apply": "poisoned"
+            }
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
         }
       ],
       "description": "You hurl a mass of sticky sludge that may poison creatures in its blast. Make a ranged attack roll against a target. On a hit, the target takes 2d8 + MOVE poison damage and the area in a 5 foot radius around it is covered in sludge until the beginning of your next turn. Any creature that enters this area for the first time on their turn, or is in that area at the beginning of their turn must make a CON save against your Move DC or become poisoned.",
@@ -25309,27 +25582,65 @@
       },
       "reaction": false,
       "categories": [
-        "damage",
-        "trigger_saving_throw",
-        "multi_hit_aoe",
         "field_terrain",
         "potential_status_condition_poisoned",
-        "potential_disadvantage"
+        "potential_disadvantage",
+        "set_terrain"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "poisoned",
+          "kind": "set_terrain",
+          "name": "Smog",
+          "description": "Difficult terrain, attacks made from inside are at disadvantage; start a turn here: poison damage and a CON save or poisoned.",
+          "radiusFt": 15,
+          "center": "point",
+          "untilSourceTurn": true,
+          "difficult": true,
+          "rule": "smog",
+          "hazard": {
+            "damageType": "Poison",
+            "ability": "CON",
+            "addMove": true,
+            "only": "start",
+            "onSave": "full",
+            "diceTiers": [
+              [
+                1,
+                "1d4"
+              ],
+              [
+                5,
+                "1d6"
+              ],
+              [
+                10,
+                "1d8"
+              ],
+              [
+                17,
+                "1d10"
+              ]
+            ],
+            "condition": {
+              "apply": "poisoned"
+            }
+          },
           "when": {
-            "type": "save_fail",
-            "ability": "CON"
-          }
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
         }
       ],
       "description": "You create a fog of poisonous smog in a 15 foot radius, centered on a point within range. Creatures that begin their turn in the area take 1d4 + MOVE poison damage and must succeed on a CON save against your Move DC or become poisoned. The area of smog is considered difficult terrain, and any attacks made from inside it are done at disadvantage. The smog cloud dissipates at the beginning of your next turn.",
       "moveStat": "CON",
       "vpCost": "15",
-      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17."
+      "scaling": "The damage dice roll for this move changes to 1d6 at level 5, 1d8 at level 10, and 1d10 at level 17.",
+      "noCastDamage": true
     },
     {
       "name": "Spike Protein",
@@ -25358,7 +25669,29 @@
             "type": "save_fail",
             "ability": "CON"
           },
-          "note": "a further CON save after the DEX save; loses 4d12 VP at the end of its turn; at 0 VP its HP also drops to 0"
+          "tick": {
+            "timing": "end",
+            "pool": "VP",
+            "diceTiers": [
+              [
+                1,
+                "4d12"
+              ],
+              [
+                5,
+                "6d12"
+              ],
+              [
+                10,
+                "8d12"
+              ],
+              [
+                17,
+                "10d12"
+              ]
+            ]
+          },
+          "note": "at 0 VP its HP also drops to 0"
         }
       ],
       "description": "You eject a cloud of viral particles in a 40ft. cone. All affected creatures must succeed a DEX saving throw or take 10d12 + MOVE poison damage, half damage on a success, and must make on a CON save against your move DC. On a failed CON save, they are infected, and must lose 4d12 VP at the end of their turn. Upon reaching 0 VP, it's HP is also reduced to 0.",
@@ -29254,7 +29587,20 @@
             "ability": "DEX",
             "requires": "hit"
           },
-          "note": "only if the target is smaller than you; it is swallowed"
+          "tick": {
+            "timing": "start",
+            "damageType": "Rock",
+            "diceTiers": [
+              [
+                1,
+                "1d12"
+              ],
+              [
+                10,
+                "4d6"
+              ]
+            ]
+          }
         },
         {
           "kind": "condition",

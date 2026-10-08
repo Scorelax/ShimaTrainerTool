@@ -442,7 +442,8 @@ def handle(conn, action, params):
             raise ValueError('Missing hazard id')
         roll = js_parse_int(params.get('roll'))
         saved = str(params.get('saved', '')) in ('1', 'true')
-        return _mutate(conn, lambda s: _resolve_hazard(conn, s, params['id'], roll, saved))
+        failed_by = js_parse_int(params.get('failedBy'))
+        return _mutate(conn, lambda s: _resolve_hazard(conn, s, params['id'], roll, saved, failed_by))
 
     if action == 'clear-terrain-zones':
         return _mutate(conn, lambda s: (s.__setitem__('terrainZones', []), s.__setitem__('weatherZones', [])))
@@ -1449,12 +1450,14 @@ def _advance_turn(state):
     # in the new turn/round.
     if ending_id:
         _apply_condition_turn_damage(state, ending_id, 'end')
+        _queue_status_ticks(state, ending_id, 'end')
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
         _expire_statuses_by_round(state)
     starting_id = state['turnOrder'][state['turnIndex']]
     _expire_fields(state, starting_id)
     _apply_condition_turn_damage(state, starting_id, 'start')
+    _queue_status_ticks(state, starting_id, 'start')
     _apply_weather_damage(state, starting_id)
     _queue_hazards(state, starting_id, 'start')
     _expire_statuses_on_turn_point(state, starting_id, 'start')
@@ -1949,7 +1952,7 @@ _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'lon
 # target's) with this field saying who actually receives it. Every other
 # repeat heal (Aqua Ring, Ingrain) is self-only, so holder and recipient
 # were always the same participant before this.
-_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId', 'against', 'appliesTo', 'noSwitch')
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId', 'against', 'appliesTo', 'noSwitch', 'tick')
 
 
 def _statuses_of(participant):
@@ -2821,40 +2824,89 @@ def _queue_hazards(state, pid, trigger):
     if not participant or participant.get('status') != 'participating':
         return
     mark = [state['round'], state['turnIndex']]
-    if participant.get('hazardHitTurn') == mark:
-        return
+    hits = participant.setdefault('hazardHits', {})  # zone -> the turn it last hit: once per turn PER ZONE (Smog over Spikes hits twice)
     def applies(z):
         h = z.get('hazard')
         # `only`: just on one trigger (Uproar hits at the START of a turn, not on entering); `excludeSource`: never the caster.
         return bool(h) and (not h.get('only') or h['only'] == trigger) and not (h.get('excludeSource') and z.get('sourceId') == pid)
-    zone = next((z for z in terrains_affecting(state, pid) if applies(z)), None)
-    if not zone:
-        return
-    participant['hazardHitTurn'] = mark
-    h = zone['hazard']
+    for zone in terrains_affecting(state, pid):
+        key = zone.get('id') or zone['name']
+        if not applies(zone) or hits.get(key) == mark:
+            continue
+        hits[key] = mark
+        _queue_hit(state, participant, zone['hazard'], zone['name'], trigger, zone.get('sourceId'), zone.get('id'))
+        _log_event(state, 'hazard', text=f"{participant['name']} {'enters' if trigger == 'enter' else 'starts their turn in'} the {zone['name']}",
+                   targetId=pid, targetName=participant['name'])
+
+
+def _queue_hit(state, participant, h, name, trigger, source_id, zone_id=None):
+    """Queues one hazard-style hit for the holder's owner to resolve in the hazard popup: a zone's `hazard` (Spikes, Magma
+    Storm, Quicksand Trap, ...) or a status's `tick` (Leech Seed, Infestation, Fire Spin, ...). Shape of `h`:
+    damageType, dice, flat, ability, dc -- plus `onSave` ('half' by default, 'none' = a pass takes nothing, 'full' = the damage
+    lands either way and the save only guards the condition), `condition` ({apply, ends, failBy} applied on a failed save),
+    `pool` ('VP' drains VP instead of HP) and `drain` (that fraction of the damage heals the source -- Leech Seed)."""
     state.setdefault('pendingHazards', []).append({
-        'id': uuid.uuid4().hex[:8], 'participantId': pid, 'participantName': participant['name'], 'zoneId': zone.get('id'),
-        'zoneName': zone['name'], 'trigger': trigger, 'damageType': h.get('damageType', ''), 'ability': h.get('ability', ''),
-        'dice': h.get('dice', ''), 'flat': h.get('flat', 0), 'dc': h.get('dc'), 'sourceId': zone.get('sourceId'),
+        'id': uuid.uuid4().hex[:8], 'participantId': participant['id'], 'participantName': participant['name'], 'zoneId': zone_id,
+        'zoneName': name, 'trigger': trigger, 'damageType': h.get('damageType', ''), 'ability': h.get('ability', ''),
+        'dice': h.get('dice', ''), 'flat': h.get('flat', 0), 'dc': h.get('dc'), 'sourceId': source_id,
+        'onSave': h.get('onSave') or 'half', 'condition': h.get('condition'), 'pool': h.get('pool') or 'HP', 'drain': h.get('drain'),
     })
-    _log_event(state, 'hazard', text=f"{participant['name']} {'enters' if trigger == 'enter' else 'starts their turn in'} the {zone['name']}",
-               targetId=pid, targetName=participant['name'])
 
 
-def _resolve_hazard(conn, state, hazard_id, roll, saved):
-    """Applies (or, with no roll, dismisses) a queued hazard hit: `roll` is the damage total the player rolled, halved
-    (rounded down) when they passed the save. Goes through the ordinary typed-damage path, so type effectiveness and
-    temp HP apply; the zone's caster is the attacker (the target itself if they've left the battle)."""
+def _queue_status_ticks(state, pid, point):
+    """Damage-over-time statuses (`tick`, see _queue_hit): at the holder's turn `point` ('start'/'end') each one due queues a
+    hit for its owner to roll -- the dice and the save are the table's, like every other roll in this tool."""
+    participant = state['participants'].get(pid)
+    if not participant or participant.get('status') != 'participating':
+        return
+    for s in _statuses_of(participant):
+        tick = s.get('tick')
+        if isinstance(tick, dict) and (tick.get('timing') or 'end') == point:
+            _queue_hit(state, participant, tick, s.get('moveName') or s.get('apply') or 'Effect', 'tick', s.get('sourceId'))
+
+
+def _resolve_hazard(conn, state, hazard_id, roll, saved, failed_by=None):
+    """Applies (or, with no roll and no condition, dismisses) a queued hit: `roll` is the damage total the player rolled,
+    adjusted by the entry's `onSave` when they passed. Goes through the ordinary typed-damage path, so type effectiveness and
+    temp HP apply; the zone's caster is the attacker (the target itself if they've left the battle). A failed save applies the
+    entry's `condition` (when it fails by at least its `failBy`); a VP-pool hit drains VP; `drain` heals the source."""
     pending = state.setdefault('pendingHazards', [])
     entry = next((h for h in pending if h['id'] == hazard_id), None)
     if not entry:
         raise ValueError('That hazard was already resolved')
     pending.remove(entry)
-    if roll is None or roll <= 0:
+    target = state['participants'].get(entry['participantId'])
+    if not target:
         return
-    amount = roll // 2 if saved else roll
     source_id = entry['sourceId'] if entry.get('sourceId') in state['participants'] else entry['participantId']
-    _apply_damage_to_target(conn, state, source_id, entry['participantId'], amount, entry['damageType'], '', turn_check=False)
+    amount = 0
+    if roll is not None and roll > 0:
+        on_save = entry.get('onSave') or 'half'
+        amount = roll if not saved or on_save == 'full' else (roll // 2 if on_save == 'half' else 0)
+    if amount > 0:
+        if entry.get('pool') == 'VP':
+            target['currentVP'] = max(0, (target.get('currentVP') or 0) - amount)
+            _log_event(state, 'status-damage', text=f"{target['name']} loses {amount} VP from the {entry['zoneName']}",
+                       actorId=target['id'], actorName=target['name'])
+        else:
+            _apply_damage_to_target(conn, state, source_id, entry['participantId'], amount, entry['damageType'], '', turn_check=False)
+        source = state['participants'].get(entry.get('sourceId'))
+        if entry.get('drain') and source and source['id'] != target['id']:
+            healed = int(amount * float(entry['drain']))
+            if healed > 0:
+                source['currentHP'] = min(source.get('maxHP') or source['currentHP'] + healed, source['currentHP'] + healed)
+                _log_event(state, 'heal', text=f"{source['name']} regains {healed} HP from the {entry['zoneName']}",
+                           actorId=source['id'], actorName=source['name'])
+    cond = entry.get('condition')
+    if cond and entry.get('ability') and not saved and (not cond.get('failBy') or (failed_by or 0) >= cond['failBy']):
+        try:
+            _apply_status(state, entry['participantId'], {
+                'kind': 'condition', 'apply': cond['apply'], 'ends': cond.get('ends') or [], 'sourceId': entry.get('sourceId'),
+                'sourceName': (state['participants'].get(entry.get('sourceId')) or {}).get('name'), 'moveName': entry['zoneName'],
+                'dc': entry.get('dc'),
+            })
+        except ValueError as e:  # immune (Misty Terrain, Safeguard, ...) -- the damage still stands
+            _log_event(state, 'status-blocked', text=str(e), targetId=target['id'], targetName=target['name'])
 
 
 def _trick_room(state):

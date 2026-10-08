@@ -1124,8 +1124,8 @@ export class CombatAPI {
   }
 
   /** Resolves a queued Spikes-style hazard hit: `roll` is the damage total, halved when `saved`; no roll dismisses it. */
-  static async resolveHazard(id, roll, saved) {
-    return API.request('combat', 'resolve-hazard', { id, roll: roll ?? '', saved: saved ? '1' : '' }, { useCache: false });
+  static async resolveHazard(id, roll, saved, failedBy = null) {
+    return API.request('combat', 'resolve-hazard', { id, roll: roll ?? '', saved: saved ? '1' : '', failedBy: failedBy ?? '' }, { useCache: false });
   }
 
   /** Removes every tile-limited terrain zone (Defog's clear_field also clears the whole-map terrain). */

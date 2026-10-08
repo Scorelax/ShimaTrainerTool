@@ -27,8 +27,9 @@ never counted as backlog. Same rule as `unknown` moves.
   "while":    [ <gate>, ... ],                    // optional: states that must ALL hold -- see Gates
   "kind":     <kind>, ...fields,                  // WHAT it does -- see Kinds
   "target":   "self",                             // who it affects: self (default) | attacker | target |
-                                                  //   allies | enemies | all   (allies/enemies/all need radiusFt
-                                                  //   unless the ability says "in battle")
+                                                  //   ally (the one that triggered it) | allies | enemies |
+                                                  //   all (includes itself) | others (all but itself)
+                                                  //   (area targets need radiusFt unless the ability says "in battle")
   "radiusFt": 30,
   "chance":   { "die": "d4", "min": 4 },          // "roll a d4, on a 4 ..." (min..max of the die passes)
   "save":     { "ability": "CON", "dc": 12 },     // the AFFECTED creature saves to avoid it;
@@ -37,6 +38,10 @@ never counted as backlog. Same rule as `unknown` moves.
                                                   //   short/long rest = the same charge tracker moves use
                                                   //   ("recharge (short rest)" -> {maxCharges, type: 'SR'})
   "optional": true,                               // "may" -- the player decides when it fires
+  "reaction": true,                               // using it costs the Pokemon's reaction
+  "targetFilter": { "types": ["Grass"], "grounded": true },  // narrows target allies/enemies/all
+  "stacks":   { "max": 5 },                       // repeat triggers stack up to N times; temp_hp uses
+                                                  //   { "capLevelMultiple": 2 } (pool capped at 2 x level)
   "ends":     [ ... ],                            // how a lasting effect stops -- same shapes as moves
                                                   //   ({"type":"until_turn","whose":"holder","point":"end"},
                                                   //    {"type":"uses","n":1}, {"type":"encounter"}, ...)
@@ -70,6 +75,15 @@ the dice boost and the VP-cost increase).
 | `switched_out` | it returns to its Poke Ball | |
 | `enemy_attack_roll` | any enemy is about to make an attack roll (Intimidate's "attack roll of your choice") | |
 | `ally_drain_heal` | an ally in `radiusFt` heals from damage it dealt (Winter Roots) | |
+| `ally_hit` | an ally in `radiusFt` is hit by an attack (Friend Guard) | |
+| `attack_roll_against` | an attack roll against it has been rolled, before hit/miss is final (Heavy Metal, Proper Form) | |
+| `would_faint` | it would drop to 0 HP (Phantom Body) -- fires before `knocked_out` | |
+| `creature_start_of_turn_within` / `creature_end_of_turn_within` | any creature starts / ends its turn within `radiusFt` | |
+
+Extra event filters: `damaged` takes `minFractionOfCurrentHP` (the hit is at least that share of its
+current HP -- Sturdy) and `crossesBelowFraction` (the hit takes it from above to below that share of
+max HP -- Wimp Out); `hit_by` takes `vulnerable` (a type it is weak to); `condition_gained` takes
+`fromMove`; `ally_targeted` takes `includeSelf` and `direct`.
 
 ## Gates (`while`)
 
@@ -124,8 +138,33 @@ The `{type: ...}` shapes the moves' `damage_note` conditions already use, plus a
 |---|---|
 | `immunity` | any of: `damageTypes`, `conditions`, `negativeConditions` (all of them), `moves` (exact names), `nameMatch`, `soundBased`, `critDamage` (no extra crit damage), `weatherDamage` (`["sand","hail"]`), `allyAttacks`, `recoil`, `opportunityAttacks`, `vulnerabilityExtra` (no extra damage from its weaknesses), `nonVulnerableDamage` (Wonder Guard) |
 | `resistance` / `vulnerability` | `damageTypes` |
-| `damage_taken_mod` | `multiplier`, `filter` (`damageTypes`, `melee`, `superEffective`, `vulnerable`, `notTypes`, `crit`, `saveForHalf` + `saveSucceeded`), `firstOnly` (only the first damage while the gate holds), `maxDamage` (dice count as max) |
+| `damage_taken_mod` | `multiplier`, `filter` (`damageTypes`, `melee`, `superEffective`, `vulnerable`, `notTypes`, `crit`, `saveForHalf` + `saveSucceeded`), `firstOnly` (only the first damage while the gate holds), `maxDamage` (dice count as max), `rerollKeep: "lower"` (Prism Armor) |
 | `lose_hp` | `amount`, optional `pool: "VP"` -- self-inflicted loss (Dry Skin in sun) |
+| `redirect` | the triggering move targets this Pokemon instead; `damageMultiplier` (Lightning Rod: 0.5), `moveAdjacent` + `useOwnAC` (Praetorian Guard) |
+| `prevent_faint` | (as moves) it stays up instead of fainting |
+
+**Area and field**
+
+| kind | fields |
+|---|---|
+| `deal_damage` | `amount`, `damageType`, optional `halfOnSave`, `ignoreResistance` -- damage to `target` (auras, Temporal Collapse) |
+| `aura_break` | Dark Aura / Fairy Aura in range halve instead of double |
+| `auto_save` | `ability` -- targets automatically pass those saves (Aroma Veil) |
+| `suppress_weather_abilities` | every ability whose effects are gated on weather does nothing (Air Lock, Cloud Nine) |
+| `suppress_secondary_effects` | `filter` -- matching moves lose their non-damage effects (Pure Waters) |
+| `action_cost_override` | `from`, `to` -- moves with that action cost use the other one instead (Dazzling) |
+
+**Turn economy and faint**
+
+| kind | fields |
+|---|---|
+| `extra_action` | it takes one more action this turn (Moxie) |
+| `use_move` | `move`, `free` -- it uses that move right away at no cost (Self-Destructor) |
+| `retreat` | `mandatory`, `allowSwitch` -- disengage and move away as a free action; its trainer may (or must) switch it out |
+
+**Type changes:** the moves' `condition` `apply: "type_changed"` with `valueFrom` (`hit_move_type` |
+`used_move_type`) instead of a fixed `value`, optional `slot: "primary"`, or `options` (list of types
+the player picks from -- Primordial Shift). `type_by_weather` (`map` keyword -> type, `default`) for Forecast.
 | `absorb` | `damageTypes`, `healFraction` -- no damage, heals that fraction of it instead |
 | `stat_lock` | `stats` (absent = all) -- other creatures can't lower these |
 | `retaliate` | `amount` (`{"proficiency":true}`, `{"dice":"1d4","plus":"proficiency"}`, `{"fractionOfDamage":0.5}`), `damageType` -- hits back at `target` |
@@ -133,8 +172,11 @@ The `{type: ...}` shapes the moves' `damage_note` conditions already use, plus a
 **Reused from moves:** `stat` (`stat`, `amount` or `set`; new stat names `swim_speed`, `reach`),
 `roll` (`roll`, `on` -- plus `on: "initiative"` and an optional `vsConditions` for saves against
 specific conditions), `condition` (`apply`, `value`), `heal` (`amount`: `{"proficiency":true}` /
-`{"fractionMaxHP":0.0625}` / `{"level":1}` / `{"dice":"2d10"}` / `{"fractionOfAllyHealing":0.5}`),
-`temp_hp`, `set_weather` (`name`, `rounds`).
+`{"fractionMaxHP":0.0625}` / `{"level":1}` / `{"dice":"2d10"}` / `{"fractionOfAllyHealing":0.5}`;
+`setTo: true` sets HP to that amount instead of adding it), `temp_hp` (`amount`: `{"levelMultiple":2}` /
+`{"abilityMod":"INT","plusProficiency":true}`), `set_weather` (`name`, `rounds`).
+More stat names: `flying_speed`, `saving_throw_abilities` (the ability scores of its saving-throw
+proficiencies -- Beast Boost).
 
 `target: "trainer"` -- the Pokemon's trainer (Speed Boost / Unburden: advantage on initiative).
 

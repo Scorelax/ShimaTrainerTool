@@ -68,6 +68,15 @@
     "Chirquill",
     "Stratosoar",
     "Rayquaza"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "suppress_weather_abilities",
+     "target": "all"
+    }
    ]
   },
   {
@@ -90,6 +99,22 @@
     "Didoss",
     "Lunus",
     "Umbrost"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "attack_missed"
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -188,6 +213,41 @@
     "Jelleem",
     "Hugeem",
     "Kraqua"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "rain"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "coastal",
+          "swamp"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "temp_hp",
+     "amount": {
+      "levelMultiple": 1
+     },
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     }
+    }
    ]
   },
   {
@@ -203,6 +263,21 @@
     "Vena",
     "Scarpea",
     "Cruscarex"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "condition",
+     "target": "all",
+     "radiusFt": 50,
+     "targetFilter": {
+      "grounded": true
+     },
+     "apply": "switch_locked",
+     "note": "Can still leave by item, move or ability."
+    }
    ]
   },
   {
@@ -211,6 +286,17 @@
    "pokemon": [
     "Stelluna",
     "Stellumina"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "auto_save",
+     "target": "allies",
+     "radiusFt": 15,
+     "ability": "WIS"
+    }
    ]
   },
   {
@@ -219,6 +305,16 @@
    "pokemon": [
     "Kortier",
     "Noblier"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "aura_break",
+     "radiusFt": 100,
+     "note": "Dark Aura and Fairy Aura halve their moves instead of doubling them."
+    }
    ]
   },
   {
@@ -247,6 +343,23 @@
    "description": "Allies that activate electric-type moves within 20 feet of this Pokémon double their damage dice.",
    "pokemon": [
     "Energem"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "target": "allies",
+     "radiusFt": 20,
+     "diceMultiplier": 2,
+     "filter": {
+      "moveTypes": [
+       "Electric"
+      ],
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -289,6 +402,25 @@
    "description": "Upon causing an opponent to faint, this Pokémon increases the ability scores of its saving throw proficiencies by 2 until the end of combat. This is stackable up to a maximum of +10 to any one ability score.",
    "pokemon": [
     "Energem"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "ko_dealt"
+     },
+     "kind": "stat",
+     "stat": "saving_throw_abilities",
+     "amount": 2,
+     "stacks": {
+      "max": 5
+     },
+     "ends": [
+      {
+       "type": "encounter"
+      }
+     ],
+     "note": "The ability scores of its saving-throw proficiencies; max +10 to any one score."
+    }
    ]
   },
   {
@@ -593,6 +725,25 @@
    "pokemon": [
     "Tempus",
     "Chronus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "damaged"
+     },
+     "kind": "damage_taken_mod",
+     "chance": {
+      "die": "d20",
+      "min": 18
+     },
+     "multiplier": 0,
+     "ends": [
+      {
+       "type": "instant"
+      }
+     ],
+     "note": "Glimpses another timeline and avoids the attack."
+    }
    ]
   },
   {
@@ -641,6 +792,15 @@
    "pokemon": [
     "Flignit",
     "Flareblit"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "suppress_weather_abilities",
+     "target": "all"
+    }
    ]
   },
   {
@@ -662,6 +822,18 @@
    "pokemon": [
     "Salo",
     "Ananansi"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "damaging": true
+     },
+     "kind": "condition",
+     "apply": "type_changed",
+     "valueFrom": "hit_move_type",
+     "note": "Takes on the new type's resistances, vulnerabilities and immunities."
+    }
    ]
   },
   {
@@ -670,6 +842,21 @@
    "pokemon": [
     "Starcub",
     "Stellursa"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "target": "all",
+     "radiusFt": 10,
+     "roll": "advantage",
+     "on": "saving_throws",
+     "vsConditions": [
+      "frightened"
+     ]
+    }
    ]
   },
   {
@@ -893,6 +1080,23 @@
     "Froscyyr",
     "Tangela (Stalker Form)",
     "Tangrowth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "target": "all",
+     "radiusFt": 100,
+     "totalMultiplier": 2,
+     "filter": {
+      "moveTypes": [
+       "Dark"
+      ],
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -937,6 +1141,18 @@
     "Lunatrice",
     "Aurette",
     "Luminarch"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "action_cost_override",
+     "target": "all",
+     "to": "1 action",
+     "note": "Any creature it can see.",
+     "from": "1 bonus action"
+    }
    ]
   },
   {
@@ -972,6 +1188,23 @@
     "Testurion",
     "Gulorine",
     "Felverine"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "condition_gained",
+      "fromMove": true
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -1029,6 +1262,22 @@
    "pokemon": [
     "Socroach",
     "Ananansi"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "kind": "temp_hp",
+     "amount": {
+      "levelMultiple": 2
+     },
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "note": "The disguise breaks when these temporary HP reach 0; a short rest repairs it."
+    }
    ]
   },
   {
@@ -1252,6 +1501,24 @@
    "description": "At any time this Pokémon is damaged when it is at or below 50% of its maximum HP, it may disengage and move up to its speed as a free action, and its trainer may switch it out as a free action.",
    "pokemon": [
     "Secto"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "damaged"
+     },
+     "while": [
+      {
+       "type": "self_hp_at_or_below",
+       "fraction": 0.5
+      }
+     ],
+     "kind": "retreat",
+     "optional": true,
+     "mandatory": false,
+     "allowSwitch": true,
+     "note": "Disengage + move up to its speed as a free action; its trainer may switch it out as a free action."
+    }
    ]
   },
   {
@@ -1291,6 +1558,24 @@
     "Tigriffon",
     "Clingae",
     "Chimae"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "target": "others",
+     "radiusFt": 100,
+     "totalMultiplier": 2,
+     "filter": {
+      "moveTypes": [
+       "Fairy"
+      ],
+      "damaging": true
+     },
+     "note": "\"By other creatures\" -- its own fairy moves are not doubled."
+    }
    ]
   },
   {
@@ -1436,6 +1721,26 @@
    "pokemon": [
     "Swinicorn",
     "Porque"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "vulnerable": true
+     },
+     "kind": "immunity",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "optional": true,
+     "vulnerabilityExtra": true,
+     "ends": [
+      {
+       "type": "instant"
+      }
+     ]
+    }
    ]
   },
   {
@@ -1588,6 +1893,29 @@
     "Stelluna",
     "Stellumina",
     "Blossomini"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "sun"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "target": "allies",
+     "radiusFt": 30,
+     "flatBonus": "proficiency",
+     "filter": {
+      "damaging": true
+     },
+     "note": "Each ally adds its OWN proficiency bonus."
+    }
    ]
   },
   {
@@ -1608,6 +1936,38 @@
     "Seedo",
     "Maiskern",
     "Blossomini"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "target": "allies",
+     "radiusFt": 15,
+     "targetFilter": {
+      "types": [
+       "Grass"
+      ]
+     },
+     "negativeConditions": true,
+     "note": "Only NEW conditions -- ones already on the ally stay."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "target": "allies",
+     "radiusFt": 15,
+     "targetFilter": {
+      "types": [
+       "Grass"
+      ]
+     },
+     "roll": "advantage",
+     "on": "saving_throws"
+    }
    ]
   },
   {
@@ -1650,6 +2010,22 @@
    "description": "This Pokémon changes form with the weather. In rain it becomes water-type, in harsh sunlight it becomes fire-type, in cold and snowy conditions it becomes ice-type. In all other conditions it is normal-type. Its STAB, resistance, immunities, and vulnerabilities change to match the form it takes.",
    "pokemon": [
     "Cirrux"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "type_by_weather",
+     "map": {
+      "rain": "Water",
+      "sun": "Fire",
+      "hail": "Ice",
+      "snow": "Ice"
+     },
+     "default": "Normal",
+     "note": "Cold and snowy conditions also make it Ice."
+    }
    ]
   },
   {
@@ -1715,6 +2091,22 @@
     "Avalgon",
     "Fryoon",
     "Froscyyr"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "creature_end_of_turn_within"
+     },
+     "kind": "condition",
+     "target": "all",
+     "radiusFt": 30,
+     "save": {
+      "ability": "CON",
+      "dc": 12
+     },
+     "apply": "frozen",
+     "note": "Creatures immune to frozen are skipped."
+    }
    ]
   },
   {
@@ -1724,6 +2116,27 @@
     "Caredevil",
     "Faredevil",
     "Infernity"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "ally_hit"
+     },
+     "kind": "damage_taken_mod",
+     "radiusFt": 15,
+     "target": "ally",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "long_rest"
+     },
+     "multiplier": 0.5,
+     "ends": [
+      {
+       "type": "instant"
+      }
+     ]
+    }
    ]
   },
   {
@@ -1767,6 +2180,25 @@
    "pokemon": [
     "Woolworth",
     "Spoolworth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by"
+     },
+     "kind": "damage_taken_mod",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "long_rest"
+     },
+     "multiplier": 0.5,
+     "ends": [
+      {
+       "type": "instant"
+      }
+     ]
+    }
    ]
   },
   {
@@ -1893,6 +2325,43 @@
    "description": "Gravity is stronger in a 100ft. radius around you. Flying speed is halved, and maintaining flight requires 20VP per turn. Rock-type moves deal 50% more damage, rounded down.",
    "pokemon": [
     "Stellarchon"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "target": "all",
+     "radiusFt": 100,
+     "totalMultiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Rock"
+      ],
+      "damaging": true
+     },
+     "note": "Rounded down."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stat",
+     "target": "all",
+     "radiusFt": 100,
+     "stat": "flying_speed",
+     "amount": {
+      "multiplier": 0.5
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Staying airborne in the area costs 20 VP per turn."
+    }
    ]
   },
   {
@@ -2009,6 +2478,27 @@
     "Triceros",
     "Rhinaurus",
     "Ferrem"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "attack_roll_against"
+     },
+     "kind": "stat",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "long_rest"
+     },
+     "stat": "ac",
+     "amount": 2,
+     "ends": [
+      {
+       "type": "instant"
+      }
+     ],
+     "note": "Only worth using when +2 AC turns the hit into a miss."
+    }
    ]
   },
   {
@@ -2467,6 +2957,25 @@
     "Solatrice",
     "Charmander",
     "Charmeleon"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Dark"
+      ]
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -2577,6 +3086,24 @@
     "Raichu",
     "Granito",
     "Ohmen"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "ally_targeted",
+      "includeSelf": true,
+      "direct": true,
+      "damaging": true,
+      "moveTypes": [
+       "Electric"
+      ]
+     },
+     "kind": "redirect",
+     "radiusFt": 30,
+     "reaction": true,
+     "optional": true,
+     "damageMultiplier": 0.5
+    }
    ]
   },
   {
@@ -2744,6 +3271,43 @@
    "pokemon": [
     "Volto",
     "Ferrem"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "condition",
+     "target": "enemies",
+     "targetFilter": {
+      "types": [
+       "Steel"
+      ]
+     },
+     "apply": "switch_locked",
+     "note": "All steel opponents in battle."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_types",
+       "any": [
+        "Steel"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "flatBonus": "proficiency",
+     "filter": {
+      "moveTypes": [
+       "Electric"
+      ],
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -2988,6 +3552,28 @@
     "Amplifuzz",
     "Flarelex",
     "Mekko"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Electric"
+      ]
+     },
+     "kind": "stat",
+     "stat": "speed",
+     "amount": 10,
+     "stacks": {
+      "max": 5
+     },
+     "ends": [
+      {
+       "type": "encounter"
+      }
+     ],
+     "note": "Only if not immune to the hit."
+    }
    ]
   },
   {
@@ -2999,6 +3585,15 @@
     "Mightyena",
     "Veerulent",
     "Nemeon"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "ko_dealt"
+     },
+     "kind": "extra_action",
+     "optional": true
+    }
    ]
   },
   {
@@ -3364,6 +3959,53 @@
    "description": "Once per short rest, when this pokemon would be reduced to 0 HP, it instead becomes incorporeal until the start of its next turn. While incorporeal, it can't attack and is immune to physical damage. It reappears with HP equal to its level, in an unstable form, and can't be safely held in a Poké Ball until it has finished a long rest.",
    "pokemon": [
     "Spectro"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "would_faint"
+     },
+     "kind": "prevent_faint",
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     }
+    },
+    {
+     "when": {
+      "type": "would_faint"
+     },
+     "kind": "condition",
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "apply": "incorporeal",
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "start",
+       "count": 1
+      }
+     ],
+     "note": "Can't attack; immune to physical damage."
+    },
+    {
+     "when": {
+      "type": "would_faint"
+     },
+     "kind": "heal",
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "amount": {
+      "level": 1
+     },
+     "setTo": true,
+     "note": "Reappears with HP equal to its level; can't be safely held in a Poke Ball until a long rest."
+    }
    ]
   },
   {
@@ -3617,6 +4259,18 @@
    "description": "This Pokémon may take hits for allies that are within its range of movement. If an ally in range is targeted by an attack, this Pokémon may spend unspent movement to move next to its ally out of turn without provoking attacks of opportunity. The attack against the ally will be rolled against this Pokémon's AC instead of the intended target.",
    "pokemon": [
     "Praetorvus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "ally_targeted"
+     },
+     "kind": "redirect",
+     "optional": true,
+     "moveAdjacent": true,
+     "useOwnAC": true,
+     "note": "Ally within its unspent movement; it moves next to the ally out of turn without provoking, and the attack is rolled against ITS AC."
+    }
    ]
   },
   {
@@ -3689,6 +4343,23 @@
    "description": "At the beginning of every round of combat, you may draw on ancient power to change your type to that of either psychic, dark, water, ground or dragon.",
    "pokemon": [
     "Equilibra"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_round"
+     },
+     "kind": "condition",
+     "optional": true,
+     "apply": "type_changed",
+     "options": [
+      "Psychic",
+      "Dark",
+      "Water",
+      "Ground",
+      "Dragon"
+     ]
+    }
    ]
   },
   {
@@ -3701,6 +4372,18 @@
     "Brillore",
     "Plankril",
     "Shkril"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_taken_mod",
+     "filter": {
+      "vulnerable": true
+     },
+     "rerollKeep": "lower"
+    }
    ]
   },
   {
@@ -3708,6 +4391,25 @@
    "description": "When attacked, this Pokémon can impose disadvantage on an attack roll, correcting the attacker's \"improper form\".",
    "pokemon": [
     "Kortier"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "attack_roll_against"
+     },
+     "kind": "roll",
+     "target": "attacker",
+     "reaction": true,
+     "optional": true,
+     "roll": "disadvantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "instant"
+      }
+     ],
+     "note": "No use limit in the text -- read as costing its reaction."
+    }
    ]
   },
   {
@@ -3722,6 +4424,18 @@
     "Dragem",
     "Zoragon",
     "Moldite"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "move_used"
+     },
+     "kind": "condition",
+     "apply": "type_changed",
+     "valueFrom": "used_move_type",
+     "slot": "primary",
+     "note": "Changes just BEFORE the move is used (so it gets STAB)."
+    }
    ]
   },
   {
@@ -3737,6 +4451,21 @@
    "description": "At the start of each turn, this Pokémon gains temporary HP equal to its INT modifier + proficiency bonus. This stacks up to a maximum equal to 2x its level.",
    "pokemon": [
     "Psycho"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "temp_hp",
+     "amount": {
+      "abilityMod": "INT",
+      "plusProficiency": true
+     },
+     "stacks": {
+      "capLevelMultiple": 2
+     }
+    }
    ]
   },
   {
@@ -3773,6 +4502,38 @@
    "description": "Damaging water moves used by other creatures within 50ft of this Pokémon have their secondary effects removed, but deal 20% more damage, rounded down.",
    "pokemon": [
     "Purifax"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "target": "others",
+     "radiusFt": 50,
+     "totalMultiplier": 1.2,
+     "filter": {
+      "moveTypes": [
+       "Water"
+      ],
+      "damaging": true
+     },
+     "note": "Rounded down."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "suppress_secondary_effects",
+     "target": "others",
+     "radiusFt": 50,
+     "filter": {
+      "moveTypes": [
+       "Water"
+      ],
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -3780,6 +4541,18 @@
    "description": "Bonus action moves activated by any creature within sight of this Pokémon become standard actions.",
    "pokemon": [
     "Reginant"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "action_cost_override",
+     "target": "all",
+     "to": "1 action",
+     "note": "Any creature it can see.",
+     "from": "1 bonus action"
+    }
    ]
   },
   {
@@ -3866,6 +4639,28 @@
    "pokemon": [
     "Magikarp",
     "Psycho"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Dark",
+       "Bug",
+       "Ghost"
+      ],
+      "damaging": true
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -4378,6 +5173,17 @@
    "pokemon": [
     "Sandem",
     "Protoxys"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "knocked_out"
+     },
+     "kind": "use_move",
+     "move": "Self-Destruct",
+     "free": true,
+     "note": "Used as if it had full HP, at no cost."
+    }
    ]
   },
   {
@@ -4453,6 +5259,18 @@
    "description": "Creatures within 50 feet of this Pokémon may not flee or switch out, except by item, Move, or ability.",
    "pokemon": [
     "Phobee"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "condition",
+     "target": "all",
+     "radiusFt": 50,
+     "apply": "switch_locked",
+     "note": "Can still leave by item, move or ability."
+    }
    ]
   },
   {
@@ -4799,6 +5617,25 @@
    "pokemon": [
     "Pixee",
     "Wispee"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "ally_fainted"
+     },
+     "kind": "stat",
+     "stat": "saving_throw_abilities",
+     "amount": 2,
+     "stacks": {
+      "max": 5
+     },
+     "ends": [
+      {
+       "type": "encounter"
+      }
+     ],
+     "note": "The ability scores of its saving-throw proficiencies; max +10 to any one score."
+    }
    ]
   },
   {
@@ -4911,6 +5748,25 @@
    "pokemon": [
     "Boradin",
     "Tremboar"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "damaged"
+     },
+     "kind": "stat",
+     "stat": "ac",
+     "amount": 2,
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "start",
+       "count": 1
+      }
+     ],
+     "note": "Doesn't stack -- a new hit just refreshes it."
+    }
    ]
   },
   {
@@ -5084,6 +5940,24 @@
    "pokemon": [
     "Turmerald",
     "Shelmerald"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "ally_targeted",
+      "includeSelf": true,
+      "direct": true,
+      "damaging": true,
+      "moveTypes": [
+       "Water"
+      ]
+     },
+     "kind": "redirect",
+     "radiusFt": 30,
+     "reaction": true,
+     "optional": true,
+     "damageMultiplier": 0.5
+    }
    ]
   },
   {
@@ -5146,6 +6020,25 @@
     "Skarmory",
     "Aurus",
     "Knighturn"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "damaged",
+      "minFractionOfCurrentHP": 0.5
+     },
+     "kind": "damage_taken_mod",
+     "chance": {
+      "die": "d4",
+      "min": 3
+     },
+     "multiplier": 0.5,
+     "ends": [
+      {
+       "type": "instant"
+      }
+     ]
+    }
    ]
   },
   {
@@ -5275,6 +6168,19 @@
    "description": "Any ally within 15 feet of this Pokémon is immune to the sleep condition.",
    "pokemon": [
     "Popkern"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "target": "allies",
+     "radiusFt": 15,
+     "conditions": [
+      "asleep"
+     ]
+    }
    ]
   },
   {
@@ -5392,6 +6298,32 @@
    "description": "When Temporis is reduced to 0 hit points, the temporal wound it embodies begins to unravel. The following effects occur: - A rift in space-time opens in Temporis's space - Each creature within 100 feet must succeed on a DC 18 Constitution saving throw - On a failed save, a creature takes 10d10 psychic damage and is moved 1d4 × 10 feet in a random direction as time distorts around them - On a successful save, a creature takes half damage and isn't moved - The area within 1000 feet becomes a temporary temporal anomaly zone for 24 hours, where: - Time moves unpredictably - Creatures that end their turn in the zone must make a DC 15 Wisdom saving throw or experience a random temporal effect - The Lorekeepers may be drawn to the area to contain the anomaly",
    "pokemon": [
     "Temporis"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "knocked_out"
+     },
+     "kind": "deal_damage",
+     "target": "all",
+     "radiusFt": 100,
+     "save": {
+      "ability": "CON",
+      "dc": 18
+     },
+     "halfOnSave": true,
+     "amount": {
+      "dice": "10d10"
+     },
+     "damageType": "Psychic"
+    },
+    {
+     "when": {
+      "type": "knocked_out"
+     },
+     "kind": "manual",
+     "note": "Failed save: moved 1d4 x 10 ft in a random direction. The 1000 ft area becomes a temporal anomaly zone for 24 hours."
+    }
    ]
   },
   {
@@ -5440,6 +6372,49 @@
    "description": "Any creature that starts its turn within 50 feet of Temporis must succeed on a DC 21 Wisdom saving throw. On a failed save, the creature takes 4d10 psychic damage and has its speed halved until the start of its next turn as it experiences temporal displacement. On a successful save, the creature takes half damage and suffers no other effects.",
    "pokemon": [
     "Temporis"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "creature_start_of_turn_within"
+     },
+     "kind": "deal_damage",
+     "target": "all",
+     "radiusFt": 50,
+     "save": {
+      "ability": "WIS",
+      "dc": 21
+     },
+     "halfOnSave": true,
+     "amount": {
+      "dice": "4d10"
+     },
+     "damageType": "Psychic"
+    },
+    {
+     "when": {
+      "type": "creature_start_of_turn_within"
+     },
+     "kind": "stat",
+     "target": "all",
+     "radiusFt": 50,
+     "save": {
+      "ability": "WIS",
+      "dc": 21
+     },
+     "stat": "speed",
+     "amount": {
+      "multiplier": 0.5
+     },
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "start",
+       "count": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -5556,6 +6531,25 @@
    "description": "When this Pokémon is hit by a poison-type attack, its next attack is rolled at advantage.",
    "pokemon": [
     "Lumo"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Poison"
+      ]
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -5731,6 +6725,26 @@
     "Scyther",
     "Razcor",
     "Treecko"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "damaged"
+     },
+     "kind": "damage_taken_mod",
+     "reaction": true,
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "multiplier": 0.5,
+     "ends": [
+      {
+       "type": "instant"
+      }
+     ]
+    }
    ]
   },
   {
@@ -5850,6 +6864,27 @@
     "Scaracross",
     "Morbit",
     "Darbit"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "damaged",
+      "moveTypes": [
+       "Water"
+      ]
+     },
+     "kind": "damage_taken_mod",
+     "multiplier": 0.5,
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "start",
+       "count": 1
+      }
+     ],
+     "note": "Any OTHER damage after the water hit."
+    }
    ]
   },
   {
@@ -5889,6 +6924,41 @@
     "Blastoise",
     "Mossling",
     "Mossaic"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "rain"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "coastal",
+          "swamp"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "temp_hp",
+     "amount": {
+      "levelMultiple": 1
+     },
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     }
+    }
    ]
   },
   {
@@ -5902,6 +6972,40 @@
     "Krabemone",
     "Hadean",
     "Styxxil"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by"
+     },
+     "kind": "stat",
+     "stat": "speed",
+     "amount": 5,
+     "stacks": {
+      "max": 5
+     },
+     "ends": [
+      {
+       "type": "encounter"
+      }
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by"
+     },
+     "kind": "stat",
+     "stat": "ac",
+     "amount": -1,
+     "stacks": {
+      "max": 5
+     },
+     "ends": [
+      {
+       "type": "encounter"
+      }
+     ]
+    }
    ]
   },
   {
@@ -5929,6 +7033,19 @@
    "pokemon": [
     "Chicklet",
     "Pollish"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "damaged",
+      "damaging": true,
+      "crossesBelowFraction": 0.5
+     },
+     "kind": "retreat",
+     "mandatory": true,
+     "allowSwitch": true,
+     "note": "MUST disengage and move its speed straight toward its trainer; if that puts it in switching range and another Pokemon is available, it must be switched out."
+    }
    ]
   },
   {
@@ -6023,6 +7140,22 @@
    "description": "A dark, smoldering aura surrounds this Pokémon. At the start of each of its turns, each creature within 5 feet of it takes 1d10 + proficiency modifier fire damage. This damage ignores resistance to fire.",
    "pokemon": [
     "Blaziken"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "deal_damage",
+     "target": "all",
+     "radiusFt": 5,
+     "amount": {
+      "dice": "1d10",
+      "plus": "proficiency"
+     },
+     "damageType": "Fire",
+     "ignoreResistance": true
+    }
    ]
   }
  ]

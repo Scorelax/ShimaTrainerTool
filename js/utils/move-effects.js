@@ -301,13 +301,18 @@ const KIND_LABELS = {
   redirect_avoided_damage: 'Redirect the damage you avoided', negate_damage: 'Ignore the damage', deal_damage: 'Deal damage back', disable_move: 'Disable one of its moves',
   undo_crit_damage: 'Treat the crit as a normal hit', teleport_swap: 'Swap places', disable_overlapping_moves: 'Disable the moves you share',
   disable_last_used_move: 'Disable the move it just used', damage_multiplier: 'Reduce the damage of the attack', trick_room: 'Twist the turn order (Trick Room)',
-  faint_on_roll: 'Faints the target', cancel_switch: "Stop the opponent's switch-out",
+  faint_on_roll: 'Faints the target', cancel_switch: "Stop the opponent's switch-out", push: 'Move the target',
 };
 
 function _effectKindLabel(s) {
   if (s.kind === 'set_terrain') return `Place ${s.name || 'a terrain'}${s.rounds ? ` for ${s.rounds} round${s.rounds === 1 ? '' : 's'}` : ''}`;
   if (s.kind === 'set_weather') return `Set the weather: ${s.name || 'a weather'}${s.rounds ? ` for ${s.rounds} rounds` : ''}`;
   if (s.kind === 'stat_transfer') return STAT_TRANSFER_LABELS[s.mode] || _title(String(s.mode || 'stat change').replace(/_/g, ' '));
+  if (s.kind === 'push') {
+    const dist = s.ft === 'speed' ? 'up to its speed' : s.bySize ? `${s.bySize.join('/')}ft by size` : `${s.ft}ft`;
+    const dir = { away: 'away', toward: 'toward you', choice: 'toward or away', any: 'any direction' }[s.direction || 'away'];
+    return `${s.direction === 'toward' ? 'Pull' : 'Push'} the target ${dist} ${dir}`;
+  }
   if (s.kind === 'ability_swap') return ABILITY_SWAP_LABELS[s.mode] || 'Change an ability';
   if (s.kind === 'damage_multiplier') return s.multiplier === 0.5 ? 'Halve the damage of the attack' : KIND_LABELS.damage_multiplier;
   return KIND_LABELS[s.kind] || _title(String(s.kind || 'effect').replace(/_/g, ' '));

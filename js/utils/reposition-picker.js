@@ -147,7 +147,8 @@ function _render() {
   gridEl.querySelectorAll('[data-cell]').forEach((cell) => {
     const [col, row] = cell.dataset.cell.split(',').map(Number);
     const dist = _distanceFt(anchorCol, anchorRow, col, row);
-    const inRange = dist <= maxFt;
+    // `allow` narrows the reachable cells further -- a push only lands on cells straight away from the pusher.
+    const inRange = dist <= maxFt && (!_state.allow || _state.allow(col, row));
     const isOccupied = occupied.has(`${col},${row}`);
     if (col === anchorCol && row === anchorRow) cell.classList.add('anchor');
     if (!inRange) cell.classList.add('out-of-range');
@@ -186,11 +187,11 @@ function _render() {
  * same "can't offer it, tell the table to place it by hand" fallback tone
  * as every other "can't auto-detect" spot in this app.
  */
-export function pickRepositionCell(session, tokenId, anchorCol, anchorRow, maxFt, { title = 'Choose a cell', hint = 'Click an unoccupied cell within range.' } = {}) {
+export function pickRepositionCell(session, tokenId, anchorCol, anchorRow, maxFt, { title = 'Choose a cell', hint = 'Click an unoccupied cell within range.', allow = null } = {}) {
   if (!session?.board?.grid) return Promise.resolve(null);
   _ensureDom();
   document.getElementById('rpickTitle').textContent = title;
-  _state = { session, tokenId, anchorCol, anchorRow, maxFt, hint, staged: null, occupied: _occupiedCells(session, tokenId) };
+  _state = { session, tokenId, anchorCol, anchorRow, maxFt, hint, allow, staged: null, occupied: _occupiedCells(session, tokenId) };
   _render();
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });

@@ -2642,6 +2642,20 @@
             "type": "save_fail",
             "ability": "DEX"
           }
+        },
+        {
+          "kind": "push",
+          "ft": 30,
+          "direction": "away",
+          "when": {
+            "type": "save_fail",
+            "ability": "DEX"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "You create a massive wave of dark water in a 60-foot cone. Each creature in the area must make a Dexterity saving throw, taking 10d12 dark damage and 4d8 water damage on a failed save, or half as much on a successful one. Additionally, creatures that fail the save are pushed 30 feet away and knocked prone.",
@@ -5389,8 +5403,10 @@
       "scaling": "Starting from level 10, the user may choose to knock creatures that fail the saving throw prone instead of pushing or pulliing them.",
       "effects": [
         {
-          "kind": "condition",
-          "apply": "forced_movement",
+          "kind": "push",
+          "ft": 15,
+          "direction": "choice",
+          "note": "only Steel types or creatures in metal armor / holding a metal weapon",
           "when": {
             "type": "save_fail",
             "ability": "STR"
@@ -5399,8 +5415,7 @@
             {
               "type": "instant"
             }
-          ],
-          "note": "Pulled 15ft toward you or pushed 15ft away, your choice. Only affects Steel-type creatures, or ones wearing metal armor/holding a metal weapon -- use judgment for anyone else."
+          ]
         }
       ]
     },
@@ -8346,6 +8361,20 @@
               "n": 1
             }
           ]
+        },
+        {
+          "kind": "push",
+          "ft": 30,
+          "direction": "away",
+          "note": "Huge or larger creatures are staggered instead",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "You strike with the force of a natural disaster. Make a melee attack with advantage against a single target dealing 10d12 + MOVE fighting damage. The target must make a CON save or be stunned for 1 round. Regardless of the save, the target is pushed back 30ft. Creatures Huge or larger are instead staggered, losing their reaction and having disadvantage on their next attack. This move can be used once per long rest. If this attack misses, the VP is spent, but the move is not expended and may be used again until it hits.",
@@ -8377,8 +8406,14 @@
       "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
       "effects": [
         {
-          "kind": "condition",
-          "apply": "forced_movement",
+          "kind": "push",
+          "bySize": [
+            30,
+            15,
+            5
+          ],
+          "direction": "any",
+          "note": "a collision with a wall or creature deals 1d6 typeless to both",
           "when": {
             "type": "on_hit"
           },
@@ -8386,8 +8421,7 @@
             {
               "type": "instant"
             }
-          ],
-          "note": "30ft (your size or smaller target), 15ft (one size larger), or 5ft (two+ sizes larger), in a direction of your choice. A collision with a solid surface or another creature deals 1d6 typeless damage to both -- not automated."
+          ]
         }
       ]
     },
@@ -9983,8 +10017,10 @@
           }
         },
         {
-          "kind": "condition",
-          "apply": "forced_movement",
+          "kind": "push",
+          "ft": 15,
+          "direction": "any",
+          "note": "random direction: roll a d8 (1 = up, then clockwise)",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
@@ -10793,8 +10829,9 @@
       "scaling": "The damage dice for this move changes to 4d12 and 2d12 at level 5, 5d12 and 3d12 at level 10, and 10d12 and 4d12 at level 17.",
       "effects": [
         {
-          "kind": "condition",
-          "apply": "forced_movement",
+          "kind": "push",
+          "ft": 10,
+          "direction": "away",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
@@ -10803,8 +10840,7 @@
             {
               "type": "instant"
             }
-          ],
-          "note": "Pushed back 10ft, straight away from the line."
+          ]
         }
       ]
     },
@@ -22243,8 +22279,10 @@
       "scaling": "The effective range for this move increases to 30 feet at level 10.",
       "effects": [
         {
-          "kind": "condition",
-          "apply": "forced_movement",
+          "kind": "push",
+          "ft": "speed",
+          "direction": "away",
+          "note": "in a straight line, until something stops it",
           "when": {
             "type": "save_fail",
             "ability": "CHA"
@@ -22253,8 +22291,7 @@
             {
               "type": "instant"
             }
-          ],
-          "note": "The creature Disengages (free action) and moves up to its own speed in a straight line directly away from you. Allies are unaffected."
+          ]
         }
       ],
       "soundBased": true
@@ -23386,8 +23423,10 @@
       "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
       "effects": [
         {
-          "kind": "condition",
-          "apply": "forced_movement",
+          "kind": "push",
+          "ft": 5,
+          "direction": "away",
+          "note": "optional",
           "when": {
             "type": "on_hit"
           },
@@ -23395,8 +23434,7 @@
             {
               "type": "instant"
             }
-          ],
-          "note": "Optional -- pushed 5ft away, your choice."
+          ]
         }
       ]
     },
@@ -26023,6 +26061,20 @@
             }
           ],
           "note": "the beholder also moves it up to 30 ft in any direction"
+        },
+        {
+          "kind": "push",
+          "ft": 30,
+          "direction": "any",
+          "when": {
+            "type": "save_fail",
+            "ability": "STR"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "If the target is a creature, it must succeed on a Strength saving throw or the beholder moves it up to 30 feet in any direction. It is restrained by the ray's telekinetic grip until the start of the beholder's next turn or until the beholder is incapacitated.",
@@ -31205,6 +31257,20 @@
             "type": "save_fail",
             "ability": "DEX"
           }
+        },
+        {
+          "kind": "push",
+          "ft": 10,
+          "direction": "away",
+          "when": {
+            "type": "save_fail",
+            "ability": "DEX"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "You emit a powerful stream of high-speed water at creatures in an 80 foot line, 5 feet wide. All creatures caught in the blast must make a DEX saving throw against your Move DC, taking 4d12 + MOVE water damage on a failure, and half as much on a success. Creatures that fail the save also are pushed back 10 feet and fall prone. This move saps you of energy, and you may not make any attack until after the end of your next turn.",

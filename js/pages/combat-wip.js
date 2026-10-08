@@ -980,6 +980,49 @@ async function _maybeMeleeRetaliate(attackerId, targetId, moveName) {
   }
 }
 
+/** Forced movement (`push`): the caster picks where the target lands. `direction` -- 'away' (every step increases the distance
+ * to the caster: "pushed 30 feet away"), 'toward' (pulled, never onto the caster), 'choice' (either -- Magnetic Pulse), 'any'
+ * (Circle Throw, Telekinetic Ray; Dawn Dance's random direction is rolled by the table). The distance is `ft`, the target's own
+ * speed (`ft: 'speed'`, Roar), or by relative size (`bySize`, Circle Throw: 30ft if your size or smaller, 15ft one size larger,
+ * 5ft two or more). Shorter is allowed ("until met by an impeding force"). */
+async function _handlePush({ casterId, targetId, effect, moveName }) {
+  const tokens = session?.board?.tokens || {};
+  const c = tokens[casterId];
+  const t = tokens[targetId];
+  const target = session?.participants?.[targetId];
+  if (!c || !t || !target || casterId === targetId) {
+    showCombatAlert(`${moveName}: move ${target?.name || 'the target'} by hand (it isn't on the map).`, { title: moveName });
+    return;
+  }
+  let ft = Number(effect.ft) || 0;
+  if (effect.ft === 'speed') ft = maxSpeed(target) || 0;
+  if (effect.bySize) {
+    const rank = (p) => ({ tiny: 0, small: 1, medium: 2, large: 3, huge: 4, gigantic: 5 })[String(p?.size || 'medium').toLowerCase()] ?? 2;
+    const diff = rank(target) - rank(session.participants[casterId]);
+    ft = diff <= 0 ? effect.bySize[0] : diff === 1 ? effect.bySize[1] : effect.bySize[2];
+  }
+  ft = Math.floor(ft / 5) * 5;
+  if (!ft) return;
+  const cheb = (a, b, x, y) => Math.max(Math.abs(a - x), Math.abs(b - y));
+  const d0 = cheb(c.col, c.row, t.col, t.row);
+  const dir = effect.direction || 'away';
+  const allow = (col, row) => {
+    const steps = cheb(t.col, t.row, col, row);
+    if (!steps) return false;
+    const d1 = cheb(c.col, c.row, col, row);
+    const away = d1 - d0 === steps;
+    const toward = d0 - d1 === steps && d1 >= 1;
+    return dir === 'any' || (dir === 'away' && away) || (dir === 'toward' && toward) || (dir === 'choice' && (away || toward));
+  };
+  const how = dir === 'away' ? 'away from' : dir === 'toward' ? 'toward' : dir === 'choice' ? 'toward or away from' : 'in any direction from';
+  const name = visibleToViewer(target, 'name') ? target.name : '???';
+  await pickRepositionCell(session, targetId, t.col, t.row, ft, {
+    title: `${moveName}: move ${name}`,
+    hint: `Up to ${ft}ft ${how} ${dir === 'any' ? 'where it stands' : session.participants[casterId]?.name || 'the user'}${effect.note ? ` -- ${effect.note}` : ''}. Close to skip.`,
+    allow,
+  });
+}
+
 /** Feet to the nearest hostile creature on the map (Chebyshev, 5ft squares -- the same distance the server's reaction ranges
  * use), or null when this participant or nobody hostile has a token. Hostile = another side, or another owner in PvP. */
 function _nearestHostileFt(state, pid) {
@@ -3278,6 +3321,12 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
     if (effect.kind === 'swap_item') {
       // Switcheroo/Trick -- attackerId (closure) is the caster, pick.targetId the real target.
       await _handleSwapItem({ attackerId, targetId: pick.targetId, moveName });
+      continue;
+    }
+    if (effect.kind === 'push') {
+      // Strength, Roar, Lava Cannon, Circle Throw, ... -- the caster moves the TARGET's token (forced movement: no movement spent,
+      // no Pursuit window; a hazard on the landing tile still counts).
+      await _handlePush({ casterId: attackerId, targetId: pick.targetId, effect, moveName });
       continue;
     }
     if (effect.kind === 'reposition_near') {

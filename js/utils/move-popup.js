@@ -146,12 +146,10 @@ function _createPopupDOM() {
     const moveName = btn.dataset.moveName;
     const vpCost = parseInt(btn.dataset.vpCost) || 0;
 
-    // The shared battle (skipConfirm) never waits on the clip: it plays in a small floating window while the move's next
-    // popup opens straight away -- waiting for it held up every effects-only move (Smog, a buff, a heal) by the clip's length.
-    if (!overlay._deferAnimation) {
-      if (overlay._skipConfirm) _playBattleAnimationFloating(overlay._speciesName);
-      else await _playBattleAnimation(overlay._speciesName);
-    }
+    // The shared battle (skipConfirm) never plays the clip here: its confirm popup is never shown, so the clip used to play
+    // invisibly while the whole move waited for it. combat-wip.js plays it as the LAST step of the move instead (see
+    // playBattleAnimationFloating).
+    if (!overlay._deferAnimation && !overlay._skipConfirm) await _playBattleAnimation(overlay._speciesName);
 
     if (overlay._onUseMove) overlay._onUseMove(moveName, vpCost);
     confirmOverlay.style.display = 'none';
@@ -279,8 +277,10 @@ async function _playBattleAnimation(speciesName) {
 }
 
 /** The same clip as _playBattleAnimation, in a small floating window at the top of the screen that doesn't block anything
- * (no clicks caught) and removes itself when the clip ends -- for the shared battle, where the next popup shouldn't wait. */
-async function _playBattleAnimationFloating(speciesName) {
+ * (no clicks caught) and removes itself when the clip ends -- the shared battle plays it as the last step of a move whose
+ * flow has no damage popup of its own to play it in (an effects-only move, after its placement; an area attack, after its
+ * last target). */
+export async function playBattleAnimationFloating(speciesName) {
   const url = await getBattleAnimationUrl(speciesName);
   if (!url) return;
   if (!document.getElementById('floating-battle-anim-styles')) {

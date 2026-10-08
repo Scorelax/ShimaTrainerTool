@@ -3,7 +3,7 @@
 import { PokemonAPI, TrainerAPI, CombatAPI } from '../api.js';
 import { showToast } from '../utils/notifications.js';
 import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMoveData } from '../utils/pokemon-types.js';
-import { showMovePopup } from '../utils/move-popup.js';
+import { showMovePopup, playBattleAnimationFloating } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
 import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, selfRequirementUnmet, zoneRuleActive } from '../utils/move-effects.js';
@@ -3355,6 +3355,9 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
         // Nothing above took it (no damage, not save/AoE-tagged) but the move has
         // structured effects -- Slack Off, Rest, Yawn, Gravity... (combat-wip.js only).
         onEffectsOnly({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+      } else if (_isSharedCombat) {
+        // Nothing else follows (Splash, a pure flavour move) -- the battle animation is the whole rest of the move.
+        playBattleAnimationFloating(target.speciesName);
       }
     },
     onDrainHeal: () => {

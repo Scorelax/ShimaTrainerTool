@@ -20,6 +20,7 @@ import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
 import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
+import { playBattleAnimationFloating } from '../utils/move-popup.js';
 import { pickRepositionCell } from '../utils/reposition-picker.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
@@ -4732,7 +4733,12 @@ async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterNa
  * handler's own pickSaveTarget call. If a future move needed this same self+enemy-
  * save shape WITHOUT that tag, this handler would need the same treatment -- check
  * before assuming it just works. */
-async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
+/** The battle animation always comes last: after the effects popup, any area placement and every target. */
+async function _handleEffectsOnly(args) {
+  if ((await _runEffectsOnly(args)) !== false) playBattleAnimationFloating(args.speciesName);
+}
+
+async function _runEffectsOnly({ combatantId, moveName, computedData }) {
   const ctx = { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: null };
   // A 'beneficial' reaction (Heal Block/Strength Sap/Spectral Surge/Snatch)
   // can cancel this move's own effects entirely before they're ever
@@ -4745,7 +4751,7 @@ async function _handleEffectsOnly({ combatantId, moveName, computedData }) {
   // this app has no mechanism to selectively cancel just one target's own
   // share of a shared effect.
   const reaction = await waitForBeneficialReactions(combatantId, moveName);
-  if (reaction?.blocked) return;
+  if (reaction?.blocked) return false;
   await _offerMoveEffects({ attackerId: combatantId, moveName, computedData, ctx });
   if (!moveEffectsFor(moveName).some(e => e.target !== 'self')) return;
   // Encore/Torment's own "force the creature that just targeted/hit you" --
@@ -4964,9 +4970,15 @@ async function _applyPrimaryDamage(casterId, targetId, diceRoll, moveType, speci
  * one DEX save per creature in the circle), or its own attack roll
  * (pickTargetAgain + _resolveOneHit) otherwise (Meteor Swarm: "make as
  * many ranged attacks as there are targets"). */
-async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
+/** The battle animation plays once, after the area is placed and every target is resolved -- not inside each target's
+ * damage popup. */
+async function _handleMultiHitAoe(args) {
+  if ((await _runMultiHitAoe(args)) !== false) playBattleAnimationFloating(args.speciesName);
+}
+
+async function _runMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
   let targetIds = await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName) });
-  if (!targetIds || !targetIds.length) return; // closed / nobody picked -- move's own cost still applied
+  if (!targetIds || !targetIds.length) return false; // closed / nobody picked -- move's own cost still applied
 
   // Wide Guard's own reaction: this app has no real blast-center/positional-
   // radius concept, so the first target actually picked stands in for "is
@@ -4981,7 +4993,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
   const aoeReaction = await waitForTargetedAoeReactions(anchorId, combatantId, moveName);
   if (aoeReaction?.blocked) {
     targetIds = targetIds.filter((id) => id !== anchorId);
-    if (!targetIds.length) return; // that was the only target -- nothing left to resolve
+    if (!targetIds.length) return false; // that was the only target -- nothing left to resolve
   }
   const damageMultiplier = aoeReaction?.multiplier || 1;
 
@@ -5017,8 +5029,9 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
       // damageOnPass: Self-Destruct's own "half as much on a success" --
       // every other save-triggered move here deals zero damage on a pass,
       // same as confirmSecondarySave's own default (see save-picker.js).
+      // speciesName '' -- no clip inside each target's damage popup; it plays once at the end (_handleMultiHitAoe).
       const outcome = await confirmSecondarySave(target, target.name, {
-        dc, hasDamage, damageModifier, speciesName, ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId],
+        dc, hasDamage, damageModifier, speciesName: '', ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId],
         damageOnPass: moveName === 'Self-Destruct',
       });
       if (!outcome) continue; // closed for this target -- move on to the next one
@@ -5069,7 +5082,7 @@ async function _handleMultiHitAoe({ combatantId, moveName, move, computedData, s
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
       // so each selected target goes straight to its damage roll.
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier });
     }
   }

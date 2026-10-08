@@ -824,6 +824,9 @@ setTargetabilityResolver((participant, moveName) => {
   if (hidden) return hidden;
   // Earthquake, Bulldoze, Land's Wrath, ...: "each grounded creature" -- a flyer (or anything up in the air) isn't hit.
   if (moveFlagsFor(moveName).affectsGroundedOnly && !_groundedNow(participant.id)) return 'not grounded';
+  // Dream Eater, Dream Rush, Dream Seal, Nightmare, Cerulean Haunt: only a sleeping creature.
+  const needs = moveFlagsFor(moveName).targetRequiresStatus;
+  if (needs && !(participant.statuses || []).some((s) => s.kind === 'condition' && s.apply === needs)) return `not ${needs}`;
   return null;
 });
 // Nasty Plot's "attacks with the Wisdom move power": which ability keys a move's power uses.
@@ -974,9 +977,11 @@ async function _maybeMeleeRetaliate(attackerId, targetId, moveName) {
   const shield = (holder?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'retaliation_on_melee_hit');
   if (!shield || holder.currentHP <= 0) return;
   const attackerName = session?.participants?.[attackerId]?.name || 'the attacker';
+  // Acid Armor: "must succeed on a CON save or take 1d6 poison damage" -- the attacker's save (enter 0 when it passes).
+  const saveNote = shield.ability ? ` (${attackerName} makes a ${shield.ability} save -- enter 0 if it succeeds)` : '';
   const rolled = await promptValueRoll({
     dice: shield.value2, moveName: shield.moveName || 'Retaliation',
-    description: `${holder.name}'s ${shield.moveName || 'shield'} erupts against ${attackerName} -- enter the ${shield.value || ''} damage roll`,
+    description: `${holder.name}'s ${shield.moveName || 'shield'} erupts against ${attackerName} -- enter the ${shield.value || ''} damage roll${saveNote}`,
   });
   if (rolled === null || rolled <= 0) return;
   try {
@@ -3199,7 +3204,35 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
     }
     if (effect.kind === 'recoil') {
       // Volt Tackle, Brave Bird, Head Smash, ... -- typeless self-damage, a fraction of what the hit did.
-      await _handleRecoil({ casterId: attackerId, effect, moveName, ctx });
+      await _handleRecoil({ casterId: attackerId, effect, moveName, ctx, computedData });
+      continue;
+    }
+    if (effect.kind === 'self_faint') {
+      // Self-Destruct, Memento, Final Gambit: "you faint" / "drop to 0 hit points" once the move is done.
+      const self = session?.participants?.[attackerId];
+      if (self && self.currentHP > 0) {
+        try {
+          await CombatAPI.updateStats(attackerId, { currentHP: 0 });
+          CombatAPI.logEvent({ type: 'faint', actorId: attackerId, actorName: self.name, text: `${self.name} faints after using ${moveName}` }).catch(() => {});
+        } catch (err) {
+          showCombatAlert(err.message, { title: 'Error' });
+        }
+      }
+      continue;
+    }
+    if (effect.kind === 'hp_fraction_loss') {
+      // Nature's Madness: "the target loses half their current HP (minimum of 1 damage)".
+      const t = session?.participants?.[pick.targetId];
+      if (t && t.currentHP > 0) {
+        const lost = Math.max(effect.min || 1, Math.floor(t.currentHP * (effect.fraction || 0.5)));
+        try {
+          await CombatAPI.updateStats(pick.targetId, { currentHP: t.currentHP - lost });
+          CombatAPI.logEvent({ type: 'damage', actorId: attackerId, actorName: session.participants[attackerId]?.name, targetId: t.id, targetName: t.name,
+            amount: lost, move: moveName, text: `${t.name} loses ${lost} HP (half its current HP) -- ${moveName}` }).catch(() => {});
+        } catch (err) {
+          showCombatAlert(err.message, { title: 'Error' });
+        }
+      }
       continue;
     }
     if (effect.kind === 'hp_equalize') {
@@ -4006,16 +4039,39 @@ async function _handleDealDamageToAttacker({ reactorId, effect, moveName }) {
  * hit just did (the same number a drain heal uses); `'damage_rolled'` (Light of Ruin: an area move with a per-target save, so
  * there's no single dealt number) asks the table for the rolled total. Applied through the ordinary damage path against the user
  * themself with no damage type (so no type-chart multiplier, and temp HP absorbs first). */
-async function _handleRecoil({ casterId, effect, moveName, ctx }) {
+async function _handleRecoil({ casterId, effect, moveName, ctx, computedData }) {
   const caster = session?.participants?.[casterId];
   if (!caster) return;
   let base = Number.isFinite(ctx?.damageDealt) ? ctx.damageDealt : null;
-  if (effect.basis === 'damage_rolled' || base === null) {
-    const typed = await showCombatPrompt(`${moveName}: what was the damage rolled? ${caster.name} takes ${effect.fraction === 0.5 ? 'half' : 'a quarter'} of it as recoil.`, { title: 'Recoil', min: 0 });
+  let fraction = effect.fraction || 0;
+  if (effect.basis === 'max_hp') {
+    // Belly Drum: "take damage equal to half your maximum".
+    base = Number(caster.maxHP) || 0;
+  } else if (effect.basis === 'dice') {
+    // Dawn Dance: "using this move drains 2d12 of the user's hit points".
+    base = await promptValueRoll({ dice: effect.dice, moveName, description: `${moveName}: roll ${effect.dice} -- ${caster.name} loses that much HP` });
+    if (base === null) return;
+    fraction = 1;
+  } else if (effect.basis === 'max_damage') {
+    // High Jump Kick / Jump Kick: "on a miss, you take damage equal to half the maximum damage of this move".
+    const m = /^(\d+)d(\d+)$/i.exec(String(computedData?.damageDice || ''));
+    if (!m) {
+      showCombatAlert(`${moveName}: couldn't read the move's damage dice -- apply the miss damage by hand.`, { title: moveName });
+      return;
+    }
+    base = Number(m[1]) * Number(m[2]) + (Number(computedData?.damageBonus) || 0);
+  } else if (effect.basis === 'heal_rolled') {
+    // Radiant Hope: "damaging it by the same amount it heals others".
+    const typed = await showCombatPrompt(`${moveName}: how much did it heal each ally? ${caster.name} takes the same amount.`, { title: 'Recoil', min: 0 });
+    if (typed === null || typed === undefined || typed === '') return;
+    base = parseInt(typed, 10);
+    fraction = 1;
+  } else if (effect.basis === 'damage_rolled' || base === null) {
+    const typed = await showCombatPrompt(`${moveName}: what was the damage rolled? ${caster.name} takes ${fraction === 0.5 ? 'half' : 'a quarter'} of it as recoil.`, { title: 'Recoil', min: 0 });
     if (typed === null || typed === undefined || typed === '') return;
     base = parseInt(typed, 10);
   }
-  const recoil = Math.floor((Number(base) || 0) * (effect.fraction || 0));
+  const recoil = Math.floor((Number(base) || 0) * fraction);
   if (!(recoil > 0)) return;
   try {
     await CombatAPI.applyDamage(casterId, casterId, recoil, effect.damageType || '', caster.name, moveName);

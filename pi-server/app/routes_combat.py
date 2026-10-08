@@ -2698,6 +2698,8 @@ def _list_move_categories():
         for k in ('affectsGroundedOnly', 'doubleDamageVsAirborne'):
             if m.get(k):
                 marks[k] = True
+        if m.get('targetRequiresStatus'):
+            marks['targetRequiresStatus'] = m['targetRequiresStatus']  # Dream Eater & co: only a sleeping target
         if marks:
             flags[m['name']] = marks
     return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags}

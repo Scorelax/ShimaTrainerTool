@@ -153,6 +153,9 @@ export function evaluateEffect(effect, ctx) {
       return 'yes';
     case 'on_hit':
       return hit ? 'yes' : 'no';
+    case 'on_miss':
+      // High Jump Kick / Jump Kick: "on a miss, you take damage ... and fall prone".
+      return hit || ctx.guaranteedHit ? 'no' : 'yes';
     case 'natural_roll':
       if (!hit || ctx.guaranteedHit) return 'no';
       if (ctx.attackRoll === null || ctx.attackRoll === undefined) return 'manual';
@@ -228,7 +231,14 @@ export function statusLabel(s) {
   if (s.kind === 'cancel_switch') return "Stop the opponent's switch-out";
   if (s.kind === 'switch_out') return s.pass ? 'Switch out, passing your effects to the newcomer' : 'Your trainer switches you out';
   if (s.kind === 'faint_pass_heal') return s.mode === 'lunar' ? "Faint -- the next Pokemon is fully healed and cured" : "Faint -- the next Pokemon is cured and healed";
-  if (s.kind === 'recoil') return `Take ${s.fraction === 0.5 ? 'half' : s.fraction === 0.25 ? 'a quarter' : `${Math.round((s.fraction || 0) * 100)}%`} of the damage as recoil`;
+  if (s.kind === 'recoil') {
+    const part = s.fraction === 0.5 ? 'half' : s.fraction === 0.25 ? 'a quarter' : `${Math.round((s.fraction || 0) * 100)}%`;
+    if (s.basis === 'max_hp') return `Take ${part} of your max HP as damage`;
+    if (s.basis === 'dice') return `Lose ${s.dice} HP`;
+    if (s.basis === 'max_damage') return `Take ${part} of the move's maximum damage`;
+    if (s.basis === 'heal_rolled') return 'Take as much damage as you healed';
+    return `Take ${part} of the damage as recoil`;
+  }
   if (s.kind === 'hp_equalize') return s.mode === 'average' ? 'Both of you go to the average of your current HP' : "Bring the target's HP down to yours";
   if (s.kind === 'consume_item') return 'Your held item is consumed';
   if (s.kind === 'quash') return 'Move the target to the bottom of the initiative order this round';
@@ -302,7 +312,8 @@ const KIND_LABELS = {
   undo_crit_damage: 'Treat the crit as a normal hit', teleport_swap: 'Swap places', disable_overlapping_moves: 'Disable the moves you share',
   disable_last_used_move: 'Disable the move it just used', damage_multiplier: 'Reduce the damage of the attack', trick_room: 'Twist the turn order (Trick Room)',
   faint_on_roll: 'Faints the target', cancel_switch: "Stop the opponent's switch-out", push: 'Move the target',
-  ground_target: 'Bring it down to the ground', set_altitude: 'Rise into the air',
+  ground_target: 'Bring it down to the ground', set_altitude: 'Rise into the air', self_faint: 'You faint',
+  hp_fraction_loss: 'Lose half its current HP',
 };
 
 function _effectKindLabel(s) {
@@ -912,9 +923,17 @@ function _sizeRank(p) {
  * target-picker.js, which only ever has the RAW structured session
  * participant (`.statuses`, real `apply` values) to work with -- there's no
  * second shape to reconcile with here. */
-function _targetConditionMet(cond, { attacker, target, attackRoll, targetDamagedMeThisRound }) {
+function _targetConditionMet(cond, { attacker, target, attackRoll, targetDamagedMeThisRound, targetDamagedThisRound, adjacentAllies }) {
   if (!cond) return false;
   switch (cond.type) {
+    // Assurance: "if the target has already taken damage in the same round" (from anyone).
+    case 'target_damaged_this_round': return !!targetDamagedThisRound;
+    // Beat Up: "add 1d6 for each allied creature adjacent to the target" -- counted on the map by the caller.
+    case 'target_adjacent_allies': return (adjacentAllies || 0) > 0;
+    // Grass Knot: "if the target's size is Large or bigger".
+    case 'target_size_at_least': return _sizeRank(target) >= (_SIZE_RANK[String(cond.size || 'large').toLowerCase()] ?? 3);
+    // Seismic Toss: "for each size category the target is above Small".
+    case 'target_size_above': return _sizeRank(target) > (_SIZE_RANK[String(cond.size || 'small').toLowerCase()] ?? 1);
     // Avalanche/Payback's own "if the target has damaged you [since your
     // last turn / earlier this round]" -- resolved by the CALLER
     // (target-picker.js, which has the shared log this pure function
@@ -979,8 +998,10 @@ function _targetConditionMet(cond, { attacker, target, attackRoll, targetDamaged
  * only ever reads this when an effect actually declares scalingBonus,
  * same "magnitude ignored unless scalingBonus asks for it" convention
  * combat.js's own self-conditional evaluator uses). */
-function _targetConditionMagnitude(cond, { attacker, target }) {
+function _targetConditionMagnitude(cond, { attacker, target, adjacentAllies }) {
   if (cond?.type === 'attacker_size_above_target') return Math.max(0, _sizeRank(attacker) - _sizeRank(target));
+  if (cond?.type === 'target_adjacent_allies') return adjacentAllies || 0;
+  if (cond?.type === 'target_size_above') return Math.max(0, _sizeRank(target) - (_SIZE_RANK[String(cond.size || 'small').toLowerCase()] ?? 1));
   if (cond?.type === 'target_active_buff_count') return activeBuffCount(target, cond.statFields);
   return 1;
 }
@@ -997,11 +1018,11 @@ function _targetConditionMagnitude(cond, { attacker, target }) {
  * same "never stacked" rule as the self-conditional side; flatBonus and
  * advantage DO accumulate/OR across every met effect, since nothing here
  * needs Flail's own "only the most severe tier" reasoning. */
-export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null, attackRoll = null, targetDamagedMeThisRound = false, moveAbilities = [] }) {
+export function targetDamageNoteResult(effects, { attacker, target, moveModValue = 0, nextTierDice = null, attackRoll = null, targetDamagedMeThisRound = false, targetDamagedThisRound = false, adjacentAllies = 0, moveAbilities = [] }) {
   let diceMultiplier = 1, diceOverride = null, flatBonus = 0, advantage = false, extraDiceCount = 0;
   const notes = [];
   for (const e of effects || []) {
-    if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target, attackRoll, targetDamagedMeThisRound })) continue;
+    if (e.kind !== 'damage_note' || !_targetConditionMet(e.condition, { attacker, target, attackRoll, targetDamagedMeThisRound, targetDamagedThisRound, adjacentAllies })) continue;
     if (e.diceMultiplier && e.diceMultiplier > diceMultiplier) diceMultiplier = e.diceMultiplier;
     // Electro Ball's own "roll the next tier's dice, or double at the top
     // tier" -- nextTierDice (the caller's own computeMoveData.nextTierDice,
@@ -1022,6 +1043,7 @@ export function targetDamageNoteResult(effects, { attacker, target, moveModValue
     // call sites), not re-derived here, so it stays exactly consistent with
     // whatever the move-popup already showed for this same move/combatant.
     else if (e.flatBonus === 'moveModifier') flatBonus += moveModValue;
+    else if (e.flatBonus === 'level') flatBonus += Number(attacker?.level) || 0; // Night Shade: "adding the user's level"
     else if (typeof e.flatBonus === 'number') flatBonus += e.flatBonus;
     // Foul Play's "using THEIR own MOVE power": the damage's MOVE modifier is the target's (best of the move's own stats),
     // not the attacker's -- so swap one for the other. No stat data on the target leaves it as it was, with a note saying so.
@@ -1039,7 +1061,7 @@ export function targetDamageNoteResult(effects, { attacker, target, moveModValue
     // magnitude from a target COMPARISON (_targetConditionMagnitude)
     // instead of a self-only counted value.
     if (e.scalingBonus) {
-      const magnitude = _targetConditionMagnitude(e.condition, { attacker, target });
+      const magnitude = _targetConditionMagnitude(e.condition, { attacker, target, adjacentAllies });
       const unitValue = e.scalingBonus.amountPerUnit === 'moveModifier' ? moveModValue : (e.scalingBonus.amountPerUnit || 0);
       let bonus = magnitude * unitValue;
       if (typeof e.scalingBonus.cap === 'number') bonus = Math.min(bonus, e.scalingBonus.cap);
@@ -1049,7 +1071,7 @@ export function targetDamageNoteResult(effects, { attacker, target, moveModValue
     // the move's own size, not a flat number (see addDiceString's own
     // docstring for why this is a different shape from scalingBonus).
     if (e.extraDice) {
-      const magnitude = _targetConditionMagnitude(e.condition, { attacker, target });
+      const magnitude = _targetConditionMagnitude(e.condition, { attacker, target, adjacentAllies });
       let extra = magnitude * (e.extraDice.amountPerUnit || 0);
       if (typeof e.extraDice.cap === 'number') extra = Math.min(extra, e.extraDice.cap);
       extraDiceCount += extra;

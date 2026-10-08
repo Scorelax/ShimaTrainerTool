@@ -2713,7 +2713,8 @@
       "categories": [
         "damage",
         "potential_status_condition_frightened",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "damage_note"
       ],
       "effects": [
         {
@@ -2723,6 +2724,17 @@
             "type": "natural_roll",
             "min": 15
           }
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_status",
+            "any": [
+              "frightened"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "The target is frightened"
         }
       ],
       "description": "You attempt to sink your terrifying set of teeth into a creature. Make a melee attack, dealing 3d10 + MOVE dark damage on a hit. On a roll of 15 or higher, the creature is frightened. If this attack hits an already frightened creature, double the damage dice for this move.",
@@ -2744,12 +2756,23 @@
       "reaction": false,
       "categories": [
         "damage",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "damage_note"
       ],
       "description": "You strike an opponent where it already hurts. Make a melee attack against an opponent, dealing 1d10 + MOVE dark damage on a hit. If the target has already taken damage in the same round, double the damage dice.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_damaged_this_round"
+          },
+          "diceMultiplier": 2,
+          "note": "The target already took damage this round"
+        }
+      ]
     },
     {
       "name": "Aura Theft",
@@ -2802,7 +2825,8 @@
       "categories": [
         "damage",
         "conditional_damage",
-        "potential_disadvantage_attack_rolls"
+        "potential_disadvantage_attack_rolls",
+        "damage_note"
       ],
       "description": "You exploit a creature's vulnerable position. Make a melee attack, dealing 1d6 + MOVE dark damage on hit. Add 1d6 for each allied creature adjacent to the target (max +4d6). If the target is completely surrounded (no empty adjacent squares), it has disadvantage on its next attack.",
       "moveStat": "STR",
@@ -2823,6 +2847,17 @@
             }
           ],
           "note": "Only if the target was completely surrounded (no empty adjacent squares) when hit."
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_adjacent_allies"
+          },
+          "extraDice": {
+            "amountPerUnit": 1,
+            "cap": 4
+          },
+          "note": "+1d6 per ally next to the target"
         }
       ]
     },
@@ -3409,6 +3444,18 @@
             }
           ],
           "noSwitch": true
+        },
+        {
+          "kind": "self_faint",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "You sacrifice your life force to leave a lasting mark on a target. When you activate this move, you touch a creature and drop to 0 hit points. As a result, the target is incapacitated for 2 rounds. All attacks against it have advantage, it automatically fails all STR and DEX saving throws, and it cannot attack, move, flee, or be switched out.",
@@ -7810,7 +7857,23 @@
       "description": "You harness all the power of nature and send it at a creature in range. The target must make a CON save against your Move DC. On a failed save, the target loses half their current HP (minimum of 1 damage). This move consumes VP equal to the HP lost by the target.",
       "moveStat": "WIS/CHA",
       "vpCost": "Varies",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "hp_fraction_loss",
+          "fraction": 0.5,
+          "min": 1,
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Noodly Appendage",
@@ -8043,8 +8106,23 @@
               "type": "uses",
               "n": 1
             }
+          ]
+        },
+        {
+          "kind": "recoil",
+          "basis": "heal_rolled",
+          "fraction": 1,
+          "damageType": "",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
           ],
-          "note": "The move's own self-recoil (damaging the user by the same amount it heals others) has no mechanism -- not modeled."
+          "note": "You take as much damage as the move healed each ally."
         }
       ]
     },
@@ -8739,6 +8817,18 @@
           },
           "target": "self",
           "note": "3 levels; the user also faints"
+        },
+        {
+          "kind": "self_faint",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "You risk everything and use your own life force to damage a creature in range. The target takes an amount of fighting damage equal to your remaining HP and VP. This damage ignores resistance and immunity to fighting type. You then faint and gain 3 levels of exhaustion.",
@@ -8968,10 +9058,25 @@
           "kind": "condition",
           "apply": "prone",
           "when": {
-            "type": "special"
+            "type": "on_miss"
+          },
+          "target": "self"
+        },
+        {
+          "kind": "recoil",
+          "basis": "max_damage",
+          "fraction": 0.5,
+          "damageType": "",
+          "when": {
+            "type": "on_miss"
           },
           "target": "self",
-          "note": "on a miss"
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "On a miss you take half the maximum damage of this move."
         }
       ],
       "description": "You leap into the air to deliver a strong kick to a target. Make a melee attack, doing 5d10 + MOVE fighting damage on a hit. On a miss, you take damage equal to half the maximum damage of this move and fall prone.",
@@ -9001,10 +9106,25 @@
           "kind": "condition",
           "apply": "prone",
           "when": {
-            "type": "special"
+            "type": "on_miss"
+          },
+          "target": "self"
+        },
+        {
+          "kind": "recoil",
+          "basis": "max_damage",
+          "fraction": 0.5,
+          "damageType": "",
+          "when": {
+            "type": "on_miss"
           },
           "target": "self",
-          "note": "on a miss"
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "On a miss you take half the maximum damage of this move."
         }
       ],
       "description": "You leap into the air to deliver a strong kick to a creature. Make a melee attack against, doing 4d8 + MOVE fighting damage on a hit. On a miss, you take damage equal to half the maximum damage of this move and fall prone.",
@@ -9410,12 +9530,33 @@
       "reaction": false,
       "categories": [
         "damage",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "damage_note"
       ],
       "description": "You unleash an all out attack that is stronger the less HP you have. Make a melee attack roll against a creature, doing 2d8 + MOVE fighting damage on a hit. If you are below 50% of your maximum health, double the damage. If you are at 25% or below of your maximum health, triple the damage. The multiplier for this attack occurs before the multiplier for resistances or vulnerabilities.",
       "moveStat": "STR/DEX",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_hp_below",
+            "fraction": 0.5
+          },
+          "diceMultiplier": 2,
+          "note": "Below 50% HP"
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_hp_at_or_below",
+            "fraction": 0.25
+          },
+          "diceMultiplier": 3,
+          "note": "At 25% HP or below"
+        }
+      ]
     },
     {
       "name": "Rock Smash",
@@ -9543,12 +9684,26 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "damage_note"
       ],
       "description": "You lift and slam a creature into the ground. Make a melee attack, dealing 2d6 + MOVE fighting damage. For each size category the target is above Small, add 2d6 to the damage.",
       "moveStat": "STR",
       "vpCost": "7",
-      "scaling": "The damage dice for this move changes to 2d8 at level 5, 2d10 at level 10, and 2d12 at level 17."
+      "scaling": "The damage dice for this move changes to 2d8 at level 5, 2d10 at level 10, and 2d12 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_size_above",
+            "size": "small"
+          },
+          "extraDice": {
+            "amountPerUnit": 2
+          },
+          "note": "+2d6 per size above Small"
+        }
+      ]
     },
     {
       "name": "Sky Uppercut",
@@ -9744,12 +9899,26 @@
       "categories": [
         "damage",
         "fixed_special_damage",
-        "guaranteed_hit"
+        "guaranteed_hit",
+        "damage_note"
       ],
       "description": "You wind up a slow but unstoppable strike. This move always goes last in the initiative order. Make an attack that automatically hits a creature in melee range, dealing 1d10 + MOVE fighting damage. If you are grappling the target, double the damage dice for this move.",
       "moveStat": "STR",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_status",
+            "any": [
+              "grappled"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "You are grappling the target"
+        }
+      ]
     },
     {
       "name": "Wake-Up Slap",
@@ -9765,12 +9934,43 @@
       "reaction": false,
       "categories": [
         "damage",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "damage_note"
       ],
       "description": "You attack with a jolting slap from your palms. Make a melee attack on a creature, dealing 1d10 + MOVE fighting damage on a hit. If the target is asleep, double the damage dice and roll damage with advantage, but the target automatically wakes up.",
       "moveStat": "STR/DEX",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_status",
+            "any": [
+              "asleep"
+            ]
+          },
+          "diceMultiplier": 2,
+          "advantage": true,
+          "note": "The target is asleep"
+        },
+        {
+          "kind": "stat_transfer",
+          "mode": "cure_named",
+          "names": [
+            "asleep"
+          ],
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "the target automatically wakes up"
+        }
+      ]
     },
     {
       "name": "Worldbreaker Fist",
@@ -10091,6 +10291,22 @@
             "die": "d4",
             "roll": 4
           }
+        },
+        {
+          "kind": "recoil",
+          "basis": "dice",
+          "dice": "2d12",
+          "damageType": "",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Using this move drains 2d12 of your HP."
         }
       ],
       "description": "Using this move drains 2d12 of the user's hit points. You create a swirling vortex of mystical flames. All creatures in a 30ft. radius must make a Dexterity saving throw. On a failure, they take 4d12 + MOVE fire damage and 3d10 fairy damage, and suffer one of the following effects: Roll a d4 to determine the effect. 1: Charmed until end of next turn 2: Burned 3: Blinded until end of next turn 4: Moved 15ft in a random direction On a successful save, they take half damage and suffer no effect. This move may be used once per long rest.",
@@ -10732,12 +10948,25 @@
       },
       "reaction": false,
       "categories": [
-        "damage"
+        "damage",
+        "damage_note"
       ],
       "description": "You slam into a creature with your flaming body. Make a melee attack on a target, dealing a minimum of 1d10 + MOVE fire damage on a hit. Add an additional bonus to damage equal to your MOVE modifier for each size level you are above a creature. (Sizes, in order, are: Tiny, Small, Medium, Large, Huge, Gigantic)",
       "moveStat": "STR",
       "vpCost": "3",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "attacker_size_above_target"
+          },
+          "scalingBonus": {
+            "amountPerUnit": "moveModifier"
+          },
+          "note": "+MOVE mod per size level above the target"
+        }
+      ]
     },
     {
       "name": "Heat Wave",
@@ -12801,7 +13030,8 @@
       "description": "Your body glows a strange blue, creating horrifying visions in the minds of a creature in range that is asleep. Make a ranged attack roll, incapacitating the creature for 1d4 + MOVE turns on a hit. The creature wakes up, but is unable to do anything for the duration. On a critical hit, the creature loses half of its remaining HP or VP.",
       "moveStat": "INT/WIS/CHA",
       "vpCost": "15",
-      "scaling": "The creature is incapacitated for 1d6 turns at level 5, 1d8 turns at level 10, and 3d4 turns at level 17."
+      "scaling": "The creature is incapacitated for 1d6 turns at level 5, 1d8 turns at level 10, and 3d4 turns at level 17.",
+      "targetRequiresStatus": "asleep"
     },
     {
       "name": "Confuse Ray",
@@ -13081,7 +13311,8 @@
       "categories": [
         "damage",
         "potential_status_condition_burned",
-        "conditional_damage"
+        "conditional_damage",
+        "damage_note"
       ],
       "effects": [
         {
@@ -13090,6 +13321,17 @@
           "when": {
             "type": "crit"
           }
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_status",
+            "any": [
+              "burned"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "Burning target: critical damage"
         }
       ],
       "description": "You engulf a target in strange flames. Make a ranged attack against a target, dealing 2d8 + MOVE ghost damage on a hit, burning the target on a critical hit. This move does critical damage to burning targets.",
@@ -13277,12 +13519,23 @@
       "reaction": false,
       "categories": [
         "damage",
-        "fixed_special_damage"
+        "fixed_special_damage",
+        "damage_note"
       ],
       "description": "You hit a target with a wave of dark energy. Make a ranged attack against a target. On a hit, this move deals 1d10 + MOVE ghost damage, adding the user’s level to the damage.",
       "moveStat": "InT/WIS",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "effects": [
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_present"
+          },
+          "flatBonus": "level",
+          "note": "Adds the user's level"
+        }
+      ]
     },
     {
       "name": "Nightmare",
@@ -13305,7 +13558,8 @@
       "description": "Choose one sleeping creature you are aware of within 600 feet. It must make a WIS save against your Move DC, taking 3d10 + MOVE ghost damage on a failure, or half as much on a success. This move does not wake the target, but will cause a long rest to fail. This move can only be used once per long rest.",
       "moveStat": "INT/WIS/CHA",
       "vpCost": "12",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "targetRequiresStatus": "asleep"
     },
     {
       "name": "Ominous Wind",
@@ -14634,7 +14888,8 @@
       "categories": [
         "damage",
         "conditional_damage",
-        "potential_status_condition_prone"
+        "potential_status_condition_prone",
+        "damage_note"
       ],
       "effects": [
         {
@@ -14644,6 +14899,15 @@
             "type": "natural_roll",
             "min": 19
           }
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "target_size_at_least",
+            "size": "large"
+          },
+          "diceMultiplier": 2,
+          "note": "Large or bigger target"
         }
       ],
       "description": "You attempt to ensnare a creature with vines that sprout from the ground, causing it to trip. Make a ranged attack, dealing 1d10 + MOVE grass damage on a hit. If the targets size is Large or bigger, double the dice roll for the damage. On a natural attack roll of 19 or 20, the target falls prone.",
@@ -18523,6 +18787,22 @@
               "type": "encounter"
             }
           ]
+        },
+        {
+          "kind": "recoil",
+          "basis": "max_hp",
+          "fraction": 0.5,
+          "damageType": "",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "You take damage equal to half your maximum HP."
         }
       ]
     },
@@ -22791,6 +23071,18 @@
           },
           "totalMultiplier": 0.5,
           "note": "Below 50% HP -- halve the total damage after rolling, whether the target failed or passed its save (not the dice)"
+        },
+        {
+          "kind": "self_faint",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ]
     },
@@ -24855,6 +25147,26 @@
               "type": "concentration"
             }
           ]
+        },
+        {
+          "kind": "condition",
+          "apply": "retaliation_on_melee_hit",
+          "value": "Poison",
+          "value2": "1d6",
+          "ability": "CON",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            },
+            {
+              "type": "concentration"
+            }
+          ]
         }
       ]
     },
@@ -26576,7 +26888,8 @@
             }
           ]
         }
-      ]
+      ],
+      "targetRequiresStatus": "asleep"
     },
     {
       "name": "Dream Fang",
@@ -26651,7 +26964,8 @@
       "description": "You send a wave of mental energy, overwhelming a sleeping creature's mind. Make a ranged attack roll, dealing 2d8 + MOVE psychic damage on a hit. A creature hit by this move fails to wake up from this and subsequent attacks until the end of its next turn.",
       "moveStat": "WIS/CHA",
       "vpCost": "9",
-      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17."
+      "scaling": "The damage dice for this move changes to 3d8 at level 5, 4d8 at level 10, and 6d8 at level 17.",
+      "targetRequiresStatus": "asleep"
     },
     {
       "name": "Dream Seal",
@@ -26691,7 +27005,8 @@
       "description": "You call upon energy from the Sea of Dreams to trap a sleeping creature. Your target must succeed a Wisdom saving throw against your move DC or be trapped in the condition of sleep for 1 minute without the ability to wake up by any means. After the effect ends, the sleep condition continues like normally. Upon waking up, the creature affected gains one point of exhaustion, and takes 5d4 psychic damage.",
       "moveStat": "WIS",
       "vpCost": "12",
-      "scaling": ""
+      "scaling": "",
+      "targetRequiresStatus": "asleep"
     },
     {
       "name": "Extrasensory",

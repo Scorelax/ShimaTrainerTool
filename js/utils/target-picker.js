@@ -168,6 +168,7 @@ let _forcedRollNote = '';
 // multi_hit_choice move needs this condition.
 let _log = [];
 let _round = 0;
+let _session = null; // the board and participants, for Beat Up's adjacent-allies count
 // The natural d20 typed into the Attack Roll step, captured when the attack is
 // resolved (see _confirmAttack) and handed back with the result so the caller
 // can tell which natural-roll / crit effects triggered (null on a guaranteed
@@ -569,6 +570,27 @@ async function _playAnimation() {
  * this round. false with no attacker/target selected yet, or on
  * pickTargetAgain's own flow (empty `_log`, never reached by either move
  * anyway). */
+/** Assurance: the target already took damage this round, from anyone. */
+function _targetDamagedThisRound() {
+  if (!_selectedTarget) return false;
+  return _log.some((e) => e.type === 'damage' && e.targetId === _selectedTarget.id && e.round === _round);
+}
+
+/** Beat Up: the attacker's allies (not the attacker) standing next to the target on the map, at most 4. */
+function _adjacentAlliesOfAttacker() {
+  const tokens = _session?.board?.tokens || {};
+  const t = _selectedTarget && tokens[_selectedTarget.id];
+  if (!_attacker || !t) return 0;
+  const pvp = _session.battleType === 'pvp';
+  let n = 0;
+  for (const [id, p] of Object.entries(_session.participants || {})) {
+    if (id === _attacker.id || id === _selectedTarget.id || p.status !== 'participating' || !tokens[id]) continue;
+    const ally = p.side === _attacker.side && (!pvp || (p.owner || '') === (_attacker.owner || ''));
+    if (ally && Math.max(Math.abs(tokens[id].col - t.col), Math.abs(tokens[id].row - t.row)) <= 1) n++;
+  }
+  return Math.min(4, n);
+}
+
 function _targetDamagedMeThisRound() {
   if (!_attacker || !_selectedTarget) return false;
   return _log.some((e) => e.type === 'damage' && e.actorId === _selectedTarget.id && e.targetId === _attacker.id && e.round === _round);
@@ -596,7 +618,7 @@ function _showStep3() {
   // the move-popup's own diceOverride hook) -- flatBonus DOES change the
   // total, folded in below same as _damageModifier.
   const { diceMultiplier, diceOverride, flatBonus, advantage, extraDiceCount, note } =
-    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll, targetDamagedMeThisRound: _targetDamagedMeThisRound(), moveAbilities: _moveAbilityResolver(_moveName) });
+    targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll, targetDamagedMeThisRound: _targetDamagedMeThisRound(), targetDamagedThisRound: _targetDamagedThisRound(), adjacentAllies: _adjacentAlliesOfAttacker(), moveAbilities: _moveAbilityResolver(_moveName) });
   _targetFlatBonus = flatBonus;
   const noteEl = document.getElementById('targetPickerDamageNote');
   const noteParts = [];
@@ -727,6 +749,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _attacker = session.participants[attackerId] || null;
   _log = session.log || [];
   _round = session.round || 0;
+  _session = session;
   _attackModifier = attackModifier;
   _damageModifier = damageModifier;
   _speciesName = speciesName;

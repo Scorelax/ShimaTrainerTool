@@ -15,6 +15,19 @@
     "Salo",
     "Aurus",
     "Aroarus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "rerollKeep": "either",
+     "filter": {
+      "damaging": true,
+      "ownType": true
+     }
+    }
    ]
   },
   {
@@ -32,6 +45,20 @@
     "Lunus",
     "Umbrost",
     "Protoxys"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "knocked_out",
+      "melee": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "amount": {
+      "fractionOfDamage": 0.5
+     },
+     "damageType": ""
+    }
    ]
   },
   {
@@ -48,7 +75,11 @@
    "description": "This Pokémon can move through spaces that are as narrow as 1 inch wide without squeezing.",
    "pokemon": [
     "Moldite"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Analytic",
@@ -74,6 +105,24 @@
    "description": "This Pokémon gains resistance to Cosmic type damage, and can predict stellar events that will happen within a 5 mile radius. Within the same area it is able to sense when Cosmic, Psychic, Ghost or Dark energy is used.",
    "pokemon": [
     "Jiehtanas"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "resistance",
+     "damageTypes": [
+      "Cosmic"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Out of combat: predicts stellar events, senses Cosmic/Psychic/Ghost/Dark energy within 5 miles."
+    }
    ]
   },
   {
@@ -96,6 +145,31 @@
     "Voltey",
     "Dynape",
     "Silvolt"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "crit_taken"
+     },
+     "kind": "damage_mod",
+     "diceMultiplier": 2,
+     "filter": {
+      "damaging": true
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      },
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "end",
+       "count": 1
+      }
+     ],
+     "note": "One move on its following turn."
+    }
    ]
   },
   {
@@ -192,6 +266,15 @@
     "Skarling",
     "Skarmory",
     "Scaracross"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "critDamage": true
+    }
    ]
   },
   {
@@ -214,7 +297,11 @@
    "pokemon": [
     "Nectini",
     "Dustwig"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Berserk",
@@ -225,6 +312,52 @@
     "Pathoplague",
     "Werewool",
     "Corshail"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "roll",
+     "roll": "disadvantage",
+     "on": "attack_rolls"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "damage_mod",
+     "totalMultiplier": 2,
+     "filter": {
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "saves_against_its_moves"
+    }
    ]
   },
   {
@@ -243,6 +376,17 @@
     "Finchap",
     "Falcinch",
     "Raptinch"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stat_lock",
+     "stats": [
+      "ac"
+     ]
+    }
    ]
   },
   {
@@ -256,6 +400,46 @@
     "Heatike",
     "Heataze",
     "Blazion"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "damage_mod",
+     "diceMultiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Fire"
+      ],
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "vp_cost_mod",
+     "multiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Fire"
+      ],
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -272,6 +456,19 @@
    "pokemon": [
     "Maiskern",
     "Popkern"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "nameMatch": [
+      "Bullet",
+      "Ball",
+      "Bomb"
+     ]
+    }
    ]
   },
   {
@@ -290,6 +487,15 @@
     "Finchap",
     "Falcinch",
     "Raptinch"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "soundBased": true
+    }
    ]
   },
   {
@@ -297,7 +503,11 @@
    "description": "This Pokémon has advantage on Stealth checks while in its natural habitat, or in a fitting habitat (GM's discretion).",
    "pokemon": [
     "Mushusk"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Centurion's Honor",
@@ -326,6 +536,43 @@
     "Venusaur",
     "Nacleaf",
     "Crystalga"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "sun"
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "speed",
+     "amount": {
+      "multiplier": 2
+     }
+    },
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "sun"
+       ]
+      }
+     ],
+     "kind": "heal",
+     "amount": {
+      "proficiency": true
+     }
+    }
    ]
   },
   {
@@ -344,6 +591,20 @@
     "Voltey",
     "Dynape",
     "Silvolt"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_immunity",
+     "moveTypes": [
+      "Electric"
+     ],
+     "vsTypes": [
+      "Ground"
+     ]
+    }
    ]
   },
   {
@@ -352,6 +613,14 @@
    "pokemon": [
     "Wormole",
     "Jormungandr"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stat_lock"
+    }
    ]
   },
   {
@@ -369,7 +638,11 @@
     "Veerulent (Stable Form)",
     "Mushusk",
     "Moldite"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Color Change",
@@ -396,6 +669,29 @@
     "Noirow",
     "Charmander",
     "Charmeleon"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_status",
+       "any": [
+        "poisoned",
+        "burned",
+        "confused",
+        "paralyzed"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "flatBonus": "proficiency",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -410,6 +706,15 @@
     "Silkonat",
     "Silkomoth",
     "Weavoth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "attack_bonus",
+     "amount": 1
+    }
    ]
   },
   {
@@ -471,6 +776,31 @@
     "Flareblit",
     "Asfire",
     "Aspyre"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "condition",
+     "target": "attacker",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "optional": true,
+     "apply": "move_disabled",
+     "value": "the move it just used",
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "end",
+       "count": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -480,6 +810,28 @@
     "Oasand",
     "Oasylph",
     "Chicklet"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enemy_attack_roll"
+     },
+     "kind": "roll",
+     "target": "attacker",
+     "roll": "disadvantage",
+     "on": "attack_rolls",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -488,6 +840,18 @@
    "pokemon": [
     "Platypara",
     "Platypulse"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "moves": [
+      "Self-Destruct",
+      "Explosion"
+     ]
+    }
    ]
   },
   {
@@ -528,6 +892,24 @@
     "Torchick",
     "Combusken",
     "Blaziken"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "type_proficiency",
+     "moveTypes": [
+      "Dark"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "If it is also Dark type, double its proficiency bonus."
+    }
    ]
   },
   {
@@ -548,6 +930,22 @@
     "Promush",
     "Mallusk",
     "Conchail"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "roll",
+     "roll": "disadvantage",
+     "on": "attack_rolls"
+    }
    ]
   },
   {
@@ -568,6 +966,33 @@
     "Voltey",
     "Dynape",
     "Silvolt"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "resistance",
+     "damageTypes": [
+      "Fire"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "type_proficiency",
+     "moveTypes": [
+      "Ground"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "No penalty from extreme heat."
+    }
    ]
   },
   {
@@ -576,7 +1001,11 @@
    "pokemon": [
     "Faeling",
     "Drairy"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Disguise",
@@ -603,7 +1032,11 @@
     "Chronus",
     "Starcub",
     "Stellursa"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Dreamscape",
@@ -619,6 +1052,25 @@
     "Kyogre",
     "Quetzalair",
     "Quetzatlas"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "while": [
+      {
+       "type": "environment",
+       "any": [
+        "outside"
+       ]
+      }
+     ],
+     "kind": "set_weather",
+     "name": "Rain",
+     "rounds": 5,
+     "note": "Ties with another weather ability go to the higher DEX score."
+    }
    ]
   },
   {
@@ -631,6 +1083,25 @@
     "Heliosol",
     "Horusol",
     "Blazion"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "while": [
+      {
+       "type": "environment",
+       "any": [
+        "outside"
+       ]
+      }
+     ],
+     "kind": "set_weather",
+     "name": "Harsh Sunlight",
+     "rounds": 5,
+     "note": "Ties with another weather ability go to the higher DEX score."
+    }
    ]
   },
   {
@@ -639,6 +1110,42 @@
    "pokemon": [
     "Armles",
     "Armful"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "end_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "sun"
+       ]
+      }
+     ],
+     "kind": "lose_hp",
+     "amount": {
+      "proficiency": true
+     }
+    },
+    {
+     "when": {
+      "type": "end_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "rain"
+       ]
+      }
+     ],
+     "kind": "heal",
+     "amount": {
+      "proficiency": true
+     }
+    }
    ]
   },
   {
@@ -648,6 +1155,19 @@
     "Grostarch",
     "Caloburn",
     "Clucky"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "saving_throws",
+     "vsConditions": [
+      "asleep"
+     ]
+    }
    ]
   },
   {
@@ -656,6 +1176,24 @@
    "pokemon": [
     "Foongus",
     "Amoonguss"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "amount": {
+      "proficiency": true
+     },
+     "damageType": "Grass"
+    }
    ]
   },
   {
@@ -664,6 +1202,29 @@
    "pokemon": [
     "Torchick",
     "Combusken"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "amount": {
+      "dice": "1d4",
+      "plus": "proficiency"
+     },
+     "damageType": "Fire",
+     "note": "Also when a creature within 5 feet grapples it."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Sheds dim light in a 10 ft radius while conscious."
+    }
    ]
   },
   {
@@ -718,6 +1279,22 @@
    "pokemon": [
     "Wyngir",
     "Faevern"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "move_type_override",
+     "to": "Fairy",
+     "filter": {
+      "moves": [
+       "Dragon Breath",
+       "Harmony Breath",
+       "Frost Breath"
+      ]
+     }
+    }
    ]
   },
   {
@@ -726,6 +1303,19 @@
    "pokemon": [
     "Wyngir",
     "Faevern"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "move_type_override",
+     "to": "Fairy",
+     "from": "Flying",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -742,6 +1332,82 @@
     "Croconaw",
     "Feraligatr",
     "Noctugatr"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.5
+      },
+      {
+       "type": "self_hp_at_or_above",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "vp_cost_mod",
+     "multiplier": 2,
+     "filter": {
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.5
+      },
+      {
+       "type": "self_hp_at_or_above",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "damage_mod",
+     "extraDice": "2d6",
+     "flatBonus": "proficiency",
+     "filter": {
+      "attackRoll": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "vp_cost_mod",
+     "multiplier": 3,
+     "filter": {
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "damage_mod",
+     "extraDice": "4d6",
+     "flatBonus": "proficiency",
+     "filter": {
+      "attackRoll": true
+     }
+    }
    ]
   },
   {
@@ -777,6 +1443,28 @@
     "Lavachnid",
     "Magmoar",
     "Heataze"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "condition",
+     "target": "attacker",
+     "chance": {
+      "die": "d10",
+      "min": 10
+     },
+     "apply": "burned"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Sheds dim light in a 15 ft radius."
+    }
    ]
   },
   {
@@ -785,6 +1473,26 @@
    "pokemon": [
     "Ailorance",
     "Fulgironce"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_status",
+       "any": [
+        "burned"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "flatBonus": "proficiency",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -798,6 +1506,59 @@
     "Lunatrice",
     "Growlithe",
     "Arcanine"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "damageTypes": [
+      "Fire"
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Fire"
+      ]
+     },
+     "kind": "stab_mod",
+     "multiplier": 2,
+     "filter": {
+      "moveTypes": [
+       "Fire"
+      ]
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ],
+     "note": "Also triggered by standing in open flames."
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Fire"
+      ]
+     },
+     "kind": "ignore_resistance",
+     "filter": {
+      "moveTypes": [
+       "Fire"
+      ]
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -814,7 +1575,11 @@
    "description": "This Pokémon can spend 1 minute changing its appearance to match any common flower. Requires a DC 15 Intelligence (Investigation) check to identify it as a Pokémon while mimicking.",
    "pokemon": [
     "Blossomini"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Flower Veil",
@@ -834,6 +1599,30 @@
     "Woolworth",
     "Spoolworth",
     "Grazeep"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "vulnerability",
+     "damageTypes": [
+      "Fire"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_taken_mod",
+     "multiplier": 0.5,
+     "filter": {
+      "melee": true,
+      "notTypes": [
+       "Fire"
+      ]
+     }
+    }
    ]
   },
   {
@@ -858,7 +1647,11 @@
    "pokemon": [
     "Monstearth",
     "Sylvestra"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Forewarn",
@@ -938,6 +1731,14 @@
     "Steelix",
     "Clingae",
     "Chimae"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stat_lock"
+    }
    ]
   },
   {
@@ -954,6 +1755,20 @@
    "pokemon": [
     "Aero",
     "Seraphlyte"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "attack_bonus",
+     "amount": 1,
+     "filter": {
+      "moveTypes": [
+       "Flying"
+      ]
+     }
+    }
    ]
   },
   {
@@ -962,6 +1777,23 @@
    "pokemon": [
     "Volto",
     "Ohmen"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "move_type_override",
+     "to": "Electric",
+     "from": "Normal"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Electric damage stores a charge (lasts 1 minute in combat); at 3 charges the next electric attack deals double damage, costs double VP and uses them all."
+    }
    ]
   },
   {
@@ -969,7 +1801,11 @@
    "description": "This Pokémon can consume gems, changing its secondary type changes to the type of the gem it consumed.",
    "pokemon": [
     "Diverigem"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Gluttony",
@@ -989,6 +1825,30 @@
     "Mudow",
     "Marshade",
     "Swampadow"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "stat",
+     "target": "attacker",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "stat": "speed",
+     "set": 0,
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "end",
+       "count": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -1021,7 +1881,11 @@
    "pokemon": [
     "Scrollix",
     "Codex"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Guts",
@@ -1032,6 +1896,24 @@
     "Redent",
     "Sargent",
     "Equitrix"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_status",
+       "any": [
+        "burned",
+        "poisoned"
+       ]
+      }
+     ],
+     "kind": "manual",
+     "note": "Ignores the disadvantage / reduced damage of burned and poisoned; still takes their end-of-turn damage."
+    }
    ]
   },
   {
@@ -1039,7 +1921,11 @@
    "description": "This Pokémon has advantage on Constitution saving throws against exhaustion from manual labor. Can work twice as long as other Pokémon before requiring rest.",
    "pokemon": [
     "Smudgel"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Harvest",
@@ -1071,6 +1957,29 @@
    "pokemon": [
     "Lodoth",
     "Pelsdoth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_taken_mod",
+     "multiplier": 0.5,
+     "filter": {
+      "damageTypes": [
+       "Fire"
+      ]
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "burned"
+     ]
+    }
    ]
   },
   {
@@ -1096,7 +2005,11 @@
    "description": "At the end of each battle, this Pokémon may roll a d20. On a result of 20, its trainer adds a Honey to its inventory",
    "pokemon": [
     "Larvasp"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Honorable",
@@ -1142,6 +2055,34 @@
    "pokemon": [
     "Albawk",
     "Albaross"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "rain"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "water"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "immunity",
+     "negativeConditions": true
+    }
    ]
   },
   {
@@ -1153,6 +2094,18 @@
     "Laborant",
     "Soldiant",
     "Veerulent (Stable Form)"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stat_lock",
+     "stats": [
+      "attack_rolls",
+      "damage_rolls"
+     ]
+    }
    ]
   },
   {
@@ -1163,6 +2116,26 @@
     "Savagice",
     "Frosticle",
     "Glacicle"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "end_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "hail",
+        "snow"
+       ]
+      }
+     ],
+     "kind": "heal",
+     "amount": {
+      "proficiency": true
+     }
+    }
    ]
   },
   {
@@ -1170,7 +2143,11 @@
    "description": "This Pokémon knows the Daylight move and can cast a light that exudes bright light for 15ft, and dim light for an additional 15ft, at will.",
    "pokemon": [
     "Aurette"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Illusion",
@@ -1180,13 +2157,28 @@
     "Vladacabra",
     "Prankis",
     "Trixen"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Immunity",
    "description": "This Pokémon is immune to becoming poisoned.",
    "pokemon": [
     "Sandem"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "poisoned"
+     ]
+    }
    ]
   },
   {
@@ -1235,6 +2227,36 @@
     "Torchick",
     "Combusken",
     "Blaziken"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_protections",
+     "names": [
+      "Light Screen",
+      "Reflect"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_status",
+       "any": [
+        "asleep",
+        "frightened"
+       ]
+      }
+     ],
+     "kind": "ignore_resistance",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -1244,6 +2266,21 @@
     "Croager",
     "Laborant",
     "Soldiant"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "knocked_out",
+      "damaging": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "amount": {
+      "fractionOfDamage": 1
+     },
+     "damageType": "",
+     "note": "Equal to the HP it lost to that move."
+    }
    ]
   },
   {
@@ -1256,6 +2293,17 @@
     "Lunatrice",
     "Tecturrow",
     "Minerox"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "flinched"
+     ]
+    }
    ]
   },
   {
@@ -1263,6 +2311,17 @@
    "description": "This Pokémon is immune to sleep.",
    "pokemon": [
     "Sandem"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "asleep"
+     ]
+    }
    ]
   },
   {
@@ -1283,6 +2342,28 @@
     "Aurus",
     "Aroarus",
     "Hugleef"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enemy_attack_roll"
+     },
+     "kind": "roll",
+     "target": "attacker",
+     "roll": "disadvantage",
+     "on": "attack_rolls",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -1296,6 +2377,25 @@
     "Soldiant",
     "Thornug",
     "Thohorn"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "amount": {
+      "proficiency": true
+     },
+     "damageType": "",
+     "optional": true
+    }
    ]
   },
   {
@@ -1303,6 +2403,34 @@
    "description": "When attacking with a punch-based move (Mega Punch, Dynamic Punch, Ice/Fire/Thunder Punch, etc.), this Pokémon may roll the damage twice and choose either total.",
    "pokemon": [
     "Fisto"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "rerollKeep": "either",
+     "filter": {
+      "moves": [
+       "Sucker Punch",
+       "Thunder Punch",
+       "Cataclysm Punch",
+       "Drain Punch",
+       "Dynamic Punch",
+       "Focus Punch",
+       "Mach Punch",
+       "Power-Up Punch",
+       "Fire Punch",
+       "Shadow Punch",
+       "Ice Punch",
+       "Comet Punch",
+       "Dizzy Punch",
+       "Mega Punch",
+       "Bullet Punch"
+      ]
+     }
+    }
    ]
   },
   {
@@ -1343,6 +2471,23 @@
    "description": "This Pokémon does not suffer from any negative status ailments in harsh sunlight.",
    "pokemon": [
     "Snarepent"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "sun"
+       ]
+      }
+     ],
+     "kind": "immunity",
+     "negativeConditions": true
+    }
    ]
   },
   {
@@ -1360,6 +2505,17 @@
     "Custospirit",
     "Protecter",
     "Wecter"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "damageTypes": [
+      "Ground"
+     ]
+    }
    ]
   },
   {
@@ -1370,6 +2526,19 @@
     "Corscout",
     "Centurvus",
     "Praetorvus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_taken_mod",
+     "multiplier": 0.75,
+     "filter": {
+      "superEffective": true
+     },
+     "note": "Rounded down."
+    }
    ]
   },
   {
@@ -1388,6 +2557,17 @@
    "pokemon": [
     "Meowser",
     "Preowlith"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "paralyzed"
+     ]
+    }
    ]
   },
   {
@@ -1407,6 +2587,18 @@
     "Beluhe",
     "Whail",
     "Whailossus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "move_type_override",
+     "to": "Water",
+     "filter": {
+      "soundBased": true
+     }
+    }
    ]
   },
   {
@@ -1414,7 +2606,11 @@
    "description": "This Pokémon may spend a day to take root in a solid surface. While rooted, the following effects take hold: This Pokémon's speed becomes 0, it can't be recalled into a Pokéball, and it automatically fails DEX saving throws. It gains HP depending on the type of surface (DMs discretion), and has advantage on STR and CON saving throws. While rooted, Mossling may merge with this Pokémon to cause it to grow larger. For every size it grows to above Large, it deals an additional 2d8 damage when using moves. It can spend another day to uproot itself.",
    "pokemon": [
     "Mossaic"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Long Reach",
@@ -1429,6 +2625,17 @@
     "Venusaur",
     "Tangela (Stalker Form)",
     "Tangrowth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stat",
+     "stat": "reach",
+     "amount": 5,
+     "note": "Melee attacks and attacks of opportunity."
+    }
    ]
   },
   {
@@ -1456,6 +2663,19 @@
     "Hugleef",
     "Starcub",
     "Stellursa"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_taken_mod",
+     "multiplier": 0,
+     "filter": {
+      "saveForHalf": true,
+      "saveSucceeded": true
+     }
+    }
    ]
   },
   {
@@ -1477,6 +2697,17 @@
     "Flintle",
     "Flaretortle",
     "Eruptoise"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "frozen"
+     ]
+    }
    ]
   },
   {
@@ -1510,6 +2741,21 @@
     "Stakerel",
     "Osphrone",
     "Osphronent"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_negative_status"
+      }
+     ],
+     "kind": "stat",
+     "stat": "ac",
+     "amount": 2
+    }
    ]
   },
   {
@@ -1518,6 +2764,30 @@
    "pokemon": [
     "Kroraleef",
     "Krabemone"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "flatBonus": "proficiency",
+     "filter": {
+      "moves": [
+       "Celestial Aura",
+       "Aura Sphere",
+       "Aura Theft",
+       "Cosmic Pulse",
+       "Dark Pulse",
+       "Dragon Pulse",
+       "Magnetic Pulse",
+       "Photon Pulse",
+       "Heal Pulse",
+       "Origin Pulse",
+       "Water Pulse"
+      ]
+     }
+    }
    ]
   },
   {
@@ -1532,6 +2802,26 @@
     "Totodile",
     "Croconaw",
     "Feraligatr"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_status",
+       "any": [
+        "poisoned"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "diceMultiplier": 2,
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -1551,7 +2841,11 @@
     "Redoute",
     "Fantome",
     "Ananansi"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Mineral Refinery",
@@ -1561,7 +2855,11 @@
     "Heatike",
     "Heataze",
     "Blazion"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Minus",
@@ -1571,6 +2869,43 @@
     "Rhinaurus",
     "Sparcupine",
     "Erethizic"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "ally_has_ability",
+       "any": [
+        "Plus",
+        "Minus"
+       ]
+      }
+     ],
+     "kind": "attack_bonus",
+     "amount": 2
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "ally_has_ability",
+       "any": [
+        "Plus",
+        "Minus"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "flatBonus": 2,
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -1611,7 +2946,11 @@
     "Charizard",
     "Pollish",
     "Wandrish"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Motor Drive",
@@ -1657,6 +2996,21 @@
     "Reginant",
     "Reagle",
     "Argonael"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_full"
+      }
+     ],
+     "kind": "damage_taken_mod",
+     "multiplier": 0.5,
+     "firstOnly": true
+    }
    ]
   },
   {
@@ -1710,6 +3064,18 @@
    "pokemon": [
     "Platypara",
     "Platypulse"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "rerollKeep": "higher",
+     "filter": {
+      "superEffective": true
+     }
+    }
    ]
   },
   {
@@ -1728,6 +3094,24 @@
     "Werewool",
     "Osphrone",
     "Osphronent"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attacks_against"
+    }
    ]
   },
   {
@@ -1743,6 +3127,15 @@
    "pokemon": [
     "Gulorine",
     "Felverine"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "move_type_override",
+     "to": "Normal"
+    }
    ]
   },
   {
@@ -1750,6 +3143,18 @@
    "description": "This Pokémon is immune to moves that attempt to charm or taunt it.",
    "pokemon": [
     "Pebbling"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "charmed",
+      "taunted"
+     ]
+    }
    ]
   },
   {
@@ -1780,6 +3185,47 @@
     "Foliarch",
     "Bulbasaur",
     "Ivysaur"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "damage_mod",
+     "diceMultiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Grass"
+      ],
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "vp_cost_mod",
+     "multiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Water"
+      ],
+      "damaging": true
+     },
+     "note": "Text says WATER moves cost more (Blaze/Torrent/Swarm use their own type) -- kept as written, see open questions."
+    }
    ]
   },
   {
@@ -1789,6 +3235,17 @@
     "Lotad",
     "Lombre",
     "Ludicolo"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "confused"
+     ]
+    }
    ]
   },
   {
@@ -1800,6 +3257,21 @@
     "Arcanine",
     "Growlarc",
     "Sparcanine"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "ally_adjacent_to_target"
+      }
+     ],
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls"
+    }
    ]
   },
   {
@@ -1808,6 +3280,27 @@
    "pokemon": [
     "Scrollix",
     "Codex"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "vulnerability",
+     "damageTypes": [
+      "Fire"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_taken_mod",
+     "filter": {
+      "crit": true
+     },
+     "maxDamage": true
+    }
    ]
   },
   {
@@ -1824,7 +3317,11 @@
    "pokemon": [
     "Scrollix",
     "Codex"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Phantom Body",
@@ -1855,6 +3352,16 @@
    "description": "All of this Pokémon's normal-type moves become fairy-type.",
    "pokemon": [
     "Lumo"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "move_type_override",
+     "to": "Fairy",
+     "from": "Normal"
+    }
    ]
   },
   {
@@ -1868,6 +3375,43 @@
     "Surgasus",
     "Sparcupine",
     "Erethizic"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "ally_has_ability",
+       "any": [
+        "Plus",
+        "Minus"
+       ]
+      }
+     ],
+     "kind": "attack_bonus",
+     "amount": 2
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "ally_has_ability",
+       "any": [
+        "Plus",
+        "Minus"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "flatBonus": 2,
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -1888,6 +3432,24 @@
     "Venolisk",
     "Loreleaf",
     "Foliarch"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "amount": {
+      "proficiency": true
+     },
+     "damageType": "Poison"
+    }
    ]
   },
   {
@@ -1898,6 +3460,21 @@
     "Toxiclaw",
     "Toxeak",
     "Mushusk"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hits",
+      "melee": true
+     },
+     "kind": "condition",
+     "target": "target",
+     "chance": {
+      "die": "d10",
+      "min": 10
+     },
+     "apply": "poisoned"
+    }
    ]
   },
   {
@@ -1906,7 +3483,11 @@
    "pokemon": [
     "Nectini",
     "Dustwig"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Potential",
@@ -1914,7 +3495,11 @@
    "pokemon": [
     "Dragem",
     "Zoragon"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Powder Master",
@@ -1923,6 +3508,31 @@
     "Silkonat",
     "Silkomoth",
     "Weavoth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "save_dc_bonus",
+     "amount": "level",
+     "filter": {
+      "moves": [
+       "Powder",
+       "Powder Cloud",
+       "Rage Powder",
+       "Disorienting Powder",
+       "Sleep Powder",
+       "Poison Powder",
+       "Stun Spore",
+       "Cotton Spore",
+       "Spore",
+       "Spore Cloud",
+       "Release Spores",
+       "Bioluminescent Spores"
+      ]
+     }
+    }
    ]
   },
   {
@@ -1931,6 +3541,39 @@
    "pokemon": [
     "Growlarc",
     "Sparcanine"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "damageTypes": [
+      "Electric"
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Electric"
+      ]
+     },
+     "kind": "stab_mod",
+     "multiplier": 2,
+     "filter": {
+      "moveTypes": [
+       "Electric"
+      ]
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ],
+     "note": "Also triggered by being in an electric current."
+    }
    ]
   },
   {
@@ -1982,6 +3625,18 @@
     "Nemeon",
     "Equilibra",
     "Jiehtanas"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "targeted",
+      "direct": true
+     },
+     "kind": "vp_cost_mod",
+     "target": "attacker",
+     "multiplier": 2,
+     "note": "Single-target moves only (not area of effect)."
+    }
    ]
   },
   {
@@ -2053,6 +3708,17 @@
    "description": "This Pokémon treats using psychic type moves as if it had the psychic type.",
    "pokemon": [
     "Storican"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "type_proficiency",
+     "moveTypes": [
+      "Psychic"
+     ]
+    }
    ]
   },
   {
@@ -2092,6 +3758,21 @@
     "Minerox",
     "Merchent",
     "Hoppit"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_negative_status"
+      }
+     ],
+     "kind": "stat",
+     "stat": "speed",
+     "amount": 15
+    }
    ]
   },
   {
@@ -2111,6 +3792,25 @@
     "Squirtle",
     "Wartortle",
     "Blastoise"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "end_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "rain"
+       ]
+      }
+     ],
+     "kind": "heal",
+     "amount": {
+      "proficiency": true
+     }
+    }
    ]
   },
   {
@@ -2149,6 +3849,18 @@
    "pokemon": [
     "Ailorance",
     "Fulgironce"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stab_mod",
+     "multiplier": 2,
+     "filter": {
+      "recoil": true
+     }
+    }
    ]
   },
   {
@@ -2156,6 +3868,23 @@
    "description": "All of this Pokémon's normal-type moves become ice-type. Additionally, ice-type moves freeze water surfaces and create difficult terrain in a 10ft radius around the target.",
    "pokemon": [
     "Subsiro"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "move_type_override",
+     "to": "Ice",
+     "from": "Normal"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Ice moves freeze water surfaces and make 10 ft radius difficult terrain around the target."
+    }
    ]
   },
   {
@@ -2175,6 +3904,25 @@
    "description": "This Pokémon has Resistance to Normal and Steel-type damage, and gains a +2 AC bonus when defending a location it has maintained for at least one day Immunity to being moved against its will while standing on ground it has cleaned.",
    "pokemon": [
     "Squeagle"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "resistance",
+     "damageTypes": [
+      "Normal",
+      "Steel"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "+2 AC defending a location held for a day; immune to forced movement on ground it has cleaned."
+    }
    ]
   },
   {
@@ -2184,7 +3932,11 @@
     "Feyer",
     "Lanfae",
     "Lumifae"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Rivalry",
@@ -2193,6 +3945,23 @@
     "Prayblade",
     "Mounteer",
     "Mounteen"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_shares_type"
+      }
+     ],
+     "kind": "damage_mod",
+     "flatBonus": "proficiency",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -2212,6 +3981,15 @@
     "Mounteer",
     "Mounteen",
     "Mountelder"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "recoil": true
+    }
    ]
   },
   {
@@ -2229,6 +4007,25 @@
     "Pelarchilagos",
     "Carvechno",
     "Technedo"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "amount": {
+      "proficiency": true
+     },
+     "damageType": "",
+     "optional": true
+    }
    ]
   },
   {
@@ -2251,6 +4048,15 @@
     "Ordus",
     "Equitrix",
     "Hoppit"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "opportunityAttacks": true
+    }
    ]
   },
   {
@@ -2268,7 +4074,11 @@
     "Scrabshell",
     "Reclaimant",
     "Purifax"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Sand Force",
@@ -2279,6 +4089,26 @@
     "Wryggle",
     "Slythir",
     "Vyphyss"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "sand"
+       ]
+      }
+     ],
+     "kind": "stab_mod",
+     "multiplier": 2,
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -2294,6 +4124,46 @@
     "Slythir",
     "Vyphyss",
     "Evaptor"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "weatherDamage": [
+      "sand"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "sand"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "desert"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "speed",
+     "amount": {
+      "multiplier": 2
+     }
+    }
    ]
   },
   {
@@ -2301,6 +4171,25 @@
    "description": "When this Pokémon enters an outside battle, the weather immediately changes to a Sandstorm for 5 rounds. In the case of another Pokémon with a similar weather ability, the tie goes to the Pokémon with the highest DEX score.",
    "pokemon": [
     "Barron"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "while": [
+      {
+       "type": "environment",
+       "any": [
+        "outside"
+       ]
+      }
+     ],
+     "kind": "set_weather",
+     "name": "Sandstorm",
+     "rounds": 5,
+     "note": "Ties with another weather ability go to the higher DEX score."
+    }
    ]
   },
   {
@@ -2314,6 +4203,44 @@
     "Terrarex",
     "Terradon",
     "Dustwig"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "weatherDamage": [
+      "sand"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "sand"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "desert"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "ac",
+     "amount": 2
+    }
    ]
   },
   {
@@ -2321,6 +4248,34 @@
    "description": "This Pokémon takes no damage from grass-type attacks. If hit by a grass type move, it takes no damage and instead absorbs the energy, granting advantage on its next attack.",
    "pokemon": [
     "Croager"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "damageTypes": [
+      "Grass"
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Grass"
+      ]
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -2337,6 +4292,21 @@
    "pokemon": [
     "Taillow",
     "Swellow"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_immunity",
+     "moveTypes": [
+      "Normal",
+      "Fighting"
+     ],
+     "vsTypes": [
+      "Ghost"
+     ]
+    }
    ]
   },
   {
@@ -2375,6 +4345,18 @@
     "Monstearth",
     "Bolking",
     "Knighturn"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "asleep"
+     ],
+     "note": "Text: can't UNWILLINGLY fall asleep."
+    }
    ]
   },
   {
@@ -2384,6 +4366,18 @@
     "Vaxicure",
     "Fryoon",
     "Kortier"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "save_dc_bonus",
+     "amount": 1,
+     "filter": {
+      "negativeCondition": true
+     }
+    }
    ]
   },
   {
@@ -2393,6 +4387,21 @@
     "Octodendron",
     "Octuber",
     "Yukinarbor"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_full"
+      }
+     ],
+     "kind": "damage_taken_mod",
+     "multiplier": 0.5,
+     "firstOnly": true
+    }
    ]
   },
   {
@@ -2428,6 +4437,29 @@
     "Silian",
     "Groundilla",
     "Terrilla"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_status",
+       "any": [
+        "poisoned",
+        "burned",
+        "confused",
+        "paralyzed"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "flatBonus": "proficiency",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -2442,6 +4474,15 @@
     "Squirtle",
     "Wartortle",
     "Blastoise"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "critDamage": true
+    }
    ]
   },
   {
@@ -2469,6 +4510,38 @@
     "Conflagirant",
     "Lodoth",
     "Pelsdoth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "combat_round_at_most",
+       "n": 2
+      }
+     ],
+     "kind": "stat",
+     "stat": "speed",
+     "amount": {
+      "multiplier": 0.5
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "combat_round_at_most",
+       "n": 2
+      }
+     ],
+     "kind": "roll",
+     "roll": "disadvantage",
+     "on": "attack_rolls"
+    }
    ]
   },
   {
@@ -2476,6 +4549,46 @@
    "description": "This Pokémon is immune to Hail damage, and its speed is doubled in arctic conditions, or during a hailstorm.",
    "pokemon": [
     "Subsiro"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "weatherDamage": [
+      "hail"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "hail"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "arctic"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "speed",
+     "amount": {
+      "multiplier": 2
+     }
+    }
    ]
   },
   {
@@ -2483,6 +4596,15 @@
    "description": "On a critical hit made by this Pokémon, triple the dice roll instead of doubling it.",
    "pokemon": [
     "Vaxicure"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "crit_dice_multiplier",
+     "multiplier": 3
+    }
    ]
   },
   {
@@ -2498,6 +4620,45 @@
     "Fricub",
     "Ursnow",
     "Glaciear"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "weatherDamage": [
+      "hail"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "hail",
+          "snow"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "arctic"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "ac",
+     "amount": 2
+    }
    ]
   },
   {
@@ -2506,6 +4667,25 @@
    "pokemon": [
     "Frizard",
     "Savagice"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "while": [
+      {
+       "type": "environment",
+       "any": [
+        "outside"
+       ]
+      }
+     ],
+     "kind": "set_weather",
+     "name": "Hail",
+     "rounds": 5,
+     "note": "Ties with another weather ability go to the higher DEX score."
+    }
    ]
   },
   {
@@ -2515,6 +4695,27 @@
     "Denarius",
     "Aureus",
     "Krassemoth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "damageTypes": [
+      "Poison",
+      "Electric",
+      "Ice",
+      "Grass"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "vulnerabilityExtra": true
+    }
    ]
   },
   {
@@ -2525,6 +4726,15 @@
     "Crolder",
     "Onix",
     "Granix"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "critDamage": true
+    }
    ]
   },
   {
@@ -2549,6 +4759,15 @@
    "pokemon": [
     "Mograyn",
     "Hedeikeel"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "soundBased": true
+    }
    ]
   },
   {
@@ -2558,7 +4777,11 @@
     "Treecko",
     "Grovyle",
     "Sceptile"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Speed Boost",
@@ -2574,6 +4797,26 @@
     "Rappid",
     "Reagle",
     "Argonael"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "environment",
+       "any": [
+        "type_habitat"
+       ]
+      }
+     ],
+     "kind": "roll",
+     "target": "trainer",
+     "roll": "advantage",
+     "on": "initiative",
+     "note": "Environment related to its type -- DM decides."
+    }
    ]
   },
   {
@@ -2603,6 +4846,15 @@
    "description": "This Pokémon is always last in initiative order.",
    "pokemon": [
     "Grostarch"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "initiative_position",
+     "position": "last"
+    }
    ]
   },
   {
@@ -2632,6 +4884,24 @@
     "Hagechu",
     "Gaupus",
     "Vargpus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "amount": {
+      "proficiency": true
+     },
+     "damageType": "Electric"
+    }
    ]
   },
   {
@@ -2639,6 +4909,46 @@
    "description": "When hit by a melee attack, this Pokémon discharges static electricity. The attacker must succeed a DC 10 Constitution saving throw or take 1d6 electric damage and be shocked, suffering disadvantage on attack rolls until the end of its next turn.",
    "pokemon": [
     "Grazeep"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "retaliate",
+     "target": "attacker",
+     "save": {
+      "ability": "CON",
+      "dc": 10
+     },
+     "amount": {
+      "dice": "1d6"
+     },
+     "damageType": "Electric"
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "roll",
+     "target": "attacker",
+     "save": {
+      "ability": "CON",
+      "dc": 10
+     },
+     "roll": "disadvantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "end",
+       "count": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -2654,6 +4964,21 @@
    "description": "When this Pokémon is hit by a melee attack, roll a d10. On a 10, the attacker flinches.",
    "pokemon": [
     "Secto"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "condition",
+     "target": "attacker",
+     "chance": {
+      "die": "d10",
+      "min": 10
+     },
+     "apply": "flinched"
+    }
    ]
   },
   {
@@ -2674,6 +4999,35 @@
     "Onix",
     "Granix",
     "Steelix"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "sand"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "rocky"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "ac",
+     "amount": 2
+    }
    ]
   },
   {
@@ -2690,7 +5044,11 @@
    "pokemon": [
     "Harbeak",
     "Storican"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Strong Jaw",
@@ -2699,6 +5057,32 @@
     "Shredator",
     "Armful",
     "Merchent"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "rerollKeep": "either",
+     "filter": {
+      "moves": [
+       "Bite",
+       "Crunch",
+       "Hydra Bite",
+       "Bug Bite",
+       "Thunder Fang",
+       "Fire Fang",
+       "Ice Fang",
+       "Hyper Fang",
+       "Super Fang",
+       "Poison Fang",
+       "Dream Fang",
+       "Psychic Fangs",
+       "Temporal Fang"
+      ]
+     }
+    }
    ]
   },
   {
@@ -2733,6 +5117,15 @@
     "Popkern",
     "Labbit",
     "Rappid"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "crit_range",
+     "amount": 1
+    }
    ]
   },
   {
@@ -2740,7 +5133,11 @@
    "description": "This Pokémon can direct up to 4 Smudgel or other worker Pokémon as a bonus action. Allies within 30 feet gain advantage on ability checks related to their work. Once per long rest, can inspire allies to ignore one level of exhaustion.",
    "pokemon": [
     "Squeagle"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Surface Tension",
@@ -2766,7 +5163,11 @@
     "Croconaw",
     "Feraligatr",
     "Noctugatr"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Swarm",
@@ -2779,6 +5180,46 @@
     "Thornug",
     "Thohorn",
     "Nectini"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "damage_mod",
+     "diceMultiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Bug"
+      ],
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "vp_cost_mod",
+     "multiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Bug"
+      ],
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -2793,7 +5234,11 @@
    "description": "When carrying an item, your speed out of combat is increased by 10 feet, and constitution rolls related to travel are done with advantage. Additionally, you have advantage when attempting to flee from battles.",
    "pokemon": [
     "Corscout"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Swift Swim",
@@ -2808,6 +5253,26 @@
     "Pelagos",
     "Archilagos",
     "Pelarchilagos"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "rain"
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "swim_speed",
+     "amount": {
+      "multiplier": 2
+     }
+    }
    ]
   },
   {
@@ -2842,6 +5307,19 @@
    "pokemon": [
     "Fuego",
     "Broosbuck"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "rerollKeep": "either",
+     "filter": {
+      "damaging": true,
+      "maxVpCost": 6
+     }
+    }
    ]
   },
   {
@@ -2850,6 +5328,15 @@
    "pokemon": [
     "Frosticle",
     "Glacicle"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "allyAttacks": true
+    }
    ]
   },
   {
@@ -2876,6 +5363,21 @@
     "Kobull",
     "Swinicorn",
     "Porque"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_taken_mod",
+     "multiplier": 0.5,
+     "filter": {
+      "damageTypes": [
+       "Ice",
+       "Fire"
+      ]
+     }
+    }
    ]
   },
   {
@@ -2899,6 +5401,17 @@
     "Conflagirant",
     "Rifractal",
     "Sheenat"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_resistance",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -2913,6 +5426,46 @@
     "Pelarchilagos",
     "Squirtle",
     "Wartortle"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "damage_mod",
+     "diceMultiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Water"
+      ],
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "vp_cost_mod",
+     "multiplier": 1.5,
+     "filter": {
+      "moveTypes": [
+       "Water"
+      ],
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -2926,6 +5479,21 @@
     "Reginant",
     "Scarpea",
     "Cruscarex"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stab_mod",
+     "grant": true,
+     "multiplier": 2,
+     "filter": {
+      "melee": true,
+      "attackRoll": true
+     },
+     "note": "Gets STAB on a melee hit whatever its type; if it already had STAB, double it."
+    }
    ]
   },
   {
@@ -2970,7 +5538,11 @@
    "pokemon": [
     "Vaultile",
     "Vaultargo"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Triage",
@@ -3012,6 +5584,22 @@
    "pokemon": [
     "Rifractal",
     "Sheenat"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_no_held_item"
+      }
+     ],
+     "kind": "roll",
+     "target": "trainer",
+     "roll": "advantage",
+     "on": "initiative"
+    }
    ]
   },
   {
@@ -3048,6 +5636,18 @@
     "Silvaroth",
     "Stelluna",
     "Stellumina"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "attack_bonus",
+     "target": "allies",
+     "amount": 1,
+     "note": "All allied Pokemon in battle (within 50 ft).",
+     "radiusFt": 50
+    }
    ]
   },
   {
@@ -3056,6 +5656,17 @@
    "pokemon": [
     "Boradin",
     "Tremboar"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "asleep"
+     ]
+    }
    ]
   },
   {
@@ -3079,7 +5690,11 @@
    "description": "Once per day, Deoxys can transport itself and up to 8 willing creatures within 30 feet to any location on the same plane that Deoxys has previously visited.",
    "pokemon": [
     "Deoxys"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Volcanic Shell",
@@ -3100,6 +5715,18 @@
     "Ohmen",
     "Wandrish",
     "Energem"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "absorb",
+     "damageTypes": [
+      "Electric"
+     ],
+     "healFraction": 0.5
+    }
    ]
   },
   {
@@ -3123,6 +5750,18 @@
     "Oasylph",
     "Mossling",
     "Mossaic"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "absorb",
+     "damageTypes": [
+      "Water"
+     ],
+     "healFraction": 0.5
+    }
    ]
   },
   {
@@ -3132,6 +5771,26 @@
     "Hydro",
     "Spectrout",
     "Horrish"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "resistance",
+     "damageTypes": [
+      "Fire"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "burned"
+     ]
+    }
    ]
   },
   {
@@ -3153,6 +5812,17 @@
     "Scalareph",
     "Driftling",
     "Aquider"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "burned"
+     ]
+    }
    ]
   },
   {
@@ -3195,6 +5865,14 @@
     "Custospirit",
     "Protecter",
     "Wecter"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "stat_lock"
+    }
    ]
   },
   {
@@ -3212,6 +5890,27 @@
     "Octodendron",
     "Octuber",
     "Yukinarbor"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "type_proficiency",
+     "moveTypes": [
+      "Ice"
+     ]
+    },
+    {
+     "when": {
+      "type": "ally_drain_heal"
+     },
+     "kind": "heal",
+     "radiusFt": 30,
+     "amount": {
+      "fractionOfAllyHealing": 0.5
+     }
+    }
    ]
   },
   {
@@ -3219,7 +5918,11 @@
    "description": "Once awake, Jirachi can grant a wish to a creature within 30 feet. Jirachi cannot grant wishes that would directly harm others or drastically alter reality's fundamental nature.",
    "pokemon": [
     "Jirachi"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Wonder Guard",
@@ -3229,6 +5932,15 @@
     "Cirrux",
     "Labbit",
     "Rappid"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "nonVulnerableDamage": true
+    }
    ]
   },
   {
@@ -3240,6 +5952,22 @@
     "Wryggle",
     "Slythir",
     "Vyphyss"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "saving_throws",
+     "vsConditions": [
+      "burned",
+      "frozen",
+      "poisoned",
+      "paralyzed"
+     ]
+    }
    ]
   },
   {

@@ -23,6 +23,9 @@ UNKNOWN = [
     'Moody', 'Perfect Memory', 'Pollinator', 'Potential', 'Revealing Light', 'Salvager',
     'Spectral Sight', 'Storm Warning', 'Supervisor', 'Swamp Stalker', 'Swift Post',
     'Treasure Hoarder', 'Void Traversal', 'Wishmaker',
+    # very specific, borderline combat -- manual for now (user's call, 2026-10-08)
+    "Centurion's Honor", "Imperion's Honor", "Legion's Honor", 'Night Watch', 'Shadow Veil', 'Bloodhound',
+    'Seasonal Coat', 'Burrower', 'Crystal Reservoir', 'Ossein Hunter', 'Radiant Being', 'Dreamscape',
 ]
 
 # --- building blocks -------------------------------------------------------------
@@ -272,6 +275,7 @@ EFFECTS = {
     # common reactive ones
     'Pressure': [eff('vp_cost_mod', when={'type': 'targeted', 'direct': True}, target='attacker', multiplier=2,
                      note='Single-target moves only (not area of effect).')],
+    # Any enemy on the field, not only attacks against this Pokemon (user confirmed, 2026-10-08).
     'Intimidate': [eff('roll', when={'type': 'enemy_attack_roll'}, target='attacker', roll='disadvantage', on='attack_rolls',
                        optional=True, limit={'uses': 1, 'per': 'short_rest'}, ends=NEXT_ATTACK)],
     'Cute Charm': [eff('roll', when={'type': 'enemy_attack_roll'}, target='attacker', roll='disadvantage', on='attack_rolls',

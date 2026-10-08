@@ -448,7 +448,11 @@
    "pokemon": [
     "Buzzlet",
     "Mosqaegis"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Bulletproof",
@@ -476,7 +480,11 @@
    "description": "This Pokémon can burrow underground traveling a distance equal to its walking speed before re-emerging.",
    "pokemon": [
     "Socroach"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Cacophony",
@@ -514,7 +522,11 @@
    "description": "This Pokémon can be wielded as a +2 longsword, dealing 2d6 + STR steel type damage. While equipped, grants the wielder proficiency in longswords if they don't already have it. When wielded, grants +2 AC, and allows the user to channel the Pokémon's moves as a bonus action, using the Pokémon's ability scores. Additionally, the wielder gains resistance to ghost type damage. It can also manifest a spectral cape behind its wielder, granting it advantage on intimidation rolls. If separated from its chosen wielder, will teleport back to them as a bonus action. While bonded, trainer and Pokémon can communicate telepathically within 120 feet. If the trainer is knocked unconscious, this Pokémon automatically detaches and fights to protect them.",
    "pokemon": [
     "Duoblade"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Cheek Pouch",
@@ -758,7 +770,11 @@
    "pokemon": [
     "Crystamel",
     "Quamel"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Curiosity",
@@ -1043,7 +1059,11 @@
    "description": "When causing a creature to fall asleep, their spirits are transported to a dreamlike plane in the mind of this Pokémon. Creatures in the Dreamscape can't wake up unless they wake the dreamer.",
    "pokemon": [
     "Whailossus"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Drizzle",
@@ -2193,7 +2213,11 @@
    "description": "This Pokémon can be wielded as a +3 greatsword, dealing 3d6 + STR steel type damage. While equipped, grants the wielder proficiency in longswords if they don't already have it. When wielded, grants +3 AC, and allows the user to channel the Pokémon's moves as a bonus action, using the Pokémon's ability scores. Additionally, the wielder gains immunity to ghost type damage. It can also manifest a spectral cape behind its wielder, granting it advantage on intimidation rolls. If separated from its chosen wielder, will teleport back to them as a bonus action. While bonded, trainer and Pokémon can communicate telepathically within 240 feet. If the trainer is knocked unconscious, this Pokémon automatically detaches and fights to protect them.",
    "pokemon": [
     "Aegislash"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Imposter",
@@ -2495,7 +2519,11 @@
    "description": "This Pokémon can be wielded as a +1 short sword, dealing 1d6 + STR/DEX steel type damage. While equipped, grants the wielder proficiency in shortswords if they don't already have it. When wielded, grants +1 AC, and allows the user to channel the Pokémon's moves as a bonus action, using the Pokémon's ability scores. If separated from its chosen wielder, will teleport back to them as a bonus action. While bonded, trainer and Pokémon can communicate telepathically within 60 feet. If the trainer is knocked unconscious, this Pokémon automatically detaches and fights to protect them.",
    "pokemon": [
     "Honedge"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Levitate",
@@ -3083,7 +3111,11 @@
    "description": "During the night or in darkness, this Pokémon's lantern creates a 15ft radius of dim light around it. This light grants this Pokémon +1/3 AC and +7 to STR and DEX saving throws. Within the range of its lantern, immunity to ghost type damage is negated.",
    "pokemon": [
     "Knighturn"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "No Guard",
@@ -3164,7 +3196,11 @@
     "Vultear",
     "Gyptor",
     "Barbature"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Overcoat",
@@ -3780,7 +3816,11 @@
    "description": "This Pokémon provides light in a 20ft. radius, adjustable as a bonus action. Additionally, it can absorb light sources within 30ft. as a bonus action, gaining 1d12 temporary HP, but having disadvantage on stealth checks until the temporary HP is gone.",
    "pokemon": [
     "Aurette"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Rain Dish",
@@ -4318,7 +4358,11 @@
     "Mounteer",
     "Mounteen",
     "Mountelder"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Sedative Spines",
@@ -4417,7 +4461,11 @@
    "pokemon": [
     "Mudow",
     "Marshade"
-   ]
+   ],
+   "categories": [
+    "unknown"
+   ],
+   "effects": []
   },
   {
    "name": "Shed Skin",

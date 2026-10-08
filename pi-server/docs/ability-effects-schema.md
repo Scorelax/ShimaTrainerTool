@@ -34,6 +34,8 @@ never counted as backlog. Same rule as `unknown` moves.
   "save":     { "ability": "CON", "dc": 12 },     // the AFFECTED creature saves to avoid it;
                                                   //   dc may be a formula string, e.g. "8+proficiency+CON"
   "limit":    { "uses": 1, "per": "short_rest" }, // per: short_rest | long_rest | day | combat | round | turn
+                                                  //   short/long rest = the same charge tracker moves use
+                                                  //   ("recharge (short rest)" -> {maxCharges, type: 'SR'})
   "optional": true,                               // "may" -- the player decides when it fires
   "ends":     [ ... ],                            // how a lasting effect stops -- same shapes as moves
                                                   //   ({"type":"until_turn","whose":"holder","point":"end"},

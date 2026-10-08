@@ -142,7 +142,7 @@ function _requirementMet(requires, ctx) {
  *                unselected and let a human judge
  *   'no'         didn't trigger */
 // Effect kinds that are read in place by the move popup / roll flow, never offered as an apply-this button.
-const NOT_OFFERED_KINDS = new Set(['damage_note', 'requires_weather', 'requires_round', 'attack_roll_weather', 'move_type_by_weather']);
+const NOT_OFFERED_KINDS = new Set(['damage_note', 'requires_weather', 'requires_round', 'requires_self', 'attack_roll_weather', 'move_type_by_weather']);
 
 export function evaluateEffect(effect, ctx) {
   if (NOT_OFFERED_KINDS.has(effect.kind)) return 'no';
@@ -261,6 +261,7 @@ export function statusLabel(s) {
     if (s.set !== undefined) return `${stat} set to ${s.set}`;
     if (s.amount === 'proficiency') return `${stat} + proficiency`;
     if (s.amount && typeof s.amount === 'object' && s.amount.dice) return `Add ${s.amount.dice} to ${stat}`;
+    if (s.amount && typeof s.amount === 'object' && s.amount.rollOnApply) return `${stat} ${s.amount.sign < 0 ? '-' : '+'}${s.amount.rollOnApply}`;
     // Surface Glide/Tailwind's own "double speed" -- a multiplicative
     // speed buff, a different shape from every other stat (scoped to one
     // movement type via `appliesTo`, or 'all' by default -- see
@@ -1077,7 +1078,7 @@ export function describeEnds(ends) {
  * the caller already resolved rolled durations (a {dice} entry given an `n`). */
 export function buildStatusSpec(effect, { sourceId, sourceName, moveName, dc, ends }) {
   const spec = { kind: effect.kind, sourceId, sourceName, moveName, dc, ends: ends || effect.ends || [] };
-  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'against', 'appliesTo']) {
+  for (const k of ['apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'against', 'appliesTo', 'noSwitch']) {
     if (effect[k] !== undefined) spec[k] = effect[k];
   }
   if (effect.stacks) spec.stacks = effect.stacks;
@@ -1300,6 +1301,29 @@ export function canClimb(p) {
   return !(p?.speeds || []).length || !isGrounded(p);
 }
 
+
+/** Whether a move row [name, type, mod, action, vp, duration, range, desc, ...] attacks in melee: "melee" in its range ("Melee",
+ * "15ft. melee", "Melee (15ft.)") or a description that makes a melee attack at reach (Fly's dive, Dimension Slash). Mirrors
+ * routes_combat.py's _is_melee_move. */
+export function isMeleeMoveRow(row) {
+  if (!row) return false;
+  return /melee/i.test(String(row[6] || '')) || /\b(?:makes?|strike out with)\b[^.]{0,40}?\bmelee attack/i.test(String(row[7] || ''));
+}
+
+/** `requires_self` -- a gate on the user's own state: Limit Break ("requires below 50% HP"), Dawn Burst ("only while your HP
+ * is above 75%"), Snore ("while you are asleep"), Recompose ("when no enemies are within melee range"). `self` = { hp, maxHp,
+ * statuses, nearestHostileFt }. Returns why the move can't be used, or null. Anything unknown never blocks. */
+export function selfRequirementUnmet(effects, self) {
+  for (const e of effects || []) {
+    if (e.kind !== 'requires_self') continue;
+    const frac = Number.isFinite(self?.hp) && self?.maxHp > 0 ? self.hp / self.maxHp : null;
+    if (e.hpBelow != null && frac !== null && !(frac < e.hpBelow)) return e.message || `Needs to be below ${Math.round(e.hpBelow * 100)}% HP`;
+    if (e.hpAbove != null && frac !== null && !(frac > e.hpAbove)) return e.message || `Needs to be above ${Math.round(e.hpAbove * 100)}% HP`;
+    if (e.status && Array.isArray(self?.statuses) && !self.statuses.some(s => s.kind === 'condition' && s.apply === e.status)) return e.message || `Only while ${e.status}`;
+    if (e.noHostileWithinFt != null && Number.isFinite(self?.nearestHostileFt) && self.nearestHostileFt <= e.noHostileWithinFt) return e.message || `Not with an enemy within ${e.noHostileWithinFt}ft`;
+  }
+  return null;
+}
 
 /** Endeavor's "this move can not be used in the first round of combat": why `effects` say a move can't be used in `round`
  * (1-based), or null when it can. An unknown round never blocks. */

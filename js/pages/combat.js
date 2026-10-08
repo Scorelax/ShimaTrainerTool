@@ -6,7 +6,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
-import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, zoneRuleActive } from '../utils/move-effects.js';
+import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, selfRequirementUnmet, zoneRuleActive } from '../utils/move-effects.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
@@ -2980,7 +2980,10 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // Ion Deluge: "any normal-type move activated within 50 feet of you is considered electric-type".
   if (zoneRuleActive(_zones, 'ion_deluge') && move[1] === 'Normal') { move = [...move]; move[1] = 'Electric'; }
   // Storm Surge ("only while it is raining"), Aurora Veil ("only while it is hailing"), Endeavor ("not in the first round").
-  const _weatherBlock = weatherRequirementUnmet(moveEffectsFor(moveName), _weathers) || roundRequirementUnmet(moveEffectsFor(moveName), state.round);
+  // Limit Break (below 50% HP), Dawn Burst (above 75%), Snore (asleep), Recompose (no enemy in melee range). Statuses and the
+  // nearest enemy are only known in the shared battle (bridged onto `c` by combat-wip.js); unknowns never block.
+  const _weatherBlock = weatherRequirementUnmet(moveEffectsFor(moveName), _weathers) || roundRequirementUnmet(moveEffectsFor(moveName), state.round)
+    || selfRequirementUnmet(moveEffectsFor(moveName), { hp: c.currentHp, maxHp: c.maxHp, statuses: c.liveStatuses, nearestHostileFt: c.nearestHostileFt });
 
   // Bide -- a genuinely different shape from every other move: no dice at
   // all, its payoff is computed server-side from damage actually taken

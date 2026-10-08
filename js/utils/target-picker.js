@@ -423,6 +423,12 @@ function _showStep2(p, name) {
     _atkCtx.mode = mergeRollMode(_atkCtx.mode, _forcedRollMode);
     if (_forcedRollNote) _atkCtx.notes.push(_forcedRollNote);
   }
+  // Feint Attack, Close Combat, Limit Break, ...: the move's own attack is always rolled with advantage.
+  const ownMode = _atkCtx ? _moveFlagResolver(_moveName)?.attackRollMode : null;
+  if (ownMode) {
+    _atkCtx.mode = mergeRollMode(_atkCtx.mode, ownMode);
+    _atkCtx.notes.push(`${_moveName}: always rolled with ${ownMode}`);
+  }
   document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
   _diceBonusExtra = 0;
   _diceBonusConsume = [];

@@ -1122,6 +1122,10 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=Non
     trapped = next((s for s in _statuses_of(out) if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
     if trapped:
         raise ValueError(f"{out['name']} is {trapped['apply']} and can't be switched out")
+    # A condition that ALSO says "can't be switched out" (Spider Web's restraint, Memento, Slack Off) carries `noSwitch`.
+    held = next((s for s in _statuses_of(out) if s.get('noSwitch')), None)
+    if held:
+        raise ValueError(f"{out['name']} can't be switched out ({held.get('moveName') or held.get('apply') or 'an effect'})")
     pending = {'outId': out_id, 'inId': in_id, 'pass': bool(pass_statuses), 'place': _switch_placement(state, out, inn, col, row)}
 
     if state.get('started') and out_id in state['board']['tokens'] and not state.get('pendingReaction'):
@@ -1634,6 +1638,16 @@ def _has_block_attack_effect(move_data):
     return any(e.get('kind') == 'block_attack' for e in (move_data.get('effects') or []))
 
 
+_MELEE_TEXT = re.compile(r'\b(?:makes?|strike out with)\b[^.]{0,40}?\bmelee attack', re.I)
+
+
+def _is_melee_move(move):
+    """Whether a move attacks in melee: "melee" in its range ("Melee", "15ft. melee", "Melee (15ft.)") or a description that
+    makes a melee attack at a distance (Fly's diving strike, Dimension Slash at 10ft, Hyperspace Hole). Mirrored by
+    move-effects.js's isMeleeMoveRow -- a plain `range == 'Melee'` check missed every reach/dive melee move."""
+    return 'melee' in str(move.get('range', '')).lower() or bool(_MELEE_TEXT.search(str(move.get('description', ''))))
+
+
 def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attacking_move_name=None, only_ids=None):
     """{participantId: [moveName, ...]} for every OTHER participant (never the
     attacker themselves) who knows at least one move flagged with this exact
@@ -1681,8 +1695,7 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
             # is checked against the attacking move's own range ("Melee" is the one melee range in the data).
             want = m.get('reactionAttackRange')
             if want and attacking_move is not None:
-                is_melee = str(attacking_move.get('range', '')).strip().lower() == 'melee'
-                if (want == 'melee') != is_melee:
+                if (want == 'melee') != _is_melee_move(attacking_move):
                     continue
             # Tragic Hero: only once the anchor is below 1/N of its max HP (rounded down), and only once per creature per battle.
             one_over = m.get('reactionAnchorHpBelowOneOver')
@@ -1936,7 +1949,7 @@ _END_TYPES = ('rounds', 'until_turn', 'save', 'concentration', 'encounter', 'lon
 # target's) with this field saying who actually receives it. Every other
 # repeat heal (Aqua Ring, Ingrain) is self-only, so holder and recipient
 # were always the same participant before this.
-_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId', 'against', 'appliesTo')
+_STATUS_FIELDS = ('kind', 'apply', 'value', 'value2', 'stat', 'amount', 'set', 'roll', 'on', 'note', 'repeat', 'ability', 'healTargetId', 'against', 'appliesTo', 'noSwitch')
 
 
 def _statuses_of(participant):
@@ -2632,6 +2645,12 @@ def _list_move_categories():
             marks['soundBased'] = True
         if m.get('doubleDamageVsStates'):
             marks['doubleDamageVsStates'] = m['doubleDamageVsStates']
+        # Limit Break / Feint Attack / Close Combat ...: the move's OWN attack roll is always made with advantage, and Limit
+        # Break's "scores a critical hit on 18-20" widens the crit range for that attack only (base_crit is the 19-20 case).
+        if m.get('attackRollMode'):
+            marks['attackRollMode'] = m['attackRollMode']
+        if m.get('critBonus'):
+            marks['critBonus'] = m['critBonus']
         if marks:
             flags[m['name']] = marks
     return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags}

@@ -823,7 +823,8 @@
               "timing": "action"
             }
           ],
-          "note": "also cannot flee or be switched out; escapes with an action and a STR save"
+          "note": "also cannot flee or be switched out; escapes with an action and a STR save",
+          "noSwitch": true
         }
       ],
       "description": "You fire a sticky web that attempts to restrain a creature. Make a ranged attack roll on a target in range. On a hit, the target is covered in web. While covered, it is restrained and cannot flee or be switched out. The target can use an action on its turn to escape with a STR save against your Move DC.",
@@ -916,6 +917,24 @@
         "stat_debuff_enemy"
       ],
       "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": -10,
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ],
+          "stacks": {
+            "max": 12
+          },
+          "note": "stacks; an action and a STR save remove the string"
+        },
         {
           "kind": "condition",
           "apply": "restrained",
@@ -2992,7 +3011,8 @@
       "description": "You bring a creature close and hit it with a sucker punch. Make a melee attack on a creature, always with advantage, doing 1d10 + MOVE dark damage on a hit.",
       "moveStat": "STR/DEX/CHA",
       "vpCost": "5",
-      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17."
+      "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
+      "attackRollMode": "advantage"
     },
     {
       "name": "Flatter",
@@ -3297,7 +3317,8 @@
               "type": "rounds",
               "n": 2
             }
-          ]
+          ],
+          "noSwitch": true
         }
       ],
       "description": "You sacrifice your life force to leave a lasting mark on a target. When you activate this move, you touch a creature and drop to 0 hit points. As a result, the target is incapacitated for 2 rounds. All attacks against it have advantage, it automatically fails all STR and DEX saving throws, and it cannot attack, move, flee, or be switched out.",
@@ -4084,8 +4105,28 @@
               "point": "start"
             }
           ]
+        },
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": {
+            "rollOnApply": "1d4",
+            "sign": -1
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
         }
-      ]
+      ],
+      "attackRollMode": "advantage"
     },
     {
       "name": "Void Consumption",
@@ -4681,6 +4722,23 @@
               "type": "concentration"
             }
           ]
+        },
+        {
+          "kind": "condition",
+          "apply": "stab_doubled",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ],
+          "note": "on your next turn"
         }
       ]
     },
@@ -4942,6 +5000,23 @@
         "potential_status_condition_restrained"
       ],
       "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": -5,
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 12
+          },
+          "note": "stacks; an action removes the web"
+        },
         {
           "kind": "condition",
           "apply": "restrained",
@@ -5433,10 +5508,38 @@
         "protect_negate",
         "counter_reaction_effect",
         "potential_status_condition_paralyzed",
-        "guaranteed_hit",
         "recharge_locked"
       ],
       "effects": [
+        {
+          "kind": "counter_attack",
+          "damageType": "Electric",
+          "damageFrom": "damage_taken",
+          "fraction": 0.5,
+          "rollMode": "disadvantage_if_ranged",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Attack back for half the damage you took (disadvantage if the attack you reflect was ranged)."
+        },
+        {
+          "kind": "negate_damage",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
         {
           "kind": "condition",
           "apply": "paralyzed",
@@ -5449,7 +5552,9 @@
       "description": "You may use this reaction when a creature lands an attack against you, and has rolled for damage. You supercharge parts of your body, creating a force field that reflects incoming attacks. You take no damage from the triggering attack. Make an attack roll, dealing half of the damage that you would have sustained on a hit as electric damage. Of the attack you're reflecting is ranged, you roll with disadvantage. On a natural roll of 15 or higher, the opponent is paralyzed. A natural 20 will guarantee a hit, but will not be a critical hit.",
       "moveStat": "None",
       "vpCost": "12",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0
     },
     {
       "name": "Storm Surge",
@@ -6330,6 +6435,11 @@
       ],
       "effects": [
         {
+          "kind": "requires_self",
+          "hpAbove": 0.75,
+          "message": "Dawn Burst needs your HP above 75% of your maximum"
+        },
+        {
           "kind": "condition",
           "apply": "stunned",
           "when": {
@@ -6509,7 +6619,7 @@
               "n": 10
             }
           ],
-          "note": "Melee reach increase to 15ft is not enforced -- no positional/range system exists in this app."
+          "note": "Melee reach increase to 15ft is not tracked."
         }
       ]
     },
@@ -6626,7 +6736,8 @@
               "point": "end",
               "count": 1
             }
-          ]
+          ],
+          "note": "Blocks grid movement (this app's meaning of trapped) and switching out."
         },
         {
           "kind": "condition",
@@ -6642,7 +6753,7 @@
               "count": 1
             }
           ],
-          "note": "Blocks grid movement (this app's own enforced meaning for trapped); switching out isn't a mechanic this app's shared combat system has yet, so that half stays advisory only."
+          "note": "Blocks grid movement (this app's meaning of trapped) and switching out."
         }
       ]
     },
@@ -7012,6 +7123,21 @@
           "kind": "roll",
           "roll": "advantage",
           "on": "saving_throws",
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 10,
           "when": {
             "type": "always"
           },
@@ -8184,7 +8310,8 @@
       "description": "You strike with the force of a natural disaster. Make a melee attack with advantage against a single target dealing 10d12 + MOVE fighting damage. The target must make a CON save or be stunned for 1 round. Regardless of the save, the target is pushed back 30ft. Creatures Huge or larger are instead staggered, losing their reaction and having disadvantage on their next attack. This move can be used once per long rest. If this attack misses, the VP is spent, but the move is not expended and may be used again until it hits.",
       "moveStat": "STR",
       "vpCost": "50",
-      "scaling": "The damage dice for this move changes to 12d12 at level 5, 15d12 at level 10, and 20d12 at level 17."
+      "scaling": "The damage dice for this move changes to 12d12 at level 5, 15d12 at level 10, and 20d12 at level 17.",
+      "attackRollMode": "advantage"
     },
     {
       "name": "Circle Throw",
@@ -8259,8 +8386,28 @@
               "point": "start"
             }
           ]
+        },
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": {
+            "rollOnApply": "1d4",
+            "sign": -1
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "start"
+            }
+          ]
         }
-      ]
+      ],
+      "attackRollMode": "advantage"
     },
     {
       "name": "Counter",
@@ -8616,6 +8763,24 @@
               "point": "end"
             }
           ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ]
     },
@@ -8760,21 +8925,13 @@
       "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
       "effects": [
         {
-          "kind": "stat",
-          "stat": "crit",
-          "amount": 1,
-          "when": {
-            "type": "always"
-          },
-          "target": "self",
-          "ends": [
-            {
-              "type": "uses",
-              "n": 1
-            }
-          ]
+          "kind": "requires_self",
+          "hpBelow": 0.5,
+          "message": "Limit Break requires being below 50% HP"
         }
-      ]
+      ],
+      "critBonus": 2,
+      "attackRollMode": "advantage"
     },
     {
       "name": "Low Kick",
@@ -8963,6 +9120,20 @@
           "kind": "stat",
           "stat": "all_abilities",
           "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 5,
           "when": {
             "type": "always"
           },
@@ -9634,7 +9805,10 @@
           ],
           "note": "Only on a crit -- a normal hit deals damage with no VP regained."
         }
-      ]
+      ],
+      "reactionTrigger": "damaged",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee"
     },
     {
       "name": "Chronoflame",
@@ -11578,7 +11752,8 @@
       "description": "While in the air, you dive at a creature in range, ignoring your flying speed and any opportunity attacks you may incur. Make a melee attack roll, doing 3d10 + MOVE flying damage on a hit. You always have advantage when using this move. On a natural roll of 19 or 20, the target is knocked prone.",
       "moveStat": "STR/DEX",
       "vpCost": "20",
-      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17."
+      "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
+      "attackRollMode": "advantage"
     },
     {
       "name": "Feather Dance",
@@ -13037,7 +13212,7 @@
           "kind": "condition",
           "apply": "frightened",
           "when": {
-            "type": "special"
+            "type": "always"
           },
           "ends": [
             {
@@ -13046,13 +13221,45 @@
               "point": "end"
             }
           ],
-          "note": "reaction: when a creature in range lands an attack against you or an ally; it also has disadvantage on all rolls"
+          "note": "the creature that just landed the attack"
+        },
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "attack_rolls",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        },
+        {
+          "kind": "roll",
+          "roll": "disadvantage",
+          "on": "saving_throws",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "When a creature in range successfully lands an attack against you or an ally, a magical dark eye opens on your forehead, striking fear and hopelessness into the creature that hit you. The creature is frightened by you, and has disadvantage on all rolls until the end of its next turn.",
       "moveStat": "WIS/INT",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "damaged",
+      "reactionRange": 50
     },
     {
       "name": "Shadow Ball",
@@ -13519,7 +13726,7 @@
               "text": "until the attacker leaves the battle"
             }
           ],
-          "note": "Blocks grid movement; switching out isn't a mechanic this app's shared combat system has yet, so that half stays advisory only."
+          "note": "Blocks grid movement and switching out."
         }
       ]
     },
@@ -13929,6 +14136,21 @@
         "potential_status_condition_restrained"
       ],
       "effects": [
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": -10,
+          "when": {
+            "type": "save_fail",
+            "ability": "CON"
+          },
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 10
+            }
+          ]
+        },
         {
           "kind": "condition",
           "apply": "restrained",
@@ -14373,7 +14595,7 @@
               "n": 3
             }
           ],
-          "note": "Also covers this move's own \"cannot be switched out\" -- trapped already means exactly that. Movement is enforced server-side (_move_token); switching isn't, since the shared system has no switch-Pokemon mechanic of its own yet."
+          "note": "Blocks moving and being switched out."
         }
       ]
     },
@@ -15109,7 +15331,10 @@
       "description": "When you are targeted by a melee attack, you can use your reaction to release a spore that attempts to put your attacker to sleep. The creature must make a CON save against your Move DC, falling asleep on a fail.",
       "moveStat": "DEX/CON",
       "vpCost": "5",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee"
     },
     {
       "name": "Spore Cloud",
@@ -15308,7 +15533,10 @@
       "description": "When you are subject to a melee attack, you can use your reaction to release a spore that attempts to stun your attacker. The creature must make a CON save against your Move DC, becoming paralyzed on a fail.",
       "moveStat": "CON",
       "vpCost": "4",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "targeted",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee"
     },
     {
       "name": "Synthesis",
@@ -16943,6 +17171,23 @@
       ],
       "effects": [
         {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": -5,
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 12
+          },
+          "note": "stacks; an action warms it up and resets its speed"
+        },
+        {
           "kind": "condition",
           "apply": "frozen",
           "when": {
@@ -17218,6 +17463,23 @@
           "roll": "disadvantage",
           "on": "saving_throws",
           "ability": "DEX",
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
           "when": {
             "type": "on_hit"
           },
@@ -20115,7 +20377,8 @@
       "description": "You lash out with force, but contain your strike to a glancing blow, leaving a creature conscious. Make a melee attack on a target, dealing 1d6 + MOVE normal damage on a hit. This attack will always leave its target with 1 hp if it would otherwise cause the target to faint.",
       "moveStat": "DEX",
       "vpCost": "1",
-      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17."
+      "scaling": "The damage dice for this move changes to 1d8 at level 5, 1d10 at level 10, and 2d6 at level 17.",
+      "leavesAtOneHp": true
     },
     {
       "name": "Hold Hands",
@@ -20660,7 +20923,7 @@
               "n": 3
             }
           ],
-          "note": "Blocks grid movement; switching out isn't a mechanic this app's shared combat system has yet, so that half stays advisory only."
+          "note": "Blocks grid movement and switching out."
         }
       ]
     },
@@ -21560,6 +21823,11 @@
       "scaling": "The VP gained for this move changes to 4d6 at level 5, 6d8 at level 10, and 8d10 at level 17.",
       "effects": [
         {
+          "kind": "requires_self",
+          "noHostileWithinFt": 5,
+          "message": "Recompose needs no enemies within melee range"
+        },
+        {
           "kind": "heal",
           "amount": {
             "dice": "2d4",
@@ -22419,7 +22687,8 @@
               "count": 2
             }
           ],
-          "note": "immediately and through your next two turns"
+          "note": "immediately and through your next two turns",
+          "noSwitch": true
         }
       ],
       "description": "You give yourself a break, healing your wounds. When you activate this move, you become incapacitated immediately and through your next two turns. Your trainer may not switch you out during this time. At the end of the second turn, regain half of your maximum hit points and become stable once again.",
@@ -22592,7 +22861,14 @@
       "moveStat": "STR/WIS",
       "vpCost": "2",
       "scaling": "The damage dice roll for this move changes to 2d6 at level 5, 4d4 at level 10, and 3d10 at level 17.",
-      "soundBased": true
+      "soundBased": true,
+      "effects": [
+        {
+          "kind": "requires_self",
+          "status": "asleep",
+          "message": "Snore can only be used while you are asleep"
+        }
+      ]
     },
     {
       "name": "Soft-Boiled",
@@ -25173,6 +25449,23 @@
       ],
       "effects": [
         {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": -10,
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ],
+          "stacks": {
+            "max": 12
+          },
+          "note": "stacks; an action removes the threads"
+        },
+        {
           "kind": "condition",
           "apply": "poisoned",
           "when": {
@@ -27721,6 +28014,22 @@
       ],
       "effects": [
         {
+          "kind": "heal",
+          "amount": {
+            "dice": "4d6",
+            "moveMod": true
+          },
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
+        {
           "kind": "condition",
           "apply": "asleep",
           "when": {
@@ -28603,6 +28912,21 @@
           "kind": "stat",
           "stat": "ac",
           "amount": 2,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "rounds",
+              "n": 3
+            }
+          ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 20,
           "when": {
             "type": "always"
           },
@@ -29650,10 +29974,25 @@
       "reaction": true,
       "categories": [
         "counter_reaction_effect",
-        "damage",
         "potential_status_condition_bleeding"
       ],
       "effects": [
+        {
+          "kind": "counter_attack",
+          "damageType": "Steel",
+          "damageFrom": "damage_taken",
+          "rollMode": "disadvantage",
+          "target": "self",
+          "when": {
+            "type": "always"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "Attack roll against your attacker with disadvantage; on a hit, the damage you just took is dealt back as steel damage."
+        },
         {
           "kind": "condition",
           "apply": "bleeding",
@@ -29673,7 +30012,10 @@
       "description": "You lash out in retaliation with a bust of harsh metal shards. As a reaction, when you are hit with a melee attack that deals damage, make a melee attack roll against your attacker, with disadvantage. On a hit, deal the same amount of damage rolled as steel type damage back at your attacker. In the unlikely event of a natural 20, the target will suffer from bleeding wounds for 3 rounds, losing HP equal to its proficiency bonus each time it spends VP or uses its movement during this time.",
       "moveStat": "STR/DEX",
       "vpCost": "10",
-      "scaling": ""
+      "scaling": "",
+      "reactionTrigger": "damaged",
+      "reactionRange": 0,
+      "reactionAttackRange": "melee"
     },
     {
       "name": "Metal Claw",
@@ -30022,6 +30364,20 @@
               "type": "concentration"
             }
           ]
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": 10,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
         }
       ]
     },
@@ -30153,6 +30509,24 @@
             "ability": "STR",
             "requires": "hit"
           }
+        },
+        {
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
+          "when": {
+            "type": "natural_roll",
+            "min": 16
+          },
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end"
+            }
+          ]
         }
       ],
       "description": "You smash into a creature with your metal fist. Make a melee attack against a creature, doing 3d10 + MOVE steel damage on a hit. On a hit, the target must succeed a STR saving throw or fall prone. If the natural attack roll is 16 or higher, the target's speed is reduced by half until the end of its next turn.",
@@ -30386,14 +30760,28 @@
           "apply": "grappled",
           "when": {
             "type": "on_hit"
-          }
+          },
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         },
         {
           "kind": "condition",
           "apply": "restrained",
           "when": {
             "type": "on_hit"
-          }
+          },
+          "ends": [
+            {
+              "type": "save",
+              "ability": "STR",
+              "timing": "start_of_turn"
+            }
+          ]
         }
       ],
       "description": "You clamp down on an enemy Pokémon, attempting to deal damage and keep them in place. Make a melee attack roll. On a hit, the target takes 1d6 + MOVE water damage and is grappled and restrained. At the beginning of each of its turns, it may attempt to pry itself away with a STR save against your Move DC. As long as the target is restrained on your subsequent turns, this move can be activated again as a bonus action with an automatic hit, dealing 1d6 water damage.",

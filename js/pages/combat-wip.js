@@ -35,7 +35,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver } from '../utils/targetability.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -958,7 +958,7 @@ async function _enterSemiInvulnerable(combatantId, moveName, state) {
  * roll prompt appears on the device that resolved the hit (the only one running this flow);
  * the table rolls physically either way. */
 async function _maybeMeleeRetaliate(attackerId, targetId, moveName) {
-  if (findMoveRow(moveName)?.[6] !== 'Melee') return;
+  if (!isMeleeMoveRow(findMoveRow(moveName))) return;
   const holder = session?.participants?.[targetId];
   const shield = (holder?.statuses || []).find(s => s.kind === 'condition' && s.apply === 'retaliation_on_melee_hit');
   if (!shield || holder.currentHP <= 0) return;
@@ -975,6 +975,24 @@ async function _maybeMeleeRetaliate(attackerId, targetId, moveName) {
   }
 }
 
+/** Feet to the nearest hostile creature on the map (Chebyshev, 5ft squares -- the same distance the server's reaction ranges
+ * use), or null when this participant or nobody hostile has a token. Hostile = another side, or another owner in PvP. */
+function _nearestHostileFt(state, pid) {
+  const tokens = state?.board?.tokens || {};
+  const me = state?.participants?.[pid];
+  const at = tokens[pid];
+  if (!me || !at) return null;
+  let best = null;
+  for (const [id, p] of Object.entries(state.participants || {})) {
+    if (id === pid || p.status !== 'participating' || !tokens[id]) continue;
+    const hostile = p.side !== me.side || (state.battleType === 'pvp' && (p.owner || '') !== (me.owner || ''));
+    if (!hostile) continue;
+    const ft = Math.max(Math.abs(tokens[id].col - at.col), Math.abs(tokens[id].row - at.row)) * 5;
+    if (best === null || ft < best) best = ft;
+  }
+  return best;
+}
+
 /** Blood Shield's own "melee damage you have dealt since the beginning of
  * your last turn": the sum of this participant's logged 'damage' entries
  * from the previous round (their last turn) through now whose move's range
@@ -987,7 +1005,7 @@ function _meleeDamageSinceLastTurn(session, pid) {
   let total = 0;
   for (const e of session.log || []) {
     if (e.type !== 'damage' || e.actorId !== pid || e.targetId === pid || e.round < since) continue;
-    if (!e.move || findMoveRow(e.move)?.[6] !== 'Melee') continue;
+    if (!e.move || !isMeleeMoveRow(findMoveRow(e.move))) continue;
     total += Number(e.amount) || 0;
   }
   return total;
@@ -1215,6 +1233,9 @@ function _syncLocalCombatState(session) {
     // Spirit Growth: moves using these abilities cost half VP (see combat.js's vpCostOverride).
     merged.vpHalvedAbilities = (p.statuses || []).filter((s) => s.kind === 'condition' && s.apply === 'vp_cost_halved' && s.value).map((s) => String(s.value).toUpperCase());
     merged.stabMultiplier = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'stab_doubled') ? 2 : 1;
+    // Move gates on the user's own state (combat.js's selfRequirementUnmet): Snore needs `asleep`, Recompose no enemy in reach.
+    merged.liveStatuses = p.statuses || [];
+    merged.nearestHostileFt = _nearestHostileFt(session, p.id);
     // A direct read of the server's own pool (see move-effects.js's tempHpRemaining),
     // not a base+delta round-trip like the stat fields below -- it shrinks on its own as
     // damage lands, there's no "manual edit" to preserve.
@@ -3540,6 +3561,13 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       }
       effect = { ...effect, amount: Math.floor(effect.amount.fractionOfMaxHP * holder.maxHP) };
     }
+    if (effect.kind === 'stat' && effect.amount && typeof effect.amount === 'object' && effect.amount.rollOnApply) {
+      // Close Combat / Twilight Rush: "your AC is reduced by 1d4" -- rolled once now, held as a flat number.
+      const rolled = await promptValueRoll({ dice: effect.amount.rollOnApply, moveName,
+        description: `${moveName}: roll ${effect.amount.rollOnApply} -- ${effect.amount.sign < 0 ? 'subtracted from' : 'added to'} ${String(effect.stat).replace(/_/g, ' ')}` });
+      if (rolled === null) continue;
+      effect = { ...effect, amount: (effect.amount.sign < 0 ? -1 : 1) * rolled };
+    }
     if (effect.stacks?.max === 'proficiency') {
       // Power-Up Punch: "max stacks = proficiency bonus", read from the caster now.
       effect = { ...effect, stacks: { max: Math.max(1, Number(attacker?.proficiency) || 1) } };
@@ -3967,10 +3995,16 @@ async function _handleCounterAttack({ reactorId, effect, moveName, computedData 
   const attacker = session?.participants?.[original.actorId];
   if (!attacker) return;
   const name = visibleToViewer(attacker, 'name') ? attacker.name : '???';
+  // Static Shield: "half of the damage you would have sustained", and "if the attack you're reflecting is ranged, you roll
+  // with disadvantage" -- `fraction` and the `disadvantage_if_ranged` roll mode.
+  const amount = Math.floor(original.amount * (Number(effect.fraction) || 1));
+  const rollMode = effect.rollMode === 'disadvantage_if_ranged'
+    ? (original.move && !isMeleeMoveRow(findMoveRow(original.move)) ? 'disadvantage' : null)
+    : (effect.rollMode || null);
   const picked = await pickTargetAgain(attacker, name, {
     attackModifier: computedData?.attackBonus || 0, speciesName: reactor.name, attacker: reactor, moveName,
-    damageDice: '', presetRoll: original.amount,
-    forcedRollMode: effect.rollMode || null, forcedRollNote: effect.rollMode ? `${moveName}: ${effect.rollMode} on the attack roll` : '',
+    damageDice: '', presetRoll: amount,
+    forcedRollMode: rollMode, forcedRollNote: rollMode ? `${moveName}: ${rollMode} on the attack roll` : '',
   });
   if (!picked || picked.blocked) return;
   if (!picked.hit) {
@@ -4494,7 +4528,8 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     // effectiveStats, not the raw record -- a live crit-range status (Focus Energy) has to
     // actually change whether this roll counts, not just show up as a number on the card.
     // Fortune Ring: a move used from inside one lowers the crit DC by its level-scaled amount.
-    crit = attackRoll === null ? undefined : attackRoll >= critThreshold(effectiveStats(attacker).critMod + critReductionFrom(terrainsAffecting(session, combatantId)), categories.includes('base_crit'));
+    // Limit Break's own "scores a critical hit on 18-20" (critBonus) widens it for this attack only.
+    crit = attackRoll === null ? undefined : attackRoll >= critThreshold(effectiveStats(attacker).critMod + critReductionFrom(terrainsAffecting(session, combatantId)) + (Number(moveFlagsFor(moveName).critBonus) || 0), categories.includes('base_crit'));
   }
   // Laser Focus overrides whatever the roll says (there may be no roll at all, see
   // guaranteedHit above) -- computed here too (consumed further down, only once the

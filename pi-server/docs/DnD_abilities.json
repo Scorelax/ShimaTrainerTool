@@ -6,6 +6,24 @@
    "description": "The area within 60 feet of this Pokémon is considered difficult terrain for creatures it chooses. Additionally, dim light within this area is treated as darkness.",
    "pokemon": [
     "Noctugatr"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "difficult_terrain",
+     "target": "chosen",
+     "radiusFt": 60,
+     "note": "Creatures it chooses; the area moves with it."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Dim light within the area counts as darkness."
+    }
    ]
   },
   {
@@ -36,6 +54,22 @@
    "pokemon": [
     "Deoxys",
     "Protoxys"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "resistance",
+     "optional": true,
+     "valueFrom": "damage_type_taken_since_last_turn",
+     "ends": [
+      {
+       "type": "other",
+       "text": "until it uses this ability again"
+      }
+     ]
+    }
    ]
   },
   {
@@ -123,6 +157,23 @@
    "pokemon": [
     "Lanfae",
     "Lumifae"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "dm_confirms",
+       "text": "within 60 ft of an ancient artifact"
+      }
+     ],
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "saving_throws",
+     "ability": "WIS"
+    }
    ]
   },
   {
@@ -204,6 +255,17 @@
     "Hatenna",
     "Hattrem",
     "Hatterene"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "kind": "reveal",
+     "target": "enemy",
+     "what": "super_effective_move",
+     "note": "Only WHETHER it has a move this Pokemon is vulnerable to -- not which move."
+    }
    ]
   },
   {
@@ -278,7 +340,11 @@
      "apply": "switch_locked",
      "note": "Can still leave by item, move or ability."
     }
-   ]
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "\"Grounded creatures within 50 ft\" -- does that include its own allies, or only opponents?"
+   }
   },
   {
    "name": "Aroma Veil",
@@ -329,6 +395,25 @@
     "Whailossus",
     "Lumorm",
     "Shadorm"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "creature_end_of_turn_within"
+     },
+     "kind": "deal_damage",
+     "target": "enemies",
+     "targetFilter": {
+      "conditions": [
+       "asleep"
+      ]
+     },
+     "amount": {
+      "proficiency": true
+     },
+     "damageType": "",
+     "note": "Every sleeping opponent in battle, at the end of each of ITS turns."
+    }
    ]
   },
   {
@@ -336,7 +421,31 @@
    "description": "At the end of every turn, revert any stat changes in effect. For every instance nullified, regain 2d10 of either HP or VP.",
    "pokemon": [
     "Equilibra"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "end_of_turn"
+     },
+     "kind": "clear_stat_changes"
+    },
+    {
+     "when": {
+      "type": "end_of_turn"
+     },
+     "kind": "heal",
+     "amount": {
+      "dice": "2d10",
+      "perClearedStatChange": true
+     },
+     "pool": "HP_or_VP",
+     "note": "2d10 HP or VP for every stat change it reverted."
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "\"At the end of every turn, revert any stat changes\" -- only its own stat changes, or every creature's? Every creature's turn, or only its own?"
+   }
   },
   {
    "name": "Battery",
@@ -395,7 +504,25 @@
    "description": "This Pokémon gains an additional action when its hit points drop below 50% of its maximum.",
    "pokemon": [
     "Centurvus"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_hp_below",
+       "fraction": 0.5
+      }
+     ],
+     "kind": "extra_action"
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "One extra action every turn while below 50% HP, or a single extra action when it first drops below?"
+   }
   },
   {
    "name": "Beast Boost",
@@ -497,6 +624,28 @@
    "description": "As a bonus action, this Pokémon can phase partially into the Depths of Twilight, gaining resistance to all damage except psychic and fairy until the start of its next turn.",
    "pokemon": [
     "Swampadow"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "resistance",
+     "damageTypes": "all",
+     "exceptTypes": [
+      "Psychic",
+      "Fairy"
+     ],
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "start",
+       "count": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -665,6 +814,18 @@
    "description": "When this Pokémon eats any type of berry, is heals for an additional 10% of its maximum HP (rounded up to the nearest whole number).",
    "pokemon": [
     "Armles"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "berry_eaten"
+     },
+     "kind": "heal",
+     "amount": {
+      "fractionMaxHP": 0.1,
+      "round": "up"
+     }
+    }
    ]
   },
   {
@@ -925,6 +1086,17 @@
     "Mergato",
     "Grovyle",
     "Sceptile"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "invert_stat_changes",
+     "filter": {
+      "fromMoves": true
+     }
+    }
    ]
   },
   {
@@ -934,6 +1106,18 @@
     "Toxchick",
     "Toxiclaw",
     "Toxeak"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_immunity",
+     "conditions": [
+      "poisoned"
+     ],
+     "note": "Can poison steel- and poison-types."
+    }
    ]
   },
   {
@@ -942,6 +1126,35 @@
    "pokemon": [
     "Stellavorii",
     "Stellarchon"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "damageTypes": [
+      "Ground"
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "damaging": true
+     },
+     "kind": "deal_damage",
+     "chance": {
+      "die": "d12",
+      "min": 8
+     },
+     "target": "all",
+     "radiusFt": 15,
+     "amount": {
+      "fractionOfDamage": 0.5
+     },
+     "damageType": "",
+     "note": "Half the damage it took, reflected around it."
+    }
    ]
   },
   {
@@ -949,6 +1162,26 @@
    "description": "Jirachi is always asleep. While asleep (its normal state), Jirachi regenerates 10 + 2x its proficiency modifier hit points at the start of its turn. It can still sense its surroundings and make decisions, but can only use a limited set of moves.",
    "pokemon": [
     "Jirachi"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "condition",
+     "apply": "asleep",
+     "note": "Always asleep -- its normal state; it still senses, decides and uses a limited set of moves."
+    },
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "heal",
+     "amount": {
+      "flat": 10,
+      "proficiencyMultiple": 2
+     }
+    }
    ]
   },
   {
@@ -969,6 +1202,20 @@
    "pokemon": [
     "Wyngir",
     "Faevern"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "extraDice": "2d10",
+     "damageType": "",
+     "filter": {
+      "attackRoll": true,
+      "firstUseInEncounter": true
+     }
+    }
    ]
   },
   {
@@ -1064,6 +1311,20 @@
     "Shimmeral",
     "Dansaic",
     "Brillore"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "creature_used_move",
+      "nameMatch": [
+       "Dance"
+      ]
+     },
+     "kind": "reaction_move",
+     "reaction": true,
+     "optional": true,
+     "note": "Any creature it can see; it uses one of its own moves."
+    }
    ]
   },
   {
@@ -1097,7 +1358,11 @@
       "damaging": true
      }
     }
-   ]
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "Does it also double its own dark moves? (Fairy Aura excludes its own.)"
+   }
   },
   {
    "name": "Dark Native",
@@ -1287,7 +1552,36 @@
     "Datagus",
     "Compizard",
     "Didoss"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "move_type_override",
+     "to": "chosen",
+     "filter": {
+      "moveTypes": [
+       "Normal"
+      ]
+     },
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ]
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "\"Normal attacks\" -- normal-TYPE moves, or any ordinary attack?"
+   }
   },
   {
    "name": "Dream Walker",
@@ -1526,6 +1820,40 @@
    "description": "This Pokémon's metal exoskeleton requires constant mental energy to maintain. At the start of this Pokémon's turn in combat, it loses VP equal to its proficiency bonus. Additionally, this Pokémon becomes weak to psychic type damage, and whenever it takes psychic damage, it also loses VP equal to the HP damage taken.",
    "pokemon": [
     "Mekko"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "lose_hp",
+     "pool": "VP",
+     "amount": {
+      "proficiency": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "vulnerability",
+     "damageTypes": [
+      "Psychic"
+     ]
+    },
+    {
+     "when": {
+      "type": "damaged",
+      "moveTypes": [
+       "Psychic"
+      ]
+     },
+     "kind": "lose_hp",
+     "pool": "VP",
+     "amount": {
+      "fractionOfDamage": 1
+     }
+    }
    ]
   },
   {
@@ -1533,6 +1861,36 @@
    "description": "This Pokémon is immune to blindness. Creatures that look directly at it must make a CON save or be blinded for 1 round. Additionally, it can manipulate light as an action to create illusions, reveal invisible creatures, or temporarily blind enemies in a 60 ft radius. Finally, at the start of its turn, this Pokémon restores 1d8 HP to all allies within 30 ft. This healing is enhanced near sources of magical or ancient light.",
    "pokemon": [
     "Luminarch"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "conditions": [
+      "blinded"
+     ]
+    },
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "heal",
+     "target": "allies",
+     "radiusFt": 30,
+     "amount": {
+      "dice": "1d8"
+     },
+     "note": "Stronger near magical or ancient light."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Creatures looking directly at it: CON save or blinded for 1 round. Action: illusions, reveal invisible creatures, or blind enemies in a 60 ft radius."
+    }
    ]
   },
   {
@@ -1541,13 +1899,47 @@
    "pokemon": [
     "Fluffire",
     "Pyronimbus"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "damage_mod",
+     "rerollKeep": "higher",
+     "filter": {
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "move_used"
+     },
+     "kind": "manual",
+     "note": "Roll a d20: on a 1 it gets Ether Overload, otherwise the overload count goes up by 1. When the overload passes it loses 1d4 levels; below level 1 it dies."
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "What does the Ether Overload status do, how long does it last, and what does the count increasing by 1 lead to?"
+   }
   },
   {
    "name": "Ether Mirror",
    "description": "Ranged move attacks against this Pokémon are reflected back at the attacker after a successful hit. All damage and effects rolled apply to the attacker.",
    "pokemon": [
     "Lumo"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "ranged": true
+     },
+     "kind": "reflect_attack",
+     "target": "attacker",
+     "note": "All damage and effects rolled apply to the attacker instead."
+    }
    ]
   },
   {
@@ -1576,7 +1968,11 @@
      },
      "note": "\"By other creatures\" -- its own fairy moves are not doubled."
     }
-   ]
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "\"Fairy moves by OTHER creatures\" are doubled (not its own), while Dark Aura says \"allies or opponents\". Intentional?"
+   }
   },
   {
    "name": "Fairy Breath",
@@ -1749,6 +2145,39 @@
    "pokemon": [
     "Reclaimant",
     "Purifax"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 action"
+     },
+     "kind": "cure_condition",
+     "target": "self_or_touched",
+     "pickOne": true,
+     "negativeConditions": true,
+     "check": {
+      "skill": "Medicine"
+     },
+     "limit": {
+      "uses": 3,
+      "per": "long_rest"
+     }
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 action"
+     },
+     "kind": "heal",
+     "check": {
+      "skill": "Medicine"
+     },
+     "amount": {
+      "fractionMaxHP": 0.0625
+     },
+     "note": "Only when the medicine check succeeds; shares the 3 uses above."
+    }
    ]
   },
   {
@@ -1758,6 +2187,27 @@
     "Silkonat",
     "Silkomoth",
     "Weavoth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "resistance",
+     "damageTypes": [
+      "Fire"
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Fire"
+      ]
+     },
+     "kind": "manual",
+     "note": "Roll 1d4: on a 1 the web burns away (resistance lost). Each later roll burns it on one more number. Resets on a long rest."
+    }
    ]
   },
   {
@@ -2035,6 +2485,42 @@
     "Sylvix",
     "Verdiane",
     "Sylvestra"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 action"
+     },
+     "kind": "heal",
+     "target": "chosen",
+     "targetFilter": {
+      "types": [
+       "Grass"
+      ]
+     },
+     "amount": {
+      "dice": "2d4",
+      "plus": "WIS"
+     },
+     "scaling": {
+      "5": "2d6",
+      "10": "2d8",
+      "17": "2d12"
+     },
+     "limit": {
+      "uses": 3,
+      "per": "long_rest"
+     },
+     "note": "Plant or grass-type Pokemon."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Passive: plants within 20 ft grow more vigorously and resist disease."
+    }
    ]
   },
   {
@@ -2056,6 +2542,17 @@
     "Caredevil",
     "Faredevil",
     "Infernity"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "kind": "reveal",
+     "target": "chosen",
+     "what": "strongest_move",
+     "note": "On a tie, the target chooses which one it reveals."
+    }
    ]
   },
   {
@@ -2064,6 +2561,36 @@
    "pokemon": [
     "Gladirena",
     "Centurvus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "stat",
+     "target": "formation",
+     "stat": "ac",
+     "amount": 2
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "roll",
+     "target": "formation",
+     "roll": "advantage",
+     "on": "saving_throws",
+     "ability": "STR"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Formation: 5 + half its level creatures (Large or smaller, at least 5) each within 5 ft of the next. They only move when the leader moves them; a gap breaks it. Does not stack."
+    }
    ]
   },
   {
@@ -2071,6 +2598,16 @@
    "description": "Deoxys can change between its four forms as a bonus action.",
    "pokemon": [
     "Deoxys"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "manual",
+     "note": "Deoxys switches between its four forms."
+    }
    ]
   },
   {
@@ -2080,6 +2617,22 @@
     "Denarius",
     "Aureus",
     "Krassemoth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "reroll_ones",
+     "pool": {
+      "halfLevel": true
+     },
+     "appliesTo": [
+      "self",
+      "trainer"
+     ],
+     "note": "Luck points: spend one when it or its trainer rolls a 1 to reroll that die."
+    }
    ]
   },
   {
@@ -2144,7 +2697,53 @@
    "description": "Enemies that start their turn within 10 feet of this Pokémon have their speed reduced by 10 feet. Enemies making melee attacks against this Pokémon must succeed a CON save or become slowed (half speed, -2 AC) until the end of their next turn.",
    "pokemon": [
     "Subsiro"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "creature_start_of_turn_within"
+     },
+     "kind": "stat",
+     "target": "enemies",
+     "radiusFt": 10,
+     "stat": "speed",
+     "amount": -10,
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "end",
+       "count": 1
+      }
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "condition",
+     "target": "attacker",
+     "save": {
+      "ability": "CON",
+      "dc": null
+     },
+     "apply": "slowed",
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "end",
+       "count": 1
+      }
+     ],
+     "note": "DC not given -- see review."
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "The CON save against becoming slowed has no DC. What is it?"
+   }
   },
   {
    "name": "Frisk",
@@ -2154,6 +2753,16 @@
     "Agiluzz",
     "Caredevil",
     "Faredevil"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "kind": "reveal",
+     "target": "enemy",
+     "what": "held_item"
+    }
    ]
   },
   {
@@ -2268,6 +2877,16 @@
     "Leefdot",
     "Bigleef",
     "Hugleef"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "damaged",
+      "crossesBelowFraction": 0.5
+     },
+     "kind": "consume_held_berry",
+     "mandatory": true
+    }
    ]
   },
   {
@@ -2311,6 +2930,24 @@
     "Elking",
     "Elkrincess",
     "Elqueen"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_terrain_contains",
+       "any": [
+        "grass"
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "ac",
+     "amount": 1
+    }
    ]
   },
   {
@@ -2318,6 +2955,20 @@
    "description": "If the move is known, this Pokémon may use the Grassy Terrain move as a bonus action.",
    "pokemon": [
     "Snarepent"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "action_cost_override",
+     "to": "1 bonus action",
+     "filter": {
+      "moves": [
+       "Grassy Terrain"
+      ]
+     }
+    }
    ]
   },
   {
@@ -2422,6 +3073,24 @@
    "pokemon": [
     "Swinicorn",
     "Porque"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "end_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_used_berry_this_turn"
+      }
+     ],
+     "kind": "restore_item",
+     "chance": {
+      "die": "d4",
+      "min": 3
+     },
+     "note": "Gets the berry back as its held item."
+    }
    ]
   },
   {
@@ -2430,6 +3099,23 @@
    "pokemon": [
     "Pixee",
     "Wispee"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 action"
+     },
+     "kind": "cure_condition",
+     "target": "touched",
+     "conditions": [
+      "poisoned",
+      "burned",
+      "paralyzed"
+     ],
+     "pickOne": true,
+     "note": "Then roll a d4: on 1-2 the cured condition moves to this Pokemon."
+    }
    ]
   },
   {
@@ -2438,6 +3124,26 @@
    "pokemon": [
     "Albawk",
     "Albaross"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 action"
+     },
+     "while": [
+      {
+       "type": "self_weather_contains",
+       "any": [
+        "rain"
+       ]
+      }
+     ],
+     "kind": "heal",
+     "amount": {
+      "level": 1
+     }
+    }
    ]
   },
   {
@@ -2508,6 +3214,19 @@
     "Pathoplague",
     "Buzzlet",
     "Mosqaegis"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hits",
+      "melee": true,
+      "damaging": true
+     },
+     "kind": "heal",
+     "amount": {
+      "fractionOfDamageDealt": 0.5
+     }
+    }
    ]
   },
   {
@@ -2527,6 +3246,58 @@
    "pokemon": [
     "Charizard",
     "Scaracross"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_level_at_least",
+       "n": 10
+      },
+      {
+       "type": "self_hp_at_or_above",
+       "fraction": 0.5
+      },
+      {
+       "type": "target_level_below",
+       "n": 10
+      }
+     ],
+     "kind": "damage_mod",
+     "totalMultiplier": 0.5,
+     "filter": {
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "self_level_at_least",
+       "n": 10
+      },
+      {
+       "type": "self_hp_at_or_above",
+       "fraction": 0.5
+      },
+      {
+       "type": "target_level_at_least",
+       "n": 10
+      }
+     ],
+     "kind": "damage_mod",
+     "extraDice": "1d12",
+     "flatBonus": "proficiency",
+     "damageType": "",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -2535,6 +3306,30 @@
    "pokemon": [
     "Beorkub",
     "Grizzerker"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "before_attack_roll"
+     },
+     "kind": "damage_mod",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "totalMultiplier": 2,
+     "filter": {
+      "attackRoll": true
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ],
+     "note": "Must be announced before the attack roll."
+    }
    ]
   },
   {
@@ -2547,6 +3342,20 @@
     "Crolder",
     "Felichim",
     "Tigriffon"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "crit_dealt"
+     },
+     "kind": "extra_action",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "round"
+     },
+     "note": "An attack made with that action has disadvantage."
+    }
    ]
   },
   {
@@ -2557,6 +3366,66 @@
     "Plurorm",
     "Plurydra",
     "Plurofera"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "while": [
+      {
+       "type": "not",
+       "gate": {
+        "type": "self_negative_status"
+       }
+      }
+     ],
+     "kind": "heal",
+     "optional": true,
+     "amount": {
+      "dice": "1d4",
+      "timesLevel": true
+     }
+    },
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_negative_status"
+      }
+     ],
+     "kind": "cure_condition",
+     "save": {
+      "ability": "CON",
+      "dc": 15
+     },
+     "negativeConditions": true,
+     "note": "On a success it also gets immunity to conditions for 1d4 rounds (next entry)."
+    },
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_negative_status"
+      }
+     ],
+     "kind": "immunity",
+     "save": {
+      "ability": "CON",
+      "dc": 15
+     },
+     "negativeConditions": true,
+     "ends": [
+      {
+       "type": "rounds",
+       "dice": "1d4"
+      }
+     ]
+    }
    ]
   },
   {
@@ -2696,7 +3565,43 @@
    "description": "This Pokémon has advantage on intimidation and persuation checks, and may use an action to automatically frighten enemies that can see it for 1d4 rounds. Additionally, three times per long rest, this Pokémon may use its bonus action to override the ability of another Pokémon it can see.",
    "pokemon": [
     "Praetorvus"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 action"
+     },
+     "kind": "condition",
+     "target": "enemies",
+     "targetFilter": {
+      "canSee": true
+     },
+     "apply": "frightened",
+     "ends": [
+      {
+       "type": "rounds",
+       "dice": "1d4"
+      }
+     ]
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "suppress_ability",
+     "target": "chosen",
+     "limit": {
+      "uses": 3,
+      "per": "long_rest"
+     }
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "What does \"override the ability of another Pokemon\" mean -- suppress it, or replace it with something?"
+   }
   },
   {
    "name": "Imperion's Honor",
@@ -2714,6 +3619,20 @@
    "description": "This Pokémon can use Transform as a bonus action.",
    "pokemon": [
     "Ditto"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "action_cost_override",
+     "to": "1 bonus action",
+     "filter": {
+      "moves": [
+       "Transform"
+      ]
+     }
+    }
    ]
   },
   {
@@ -2725,6 +3644,15 @@
     "Wecter",
     "Spectrout",
     "Horrish"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Moves through walls (difficult terrain). Inside a wall it takes half damage. Entering costs 5 VP, plus 5 VP at the start of each turn inside."
+    }
    ]
   },
   {
@@ -2990,6 +3918,15 @@
     "Skarling",
     "Skarmory",
     "Corscout"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_disadvantage",
+     "source": "sight"
+    }
    ]
   },
   {
@@ -2997,6 +3934,14 @@
    "description": "This Pokémon cannot hold an item.",
    "pokemon": [
     "Chicklet"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "no_held_item"
+    }
    ]
   },
   {
@@ -3131,6 +4076,22 @@
    "pokemon": [
     "Platypara",
     "Platypulse"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "targeted",
+      "drain": true
+     },
+     "kind": "condition",
+     "target": "attacker",
+     "save": {
+      "ability": "CON",
+      "dc": 12
+     },
+     "apply": "poisoned",
+     "note": "Leeching / absorbing moves."
+    }
    ]
   },
   {
@@ -3202,6 +4163,22 @@
     "Hatterene",
     "Harbeak",
     "Storican"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "condition_gained",
+      "negative": true,
+      "fromCreature": true
+     },
+     "kind": "reflect_condition",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "long_rest"
+     },
+     "target": "attacker"
+    }
    ]
   },
   {
@@ -3240,6 +4217,21 @@
     "Datagus",
     "Compizard",
     "Didoss"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hits",
+      "melee": true
+     },
+     "while": [
+      {
+       "type": "self_no_held_item"
+      }
+     ],
+     "kind": "steal_item",
+     "target": "target"
+    }
    ]
   },
   {
@@ -3317,6 +4309,81 @@
     "Ferrarg",
     "Stellavorii",
     "Stellarchon"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Electric"
+      ]
+     },
+     "kind": "manual",
+     "choice": {
+      "kind": "random",
+      "die": "d4",
+      "roll": 1
+     },
+     "note": "Takes the damage as usual."
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Electric"
+      ]
+     },
+     "kind": "split_damage",
+     "choice": {
+      "kind": "random",
+      "die": "d4",
+      "roll": 2
+     },
+     "pools": [
+      "HP",
+      "VP"
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Electric"
+      ]
+     },
+     "kind": "split_damage",
+     "choice": {
+      "kind": "random",
+      "die": "d4",
+      "roll": 3
+     },
+     "pools": [
+      "HP",
+      "VP"
+     ]
+    },
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Electric"
+      ]
+     },
+     "kind": "store_damage",
+     "choice": {
+      "kind": "random",
+      "die": "d4",
+      "roll": 4
+     },
+     "damageType": "Electric",
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ],
+     "note": "Added to its next damaging move as bonus electric damage."
+    }
    ]
   },
   {
@@ -3324,6 +4391,21 @@
    "description": "Water and dark type moves made by this Pokémon cause flinching on natural attack rolls of 18 or more.",
    "pokemon": [
     "Mergato"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hits",
+      "moveTypes": [
+       "Water",
+       "Dark"
+      ],
+      "naturalRollMin": 18
+     },
+     "kind": "condition",
+     "target": "target",
+     "apply": "flinched"
+    }
    ]
   },
   {
@@ -3423,6 +4505,20 @@
     "Denarius",
     "Aureus",
     "Krassemoth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "action_cost_override",
+     "to": "1 bonus action",
+     "filter": {
+      "moves": [
+       "Thief"
+      ]
+     }
+    }
    ]
   },
   {
@@ -3506,6 +4602,16 @@
    "pokemon": [
     "Prankis",
     "Trixen"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "initiative_position",
+     "position": "any",
+     "note": "Each round it may take its turn whenever it wants."
+    }
    ]
   },
   {
@@ -3517,6 +4623,15 @@
     "Gabyztare",
     "Reagle",
     "Argonael"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_target_abilities",
+     "note": "Abilities that would lessen its moves or their chance to hit."
+    }
    ]
   },
   {
@@ -3526,7 +4641,38 @@
     "Onix",
     "Granix",
     "Steelix"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "moveTypes": [
+       "Fire"
+      ]
+     },
+     "kind": "damage_mod",
+     "extraDice": "1d6",
+     "flatBonus": "proficiency",
+     "damageType": "Fire",
+     "filter": {
+      "melee": true
+     },
+     "scaling": {
+      "note": "+1d6 at every odd level above 10"
+     },
+     "ends": [
+      {
+       "type": "rounds",
+       "n": 1
+      }
+     ],
+     "note": "Read as its own melee attacks -- see review. Also lava."
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "While superheated, is the extra fire damage on ITS melee attacks, or on melee attacks made against it?"
+   }
   },
   {
    "name": "Moody",
@@ -3603,6 +4749,15 @@
     "Plurorm",
     "Plurydra",
     "Plurofera"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Start of turn: choose an active head, gaining its type as a secondary type for the round. A head taking 25+ damage in one turn dies; end of next turn, bonus action: 1d6 per lost head, regrow one on a 5, two on a 6."
+    }
    ]
   },
   {
@@ -3642,6 +4797,16 @@
    "pokemon": [
     "Carvechno",
     "Technedo"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "type_from_held_item",
+     "item": "Elemental Plate",
+     "note": "The plate cannot be removed by any ability or move."
+    }
    ]
   },
   {
@@ -3650,6 +4815,23 @@
    "pokemon": [
     "Hadean",
     "Styxxil"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "replace_ability",
+     "target": "attacker",
+     "random": true,
+     "to": "Mummy",
+     "ends": [
+      {
+       "type": "encounter"
+      }
+     ]
+    }
    ]
   },
   {
@@ -3664,6 +4846,15 @@
     "Verdiane",
     "Sylvestra",
     "Luminarch"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "save_ability_override",
+     "use": "CHA"
+    }
    ]
   },
   {
@@ -3671,6 +4862,15 @@
    "description": "This Pokémon is cured of negative status ailments upon returning to its Pokeball.",
    "pokemon": [
     "Hydro"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "switched_out"
+     },
+     "kind": "cure_condition",
+     "negativeConditions": true
+    }
    ]
   },
   {
@@ -3679,6 +4879,22 @@
    "pokemon": [
     "Gabyz",
     "Gabyztare"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "negation_zone",
+     "shape": "cone",
+     "lengthFt": 150,
+     "exceptMoveTypes": [
+      "Normal"
+     ],
+     "exceptSelf": true,
+     "note": "Bonus action: aim the cone and switch it on or off. Moves other than normal-type are negated inside it; the beholder's own moves aren't."
+    }
    ]
   },
   {
@@ -3746,7 +4962,23 @@
    "description": "At the beginning of each turn during initiative, this Pokémon can grant advantage on one roll to an ally within 60ft.",
    "pokemon": [
     "Noblier"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "roll",
+     "target": "chosen_ally",
+     "radiusFt": 60,
+     "roll": "advantage",
+     "on": "one_roll"
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "\"At the beginning of each turn during initiative\" -- each of its own turns, or every creature's turn?"
+   }
   },
   {
    "name": "Normalize",
@@ -3803,6 +5035,23 @@
    "pokemon": [
     "Crystamel",
     "Quamel"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "weatherDamage": [
+      "sand",
+      "hail"
+     ],
+     "moves": [
+      "Hail",
+      "Sandstorm",
+      "Weather Ball"
+     ]
+    }
    ]
   },
   {
@@ -3940,7 +5189,36 @@
    "pokemon": [
     "Faeling",
     "Drairy"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "roll",
+     "target": "enemies",
+     "radiusFt": 30,
+     "save": {
+      "ability": "WIS",
+      "dc": null
+     },
+     "roll": "disadvantage",
+     "on": "attack_rolls",
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "start",
+       "count": 1
+      }
+     ],
+     "note": "Until the start of THEIR next turn. DC not given -- see review."
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "No save DC is given. What is it (e.g. 8 + proficiency + WIS)? And \"at the beginning of each turn\" -- each of this Pokemon's turns, or each creature's turn?"
+   }
   },
   {
    "name": "Perfect Memory",
@@ -4015,6 +5293,21 @@
     "Sandit",
     "Snift",
     "Bedouwara"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "steal_item",
+     "target": "target",
+     "contest": {
+      "self": "DEX",
+      "target": "WIS"
+     },
+     "note": "After the first attempt, further attempts on the same opponent are at disadvantage."
+    }
    ]
   },
   {
@@ -4023,6 +5316,19 @@
    "pokemon": [
     "Gulorine",
     "Felverine"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enemy_used_consumable_item"
+     },
+     "while": [
+      {
+       "type": "self_no_held_item"
+      }
+     ],
+     "kind": "copy_item"
+    }
    ]
   },
   {
@@ -4098,6 +5404,18 @@
    "pokemon": [
     "Plankril",
     "Shkril"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "invert_condition_damage",
+     "conditions": [
+      "poisoned"
+     ],
+     "note": "Poison damage heals it instead."
+    }
    ]
   },
   {
@@ -4280,6 +5598,21 @@
     "Broosbuck",
     "Rifractal",
     "Sheenat"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_round"
+     },
+     "kind": "initiative_position",
+     "optional": true,
+     "position": "first",
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "note": "Must use a status-affecting move on that turn."
+    }
    ]
   },
   {
@@ -4290,6 +5623,38 @@
     "Arcanine",
     "Growlarc",
     "Sparcanine"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_marked",
+       "mark": "prey"
+      }
+     ],
+     "kind": "attack_bonus",
+     "amount": "proficiency",
+     "note": "Double proficiency = one extra proficiency bonus. Prey is chosen during a long rest."
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_marked",
+       "mark": "prey"
+      }
+     ],
+     "kind": "damage_mod",
+     "rerollKeep": "higher",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -4336,6 +5701,36 @@
     "Meowser",
     "Preowlith",
     "Mergato"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_level_below_self"
+      }
+     ],
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_level_below_self"
+      }
+     ],
+     "kind": "damage_mod",
+     "rerollKeep": "higher",
+     "filter": {
+      "damaging": true
+     }
+    }
    ]
   },
   {
@@ -4410,7 +5805,11 @@
      ],
      "note": "No use limit in the text -- read as costing its reaction."
     }
-   ]
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "No use limit. Does it cost the reaction each time, or is it limited (once per round / short rest)?"
+   }
   },
   {
    "name": "Protean",
@@ -4444,6 +5843,38 @@
    "pokemon": [
     "Terrilla",
     "Aroarus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "dm_confirms",
+       "text": "a lower-stage ally of its own family is in danger"
+      }
+     ],
+     "kind": "attack_bonus",
+     "amount": 5
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "dm_confirms",
+       "text": "a lower-stage ally of its own family is in danger"
+      }
+     ],
+     "kind": "damage_mod",
+     "flatBonus": "proficiency",
+     "filter": {
+      "damaging": true
+     },
+     "note": "Once per move."
+    }
    ]
   },
   {
@@ -4495,6 +5926,30 @@
     "Fricub",
     "Ursnow",
     "Glaciear"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "before_attack_roll"
+     },
+     "kind": "damage_mod",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "totalMultiplier": 2,
+     "filter": {
+      "attackRoll": true
+     },
+     "ends": [
+      {
+       "type": "uses",
+       "n": 1
+      }
+     ],
+     "note": "Must be announced before the attack roll."
+    }
    ]
   },
   {
@@ -4631,6 +6086,41 @@
    "description": "If this Pokémon has charges for at least 15ft. going into a melee attack, it has advantage on the attack and damage rolls.",
    "pokemon": [
     "Mountelder"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "moved_straight_at_least",
+       "ft": 15
+      }
+     ],
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls",
+     "filter": {
+      "melee": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "moved_straight_at_least",
+       "ft": 15
+      }
+     ],
+     "kind": "damage_mod",
+     "rerollKeep": "higher",
+     "filter": {
+      "melee": true
+     }
+    }
    ]
   },
   {
@@ -4669,13 +6159,62 @@
    "pokemon": [
     "Scyther",
     "Razcor"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_resistance",
+     "filter": {
+      "slashing": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_immunity",
+     "filter": {
+      "slashing": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Can hit creatures in the Ethereal Plane."
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "Which moves count as \"slashing attacks\"? (Slash, Night Slash, the Claw and Cutter moves, Leaf Blade ...?)"
+   }
   },
   {
    "name": "Reality Weaver",
    "description": "When Jirachi's third eye is open, it can manipulate probability in a 60-foot radius. As a reaction, it can force a reroll on any d20 roll made within this area.",
    "pokemon": [
     "Jirachi"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "dm_confirms",
+       "text": "Jirachi's third eye is open"
+      }
+     ],
+     "kind": "force_reroll",
+     "reaction": true,
+     "optional": true,
+     "radiusFt": 60,
+     "note": "Any d20 roll made in the area."
+    }
    ]
   },
   {
@@ -4732,6 +6271,21 @@
     "Wispee",
     "Veerum",
     "Hydling"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "switched_out"
+     },
+     "kind": "heal",
+     "limit": {
+      "uses": 1,
+      "per": "long_rest"
+     },
+     "amount": {
+      "level": 1
+     }
+    }
    ]
   },
   {
@@ -4804,6 +6358,15 @@
    "description": "This Pokémon's type is determined by the memory disc it holds.",
    "pokemon": [
     "Mekko"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "type_from_held_item",
+     "item": "memory disc"
+    }
    ]
   },
   {
@@ -4868,7 +6431,31 @@
    "description": "Once per long rest, this Pokémon can issue a command that creatures within 30 ft must obey unless they succeed on a WIS save.",
    "pokemon": [
     "Noblier"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 action"
+     },
+     "kind": "condition",
+     "target": "all",
+     "radiusFt": 30,
+     "save": {
+      "ability": "WIS",
+      "dc": null
+     },
+     "apply": "commanded",
+     "limit": {
+      "uses": 1,
+      "per": "long_rest"
+     }
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "What is the WIS save DC, and what kind of command (one word like Command, or anything)?"
+   }
   },
   {
    "name": "Run Away",
@@ -4900,6 +6487,77 @@
    "pokemon": [
     "Nacleaf",
     "Crystalga"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "rain"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "water"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "resistance",
+     "damageTypes": "all_not_vulnerable"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "any_of",
+       "gates": [
+        {
+         "type": "self_weather_contains",
+         "any": [
+          "rain"
+         ]
+        },
+        {
+         "type": "environment",
+         "any": [
+          "water"
+         ]
+        }
+       ]
+      }
+     ],
+     "kind": "immunity",
+     "vulnerabilityExtra": true
+    },
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "while": [
+      {
+       "type": "environment",
+       "any": [
+        "salt_water"
+       ]
+      }
+     ],
+     "kind": "heal",
+     "amount": {
+      "fractionMaxHP": 0.0625
+     }
+    }
    ]
   },
   {
@@ -5119,6 +6777,43 @@
    "pokemon": [
     "Stakerel",
     "Shredator"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_level_at_least",
+       "n": 5
+      },
+      {
+       "type": "self_hp_at_or_above",
+       "fraction": 0.25
+      }
+     ],
+     "kind": "stat",
+     "optional": true,
+     "stat": "ac",
+     "amount": 5,
+     "limit": {
+      "uses": 1,
+      "per": "short_rest"
+     },
+     "alsoStats": {
+      "str": 5,
+      "dex": 5,
+      "con": 5
+     },
+     "ends": [
+      {
+       "type": "hp_below",
+       "fraction": 0.25
+      }
+     ],
+     "note": "School Form. The extra CON doesn't change its HP."
+    }
    ]
   },
   {
@@ -5165,6 +6860,28 @@
    "pokemon": [
     "Lumorm",
     "Shadorm"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "contact"
+     },
+     "kind": "condition",
+     "target": "other",
+     "save": {
+      "ability": "CON",
+      "dc": 15
+     },
+     "apply": "drowsy",
+     "ends": [
+      {
+       "type": "rounds",
+       "dice": "1d4",
+       "unit": "minute"
+      }
+     ],
+     "note": "Drowsy: disadvantage on saves and attack rolls, others get advantage on saves it causes. When it ends: unconscious (counts as asleep) for 1d12 hours, only a long rest wakes it."
+    }
    ]
   },
   {
@@ -5271,7 +6988,11 @@
      "apply": "switch_locked",
      "note": "Can still leave by item, move or ability."
     }
-   ]
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "\"Creatures within 50 ft\" -- does that include its own allies, or only opponents?"
+   }
   },
   {
    "name": "Shadow Veil",
@@ -5291,6 +7012,24 @@
    "pokemon": [
     "Venomire",
     "Venolisk"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "end_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_negative_status"
+      }
+     ],
+     "kind": "cure_condition",
+     "chance": {
+      "die": "d4",
+      "min": 4
+     },
+     "negativeConditions": true
+    }
    ]
   },
   {
@@ -5358,6 +7097,22 @@
     "Caterpie",
     "Metapod",
     "Butterfree"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "condition_gained",
+      "negative": true,
+      "fromMove": true,
+      "byEnemy": true
+     },
+     "kind": "negate_condition",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "long_rest"
+     }
+    }
    ]
   },
   {
@@ -5367,6 +7122,16 @@
     "Clawine",
     "Thornug",
     "Thohorn"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "multi_hit_minimum",
+     "min": 2,
+     "note": "Combo moves that hit more than once off the same attack roll."
+    }
    ]
   },
   {
@@ -5609,6 +7374,39 @@
    "pokemon": [
     "Smudgel",
     "Squeagle"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_types",
+       "any": [
+        "Poison",
+        "Steel"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "extraDice": "1d4",
+     "scaling": {
+      "5": "1d6",
+      "10": "2d6",
+      "17": "2d8"
+     },
+     "filter": {
+      "damaging": true
+     }
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Bonus action: coat an ally's weapon with the same bonus for 1 minute."
+    }
    ]
   },
   {
@@ -5709,6 +7507,37 @@
    "description": "Ghost type moves used by this Pokémon can hit normal and fighting type Pokémon, and are treated as if this Pokémon has the ghost type. Dying creatures in the presence of this Pokémon, within 15ft., can see and communicate telepathically with it. While in range of a dying creature, this Pokémon may use a reaction to change the outcome of a death saving throw. If a creature dies in range of this Pokémon, its spirit will travel safely.",
    "pokemon": [
     "Infernity"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_immunity",
+     "moveTypes": [
+      "Ghost"
+     ],
+     "vsTypes": [
+      "Normal",
+      "Fighting"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "type_proficiency",
+     "moveTypes": [
+      "Ghost"
+     ]
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Dying creatures within 15 ft can talk to it; reaction: change the outcome of a death saving throw."
+    }
    ]
   },
   {
@@ -5716,6 +7545,25 @@
    "description": "Once per day, this Pokémon can use its action to remove all mundane dirt, grime, and stains from a 10-foot radius area. This ability can also neutralize Poison-type residue and removes the Poisoned condition from allies in range.",
    "pokemon": [
     "Smudgel"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 action"
+     },
+     "kind": "cure_condition",
+     "target": "allies",
+     "radiusFt": 10,
+     "conditions": [
+      "poisoned"
+     ],
+     "limit": {
+      "uses": 1,
+      "per": "day"
+     },
+     "note": "Also cleans dirt and poison residue in the area."
+    }
    ]
   },
   {
@@ -5724,6 +7572,30 @@
    "pokemon": [
     "Beorkub",
     "Grizzerker"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enemy_switched_in"
+     },
+     "kind": "damage_mod",
+     "totalMultiplier": 2,
+     "filter": {
+      "damaging": true
+     },
+     "targetFilter": {
+      "switchedIn": true
+     },
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "end",
+       "count": 1
+      }
+     ],
+     "note": "Only against the replacement, on its first turn after the switch."
+    }
    ]
   },
   {
@@ -5774,6 +7646,28 @@
    "description": "Mossworn has two forms. When Mossworn uses King's Shield, it changes to Shield Forme, swapping its AC and DEX stats. When it uses a damaging move, Mossworn immediately returns to Blade Forme, returning its stats to normal.",
    "pokemon": [
     "Mossworn"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "move_used",
+      "moves": [
+       "King's Shield"
+      ]
+     },
+     "kind": "swap_stats",
+     "stats": [
+      "ac",
+      "dex"
+     ],
+     "ends": [
+      {
+       "type": "move_used",
+       "damaging": true
+      }
+     ],
+     "note": "Shield Forme; a damaging move returns it to Blade Forme."
+    }
    ]
   },
   {
@@ -5861,6 +7755,20 @@
    "pokemon": [
     "Underoath",
     "Broosbuck"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "save_failed",
+      "vsNegativeCondition": true
+     },
+     "kind": "pass_save",
+     "optional": true,
+     "limit": {
+      "uses": 1,
+      "per": "long_rest"
+     }
+    }
    ]
   },
   {
@@ -5893,6 +7801,15 @@
     "Mallusk",
     "Conchail",
     "Corshail"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "itemRemoval": true
+    }
    ]
   },
   {
@@ -6047,6 +7964,15 @@
    "pokemon": [
     "Swarmy",
     "Ordus"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "forcedSwitch": true
+    }
    ]
   },
   {
@@ -6086,6 +8012,22 @@
    "pokemon": [
     "Driftling",
     "Aquider"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "hazards": true
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Can walk on water."
+    }
    ]
   },
   {
@@ -6094,6 +8036,34 @@
    "pokemon": [
     "Sparcupine",
     "Erethizic"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "while": [
+      {
+       "type": "self_terrain_contains",
+       "any": [
+        "electric"
+       ]
+      }
+     ],
+     "kind": "stat",
+     "stat": "speed",
+     "amount": {
+      "multiplier": 2
+     },
+     "ends": [
+      {
+       "type": "until_turn",
+       "whose": "holder",
+       "point": "end",
+       "count": 1
+      }
+     ]
+    }
    ]
   },
   {
@@ -6235,6 +8205,17 @@
    "pokemon": [
     "Mograyn",
     "Hedeikeel"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "free"
+     },
+     "kind": "swap_item",
+     "target": "ally",
+     "radiusFt": 15
+    }
    ]
   },
   {
@@ -6244,6 +8225,24 @@
     "Psycho",
     "Loreleaf",
     "Foliarch"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "condition_gained",
+      "conditions": [
+       "burned",
+       "paralyzed",
+       "poisoned"
+      ],
+      "fromCreature": true
+     },
+     "kind": "condition",
+     "target": "attacker",
+     "valueFrom": "gained_condition",
+     "ignoreImmunity": true,
+     "note": "The attacker gets the same condition, even if otherwise immune."
+    }
    ]
   },
   {
@@ -6253,6 +8252,17 @@
     "Tangela",
     "Tangela (Stalker Form)",
     "Tangrowth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "condition",
+     "target": "enemies",
+     "radiusFt": 5,
+     "apply": "no_disengage"
+    }
    ]
   },
   {
@@ -6331,6 +8341,15 @@
    "description": "This Pokémon’s moves completely ignore any ability that would hinder or prevent their effect on the target or the user's ability to hit the target.",
    "pokemon": [
     "Hagechu"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_target_abilities",
+     "note": "Abilities that would hinder its moves or their chance to hit."
+    }
    ]
   },
   {
@@ -6365,6 +8384,39 @@
    "description": "Temporis exists across multiple moments simultaneously. It has advantage on attack rolls and saving throws, and can't be surprised. Additionally, opportunity attacks against it are made with disadvantage.",
    "pokemon": [
     "Temporis"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "attack_rolls"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "roll": "advantage",
+     "on": "saving_throws"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "roll",
+     "roll": "disadvantage",
+     "on": "opportunity_attacks_against"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "surprised": true
+    }
    ]
   },
   {
@@ -6524,6 +8576,18 @@
    "description": "At the start of this Pokémon's turn, it may use the move Smog as a bonus action, costing no VP.",
    "pokemon": [
     "Venusaur"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "start_of_turn"
+     },
+     "kind": "use_move",
+     "optional": true,
+     "move": "Smog",
+     "free": true,
+     "action": "1 bonus action"
+    }
    ]
   },
   {
@@ -6557,6 +8621,43 @@
    "description": "When this Pokémon enters combat, all enemies within 15 feet must make a CON save (DC = 8 + proficiency + CON mod) or become badly poisoned. While an enemy is poisoned, this Pokémon's attacks deal an additional 1d6 + proficiency bonus poison damage.",
    "pokemon": [
     "Secto"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "kind": "condition",
+     "target": "enemies",
+     "radiusFt": 15,
+     "save": {
+      "ability": "CON",
+      "dc": "8+proficiency+CON"
+     },
+     "apply": "poisoned",
+     "value": "badly"
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "while": [
+      {
+       "type": "target_status",
+       "any": [
+        "poisoned"
+       ]
+      }
+     ],
+     "kind": "damage_mod",
+     "extraDice": "1d6",
+     "flatBonus": "proficiency",
+     "damageType": "Poison",
+     "filter": {
+      "damaging": true
+     },
+     "note": "Read as: against a poisoned enemy."
+    }
    ]
   },
   {
@@ -6565,6 +8666,26 @@
    "pokemon": [
     "Drago",
     "Aero"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "enter_battle"
+     },
+     "kind": "copy_ability",
+     "random": true,
+     "target": "enemy",
+     "exclude": [
+      "Flower Gift",
+      "Forecast",
+      "Illusion",
+      "Imposter",
+      "Multitype",
+      "Trace",
+      "Wonder Guard",
+      "Zen Mode"
+     ]
+    }
    ]
   },
   {
@@ -6572,6 +8693,97 @@
    "description": "This Pokémon has a standard Normal form from which all stats are based, but may change forms as a bonus action to drastically change its abilities. The forms it can take are Attack, Defense, and Speed. In Attack form, it adds an additional +5 to its attack rolls, but all attacks against it has advantage. In Defense form, its AC increases by 3, but its attacks are rolled at disadvantage. If the activated move requires a save, the target(s) have advantage. In Speed form, it gains an additional attack action each turn, but the attack is done at disadvantage. If it is a move that requires a save, the target(s) have advantage.",
    "pokemon": [
     "Ditto"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "attack_bonus",
+     "choice": {
+      "kind": "chosen",
+      "option": "Attack"
+     },
+     "amount": 5
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "roll",
+     "choice": {
+      "kind": "chosen",
+      "option": "Attack"
+     },
+     "roll": "advantage",
+     "on": "attacks_against"
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "stat",
+     "choice": {
+      "kind": "chosen",
+      "option": "Defense"
+     },
+     "stat": "ac",
+     "amount": 3
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "roll",
+     "choice": {
+      "kind": "chosen",
+      "option": "Defense"
+     },
+     "roll": "disadvantage",
+     "on": "attack_rolls"
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "roll",
+     "choice": {
+      "kind": "chosen",
+      "option": "Defense"
+     },
+     "roll": "advantage",
+     "on": "saves_against_its_moves"
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "extra_action",
+     "choice": {
+      "kind": "chosen",
+      "option": "Speed"
+     },
+     "note": "An extra attack action each turn, made at disadvantage."
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "1 bonus action"
+     },
+     "kind": "roll",
+     "choice": {
+      "kind": "chosen",
+      "option": "Speed"
+     },
+     "roll": "advantage",
+     "on": "saves_against_its_moves"
+    }
    ]
   },
   {
@@ -6592,6 +8804,19 @@
    "pokemon": [
     "Vamprat",
     "Vladacabra"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "action_cost_override",
+     "to": "1 bonus action",
+     "filter": {
+      "healing": true
+     },
+     "note": "Healing or draining moves."
+    }
    ]
   },
   {
@@ -6601,6 +8826,15 @@
     "Grell",
     "Groll",
     "Heimskroll"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "no_repeat_move",
+     "note": "Can't use the same move in back-to-back rounds."
+    }
    ]
   },
   {
@@ -6611,6 +8845,15 @@
     "Plundrake",
     "Treasuroth",
     "Silvaroth"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_target_abilities",
+     "note": "Abilities that would hinder its moves or their chance to hit."
+    }
    ]
   },
   {
@@ -6618,6 +8861,15 @@
    "description": "When this Pokémon attacks an opponent, it ignores any stat boosts the opponent has been affected with after the start of battle. This includes boosts to AC or saving throws the Pokémon has to make.",
    "pokemon": [
     "Drago"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "ignore_target_stat_changes",
+     "note": "Boosts since the start of battle, including AC and saves."
+    }
    ]
   },
   {
@@ -6652,6 +8904,20 @@
     "Mightyena",
     "Redoute",
     "Fantome"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "item_use_save",
+     "target": "enemies",
+     "save": {
+      "ability": "WIS",
+      "dc": 15
+     },
+     "note": "To consume an item."
+    }
    ]
   },
   {
@@ -6663,7 +8929,35 @@
     "Pathoplague",
     "Buzzlet",
     "Mosqaegis"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hits"
+     },
+     "kind": "condition",
+     "target": "target",
+     "save": {
+      "ability": "CON",
+      "dc": null
+     },
+     "options": [
+      "poisoned",
+      "paralyzed",
+      "slowed"
+     ],
+     "ends": [
+      {
+       "type": "long_rest"
+      }
+     ],
+     "note": "Failing by 5 or more bypasses defences like Safeguard. Slowed here = half movement."
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "What is the CON save DC?"
+   }
   },
   {
    "name": "Victory Star",
@@ -6716,7 +9010,47 @@
    "description": "This Pokémon may as a free action assume the Void Form or Watcher's Guise. While in Void Form, this Pokémon creates a field of supernatural darkness in a 30ft. radius that nullifies natural light, and dims ether based light. The field moves with the Pokémon. Unless illuminated by ether based light, or otherwise identified, this Pokémon is untargetable. All attacks against this Pokémon while obscured by this darkness are made with disadvantage, and it has advantage on all saving throws caused by AoE moves.",
    "pokemon": [
     "Jiehtanas"
-   ]
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "activated",
+      "action": "free"
+     },
+     "kind": "roll",
+     "choice": {
+      "kind": "chosen",
+      "option": "Void Form"
+     },
+     "roll": "disadvantage",
+     "on": "attacks_against"
+    },
+    {
+     "when": {
+      "type": "activated",
+      "action": "free"
+     },
+     "kind": "roll",
+     "choice": {
+      "kind": "chosen",
+      "option": "Void Form"
+     },
+     "roll": "advantage",
+     "on": "saving_throws",
+     "vsAreaMoves": true
+    },
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "manual",
+     "note": "Void Form: 30 ft supernatural darkness that moves with it; untargetable unless lit by ether light. Watcher's Guise isn't described."
+    }
+   ],
+   "review": {
+    "with": "Benjakronk",
+    "question": "What does Watcher's Guise do? Only Void Form is described."
+   }
   },
   {
    "name": "Void Shift",
@@ -6765,6 +9099,30 @@
     "Flintle",
     "Flaretortle",
     "Eruptoise"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "hit_by",
+      "melee": true
+     },
+     "kind": "deal_damage",
+     "reaction": true,
+     "optional": true,
+     "target": "all",
+     "radiusFt": 5,
+     "damageType": "Fire",
+     "amount": {
+      "diceBySize": {
+       "Tiny": "1d4",
+       "Small": "2d4",
+       "Medium": "3d4",
+       "Large": "4d4",
+       "Huge": "5d4",
+       "Gigantic": "6d4"
+      }
+     }
+    }
    ]
   },
   {
@@ -6797,6 +9155,22 @@
    "pokemon": [
     "Clingae",
     "Chimae"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "passive"
+     },
+     "kind": "immunity",
+     "target": "self_and_allies",
+     "radiusFt": 60,
+     "surprised": true,
+     "scaling": {
+      "10": {
+       "radiusFt": 100
+      }
+     }
+    }
    ]
   },
   {
@@ -6914,6 +9288,20 @@
    "pokemon": [
     "Morbit",
     "Darbit"
+   ],
+   "effects": [
+    {
+     "when": {
+      "type": "move_used",
+      "moveTypes": [
+       "Water"
+      ]
+     },
+     "kind": "heal",
+     "amount": {
+      "fractionMaxHP": 0.0625
+     }
+    }
    ]
   },
   {

@@ -1864,12 +1864,13 @@ function _syncTurnOrderSidebar(state) {
 
   const activeId = state.reactingParticipantId || state.turnOrder[state.turnIndex];
   const focusId = _resolveFocusId(state);
+  // Benched (switched-out) and spectating creatures aren't in the battle -- they don't belong in the turn order at all.
   const orderedIds = [
     ...state.turnOrder,
-    ...Object.keys(state.participants).filter(id => !state.turnOrder.includes(id)),
+    ...Object.keys(state.participants).filter(id => !state.turnOrder.includes(id) && state.participants[id].status === 'participating'),
   ];
 
-  const liveIds = new Set(Object.keys(state.participants));
+  const liveIds = new Set(orderedIds);
   [...el.children].forEach(node => { if (!liveIds.has(node.dataset.id)) node.remove(); });
 
   orderedIds.forEach((id, index) => {
@@ -1982,7 +1983,20 @@ function _getDefaultFocusId(state) {
 }
 
 function _resolveFocusId(state) {
-  if (_focusManuallySet && state.participants[_focusedParticipantId]) return _focusedParticipantId;
+  const manual = _focusManuallySet ? state.participants[_focusedParticipantId] : null;
+  if (manual && manual.status === 'participating') return _focusedParticipantId;
+  if (manual && manual.combatantType === 'pokemon' && manual.owner === _currentTrainerName()) {
+    // The Pokemon you were looking at was switched out: follow the one that came in for it.
+    const replacement = state.turnOrder.find(id => {
+      const p = state.participants[id];
+      return p && p.owner === manual.owner && p.combatantType === 'pokemon' && p.status === 'participating';
+    });
+    if (replacement) {
+      _focusedParticipantId = replacement;
+      return replacement;
+    }
+  }
+  if (manual) _focusManuallySet = false; // the manual pick left the battle -- back to the default
   const def = _getDefaultFocusId(state);
   _focusedParticipantId = def; // keep in sync for the sidebar's .focused highlight even in auto mode
   return def;

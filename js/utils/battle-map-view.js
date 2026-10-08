@@ -93,19 +93,30 @@ export function circleCells(board, cx, cy, radiusCells) {
   return out;
 }
 
-/** The cells a 90-degree cone of `lengthCells` reaches from (cx, cy) when facing `facing` degrees clockwise from up. */
-export function coneCells(board, cx, cy, facing, lengthCells) {
+/** The cells a cone of `lengthCells` covers from a token at `pos` (its footprint's bottom-left cell) of `size` cells, facing
+ * `facing` degrees clockwise from up. Grid cones, the table's rule: facing straight, row k in front is 2k-1 cells wider than
+ * the token's edge (a 15ft cone from a 1x1 token: 1, 3, 5 = 9 squares); facing a diagonal, it's the lengthCells x lengthCells
+ * block off that corner (3x3 = 9 squares). Cells off the board are dropped. */
+export function coneCells(board, pos, size, facing, lengthCells) {
   const { cols, rows } = board.grid;
   const out = new Set();
-  const rad = (facing * Math.PI) / 180;
-  const fx = Math.sin(rad), fy = -Math.cos(rad);
-  for (let c = 0; c < cols; c++) {
-    for (let r = 0; r < rows; r++) {
-      const dx = c - cx, dy = r - cy;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 0.5 || dist > lengthCells + 0.35) continue;
-      // Within 45 degrees of the facing direction on either side.
-      if ((dx * fx + dy * fy) / dist >= Math.cos(Math.PI / 4) - 0.001) out.add(`${c},${r}`);
+  const add = (c, r) => { if (c >= 0 && r >= 0 && c < cols && r < rows) out.add(`${c},${r}`); };
+  const n = size || 1;
+  const x0 = pos.col, x1 = pos.col + n - 1, y0 = pos.row - n + 1, y1 = pos.row;
+  const dir = ((Math.round((facing || 0) / 45) % 8) + 8) % 8; // 0 up, 1 up-right, 2 right, ... 7 up-left
+  const dx = [0, 1, 1, 1, 0, -1, -1, -1][dir];
+  const dy = [-1, -1, 0, 1, 1, 1, 0, -1][dir];
+  for (let k = 1; k <= lengthCells; k++) {
+    if (dx === 0) {
+      const r = dy < 0 ? y0 - k : y1 + k;
+      for (let c = x0 - (k - 1); c <= x1 + (k - 1); c++) add(c, r);
+    } else if (dy === 0) {
+      const c = dx > 0 ? x1 + k : x0 - k;
+      for (let r = y0 - (k - 1); r <= y1 + (k - 1); r++) add(c, r);
+    } else {
+      // Diagonal: column k of the block off the corner the token faces.
+      const c = dx > 0 ? x1 + k : x0 - k;
+      for (let j = 1; j <= lengthCells; j++) add(c, dy < 0 ? y0 - j : y1 + j);
     }
   }
   return out;

@@ -32,9 +32,9 @@ import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './
 import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, canClimb } from './move-effects.js';
-import { injectBattleMapStyles, zoneKindsByCell, legendHtml, tokenCenter, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
+import { injectBattleMapStyles, zoneKindsByCell, legendHtml, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 
-const CONE_LENGTHS_FT = [0, 15, 30, 60]; // 0 = preview off
+const CONE_FT = 15; // the cone preview is just a visual of where the token faces -- one size is enough
 
 function _injectStyles() {
   if (document.getElementById('battle-map-popup-styles')) return;
@@ -66,6 +66,10 @@ function _injectStyles() {
     .bmap-confirm-btn:disabled { background: #444; color: #888; cursor: not-allowed; box-shadow: none; }
     .bmap-cancel-btn { background: rgba(255,255,255,0.12); color: #e0e0e0; }
     .bmap-stage-warning { color: #e77373; }
+    /* a staged move: the token is drawn at its destination, the tile it left keeps a faint dashed outline */
+    .bmap-token.moving { opacity: 0.9; pointer-events: none; }
+    .bmap-token.moving .bmap-token-portrait { outline: 2px dashed #FFD700; outline-offset: 2px; }
+    .bmap-token-origin { position: absolute; box-sizing: border-box; pointer-events: none; border-radius: 14%; border: 2px dashed rgba(255,215,0,0.45); background: rgba(255,215,0,0.06); }
     /* the selected token's toolbar lives in this strip above the map, so it never covers the board */
     .bmap-toolbar-slot { display: flex; justify-content: center; min-height: 2.8rem; margin-bottom: 0.5rem; }
     .bmap-toolbar-slot .bmap-toolbar { position: static; transform: none; }
@@ -80,8 +84,8 @@ let _ownerName = null;
 let _selectedTokenId = null;
 // A clicked-but-not-yet-confirmed destination for _selectedTokenId.
 let _stagedDestination = null;
-// Index into CONE_LENGTHS_FT -- the cone preview length for the selected token (0 = off). Kept across selections.
-let _coneIdx = 0;
+// Whether the cone preview is on for the selected token. Kept across selections.
+let _coneOn = false;
 // The altitude (ft) the selected token is being sent to, or null to stay where it is -- changed by the toolbar's ▲ ▼,
 // confirmed together with the staged cell (a pure climb stages the token's own cell).
 let _stagedAlt = null;
@@ -344,11 +348,11 @@ function _renderGrid() {
 
   // Reach: cells the selected mover can still afford (Chebyshev distance x 5ft, same as the server's budget check).
   const bestRemaining = sel && (sel.p.speeds || []).length ? Math.max(...sel.p.speeds.map(s => _remainingFt(sel.p, s.type))) : null;
-  const coneFt = CONE_LENGTHS_FT[_coneIdx];
   let cone = null;
-  if (sel && coneFt) {
-    const c = tokenCenter(sel.pos, sel.size);
-    cone = coneCells(_session.board, c.x, c.y, sel.pos.facing || 0, coneFt / 5);
+  if (sel && _coneOn) {
+    // From where the token will be once the staged move is confirmed.
+    const from = _stagedDestination ? { col: _stagedDestination.col, row: _stagedDestination.row } : sel.pos;
+    cone = coneCells(_session.board, from, sel.size, sel.pos.facing || 0, CONE_FT / 5);
   }
 
   gridEl.setAttribute('style', gridTemplateStyle(_session.board));
@@ -396,13 +400,28 @@ function _renderTokens() {
     if (id === _selectedTokenId) classes.push('selected');
     if ((pos.z || 0) > 0) classes.push('airborne');
 
+    // A staged move is shown live: the token is drawn where it's going (and at the staged altitude), with a faint outline
+    // left on the tile it came from. Nothing is sent until Confirm; Cancel puts it back.
+    const staged = id === _selectedTokenId && _stagedDestination;
+    const shownAt = staged ? _stagedDestination : pos;
+    const shownZ = staged && _stagedAlt !== null ? _stagedAlt : (pos.z || 0);
+    if (staged) {
+      classes.push('moving');
+      const origin = document.createElement('div');
+      origin.className = `bmap-token-origin ${p.side}`;
+      Object.assign(origin.style, cellRect(_session.board, pos.col, pos.row, footprintForSize(p.size)));
+      layer.appendChild(origin);
+    }
+    if (shownZ > 0 && !classes.includes('airborne')) classes.push('airborne');
+    if (shownZ === 0) { const i = classes.indexOf('airborne'); if (i >= 0) classes.splice(i, 1); }
+
     const el = document.createElement('div');
     el.className = classes.join(' ');
     el.dataset.id = id;
     const name = visibleToViewer(p, 'name') ? p.name : '???';
     el.title = name;
-    Object.assign(el.style, cellRect(_session.board, pos.col, pos.row, footprintForSize(p.size)));
-    el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>${(pos.z || 0) > 0 ? `<span class="bmap-alt">↑${pos.z}ft</span>` : ''}`;
+    Object.assign(el.style, cellRect(_session.board, shownAt.col, shownAt.row, footprintForSize(p.size)));
+    el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>${shownZ > 0 ? `<span class="bmap-alt">↑${shownZ}ft</span>` : ''}`;
     const sprite = el.querySelector('.bmap-sprite');
     patchPortraitMedia(sprite, p.image, name);
     // The tokens are rebuilt every render, so start at the last drawn angle and let the transition carry it to the new one.
@@ -412,7 +431,8 @@ function _renderTokens() {
     sprite.style.transform = spriteTransform(previous);
     if (angle !== previous) requestAnimationFrame(() => requestAnimationFrame(() => { sprite.style.transform = spriteTransform(angle); }));
 
-    if (isMyTurn) {
+    // While a move is staged the token sits on the cell it's going to -- let clicks fall through to the cells beneath it.
+    if (isMyTurn && !staged) {
       el.addEventListener('click', () => {
         _selectedTokenId = _selectedTokenId === id ? null : id;
         _stagedDestination = null; _stagedAlt = null;
@@ -436,7 +456,6 @@ function _renderToolbar() {
   const bar = document.createElement('div');
   bar.id = 'bmapToolbar';
   bar.className = 'bmap-toolbar';
-  const coneFt = CONE_LENGTHS_FT[_coneIdx];
   const name = visibleToViewer(sel.p, 'name') ? sel.p.name : '???';
   bar.innerHTML = `
     <span class="tb-name">${name}</span>
@@ -444,7 +463,7 @@ function _renderToolbar() {
     <button type="button" data-act="right" title="Turn right 45° (E)">⟳</button>
     <span class="tb-sep"></span>
     ${canClimb(sel.p) ? `<button type="button" data-act="down" title="Descend 5ft">▼</button><span class="tb-label">${_stagedAlt ?? (sel.pos.z || 0)}ft</span><button type="button" data-act="up" title="Climb 5ft">▲</button><span class="tb-sep"></span>` : ''}
-    <button type="button" data-act="cone" class="${coneFt ? 'on' : ''}" title="Cone preview from this facing">◔ ${coneFt ? coneFt + 'ft' : 'Cone'}</button>
+    <button type="button" data-act="cone" class="${_coneOn ? 'on' : ''}" title="Show a ${CONE_FT}ft cone from this facing">◔ Cone</button>
     <button type="button" data-act="close" title="Deselect (Esc)">✕</button>`;
   bar.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -453,7 +472,7 @@ function _renderToolbar() {
     else if (act === 'right') _rotate(45);
     else if (act === 'up') _stepAltitude(5);
     else if (act === 'down') _stepAltitude(-5);
-    else if (act === 'cone') { _coneIdx = (_coneIdx + 1) % CONE_LENGTHS_FT.length; _render(); }
+    else if (act === 'cone') { _coneOn = !_coneOn; _render(); }
     else if (act === 'close') { _selectedTokenId = null; _stagedDestination = null; _stagedAlt = null; _render(); }
   });
   slot.appendChild(bar);

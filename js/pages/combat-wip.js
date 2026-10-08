@@ -44,7 +44,7 @@ import {
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
   setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
-  buildKnownMovesString,
+  buildKnownMovesString, COMBAT_CSS,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -230,7 +230,7 @@ const WIP_CSS = `
      the old minimal .wip-foreign-focus panel it replaces, rather than
      stretching edge to edge the way the viewer's own (always the sole card
      shown) does. */
-  .wip-foreign-focus-full { max-width: 420px; margin: 0 auto; }
+  .wip-foreign-focus-full { max-width: 700px; margin: 0 auto; padding: 0 0.8rem; }
   /* Damage/HP-VP Calculator stacks below the HP+VP rows instead of beside
      them (its own single-line text, set by the same compactWip option,
      needs the extra width that frees up). */
@@ -238,6 +238,150 @@ const WIP_CSS = `
   /* End Turn, moved below the moves section by the same option, centered
      rather than left-aligned like a plain block-level button defaults to. */
   #wipBattlePhase .combat-end-turn-bottom { display: block; width: fit-content; margin: 0.7rem auto 0.9rem; }
+
+  /* ===================================================================================================================
+     Card redesign (shared battle only -- the legacy local combat page keeps combat.js's own look). Same dark-navy glass
+     as the battle map: one panel per card, the portrait in a ringed tile, big HP/VP bars, ability scores as tiles, each
+     expanded section as its own sub-panel. Purely a style layer over combat.js's markup -- every button, input and
+     data-* hook is untouched, so nothing about how the card works changes.
+     =================================================================================================================== */
+  #wipBattlePhase .combat-page { background: transparent; }
+  #wipBattlePhase .battle-list { padding: 0.4rem 0.8rem 0.8rem; gap: 0.8rem; }
+  #wipBattlePhase .combat-card {
+    --ring: 140,170,255;
+    background: linear-gradient(180deg, rgba(30,34,64,0.96), rgba(16,18,40,0.98));
+    border: 1px solid rgba(var(--ring), 0.22); border-radius: 18px; overflow: hidden;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  #wipBattlePhase .combat-card--active {
+    --ring: 255,215,0;
+    border: 1px solid rgba(255,215,0,0.75);
+    box-shadow: 0 0 0 1px rgba(255,215,0,0.35), 0 0 28px rgba(255,215,0,0.22), 0 14px 40px rgba(0,0,0,0.55);
+  }
+  #wipBattlePhase .combat-card--fainted { opacity: 0.55; filter: grayscale(0.7); }
+
+  /* ---- header ---- */
+  #wipBattlePhase .combat-card-main {
+    gap: 1rem; padding: 1rem 1.1rem 0.9rem; cursor: default;
+    background: radial-gradient(ellipse at 0% 0%, rgba(var(--ring), 0.12), transparent 60%);
+  }
+  #wipBattlePhase .combat-card-img {
+    width: 104px; height: 104px; border-radius: 16px; padding: 4px; box-sizing: border-box;
+    background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.16), rgba(8,10,22,0.75) 75%);
+    box-shadow: 0 0 0 2px rgba(var(--ring), 0.85), 0 0 18px -2px rgba(var(--ring), 0.6), inset 0 0 12px rgba(0,0,0,0.5);
+  }
+  #wipBattlePhase .combat-initiative-badge--under-portrait {
+    margin-top: 0.35rem; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; color: #0b0d1a;
+    background: rgb(var(--ring)); padding: 0.12rem 0.55rem; border-radius: 999px;
+  }
+  #wipBattlePhase .combat-card-name-row { gap: 0.45rem; margin-bottom: 0.55rem; }
+  #wipBattlePhase .combat-card-name { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.02em; color: #f4f6ff; }
+  #wipBattlePhase .combat-card-level {
+    font-size: 0.72rem; font-weight: 700; color: #b9c8ff; padding: 0.12rem 0.5rem; border-radius: 999px;
+    background: rgba(140,170,255,0.14); border: 1px solid rgba(140,170,255,0.3);
+  }
+  #wipBattlePhase .combat-card-name-row .type-badge { border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.68rem; letter-spacing: 0.05em; }
+  #wipBattlePhase .wip-react-btn {
+    margin-left: auto; border-radius: 999px; padding: 0.35rem 0.9rem; font-weight: 700;
+    background: linear-gradient(135deg, #f1c40f, #d68910); color: #1a1300; border: none; box-shadow: 0 0 14px rgba(241,196,15,0.35);
+  }
+  #wipBattlePhase .wip-react-btn:disabled { background: rgba(255,255,255,0.08); color: #8a8fb0; box-shadow: none; }
+
+  /* AC chip + HP / VP bars */
+  #wipBattlePhase .combat-card-stats-group { background: none; padding: 0; margin-bottom: 0.65rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  #wipBattlePhase .combat-card-ac-line {
+    align-self: flex-start; font-size: 0.78rem; color: #cfd6ff; margin: 0; padding: 0.2rem 0.65rem; border-radius: 999px;
+    background: rgba(140,170,255,0.12); border: 1px solid rgba(140,170,255,0.28);
+  }
+  #wipBattlePhase .combat-card-ac-line::before { content: '🛡 '; }
+  #wipBattlePhase .combat-card-stats-group .combat-card-stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; font-size: 0.8rem; }
+  #wipBattlePhase .stat-bar-wrap { flex-wrap: wrap; gap: 0.15rem 0.35rem; color: #a9b0d6; }
+  #wipBattlePhase .stat-bar-wrap strong { color: #f4f6ff; font-size: 0.95rem; }
+  #wipBattlePhase .mini-bar { flex-basis: 100%; width: auto; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.08); box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); }
+  #wipBattlePhase .mini-bar-fill { border-radius: 999px; }
+  #wipBattlePhase .hp-bar { background: linear-gradient(90deg, #27ae60, #58d68d); box-shadow: 0 0 8px rgba(46,204,113,0.55); }
+  #wipBattlePhase .vp-bar { background: linear-gradient(90deg, #2e86de, #5dade2); box-shadow: 0 0 8px rgba(52,152,219,0.55); }
+
+  /* ability scores as tiles */
+  #wipBattlePhase .combat-mods-row { grid-template-columns: repeat(6, 1fr); gap: 0.35rem; font-size: 0.74rem; color: #d7dcff; }
+  #wipBattlePhase .combat-mods-row > span {
+    display: flex; flex-direction: column; align-items: center; line-height: 1.2; padding: 0.3rem 0.1rem; border-radius: 10px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(140,170,255,0.14); font-weight: 700;
+  }
+  #wipBattlePhase .combat-mods-row small { color: #8f97c4; font-weight: 600; margin: 0; }
+
+  /* footer: live status badges */
+  #wipBattlePhase .combat-card-footer { background: rgba(0,0,0,0.18); border-top: 1px solid rgba(140,170,255,0.12); padding: 0.5rem 1.1rem; min-height: 0; }
+  #wipBattlePhase .combat-card-footer:has(.combat-status-badges:empty) { display: none; }
+  #wipBattlePhase .status-badge { border-radius: 999px; }
+
+  /* ---- expanded sections: each its own sub-panel ---- */
+  #wipBattlePhase .combat-card-expanded { background: none; border-top: none; padding: 0.3rem 0.8rem 0.4rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  #wipBattlePhase .expanded-feats-section,
+  #wipBattlePhase .expanded-info-section,
+  #wipBattlePhase .expanded-hpvp-section,
+  #wipBattlePhase .expanded-stats-adj-section,
+  #wipBattlePhase .expanded-status-section,
+  #wipBattlePhase .expanded-trainer-actions,
+  #wipBattlePhase .expanded-moves-section {
+    padding: 0.75rem 0.85rem; border: 1px solid rgba(140,170,255,0.13); border-radius: 14px; background: rgba(255,255,255,0.025);
+  }
+  #wipBattlePhase .expanded-section-label {
+    display: flex; align-items: center; gap: 0.45rem; font-size: 0.68rem; letter-spacing: 0.14em; color: #9fb0ff; margin-bottom: 0.55rem;
+  }
+  #wipBattlePhase .expanded-section-label::before { content: ''; width: 3px; height: 0.85rem; border-radius: 2px; background: rgb(var(--ring)); box-shadow: 0 0 6px rgba(var(--ring), 0.8); }
+  #wipBattlePhase .info-row { font-size: 0.85rem; padding: 0.2rem 0; }
+  #wipBattlePhase .info-row + .info-row { border-top: 1px solid rgba(255,255,255,0.05); }
+  #wipBattlePhase .info-label { color: #8f97c4; min-width: 92px; }
+
+  /* steppers */
+  #wipBattlePhase .hpvp-stat-label { color: #b9c8ff; min-width: 26px; }
+  #wipBattlePhase .hpvp-btn, #wipBattlePhase .stat-delta-btn {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(140,170,255,0.3);
+    background: rgba(140,170,255,0.1); color: #e8ecff; font-weight: 700; transition: background 0.12s, transform 0.08s;
+  }
+  #wipBattlePhase .stat-delta-btn { width: 26px; height: 26px; }
+  #wipBattlePhase .hpvp-btn:hover, #wipBattlePhase .stat-delta-btn:hover { background: rgba(255,215,0,0.28); }
+  #wipBattlePhase .hpvp-btn:active, #wipBattlePhase .stat-delta-btn:active { transform: scale(0.92); }
+  #wipBattlePhase .hpvp-input, #wipBattlePhase .stat-adjust-val {
+    background: rgba(8,10,22,0.6); border: 1px solid rgba(140,170,255,0.25); border-radius: 10px; color: #f4f6ff; font-weight: 700; padding: 0.3rem;
+  }
+  #wipBattlePhase .hpvp-input:focus, #wipBattlePhase .stat-adjust-val:focus { outline: none; border-color: #FFD700; box-shadow: 0 0 0 2px rgba(255,215,0,0.25); }
+  #wipBattlePhase .hpvp-hpvp-right { border-left-color: rgba(140,170,255,0.15); }
+  #wipBattlePhase .combat-type-calc-btn { border-radius: 999px; }
+  #wipBattlePhase .stat-adjust-grid { gap: 0.5rem; }
+  #wipBattlePhase .stat-adjust-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(140,170,255,0.12); border-radius: 12px; padding: 0.45rem 0.5rem; }
+  #wipBattlePhase .stat-adjust-name { color: #d7dcff; }
+
+  /* status + trainer actions */
+  #wipBattlePhase .add-status-btn, #wipBattlePhase .combat-trainer-action-btn {
+    border-radius: 999px; background: rgba(140,170,255,0.08); border: 1px solid rgba(140,170,255,0.25); color: #e8ecff; transition: background 0.12s;
+  }
+  #wipBattlePhase .add-status-btn:hover, #wipBattlePhase .combat-trainer-action-btn:hover { background: rgba(255,215,0,0.2); }
+  #wipBattlePhase .status-remove-hint { color: #8f97c4; }
+
+  /* moves as a grid of type-coloured buttons */
+  #wipBattlePhase .expanded-moves-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; }
+  #wipBattlePhase .combat-move-row { display: block; }
+  #wipBattlePhase .combat-move-item {
+    width: 100%; padding: 0.55rem 0.7rem; border-radius: 12px; font-size: 0.85rem; font-weight: 800; text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.25); transition: transform 0.08s, filter 0.12s;
+  }
+  #wipBattlePhase .combat-move-item:not(:disabled):not(.combat-move-item--display):hover { filter: brightness(1.12); transform: translateY(-1px); }
+  #wipBattlePhase .combat-move-item--display { box-sizing: border-box; }
+
+  /* End Turn */
+  #wipBattlePhase .end-turn-btn {
+    border-radius: 999px; padding: 0.55rem 1.6rem; font-size: 0.95rem; font-weight: 800; letter-spacing: 0.03em;
+    background: linear-gradient(135deg, #f39c12, #d35400); box-shadow: 0 0 18px rgba(230,126,34,0.45);
+  }
+  #wipBattlePhase .combat-end-turn-bottom { margin: 0.4rem auto 1rem; }
+
+  @media (max-width: 560px) {
+    #wipBattlePhase .combat-mods-row { grid-template-columns: repeat(3, 1fr); }
+    #wipBattlePhase .combat-card-img { width: 84px; height: 84px; }
+    #wipBattlePhase .combat-card-name { font-size: 1.1rem; }
+  }
 `;
 
 // Reuses .bmap-cell/.bmap-token's exact rules from battle-map-popup.js (same
@@ -2084,7 +2228,24 @@ function _foreignCombatantView(p) {
  * this is read-only, so a restarted sprite on every push is an acceptable
  * trade for not needing a second copy of that logic. */
 function _renderForeignFocusFull(p) {
+  // The card styles normally ride along inside the viewer's own battle markup (combat.js's renderBattlePhase), which this
+  // replaces -- without them in <head> another player's card rendered as unstyled text.
+  _ensureCombatCardStyles();
   return `<div class="wip-foreign-focus-full" data-focus-id="${p.id}">${renderCombatCard(_foreignCombatantView(p), false, { compactWip: true, readOnly: true })}</div>`;
+}
+
+/** Another trainer's own participants (themselves and their Pokemon) show their full card, read-only, in every battle type;
+ * only a DM's enemy in PvE (no owner) keeps the short fog-of-war panel. */
+function _showsFullForeignCard(state, p) {
+  return state.battleType === 'pvp' || !!p.owner;
+}
+
+function _ensureCombatCardStyles() {
+  if (document.getElementById('combat-card-base-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'combat-card-base-styles';
+  style.textContent = COMBAT_CSS;
+  document.head.appendChild(style);
 }
 
 /** PvE's minimal foreign panel (name/type/level/HP/VP/statuses only, respecting
@@ -2163,7 +2324,7 @@ function _updateForeignFocusInfo(p) {
 function _renderMainFocusHtml(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx) return '<div class="combat-wip-empty"><p style="color:#a0a0c0;">No participants yet.</p></div>';
-  if (!ctx.isMine) return state.battleType === 'pvp' ? _renderForeignFocusFull(ctx.p) : _renderForeignFocusInfo(ctx.p);
+  if (!ctx.isMine) return _showsFullForeignCard(state, ctx.p) ? _renderForeignFocusFull(ctx.p) : _renderForeignFocusInfo(ctx.p);
   return renderBattlePhase(ctx.filteredState, ctx.cardOptions);
 }
 
@@ -2231,7 +2392,7 @@ function _syncMainFocus(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx) { el.innerHTML = '<div class="combat-wip-empty"><p style="color:#a0a0c0;">No participants yet.</p></div>'; return; }
   if (!ctx.isMine) {
-    if (state.battleType === 'pvp') {
+    if (_showsFullForeignCard(state, ctx.p)) {
       el.innerHTML = _renderForeignFocusFull(ctx.p); // always a full rebuild -- see its own comment
       return;
     }

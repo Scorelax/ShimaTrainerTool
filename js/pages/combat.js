@@ -1171,7 +1171,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
     ? (statusBadges ? `
     <div class="expanded-status-section">
       <div class="expanded-section-label">Status Effects</div>
-      <div class="status-remove-hint">Tap a badge to remove it</div>
+      <div class="status-remove-hint">Tap a badge for its details</div>
     </div>` : '')
     : `
     <div class="expanded-status-section">
@@ -1211,7 +1211,13 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
           // No move-use flow wired for a foreign card (see readOnly, above) --
           // a plain row instead of a clickable button, so it doesn't look like
           // it's supposed to do something on click.
-          if (readOnly) return `<div class="combat-move-row"><div class="combat-move-item combat-move-item--display">${label}</div></div>`;
+          if (readOnly) {
+            // Coloured by type like the owner's own buttons (applyMoveColors only runs on the viewer's own card).
+            const mv = _moveMap?.get(moveName);
+            const bg = mv ? getMoveTypeColor(mv[1]) : '';
+            const style = bg ? ` style="background-color:${bg};color:${getTextColorForBackground(bg)}"` : '';
+            return `<div class="combat-move-row"><div class="combat-move-item combat-move-item--display" data-move="${moveName}"${style}>${label}</div></div>`;
+          }
           return `<div class="combat-move-row">
             <button class="combat-move-item ${isLocked || bonusSpent ? 'move-locked' : ''} ${isDiceLocked ? 'move-dice-locked' : ''}"
               data-move="${moveName}" data-combatant-id="${c.id}"

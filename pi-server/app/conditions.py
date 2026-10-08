@@ -27,6 +27,8 @@ CONDITION_RULES = {
     'poisoned': {'turnDamage': {'timing': 'end', 'amount': 'proficiency'}},
     'paralyzed': {'speedMultiplier': 0.5},
     'confused': {'speedMultiplier': 0.5},
+    # Temporal Fang's slow (the only move that applies `slowed` -- every other "speed halved" move is a plain speed stat).
+    'slowed': {'speedMultiplier': 0.5},
 }
 
 # Any of these blocks move-use and reactions entirely (_apply_move,

@@ -330,7 +330,7 @@
         "vpCost": "8",
         "duration": "Instantaneous",
         "range": "Melee",
-        "description": "You latch on to a creature, attempting to drain its life energy. Make an attack roll, dealing 1d10 + MOVE bug damage on a hit. You regain of the damage dealt as HP. The target must then succeed a Strength saving throw or become grappled by you. While you have grappled an opponent, you may use this move as a bonus action.",
+        "description": "You latch on to a creature, attempting to drain its life energy. Make an attack roll, dealing 1d10 + MOVE bug damage on a hit. You regain HP equal to the damage dealt. The target must then succeed a Strength saving throw or become grappled by you. While you have grappled an opponent, you may use this move as a bonus action.",
         "scaling": "The damage dice roll for this move changes to 2d8 at level 5, 4d6 at level 10 and 4d8 at level 17"
       },
       {

@@ -1034,6 +1034,90 @@ async function _handlePush({ casterId, targetId, effect, moveName }) {
   });
 }
 
+/** 'hot' | 'cold' | 'temperate' -- the map's environment (Chill / Superheat set one; windy or none counts as temperate). */
+function _environmentKind(state) {
+  const k = state?.environment?.kind;
+  return k === 'hot' || k === 'cold' ? k : 'temperate';
+}
+
+/** Dragon Tail: in a trainer battle the target's trainer must switch it out (their device opens the switch picker -- see
+ * _maybePromptForcedSwitch); a creature nobody owns (a wild battle) instead moves up to half its speed away from the user. */
+async function _handleForceSwitch({ casterId, targetId, effect, moveName }) {
+  const target = session?.participants?.[targetId];
+  if (!target) return;
+  if (!target.owner || target.combatantType !== 'pokemon') {
+    await _handlePush({ casterId, targetId, moveName, effect: { ft: Math.floor((maxSpeed(target) || 0) / 2), direction: 'away',
+      note: 'a wild creature lower level than the user flees outright' } });
+    return;
+  }
+  try {
+    await CombatAPI.requestForcedSwitch(targetId, moveName, casterId);
+  } catch (err) {
+    showCombatAlert(err.message, { title: moveName });
+  }
+}
+
+const _forcedSwitchPrompted = new Set();
+
+/** The server says one of THIS viewer's Pokemon must be switched out (Dragon Tail): ask once, then open the switch picker.
+ * Nothing to send in clears the request. */
+function _maybePromptForcedSwitch(state) {
+  const req = state?.pendingForcedSwitch;
+  if (!req || req.owner !== _currentTrainerName()) return;
+  const key = `${req.pokemonId}:${state.round}:${state.turnIndex}`;
+  if (_forcedSwitchPrompted.has(key)) return;
+  _forcedSwitchPrompted.add(key);
+  const name = state.participants?.[req.pokemonId]?.name || 'Your Pokémon';
+  const available = _benchFor(state, req.owner).filter(b => (b.currentHp ?? 1) > 0);
+  if (!available.length) {
+    showCombatAlert(`${name} is hit by ${req.moveName || 'a forced switch'}, but you have no other Pokémon to send in -- it stays.`, { title: req.moveName || 'Switch' });
+    CombatAPI.clearForcedSwitch().catch(() => {});
+    return;
+  }
+  showCombatAlert(`${name} is too frightened to stay in battle (${req.moveName || 'forced switch'}) -- choose who to send in.`, { title: 'Switch Pokémon' })
+    .then(() => openSwitchPopup({}))
+    .catch(() => {});
+}
+
+/** Sing: "Roll 5d8 + MOVE; the total is how many hit points of creatures this move can affect. Creatures within 30 feet of you
+ * are affected in ascending order of their current hit points ... A creature's hit points must be equal to or less than the
+ * remaining total." Creatures already asleep, at 0 HP, or out of reach (Fly, Dig) are skipped; one that can't fall asleep
+ * (Misty / Electric Terrain, Safeguard, Uproar) is passed over without using up any of the total. */
+async function _handleSleepPool({ casterId, effect, moveName }) {
+  const caster = session?.participants?.[casterId];
+  const tokens = session?.board?.tokens || {};
+  if (!caster || !tokens[casterId]) {
+    showCombatAlert(`${moveName}: ${caster?.name || 'the singer'} isn't on the map -- resolve it by hand.`, { title: moveName });
+    return;
+  }
+  const dice = tierAt(effect.diceTiers, caster.level) || effect.dice;
+  const mod = effect.addMove ? bestMoveStatModifier(findMoveRow(moveName) || [], caster) : 0;
+  const pool = await promptValueRoll({ dice: mod ? `${dice}${mod > 0 ? '+' : ''}${mod}` : dice, moveName,
+    description: `${moveName}: roll ${dice} + MOVE -- the total is how many hit points of creatures fall asleep` });
+  if (pool === null || pool <= 0) return;
+  const at = tokens[casterId];
+  const reach = (effect.radiusFt || 30) / 5;
+  const candidates = Object.values(session.participants)
+    .filter(p => p.id !== casterId && p.status === 'participating' && tokens[p.id] && (p.currentHP ?? 0) > 0)
+    .filter(p => Math.max(Math.abs(tokens[p.id].col - at.col), Math.abs(tokens[p.id].row - at.row)) <= reach)
+    .filter(p => !untargetableState(p, []) && !(p.statuses || []).some(s => s.kind === 'condition' && s.apply === 'asleep'))
+    .sort((a, b) => a.currentHP - b.currentHP);
+  let left = pool;
+  const slept = [];
+  for (const p of candidates) {
+    if (p.currentHP > left) break;
+    try {
+      await CombatAPI.applyStatus(p.id, buildStatusSpec({ kind: 'condition', apply: 'asleep' }, { sourceId: casterId, sourceName: caster.name, moveName }));
+      left -= p.currentHP;
+      slept.push(visibleToViewer(p, 'name') ? p.name : '???');
+    } catch {
+      // immune -- passed over without using up the total
+    }
+  }
+  CombatAPI.logEvent({ type: 'save', actorId: casterId, actorName: caster.name,
+    text: slept.length ? `${caster.name}'s ${moveName} (${pool}) puts ${slept.join(', ')} to sleep` : `${caster.name}'s ${moveName} (${pool}) puts nobody to sleep` }).catch(() => {});
+}
+
 /** Feet to the nearest hostile creature on the map (Chebyshev, 5ft squares -- the same distance the server's reaction ranges
  * use), or null when this participant or nobody hostile has a token. Hostile = another side, or another owner in PvP. */
 function _nearestHostileFt(state, pid) {
@@ -1294,6 +1378,7 @@ function _syncLocalCombatState(session) {
     merged.stabMultiplier = (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === 'stab_doubled') ? 2 : 1;
     // Move gates on the user's own state (combat.js's selfRequirementUnmet): Snore needs `asleep`, Recompose no enemy in reach.
     merged.liveStatuses = p.statuses || [];
+    merged.environmentKind = _environmentKind(session); // Thermal Shock
     merged.enteredRound = p.enteredRound ?? null; // Fake Out / First Impression
     // Pursuit's doubled dice against a switch-out: the trigger of the window this participant is reacting to.
     merged.reactingToTrigger = session.reactingParticipantId === p.id ? (session.pendingReaction?.trigger || null) : null;
@@ -1333,7 +1418,7 @@ function _syncLocalCombatState(session) {
     // (existing) -- weather/terrain are shared session state now (see
     // routes_combat.py's set-weather/set-terrain), so every device sees
     // whatever the DM actually set, not just whoever set it.
-    weather: session.weather || null, terrain: session.terrain || null,
+    weather: session.weather || null, terrain: session.terrain || null, environment: session.environment || null,
   };
   sessionStorage.setItem(WIP_COMBAT_STATE_KEY, JSON.stringify(local));
   return local;
@@ -2204,6 +2289,7 @@ export function attachCombatWipListeners() {
       _maybePromptStartOfTurnSaves(session);
       _maybePromptHazards(session);
       _maybeShowReactionPrompt(session);
+      _maybePromptForcedSwitch(session);
       return;
     }
 
@@ -2217,6 +2303,7 @@ export function attachCombatWipListeners() {
     _maybePromptStartOfTurnSaves(session);
     _maybePromptHazards(session);
     _maybeShowReactionPrompt(session);
+    _maybePromptForcedSwitch(session);
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
 
@@ -3109,7 +3196,9 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
   // Weather variants (Surface Glide's "if raining, all surfaces are water", Shore Up's "doubled in a Sandstorm") are
   // resolved against the weather the user stands in, once, as the effects are offered.
   const userWeathers = weathersAffecting(session, attackerId);
-  const effects = moveEffectsFor(moveName).map(e => applyWeatherVariants(e, userWeathers));
+  // Thermal Shock: an effect with `env` only happens in that environment ('hot' / 'cold' / 'temperate').
+  const envKind = _environmentKind(session);
+  const effects = moveEffectsFor(moveName).map(e => applyWeatherVariants(e, userWeathers)).filter(e => !e.env || e.env.includes(envKind));
   if (!effects.length) return;
   const attacker = session?.participants?.[attackerId];
   const target = targetId ? session?.participants?.[targetId] : null;
@@ -3458,6 +3547,24 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });
       }
+      continue;
+    }
+    if (effect.kind === 'set_environment') {
+      // Chill / Superheat / Stormwind -- the whole map turns cold / hot / windy.
+      const caster = session?.participants?.[attackerId];
+      try {
+        await CombatAPI.setEnvironment(effect.name || moveName, effect.env, { rounds: effect.rounds || '', sourceId: attackerId, sourceName: caster?.name || '' });
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+      continue;
+    }
+    if (effect.kind === 'force_switch') {
+      await _handleForceSwitch({ casterId: attackerId, targetId: pick.targetId, effect, moveName });
+      continue;
+    }
+    if (effect.kind === 'sleep_pool') {
+      await _handleSleepPool({ casterId: attackerId, effect, moveName });
       continue;
     }
     if (effect.kind === 'trick_room') {

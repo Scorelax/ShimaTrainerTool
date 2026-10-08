@@ -589,7 +589,7 @@ const WEATHER_SUGGESTIONS = ['Clear Skies', 'Rain', 'Harsh Sunlight', 'Sandstorm
 const TERRAIN_SUGGESTIONS = ['Electric Terrain', 'Grassy Terrain', 'Misty Terrain', 'Psychic Terrain'];
 
 function renderConditionBadge(type, cond) {
-  const icon = type === 'weather' ? '🌦' : '🌿';
+  const icon = type === 'weather' ? '🌦' : type === 'environment' ? '🌡' : '🌿';
   return `
     <div class="combat-condition-badge">
       <span class="condition-icon">${icon}</span>
@@ -604,10 +604,13 @@ function renderConditionBadge(type, cond) {
 function renderGlobalBar(state) {
   const w = state.weather || null;
   const t = state.terrain || null;
+  // Chill / Superheat / Stormwind's environment (shared battle only -- set by a move, cleared from its badge).
+  const env = state.environment || null;
   return `
     <div class="combat-global-bar" id="combatGlobalBar">
       ${w ? renderConditionBadge('weather', w) : '<button class="combat-global-btn" id="weatherBtn">🌦 Weather</button>'}
       ${t ? renderConditionBadge('terrain', t) : '<button class="combat-global-btn" id="terrainBtn">🌿 Terrain</button>'}
+      ${env ? renderConditionBadge('environment', { name: env.name, effect: `Environment: ${env.kind}` }) : ''}
     </div>`;
 }
 
@@ -1816,6 +1819,10 @@ function recalcInitiativeTotal(id, state) {
  * server instead of this device's own local cache). `cond` is {name,
  * effect} or null to clear. */
 function _pushGlobalCondition(type, cond) {
+  if (type === 'environment') {
+    CombatAPI.setEnvironment('').catch(err => showCombatAlert(err.message, { title: 'Error' }));
+    return;
+  }
   const api = type === 'weather' ? CombatAPI.setWeather : CombatAPI.setTerrain;
   api(cond?.name || '', cond?.effect || '').catch(err => showCombatAlert(err.message, { title: 'Error' }));
 }
@@ -1853,9 +1860,11 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
     if (!bar) return;
     const w = state.weather || null;
     const t = state.terrain || null;
+    const env = state.environment || null;
     bar.innerHTML = [
       w ? renderConditionBadge('weather', w) : '<button class="combat-global-btn" id="weatherBtn">🌦 Weather</button>',
       t ? renderConditionBadge('terrain', t) : '<button class="combat-global-btn" id="terrainBtn">🌿 Terrain</button>',
+      env ? renderConditionBadge('environment', { name: env.name, effect: `Environment: ${env.kind}` }) : '',
     ].join('');
     document.getElementById('weatherBtn')?.addEventListener('click', () => openGcModal('weather'));
     document.getElementById('terrainBtn')?.addEventListener('click', () => openGcModal('terrain'));
@@ -2366,6 +2375,8 @@ function _evaluateDamageNotes(effects, c, moveModValue = 0, weathers = [], moveN
     if (!cond) return { met: false, magnitude: 0 };
     switch (cond.type) {
       case 'self_always': return { met: true, magnitude: 1 };
+      // Thermal Shock: "in hot environments, double the dice" -- the shared battle's environment (Chill / Superheat / Stormwind).
+      case 'self_environment': return { met: (cond.any || []).includes(c.environmentKind || 'temperate'), magnitude: 1 };
       // Pursuit: "if the creature is ... being switched out, double the damage dice" -- what the reaction is answering.
       case 'self_reacting_to': return { met: !!c.reactingToTrigger && (cond.any || []).includes(c.reactingToTrigger), magnitude: 1 };
       case 'self_hp_below': return { met: hpFrac !== null && hpFrac < cond.fraction, magnitude: 1 };

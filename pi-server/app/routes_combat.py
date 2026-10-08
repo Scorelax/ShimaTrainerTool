@@ -419,6 +419,18 @@ def handle(conn, action, params):
     if action == 'set-board-background':
         return _mutate(conn, lambda s: _set_board_background(s, params.get('url', '')))
 
+    if action == 'set-environment':
+        return _mutate(conn, lambda s: _set_environment(s, params.get('name', ''), params.get('kind', ''), params.get('rounds'),
+                                                        params.get('sourceId'), params.get('sourceName')))
+
+    if action == 'request-forced-switch':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _request_forced_switch(s, params['id'], params.get('moveName', ''), params.get('sourceId')))
+
+    if action == 'clear-forced-switch':
+        return _mutate(conn, lambda s: s.__setitem__('pendingForcedSwitch', None))
+
     if action == 'set-weather':
         return _mutate(conn, lambda s: _set_weather(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
                                                     params.get('sourceId'), params.get('sourceName'),
@@ -1020,6 +1032,8 @@ def _entered_battle(state, participant):
 
 def _remove_participant(state, pid):
     _end_source_leaves(state, pid)
+    if (state.get('pendingForcedSwitch') or {}).get('pokemonId') == pid:
+        state['pendingForcedSwitch'] = None
     state['participants'].pop(pid, None)
     state['board']['tokens'].pop(pid, None)
     _drop_pending_switch_involving(state, {pid})
@@ -1042,6 +1056,8 @@ def _leave_session(conn, owner):
         _drop_pending_switch_involving(state, leaving)
         for pid in leaving:
             _end_source_leaves(state, pid)
+        if (state.get('pendingForcedSwitch') or {}).get('pokemonId') in leaving:
+            state['pendingForcedSwitch'] = None
         for pid in leaving:
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
@@ -1065,6 +1081,8 @@ def _set_status(state, pid, status):
             _entered_battle(state, participant)
     elif was == 'participating':
         _end_source_leaves(state, pid)
+        if (state.get('pendingForcedSwitch') or {}).get('pokemonId') == pid:
+            state['pendingForcedSwitch'] = None
     _rebuild_turn_order(state)
 
 
@@ -1202,6 +1220,10 @@ def _cancel_pending_switch(state, pid):
     _log_event(state, 'switch-block', text=f"{blocker['name']} moves to stop the switch", actorId=pid, actorName=blocker['name'])
 
 
+# What a Pokemon keeps when it's switched out normally (Baton Pass passes everything instead): the lasting conditions.
+_SWITCH_PERSISTENT_CONDITIONS = {'burned', 'poisoned', 'asleep', 'paralyzed', 'frozen'}
+
+
 def _perform_switch(state, pending):
     out, inn = state['participants'].get(pending['outId']), state['participants'].get(pending['inId'])
     if not out or not inn or out.get('status') != 'participating' or inn.get('status') == 'participating':
@@ -1237,6 +1259,15 @@ def _perform_switch(state, pending):
             copy_['id'] = uuid.uuid4().hex[:8]
             _statuses_of(inn).append(copy_)
             _statuses_of(out).remove(s)
+    else:
+        # A normal switch-out: stat changes and passing effects end; the lasting conditions stay with the Pokemon on the bench.
+        kept = [s for s in _statuses_of(out) if s.get('kind') == 'condition' and s.get('apply') in _SWITCH_PERSISTENT_CONDITIONS]
+        if len(kept) != len(_statuses_of(out)):
+            out['statuses'] = kept
+            _log_event(state, 'status-expire', text=f"{out['name']}'s stat changes and other effects end as it is withdrawn",
+                       targetId=out_id, targetName=out['name'])
+    if (state.get('pendingForcedSwitch') or {}).get('pokemonId') == out_id:
+        state['pendingForcedSwitch'] = None
     _apply_switch_heal(state, inn)
     _entered_battle(state, inn)
     _end_source_leaves(state, out_id)
@@ -2777,6 +2808,41 @@ def _set_weather(state, name, effect, rounds=None, source_id=None, source_name=N
     _set_field(state, 'weather', name, effect, rounds, None, source_id, source_name, cells, caster_level, concentration)
 
 
+_ENVIRONMENT_KINDS = ('cold', 'hot', 'windy')
+
+
+def _set_environment(state, name, kind, rounds=None, source_id=None, source_name=None):
+    """Chill / Superheat / Stormwind: the environment of the whole map -- 'cold', 'hot' or 'windy' -- for a number of rounds.
+    Separate from the weather (it can be raining AND cold). No name clears it. Thermal Shock reads it: hot doubles its dice,
+    cold freezes the ground, anything else (no environment, or windy) is "temperate"."""
+    if not name:
+        state['environment'] = None
+        return
+    if kind not in _ENVIRONMENT_KINDS:
+        raise ValueError('environment kind must be cold, hot or windy')
+    env = {'name': name, 'kind': kind}
+    n = js_parse_int(rounds)
+    if n and n > 0:
+        env['expiresRound'] = state['round'] + n
+    if source_id:
+        env['sourceId'], env['sourceName'] = source_id, source_name
+    state['environment'] = env
+    _log_event(state, 'terrain', text=f"The environment turns {kind}: {name}")
+
+
+def _request_forced_switch(state, pid, move_name='', source_id=None):
+    """Dragon Tail in a trainer battle: "the target must be switched out if another creature is available". The target's own
+    trainer picks the replacement -- their client sees `pendingForcedSwitch` and opens the switch picker. Cleared by the switch
+    itself, by the Pokemon leaving, or by the owner's client when there is nobody to send in."""
+    p = state['participants'].get(pid)
+    if not p or p.get('status') != 'participating':
+        raise ValueError('That creature is not in the battle')
+    if not p.get('owner') or p.get('combatantType') != 'pokemon':
+        raise ValueError("Only a trainer's Pokemon can be forced to switch")
+    state['pendingForcedSwitch'] = {'pokemonId': pid, 'owner': p['owner'], 'moveName': move_name, 'sourceId': source_id}
+    _log_event(state, 'switch-attempt', text=f"{p['name']} must be switched out ({move_name or 'forced'})", targetId=pid, targetName=p['name'])
+
+
 def _remove_field_zone(state, kind, zone_id):
     """Ends one tile-limited zone by hand -- how a concentration weather (Hail, Sandstorm) is dropped when the
     caster loses concentration, since concentration itself isn't tracked as game state."""
@@ -2810,7 +2876,7 @@ def _expire_fields(state, starting_id=None):
         if f.get('untilTurnOf') and f['untilTurnOf'] == starting_id:
             return True
         return f.get('expiresRound') is not None and state['round'] >= f['expiresRound']
-    for key in ('terrain', 'weather'):
+    for key in ('terrain', 'weather', 'environment'):
         if state.get(key) and over(state[key]):
             _log_event(state, 'terrain-end', text=f"{state[key]['name']} fades")
             state[key] = None

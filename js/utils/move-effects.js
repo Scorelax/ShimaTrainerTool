@@ -220,6 +220,7 @@ export function statusLabel(s) {
     if (s.apply === 'granted_immunity') return `Immune to ${s.value || ''}`;
     if (s.apply === 'exhaustion') return `Exhaustion (level ${s.value || 1})`;
     if (s.apply === 'stab_doubled') return 'STAB doubled';
+    if (s.apply === 'switch_locked') return "Can't be switched out";
     return _title(String(s.apply || '').replace(/_/g, ' '));
   }
   if (s.kind === 'temp_hp') {
@@ -313,11 +314,12 @@ const KIND_LABELS = {
   disable_last_used_move: 'Disable the move it just used', damage_multiplier: 'Reduce the damage of the attack', trick_room: 'Twist the turn order (Trick Room)',
   faint_on_roll: 'Faints the target', cancel_switch: "Stop the opponent's switch-out", push: 'Move the target',
   ground_target: 'Bring it down to the ground', set_altitude: 'Rise into the air', self_faint: 'You faint',
-  hp_fraction_loss: 'Lose half its current HP',
+  hp_fraction_loss: 'Lose half its current HP', force_switch: 'Force it out of the battle', sleep_pool: 'Put creatures to sleep (HP pool)',
 };
 
 function _effectKindLabel(s) {
   if (s.kind === 'set_terrain') return `Place ${s.name || 'a terrain'}${s.rounds ? ` for ${s.rounds} round${s.rounds === 1 ? '' : 's'}` : ''}`;
+  if (s.kind === 'set_environment') return `Make the environment ${s.env}${s.rounds ? ` for ${s.rounds} rounds` : ''}`;
   if (s.kind === 'set_weather') return `Set the weather: ${s.name || 'a weather'}${s.rounds ? ` for ${s.rounds} rounds` : ''}`;
   if (s.kind === 'stat_transfer') return STAT_TRANSFER_LABELS[s.mode] || _title(String(s.mode || 'stat change').replace(/_/g, ' '));
   if (s.kind === 'push') {

@@ -129,6 +129,13 @@ export const CONDITION_RULES = {
     immuneTypes: ['Electric'],
     note: "At the start of its turn, rolls a d4: on a 1, it's incapacitated and restrained until the start of its next turn, forfeiting its remaining action and bonus action (auto-prompted). If also Confused or Asleep, this roll happens first -- a failure skips the confusion/wake-up check entirely for that turn (enforced in the prompt order, not a passive rule). Electric types are immune.",
   },
+  // Temporal Fang's slow -- the only move that applies `slowed`; every other "speed halved" move is a plain speed stat.
+  slowed: {
+    speedMultiplier: 0.5,
+    disadvantageOn: ['attack_rolls', 'saving_throws'],
+    advantageOn: ['attacks_against'],
+    note: 'Moves at half speed, with disadvantage on attack rolls and saving throws; attacks against it have advantage.',
+  },
   confused: {
     speedMultiplier: 0.5,
     note: "Loses its reactions (enforced server-side) and moves at half speed. When it attempts an action or bonus action on its turn, rolls a d20 first (auto-prompted at the start of its turn): 10 or lower hurts itself for typeless damage equal to its proficiency modifier and forfeits the rest of the turn's action/bonus action; 16 or higher ends Confused immediately.",

@@ -1080,9 +1080,25 @@
       "categories": [
         "damage",
         "potential_status_condition_grappled",
-        "heal_self"
+        "heal_self",
+        "drain"
       ],
       "effects": [
+        {
+          "kind": "heal",
+          "amount": {
+            "fractionOfDamage": 1.0
+          },
+          "when": {
+            "type": "on_hit"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        },
         {
           "kind": "condition",
           "apply": "grappled",
@@ -1092,7 +1108,7 @@
           }
         }
       ],
-      "description": "You latch on to a creature, attempting to drain its life energy. Make an attack roll, dealing 1d10 + MOVE bug damage on a hit. You regain of the damage dealt as HP. The target must then succeed a Strength saving throw or become grappled by you. While you have grappled an opponent, you may use this move as a bonus action.",
+      "description": "You latch on to a creature, attempting to drain its life energy. Make an attack roll, dealing 1d10 + MOVE bug damage on a hit. You regain HP equal to the damage dealt. The target must then succeed a Strength saving throw or become grappled by you. While you have grappled an opponent, you may use this move as a bonus action.",
       "moveStat": "STR/DEX",
       "vpCost": "8",
       "scaling": "The damage dice roll for this move changes to 2d8 at level 5, 4d6 at level 10 and 4d8 at level 17"
@@ -1762,7 +1778,7 @@
         "damage",
         "recharge_locked",
         "potential_status_condition_prone",
-        "potential_status_condition_slowed"
+        "potential_stat_debuff_speed"
       ],
       "effects": [
         {
@@ -1774,8 +1790,11 @@
           }
         },
         {
-          "kind": "condition",
-          "apply": "slowed",
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
           "when": {
             "type": "save_fail",
             "ability": "STR"
@@ -1786,7 +1805,8 @@
               "n": 10
             }
           ],
-          "note": "movement speed halved"
+          "noSwitch": true,
+          "note": "can't leave the ground or be switched out while slowed"
         },
         {
           "kind": "ground_target",
@@ -4583,7 +4603,21 @@
             "ability": "CON",
             "requires": "hit"
           },
-          "note": "too frightened to remain in battle: switched out in trainer battles, moves away in wild battles"
+          "note": "too frightened to remain in battle"
+        },
+        {
+          "kind": "force_switch",
+          "when": {
+            "type": "save_fail",
+            "ability": "CON",
+            "requires": "hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "note": "trainer battles: its trainer switches it out; wild battles: it moves half its speed away"
         }
       ],
       "description": "You whip your dragon tail at an opponent in an attempt to send them away. Make a melee attack against a target, dealing 1d10 + MOVE dragon damage and forcing it to make a CON save against your Move DC on a hit. On a failure, the target is too frightened by you to remain in battle. In trainer battles, the target must be switched out if another creature is available. In wild battles, the target must move up to half its speed away from the user, but only attempts to flee outright if it a lower level than the user.",
@@ -6611,6 +6645,24 @@
               "n": 1
             }
           ]
+        },
+        {
+          "kind": "condition",
+          "apply": "switch_locked",
+          "noSwitch": true,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "until_turn",
+              "whose": "holder",
+              "point": "end",
+              "count": 1
+            }
+          ],
+          "note": "also cannot use attack moves until the end of your next turn"
         }
       ],
       "description": "You may only use while your current hit points are above 75% of your maximum. Your form transforms into pure ether for an instant as you let out a massive burst of energy. All creatures in a 60ft. radius must succeed a Charisma saving throw, or take 4d12 + MOVE damage of any type, and be stunned for one round. The type of damage is determined by you. This move does not benefit from STAB even if your type aligns with the type of damage dealt. On a successful save, they take half damage and are not stunned. This move costs VP equal to your current HP. After using this move, you drop to 1 hit point and are not able to use attack moves or be recalled until the end of your next turn. This move may be used once per long rest.",
@@ -6873,8 +6925,8 @@
       "reaction": false,
       "categories": [
         "positioning",
-        "self_status_condition_trapped",
-        "status_condition_trapped"
+        "self_status_condition_switch_locked",
+        "status_condition_switch_locked"
       ],
       "description": "You summon forth a mystical power that locks down the battlefield. Creatures within a 40 foot circle, centered on you, may not flee or be switched out on their next turn.",
       "moveStat": "None",
@@ -6883,7 +6935,7 @@
       "effects": [
         {
           "kind": "condition",
-          "apply": "trapped",
+          "apply": "switch_locked",
           "target": "self",
           "when": {
             "type": "always"
@@ -6896,11 +6948,11 @@
               "count": 1
             }
           ],
-          "note": "Blocks grid movement (this app's meaning of trapped) and switching out."
+          "noSwitch": true
         },
         {
           "kind": "condition",
-          "apply": "trapped",
+          "apply": "switch_locked",
           "when": {
             "type": "always"
           },
@@ -6912,7 +6964,7 @@
               "count": 1
             }
           ],
-          "note": "Blocks grid movement (this app's meaning of trapped) and switching out."
+          "noSwitch": true
         }
       ]
     },
@@ -8175,28 +8227,11 @@
       },
       "reaction": false,
       "categories": [
-        "trigger_saving_throw",
+        "unknown",
         "potential_status_condition_mind_captured",
         "self_status_condition_asleep"
       ],
-      "effects": [
-        {
-          "kind": "condition",
-          "apply": "mind_captured",
-          "when": {
-            "type": "save_fail"
-          },
-          "note": "you then fall asleep, entering the Dreamscape with your captives"
-        },
-        {
-          "kind": "condition",
-          "apply": "asleep",
-          "when": {
-            "type": "always"
-          },
-          "target": "self"
-        }
-      ],
+      "effects": [],
       "description": "You sing a hauntingly beautiful song that can be heard in a 5 mile radius. Affected creatures have to make a save against your move DC, their minds being captured by you on a failure. You then fall asleep, entering the Dreamscape with your captives.",
       "moveStat": "WIS/CHA",
       "vpCost": "30",
@@ -9385,6 +9420,20 @@
           "kind": "stat",
           "stat": "speed",
           "amount": 5,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "encounter"
+            }
+          ]
+        },
+        {
+          "kind": "condition",
+          "apply": "switch_locked",
+          "noSwitch": true,
           "when": {
             "type": "always"
           },
@@ -11651,11 +11700,30 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_environment"
+      ],
       "description": "The air around you becomes intensely hot for 5 rounds.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_environment",
+          "name": "Intense Heat",
+          "env": "hot",
+          "rounds": 5,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Supernova",
@@ -12751,11 +12819,30 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_environment"
+      ],
       "description": "You summon strong winds that cover the battlefield for 5 rounds.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_environment",
+          "name": "Strong Winds",
+          "env": "windy",
+          "rounds": 5,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Strafe",
@@ -13131,7 +13218,7 @@
         "potential_stat_debuff_wis",
         "potential_stat_debuff_int",
         "potential_stat_debuff_cha",
-        "potential_status_condition_trapped",
+        "potential_status_condition_switch_locked",
         "positioning"
       ],
       "description": "Your eyes open wide and fixate on one creature in range, casting a devastating curse. Make a ranged attack. On a hit, force the creature to attempt a WIS save against your move DC. On a failure, the creature gets -1 to AC, STR, DEX, CON, WIS, INT, and CHA, and they can't flee or be switched out for the rest of the encounter. The effect stacks for a maximum of 5 times. On a success, nothing happens.",
@@ -13260,7 +13347,7 @@
         },
         {
           "kind": "condition",
-          "apply": "trapped",
+          "apply": "switch_locked",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
@@ -13269,7 +13356,8 @@
             {
               "type": "encounter"
             }
-          ]
+          ],
+          "noSwitch": true
         }
       ]
     },
@@ -14204,7 +14292,7 @@
       "categories": [
         "damage",
         "positioning",
-        "status_condition_trapped"
+        "status_condition_switch_locked"
       ],
       "description": "You employ dark energy to stitch a creature’s shadow to the ground. Make a ranged attack, dealing 2d8 + MOVE ghost damage on a hit. On hit, the target is unable to flee or switch out while the user remains in battle.",
       "moveStat": "DEX/CHA",
@@ -14213,7 +14301,7 @@
       "effects": [
         {
           "kind": "condition",
-          "apply": "trapped",
+          "apply": "switch_locked",
           "when": {
             "type": "on_hit"
           },
@@ -14222,7 +14310,7 @@
               "type": "source_leaves"
             }
           ],
-          "note": "Blocks grid movement and switching out."
+          "noSwitch": true
         }
       ]
     },
@@ -16716,12 +16804,15 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "potential_status_condition_slowed"
+        "potential_stat_debuff_speed"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "slowed",
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
           "when": {
             "type": "save_fail",
             "ability": "DEX"
@@ -16732,8 +16823,7 @@
               "whose": "holder",
               "point": "end"
             }
-          ],
-          "note": "speed halved"
+          ]
         }
       ],
       "description": "You gather in the natural energy of the land around you and focus it into a sudden eruption of earth in a 40ft. radius, centered on a point within range. All grounded creatures caught in the blast must make a DEX save against your Move DC, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. Creatures that fail the save have their speed halved until the end of their next turn as the ground clings to them.",
@@ -17410,12 +17500,12 @@
         "recharge_locked",
         "multi_hit_aoe",
         "trigger_saving_throw",
-        "potential_status_condition_trapped"
+        "potential_status_condition_switch_locked"
       ],
       "effects": [
         {
           "kind": "condition",
-          "apply": "trapped",
+          "apply": "switch_locked",
           "when": {
             "type": "save_fail",
             "ability": "DEX"
@@ -17424,7 +17514,8 @@
             {
               "type": "source_leaves"
             }
-          ]
+          ],
+          "noSwitch": true
         }
       ],
       "description": "A wave of green energy courses through the battlefield in a 60 foot cone, centered on you. All creatures caught in the wave must make a DEX save against your Move DC, taking 3d10 + MOVE ground damage on a failure, or half as much on a success. Any creature that fails the saving throw cannot flee or be switched out as long as you remain in battle.",
@@ -17589,11 +17680,30 @@
         "varies": false
       },
       "reaction": false,
-      "categories": [],
+      "categories": [
+        "field_environment"
+      ],
       "description": "The air around you becomes freezing cold for 5 rounds.",
       "moveStat": "None",
       "vpCost": "15",
-      "scaling": ""
+      "scaling": "",
+      "effects": [
+        {
+          "kind": "set_environment",
+          "name": "Freezing Cold",
+          "env": "cold",
+          "rounds": 5,
+          "when": {
+            "type": "always"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
+        }
+      ]
     },
     {
       "name": "Cold Embrace",
@@ -18314,12 +18424,15 @@
       "categories": [
         "damage",
         "trigger_saving_throw",
-        "potential_status_condition_slowed"
+        "potential_stat_debuff_speed"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "slowed",
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
           "when": {
             "type": "save_fail",
             "ability": "CON"
@@ -18404,12 +18517,17 @@
         "field_terrain",
         "trigger_saving_throw",
         "conditional_damage",
-        "potential_status_condition_slowed"
+        "potential_stat_debuff_speed",
+        "damage_note",
+        "set_terrain"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "slowed",
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
           "when": {
             "type": "save_fail",
             "ability": "CON",
@@ -18422,7 +18540,41 @@
               "point": "end"
             }
           ],
-          "note": "temperate environments only; speed halved"
+          "env": [
+            "temperate"
+          ],
+          "note": "temperate environment"
+        },
+        {
+          "kind": "damage_note",
+          "condition": {
+            "type": "self_environment",
+            "any": [
+              "hot"
+            ]
+          },
+          "diceMultiplier": 2,
+          "note": "Hot environment: double the damage dice"
+        },
+        {
+          "kind": "set_terrain",
+          "name": "Frozen ground",
+          "description": "Difficult terrain: the moisture froze instantly.",
+          "radiusFt": 10,
+          "center": "point",
+          "difficult": true,
+          "env": [
+            "cold"
+          ],
+          "when": {
+            "type": "on_hit"
+          },
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ],
+          "target": "self"
         }
       ],
       "description": "You cause rapid evaporative cooling to happen around a single target in range. Make a ranged attack, dealing 2d8 + MOVE ice damage. On a hit, this move triggers different effects based on the temperature of the surrounding environment: - In hot environments: Double the dice for the damage roll. - In temperate environments: Target must succeed a Constitution saving throw or have their speed halved until the end of their next turn. - In cold environments: Creates a 10ft. radius of difficult terrain as moisture instantly freezes.",
@@ -21558,7 +21710,7 @@
       "categories": [
         "trigger_saving_throw",
         "positioning",
-        "potential_status_condition_trapped"
+        "potential_status_condition_switch_locked"
       ],
       "description": "You flash an intimidating look at a target, attempting to freeze them in fear. Force a target in range to make a WIS save against your Move DC. On a fail, the target cannot flee or be switched out for 3 rounds.",
       "moveStat": "STR/CHA",
@@ -21567,7 +21719,7 @@
       "effects": [
         {
           "kind": "condition",
-          "apply": "trapped",
+          "apply": "switch_locked",
           "when": {
             "type": "save_fail",
             "ability": "WIS"
@@ -21578,7 +21730,7 @@
               "n": 3
             }
           ],
-          "note": "Blocks grid movement and switching out."
+          "noSwitch": true
         }
       ]
     },
@@ -23249,25 +23401,48 @@
       },
       "reaction": false,
       "categories": [
-        "multi_hit_aoe",
-        "potential_status_condition_asleep",
-        "unknown"
+        "potential_status_condition_asleep"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "asleep",
+          "kind": "sleep_pool",
+          "diceTiers": [
+            [
+              1,
+              "5d8"
+            ],
+            [
+              5,
+              "7d8"
+            ],
+            [
+              10,
+              "6d12"
+            ],
+            [
+              17,
+              "11d8"
+            ]
+          ],
+          "addMove": true,
+          "radiusFt": 30,
           "when": {
-            "type": "special"
+            "type": "always"
           },
-          "note": "roll 5d8 + MOVE: that many total hit points of creatures within 30 ft fall asleep, lowest current HP first; a creature is affected only if its HP fits in the remaining total"
+          "target": "self",
+          "ends": [
+            {
+              "type": "instant"
+            }
+          ]
         }
       ],
       "description": "You sing a beautiful song in an attempt to put creatures to sleep. Roll 5d8 + MOVE; the total is how many hit points of creature this move can affect. Creatures within 30 feet of you are affected in ascending order of their current hit points. Starting with the creature that has the lowest current hit points, each creature affected by this move falls asleep. Subtract each creature’s hit points from the total before moving on to the creature with the next lowest hit points. A creature’s hit points must be equal to or less than the remaining total for that creature to be affected.",
       "moveStat": "CHA",
       "vpCost": "4",
       "scaling": "The number of hit points affected changes to 7d8 at level 5, 6d12 at level 10, and 11d8 at level 17.",
-      "soundBased": true
+      "soundBased": true,
+      "noCastDamage": true
     },
     {
       "name": "Sketch",
@@ -25056,12 +25231,15 @@
       "categories": [
         "trigger_saving_throw",
         "stat_debuff_enemy",
-        "potential_status_condition_slowed"
+        "potential_stat_debuff_speed"
       ],
       "effects": [
         {
-          "kind": "condition",
-          "apply": "slowed",
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
           "when": {
             "type": "save_fail",
             "ability": "DEX"
@@ -25077,7 +25255,7 @@
               "timing": "end_of_turn"
             }
           ],
-          "note": "speed halved; cannot take reactions; one action or bonus action per turn, not both"
+          "note": "cannot take reactions; one action or bonus action per turn, not both"
         }
       ],
       "description": "The targeted creature must succeed on a Dexterity saving throw. On a failed save, the target's speed is halved for 1 minute. In addition, the creature can't take reactions, and it can take either an action or a bonus action on its turn, not both. The creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
@@ -29352,7 +29530,7 @@
       "categories": [
         "trigger_saving_throw",
         "potential_status_condition_incapacitated",
-        "potential_status_condition_slowed",
+        "potential_stat_debuff_speed",
         "stat_debuff_enemy"
       ],
       "effects": [
@@ -29371,8 +29549,11 @@
           ]
         },
         {
-          "kind": "condition",
-          "apply": "slowed",
+          "kind": "stat",
+          "stat": "speed",
+          "amount": {
+            "multiplier": 0.5
+          },
           "when": {
             "type": "save_fail",
             "ability": "WIS"
@@ -29387,8 +29568,7 @@
               "ability": "WIS",
               "timing": "end_of_turn"
             }
-          ],
-          "note": "speed halved"
+          ]
         }
       ],
       "description": "The user releases a wave of disorienting psychic energy. Target creature must make a Wisdom saving throw or become incapacitated for 1 round and have its speed halved for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the speed reduction on a success.",

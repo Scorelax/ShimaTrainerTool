@@ -1073,6 +1073,20 @@ export class CombatAPI {
    * set-weather/set-terrain) -- empty name clears it. */
   /** `extra` is only passed by a weather MOVE: { rounds, sourceId, sourceName, casterLevel, concentration, cells }
    * (see routes_combat.py's _set_weather) -- `cells` limits it to those tiles, otherwise it covers the whole map. */
+  /** Chill / Superheat / Stormwind: the whole map's environment ('cold' | 'hot' | 'windy'); an empty name clears it. */
+  static async setEnvironment(name, kind = '', extra = {}) {
+    return API.request('combat', 'set-environment', { name, kind, ...extra }, { useCache: false });
+  }
+
+  /** Dragon Tail: the target's trainer must switch it out (their client opens the switch picker). */
+  static async requestForcedSwitch(id, moveName, sourceId) {
+    return API.request('combat', 'request-forced-switch', { id, moveName, sourceId }, { useCache: false });
+  }
+
+  static async clearForcedSwitch() {
+    return API.request('combat', 'clear-forced-switch', {}, { useCache: false });
+  }
+
   static async setWeather(name, effect, extra = {}) {
     const { cells, ...rest } = extra;
     return API.request('combat', 'set-weather', { name, effect, ...rest, ...(cells?.length ? { cells: JSON.stringify(cells) } : {}) }, { useCache: false });

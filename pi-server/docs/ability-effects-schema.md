@@ -38,9 +38,24 @@ Status 2026-10-09: all 348 abilities done -- 305 with effects, 43 `unknown`, 18 
     and the attacker's `hits` (filters melee / moveTypes / damaging / vulnerable / naturalRollMin); a `chance` die
     or a `save` is asked once per ability; the server's `ability-trigger` action (holder, ability, effect index,
     affected creature, rolled amount) checks the ability and applies retaliate / condition / stat / roll / heal.
-- Not yet (3b): would_faint, redirect, damaged reactions with a choice (Sturdy, Fur Coat, Void Shift...),
-  activated abilities, condition_gained, valueFrom (Color Change, Protean), Pressure; firstUseInEncounter, ally auras that change
-  dice or flat damage (Battery, Flower Gift, Victory Star), triggered effects (slice 3), reminders (slice 4).
+- Slice 3b:
+  - server: `would_faint` (Phantom Body: prevent_faint + heal + condition, per its limit), `condition_gained`
+    (Synchronize's valueFrom gained_condition back at the source, Defiant's roll; Shield Dust / Magic Bounce as a log
+    reminder); `ability-trigger` also takes damage_taken_mod (the softened share back as HP), vp_cost_mod, extra_action,
+    cure_condition, attack_bonus, and `activated` effects (`spend=1`: own turn only, spends `when.action`'s action /
+    bonus action once; anything it can't apply is logged). `reaction: true` spends the holder's reaction; `limit.per`
+    round/turn resets each round.
+  - client: damage reactions after a hit (`damaged` / `hit_by` / an ally's `ally_hit` within `radiusFt`, kind
+    damage_taken_mod with instant ends) -- the `chance` die, or "use it?" for optional / limited / reaction ones; one
+    per hit, and a refund that keeps the target up cancels its knocked_out triggers. `knocked_out` (Aftermath,
+    Innards Out), `targeted` with `drain` (Liquid Ooze) or direct (Pressure, on a single-target move's first hit),
+    `crit_dealt` (Hustle), `attack_missed` (Analytic), valueFrom hit_move_type (Color Change). Turn prompts: a
+    `chance` cure (Shed Skin, end of turn) and a dice heal (start of turn). The card's Actions row gets an ability
+    button for `activated` effects -- a `choice.option` picker (Transformer) and a dice heal roll (scaling by level).
+- Not yet: redirect (Lightning Rod, Storm Drain), crossesBelowFraction (Wimp Out, Emergency Exit), lasting
+  damage_taken_mod reactions (Water Compaction), enemy_attack_roll (Intimidate, Cute Charm), start_of_round,
+  creature_used_move (Dancer), area turn effects with saves, firstUseInEncounter, ally auras that change dice or flat
+  damage (Battery, Flower Gift, Victory Star) -- reminders (slice 4).
 
 `DnD_abilities.json` -- one entry per ability (built from the Pi's cached dex by
 `build_abilities_list.py`; the rebuild only refreshes `description` and `pokemon`, so

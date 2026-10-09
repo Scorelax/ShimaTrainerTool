@@ -32,6 +32,7 @@ import json
 import math
 import os
 import re
+import threading
 import uuid
 from datetime import datetime, timezone
 
@@ -159,7 +160,18 @@ _PVP_DEFAULT_GRID = {'cols': 11, 'rows': 13}
 _PVP_DEFAULT_BACKGROUND = 'battle-forest.png'
 
 
+# Requests run on a thread pool, and every action is load -> change -> save of the one session blob: two at once
+# (a move's VP update-stats and its log-event, say) would each save their own copy and the later one would quietly
+# undo the other. One action at a time -- they're all quick.
+_SESSION_LOCK = threading.Lock()
+
+
 def handle(conn, action, params):
+    with _SESSION_LOCK:
+        return _handle(conn, action, params)
+
+
+def _handle(conn, action, params):
     if action == 'get-state':
         return {'status': 'success', 'data': load_state(conn)}
 
@@ -514,7 +526,7 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id or ability')
         return _mutate(conn, lambda s: _ability_trigger(conn, s, params['id'], params['ability'], js_parse_int(params.get('index')),
                                                         params.get('targetId') or params['id'], js_parse_int(params.get('amount')),
-                                                        params.get('value')))
+                                                        params.get('value'), params.get('spend') == '1'))
 
     if action == 'type-preview':
         # Read-only: the type multiplier a hit WOULD get, for the damage-roll step (super-effective ability conditions).
@@ -2302,6 +2314,8 @@ def _apply_status(state, target_id, spec):
     _log_event(state, 'status-apply', text=f"{target['name']} {verb} {_status_label(new)}{from_text}",
                actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
     _mirror_magic_coat(state, target, target_id, source, source_id, spec, new)
+    if not existing and not spec.get('fromSynchronize'):
+        _ability_condition_gained(state, target_id, new, source_id)  # Synchronize, Defiant, Shield Dust...
 
 
 def _mirror_magic_coat(state, target, target_id, source, source_id, spec, new):
@@ -2647,7 +2661,7 @@ def _move_has_flag(move_name, flag):
 _SAVE_ABILITY_KEYS = {'str': 'str', 'dex': 'dex', 'con': 'con', 'int': 'int', 'wis': 'wis', 'cha': 'cha'}
 
 
-def _ability_use_ok(holder, ability, index, effect):
+def _ability_use_ok(state, holder, ability, index, effect):
     """False once the effect's per-battle use limit is spent; records a use otherwise."""
     limit = effect.get('limit') or {}
     uses = js_parse_int(limit.get('uses'))
@@ -2655,6 +2669,8 @@ def _ability_use_ok(holder, ability, index, effect):
         return True
     counts = holder.setdefault('abilityUses', {})
     key = f'{ability}:{index}'
+    if limit.get('per') in ('round', 'turn'):
+        key += f":r{state['round']}"  # Hustle's once per round starts over each round
     if counts.get(key, 0) >= uses:
         return False
     counts[key] = counts.get(key, 0) + 1
@@ -2699,7 +2715,7 @@ def _ability_auto(state, pid, event, **ctx):
             continue  # dice -- rolled at the table
         if (e.get('optional') and kind != 'extra_action') or e.get('chance') or e.get('save'):
             continue  # a choice or a roll -- not automatic (Moxie's "may take another action" just re-opens the action)
-        if not _ability_use_ok(holder, ab, i, e):
+        if not _ability_use_ok(state, holder, ab, i, e):
             continue
         if kind == 'heal' and not e.get('setTo') and (e.get('target') or 'self') == 'self':
             _ability_heal(state, holder, amount, ab, e.get('pool') if e.get('pool') in ('HP', 'VP') else 'HP')
@@ -2733,7 +2749,54 @@ def _ability_auto(state, pid, event, **ctx):
                 _remove_status(state, pid, s['id'], f'cured by {ab}')
 
 
-def _ability_trigger(conn, state, holder_id, ability, index, target_id, amount, value=None):
+def _ability_prevent_faint(state, pid):
+    """Phantom Body's `would_faint` effects: instead of fainting it reappears with the `heal` amount (its level) and
+    the condition (incorporeal until its next turn) -- once per battle (`limit`)."""
+    holder = state['participants'][pid]
+    effects = abilities.triggered(state, pid, 'would_faint')
+    stop = next(((ab, i, e) for ab, i, e in effects if e.get('kind') == 'prevent_faint'), None)
+    if not stop or not _ability_use_ok(state, holder, *stop):
+        return
+    ab = stop[0]
+    heal = next((e for _, _, e in effects if e.get('kind') == 'heal'), None)
+    holder['currentHP'] = max(1, abilities.resolve_amount(holder, (heal or {}).get('amount')) or 1)
+    for _, _, e in effects:
+        if e.get('kind') == 'condition':
+            _apply_status(state, pid, {'kind': 'condition', 'apply': e.get('apply'), 'sourceId': pid, 'moveName': ab, 'ends': e.get('ends') or []})
+    _log_event(state, 'ability', text=f"{holder['name']}'s {ab}: instead of fainting it phases out, and comes back with {holder['currentHP']} HP",
+               actorId=pid, actorName=holder['name'])
+
+
+def _ability_condition_gained(state, target_id, new, source_id):
+    """A condition just landed on `target_id`: Synchronize hands burn/paralysis/poison straight back to whoever caused
+    it, Defiant gets advantage on its next attack when a move did it. Shield Dust / Magic Bounce are a choice -- a
+    reminder in the log."""
+    if new.get('kind') != 'condition' or not source_id or source_id == target_id:
+        return
+    holder = state['participants'].get(target_id)
+    for ab, _, e in abilities.triggered(state, target_id, 'condition_gained'):
+        wanted = (e.get('when') or {}).get('conditions')
+        if wanted and new.get('apply') not in wanted:
+            continue
+        if (e.get('when') or {}).get('negative') and new.get('apply') not in abilities.NEGATIVE_CONDITIONS:
+            continue
+        kind = e.get('kind')
+        if kind == 'condition' and e.get('valueFrom') == 'gained_condition':
+            try:
+                _apply_status(state, source_id, {'kind': 'condition', 'apply': new.get('apply'), 'sourceId': target_id,
+                                                  'moveName': ab, 'ends': new.get('ends') or [], 'fromSynchronize': True})
+            except ValueError as err:
+                _log_event(state, 'ability', text=f"{holder['name']}'s {ab}: {err}", actorId=target_id, actorName=holder['name'])
+        elif kind == 'roll':
+            _apply_status(state, target_id, {'kind': 'roll', 'roll': e.get('roll'), 'on': e.get('on'), 'sourceId': target_id,
+                                              'moveName': ab, 'ends': e.get('ends') or []})
+        elif kind in ('negate_condition', 'reflect_condition'):
+            _log_event(state, 'ability', text=f"{holder['name']} has {ab} -- it may {'ignore' if kind == 'negate_condition' else 'bounce back'}"
+                                              f" this {new.get('apply')} (once per long rest): remove it from its badge if so",
+                       actorId=target_id, actorName=holder['name'])
+
+
+def _ability_trigger(conn, state, holder_id, ability, index, target_id, amount, value_text=None, spend=False):
     """A client-detected trigger (being hit, hitting): validates that `holder_id` has `ability` with an effect at `index`
     of a kind this can apply, then applies it -- damage to `target_id` (Rough Skin), a condition or stat or roll mode on
     it (Flame Body, Gooey, Justified), or a heal for the holder (Hematophage). `amount` is the rolled number when the
@@ -2746,28 +2809,82 @@ def _ability_trigger(conn, state, holder_id, ability, index, target_id, amount, 
     if not entry:
         raise ValueError(f"{holder['name']} doesn't have that ability effect")
     ab, i, e = entry
-    if not _ability_use_ok(holder, ab, i, e):
+    if not _ability_use_ok(state, holder, ab, i, e):
         raise ValueError(f"{holder['name']}'s {ab} has no uses left this battle")
     kind = e.get('kind')
     fixed = abilities.resolve_amount(holder, e.get('amount'))
     value = fixed if fixed is not None else amount
     spec_base = {'sourceId': holder_id, 'moveName': ab, 'ends': e.get('ends') or []}
+    when = (e.get('when') or {})
+    if when.get('type') == 'activated' and spend:
+        # An ability used on its own turn: it costs the action / bonus action its `when.action` names.
+        if holder_id != _active_participant_id(state):
+            raise ValueError(f"{holder['name']} can only use {ab} on its own turn")
+        cost = str(when.get('action') or '')
+        if 'bonus' in cost:
+            if holder.get('bonusActionUsed'):
+                raise ValueError(f"{holder['name']} has already used their bonus action this round")
+            holder['bonusActionUsed'] = True
+        elif 'action' in cost:
+            if holder.get('actionUsed'):
+                raise ValueError(f"{holder['name']} has already used their action this turn")
+            holder['actionUsed'] = True
+        _log_event(state, 'ability', text=f"{holder['name']} uses {ab}", actorId=holder_id, actorName=holder['name'])
+    if e.get('reaction'):
+        if holder.get('reactionUsed'):
+            raise ValueError(f"{holder['name']} has already used their reaction")
+        holder['reactionUsed'] = True
+    if kind == 'damage_taken_mod':
+        # A reaction to a hit that already landed (Sturdy, Fur Coat, Void Shift, Chronoshift, Friend Guard): the part
+        # of it the ability takes away comes back as HP -- the client works out how much (`amount`).
+        if value and value > 0:
+            gained = max(0, min((target.get('maxHP') or 0) - target['currentHP'], value))
+            target['currentHP'] += gained
+            _log_event(state, 'heal', text=f"{holder['name']}'s {ab} softens the hit -- {target['name']} gets {gained} HP back",
+                       actorId=holder_id, actorName=holder['name'], targetId=target_id, targetName=target['name'], amount=gained)
+        return
+    if kind == 'vp_cost_mod':
+        # Pressure: whoever targets the holder pays the move's VP again.
+        if value and value > 0:
+            target['currentVP'] = max(0, (target.get('currentVP') or 0) - value)
+            _log_event(state, 'ability', text=f"{holder['name']}'s {ab}: {target['name']} pays {value} extra VP",
+                       actorId=holder_id, actorName=holder['name'], targetId=target_id, targetName=target['name'])
+        return
+    if kind == 'extra_action':
+        target['actionUsed'] = False
+        _log_event(state, 'ability', text=f"{holder['name']}'s {ab}: {target['name']} may take another action", actorId=holder_id, actorName=holder['name'])
+        return
+    if kind == 'cure_condition':
+        for s in [s for s in _statuses_of(target) if s.get('kind') == 'condition' and (
+                s.get('apply') in (e.get('conditions') or []) or (e.get('negativeConditions') and s.get('apply') in abilities.NEGATIVE_CONDITIONS))]:
+            _remove_status(state, target_id, s['id'], f'cured by {ab}')
+        return
     if kind in ('retaliate', 'deal_damage'):
         if not value or value <= 0:
             return
         _apply_damage_to_target(conn, state, holder_id, target_id, value, e.get('damageType') or '', ab, turn_check=False)
     elif kind == 'condition':
-        # Cursed Body's move_disabled names the move that just hit -- the client sends it as `value`.
-        cond_value = value if value and e.get('apply') == 'move_disabled' else e.get('value')
+        # Cursed Body's move_disabled names the move that just hit, Color Change's type_changed the type that hit it --
+        # the client sends either as `value` (`valueFrom` in the data).
+        cond_value = value_text if value_text and (e.get('apply') == 'move_disabled' or e.get('valueFrom')) else e.get('value')
         _apply_status(state, target_id, {**spec_base, 'kind': 'condition', 'apply': e.get('apply'),
                                          **({'value': cond_value} if cond_value is not None else {})})
     elif kind == 'stat':
         _ability_stat(state, holder_id, target_id, ab, e)
     elif kind == 'roll':
         _apply_status(state, target_id, {**spec_base, 'kind': 'roll', 'roll': e.get('roll'), 'on': e.get('on')})
+    elif kind == 'attack_bonus':
+        # Transformer's Attack form: +N to its attack rolls, as the usual attack-roll stat status.
+        _apply_status(state, target_id, {**spec_base, 'kind': 'stat', 'stat': 'attack_rolls',
+                                         'amount': abilities.resolve_amount(holder, e.get('amount')) or 0})
     elif kind == 'heal':
         if value and value > 0:
-            _ability_heal(state, holder, value, ab, e.get('pool') if e.get('pool') in ('HP', 'VP') else 'HP')
+            _ability_heal(state, target if e.get('target') in ('chosen', 'allies', 'ally') else holder, value, ab,
+                          e.get('pool') if e.get('pool') in ('HP', 'VP') else 'HP')
+    elif when.get('type') == 'activated':
+        # Anything else an activated ability does is the table's to play out -- the use (and its cost) is logged above.
+        if e.get('note'):
+            _log_event(state, 'ability', text=f"{ab}: {e['note']}", actorId=holder_id, actorName=holder['name'])
     else:
         raise ValueError(f"{ab}'s {kind} effect isn't triggered this way")
 
@@ -2869,6 +2986,8 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         # False Swipe: "if this attack would normally cause a creature to faint, it is reduced to 1HP instead".
         target['currentHP'] = 1
         spared = True
+    if hp_before > 0 and target['currentHP'] <= 0:
+        _ability_prevent_faint(state, target_id)  # Phantom Body
     _note_faint(target, hp_before)
     if hp_before > 0 and target['currentHP'] <= 0:
         # A knockout: the attacker's ko_dealt (Beast Boost, Moxie) and the fallen one's allies' ally_fainted (Soul-Heart).

@@ -19,7 +19,7 @@ import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
 import { lineFtFromRange } from '../utils/line-area.js';
-import { setAbilitySession, abilityTriggers } from '../utils/ability-mods.js';
+import { setAbilitySession, abilityTriggers, activatedAbilityEffects } from '../utils/ability-mods.js';
 import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { playBattleAnimationFloating } from '../utils/move-popup.js';
@@ -2485,6 +2485,7 @@ function _attachMainFocusListeners(state) {
     _promptTurnSaves(endingId, 'end_of_turn')
       .then(() => _promptTurnHeals(endingId, 'end_of_turn'))
       .then(() => _promptSleepCheck(endingId))
+      .then(() => _promptAbilityTurn(endingId, 'end_of_turn')) // Shed Skin
       .then(() => CombatAPI.advanceTurn())
       .then(() => { if (nextId && nextId !== endingId && !endingHasIngrain) _setFocus(nextId); })
       .catch((err) => {
@@ -2920,7 +2921,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // ...) -- see move-effects-schema.md and target-picker.js's own use of these.
   const damageNotes = _targetDamageNotes(moveName);
   const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
-  let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked);
+  let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { direct: true });
 
   const isSameTarget = categories.includes('multi_hit_same_target');
   const isChoice = categories.includes('multi_hit_choice');
@@ -5152,11 +5153,14 @@ async function _handleGroundTarget({ casterId, targetId, effect, moveName }) {
   }
 }
 
-async function _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier = 1 } = {}) {
+async function _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier = 1, direct = false } = {}) {
   if (picked) damageMultiplier *= _stateDamageMultiplier(moveName, picked.targetId);
   if (!picked) return null; // "no target" / closed -- move's own cost still applied, nothing more to do
   if (picked.blocked) return null; // a reactor's block_attack effect (Protect, ...) ended this attack entirely -- routes_combat.py's own block-pending-attack already logged it (reaction-block), nothing left to do
+  // Pressure: targeting it directly (the first hit of a single-target move, hit or miss) costs the move's VP again.
+  if (direct) await _abilityTargetedTriggers(combatantId, picked.targetId, move);
   if (!picked.hit) {
+    await _abilityEventTriggers(combatantId, 'attack_missed', picked.targetId); // Analytic
     // Miss -- VP already spent when the move was confirmed, nothing else to
     // do mechanically, but it still belongs in the shared log (a Miss never
     // reaches the server otherwise -- apply-damage is only ever called on a
@@ -5216,6 +5220,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   if (laserFocusId) crit = true;
 
   let damageDealt, targetFainted, rawDamageDealt, lastTypeMultiplier = null;
+  const hpBefore = session?.participants?.[targetId]?.currentHP; // Sturdy: was the hit at least half its HP?
   try {
     // No "N damage applied" popup -- it's already in the shared battle log
     // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
@@ -5242,7 +5247,8 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // resolved.
   await waitForDamagedReactions(targetId, combatantId, moveName);
   await _maybeMeleeRetaliate(combatantId, targetId, moveName);
-  await _abilityHitTriggers({ attackerId: combatantId, targetId, moveName, move, attackRoll, damageDealt, typeMultiplier: lastTypeMultiplier });
+  await _abilityHitTriggers({ attackerId: combatantId, targetId, moveName, move, attackRoll, damageDealt, typeMultiplier: lastTypeMultiplier,
+    hpBefore, crit: !!crit, targetFainted: !!targetFainted, drain: categories.includes('drain') });
 
   // Some moves land a hit AND separately make the hit creature save against
   // a secondary consequence (e.g. Temporal Fang: damage on the attack roll,
@@ -5867,11 +5873,13 @@ async function _maybePromptStartOfTurnSaves(state) {
   sessionStorage.setItem(WIP_SAVE_PROMPT_KEY, key);
   const hasParalyzed = (p.statuses || []).some(s => s.kind === 'condition' && s.apply === 'paralyzed');
   const hasConfused = (p.statuses || []).some(s => s.kind === 'condition' && s.apply === 'confused');
-  if (!pendingTurnSaves(p, 'start_of_turn').length && !pendingTurnHeals(p, 'start_of_turn').length && !hasParalyzed && !hasConfused) return;
+  if (!pendingTurnSaves(p, 'start_of_turn').length && !pendingTurnHeals(p, 'start_of_turn').length && !hasParalyzed && !hasConfused
+    && !_abilityTurnPrompts(p, 'start_of_turn').length) return;
   _promptingSaves = true;
   try {
     await _promptTurnSaves(activeId, 'start_of_turn');
     await _promptTurnHeals(activeId, 'start_of_turn');
+    await _promptAbilityTurn(activeId, 'start_of_turn'); // Hydra's Resilience
     // Paralysis is checked first and, on a failed roll, suppresses the
     // confusion check entirely for this turn -- see _promptParalysisCheck's
     // own docstring for the rulebook's explicit ordering.
@@ -5940,29 +5948,170 @@ async function _openLocalStatusDetail(c, se, remove) {
   if (await showStatusDetail(c.name, status, session?.round) === 'remove') remove();
 }
 
-// The kinds the server's ability-trigger applies (routes_combat.py's _ability_trigger); other triggered kinds are slice 3b.
-const _TRIGGER_KINDS = new Set(['retaliate', 'condition', 'stat', 'roll', 'heal']);
+// The kinds the server's ability-trigger applies straight away (routes_combat.py's _ability_trigger). damage_taken_mod
+// (a hit softened after it landed) has its own flow -- _abilityDamageReactions.
+const _TRIGGER_KINDS = new Set(['retaliate', 'condition', 'stat', 'roll', 'heal', 'extra_action']);
+
+/** Ability effects for one simple event with nothing to roll: Analytic (attack_missed -> advantage next time). */
+async function _abilityEventTriggers(holderId, trigger, otherId) {
+  const holder = session?.participants?.[holderId];
+  if (!holder) return;
+  for (const { ability, index, effect: e } of abilityTriggers(holder, trigger, {}, session?.participants?.[otherId])) {
+    if (!_TRIGGER_KINDS.has(e.kind)) continue;
+    await CombatAPI.abilityTrigger(holderId, ability, index, holderId).catch(err => showCombatAlert(err.message, { title: ability }));
+  }
+}
+
+/** The card's Ability button: an ability used on its own turn (Healing Rain, Forest Blessing, Between Worlds,
+ * Transformer...). Shows its text, asks for a form when it has several (Transformer), a dice heal's roll; the server
+ * spends the action / bonus action it costs (once) and applies what it can -- anything else is logged for the table. */
+async function _useActivatedAbility(participantId) {
+  const p = session?.participants?.[participantId];
+  if (!p) return;
+  let effects = activatedAbilityEffects(p);
+  if (!effects.length) return;
+  const ability = effects[0].ability;
+  const desc = parseAbilityList(effectiveAbilities(p) || '').find(a => a.name === ability)?.desc || '';
+  const options = [...new Set(effects.map(t => t.effect.choice?.option).filter(Boolean))];
+  if (options.length) {
+    const pick = await pickOneMoveName(options, { title: ability, message: desc });
+    if (!pick) return;
+    effects = effects.filter(t => !t.effect.choice || t.effect.choice.option === pick);
+  } else if (!(await showCombatConfirm(desc || `Use ${ability}?`, { title: ability, yesLabel: `Use ${ability}`, noLabel: 'Cancel' }))) {
+    return;
+  }
+  let spend = true;
+  for (const { index, effect: e } of effects) {
+    let amount = null;
+    if (e.kind === 'heal' && e.amount?.dice) {
+      // "2d4 + WIS", scaling with level ({ "5": "2d6", ... })
+      let dice = e.amount.dice;
+      for (const [lvl, d] of Object.entries(e.scaling || {})) if (typeof d === 'string' && (Number(p.level) || 0) >= Number(lvl)) dice = d;
+      const plus = e.amount.plus ? Number(p[`${String(e.amount.plus).toLowerCase()}Mod`]) || 0 : 0;
+      amount = await promptHealRoll({ dice, moveModBonus: plus, targetName: p.name, moveName: ability, bonusSource: e.amount.plus || 'MOVE' });
+      if (amount == null) return;
+    }
+    try {
+      await CombatAPI.abilityTrigger(participantId, ability, index, participantId, amount, null, spend);
+      spend = false;
+    } catch (err) {
+      showCombatAlert(err.message, { title: ability });
+      return;
+    }
+  }
+}
+
+/** The creature's own start/end-of-turn ability effects that need a die: Shed Skin's d4 cure, a dice heal (Hydra's
+ * Resilience's 1d4 × level). The fixed ones (Rain Dish, Psychic Barrier...) the server already applied itself. */
+function _abilityTurnPrompts(p, trigger) {
+  return abilityTriggers(p, trigger, {}).filter(({ effect: e }) =>
+    (e.kind === 'cure_condition' && e.chance) || (e.kind === 'heal' && e.amount?.dice && (e.target || 'self') === 'self'));
+}
+
+async function _promptAbilityTurn(pid, trigger) {
+  const p = session?.participants?.[pid];
+  if (!p) return;
+  for (const { ability, index, effect: e } of _abilityTurnPrompts(p, trigger)) {
+    let amount = null;
+    if (e.chance) {
+      const rolled = await promptValueRoll({ dice: `1${e.chance.die}`, moveName: ability,
+        description: `${p.name}'s ${ability} -- roll a ${e.chance.die}: it works on ${e.chance.min}${e.chance.min < Number(String(e.chance.die).slice(1)) ? '+' : ''}.` });
+      if (rolled == null || rolled < e.chance.min) continue;
+    }
+    if (e.kind === 'heal') {
+      const rolled = await promptHealRoll({ dice: e.amount.dice, targetName: p.name, moveName: ability });
+      if (rolled == null) continue; // closing it skips it (Hydra's Resilience "may")
+      amount = rolled * (e.amount.timesLevel ? Number(p.level) || 1 : 1);
+    }
+    await CombatAPI.abilityTrigger(pid, ability, index, pid, amount).catch(err => showCombatAlert(err.message, { title: ability }));
+  }
+}
+
+/** Pressure: targeting its holder with a single-target move costs the attacker that move's VP again. */
+async function _abilityTargetedTriggers(attackerId, targetId, move) {
+  const target = session?.participants?.[targetId];
+  if (!target || targetId === attackerId) return;
+  const cost = parseInt(move?.[4], 10) || 0;
+  for (const { ability, index, effect: e } of abilityTriggers(target, 'targeted', { direct: true })) {
+    if (e.kind !== 'vp_cost_mod' || !cost) continue;
+    await CombatAPI.abilityTrigger(targetId, ability, index, attackerId, Math.round(cost * ((e.multiplier || 2) - 1)))
+      .catch(err => showCombatAlert(err.message, { title: ability }));
+  }
+}
+
+/** A hit that already landed, softened by an ability (Sturdy, Fur Coat, Void Shift, Chronoshift -- the target's own --
+ * and an ally's Friend Guard within range): its die, or a "use it?" for an optional / once-per-rest / reaction one, is
+ * asked here; the share it takes away comes back as HP (the server's ability-trigger, kind damage_taken_mod). */
+async function _abilityDamageReactions({ attacker, target, event, damageDealt }) {
+  if (!(damageDealt > 0)) return;
+  const candidates = [
+    ...abilityTriggers(target, 'damaged', event, attacker).map(t => ({ ...t, holder: target })),
+    ...abilityTriggers(target, 'hit_by', event, attacker).map(t => ({ ...t, holder: target })),
+  ];
+  for (const p of Object.values(session?.participants || {})) {
+    if (p.id === target.id || p.status !== 'participating' || (p.owner || '') !== (target.owner || '') || (p.side || '') !== (target.side || '')) continue;
+    const a = session.board?.tokens?.[p.id], b = session.board?.tokens?.[target.id];
+    const ft = a && b ? Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row)) * 5 : null;
+    abilityTriggers(p, 'ally_hit', event, attacker).forEach(t => {
+      if (t.effect.radiusFt == null || (ft != null && ft <= t.effect.radiusFt)) candidates.push({ ...t, holder: p });
+    });
+  }
+  for (const { ability, index, effect: e, holder } of candidates) {
+    if (e.kind !== 'damage_taken_mod' || e.ends?.length && e.ends[0].type !== 'instant') continue; // Water Compaction lasts -- a reminder
+    if (e.reaction && holder.reactionUsed) continue;
+    const refund = Math.floor(damageDealt * (1 - (e.multiplier ?? 1)));
+    if (!(refund > 0)) continue;
+    if (e.chance) {
+      const rolled = await promptValueRoll({
+        dice: `1${e.chance.die}`, moveName: ability,
+        description: `${holder.name}'s ${ability} -- roll a ${e.chance.die}: on ${e.chance.min}+ it ${e.multiplier === 0 ? 'avoids the hit' : 'halves the hit'} (${refund} HP back).`,
+      });
+      if (rolled == null || rolled < e.chance.min) continue;
+    } else if (e.optional || e.limit || e.reaction) {
+      const uses = e.limit ? ` (${e.limit.uses}× per ${String(e.limit.per).replace('_', ' ')})` : '';
+      const ok = await showCombatConfirm(
+        `Use ${holder.name}'s ${ability}${uses}${e.reaction ? ', spending its reaction' : ''}? ${target.name} gets ${refund} HP of this ${damageDealt}-damage hit back.`,
+        { title: ability, yesLabel: `Use ${ability}`, noLabel: 'Not now' },
+      );
+      if (!ok) continue;
+    }
+    try {
+      await CombatAPI.abilityTrigger(holder.id, ability, index, target.id, refund);
+      return refund; // one softening per hit
+    } catch (err) {
+      showCombatAlert(err.message, { title: ability });
+    }
+  }
+  return 0;
+}
 
 /** Abilities that fire on a landed hit (ability engine slice 3a): the target's hit_by / damaged effects (Rough Skin,
  * Static, Flame Body, Stench, Gooey, Cursed Body, Justified, Rattled, Motor Drive, Weak Armor, Stamina...) and the
  * attacker's `hits` effects (Poison Touch, Maritime Prowler, Hematophage). A die ("roll a d4, on a 4") or the affected
  * creature's save is asked here -- once per ability, so Static Wool's one save covers both its effects -- and each
  * effect that goes through is applied by the server (ability-trigger), which checks the ability is really there. */
-async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attackRoll, damageDealt, typeMultiplier }) {
+async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attackRoll, damageDealt, typeMultiplier,
+  hpBefore = null, crit = false, targetFainted = false, drain = false }) {
   const attacker = session?.participants?.[attackerId];
   const target = session?.participants?.[targetId];
   if (!attacker || !target || attackerId === targetId) return;
   const row = findMoveRow(moveName) || move || [];
   const event = {
     melee: isMeleeMoveRow(row), moveType: (move && move[1]) || row[1] || '', damaging: (damageDealt ?? 0) > 0,
-    vulnerable: (typeMultiplier ?? 1) > 1, attackRoll,
+    vulnerable: (typeMultiplier ?? 1) > 1, attackRoll, hpBefore, damageDealt, drain,
   };
+  // First the target's chance to soften the hit (Sturdy, Fur Coat...) -- it can turn a knockout into a survival.
+  const refunded = await _abilityDamageReactions({ attacker, target, event, damageDealt }) || 0;
+  const fainted = targetFainted && (hpBefore ?? 0) - (damageDealt ?? 0) + refunded <= 0;
   const fired = [
     ...abilityTriggers(target, 'hit_by', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),
     ...abilityTriggers(target, 'damaged', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),
+    ...abilityTriggers(target, 'targeted', event, attacker).map(t => ({ ...t, holder: target, other: attacker })), // Liquid Ooze (drain)
+    ...(fainted ? abilityTriggers(target, 'knocked_out', event, attacker).map(t => ({ ...t, holder: target, other: attacker })) : []), // Aftermath, Innards Out
     ...abilityTriggers(attacker, 'hits', event, target).map(t => ({ ...t, holder: attacker, other: target })),
+    ...(crit ? abilityTriggers(attacker, 'crit_dealt', event, target).map(t => ({ ...t, holder: attacker, other: target })) : []), // Hustle
   ].filter(t => _TRIGGER_KINDS.has(t.effect.kind) && !t.effect.reaction
-    && !t.effect.valueFrom                                 // Color Change's "the type that hit it" -- slice 3b
+    && (!t.effect.valueFrom || t.effect.valueFrom === 'hit_move_type') // Color Change gets the move's type below
     && !(t.effect.save && t.effect.save.dc == null));      // a save with no DC yet (Frigid Aura -- asked of Benjakronk)
   const decided = new Map(); // ability -> did its die / save let it through (asked once)
   for (const { ability, index, effect: e, holder, other } of fired) {
@@ -6000,8 +6149,9 @@ async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attac
       amount = Math.floor((damageDealt || 0) * (a.fractionOfDamage ?? a.fractionOfDamageDealt));
     }
     try {
-      // Cursed Body: the move to disable is the one that just hit.
-      const value = e.kind === 'condition' && e.apply === 'move_disabled' ? moveName : null;
+      // Cursed Body: the move to disable is the one that just hit; Color Change: the type that hit it.
+      const value = e.kind === 'condition' && e.apply === 'move_disabled' ? moveName
+        : e.valueFrom === 'hit_move_type' ? event.moveType : null;
       await CombatAPI.abilityTrigger(holder.id, ability, index, affected.id, amount, value);
     } catch (err) {
       // An immunity (Limber vs Static's paralysis...) or a spent use is just reported.
@@ -6088,6 +6238,7 @@ async function _rapidOrders(trainer, pokemon, closePopup) {
 
 /** combat.js's setOnBasicAction hook -- Disengage: spend the action, then straight onto the map to move. */
 async function _onBasicAction(action, participantId) {
+  if (action === 'ability') return _useActivatedAbility(participantId);
   if (action !== 'disengage') return;
   const p = session?.participants?.[participantId];
   if (!p) return;

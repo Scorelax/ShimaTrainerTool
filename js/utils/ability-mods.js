@@ -59,6 +59,12 @@ export function abilityEffectsOf(p) {
   return out;
 }
 
+/** Effects the creature uses on its own turn (`when.type` 'activated': Healing Rain, Between Worlds, Transformer...),
+ * gates checked -- the card's Ability button lists these. */
+export function activatedAbilityEffects(p) {
+  return abilityEffectsOf(p).filter(({ effect: e }) => e.when?.type === 'activated' && _gatesHold(p, e, null));
+}
+
 /** The creature's effects for one trigger (`when.type`: hit_by, damaged, hits...) whose gates hold, with the trigger's
  * own filters checked against `event` = { melee, moveTypes: [the move's type], damaging, vulnerable, attackRoll }. */
 export function abilityTriggers(p, trigger, event = {}, target = null) {
@@ -71,7 +77,11 @@ export function abilityTriggers(p, trigger, event = {}, target = null) {
     if (w.vulnerable && !event.vulnerable) return false;
     if (w.moveTypes && !w.moveTypes.map(t => t.toLowerCase()).includes(String(event.moveType || '').toLowerCase())) return false;
     if (w.naturalRollMin != null && !((event.attackRoll ?? 0) >= w.naturalRollMin)) return false;
-    if (w.minFractionOfCurrentHP != null || w.crossesBelowFraction != null || w.includeSelf != null) return false; // slice 3b
+    if (w.drain && !event.drain) return false;
+    if (w.direct && !event.direct) return false;
+    // Sturdy: a hit of at least that share of its HP before the hit.
+    if (w.minFractionOfCurrentHP != null && !((event.damageDealt ?? 0) >= w.minFractionOfCurrentHP * (event.hpBefore ?? Infinity))) return false;
+    if (w.crossesBelowFraction != null || w.includeSelf != null) return false; // Wimp Out, redirection -- reminders (slice 4)
     return _gatesHold(p, e, target);
   });
 }

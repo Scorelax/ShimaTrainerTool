@@ -1033,9 +1033,10 @@ export class CombatAPI {
 
   /** An ability effect the client detected (being hit, hitting): the server checks `holderId` has it and applies it
    * (routes_combat.py's _ability_trigger). `amount` = the rolled number when the effect has dice. */
-  static async abilityTrigger(holderId, ability, index, targetId, amount = null, value = null) {
+  static async abilityTrigger(holderId, ability, index, targetId, amount = null, value = null, spend = false) {
     return API.request('combat', 'ability-trigger', {
       id: holderId, ability, index, targetId, ...(amount != null ? { amount } : {}), ...(value != null ? { value } : {}),
+      ...(spend ? { spend: 1 } : {}), // an activated ability: spend its action / bonus action (once per use)
     }, { useCache: false });
   }
 

@@ -7,7 +7,7 @@ import { showMovePopup, playBattleAnimationFloating } from '../utils/move-popup.
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
 import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, selfRequirementUnmet, zoneRuleActive, isMeleeMoveRow } from '../utils/move-effects.js';
-import { setAbilityData, moveAbilityMods } from '../utils/ability-mods.js';
+import { setAbilityData, moveAbilityMods, activatedAbilityEffects } from '../utils/ability-mods.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
@@ -1341,6 +1341,12 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
           title="Use your action to move away without provoking opportunity attacks or reactions">🏃 Disengage</button>
         ${c.type === 'trainer' ? `<button class="combat-basic-action-btn" data-action="attack" data-combatant-id="${c.id}" ${actionLocked ? 'disabled' : ''}
           title="Melee attack: 1d6 + STR">⚔️ Attack</button>` : ''}
+        ${(() => {
+          // An ability the creature uses on its own turn (Healing Rain, Between Worlds...) -- ability-mods.js.
+          const used = activatedAbilityEffects(c);
+          return used.length ? `<button class="combat-basic-action-btn" data-action="ability" data-combatant-id="${c.id}" ${isActive ? '' : 'disabled'}
+            title="Use ${used[0].ability}">✨ ${used[0].ability}</button>` : '';
+        })()}
       </div>
     </div>` : '';
 

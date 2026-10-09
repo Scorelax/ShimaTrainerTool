@@ -15,36 +15,46 @@
 // check" has nowhere to hook into and stays in `note` as advisory text
 // instead, same trust-the-human treatment this app already gives Charmed's
 // targeting restriction or a `damage_note`'s reminder.
+// `summary` is the plain-language rule text the status popup shows players (status-popup.js); `note` stays the
+// implementation-facing detail (what is and isn't auto-enforced).
 export const CONDITION_RULES = {
   blinded: {
+    summary: "Can't see. Its attack rolls have disadvantage and attacks against it have advantage. It automatically fails any check that needs sight.",
     disadvantageOn: ['attack_rolls'],
     advantageOn: ['attacks_against'],
     note: "Can't see — auto-fails any ability check that requires sight (advisory only: this app has no ability-check roll to auto-fail).",
   },
   invisible: {
+    summary: "Can't be seen without magic or a special sense. Its attack rolls have advantage and attacks against it have disadvantage. Noise and tracks can still give it away.",
     advantageOn: ['attack_rolls'],
     disadvantageOn: ['attacks_against'],
     note: 'Impossible to see without magic or a special sense; heavily obscured for hiding. Detectable by any noise it makes or tracks it leaves.',
   },
   deafened: {
+    summary: "Can't hear, and automatically fails any check that needs hearing.",
     note: "Can't hear — auto-fails any ability check that requires hearing (advisory only: this app has no ability-check roll to auto-fail).",
   },
   flinched: {
+    summary: "Disadvantage on attack rolls, saving throws and skill checks. If it uses a move that forces a save before this ends, the target has advantage on that save.",
     disadvantageOn: ['attack_rolls', 'saving_throws'],
     note: 'Also disadvantage on skill checks (advisory only, no skill-check roll exists in this app). If it activates a move that requires a saving throw before this ends, the target has advantage on that save (advisory only).',
   },
   frightened: {
+    summary: "Disadvantage on attack rolls and ability checks while the source of its fear is in sight, and it can't willingly move closer to it.",
     disadvantageOn: ['attack_rolls'],
     note: "Also disadvantage on ability checks (advisory only), and only while the fear source is within line of sight; can't willingly move closer to it (not enforced — no line-of-sight tracking exists in this app).",
   },
   charmed: {
+    summary: "Can't attack the charmer or target it with harmful moves or effects. The charmer has advantage on social checks against it.",
     note: "Can't attack the charmer or target them with harmful abilities/effects (not enforced — no move-targeting restriction exists in this app). The charmer has advantage on ability checks to interact with it socially.",
   },
   grappled: {
+    summary: "Speed becomes 0 and can't be increased. Ends if the grappler is incapacitated or it is moved out of the grappler's reach.",
     speedMultiplier: 0,
     note: "Speed becomes 0 and can't benefit from any bonus to speed. Ends if the grappler is incapacitated, or if an effect removes this creature from the grappler's reach (e.g. hurled away by Thunder Wave) — neither is auto-detected, remove the status by hand when it applies.",
   },
   restrained: {
+    summary: "Speed becomes 0. Disadvantage on attack rolls and DEX saves, and attacks against it have advantage.",
     // Restrained's own "disadvantage on DEX saves" is narrower than a plain
     // saving_throws entry (see _entryMatches in move-effects.js) -- every
     // OTHER ability's save is unaffected, only DEX.
@@ -61,19 +71,23 @@ export const CONDITION_RULES = {
   // themselves -- an auto-fail isn't a roll MODIFIER, it overrides the
   // outcome regardless of what's rolled.
   incapacitated: {
+    summary: "Can't take actions or reactions.",
     note: "Can't take actions or reactions.",
   },
   stunned: {
+    summary: "Incapacitated, can't move and can barely speak. Automatically fails STR and DEX saves, and attacks against it have advantage.",
     advantageOn: ['attacks_against'],
     autoFailSaves: ['STR', 'DEX'],
     note: "Incapacitated, can't move, and can only speak falteringly.",
   },
   unconscious: {
+    summary: "Incapacitated, can't move or speak and is unaware of its surroundings; drops what it holds and falls prone. Automatically fails STR and DEX saves, attacks against it have advantage, and a hit from within 5 ft is a critical hit.",
     advantageOn: ['attacks_against'],
     autoFailSaves: ['STR', 'DEX'],
     note: "Incapacitated, can't move or speak, unaware of its surroundings, drops whatever it's holding and falls prone (apply Prone separately by hand -- not auto-chained). Any attack that hits it from within 5ft is an automatic critical hit (not auto-enforced yet -- needs a range check at hit resolution).",
   },
   petrified: {
+    summary: "Turned to stone: incapacitated and unaware of its surroundings. Automatically fails STR and DEX saves, attacks against it have advantage, and it resists all damage.",
     advantageOn: ['attacks_against'],
     autoFailSaves: ['STR', 'DEX'],
     note: 'Transformed to stone (weight ×10, stops aging), unaware of its surroundings. Resistant to all damage, and immune to poison/disease (any existing poison/disease is suspended, not neutralized) -- damage resistance and the poison/disease interaction are not auto-enforced yet.',
@@ -86,11 +100,13 @@ export const CONDITION_RULES = {
   // combat-wip.js's _confirmNotImmune) -- advisory only, never a hard
   // block, same "trust the human" philosophy as everywhere else in this app.
   burned: {
+    summary: "Takes damage equal to its proficiency bonus at the start of each of its turns, and rolls its damage rolls twice, using the lower result. Fire types are immune.",
     turnDamage: { timing: 'start', amount: 'proficiency' },
     immuneTypes: ['Fire'],
     note: 'Rolls all damage rolls twice and takes the LOWER result (bypasses and does not cancel out with other damage-roll modifiers) -- not auto-enforced yet, no damage-roll-mode banner exists for this. Takes damage equal to proficiency bonus at the start of each of its turns until fainted or cured (auto-applied). Fire types are immune.',
   },
   poisoned: {
+    summary: "Disadvantage on attack rolls and ability checks. Takes damage equal to its proficiency bonus at the end of each of its turns. Poison and Steel types are immune.",
     disadvantageOn: ['attack_rolls'],
     turnDamage: { timing: 'end', amount: 'proficiency' },
     immuneTypes: ['Poison', 'Steel'],
@@ -111,6 +127,7 @@ export const CONDITION_RULES = {
   // would only apply to this single condition. Revisit if that
   // inconsistency ever actually matters at the table.
   frozen: {
+    summary: "Incapacitated and restrained: no actions, reactions or movement, disadvantage on attack rolls and DEX saves, and attacks against it have advantage. It tries a STR save at the end of each of its turns to break free. Ice types are immune.",
     disadvantageOn: ['attack_rolls', { on: 'saving_throws', ability: 'DEX' }],
     advantageOn: ['attacks_against'],
     speedMultiplier: 0,
@@ -124,6 +141,7 @@ export const CONDITION_RULES = {
   // (these checks are a fixed, unconditional part of what the condition IS,
   // not something a move author configures per use).
   paralyzed: {
+    summary: "Moves at half speed, with disadvantage on STR and DEX saves. At the start of each of its turns it rolls a d4: on a 1 it can't act or move until its next turn. Electric types are immune.",
     disadvantageOn: [{ on: 'saving_throws', ability: 'STR' }, { on: 'saving_throws', ability: 'DEX' }],
     speedMultiplier: 0.5,
     immuneTypes: ['Electric'],
@@ -131,12 +149,14 @@ export const CONDITION_RULES = {
   },
   // Temporal Fang's slow -- the only move that applies `slowed`; every other "speed halved" move is a plain speed stat.
   slowed: {
+    summary: "Moves at half speed, with disadvantage on attack rolls and saving throws; attacks against it have advantage.",
     speedMultiplier: 0.5,
     disadvantageOn: ['attack_rolls', 'saving_throws'],
     advantageOn: ['attacks_against'],
     note: 'Moves at half speed, with disadvantage on attack rolls and saving throws; attacks against it have advantage.',
   },
   confused: {
+    summary: "Moves at half speed and can't take reactions. At the start of its turn it rolls a d20: on 10 or lower it hurts itself (damage equal to its proficiency bonus) and loses its action and bonus action; on 16 or higher the confusion ends.",
     speedMultiplier: 0.5,
     note: "Loses its reactions (enforced server-side) and moves at half speed. When it attempts an action or bonus action on its turn, rolls a d20 first (auto-prompted at the start of its turn): 10 or lower hurts itself for typeless damage equal to its proficiency modifier and forfeits the rest of the turn's action/bonus action; 16 or higher ends Confused immediately.",
   },
@@ -150,10 +170,12 @@ export const CONDITION_RULES = {
   // never threads board/grid data through it), so this stays advisory,
   // same deferral as Charmed/Frightened's own positional clauses.
   prone: {
+    summary: "Lying down: it can only crawl until it stands up (costs half its movement). Its attack rolls have disadvantage. Attacks against it have advantage from within 5 ft and disadvantage from further away.",
     disadvantageOn: ['attack_rolls'],
     note: "Its only movement option is to crawl until it stands up (a button on this badge -- costs half its fastest movement speed for the round, auto-enforced). An attack against it has advantage if the attacker is within 5ft, otherwise disadvantage -- not auto-enforced, this app's attack-roll pipeline has no positional/distance awareness yet.",
   },
   asleep: {
+    summary: "Incapacitated and can't move. Disadvantage on attack rolls and saving throws, and attacks against it have advantage. At the end of each of its turns it rolls a d20 and wakes up on 11 or higher.",
     disadvantageOn: ['attack_rolls', 'saving_throws'],
     advantageOn: ['attacks_against'],
     speedMultiplier: 0,
@@ -169,6 +191,7 @@ export const CONDITION_RULES = {
   // decision (Long Rest lives entirely outside any combat session, on the
   // trainer-card page, with no hook into this at all).
   exhaustion: {
+    summary: "Comes in levels, each adding to the ones before: 1 disadvantage on ability checks; 2 speed halved; 3 disadvantage on attack rolls and saves; 4 max HP halved; 5 speed 0; 6 death. A long rest removes one level.",
     note: '6 cumulative levels (each includes every lower level\'s own effect): 1 = disadvantage on ability checks (advisory only, no ability-check roll exists in this app); 2 = speed halved (auto-enforced); 3 = disadvantage on attack rolls AND saving throws (auto-enforced); 4 = max HP halved (exposed via effectiveMaxHP, not yet wired into any display); 5 = speed reduced to 0 (auto-enforced); 6 = death (NOT auto-applied -- a human decides how this plays out, same as this app\'s other death/faint edge cases). A long rest reduces the level by 1 (not tracked here -- session-only, see above). Reapplying from ANY source/move adds to the same shared level rather than creating a separate status.',
   },
 };

@@ -143,11 +143,15 @@ function _close() {
 
 /** Opens the popup for `trainerName` (whoever's using this device) showing
  * `session`'s board. Re-openable/re-callable freely -- each call just
- * re-renders against the given session. */
-export function showBattleMap(session, trainerName) {
+ * re-renders against the given session. `selectId` starts with that token
+ * already selected (Disengage: straight into moving) -- only when it's the
+ * viewer's own token and its turn, the same rule a click follows. */
+export function showBattleMap(session, trainerName, { selectId = null } = {}) {
   _session = session;
   _ownerName = trainerName;
-  _selectedTokenId = null;
+  const pre = selectId && session.participants?.[selectId];
+  _selectedTokenId = pre && session.board?.tokens?.[selectId] && pre.owner === trainerName
+    && selectId === _activeParticipantId(session) ? selectId : null;
   _stagedDestination = null; _stagedAlt = null;
   _ensureDom();
   _render();

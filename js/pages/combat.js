@@ -447,6 +447,19 @@ export function setOnSwitchPokemon(fn) {
   _onSwitchPokemon = fn || null;
 }
 
+// Shared-battle hooks for the card's own controls (combat-wip.js registers them; the legacy page never does, so these
+// stay null there and the card keeps its local behaviour):
+//  - _onAddStatus(combatantId, name, description): the Poison/Burn/... and Custom buttons add a shared status instead
+//  - _onLocalStatusClick(combatant, statusEffect, remove): a badge with no server id opens a detail popup instead of
+//    vanishing on click (`remove()` drops it)
+//  - _onBasicAction(action, combatantId): the Actions row's Disengage button
+let _onAddStatus = null;
+let _onLocalStatusClick = null;
+let _onBasicAction = null;
+export function setOnAddStatus(fn) { _onAddStatus = fn || null; }
+export function setOnLocalStatusClick(fn) { _onLocalStatusClick = fn || null; }
+export function setOnBasicAction(fn) { _onBasicAction = fn || null; }
+
 /** Opens the bench picker for a move-driven switch (Baton Pass, U-turn / Volt Switch's trainer switch, Lunar Dance, Healing
  * Wish). The normal "⇄ Switch Pokémon" button opens the same picker with no options. */
 export function openSwitchPopup(options = {}) {
@@ -1027,7 +1040,8 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
   const statusBadges = otherEffects.map(_badgeHtml).join('')
     + (concEffects.length ? `<span class="status-concentration-group"><span class="status-concentration-group-label">🧠 Concentration</span>${concEffects.map(_badgeHtml).join('')}</span>` : '');
 
-  const expandedHTML = c.isExpanded ? renderExpandedSection(c, statusBadges, { compactWip, readOnly }) : '';
+  // The shared battle shows one card at a time, always open -- only the legacy page still collapses cards.
+  const expandedHTML = c.isExpanded || compactWip ? renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive }) : '';
 
   return `
     <div class="combat-card ${isActive ? 'combat-card--active' : ''} ${fainted ? 'combat-card--fainted' : ''}" data-combatant-id="${c.id}" id="card_${c.id}">
@@ -1087,7 +1101,7 @@ function renderItemForCombat(itemName) {
   return `<strong>${itemName}</strong>${desc ? `<span class="item-desc">: ${desc}</span>` : ''}`;
 }
 
-function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
+function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive } = {}) {
   // --- Feats section (both) ---
   const featsSection = c.feats ? `
     <div class="expanded-feats-section">
@@ -1266,7 +1280,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
         <button class="add-status-btn" data-combatant-id="${c.id}" data-action="addCustomStatus">Add</button>
         <button class="add-status-btn" data-combatant-id="${c.id}" data-action="cancelCustomStatus">Cancel</button>
       </div>
-      ${statusBadges ? `<div class="status-remove-hint">Tap a badge to remove it</div>` : ''}
+      ${statusBadges ? `<div class="status-remove-hint">${compactWip ? 'Tap a badge to see what it does (and remove it)' : 'Tap a badge to remove it'}</div>` : ''}
     </div>`;
 
   // --- Moves section (pokemon only) ---
@@ -1309,6 +1323,21 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
       </div>
     </div>` : '';
 
+  // --- Basic actions (shared battle only) ---
+  // Disengage for everyone, Attack for trainers (they have no moves). Both spend the action, so they lock once
+  // it's used (`actionUsed`, bridged from the session) and outside this combatant's own turn.
+  const actionLocked = !isActive || !!c.actionUsed;
+  const basicActionsSection = compactWip && !readOnly ? `
+    <div class="expanded-basic-actions-section">
+      <div class="expanded-section-label">Actions</div>
+      <div class="expanded-basic-actions">
+        <button class="combat-basic-action-btn" data-action="disengage" data-combatant-id="${c.id}" ${actionLocked ? 'disabled' : ''}
+          title="Use your action to move away without provoking opportunity attacks or reactions">🏃 Disengage</button>
+        ${c.type === 'trainer' ? `<button class="combat-basic-action-btn" data-action="attack" data-combatant-id="${c.id}" ${actionLocked ? 'disabled' : ''}
+          title="Melee attack: 1d6 + STR">⚔️ Attack</button>` : ''}
+      </div>
+    </div>` : '';
+
   return `
     <div class="combat-card-expanded" id="expanded_${c.id}">
       ${featsSection}
@@ -1317,6 +1346,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly } = {}) {
       ${statSection}
       ${statusSection}
       ${trainerActionsSection}
+      ${basicActionsSection}
       ${movesSection}
     </div>`;
 }
@@ -2066,7 +2096,15 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
       if (e.target.closest('.status-badge')) {
         const badge = e.target.closest('.status-badge');
         if (badge.dataset.serverStatusId) return; // shared status -- combat-wip.js's own handler opens its detail popup
-        removeStatusEffect(badge.dataset.combatantId, badge.dataset.effect, state); return;
+        const { combatantId, effect } = badge.dataset;
+        if (_onLocalStatusClick) {
+          // Shared battle: explain it first, remove only on request.
+          const c = state.combatants.find(x => x.id === combatantId);
+          const se = c?.statusEffects.find(s => s.name === effect);
+          if (c && se) _onLocalStatusClick(c, se, () => removeStatusEffect(combatantId, effect, state));
+          return;
+        }
+        removeStatusEffect(combatantId, effect, state); return;
       }
       if (e.target.closest('.combat-trainer-hpvp-btn')) {
         const btn = e.target.closest('.combat-trainer-hpvp-btn');
@@ -2103,9 +2141,20 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
         }
         showCombatMoveDetails(moveItem.dataset.move, moveItem.dataset.combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve }); return;
       }
-      // Toggle expand on card click (not on controls)
+      const basicAction = e.target.closest('.combat-basic-action-btn');
+      if (basicAction && !basicAction.disabled) {
+        const id = basicAction.dataset.combatantId;
+        if (basicAction.dataset.action === 'attack') {
+          // The trainers' Attack is an ordinary move entry (moves file, "Attack") -- same popup, roll and damage flow.
+          showCombatMoveDetails('Attack', id, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve });
+        } else if (_onBasicAction) {
+          _onBasicAction(basicAction.dataset.action, id);
+        }
+        return;
+      }
+      // Toggle expand on card click (not on controls) -- legacy page only; the shared battle's card is always open.
       const card = e.target.closest('.combat-card');
-      if (card && !e.target.closest('.combat-card-footer') && !e.target.closest('.combat-card-expanded')) {
+      if (card && !_battleCardOptions.compactWip && !e.target.closest('.combat-card-footer') && !e.target.closest('.combat-card-expanded')) {
         const c = state.combatants.find(x => x.id === card.dataset.combatantId);
         if (c) { c.isExpanded = !c.isExpanded; saveCombatState(state); rerenderBattle(state); }
       }
@@ -2975,6 +3024,13 @@ function _syncStatusConditionToDb(c, state) {
 }
 
 function addStatusEffect(combatantId, effectName, state, description = '') {
+  if (_onAddStatus) {
+    // Shared battle: a real shared status on the server, so everyone sees it and its badge opens the detail popup.
+    const form = document.getElementById(`customStatusForm_${combatantId}`);
+    if (form) form.style.display = 'none';
+    _onAddStatus(combatantId, effectName, description);
+    return;
+  }
   const c = state.combatants.find(x => x.id === combatantId);
   if (!c || c.statusEffects.find(s => s.name === effectName)) return;
   const entry = { name: effectName, duration: -1 };

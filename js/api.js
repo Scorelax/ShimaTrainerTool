@@ -1022,6 +1022,11 @@ export class CombatAPI {
     return API.request('combat', 'stand-up', { id }, { useCache: false });
   }
 
+  /** Disengage: spends the action; moving away this turn provokes no reactions (routes_combat.py's _disengage). */
+  static async disengage(id) {
+    return API.request('combat', 'disengage', { id }, { useCache: false });
+  }
+
   /** Bide's own two-phase toggle (see routes_combat.py's _bide_use) -- same
    * call either way, the server decides activate vs. resolve from the
    * participant's own current state. `hold` (10th level+ only) keeps

@@ -32830,6 +32830,26 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Attack",
+      "type": "",
+      "action": "1 action",
+      "range": "Melee",
+      "duration": {
+        "raw": "Instantaneous",
+        "rounds": 0,
+        "concentration": false,
+        "varies": false
+      },
+      "reaction": false,
+      "categories": [
+        "damage"
+      ],
+      "description": "A trainer's basic attack -- describe how it looks however you like. Make a melee attack roll against a creature, doing 1d6 + MOVE typeless damage on a hit.",
+      "moveStat": "STR",
+      "vpCost": "0",
+      "scaling": ""
     }
   ]
 }

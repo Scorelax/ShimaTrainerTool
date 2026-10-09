@@ -27,6 +27,7 @@ the server converts that to actual damage using the move's type (from the
 moves dataset) and the target's stored type(s), the same type-chart data
 game-data/type-effectiveness already exposes.
 """
+import copy
 import json
 import math
 import os
@@ -151,6 +152,13 @@ _EMPTY_STATE = {
 }
 
 
+# The trainers' basic attack -- an ordinary entry in the moves file (1d6 + STR, typeless), used from the card's Attack button.
+TRAINER_ATTACK_MOVE = 'Attack'
+
+_PVP_DEFAULT_GRID = {'cols': 11, 'rows': 13}
+_PVP_DEFAULT_BACKGROUND = 'battle-forest.png'
+
+
 def handle(conn, action, params):
     if action == 'get-state':
         return {'status': 'success', 'data': load_state(conn)}
@@ -159,9 +167,14 @@ def handle(conn, action, params):
         battle_type = params.get('battleType', 'pve')
         if battle_type not in ('pvp', 'pve'):
             raise ValueError('battleType must be pvp or pve')
-        state = dict(_EMPTY_STATE)
+        state = copy.deepcopy(_EMPTY_STATE)  # deep: the board below is edited, never the shared template
         state['active'] = True
         state['battleType'] = battle_type
+        if battle_type == 'pvp':
+            # PvP starts on an 11x13 forest map (the user's call); still changeable on the placement screen.
+            state['board']['grid'] = dict(_PVP_DEFAULT_GRID)
+            if os.path.isfile(os.path.join(upstream.BATTLE_IMAGE_DIR, _PVP_DEFAULT_BACKGROUND)):
+                state['board']['backgroundImage'] = f'/battle-images/{_PVP_DEFAULT_BACKGROUND}'
         state['round'] = 1
         state['log'] = []
         state['logFile'] = _new_log_filename(battle_type)
@@ -491,6 +504,11 @@ def handle(conn, action, params):
         if not params.get('id'):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _stand_up(s, params['id']))
+
+    if action == 'disengage':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _disengage(s, params['id']))
 
     if action == 'clear-token-position':
         if not params.get('id'):
@@ -1515,6 +1533,8 @@ def _advance_turn(state):
         next_participant['reactionUsed'] = False
         next_participant['bonusActionUsed'] = False
         next_participant['movementUsed'] = 0
+        next_participant['actionUsed'] = False
+        next_participant['disengaged'] = False
     _log_event(state, 'turn-advance', text=f"Round {state['round']}: {next_participant['name'] if next_participant else '?'}'s turn",
                actorId=state['turnOrder'][state['turnIndex']], actorName=next_participant['name'] if next_participant else None)
     # Effects that end on a turn boundary or a round count (see the status
@@ -1551,6 +1571,27 @@ def _use_bonus_action(state, pid, move_name=''):
     participant['bonusActionUsed'] = True
     label = f' ({move_name})' if move_name else ''
     _log_event(state, 'bonus-action', text=f"{participant['name']} used their bonus action{label}", actorId=pid, actorName=participant['name'])
+
+
+def _disengage(state, pid):
+    """The Disengage action (trainers and Pokemon alike): spends the participant's action, and for the rest of this
+    turn moving away from enemies opens no "moved away" reaction window (_open_moved_away_window), so nothing in melee
+    range gets an opportunity attack or reaction. Both flags reset when their next turn starts (_advance_turn).
+    Moves don't mark the action as spent (nothing tracks that yet), so this only guards the basic actions."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if pid != _active_participant_id(state):
+        raise ValueError("It's not this participant's turn")
+    incap = _incapacitating_status(participant)
+    if incap:
+        raise ValueError(f"{participant['name']} is {incap['apply']} and can't act")
+    if participant.get('actionUsed'):
+        raise ValueError(f"{participant['name']} has already used their action this turn")
+    participant['actionUsed'] = True
+    participant['disengaged'] = True
+    state['started'] = True
+    _log_event(state, 'disengage', text=f"{participant['name']} disengaged", actorId=pid, actorName=participant['name'])
 
 
 def _reaction_start(state, pid):
@@ -1636,6 +1677,8 @@ def _open_moved_away_window(state, mover_id, previous):
     if state.get('pendingReaction'):
         return  # one window at a time
     mover = state['participants'][mover_id]
+    if mover.get('disengaged'):
+        return  # Disengage: leaving reach this turn provokes nothing
     now = state['board']['tokens'][mover_id]
     away = set()
     for pid, p in state['participants'].items():
@@ -1671,6 +1714,8 @@ def _reaction_end(state):
     if extra and extra.get('status') == 'participating':
         extra['movementUsed'] = 0
         extra['bonusActionUsed'] = False
+        extra['actionUsed'] = False
+        extra['disengaged'] = False
         state['reactingParticipantId'] = extra_id
         _log_event(state, 'extra-turn', text=f"{extra['name']} takes an extra turn", actorId=extra_id, actorName=extra['name'])
 
@@ -2371,6 +2416,11 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
     lock = move_lock(attacker)
     if lock and move_name != lock:
         raise ValueError(f"{attacker['name']} can only use {lock} right now")
+    if move_name == TRAINER_ATTACK_MOVE:
+        # A trainer's basic Attack is their action, same as Disengage (see _disengage).
+        if attacker.get('actionUsed'):
+            raise ValueError(f"{attacker['name']} has already used their action this turn")
+        attacker['actionUsed'] = True
     state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
 
     # VP floors at 0; overflow drains the user's own HP with NO floor --

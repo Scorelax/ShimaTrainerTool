@@ -43,7 +43,7 @@ import {
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
-  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
+  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, setOnAddStatus, setOnLocalStatusClick, setOnBasicAction, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
   buildKnownMovesString, COMBAT_CSS,
 } from './combat.js';
 
@@ -359,6 +359,20 @@ const WIP_CSS = `
   }
   #wipBattlePhase .add-status-btn:hover, #wipBattlePhase .combat-trainer-action-btn:hover { background: rgba(255,215,0,0.2); }
   #wipBattlePhase .status-remove-hint { color: #8f97c4; }
+
+  /* the card is always open here -- nothing to click on the card itself */
+  #wipBattlePhase .combat-card-main { cursor: default; }
+
+  /* basic actions: Disengage (everyone), Attack (trainers) */
+  #wipBattlePhase .expanded-basic-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  #wipBattlePhase .combat-basic-action-btn {
+    flex: 1 1 140px; padding: 0.55rem 0.9rem; border-radius: 12px; font-size: 0.92rem; font-weight: 700; cursor: pointer;
+    background: linear-gradient(135deg, rgba(93,173,226,0.22), rgba(93,173,226,0.1)); border: 1px solid rgba(93,173,226,0.5); color: #e8ecff;
+    transition: background 0.12s;
+  }
+  #wipBattlePhase .combat-basic-action-btn[data-action="attack"] { background: linear-gradient(135deg, rgba(231,76,60,0.28), rgba(231,76,60,0.12)); border-color: rgba(231,76,60,0.55); }
+  #wipBattlePhase .combat-basic-action-btn:hover:not(:disabled) { background: rgba(255,215,0,0.2); }
+  #wipBattlePhase .combat-basic-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* moves as a grid of type-coloured buttons */
   #wipBattlePhase .expanded-moves-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; }
@@ -798,6 +812,9 @@ function _enterBattleSync() {
   setOnCombatStateSave(_onLocalCombatStateSave);
   setOnLogEvent((event) => CombatAPI.logEvent(event).catch(() => {}));
   setOnSwitchPokemon((bench, options) => _switchPokemonShared(bench, options)); // swaps on the server, not the local mirror
+  setOnAddStatus(_addSharedStatus);
+  setOnLocalStatusClick(_openLocalStatusDetail);
+  setOnBasicAction(_onBasicAction);
 }
 
 function _exitBattleSync() {
@@ -812,6 +829,9 @@ function _exitBattleSync() {
   setOnCombatStateSave(null);
   setOnLogEvent(null);
   setOnSwitchPokemon(null); // the legacy local combat page switches in its own local state again
+  setOnAddStatus(null);
+  setOnLocalStatusClick(null);
+  setOnBasicAction(null);
   _focusedParticipantId = null;
   _focusManuallySet = false;
 }
@@ -1572,6 +1592,7 @@ function _syncLocalCombatState(session) {
     const psychic = merged.activeTerrains.find(t => terrainKindOf(t) === 'psychic');
     merged.bonusActionBlockedBy = psychic && isGroundedIn(p, merged.activeTerrains) ? psychic.name : '';
     merged.bonusActionUsed = !!p.bonusActionUsed; // one bonus action per round -- see combat.js's _isBonusActionMove
+    merged.actionUsed = !!p.actionUsed; // Disengage / a trainer's Attack spent it -- locks the card's Actions row
     merged.bideHeld = !!p.bideHeld;
     // Archive Blast's own "every type of move you have witnessed so far
     // during this battle" -- distinct move types from the shared log,
@@ -2172,14 +2193,6 @@ function _setFocus(id) {
 
 let _focusedParticipantId = null;
 let _focusManuallySet = false;
-// Which foreign (PvP opponent) participant currently has its read-only card
-// manually COLLAPSED (the user's own call: a PvP opponent's card should show
-// everything by default, same as your own combatant's -- collapsing is an
-// opt-in you can still click into, not the default). See _foreignCombatantView
-// / the click handler in _bindStatusBadgeClicks. Not persisted; resets back
-// to expanded whenever focus moves to a different participant, same as the
-// "mine" side never remembering isExpanded across a fresh focus either.
-let _foreignCollapsedId = null;
 // Which participant combat.js's button handlers (HP/VP, stats, moves, End
 // Turn's local half...) are currently attached for. Those handlers look their
 // combatant up in the state object they were attached with, so they only work
@@ -2299,12 +2312,11 @@ function _foreignCombatantView(p) {
     statusEffects: (p.statuses || []).map(st => _statusToBadge(st, session?.round)),
     appliedStatMods: { ...statDeltas(p), set: statSetOverrides(p) },
     hasStatBlock: p.combatantType != null && p.proficiency != null,
-    isExpanded: _foreignCollapsedId !== p.id,
+    isExpanded: true, // one card at a time, always open
   };
 }
 
-/** data-focus-id (read by the expand-toggle click handler in
- * _bindStatusBadgeClicks) marks which participant this card is currently
+/** data-focus-id marks which participant this card is currently
  * showing. No attempt to preserve mp4 playback position across a rebuild
  * (unlike the "mine" path below) -- there's no button state to lose either,
  * this is read-only, so a restarted sprite on every push is an acceptable
@@ -5823,24 +5835,56 @@ async function _openStatusDetail(holderId, statusId) {
   }
 }
 
+// The card's own status buttons (combat.js's add-status row) -> the shared condition each one stands for. Anything
+// else (the Custom form) keeps its typed name as the condition and its description as the note.
+const _CARD_STATUS_CONDITIONS = { Poison: 'poisoned', Burn: 'burned', Confusion: 'confused', Paralysis: 'paralyzed', Sleep: 'asleep', Freeze: 'frozen' };
+
+/** combat.js's setOnAddStatus hook: the card's status buttons add a real shared status, so every viewer sees it, its
+ * rules (turn damage, roll modes, ...) apply, and its badge opens the detail popup. */
+async function _addSharedStatus(participantId, name, description) {
+  const effect = { kind: 'condition', apply: _CARD_STATUS_CONDITIONS[name] || name };
+  if (description) effect.note = description;
+  try {
+    await CombatAPI.applyStatus(participantId, buildStatusSpec(effect, {}));
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
+/** combat.js's setOnLocalStatusClick hook: a status that only lives on this device (added before statuses went
+ * through the server) gets the same explain-then-remove popup instead of vanishing on click. */
+async function _openLocalStatusDetail(c, se, remove) {
+  const status = { kind: 'condition', apply: _CARD_STATUS_CONDITIONS[se.name] || se.name, ends: [] };
+  if (se.description) status.note = se.description;
+  if (await showStatusDetail(c.name, status, session?.round) === 'remove') remove();
+}
+
+/** combat.js's setOnBasicAction hook -- Disengage: spend the action, then straight onto the map to move. */
+async function _onBasicAction(action, participantId) {
+  if (action !== 'disengage') return;
+  const p = session?.participants?.[participantId];
+  if (!p) return;
+  const ok = await showCombatConfirm(
+    `${p.name} uses its action to disengage: moving away this turn won't provoke opportunity attacks or reactions from anyone in melee range.`,
+    { title: 'Disengage', yesLabel: 'Disengage', noLabel: 'Cancel' },
+  );
+  if (!ok) return;
+  try {
+    const res = await CombatAPI.disengage(participantId);
+    showBattleMap(res?.data || session, _currentTrainerName(), { selectId: participantId });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Error' });
+  }
+}
+
 let _statusClickHandler = null;
 
-/** One delegated listener for every shared-status badge on the page, plus the
- * expand/collapse toggle for a PvP opponent's read-only card (see
- * _renderForeignFocusFull) -- that card has no attachBattleListeners of its
- * own (nothing on it is actionable), so its one interactive bit lives here
- * instead of duplicating a whole click-handling setup just for this. */
+/** One delegated listener for every shared-status badge on the page (own card or another participant's). */
 function _bindStatusBadgeClicks() {
   if (_statusClickHandler) document.removeEventListener('click', _statusClickHandler);
   _statusClickHandler = (e) => {
     const badge = e.target.closest?.('.status-badge[data-server-status-id]');
-    if (badge) { _openStatusDetail(badge.dataset.combatantId, badge.dataset.serverStatusId); return; }
-    const foreignMain = e.target.closest?.('.wip-foreign-focus-full .combat-card-main');
-    if (!foreignMain) return;
-    const id = foreignMain.closest('.wip-foreign-focus-full')?.dataset.focusId;
-    _foreignCollapsedId = _foreignCollapsedId === id ? null : id;
-    const el = document.getElementById('wipBattlePhase');
-    if (el && session) el.innerHTML = _renderMainFocusHtml(session);
+    if (badge) _openStatusDetail(badge.dataset.combatantId, badge.dataset.serverStatusId);
   };
   document.addEventListener('click', _statusClickHandler);
 }

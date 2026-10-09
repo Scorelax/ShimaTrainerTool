@@ -21,6 +21,8 @@ function _injectStyles() {
     .status-popup-row { display: flex; gap: 0.6rem; margin-bottom: 0.5rem; font-size: 0.9rem; }
     .status-popup-key { width: 5.5rem; flex-shrink: 0; color: #a0a0c0; }
     .status-popup-actions { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+    .status-popup-summary { background: rgba(140,170,255,0.08); border: 1px solid rgba(140,170,255,0.25); border-radius: 10px; padding: 0.65rem 0.8rem; margin-bottom: 0.8rem; font-size: 0.92rem; line-height: 1.4; }
+    .status-popup-summary-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #a0a8d0; margin-bottom: 0.25rem; }
     .status-popup-remove { background: linear-gradient(135deg, #EE1515, #C91010) !important; }
     .status-popup-secondary { background: rgba(255,255,255,0.1) !important; }
   `;
@@ -41,17 +43,17 @@ export function showStatusDetail(holderName, status, round) {
     const hasSave = (status.ends || []).some(e => e.type === 'save');
     const hasUses = (status.ends || []).some(e => e.type === 'uses' && e.left > 0);
     const isProne = status.kind === 'condition' && status.apply === 'prone';
+    // What the condition does, in plain words (condition-rules.js's `summary`) -- the point of opening the badge.
+    // A move's own note, or a custom status's typed description, shows under it.
+    const summary = status.kind === 'condition' ? CONDITION_RULES[status.apply]?.summary : null;
     const rows = [
       ['On', holderName],
       ['From', from],
       ['Ends', describeStatusEnds(status, round)],
       status.dc ? ['Move DC', status.dc] : null,
-      // A status applied with its own authored note wins; otherwise fall back to
-      // the condition's own rulebook text (e.g. a DM's manual apply-status pick,
-      // which carries no authored note at all) -- see condition-rules.js.
-      (status.note || (status.kind === 'condition' && CONDITION_RULES[status.apply]?.note))
-        ? ['Note', status.note || CONDITION_RULES[status.apply].note] : null,
+      status.note ? ['Note', status.note] : null,
     ].filter(Boolean).map(([k, v]) => `<div class="status-popup-row"><span class="status-popup-key">${k}</span><span>${esc(v)}</span></div>`).join('');
+    const summaryHtml = summary ? `<div class="status-popup-summary"><div class="status-popup-summary-label">What it does</div>${esc(summary)}</div>` : '';
     overlay.innerHTML = `
       <div class="combat-popup-content" style="max-width:420px;">
         <div class="combat-move-popup-header">
@@ -59,6 +61,7 @@ export function showStatusDetail(holderName, status, round) {
           <h2>${esc(statusLabel(status))}</h2>
         </div>
         <div class="combat-move-popup-body">
+          ${summaryHtml}
           ${rows}
           <div class="status-popup-actions">
             ${hasSave ? '<button class="combat-use-move-btn" data-act="save">Roll the saving throw</button>' : ''}

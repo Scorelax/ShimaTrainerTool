@@ -34,7 +34,18 @@ export function initLiveUpdates() {
   if (!EVENTS_URL || source) return;
 
   source = new EventSource(EVENTS_URL);
-  // EventSource reconnects on its own after a drop -- no manual retry/backoff needed.
+  // EventSource reconnects on its own after a drop -- no manual retry/backoff needed. But whatever was pushed while it
+  // was down is gone, and phones drop it whenever the screen sleeps or the app goes to the background. So on every
+  // reconnect, and whenever the app comes back to the foreground, pages that mirror live state (the shared battle)
+  // are told to fetch it fresh ('app:live-resync').
+  let opened = false;
+  source.onopen = () => {
+    if (opened) window.dispatchEvent(new CustomEvent('app:live-resync'));
+    opened = true;
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') window.dispatchEvent(new CustomEvent('app:live-resync'));
+  });
   source.onmessage = (e) => {
     let event;
     try {

@@ -167,6 +167,10 @@ def handle(conn, action, params):
         battle_type = params.get('battleType', 'pve')
         if battle_type not in ('pvp', 'pve'):
             raise ValueError('battleType must be pvp or pve')
+        if load_state(conn).get('active'):
+            # One battle at a time -- a new one would silently replace the running one. It ends when its last
+            # participant leaves (End Battle), so only the people in it can end it.
+            raise ValueError('A battle is already in progress -- join it, or wait until its players end it.')
         state = copy.deepcopy(_EMPTY_STATE)  # deep: the board below is edited, never the shared template
         state['active'] = True
         state['battleType'] = battle_type
@@ -3296,7 +3300,8 @@ def _move_token(state, pid, col, row, z=None):
     z0 = (current or {}).get('z', 0)
     z1 = z0 if z is None else z
     if current and (col, row, z1) == (current['col'], current['row'], z0):
-        raise ValueError(f"{participant['name']} is already there -- movement comes in 5ft steps")
+        depth = f' ({-z1}ft underground)' if z1 < 0 else f' ({z1}ft up)' if z1 > 0 else ''
+        raise ValueError(f"{participant['name']} is already there{depth} -- movement comes in 5ft steps")
     if z1 != z0:
         # Leaving the ground needs a way to fly (a flying speed goes as high as it likes, a hover-only creature stays within
         # 5ft); going below it needs a burrowing speed -- see conditions.py's altitude_limits. Coming back toward the ground

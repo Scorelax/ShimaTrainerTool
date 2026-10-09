@@ -2446,9 +2446,15 @@ function _attachMainFocusListeners(state) {
     const endBtn = e.target.closest('.end-turn-btn');
     if (!endBtn) return;
     if (session.reactingParticipantId) {
-      CombatAPI.reactionEnd().catch(() => {});
+      CombatAPI.reactionEnd().catch(err => showCombatAlert(err.message, { title: "Couldn't end the reaction" }));
       return;
     }
+    // One End Turn at a time: the button shows it's working (a slow connection is visible instead of "nothing
+    // happened"), and a second tap while the first is still on its way can't advance the turn twice.
+    if (_endingTurn) return;
+    _endingTurn = true;
+    endBtn.disabled = true;
+    endBtn.textContent = 'Ending turn…';
 
     // Ending a real turn also moves the info box on to this viewer's own next
     // combatant (trainer or Pokémon, wrapping round the turn order), so the
@@ -2468,8 +2474,54 @@ function _attachMainFocusListeners(state) {
       .then(() => _promptSleepCheck(endingId))
       .then(() => CombatAPI.advanceTurn())
       .then(() => { if (nextId && nextId !== endingId && !endingHasIngrain) _setFocus(nextId); })
-      .catch(() => {});
+      .catch((err) => {
+        showCombatAlert(err.message, { title: "Couldn't end the turn" });
+        // The card is normally redrawn by the next push; after a failure there may be none, so restore the button here.
+        if (endBtn.isConnected) { endBtn.disabled = false; endBtn.textContent = 'End Turn'; }
+      })
+      .finally(() => { _endingTurn = false; });
   });
+}
+
+// True while an End Turn is on its way to the server (see the handler above).
+let _endingTurn = false;
+
+// ---------------------------------------------------------------------------
+// Re-sync. The page only learns about changes from live pushes, and a phone drops that connection whenever its screen
+// sleeps or the app is in the background -- anything pushed meanwhile is lost, leaving a stale screen (a move that
+// "didn't happen", a turn that never moves on). So the session is fetched fresh when the connection comes back or the
+// app returns to the foreground ('app:live-resync', live-updates.js), and every RESYNC_MS while this page is visible,
+// for a connection that died without saying so. A fetched session only goes through the normal push handler when it
+// differs from the one on screen, so an unchanged battle is never redrawn.
+// ---------------------------------------------------------------------------
+const RESYNC_MS = 15000;
+let _resyncStarted = false;
+let _resyncInFlight = false;
+
+function _onBattlePage() {
+  return location.hash === '#combat-wip' && document.visibilityState === 'visible';
+}
+
+async function _resyncSession() {
+  if (_resyncInFlight || !combatUpdateHandler || !_onBattlePage()) return;
+  _resyncInFlight = true;
+  try {
+    const res = await CombatAPI.getState();
+    if (res?.status === 'success' && res.data && JSON.stringify(res.data) !== JSON.stringify(session)) {
+      combatUpdateHandler({ detail: res.data });
+    }
+  } catch {
+    // Still offline -- the next resync tries again.
+  } finally {
+    _resyncInFlight = false;
+  }
+}
+
+function _startSessionResync() {
+  if (_resyncStarted) return;
+  _resyncStarted = true;
+  window.addEventListener('app:live-resync', _resyncSession);
+  setInterval(_resyncSession, RESYNC_MS);
 }
 
 /** Updates #wipBattlePhase once the DOM already exists -- used by both the
@@ -2614,6 +2666,7 @@ export function attachCombatWipListeners() {
     _maybePromptForcedSwitch(session);
   };
   window.addEventListener('app:combat-updated', combatUpdateHandler);
+  _startSessionResync();
 
   if (document.getElementById('joinChoiceJoinBtn')) {
     document.getElementById('joinChoiceJoinBtn').addEventListener('click', () => {
@@ -2695,10 +2748,19 @@ function attachBodyListeners() {
     // here doing nothing until the player happens to navigate back in.
     _justCreatedSession = true;
     try {
-      await CombatAPI.createSession(battleType);
+      const res = await CombatAPI.createSession(battleType);
+      // Use the reply itself rather than only waiting for the live push -- if this phone's live connection is down,
+      // that push never comes and the button looks dead. Whichever arrives first switches the view (it consumes
+      // _justCreatedSession); the other is then a no-op.
+      if (_justCreatedSession && res?.data && combatUpdateHandler) combatUpdateHandler({ detail: res.data });
     } catch (err) {
       _justCreatedSession = false;
-      showCombatAlert(err.message, { title: 'Error' });
+      showCombatAlert(err.message, { title: "Couldn't create the battle" });
+      // Most likely a battle is already running (only one at a time) and this screen was stale -- show it.
+      try {
+        const res = await CombatAPI.getState();
+        if (res?.status === 'success' && res.data?.active) { session = res.data; _rerenderFull(); }
+      } catch { /* offline -- the alert above already says so */ }
     }
   });
 

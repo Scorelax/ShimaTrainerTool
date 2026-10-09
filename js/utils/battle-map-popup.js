@@ -66,6 +66,7 @@ function _injectStyles() {
     .bmap-confirm-btn:disabled { background: #444; color: #888; cursor: not-allowed; box-shadow: none; }
     .bmap-cancel-btn { background: rgba(255,255,255,0.12); color: #e0e0e0; }
     .bmap-stage-warning { color: #e77373; }
+    .bmap-stage-alt { font-weight: 800; color: #ffd76a; background: rgba(255,215,106,0.12); border: 1px solid rgba(255,215,106,0.45); border-radius: 999px; padding: 0.15rem 0.6rem; }
     /* a staged move: the token is drawn at its destination, the tile it left keeps a faint dashed outline */
     .bmap-token.moving { opacity: 0.9; pointer-events: none; }
     .bmap-token.moving .bmap-token-portrait { outline: 2px dashed #FFD700; outline-offset: 2px; }
@@ -291,10 +292,16 @@ function _renderMovePanel() {
     const bestRemaining = Math.max(...p.speeds.map(s => _remainingFt(p, s.type)));
     const canMove = distance <= bestRemaining;
 
+    // A depth change is easy to stage by accident (one tap on ▼/▲), so it gets its own highlighted line and the
+    // button says what it will do.
+    const altLine = z1 !== z0
+      ? `<span class="bmap-stage-alt">${z1 < 0 ? '⛏' : z1 > 0 ? '🪽' : '⬇'} Ends ${_altText(z1)} (now ${_altText(z0)})</span>` : '';
+    const confirmLabel = z1 < 0 && z1 !== z0 ? 'Confirm Burrow' : z1 > 0 && z1 !== z0 ? 'Confirm Climb' : 'Confirm Move';
     stageRow = canMove ? `
         <div class="bmap-stage-row">
-          <span>Move ${distance}ft${z1 !== z0 ? ` · ${_altText(z0)} → ${_altText(z1)}` : ''}</span>
-          <button type="button" class="bmap-confirm-btn" id="bmapConfirmMove">Confirm Move</button>
+          <span>Move ${distance}ft</span>
+          ${altLine}
+          <button type="button" class="bmap-confirm-btn" id="bmapConfirmMove">${confirmLabel}</button>
           <button type="button" class="bmap-cancel-btn" id="bmapCancelStage">Cancel</button>
         </div>` : `
         <div class="bmap-stage-row">

@@ -106,7 +106,11 @@ const HEAVY_TIMEOUT = 90000;
 
 class API {
   static async request(route, action, params = {}, options = {}) {
-    const { useCache = true, cacheKey, cacheTtl, timeout = API_CONFIG.timeout, retries = 1, bypassCache = false } = options;
+    // Shared-battle actions (route 'combat') change live state, so a timed-out one is never retried -- the first try may
+    // have reached the server with only the answer lost (a retried advance-turn would skip a turn) -- and they give up
+    // sooner, with a message that says what's wrong, instead of hanging a button for a minute.
+    const isCombat = route === 'combat';
+    const { useCache = true, cacheKey, cacheTtl, timeout = isCombat ? 15000 : API_CONFIG.timeout, retries = isCombat ? 0 : 1, bypassCache = false } = options;
 
     // Check cache first -- bypassCache skips this read (forces a network
     // fetch) but the cache is still warmed below, so other callers still
@@ -190,8 +194,13 @@ class API {
       } catch (error) {
         clearTimeout(timeoutId);
         if (error.name === 'AbortError') {
-          lastError = new Error('Request timeout - please try again');
+          lastError = new Error(isCombat
+            ? 'No answer from the server -- check your connection, then try again.'
+            : 'Request timeout - please try again');
           console.warn(`[API] Timeout on ${route}/${action} (attempt ${attempt + 1})`);
+        } else if (isCombat && error instanceof TypeError) {
+          // fetch's own network failure ("Failed to fetch") -- the connection to the Pi dropped.
+          throw new Error("Can't reach the server -- check your connection, then try again.");
         } else {
           throw error; // non-timeout errors are not retried
         }

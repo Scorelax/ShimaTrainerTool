@@ -3017,7 +3017,9 @@ function _syncStatusConditionToDb(c, state) {
   if (c.type !== 'pokemon' || !c.entityKey) return;
   const pd = JSON.parse(sessionStorage.getItem(c.entityKey) || 'null');
   if (!pd) return;
-  const trainerName = state.combatants.find(x => x.type === 'trainer')?.name || '';
+  // The shared battle's card state holds only the one combatant on screen, so fall back to the logged-in trainer.
+  const trainerName = state.combatants.find(x => x.type === 'trainer')?.name
+    || JSON.parse(sessionStorage.getItem('trainerData') || '[]')[1] || '';
   pd[60] = c.statusEffects.filter(s => !s.serverStatusId).map(s => s.name).join(',');
   sessionStorage.setItem(c.entityKey, JSON.stringify(pd));
   PokemonAPI.updateLiveStats(trainerName, pd[2], 'StatusCondition', pd[60]).catch(e => console.error('Status sync:', e));

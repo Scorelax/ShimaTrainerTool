@@ -19,7 +19,7 @@ import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
 import { lineFtFromRange } from '../utils/line-area.js';
-import { setAbilitySession } from '../utils/ability-mods.js';
+import { setAbilitySession, abilityTriggers } from '../utils/ability-mods.js';
 import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { playBattleAnimationFloating } from '../utils/move-popup.js';
@@ -5215,7 +5215,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   const laserFocusId = guaranteedCritStatusId(attacker);
   if (laserFocusId) crit = true;
 
-  let damageDealt, targetFainted, rawDamageDealt;
+  let damageDealt, targetFainted, rawDamageDealt, lastTypeMultiplier = null;
   try {
     // No "N damage applied" popup -- it's already in the shared battle log
     // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
@@ -5231,6 +5231,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit);
     damageDealt = dmgResult?.damageApplied;
     targetFainted = dmgResult?.targetFainted;
+    lastTypeMultiplier = dmgResult?.multiplier ?? null;
     rawDamageDealt = finalDamage; // before the type chart -- Spud Bomb's "an equal amount" of fire damage
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
@@ -5241,6 +5242,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // resolved.
   await waitForDamagedReactions(targetId, combatantId, moveName);
   await _maybeMeleeRetaliate(combatantId, targetId, moveName);
+  await _abilityHitTriggers({ attackerId: combatantId, targetId, moveName, move, attackRoll, damageDealt, typeMultiplier: lastTypeMultiplier });
 
   // Some moves land a hit AND separately make the hit creature save against
   // a secondary consequence (e.g. Temporal Fang: damage on the attack roll,
@@ -5936,6 +5938,76 @@ async function _openLocalStatusDetail(c, se, remove) {
   const status = { kind: 'condition', apply: _CARD_STATUS_CONDITIONS[se.name] || se.name, ends: [] };
   if (se.description) status.note = se.description;
   if (await showStatusDetail(c.name, status, session?.round) === 'remove') remove();
+}
+
+// The kinds the server's ability-trigger applies (routes_combat.py's _ability_trigger); other triggered kinds are slice 3b.
+const _TRIGGER_KINDS = new Set(['retaliate', 'condition', 'stat', 'roll', 'heal']);
+
+/** Abilities that fire on a landed hit (ability engine slice 3a): the target's hit_by / damaged effects (Rough Skin,
+ * Static, Flame Body, Stench, Gooey, Cursed Body, Justified, Rattled, Motor Drive, Weak Armor, Stamina...) and the
+ * attacker's `hits` effects (Poison Touch, Maritime Prowler, Hematophage). A die ("roll a d4, on a 4") or the affected
+ * creature's save is asked here -- once per ability, so Static Wool's one save covers both its effects -- and each
+ * effect that goes through is applied by the server (ability-trigger), which checks the ability is really there. */
+async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attackRoll, damageDealt, typeMultiplier }) {
+  const attacker = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  if (!attacker || !target || attackerId === targetId) return;
+  const row = findMoveRow(moveName) || move || [];
+  const event = {
+    melee: isMeleeMoveRow(row), moveType: (move && move[1]) || row[1] || '', damaging: (damageDealt ?? 0) > 0,
+    vulnerable: (typeMultiplier ?? 1) > 1, attackRoll,
+  };
+  const fired = [
+    ...abilityTriggers(target, 'hit_by', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),
+    ...abilityTriggers(target, 'damaged', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),
+    ...abilityTriggers(attacker, 'hits', event, target).map(t => ({ ...t, holder: attacker, other: target })),
+  ].filter(t => _TRIGGER_KINDS.has(t.effect.kind) && !t.effect.reaction
+    && !t.effect.valueFrom                                 // Color Change's "the type that hit it" -- slice 3b
+    && !(t.effect.save && t.effect.save.dc == null));      // a save with no DC yet (Frigid Aura -- asked of Benjakronk)
+  const decided = new Map(); // ability -> did its die / save let it through (asked once)
+  for (const { ability, index, effect: e, holder, other } of fired) {
+    const affected = e.target === 'attacker' || e.target === 'target' ? other : holder;
+    const key = `${holder.id}:${ability}`;
+    if (!decided.has(key)) {
+      let ok = true;
+      if (e.chance) {
+        const rolled = await promptValueRoll({
+          dice: `1${e.chance.die}`, moveName: ability,
+          description: `${holder.name}'s ${ability} -- roll a ${e.chance.die}: it works on ${e.chance.min}${e.chance.min < Number(String(e.chance.die).slice(1)) ? '+' : ''}.`,
+        });
+        ok = rolled != null && rolled >= e.chance.min;
+      }
+      if (ok && e.save) {
+        const outcome = await confirmSecondarySave(affected, affected.name, {
+          dc: Number(e.save.dc) || 0, ability: e.save.ability, title: `${holder.name}'s ${ability} -- ${e.save.ability} save`, moveUser: holder,
+        });
+        ok = !!outcome && !outcome.passed;
+      }
+      decided.set(key, ok);
+      if (!ok) continue;
+    } else if (!decided.get(key)) {
+      continue;
+    }
+    // The number for a rolled amount (Emberflame's 1d4 + proficiency, Static Wool's 1d6) or a share of the damage dealt.
+    let amount = null;
+    const a = e.amount;
+    if (a && typeof a === 'object' && a.dice) {
+      const bonus = a.plus === 'proficiency' ? Number(holder.proficiency) || 0 : 0;
+      amount = await promptValueRoll({ dice: a.dice, moveModBonus: bonus, moveName: ability,
+        description: `${holder.name}'s ${ability} -- enter the ${a.dice} roll${bonus ? ` (+${bonus} added)` : ''}.` });
+      if (amount == null) continue;
+    } else if (a && typeof a === 'object' && (a.fractionOfDamage != null || a.fractionOfDamageDealt != null)) {
+      amount = Math.floor((damageDealt || 0) * (a.fractionOfDamage ?? a.fractionOfDamageDealt));
+    }
+    try {
+      // Cursed Body: the move to disable is the one that just hit.
+      const value = e.kind === 'condition' && e.apply === 'move_disabled' ? moveName : null;
+      await CombatAPI.abilityTrigger(holder.id, ability, index, affected.id, amount, value);
+    } catch (err) {
+      // An immunity (Limber vs Static's paralysis...) or a spent use is just reported.
+      showCombatAlert(err.message, { title: ability });
+    }
+  }
 }
 
 /** combat.js's setOnUseTrainerBuff hook: Second Wind and Rapid Orders do the real thing (see below); every other buff

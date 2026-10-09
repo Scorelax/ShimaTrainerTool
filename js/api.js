@@ -1031,6 +1031,14 @@ export class CombatAPI {
     return API.request('combat', 'stand-up', { id }, { useCache: false });
   }
 
+  /** An ability effect the client detected (being hit, hitting): the server checks `holderId` has it and applies it
+   * (routes_combat.py's _ability_trigger). `amount` = the rolled number when the effect has dice. */
+  static async abilityTrigger(holderId, ability, index, targetId, amount = null, value = null) {
+    return API.request('combat', 'ability-trigger', {
+      id: holderId, ability, index, targetId, ...(amount != null ? { amount } : {}), ...(value != null ? { value } : {}),
+    }, { useCache: false });
+  }
+
   /** The type multiplier a hit would get (chart + live type changes + abilities) -- read-only (routes_combat.py's _type_preview). */
   static async typePreview(attackerId, targetId, moveType, moveName = '') {
     return API.request('combat', 'type-preview', { id: attackerId, targetId, moveType, moveName }, { useCache: false });

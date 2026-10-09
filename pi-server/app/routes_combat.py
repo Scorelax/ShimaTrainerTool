@@ -509,6 +509,13 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _stand_up(s, params['id']))
 
+    if action == 'ability-trigger':
+        if not params.get('id') or not params.get('ability'):
+            raise ValueError('Missing participant id or ability')
+        return _mutate(conn, lambda s: _ability_trigger(conn, s, params['id'], params['ability'], js_parse_int(params.get('index')),
+                                                        params.get('targetId') or params['id'], js_parse_int(params.get('amount')),
+                                                        params.get('value')))
+
     if action == 'type-preview':
         # Read-only: the type multiplier a hit WOULD get, for the damage-roll step (super-effective ability conditions).
         return {'status': 'success', 'data': _type_preview(conn, load_state(conn), params.get('id'), params.get('targetId'),
@@ -1061,6 +1068,7 @@ def _entered_battle(state, participant):
     """Remembers the round a creature came into the battle (Fake Out / First Impression: "only usable in the first round you
     are in combat"). Before the battle starts that is round 1."""
     participant['enteredRound'] = state['round'] if state.get('started') else 1
+    _ability_auto(state, participant['id'], 'enter_battle')  # Drizzle & co., Frisk & co., Disguise
 
 
 def _remove_participant(state, pid):
@@ -1299,6 +1307,7 @@ def _perform_switch(state, pending):
             out['statuses'] = kept
             _log_event(state, 'status-expire', text=f"{out['name']}'s stat changes and other effects end as it is withdrawn",
                        targetId=out_id, targetName=out['name'])
+    _ability_auto(state, out_id, 'switched_out')  # Natural Cure, Regenerator
     if (state.get('pendingForcedSwitch') or {}).get('pokemonId') == out_id:
         state['pendingForcedSwitch'] = None
     _apply_switch_heal(state, inn)
@@ -1555,12 +1564,14 @@ def _advance_turn(state):
     # section) -- after the log line, so "wore off" entries read as happening
     # in the new turn/round.
     if ending_id:
+        _ability_auto(state, ending_id, 'end_of_turn')  # Rain Dish, Ice Body, Dry Skin
         _apply_condition_turn_damage(state, ending_id, 'end')
         _queue_status_ticks(state, ending_id, 'end')
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
         _expire_statuses_by_round(state)
     starting_id = state['turnOrder'][state['turnIndex']]
+    _ability_auto(state, starting_id, 'start_of_turn')  # Chlorophyll, Psychic Barrier, Energy Intensive, Cosmic Slumber
     _expire_fields(state, starting_id)
     _apply_condition_turn_damage(state, starting_id, 'start')
     _queue_status_ticks(state, starting_id, 'start')
@@ -2623,6 +2634,144 @@ def _move_has_flag(move_name, flag):
     return bool(move and move.get(flag))
 
 
+# ---------------------------------------------------------------------------
+# Ability triggers (slice 3 of the ability engine -- abilities.py has the lookups). Two paths:
+#   - _ability_auto: triggers with nothing to roll, run by the server itself at the moment they happen (turn start/end,
+#     entering the battle, being withdrawn, a knockout).
+#   - ability-trigger (_ability_trigger): triggers the client detects and rolls for (being hit, hitting -- Rough Skin's
+#     "roll a d4, on a 4"). The client names the holder, the ability and the effect's index; this checks the holder
+#     really has it and applies it through the normal damage/status paths.
+# `limit` ({uses, per}) is counted per battle -- rests happen outside battles, so one battle is one rest period.
+# ---------------------------------------------------------------------------
+
+_SAVE_ABILITY_KEYS = {'str': 'str', 'dex': 'dex', 'con': 'con', 'int': 'int', 'wis': 'wis', 'cha': 'cha'}
+
+
+def _ability_use_ok(holder, ability, index, effect):
+    """False once the effect's per-battle use limit is spent; records a use otherwise."""
+    limit = effect.get('limit') or {}
+    uses = js_parse_int(limit.get('uses'))
+    if not uses:
+        return True
+    counts = holder.setdefault('abilityUses', {})
+    key = f'{ability}:{index}'
+    if counts.get(key, 0) >= uses:
+        return False
+    counts[key] = counts.get(key, 0) + 1
+    return True
+
+
+def _ability_heal(state, holder, amount, ability, pool='HP'):
+    field, max_field = ('currentVP', 'maxVP') if pool == 'VP' else ('currentHP', 'maxHP')
+    gained = max(0, min((holder.get(max_field) or 0) - (holder.get(field) or 0), amount))
+    if gained:
+        holder[field] = (holder.get(field) or 0) + gained
+        _log_event(state, 'heal', text=f"{holder['name']}'s {ability}: +{gained} {pool}", actorId=holder['id'], actorName=holder['name'],
+                   targetId=holder['id'], targetName=holder['name'], amount=gained)
+
+
+def _ability_stat(state, holder_id, target_id, ability, effect):
+    """A stat effect as a status. 'saving_throw_abilities' (Beast Boost, Soul-Heart) means the ability scores of the
+    target's saving-throw proficiencies -- one status each."""
+    target = state['participants'][target_id]
+    stats = [effect.get('stat')]
+    if effect.get('stat') == 'saving_throw_abilities':
+        words = re.findall(r'[A-Za-z]+', str(target.get('savingThrows') or ''))
+        stats = [_SAVE_ABILITY_KEYS[w[:3].lower()] for w in words if w[:3].lower() in _SAVE_ABILITY_KEYS]
+    for stat in stats:
+        spec = {'kind': 'stat', 'stat': stat, 'sourceId': holder_id, 'moveName': ability, 'ends': effect.get('ends') or []}
+        for k in ('amount', 'set', 'stacks'):
+            if k in effect:
+                spec[k] = effect[k]
+        _apply_status(state, target_id, spec)
+
+
+def _ability_auto(state, pid, event, **ctx):
+    """Runs the participant's `event` effects that need no roll. Anything that does is left to the client (being hit)
+    or to the table (the rest -- slice 4's reminders)."""
+    holder = state['participants'].get(pid)
+    if not holder or holder.get('status') != 'participating' and event != 'switched_out':
+        return
+    for ab, i, e in abilities.triggered(state, pid, event):
+        kind = e.get('kind')
+        amount = abilities.resolve_amount(holder, e.get('amount'))
+        if kind in ('heal', 'lose_hp', 'temp_hp') and amount is None:
+            continue  # dice -- rolled at the table
+        if (e.get('optional') and kind != 'extra_action') or e.get('chance') or e.get('save'):
+            continue  # a choice or a roll -- not automatic (Moxie's "may take another action" just re-opens the action)
+        if not _ability_use_ok(holder, ab, i, e):
+            continue
+        if kind == 'heal' and not e.get('setTo') and (e.get('target') or 'self') == 'self':
+            _ability_heal(state, holder, amount, ab, e.get('pool') if e.get('pool') in ('HP', 'VP') else 'HP')
+        elif kind == 'lose_hp':
+            if e.get('pool') == 'VP':
+                holder['currentVP'] = max(0, (holder.get('currentVP') or 0) - amount)
+            else:
+                holder['currentHP'] -= _absorb_temp_hp(state, holder, amount)
+            _log_event(state, 'status-damage', text=f"{holder['name']}'s {ab}: -{amount} {e.get('pool') or 'HP'}", actorId=pid, actorName=holder['name'])
+        elif kind == 'temp_hp':
+            cap = (e.get('stacks') or {}).get('capLevelMultiple')
+            current = next((s for s in _statuses_of(holder) if s.get('kind') == 'temp_hp' and s.get('moveName') == ab), None)
+            total = amount + ((current.get('remaining', current.get('amount')) or 0) if current and cap else 0)
+            if cap:
+                total = min(total, int(holder.get('level') or 0) * int(cap))
+            _apply_status(state, pid, {'kind': 'temp_hp', 'amount': total, 'sourceId': pid, 'moveName': ab, 'ends': []})
+        elif kind == 'set_weather':
+            _set_weather(state, e.get('name'), '', e.get('rounds'), pid, holder['name'], caster_level=holder.get('level'))
+            _log_event(state, 'weather', text=f"{holder['name']}'s {ab}: {e.get('name')} for {e.get('rounds')} rounds"
+                                              f" (outside battles only -- clear it on the map if this one is indoors)", actorId=pid, actorName=holder['name'])
+        elif kind == 'reveal':
+            _log_event(state, 'ability', text=f"{holder['name']}'s {ab}: {e.get('note') or 'reveals something'}"
+                                              f" -- {str(e.get('what', '')).replace('_', ' ')}", actorId=pid, actorName=holder['name'])
+        elif kind == 'stat':
+            _ability_stat(state, pid, pid, ab, e)
+        elif kind == 'extra_action':
+            holder['actionUsed'] = False
+            _log_event(state, 'ability', text=f"{holder['name']}'s {ab}: may take another action", actorId=pid, actorName=holder['name'])
+        elif kind == 'cure_condition' and e.get('negativeConditions'):
+            for s in [s for s in _statuses_of(holder) if s.get('kind') == 'condition' and s.get('apply') in abilities.NEGATIVE_CONDITIONS]:
+                _remove_status(state, pid, s['id'], f'cured by {ab}')
+
+
+def _ability_trigger(conn, state, holder_id, ability, index, target_id, amount, value=None):
+    """A client-detected trigger (being hit, hitting): validates that `holder_id` has `ability` with an effect at `index`
+    of a kind this can apply, then applies it -- damage to `target_id` (Rough Skin), a condition or stat or roll mode on
+    it (Flame Body, Gooey, Justified), or a heal for the holder (Hematophage). `amount` is the rolled number when the
+    effect has dice or depends on damage dealt."""
+    holder = state['participants'].get(holder_id)
+    target = state['participants'].get(target_id)
+    if not holder or not target:
+        raise ValueError('Unknown participant')
+    entry = next(((ab, i, e) for ab, i, e in abilities.indexed_effects(holder) if ab.lower() == str(ability).lower() and i == index), None)
+    if not entry:
+        raise ValueError(f"{holder['name']} doesn't have that ability effect")
+    ab, i, e = entry
+    if not _ability_use_ok(holder, ab, i, e):
+        raise ValueError(f"{holder['name']}'s {ab} has no uses left this battle")
+    kind = e.get('kind')
+    fixed = abilities.resolve_amount(holder, e.get('amount'))
+    value = fixed if fixed is not None else amount
+    spec_base = {'sourceId': holder_id, 'moveName': ab, 'ends': e.get('ends') or []}
+    if kind in ('retaliate', 'deal_damage'):
+        if not value or value <= 0:
+            return
+        _apply_damage_to_target(conn, state, holder_id, target_id, value, e.get('damageType') or '', ab, turn_check=False)
+    elif kind == 'condition':
+        # Cursed Body's move_disabled names the move that just hit -- the client sends it as `value`.
+        cond_value = value if value and e.get('apply') == 'move_disabled' else e.get('value')
+        _apply_status(state, target_id, {**spec_base, 'kind': 'condition', 'apply': e.get('apply'),
+                                         **({'value': cond_value} if cond_value is not None else {})})
+    elif kind == 'stat':
+        _ability_stat(state, holder_id, target_id, ab, e)
+    elif kind == 'roll':
+        _apply_status(state, target_id, {**spec_base, 'kind': 'roll', 'roll': e.get('roll'), 'on': e.get('on')})
+    elif kind == 'heal':
+        if value and value > 0:
+            _ability_heal(state, holder, value, ab, e.get('pool') if e.get('pool') in ('HP', 'VP') else 'HP')
+    else:
+        raise ValueError(f"{ab}'s {kind} effect isn't triggered this way")
+
+
 def _type_preview(conn, state, pid, target_id, move_type, move_name=''):
     """The type multiplier (2 / 1 / 0.5 / 0) a hit from `pid` on `target_id` would get -- the same chart, live type
     changes and abilities _apply_damage_to_target uses, without changing anything. None for an unknown participant."""
@@ -2721,6 +2870,13 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         target['currentHP'] = 1
         spared = True
     _note_faint(target, hp_before)
+    if hp_before > 0 and target['currentHP'] <= 0:
+        # A knockout: the attacker's ko_dealt (Beast Boost, Moxie) and the fallen one's allies' ally_fainted (Soul-Heart).
+        if pid != target_id:
+            _ability_auto(state, pid, 'ko_dealt')
+        for qid, q in state['participants'].items():
+            if qid != target_id and q.get('status') == 'participating' and not _hostile(state, q, target):
+                _ability_auto(state, qid, 'ally_fainted')
     move_label = f' with {move_name}' if move_name else ''
     condition_note = ' -- Mat Block/Testudo Formation reduces this' if condition_multiplier != 1 else ''
     condition_note += ' -- held back, left at 1 HP' if spared else ''

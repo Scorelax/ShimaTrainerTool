@@ -48,14 +48,32 @@ export function abilityNamesOf(p) {
   return names;
 }
 
-/** [{ ability, effect }] for the creature's ability. */
+/** [{ ability, effect, index }] for the creature's ability (`index` = the effect's place in that ability's list -- how
+ * the server's ability-trigger action names it). */
 export function abilityEffectsOf(p) {
   const out = [];
   for (const n of abilityNamesOf(p)) {
     const a = _data[n.toLowerCase()];
-    if (a) a.effects.forEach(effect => out.push({ ability: a.name, effect }));
+    if (a) a.effects.forEach((effect, index) => out.push({ ability: a.name, effect, index }));
   }
   return out;
+}
+
+/** The creature's effects for one trigger (`when.type`: hit_by, damaged, hits...) whose gates hold, with the trigger's
+ * own filters checked against `event` = { melee, moveTypes: [the move's type], damaging, vulnerable, attackRoll }. */
+export function abilityTriggers(p, trigger, event = {}, target = null) {
+  return abilityEffectsOf(p).filter(({ effect: e }) => {
+    const w = e.when || {};
+    if (w.type !== trigger) return false;
+    if (w.melee && !event.melee) return false;
+    if (w.ranged && event.melee) return false;
+    if (w.damaging && !event.damaging) return false;
+    if (w.vulnerable && !event.vulnerable) return false;
+    if (w.moveTypes && !w.moveTypes.map(t => t.toLowerCase()).includes(String(event.moveType || '').toLowerCase())) return false;
+    if (w.naturalRollMin != null && !((event.attackRoll ?? 0) >= w.naturalRollMin)) return false;
+    if (w.minFractionOfCurrentHP != null || w.crossesBelowFraction != null || w.includeSelf != null) return false; // slice 3b
+    return _gatesHold(p, e, target);
+  });
 }
 
 // --- gates ---------------------------------------------------------------------------------------------------------

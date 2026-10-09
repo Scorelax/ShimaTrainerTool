@@ -71,14 +71,55 @@ def client_effects():
 
 def ability_effects(participant):
     """[(ability name, effect), ...] for the participant's ability."""
+    return [(name, e) for name, _, e in indexed_effects(participant)]
+
+
+def indexed_effects(participant):
+    """[(ability name, index of the effect within that ability, effect), ...] -- the index is how the client names
+    one effect when it reports a trigger (routes_combat's ability-trigger)."""
     by_name = _by_name()
     out = []
     for name in ability_names(participant):
         a = by_name.get(name.lower())
         if not a or 'unknown' in a.get('categories', []):
             continue
-        out += [(a['name'], e) for e in a.get('effects') or []]
+        out += [(a['name'], i, e) for i, e in enumerate(a.get('effects') or [])]
     return out
+
+
+def triggered(state, pid, event):
+    """The participant's effects for this trigger (`when.type`) whose gates hold: [(ability, index, effect), ...]."""
+    p = state['participants'].get(pid)
+    if not p:
+        return []
+    return [(ab, i, e) for ab, i, e in indexed_effects(p)
+            if (e.get('when') or {}).get('type') == event and gates_hold(state, pid, p, e)]
+
+
+def resolve_amount(p, amount):
+    """A fixed amount the server can work out by itself, or None when it needs a roll (dice) or a number only the
+    table knows (a share of damage dealt)."""
+    if isinstance(amount, (int, float)):
+        return int(amount)
+    if not isinstance(amount, dict) or amount.get('dice'):
+        return None
+    prof = int(p.get('proficiency') or 0)
+    level = int(p.get('level') or 0)
+    if amount.get('proficiency'):
+        return prof
+    if 'level' in amount:
+        return level * int(amount['level'] or 1)
+    if 'levelMultiple' in amount:
+        return level * int(amount['levelMultiple'])
+    if 'fractionMaxHP' in amount:
+        value = (p.get('maxHP') or 0) * amount['fractionMaxHP']
+        return int(-(-value // 1)) if amount.get('round') == 'up' else int(value)
+    if 'flat' in amount:
+        return int(amount['flat']) + prof * int(amount.get('proficiencyMultiple') or 0)
+    if 'abilityMod' in amount:
+        mod = int(p.get(f"{str(amount['abilityMod']).lower()}Mod") or 0)
+        return mod + (prof if amount.get('plusProficiency') else 0)
+    return None
 
 
 # --- gates --------------------------------------------------------------------------------------------------------
@@ -119,6 +160,8 @@ def gate_holds(state, pid, p, gate, target=None):
         return bool(_conditions(p) & set(gate.get('any') or []))
     if t == 'self_negative_status':
         return bool(_conditions(p) & NEGATIVE_CONDITIONS)
+    if t == 'environment' and set(gate.get('any') or []) == {'outside'}:
+        return True  # "enters an outside battle": nearly every battle map is outdoors -- the log says so, the DM can clear it
     if t in ('self_weather_contains', 'self_terrain_contains'):
         fields = weathers_affecting(state, pid) if t == 'self_weather_contains' else terrains_affecting(state, pid)
         names = [str(f.get('name') or '').lower() for f in fields]

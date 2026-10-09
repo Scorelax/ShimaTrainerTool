@@ -27,7 +27,19 @@ Status 2026-10-09: all 348 abilities done -- 305 with effects, 43 `unknown`, 18 
     `radiusFt` of the attacker, Aura Break reversing Dark/Fairy Aura.
   - superEffective / vulnerable filters on the client: the damage step asks the server for the hit's multiplier
     (`type-preview` -- the chart plus live type changes and abilities, read-only) and shows it ("Super effective (×2)").
-- Not yet: firstUseInEncounter, ally auras that change
+- Slice 3a, triggers (routes_combat.py's "Ability triggers" section):
+  - server, automatic (no roll, no choice): `enter_battle` (set_weather -- an `outside` environment gate counts as
+    met, the log says to clear it indoors; reveal as a log line; temp_hp), `start_of_turn` / `end_of_turn` (heal,
+    lose_hp, temp_hp with `capLevelMultiple`), `switched_out` (Natural Cure, Regenerator), `ko_dealt` /
+    `ally_fainted` (stat incl. `saving_throw_abilities`, Moxie's extra_action). Amounts the server can work out
+    (proficiency, level, fraction of max HP, flat + proficiency, ability modifier) -- dice are left to the table.
+    `limit` counts per battle.
+  - client-detected (`_abilityHitTriggers` in combat-wip.js, after a hit lands): the target's `hit_by` / `damaged`
+    and the attacker's `hits` (filters melee / moveTypes / damaging / vulnerable / naturalRollMin); a `chance` die
+    or a `save` is asked once per ability; the server's `ability-trigger` action (holder, ability, effect index,
+    affected creature, rolled amount) checks the ability and applies retaliate / condition / stat / roll / heal.
+- Not yet (3b): would_faint, redirect, damaged reactions with a choice (Sturdy, Fur Coat, Void Shift...),
+  activated abilities, condition_gained, valueFrom (Color Change, Protean), Pressure; firstUseInEncounter, ally auras that change
   dice or flat damage (Battery, Flower Gift, Victory Star), triggered effects (slice 3), reminders (slice 4).
 
 `DnD_abilities.json` -- one entry per ability (built from the Pi's cached dex by

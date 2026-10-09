@@ -5,6 +5,12 @@
 // answers questions, so it can be exercised in isolation.
 
 import { CONDITION_RULES } from './condition-rules.js';
+import { abilityStatuses } from './ability-mods.js';
+
+/** A participant's live statuses plus its ability's always-on bonuses as virtual statuses (ability-mods.js), for the
+ * rules that should count both the same way (stat deltas, attack and save roll modes). `target` adds the abilities
+ * gated on who's being attacked (Pack Tactics). */
+const _withAbilities = (p, target = null) => [...(p?.statuses || []), ...abilityStatuses(p, target)];
 
 const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
@@ -414,7 +420,7 @@ export function attackRollContext(attacker, target, moveAbilities = [], { ignore
     ctx.notes.push(_sourceText(s));
     if (_hasUses(s)) ctx.consume.push({ holderId: holder.id, statusId: s.id });
   };
-  for (const s of attacker?.statuses || []) {
+  for (const s of _withAbilities(attacker, target)) {
     if (s.kind === 'roll' && (s.on === 'attack_rolls' || s.on === 'all_rolls') && scopeOk(s)) take(s, attacker, s.roll === 'advantage' ? adv : dis);
     if (s.kind === 'stat' && s.stat === 'attack_rolls' && !_isDiceAmount(s) && scopeOk(s)) {
       const a = _statAmount(s, attacker);
@@ -435,7 +441,7 @@ export function attackRollContext(attacker, target, moveAbilities = [], { ignore
     const condMode = _conditionRollMode(s, 'attack_rolls');
     if (condMode) take(s, attacker, condMode === 'advantage' ? adv : dis);
   }
-  for (const s of target?.statuses || []) {
+  for (const s of _withAbilities(target)) {
     // (a target's own all_rolls status affects ITS rolls, not attacks against it)
     if (s.kind === 'roll' && s.on === 'attacks_against') take(s, target, s.roll === 'advantage' ? adv : dis);
     // Phantom Tendril: "unaffected by any of the target's stat changes" -- its AC modifiers don't count.
@@ -469,7 +475,7 @@ const _FLAT_FIELD = { ac: 'ac', crit: 'critMod' };
  * all (see statSetOverrides) so it's already skipped here by construction. */
 export function statDeltas(participant) {
   const d = { ac: 0, crit: 0, str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
-  for (const s of participant?.statuses || []) {
+  for (const s of _withAbilities(participant)) {
     if (s.kind !== 'stat' || typeof s.amount !== 'number') continue;
     const amount = s.amount * _stackCount(s);
     if (s.stat === 'ac' || s.stat === 'crit') d[s.stat] += amount;
@@ -664,7 +670,7 @@ export function saveRollContext(saver, moveUser, ability) {
     ctx.notes.push(_sourceText(s));
     if (_hasUses(s)) ctx.consume.push({ holderId: holder.id, statusId: s.id });
   };
-  for (const s of saver?.statuses || []) {
+  for (const s of _withAbilities(saver)) {
     if (s.kind === 'roll' && s.on === 'all_rolls') take(s, saver, s.roll === 'advantage' ? adv : dis);
     if (s.kind === 'roll' && s.on === 'saving_throws' && _abilityMatches(s, ability)) take(s, saver, s.roll === 'advantage' ? adv : dis);
     if (s.kind === 'stat' && s.stat === 'saving_throws' && _abilityMatches(s, ability) && !_isDiceAmount(s)) {
@@ -686,7 +692,7 @@ export function saveRollContext(saver, moveUser, ability) {
       ctx.notes.push(`${ability} score ${scoreDelta > 0 ? '+' : ''}${scoreDelta} → modifier ${d >= 0 ? '+' : ''}${d}`);
     }
   }
-  for (const s of moveUser?.statuses || []) {
+  for (const s of _withAbilities(moveUser)) {
     if (s.kind === 'roll' && s.on === 'saves_against_its_moves' && _abilityMatches(s, ability)) take(s, moveUser, s.roll === 'advantage' ? adv : dis);
   }
   return _finish(ctx, adv, dis);

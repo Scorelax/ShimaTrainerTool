@@ -2645,7 +2645,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
     in_gravity = any(t.get('rule') == 'gravity' for t in terrains_affecting(state, target_id))
     chart_multiplier = multiplier
     multiplier, ability_multiplier, absorb, ability_notes = abilities.adjust_incoming_damage(
-        state, pid, target_id, move_type, record, crit, multiplier, _hostile(state, attacker, target), in_gravity)
+        state, pid, target_id, move_type, record, crit, multiplier, _hostile(state, attacker, target), in_gravity, _grid_distance_ft)
     ability_note = f" -- {'; '.join(ability_notes)}" if ability_notes else ''
     if absorb is not None:
         # Volt/Water Absorb: no damage; a share of what the hit would have dealt comes back as HP instead.
@@ -2851,7 +2851,9 @@ def _list_move_categories():
             marks['targetRequiresStatus'] = m['targetRequiresStatus']  # Dream Eater & co: only a sleeping target
         if marks:
             flags[m['name']] = marks
-    return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags}
+    # Ability effects for the client's half of the engine (js/utils/ability-mods.js): name -> effects, unknown-tagged ones left out.
+    return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags,
+            'abilities': abilities.client_effects()}
 
 
 def _set_board_background(state, url):

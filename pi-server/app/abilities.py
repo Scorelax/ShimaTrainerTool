@@ -62,6 +62,13 @@ def ability_names(participant):
     return [n for n in names if n]
 
 
+def client_effects():
+    """{ability name: effects} for every ability with effects (not unknown-tagged) -- sent to the client with the move
+    data (list-move-categories) for its half of the engine."""
+    return {a['name']: a['effects'] for a in _by_name().values()
+            if a.get('effects') and 'unknown' not in a.get('categories', [])}
+
+
 def ability_effects(participant):
     """[(ability name, effect), ...] for the participant's ability."""
     by_name = _by_name()
@@ -85,14 +92,21 @@ def _hp_fraction(p):
     return (p.get('currentHP') or 0) / mx if mx else 1
 
 
-def gate_holds(state, pid, p, gate):
-    """True / False, or None when the server can't judge it (treated as not met)."""
+def gate_holds(state, pid, p, gate, target=None):
+    """True / False, or None when the server can't judge it (treated as not met). `target` (a participant) lets the
+    target_* gates be judged -- an attacker's ability against who it's hitting (Infiltrator)."""
     t = (gate or {}).get('type')
     if t == 'any_of':
-        return any(gate_holds(state, pid, p, g) is True for g in gate.get('gates') or [])
+        return any(gate_holds(state, pid, p, g, target) is True for g in gate.get('gates') or [])
     if t == 'not':
-        inner = gate_holds(state, pid, p, gate.get('gate') or {})
+        inner = gate_holds(state, pid, p, gate.get('gate') or {}, target)
         return None if inner is None else not inner
+    if target is not None and t == 'target_status':
+        return bool(_conditions(target) & set(gate.get('any') or []))
+    if target is not None and t == 'target_types':
+        return bool({x.lower() for x in gate.get('any') or []} & _types(target))
+    if target is not None and t == 'target_shares_type':
+        return bool(_types(target) & _types(p))
     if t == 'self_hp_full':
         return (p.get('maxHP') or 0) > 0 and (p.get('currentHP') or 0) >= p['maxHP']
     if t == 'self_hp_below':
@@ -112,8 +126,12 @@ def gate_holds(state, pid, p, gate):
     return None
 
 
-def gates_hold(state, pid, p, effect):
-    return all(gate_holds(state, pid, p, g) is True for g in effect.get('while') or [])
+def gates_hold(state, pid, p, effect, target=None):
+    return all(gate_holds(state, pid, p, g, target) is True for g in effect.get('while') or [])
+
+
+def _types(p):
+    return {str((p or {}).get(k) or '').lower() for k in ('type1', 'type2')} - {''}
 
 
 def passive_effects(state, pid, p, kinds):
@@ -155,16 +173,27 @@ def _step(multiplier, better):
 _DAMAGE_ORDER = ('vulnerability', 'resistance', 'immunity', 'absorb', 'damage_taken_mod')
 
 
-def adjust_incoming_damage(state, attacker_id, target_id, move_type, record, crit, multiplier, hostile, in_gravity):
-    """The target's ability on an incoming hit, after the type chart. Returns (type multiplier, extra multiplier,
-    absorb fraction or None, [notes for the log]). `hostile` = attacker and target are on opposite sides."""
+def adjust_incoming_damage(state, attacker_id, target_id, move_type, record, crit, multiplier, hostile, in_gravity,
+                           distance_ft=None):
+    """Abilities on a hit, after the type chart: the target's defence (slice 1), then the attacker's own (Tinted Lens,
+    Scrappy, Mold Breaker -- slice 2) and damage auras around the attacker (Dark/Fairy Aura, Aura Break, Gravity Well,
+    Pure Waters). Returns (type multiplier, extra multiplier, absorb fraction or None, [notes for the log]).
+    `hostile` = attacker and target are on opposite sides; `distance_ft(state, a, b)` is routes_combat's helper."""
     target = state['participants'][target_id]
+    attacker = state['participants'].get(attacker_id) or {}
     mtype = (move_type or '').strip().lower()
     name = (record or {}).get('name') or ''
     melee = is_melee_record(record)
-    effects = passive_effects(state, target_id, target, set(_DAMAGE_ORDER))
-    effects.sort(key=lambda ne: _DAMAGE_ORDER.index(ne[1]['kind']))
     extra, absorb, notes = 1, None, []
+    # Mold Breaker / Teravolt / Turboblaze: the target's ability doesn't get a say.
+    breaker = next((ab for ab, _ in passive_effects(state, attacker_id, attacker, {'ignore_target_abilities'})), None)
+    if breaker and target_id != attacker_id:
+        effects = []
+        if ability_names(target):
+            notes.append(f"{breaker}: ignores {target.get('name')}'s ability")
+    else:
+        effects = passive_effects(state, target_id, target, set(_DAMAGE_ORDER))
+    effects.sort(key=lambda ne: _DAMAGE_ORDER.index(ne[1]['kind']))
     for ab, e in effects:
         kind = e['kind']
         if kind == 'vulnerability' and _types_match(e.get('damageTypes'), mtype, multiplier):
@@ -205,6 +234,57 @@ def adjust_incoming_damage(state, attacker_id, target_id, move_type, record, cri
                 continue
             extra *= e['multiplier']
             notes.append(f"{ab}: x{e['multiplier']}")
+
+    # The attacker's own ability on its move (gates may look at the target -- Infiltrator).
+    for ab, e in ability_effects(attacker):
+        if (e.get('when') or {}).get('type') != 'passive' or e.get('target', 'self') != 'self':
+            continue
+        f = e.get('filter') or {}
+        if set(f) - {'damaging', 'moveTypes'}:
+            continue  # slashing & co. -- not something the server can tell from the move
+        if f.get('moveTypes') and mtype not in {x.lower() for x in f['moveTypes']}:
+            continue
+        if not gates_hold(state, attacker_id, attacker, e, target):
+            continue
+        if e.get('kind') == 'ignore_immunity' and multiplier == 0 and mtype in {x.lower() for x in e.get('moveTypes') or []} \
+                and _types(target) & {x.lower() for x in e.get('vsTypes') or []}:
+            multiplier = 1
+            notes.append(f'{ab}: hits through the immunity')
+        elif e.get('kind') == 'ignore_resistance' and multiplier == 0.5:
+            multiplier = 1
+            notes.append(f'{ab}: ignores the resistance')
+
+    # Damage auras: a move used within the aura holder's radius (Dark Aura, Fairy Aura -- reversed by Aura Break --
+    # Gravity Well, Pure Waters).
+    if distance_ft and mtype:
+        def within(holder_id, radius):
+            if holder_id == attacker_id:
+                return True
+            d = distance_ft(state, holder_id, attacker_id)
+            return d is not None and d <= radius
+        auras_broken = any(e.get('kind') == 'aura_break' and within(pid, e.get('radiusFt') or 0)
+                           for pid, p in state['participants'].items() if p.get('status') == 'participating'
+                           for _, e in ability_effects(p))
+        for pid, p in state['participants'].items():
+            if p.get('status') != 'participating':
+                continue
+            for ab, e in ability_effects(p):
+                if e.get('kind') != 'damage_mod' or not e.get('totalMultiplier') or e.get('target') not in ('all', 'others'):
+                    continue
+                if (e.get('when') or {}).get('type', 'passive') != 'passive' or not gates_hold(state, pid, p, e):
+                    continue
+                if e['target'] == 'others' and pid == attacker_id:
+                    continue
+                types = (e.get('filter') or {}).get('moveTypes')
+                if types and mtype not in {x.lower() for x in types}:
+                    continue
+                if not within(pid, e.get('radiusFt') or 0):
+                    continue
+                factor = e['totalMultiplier']
+                if auras_broken and ab in ('Dark Aura', 'Fairy Aura'):
+                    factor = 1 / factor
+                extra *= factor
+                notes.append(f"{ab} ({p.get('name')}): x{factor:g}")
     return multiplier, extra, absorb, notes
 
 

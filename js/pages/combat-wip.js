@@ -9,7 +9,7 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
-import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setWeatherAttackModeResolver } from '../utils/target-picker.js';
+import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver } from '../utils/target-picker.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
 import { waitForOpenWindow } from '../utils/reaction-window.js';
@@ -19,6 +19,7 @@ import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
 import { lineFtFromRange } from '../utils/line-area.js';
+import { setAbilitySession } from '../utils/ability-mods.js';
 import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { playBattleAnimationFloating } from '../utils/move-popup.js';
@@ -644,6 +645,7 @@ async function _prefetchAllBackgrounds() {
 export async function renderCombatWip() {
   const result = await CombatAPI.getState();
   session = result.status === 'success' ? result.data : { active: false };
+  setAbilitySession(session); // ability-mods.js reads weather, round and positions from it
   return _renderCurrentView();
 }
 
@@ -1066,6 +1068,7 @@ function _lastHitMoveStreak(session, pid) {
 }
 
 setMoveFlagResolver((moveName) => moveFlagsFor(moveName));
+setMoveRowResolver((moveName) => findMoveRow(moveName)); // abilities' target-dependent damage (ability-mods.js)
 // Wonder Room: WIS saves become CON saves and CON saves become WIS saves for creatures standing in it.
 setSaveAbilityResolver((ability, saver) => {
   if (!saver?.id || !zoneRuleActive(terrainsAffecting(session, saver.id), 'wonder_room')) return ability;
@@ -2608,6 +2611,7 @@ export function attachCombatWipListeners() {
   if (combatUpdateHandler) window.removeEventListener('app:combat-updated', combatUpdateHandler);
   combatUpdateHandler = (e) => {
     session = e.detail;
+    setAbilitySession(session);
     if (_joinStage === 'placement') {
       if (_placementQueue.length) {
         _renderPlacementTokens(session, _placementQueue[0]);

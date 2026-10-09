@@ -11,8 +11,22 @@ Status 2026-10-09: all 348 abilities done -- 305 with effects, 43 `unknown`, 18 
   `allies` aura within `radiusFt`; weatherDamage on hail/sandstorm ticks), `resistance` / `vulnerability` (one step on
   the 2 / 1 / 0.5 / 0 ladder), `absorb`, `damage_taken_mod` (damageTypes / notTypes / melee / superEffective /
   vulnerable filters), `stat_lock`. Gravity switches Levitate off.
-- Not yet: everything needing the roll or the save (critDamage, maxDamage, rerollKeep, saveForHalf), outgoing effects,
-  triggered effects -- slices 2-4.
+- Slice 2, client (`js/utils/ability-mods.js`, ability data from list-move-categories' `abilities`) + server:
+  - virtual statuses (move-independent, `filter`-less): `stat` (ac/crit/scores/attack_rolls), `crit_range`,
+    `attack_bonus`, `roll` on attack_rolls / attacks_against / saving_throws / saves_against_its_moves -- counted by
+    move-effects.js's statDeltas, attackRollContext (with the target: Pack Tactics, Prey Stalker) and saveRollContext.
+  - move popup (combat.js, shared battle only): `move_type_override`, `type_proficiency`, `attack_bonus` (filtered),
+    `damage_mod` (flatBonus / diceMultiplier rounded up / extraDice with scaling / totalMultiplier + rerollKeep as
+    notes), `stab_mod` (not `grant` -- Tough Claws stays computeMoveData's), `vp_cost_mod`, `save_dc_bonus`,
+    `crit_dice_multiplier` (note). Extra gates: self_no_held_item, self_level_at_least, combat_round_at_most,
+    ally_has_ability.
+  - damage step (target-picker.js): target-gated `damage_mod` (flat added, the rest as notes); the defender's
+    critDamage / crit maxDamage / rerollKeep lower as notes. Magic Guard skips the damage step on a passed save.
+  - server: the attacker's `ignore_target_abilities`, `ignore_immunity` (moveTypes vs vsTypes), `ignore_resistance`
+    (target_* gates judged); damage auras `damage_mod` with `totalMultiplier` and target all/others within
+    `radiusFt` of the attacker, Aura Break reversing Dark/Fairy Aura.
+- Not yet: superEffective filters on the client (no type chart there), firstUseInEncounter, ally auras that change
+  dice or flat damage (Battery, Flower Gift, Victory Star), triggered effects (slice 3), reminders (slice 4).
 
 `DnD_abilities.json` -- one entry per ability (built from the Pi's cached dex by
 `build_abilities_list.py`; the rebuild only refreshes `description` and `pokemon`, so

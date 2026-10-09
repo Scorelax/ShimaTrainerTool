@@ -21,6 +21,7 @@ import { getBattleAnimationUrl } from './battle-animation.js';
 import { filterTargetable } from './targetability.js';
 import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, saveAutoFails } from './move-effects.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
+import { noDamageOnPassedSave } from './ability-mods.js';
 
 function _injectStyles() {
   if (document.getElementById('save-picker-styles')) return;
@@ -374,7 +375,8 @@ function _confirmPass() {
   // Self-Destruct's own "half as much on a success" -- everything else
   // that's ever called this closes right away on a Pass, no damage step at
   // all (see this file's own header comment).
-  if (_hasDamage && _damageOnPass) {
+  // Magic Guard (the saver's ability, ability-mods.js): a passed save against a half-damage move means no damage.
+  if (_hasDamage && _damageOnPass && !noDamageOnPassedSave(_selectedTarget)) {
     _showStep3();
     _playAnimation();
   } else {

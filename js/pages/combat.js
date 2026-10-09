@@ -6,7 +6,8 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup, playBattleAnimationFloating } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
-import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, selfRequirementUnmet, zoneRuleActive } from '../utils/move-effects.js';
+import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, selfRequirementUnmet, zoneRuleActive, isMeleeMoveRow } from '../utils/move-effects.js';
+import { setAbilityData, moveAbilityMods } from '../utils/ability-mods.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
@@ -74,6 +75,7 @@ function loadMoveCategories() {
     _moveCategories = normalized;
     _moveEffects = result.effects || {};
     _moveFlags = result.flags || {};
+    setAbilityData(result.abilities || {}); // the shared battle's ability engine (ability-mods.js)
   }).catch(() => {}).finally(() => { _moveCategoriesLoading = false; });
 }
 
@@ -3149,6 +3151,19 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   const _zones = c.activeTerrains || (state.terrain ? [state.terrain] : []);
   // Ion Deluge: "any normal-type move activated within 50 feet of you is considered electric-type".
   if (zoneRuleActive(_zones, 'ion_deluge') && move[1] === 'Normal') { move = [...move]; move[1] = 'Electric'; }
+  // The shared battle's ability engine (ability-mods.js): what this creature's ability does to this move. Its type
+  // first (Pixilate, Normalize...), since STAB and every type filter read it; the numbers are folded in once
+  // computeMoveData has run (below). The legacy page never gets here (no ability data, _isSharedCombat false).
+  const _moveFx = moveEffectsFor(moveName);
+  const _abilityMods = _isSharedCombat ? moveAbilityMods(c, move, {
+    damaging: !!parseDamageDice(move[7] || '', move[8] || '', c.level),
+    melee: isMeleeMoveRow(move),
+    soundBased: !!moveFlagsFor(moveName).soundBased,
+    attackRoll: !moveFlagsFor(moveName).noAttackRoll,
+    recoil: _moveFx.some(e => e.kind === 'recoil'),
+    negativeCondition: _moveFx.some(e => e.kind === 'condition' && e.target !== 'self'),
+  }) : null;
+  if (_abilityMods && _abilityMods.type !== move[1]) { move = [...move]; move[1] = _abilityMods.type; }
   // Storm Surge ("only while it is raining"), Aurora Veil ("only while it is hailing"), Endeavor ("not in the first round").
   // Limit Break (below 50% HP), Dawn Burst (above 75%), Snore (asleep), Recompose (no enemy in melee range). Statuses and the
   // nearest enemy are only known in the shared battle (bridged onto `c` by combat-wip.js); unknowns never block.
@@ -3198,7 +3213,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   const computedData = computeMoveData(
     move,
     {
-      types: c.types || [],
+      // Psychic Boost / Dark Native / Winter Roots...: proficient with those moves = they count as its own type.
+      types: [...(c.types || []), ...(_abilityMods?.extraTypes || [])],
       strMod: c.strMod, dexMod: c.dexMod, conMod: c.conMod,
       intMod: c.intMod, wisMod: c.wisMod, chaMod: c.chaMod,
       proficiency: c.proficiency,
@@ -3210,13 +3226,34 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       // undefined (-> computeMoveData's own default of 1) on the legacy
       // standalone engine.
       // Rototiller: grass-type creatures inside it double their STAB bonus on grass-type moves.
-      stabMultiplier: (c.stabMultiplier || 1) * (zoneRuleActive(_zones, 'rototiller') && move[1] === 'Grass' && (c.types || []).includes('Grass') ? 2 : 1),
+      stabMultiplier: (c.stabMultiplier || 1) * (zoneRuleActive(_zones, 'rototiller') && move[1] === 'Grass' && (c.types || []).includes('Grass') ? 2 : 1)
+        * (_abilityMods?.stabMultiplier || 1), // Sand Force, Reckless...
       // Live `damage_rolls` stat statuses -- WIP-bridged, undefined on the legacy engine.
       damageRollBonus: c.damageRollBonus,
     },
     { path: trainerPath, level: trainerLevel, specializationsStr },
     heldItemEffects
   );
+
+  // The ability's numbers (see _abilityMods above): attack bonus, damage dice (Overgrow's "50% more dice", rounded up)
+  // and extra dice, flat damage, save DC. Breakdowns read "(Proficiency +3, STR +2)" -- the ability parts go inside.
+  if (_abilityMods) {
+    const addParts = (text, parts) => (parts.length ? `(${[text.replace(/^\(|\)$/g, ''), ...parts].filter(Boolean).join(', ')})` : text);
+    if (_abilityMods.attack) {
+      computedData.attackBonus += _abilityMods.attack;
+      computedData.attackBreakdown = addParts(computedData.attackBreakdown, _abilityMods.atkParts);
+    }
+    if (computedData.damageDice) {
+      let dice = computedData.damageDice;
+      const m = /^(\d+)(d\d+)$/i.exec(dice);
+      if (_abilityMods.diceMultiplier !== 1 && m) dice = `${Math.ceil(parseInt(m[1], 10) * _abilityMods.diceMultiplier)}${m[2]}`;
+      for (const d of _abilityMods.extraDice) dice = `${dice} + ${d}`;
+      computedData.damageDice = dice;
+      computedData.damageBonus += _abilityMods.damageFlat;
+      computedData.damageBreakdown = addParts(computedData.damageBreakdown, _abilityMods.dmgParts);
+    }
+    if (_abilityMods.dcBonus && computedData.moveDC != null) computedData.moveDC += _abilityMods.dcBonus;
+  }
 
   // noCastDamage moves: the dice in their text aren't a damage roll made when the move is cast -- they belong to what it does LATER
   // (Spikes/Uproar's zone hazard, Mirror Coat's reduction and return hit, Etheric Discharge's VP multiplier) -- so casting must not open
@@ -3405,7 +3442,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     spriteUrl: c.image,
     spriteAlt: c.name,
     speciesName: c.speciesName,
-    noteText: _stackNote || _damageNote || undefined,
+    noteText: [_stackNote || _damageNote, ...(_abilityMods?.notes || [])].filter(Boolean).join(' · ') || undefined,
     disableUse: (_isStackMove && _stacks === 0) || _bonusSpent || !!_weatherBlock,
     disableUseMsg: _weatherBlock || (_bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first'),
     diceLabel: _diceLabel,
@@ -3416,6 +3453,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       // half, rounded up" (WIP-bridged `vpHalvedAbilities`, empty on the legacy engine).
       const base = parseInt(move[4], 10) || 0;
       let cost = base + (_extraVpCost > 0 ? _extraVpCost : 0);
+      // Overgrow/Blaze/Torrent/Swarm/Ferocity...: the ability's VP-cost multiplier (rounded up).
+      if (_abilityMods && _abilityMods.vpMultiplier !== 1) cost = Math.ceil(cost * _abilityMods.vpMultiplier);
       const halved = c.vpHalvedAbilities || [];
       const abilities = String(move[2] || '').split('/').map((m) => m.trim().toUpperCase());
       if (halved.some((a) => abilities.includes(a))) cost = Math.ceil(cost / 2);

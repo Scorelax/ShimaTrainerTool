@@ -14,7 +14,8 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode } from './move-effects.js';
+import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode, isMeleeMoveRow } from './move-effects.js';
+import { targetAbilityDamage, moveAbilityMods } from './ability-mods.js';
 import { waitForReactionWindow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 import { filterTargetable } from './targetability.js';
@@ -134,6 +135,10 @@ let _weatherModeResolver = () => null;
 export function setWeatherAttackModeResolver(fn) { _weatherModeResolver = typeof fn === 'function' ? fn : () => null; }
 let _moveFlagResolver = () => ({});
 export function setMoveFlagResolver(fn) { _moveFlagResolver = typeof fn === 'function' ? fn : () => ({}); }
+// Same injection for the move's data row ([name, type, stat, action, vp, duration, range, description, scaling]) --
+// the abilities' target-dependent damage (ability-mods.js's targetAbilityDamage) needs its type and range.
+let _moveRowResolver = () => null;
+export function setMoveRowResolver(fn) { _moveRowResolver = typeof fn === 'function' ? fn : () => null; }
 export function setMoveAbilityResolver(fn) { _moveAbilityResolver = typeof fn === 'function' ? fn : () => []; }
 // The name of a move the ATTACKER knows that carries `negatesProtectBlock`
 // (Feint), precomputed by the caller (combat-wip.js's own _feintMoveNameFor
@@ -670,7 +675,13 @@ function _showStep3() {
   // total, folded in below same as _damageModifier.
   const { diceMultiplier, diceOverride, flatBonus, advantage, extraDiceCount, note } =
     targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll, targetDamagedMeThisRound: _targetDamagedMeThisRound(), targetDamagedThisRound: _targetDamagedThisRound(), adjacentAllies: _adjacentAlliesOfAttacker(), moveAbilities: _moveAbilityResolver(_moveName) });
-  _targetFlatBonus = flatBonus;
+  // The attacker's ability against THIS target (Merciless, Rivalry, Magnet Pull...) and the target's own crit/reroll
+  // rules (Battle Armor, Paper Thin, Prism Armor) -- ability-mods.js. Its flat damage joins the total like Crush Grip's.
+  const row = _moveRowResolver(_moveName);
+  const abilityDamage = row
+    ? targetAbilityDamage(_attacker, _selectedTarget, row, { type: moveAbilityMods(_attacker, row).type, melee: isMeleeMoveRow(row) })
+    : { flat: 0, notes: [] };
+  _targetFlatBonus = flatBonus + abilityDamage.flat;
   const noteEl = document.getElementById('targetPickerDamageNote');
   const noteParts = [];
   if (diceOverride && _damageDice) {
@@ -695,6 +706,7 @@ function _showStep3() {
   if (_presetRoll != null) {
     noteParts.push(`<div class="note">Pre-filled with ${_presetRoll} -- not rolled, edit it if it's wrong</div>`);
   }
+  abilityDamage.notes.forEach(n => noteParts.push(`<div class="note">${n}</div>`));
   noteEl.innerHTML = noteParts.join('');
 
   _damageDiceExtra = 0;

@@ -90,14 +90,14 @@ function _confirm() {
   _close(raw);
 }
 
-function _promptRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', title = 'Heal Roll', verb = 'heals', pool = 'HP', description } = {}) {
+function _promptRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', title = 'Heal Roll', verb = 'heals', pool = 'HP', description, bonusSource = 'MOVE' } = {}) {
   _ensureDom();
   _moveModBonus = moveModBonus;
   _poolLabel = pool;
   document.getElementById('healPopupTitle').textContent = title;
   document.getElementById('healPopupDesc').textContent = description || `${moveName} ${verb} ${targetName}.`;
   document.getElementById('healPopupLabel').textContent =
-    `Roll ${dice}${moveModBonus ? ` (+${moveModBonus} from MOVE added automatically)` : ''}`;
+    `Roll ${dice}${moveModBonus ? ` (${moveModBonus > 0 ? '+' : ''}${moveModBonus} from ${bonusSource} added automatically)` : ''}`;
   const input = document.getElementById('healPopupInput');
   input.value = '';
   _updateTotal();
@@ -116,8 +116,8 @@ function _promptRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?',
  * result to whichever field it means. Resolves to the TOTAL healed (roll +
  * moveModBonus, a plain number), or null if closed without entering one.
  */
-export function promptHealRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', pool = 'HP' } = {}) {
-  return _promptRoll({ dice, moveModBonus, targetName, moveName, pool, title: 'Heal Roll', verb: 'heals' });
+export function promptHealRoll({ dice, moveModBonus = 0, targetName = '?', moveName = '?', pool = 'HP', bonusSource = 'MOVE' } = {}) {
+  return _promptRoll({ dice, moveModBonus, targetName, moveName, pool, title: 'Heal Roll', verb: 'heals', bonusSource });
 }
 
 /**

@@ -1031,6 +1031,11 @@ export class CombatAPI {
     return API.request('combat', 'stand-up', { id }, { useCache: false });
   }
 
+  /** Rapid Orders: on the trainer's turn, their Pokemon takes an extra action now (routes_combat.py's _rapid_orders). */
+  static async rapidOrders(trainerId, pokemonId) {
+    return API.request('combat', 'rapid-orders', { id: trainerId, targetId: pokemonId }, { useCache: false });
+  }
+
   /** Disengage: spends the action; moving away this turn provokes no reactions (routes_combat.py's _disengage). */
   static async disengage(id) {
     return API.request('combat', 'disengage', { id }, { useCache: false });

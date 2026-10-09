@@ -44,7 +44,7 @@ import {
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
-  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, setOnAddStatus, setOnLocalStatusClick, setOnBasicAction, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
+  setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, setOnAddStatus, setOnLocalStatusClick, setOnBasicAction, setOnUseTrainerBuff, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
   buildKnownMovesString, COMBAT_CSS,
 } from './combat.js';
 
@@ -816,6 +816,7 @@ function _enterBattleSync() {
   setOnAddStatus(_addSharedStatus);
   setOnLocalStatusClick(_openLocalStatusDetail);
   setOnBasicAction(_onBasicAction);
+  setOnUseTrainerBuff(_useTrainerBuff);
 }
 
 function _exitBattleSync() {
@@ -833,6 +834,7 @@ function _exitBattleSync() {
   setOnAddStatus(null);
   setOnLocalStatusClick(null);
   setOnBasicAction(null);
+  setOnUseTrainerBuff(null);
   _focusedParticipantId = null;
   _focusManuallySet = false;
 }
@@ -2447,7 +2449,14 @@ function _attachMainFocusListeners(state) {
     const endBtn = e.target.closest('.end-turn-btn');
     if (!endBtn) return;
     if (session.reactingParticipantId) {
-      CombatAPI.reactionEnd().catch(err => showCombatAlert(err.message, { title: "Couldn't end the reaction" }));
+      // A reaction or an extra action (Rapid Orders) is over: the floor goes back to whoever's turn it is -- show them
+      // if they're this player's own (the trainer who gave Rapid Orders).
+      CombatAPI.reactionEnd()
+        .then(() => {
+          const backId = session.turnOrder[session.turnIndex];
+          if (session.participants[backId]?.owner === _currentTrainerName()) _setFocus(backId);
+        })
+        .catch(err => showCombatAlert(err.message, { title: "Couldn't end the reaction" }));
       return;
     }
     // One End Turn at a time: the button shows it's working (a slow connection is visible instead of "nothing
@@ -5923,6 +5932,82 @@ async function _openLocalStatusDetail(c, se, remove) {
   const status = { kind: 'condition', apply: _CARD_STATUS_CONDITIONS[se.name] || se.name, ends: [] };
   if (se.description) status.note = se.description;
   if (await showStatusDetail(c.name, status, session?.round) === 'remove') remove();
+}
+
+/** combat.js's setOnUseTrainerBuff hook: Second Wind and Rapid Orders do the real thing (see below); every other buff
+ * returns null and just spends its charge like before. Both need the trainer and an active Pokemon in the battle and
+ * are used on the trainer's own turn. */
+async function _useTrainerBuff(name, closePopup) {
+  if (name !== 'Second Wind' && name !== 'Rapid Orders') return null;
+  const me = _currentTrainerName();
+  const parts = Object.values(session?.participants || {});
+  const trainer = parts.find(p => p.owner === me && p.combatantType === 'trainer');
+  const pokemon = parts.find(p => p.owner === me && p.combatantType === 'pokemon' && p.status === 'participating');
+  if (!trainer || !pokemon) {
+    showCombatAlert(`${name} needs your trainer and an active Pokémon in the battle.`, { title: name });
+    return false;
+  }
+  const activeId = session.reactingParticipantId || session.turnOrder[session.turnIndex];
+  if (activeId !== trainer.id) {
+    showCombatAlert(`${name} can only be used on ${trainer.name}'s own turn.`, { title: name });
+    return false;
+  }
+  return name === 'Second Wind' ? _secondWind(trainer, pokemon, closePopup) : _rapidOrders(trainer, pokemon, closePopup);
+}
+
+/** Second Wind (a bonus action): roll the dice the trainer's current Second Wind text names (2d4 / 2d8 / 4d8 by
+ * level), plus the CHA modifier -- and the proficiency bonus once the text says so (level 14) -- and the active
+ * Pokemon gets that much VP back, up to its max. */
+async function _secondWind(trainer, pokemon, closePopup) {
+  if (trainer.bonusActionUsed) {
+    showCombatAlert(`${trainer.name} has already used their bonus action this round.`, { title: 'Second Wind' });
+    return false;
+  }
+  const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  const level = parseInt(td[2], 10) || 1;
+  let skills = [];
+  try { skills = JSON.parse(sessionStorage.getItem('skills') || '[]'); } catch { /* falls back to the level-3 dice */ }
+  const text = skills.filter(s => s.name === 'Second Wind' && level >= s.level).sort((a, b) => b.level - a.level)[0]?.fullEffect || '';
+  const dice = /(\d+d\d+)/i.exec(text)?.[1] || '2d4';
+  const prof = /proficiency/i.test(text) ? (parseInt(td[17], 10) || 0) : 0;
+  const bonus = (parseInt(td[32], 10) || 0) + prof; // trainerData[32] = CHA modifier, [17] = proficiency
+  closePopup();
+  const total = await promptHealRoll({
+    dice, moveModBonus: bonus, targetName: pokemon.name, moveName: 'Second Wind', pool: 'VP',
+    bonusSource: prof ? 'CHA + proficiency' : 'CHA',
+  });
+  if (total == null) return false;
+  const fresh = session?.participants?.[pokemon.id] || pokemon;
+  const restored = Math.max(0, Math.min((fresh.maxVP || 0) - (fresh.currentVP || 0), total));
+  try {
+    await CombatAPI.useBonusAction(trainer.id, 'Second Wind');
+    await CombatAPI.updateStats(pokemon.id, { currentVP: (fresh.currentVP || 0) + restored });
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Second Wind' });
+    return false;
+  }
+  CombatAPI.logEvent({ type: 'heal', actorId: trainer.id, actorName: trainer.name, targetId: pokemon.id, targetName: pokemon.name,
+    text: `${trainer.name} uses Second Wind: ${pokemon.name} restores ${restored} VP` }).catch(() => {});
+  return true;
+}
+
+/** Rapid Orders: the active Pokemon takes one extra action right now -- it gets the floor like a reaction would
+ * (routes_combat.py's _rapid_orders), and its End Turn hands it back to the trainer. */
+async function _rapidOrders(trainer, pokemon, closePopup) {
+  closePopup(); // the buffs popup would otherwise sit on top of the confirm
+  const ok = await showCombatConfirm(
+    `${pokemon.name} takes one extra action right now. When it presses End Turn, play goes back to ${trainer.name}.`,
+    { title: 'Rapid Orders', yesLabel: 'Give the order', noLabel: 'Cancel' },
+  );
+  if (!ok) return false;
+  try {
+    await CombatAPI.rapidOrders(trainer.id, pokemon.id);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Rapid Orders' });
+    return false;
+  }
+  _setFocus(pokemon.id);
+  return true;
 }
 
 /** combat.js's setOnBasicAction hook -- Disengage: spend the action, then straight onto the map to move. */

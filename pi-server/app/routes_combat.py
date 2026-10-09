@@ -509,6 +509,11 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _stand_up(s, params['id']))
 
+    if action == 'rapid-orders':
+        if not params.get('id') or not params.get('targetId'):
+            raise ValueError('Missing trainer id or Pokemon id')
+        return _mutate(conn, lambda s: _rapid_orders(s, params['id'], params['targetId']))
+
     if action == 'disengage':
         if not params.get('id'):
             raise ValueError('Missing participant id')
@@ -1598,6 +1603,35 @@ def _disengage(state, pid):
     _log_event(state, 'disengage', text=f"{participant['name']} disengaged", actorId=pid, actorName=participant['name'])
 
 
+def _rapid_orders(state, trainer_id, pokemon_id):
+    """Rapid Orders (trainer buff, once per long rest -- the charge is the trainer's own, tracked client-side like
+    every trainer buff): on the trainer's own turn, their active Pokemon takes one extra action right away. It gets
+    the floor the same way a reaction does (reactingParticipantId -- so use-move, move-token and End Turn all act for
+    it) without spending its reaction, and its End Turn (reaction-end) hands the floor straight back to the trainer,
+    whose turn it still is. One extra action, not a whole turn: movement and bonus action are NOT refreshed."""
+    trainer = state['participants'].get(trainer_id)
+    pokemon = state['participants'].get(pokemon_id)
+    if not trainer or not pokemon:
+        raise ValueError('Unknown participant')
+    if state.get('reactingParticipantId'):
+        raise ValueError('Wait until the current reaction or extra action is over')
+    if trainer_id != _active_participant_id(state):
+        raise ValueError(f"Rapid Orders can only be given on {trainer['name']}'s own turn")
+    if (pokemon.get('owner') or '') != (trainer.get('owner') or '') or pokemon.get('combatantType') != 'pokemon':
+        raise ValueError("Rapid Orders can only be given to your own Pokemon")
+    if pokemon.get('status') != 'participating':
+        raise ValueError(f"{pokemon['name']} isn't in the battle right now")
+    incap = _incapacitating_status(pokemon)
+    if incap:
+        raise ValueError(f"{pokemon['name']} is {incap['apply']} and can't act")
+    pokemon['actionUsed'] = False
+    pokemon['extraActionFrom'] = 'Rapid Orders'
+    state['reactingParticipantId'] = pokemon_id
+    state['started'] = True
+    _log_event(state, 'extra-action', text=f"{trainer['name']} gives Rapid Orders -- {pokemon['name']} takes an extra action",
+               actorId=trainer_id, actorName=trainer['name'], targetId=pokemon_id, targetName=pokemon['name'])
+
+
 def _reaction_start(state, pid):
     participant = state['participants'].get(pid)
     if not participant:
@@ -1704,7 +1738,12 @@ def _reaction_end(state):
     # turnIndex was never touched during the reaction, so the floor returns
     # to exactly where the normal order left off.
     state['reactingParticipantId'] = None
-    if reactor:
+    if reactor and reactor.get('extraActionFrom'):
+        # Rapid Orders (_rapid_orders): the extra action is over, the floor goes back to the trainer.
+        _log_event(state, 'extra-action-end', text=f"{reactor['name']}'s extra action ({reactor['extraActionFrom']}) ended",
+                   actorId=reactor['id'], actorName=reactor['name'])
+        reactor['extraActionFrom'] = None
+    elif reactor:
         _log_event(state, 'reaction-end', text=f"{reactor['name']}'s reaction ended", actorId=reactor['id'], actorName=reactor['name'])
     # The window (if this reactor came from one) may have been waiting on
     # them specifically -- now that they've released the floor, see if

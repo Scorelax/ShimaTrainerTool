@@ -453,9 +453,13 @@ export function setOnSwitchPokemon(fn) {
 //  - _onLocalStatusClick(combatant, statusEffect, remove): a badge with no server id opens a detail popup instead of
 //    vanishing on click (`remove()` drops it)
 //  - _onBasicAction(action, combatantId): the Actions row's Disengage button
+//  - _onUseTrainerBuff(name, closePopup): a trainer buff's Use button -- resolves true (done, spend the charge), false
+//    (cancelled or refused, keep it) or null (no special logic, spend it as before)
 let _onAddStatus = null;
 let _onLocalStatusClick = null;
 let _onBasicAction = null;
+let _onUseTrainerBuff = null;
+export function setOnUseTrainerBuff(fn) { _onUseTrainerBuff = fn || null; }
 export function setOnAddStatus(fn) { _onAddStatus = fn || null; }
 export function setOnLocalStatusClick(fn) { _onLocalStatusClick = fn || null; }
 export function setOnBasicAction(fn) { _onBasicAction = fn || null; }
@@ -4116,15 +4120,26 @@ function showCombatBuffsPopup() {
   container.innerHTML = content || '<p style="color:#aaa;padding:1rem;">No skills data available.</p>';
 
   container.querySelectorAll('.use-buff-button').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const buffIndex = parseInt(btn.dataset.buffIndex);
       const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
       const current = parseInt(td[buffIndex]) || 0;
       if (current <= 0) return;
+      // Shared battle: a buff with real logic (Second Wind, Rapid Orders) runs it first; the charge is only spent when
+      // it went through (the hook resolves true). Anything it doesn't handle (null) just spends the charge, as before.
+      const buffName = trainerBuffDefs.find(b => b.index === buffIndex)?.name;
+      let closedByBuff = false;
+      if (_onUseTrainerBuff && buffName) {
+        const handled = await _onUseTrainerBuff(buffName, () => {
+          closedByBuff = true;
+          document.getElementById('combatBuffsPopup').style.display = 'none';
+        });
+        if (handled === false) return;
+      }
       td[buffIndex] = current - 1;
       sessionStorage.setItem('trainerData', JSON.stringify(td));
       TrainerAPI.update(td).catch(e => console.error('Buff sync:', e));
-      showCombatBuffsPopup();
+      if (!closedByBuff) showCombatBuffsPopup(); // refresh the charge dots (not when the buff moved on, e.g. Rapid Orders)
     });
   });
 

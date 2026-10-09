@@ -33,12 +33,14 @@ import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, altitudeLimits } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
+import { lineFtFromRange, lineGeometry, lineHitIds, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 const CONE_FT = 15; // the cone preview is just a visual of where the token faces -- one size is enough
 
 function _injectStyles() {
   if (document.getElementById('battle-map-popup-styles')) return;
   injectBattleMapStyles();
+  injectLineStyles();
   const style = document.createElement('style');
   style.id = 'battle-map-popup-styles';
   style.textContent = `
@@ -66,6 +68,7 @@ function _injectStyles() {
     .bmap-confirm-btn:disabled { background: #444; color: #888; cursor: not-allowed; box-shadow: none; }
     .bmap-cancel-btn { background: rgba(255,255,255,0.12); color: #e0e0e0; }
     .bmap-stage-warning { color: #e77373; }
+    .bmap-stage.line-aiming { touch-action: none; cursor: crosshair; }
     .bmap-stage-alt { font-weight: 800; color: #ffd76a; background: rgba(255,215,106,0.12); border: 1px solid rgba(255,215,106,0.45); border-radius: 999px; padding: 0.15rem 0.6rem; }
     /* a staged move: the token is drawn at its destination, the tile it left keeps a faint dashed outline */
     .bmap-token.moving { opacity: 0.9; pointer-events: none; }
@@ -88,6 +91,12 @@ let _selectedTokenId = null;
 let _stagedDestination = null;
 // Whether the cone preview is on for the selected token. Kept across selections.
 let _coneOn = false;
+// The line preview (line-area.js): a 5ft-wide strip from the selected token, aimed at any angle by dragging on the map.
+// Its length is one of the token's own line moves (cycled by tapping the length), or 30ft when it knows none.
+let _lineOn = false;
+let _lineAngle = 0;
+let _lineChoice = 0;
+let _lineAiming = false;
 // The altitude (ft) the selected token is being sent to, or null to stay where it is -- changed by the toolbar's ▲ ▼,
 // confirmed together with the staged cell (a pure climb stages the token's own cell).
 let _stagedAlt = null;
@@ -128,6 +137,19 @@ function _ensureDom() {
     if (x) CombatAPI.removeFieldZone(x.dataset.key, x.dataset.id).catch(err => showCombatAlert(err.message, { title: 'Error' }));
   });
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(); });
+  // Line tool: press and drag anywhere on the map to sweep the line round (a tap aims it straight at that spot).
+  const stage = document.getElementById('bmapStage');
+  stage.addEventListener('pointerdown', (e) => {
+    if (!_lineOn || !_selected()) return;
+    e.preventDefault();
+    _lineAiming = true;
+    stage.setPointerCapture?.(e.pointerId);
+    _aimLine(e);
+  });
+  stage.addEventListener('pointermove', (e) => { if (_lineAiming) _aimLine(e); });
+  const stopAiming = () => { _lineAiming = false; };
+  stage.addEventListener('pointerup', stopAiming);
+  stage.addEventListener('pointercancel', stopAiming);
   document.addEventListener('keydown', (e) => {
     if (!_overlay || _overlay.style.display === 'none' || !_selectedTokenId) return;
     if (e.key === 'q' || e.key === 'Q') _rotate(-45);
@@ -240,6 +262,8 @@ function _render() {
   if (hint) {
     if (_stagedDestination) {
       hint.textContent = 'Confirm the move below, or click a different cell.';
+    } else if (_selectedTokenId && _lineOn) {
+      hint.textContent = 'Drag on the map to aim the line (any angle) · tap the length to switch line move · turn Line off to move again.';
     } else if (_selectedTokenId) {
       hint.textContent = 'Click a cell to move there · ⟲ ⟳ (or Q / E) to turn · the cone shows what a facing would hit.';
     } else {
@@ -252,6 +276,8 @@ function _render() {
   }
   _renderMovePanel();
   _renderStage();
+  // While aiming a line, a drag on the map turns it instead of scrolling the page (phones).
+  document.getElementById('bmapStage')?.classList.toggle('line-aiming', _lineOn && !!_selected());
   _renderGrid();
   _renderTokens();
   _renderToolbar();
@@ -389,6 +415,7 @@ function _renderGrid() {
     const [col, row] = cell.dataset.cell.split(',').map(Number);
     cell.addEventListener('click', () => {
       if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
+      if (_lineOn) return; // the line tool owns the map's clicks (aiming) until it's turned off
       const own = _selected();
       // Standing still isn't a move (movement comes in 5ft steps) -- unless an altitude change is staged with it.
       if (own && own.pos.col === col && own.pos.row === row && (_stagedAlt === null || _stagedAlt === (own.pos.z || 0))) return;
@@ -454,6 +481,7 @@ function _renderTokens() {
     // While a move is staged the token sits on the cell it's going to -- let clicks fall through to the cells beneath it.
     if (isMyTurn && !staged) {
       el.addEventListener('click', () => {
+        if (_lineOn && _selectedTokenId) return; // aiming the line -- a tap on the token is part of the drag
         _selectedTokenId = _selectedTokenId === id ? null : id;
         _stagedDestination = null; _stagedAlt = null;
         _render();
@@ -462,6 +490,51 @@ function _renderTokens() {
 
     layer.appendChild(el);
   });
+  _renderLine();
+}
+
+/** The selected token's line moves as { label, ft } (from the logged-in device's move list), or a plain 30ft line. */
+function _lineOptions(p) {
+  let rows = [];
+  try { rows = JSON.parse(sessionStorage.getItem('moves') || '[]'); } catch { /* no move list -- generic line */ }
+  const opts = (p?.moves || []).map(name => {
+    const ft = lineFtFromRange(rows.find(r => r[0] === name)?.[6]);
+    return ft ? { label: name, ft } : null;
+  }).filter(Boolean);
+  return opts.length ? opts : [{ label: '', ft: 30 }];
+}
+
+function _lineOption(p) {
+  const opts = _lineOptions(p);
+  return opts[_lineChoice % opts.length];
+}
+
+/** Draws the line strip from the selected token and rings everyone it touches (see line-area.js). */
+function _renderLine() {
+  const layer = document.getElementById('bmapTokens');
+  const sel = _selected();
+  if (!layer || !_lineOn || !sel) return;
+  const { ft } = _lineOption(sel.p);
+  const g = lineGeometry(sel.pos, sel.size, _lineAngle, ft);
+  let strip = layer.querySelector('.bmap-line');
+  if (!strip) {
+    strip = document.createElement('div');
+    strip.className = 'bmap-line';
+    layer.prepend(strip); // under the tokens, so the hit rings (not an orange wash) show who's in it
+  }
+  strip.setAttribute('style', lineStyle(_session.board, g, _lineAngle));
+  const hits = new Set(lineHitIds(_session, sel.id, _lineAngle, ft));
+  layer.querySelectorAll('.bmap-token[data-id]').forEach(el => el.classList.toggle('line-hit', hits.has(el.dataset.id)));
+}
+
+/** Pointer on the map while the line tool is on: aim the line at the pointer (drag to sweep it round). */
+function _aimLine(e) {
+  const sel = _selected();
+  const stage = document.getElementById('bmapStage');
+  if (!sel || !stage) return;
+  const origin = lineGeometry(sel.pos, sel.size, 0, 5).o;
+  _lineAngle = angleToPointer(stage, _session.board, origin, e.clientX, e.clientY);
+  _renderLine();
 }
 
 /** "20ft up" / "15ft underground" / "the ground". */
@@ -503,6 +576,8 @@ function _renderToolbar() {
     <span class="tb-sep"></span>
     ${_altitudeControlsHtml(sel)}
     <button type="button" data-act="cone" class="${_coneOn ? 'on' : ''}" title="Show a ${CONE_FT}ft cone from this facing">◔ Cone</button>
+    <button type="button" data-act="line" class="${_lineOn ? 'on' : ''}" title="Show a 5ft-wide line you can aim at any angle">━ Line</button>
+    ${_lineOn ? (() => { const o = _lineOption(sel.p); return `<button type="button" data-act="line-len" title="Switch line move">${o.ft}ft${o.label ? ` · ${o.label}` : ''}</button>`; })() : ''}
     <button type="button" data-act="close" title="Deselect (Esc)">✕</button>`;
   bar.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -512,6 +587,12 @@ function _renderToolbar() {
     else if (act === 'up') _stepAltitude(5);
     else if (act === 'down') _stepAltitude(-5);
     else if (act === 'cone') { _coneOn = !_coneOn; _render(); }
+    else if (act === 'line') {
+      _lineOn = !_lineOn;
+      if (_lineOn) { _lineAngle = sel.pos.facing || 0; _stagedDestination = null; _stagedAlt = null; }
+      _render();
+    }
+    else if (act === 'line-len') { _lineChoice++; _render(); }
     else if (act === 'close') { _selectedTokenId = null; _stagedDestination = null; _stagedAlt = null; _render(); }
   });
   slot.appendChild(bar);

@@ -2772,6 +2772,8 @@ def _list_move_categories():
             marks['hitsStates'] = m['hitsStates']
         if m.get('soundBased'):
             marks['soundBased'] = True
+        if m.get('attackRoll') is False:
+            marks['noAttackRoll'] = True  # migrate_effects_v97.py -- the move popup shows no attack modifier
         if m.get('doubleDamageVsStates'):
             marks['doubleDamageVsStates'] = m['doubleDamageVsStates']
         # Limit Break / Feint Attack / Close Combat ...: the move's OWN attack roll is always made with advantage, and Limit

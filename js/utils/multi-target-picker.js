@@ -12,6 +12,7 @@ import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { filterTargetable } from './targetability.js';
 import { pickTerrainArea } from './terrain-area-picker.js';
+import { pickLineArea } from './line-area-picker.js';
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
 
 function _injectStyles() {
@@ -99,6 +100,7 @@ function _cardHtml(p) {
  * `area` ({ radiusFt, heightFt, centeredOnCaster }, from the move's own range/description) adds a "Select from the map"
  * button: the caster marks the blast on the battle map and everyone whose token overlaps it -- and, for a cylinder with a
  * height, is at or below that altitude -- is ticked for them, to adjust by hand before confirming.
+ * A line move's area is { lineFt } instead: the caster aims a 5ft-wide line on the map (line-area-picker.js).
  */
 export async function pickMultipleTargets(casterId, { moveName = '', area = null } = {}) {
   const result = await CombatAPI.getState();
@@ -127,6 +129,15 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   const hasBoard = !!session.board?.tokens?.[casterId] || Object.keys(session.board?.tokens || {}).length > 0;
   mapBtn.hidden = !(area && hasBoard);
   mapBtn.onclick = async () => {
+    if (area.lineFt) {
+      const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt });
+      if (!line) return;
+      participants.forEach(p => {
+        const card = grid.querySelector(`[data-target-id="${p.id}"]`);
+        if (card) toggle(card, line.ids.includes(p.id));
+      });
+      return;
+    }
     const res = await pickTerrainArea({
       session, casterId, title: moveName || 'Blast area', kind: 'other', radiusFt: area.radiusFt,
       centeredOnCaster: area.centeredOnCaster, heightFt: area.heightFt, allowCancel: true, confirmLabel: 'Select targets inside',

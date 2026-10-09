@@ -20,6 +20,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
 import { filterTargetable } from './targetability.js';
 import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, saveAutoFails } from './move-effects.js';
+import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
 
 function _injectStyles() {
   if (document.getElementById('save-picker-styles')) return;
@@ -161,6 +162,7 @@ function _ensureDom() {
         <div id="savePickerStep3" hidden>
           <div class="save-picker-anim-media" id="savePickerAnimMedia"></div>
           <div class="save-picker-dc-target" id="savePickerDamageTarget"></div>
+          <div class="save-picker-dice-row" id="savePickerDamageDiceRow"></div>
           <label class="save-picker-roll-label" for="savePickerRollInput">Damage roll<span id="savePickerModifierNote"></span></label>
           <input type="number" id="savePickerRollInput" class="save-picker-roll-input" placeholder="Enter roll…">
           <div class="save-picker-roll-total" id="savePickerRollTotal"></div>
@@ -437,20 +439,57 @@ function _showStep3() {
     _damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '';
   const input = document.getElementById('savePickerRollInput');
   input.value = '';
+  _damageDiceExtra = 0;
+  _damageBattleDice = 0;
+  _renderDamageDiceRow();
   _updateRollTotal();
   setTimeout(() => input.focus(), 50);
+}
+
+// Ace Trainer's Battle Dice (battle-dice.js) added to this damage roll: the total and how many, spent on confirm.
+let _damageDiceExtra = 0;
+let _damageBattleDice = 0;
+
+function _renderDamageDiceRow() {
+  const row = document.getElementById('savePickerDamageDiceRow');
+  row.innerHTML = battleDieButtonHtml('save-picker-dice-btn');
+  row.querySelector('[data-battle-die]')?.addEventListener('click', (e) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'save-picker-dice-input-row';
+    wrap.innerHTML = '<input type="number" min="1" max="6" placeholder="Rolled 1d6…"><button type="button" class="combat-use-move-btn">Add</button>';
+    e.currentTarget.replaceWith(wrap);
+    const input = wrap.querySelector('input');
+    const submit = () => {
+      const rolled = parseInt(input.value, 10);
+      if (Number.isNaN(rolled) || rolled < 1 || rolled > 6) return;
+      _damageDiceExtra += rolled;
+      _damageBattleDice++;
+      const used = document.createElement('div');
+      used.className = 'save-picker-dice-used';
+      used.textContent = `Battle Dice: +${rolled} added`;
+      wrap.replaceWith(used);
+      _updateRollTotal();
+    };
+    wrap.querySelector('button').addEventListener('click', submit);
+    input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') submit(); });
+    input.focus();
+  });
 }
 
 function _updateRollTotal() {
   const raw = parseInt(document.getElementById('savePickerRollInput').value, 10);
   const totalEl = document.getElementById('savePickerRollTotal');
-  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier}</strong>`;
+  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier + _damageDiceExtra}</strong>`;
 }
 
 function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('savePickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
-  _close({ targetId: _selectedTargetId, passed: _pendingPassed, rawRoll: raw, ...(_pendingSave || {}) });
+  for (let i = 0; i < _damageBattleDice; i++) spendBattleDie();
+  const extra = _damageDiceExtra;
+  _damageDiceExtra = 0;
+  _damageBattleDice = 0;
+  _close({ targetId: _selectedTargetId, passed: _pendingPassed, rawRoll: raw + extra, ...(_pendingSave || {}) });
 }
 
 function _cardHtml(p) {

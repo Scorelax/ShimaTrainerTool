@@ -586,7 +586,7 @@ function _renderCommander(trainerData) {
  * @param {boolean} [params.skipConfirm] - Skip the separate "Use MoveName (N VP)? Yes/No" confirm popup entirely -- clicking Use Move directly uses it (the same VP cost is already shown in this popup's own grid, so that confirm step was just a second click for no new information). Defaults to false (legacy behavior: confirm popup shown), so only callers that opt in (combat-wip.js) are affected -- pokemon-card.js's own semi-permanent VP/HP deduction keeps the confirm step.
  * @param {number} [params.vpCostOverride] - Actual VP cost to show/deduct, in place of move[4]'s base value -- Fury Cutter/Ice Ball/Rollout's own escalating cost per consecutive hit (see combat.js's showCombatMoveDetails). Falls back to move[4] when not given, same as before this existed.
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, vpCostOverride, spriteUrl, spriteAlt, speciesName, deferAnimation, skipConfirm }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, vpCostOverride, spriteUrl, spriteAlt, speciesName, deferAnimation, skipConfirm, noAttackRoll, battleDiceInRolls }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -655,8 +655,10 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   const diceLabelEl = document.getElementById('cDiceLabel');
   if (diceLabelEl) diceLabelEl.textContent = diceLabel || 'Damage Roll:';
 
-  document.getElementById('cAttackBonus').textContent = fmtMod(attackBonus);
-  document.getElementById('cAttackBreakdown').textContent = attackBreakdown;
+  // noAttackRoll: the move never rolls one (the moves file's `attackRoll: false`) -- no modifier to show, same as
+  // the damage row for a non-damaging move.
+  document.getElementById('cAttackBonus').textContent = noAttackRoll ? '—' : fmtMod(attackBonus);
+  document.getElementById('cAttackBreakdown').textContent = noAttackRoll ? '' : attackBreakdown;
   if (diceOverride !== undefined) {
     document.getElementById('cDamageBonus').textContent = diceOverride || '—';
     document.getElementById('cDamageBreakdown').textContent = diceBreakdownOverride || '';
@@ -680,8 +682,14 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
     }
   }
 
-  // Trainer path sections
-  _renderBattleDice(trainerData);
+  // Trainer path sections. battleDiceInRolls (the shared battle): Battle Dice are offered inside the attack and damage
+  // roll windows instead (target-picker.js / save-picker.js), so they're added to the roll they're meant for.
+  if (battleDiceInRolls) {
+    const dice = document.getElementById('cBattleDiceContainer');
+    if (dice) dice.innerHTML = '';
+  } else {
+    _renderBattleDice(trainerData);
+  }
   _renderTactician(trainerData);
   _renderCommander(trainerData);
 

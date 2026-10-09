@@ -18,6 +18,7 @@ import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteR
 import { waitForReactionWindow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 import { filterTargetable } from './targetability.js';
+import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -184,6 +185,12 @@ let _atkCtx = null;
 // confirmed (only the ones with a `uses` end -- see _onDiceBonusSubmit).
 let _diceBonusExtra = 0;
 let _diceBonusConsume = [];
+// Ace Trainer's Battle Dice (battle-dice.js) added on this attack: how many on the attack roll (their value is part of
+// _diceBonusExtra) and the damage roll's own extra, with its count. The charges are only spent when the roll is
+// confirmed (_consume), so backing out of a step never loses one.
+let _attackBattleDice = 0;
+let _damageDiceExtra = 0;
+let _damageBattleDice = 0;
 
 /** The attack modifier actually in force: the move's own plus any live attack-roll status
  * plus any dice bonus the player chose to add in on this roll. */
@@ -199,10 +206,48 @@ function _renderDiceRow() {
   row.innerHTML = options.map(o => `
     <button type="button" class="combat-use-move-btn target-picker-dice-btn" data-status-id="${o.statusId}" data-dice="${o.dice}" data-move="${o.moveName}" data-consumable="${o.consumable}">
       Add ${o.moveName} (+${o.dice})
-    </button>`).join('');
+    </button>`).join('') + (_guaranteedHit ? '' : battleDieButtonHtml('target-picker-dice-btn'));
   row.querySelectorAll('[data-status-id]').forEach(btn => {
     btn.addEventListener('click', () => _openDiceBonusInput(btn));
   });
+  row.querySelector('[data-battle-die]')?.addEventListener('click', (e) => _openBattleDieInput(e.currentTarget, (rolled) => {
+    _diceBonusExtra += rolled;
+    _attackBattleDice++;
+    _updateAttackTotal();
+  }));
+}
+
+/** The damage step's own dice row -- only Battle Dice so far. */
+function _renderDamageDiceRow() {
+  const row = document.getElementById('targetPickerDamageDiceRow');
+  row.innerHTML = battleDieButtonHtml('target-picker-dice-btn', _attackBattleDice);
+  row.querySelector('[data-battle-die]')?.addEventListener('click', (e) => _openBattleDieInput(e.currentTarget, (rolled) => {
+    _damageDiceExtra += rolled;
+    _damageBattleDice++;
+    _updateRollTotal();
+  }));
+}
+
+/** Battle Dice: swaps the button for a "type the d6" input like the other dice bonuses; `onAdd(rolled)` folds it into
+ * the roll. One die per button -- the button only comes back on a fresh render of the step. */
+function _openBattleDieInput(btn, onAdd) {
+  const wrap = document.createElement('div');
+  wrap.className = 'target-picker-dice-input-row';
+  wrap.innerHTML = '<input type="number" min="1" max="6" placeholder="Rolled 1d6…"><button type="button" class="combat-use-move-btn">Add</button>';
+  btn.replaceWith(wrap);
+  const input = wrap.querySelector('input');
+  const submit = () => {
+    const rolled = parseInt(input.value, 10);
+    if (Number.isNaN(rolled) || rolled < 1 || rolled > 6) return;
+    onAdd(rolled);
+    const used = document.createElement('div');
+    used.className = 'target-picker-dice-used';
+    used.textContent = `Battle Dice: +${rolled} added`;
+    wrap.replaceWith(used);
+  };
+  wrap.querySelector('button').addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  input.focus();
 }
 
 /** Swaps a dice-bonus button for an inline number input + confirm, matching the
@@ -243,6 +288,9 @@ function _consume(ctx) {
   for (const c of ctx?.consume || []) CombatAPI.useStatus(c.holderId, c.statusId).catch(() => {});
   for (const c of _diceBonusConsume) CombatAPI.useStatus(c.holderId, c.statusId).catch(() => {});
   _diceBonusConsume = [];
+  for (let i = 0; i < _attackBattleDice + _damageBattleDice; i++) spendBattleDie();
+  _attackBattleDice = 0;
+  _damageBattleDice = 0;
 }
 
 function _notesHtml(ctx) {
@@ -294,6 +342,7 @@ function _ensureDom() {
           <div class="target-picker-anim-media" id="targetPickerAnimMedia"></div>
           <div class="target-picker-roll-target" id="targetPickerDamageTarget"></div>
           <div class="target-picker-roll-notes" id="targetPickerDamageNote"></div>
+          <div class="target-picker-dice-row" id="targetPickerDamageDiceRow"></div>
           <label class="target-picker-roll-label" for="targetPickerRollInput">Damage roll<span id="targetPickerModifierNote"></span></label>
           <input type="number" id="targetPickerRollInput" class="target-picker-roll-input" placeholder="Enter roll…">
           <div class="target-picker-roll-total" id="targetPickerRollTotal"></div>
@@ -433,6 +482,7 @@ function _showStep2(p, name) {
   document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
   _diceBonusExtra = 0;
   _diceBonusConsume = [];
+  _attackBattleDice = 0;
   _renderDiceRow();
   const mod = _effectiveAttackMod();
   document.getElementById('targetPickerAttackModifierNote').textContent =
@@ -525,6 +575,7 @@ function _autoHit(p, name) {
   _atkCtx = null; // nothing is rolled, so no roll modifiers apply
   _diceBonusExtra = 0; // no attack-roll step to offer a dice bonus on -- clear any stale value
   _diceBonusConsume = [];
+  _attackBattleDice = 0;
   _selectedTarget = p;
   _selectedTargetName = name;
   _showStep3();
@@ -646,6 +697,9 @@ function _showStep3() {
   }
   noteEl.innerHTML = noteParts.join('');
 
+  _damageDiceExtra = 0;
+  _damageBattleDice = 0;
+  _renderDamageDiceRow();
   const totalMod = _damageModifier + _targetFlatBonus;
   document.getElementById('targetPickerModifierNote').textContent =
     totalMod ? ` (${totalMod >= 0 ? '+' : ''}${totalMod} modifier added automatically)` : '';
@@ -659,7 +713,7 @@ function _showStep3() {
 function _updateRollTotal() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   const totalEl = document.getElementById('targetPickerRollTotal');
-  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier + _targetFlatBonus}</strong>`;
+  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier + _targetFlatBonus + _damageDiceExtra}</strong>`;
 }
 
 /** Confirm Damage -- plays the one-shot attack animation (see _playAnimation)
@@ -680,7 +734,8 @@ async function _confirmDamageRoll() {
     // (combat-wip.js's _resolveOneHit) already adds its own damageModifier
     // on top of whatever rawRoll it's given, same as it always has, so
     // this needs no changes there to land correctly.
-    targetId: _selectedTargetId, hit: true, rawRoll: raw + _targetFlatBonus,
+    // _damageDiceExtra: Battle Dice added on this step (_renderDamageDiceRow).
+    targetId: _selectedTargetId, hit: true, rawRoll: raw + _targetFlatBonus + _damageDiceExtra,
     attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _effectiveAttackMod(),
     rollMode: _atkCtx?.mode || 'normal',
   };

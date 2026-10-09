@@ -3423,6 +3423,10 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     })(),
     deferAnimation: _willDeferToTargetPicker || _willDeferToSavePicker || _willDeferToReactiveSave || _willDeferToMultiHitAoe,
     skipConfirm: _isSharedCombat,
+    // Shared battle only (the legacy page and the Pokemon card keep showing both as before): no attack modifier for a
+    // move that never rolls one, and Battle Dice move into the attack/damage roll windows.
+    noAttackRoll: _isSharedCombat && !!moveFlagsFor(moveName).noAttackRoll,
+    battleDiceInRolls: _isSharedCombat,
     onUseMove: (usedMoveName, vpCost) => {
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;

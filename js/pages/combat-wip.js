@@ -18,6 +18,7 @@ import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
+import { lineFtFromRange } from '../utils/line-area.js';
 import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { playBattleAnimationFloating } from '../utils/move-popup.js';
@@ -5808,6 +5809,9 @@ const WIP_SAVE_PROMPT_KEY = 'combatWipLastSavePrompt';
 function _aoeAreaFor(moveName) {
   const row = findMoveRow(moveName) || [];
   const range = String(row[6] || '');
+  // A line move ("Self (80ft. line)") is aimed as a 5ft-wide strip instead (line-area-picker.js).
+  const lineFt = lineFtFromRange(range);
+  if (lineFt) return { lineFt };
   if (!/radius|circle|cylinder/i.test(range)) return null;
   const radiusFt = radiusFtFromRange(range);
   if (!radiusFt) return null;

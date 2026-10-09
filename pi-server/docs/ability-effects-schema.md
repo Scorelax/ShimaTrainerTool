@@ -3,6 +3,17 @@
 Status 2026-10-09: all 348 abilities done -- 305 with effects, 43 `unknown`, 18 with a Benjakronk
 `review` question (`abilities_to_check.md`).
 
+**Engine status** -- what the shared battle actually applies (the rest is data only so far):
+- Slice 1, server (`app/abilities.py`, called from routes_combat.py): `passive` effects with `target` self, gates
+  `self_hp_*`, `self_status`, `self_negative_status`, `self_weather_contains`, `self_terrain_contains`, `any_of`, `not`
+  (any other gate counts as not met). Kinds: `immunity` (damageTypes / moves / nameMatch / soundBased / allyAttacks /
+  nonVulnerableDamage / vulnerabilityExtra on damage; conditions / negativeConditions on statuses, including an ally's
+  `allies` aura within `radiusFt`; weatherDamage on hail/sandstorm ticks), `resistance` / `vulnerability` (one step on
+  the 2 / 1 / 0.5 / 0 ladder), `absorb`, `damage_taken_mod` (damageTypes / notTypes / melee / superEffective /
+  vulnerable filters), `stat_lock`. Gravity switches Levitate off.
+- Not yet: everything needing the roll or the save (critDamage, maxDamage, rerollKeep, saveForHalf), outgoing effects,
+  triggered effects -- slices 2-4.
+
 `DnD_abilities.json` -- one entry per ability (built from the Pi's cached dex by
 `build_abilities_list.py`; the rebuild only refreshes `description` and `pokemon`, so
 everything below survives it). Effects are added by `migrate_abilities_vN.py` scripts, the

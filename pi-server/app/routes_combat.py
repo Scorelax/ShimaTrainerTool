@@ -35,8 +35,8 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from . import db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, is_grounded, grounded_in, altitude_limits
+from . import abilities, db, live, routes_gamedata, upstream
+from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, weather_damage_kind, is_grounded, grounded_in, altitude_limits
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -2217,6 +2217,12 @@ def _apply_status(state, target_id, spec):
     terrain_block = terrain_blocked_status(terrains_affecting(state, target_id), target, spec)
     if terrain_block:
         raise ValueError(f"{target['name']} is immune to that ({terrain_block})")
+    # Abilities (abilities.py): Limber, Insomnia, Own Tempo... on the target itself, an ally's aura in range (Sweet
+    # Veil, Flower Veil), or a stat lock against someone else lowering a stat (Clear Body, Big Pecks...).
+    ability_block = (abilities.condition_block(state, target_id, spec, _grid_distance_ft, _hostile)
+                     or abilities.stat_lock_block(state, target_id, spec))
+    if ability_block:
+        raise ValueError(f"{target['name']} is immune to that ({ability_block})")
     raw_ends = spec.get('ends') or []
     for e in raw_ends:
         if not isinstance(e, dict) or e.get('type') not in _END_TYPES:
@@ -2624,6 +2630,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
     state['started'] = True  # see _rebuild_turn_order -- someone acting means turn order is now live
 
     # A semi-invulnerable target (underground, airborne, ...) can't be hit unless the move lists its state.
+    record = None
     if move_name:
         record = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None)
         if record:
@@ -2633,7 +2640,21 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
 
     _consume_ignore_immunities(state, pid, attacker, move_type, move_name)
     multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target, attacker)
-    actual_damage = round(dice_roll * multiplier)
+    # The target's ability (abilities.py): immunities, resistances/weaknesses (a step on the type chart), absorbs,
+    # and standing damage multipliers (Thick Fat, Multiscale, Fluffy...).
+    in_gravity = any(t.get('rule') == 'gravity' for t in terrains_affecting(state, target_id))
+    chart_multiplier = multiplier
+    multiplier, ability_multiplier, absorb, ability_notes = abilities.adjust_incoming_damage(
+        state, pid, target_id, move_type, record, crit, multiplier, _hostile(state, attacker, target), in_gravity)
+    ability_note = f" -- {'; '.join(ability_notes)}" if ability_notes else ''
+    if absorb is not None:
+        # Volt/Water Absorb: no damage; a share of what the hit would have dealt comes back as HP instead.
+        healed = max(0, min((target.get('maxHP') or 0) - target['currentHP'], int(dice_roll * chart_multiplier * absorb)))
+        target['currentHP'] += healed
+        _log_event(state, 'heal', text=f"{target['name']} absorbs {attacker['name']}'s {move_name or 'attack'} and recovers {healed} HP{ability_note}",
+                   actorId=target_id, actorName=target['name'], targetId=target_id, targetName=target['name'], amount=healed)
+        return {'multiplier': 0, 'damageApplied': 0, 'absorbed': healed}
+    actual_damage = round(dice_roll * multiplier * ability_multiplier)
 
     if pool == 'vp':
         # Energize/Enervation Ray's own "deals typed damage, but it's VP, not
@@ -2684,6 +2705,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
     condition_note = ' -- Mat Block/Testudo Formation reduces this' if condition_multiplier != 1 else ''
     condition_note += ' -- held back, left at 1 HP' if spared else ''
     condition_note += ' -- Harden reduces this' if flat_reduction else ''
+    condition_note += ability_note
     _log_event(
         state, 'damage',
         text=f"{attacker['name']} hit {target['name']}{move_label} for {actual_damage} damage ({multiplier}x){condition_note}",
@@ -2998,6 +3020,8 @@ def _apply_weather_damage(state, pid):
         hit = weather_damage_for(weather, participant, (source or {}).get('level'))
         if not hit:
             continue
+        if abilities.weather_damage_immune(state, pid, participant, weather_damage_kind(weather)):
+            continue  # Sand Veil, Snow Cloak, Overcoat...
         damage_type, amount = hit
         participant['weatherHitTurn'] = mark
         leftover = _absorb_temp_hp(state, participant, amount)

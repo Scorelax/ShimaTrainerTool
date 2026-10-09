@@ -126,7 +126,9 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "potential_disadvantage_attack_rolls"
+        "potential_disadvantage_attack_rolls",
+        "trigger_saving_throw",
+        "multi_hit_aoe"
       ],
       "description": "You vibrate your wings, creating a harsh sound that damages any creature in range. All creatures within 20 feet of you must make a CON save against your Move DC, taking 3d10 + MOVE bug damage on a fail. If an opponent fails the save by more than 5, they have disadvantage on their next attack.",
       "moveStat": "DEX/CHA",
@@ -1540,7 +1542,9 @@
       "categories": [
         "damage",
         "recharge_locked",
-        "variable_move_type"
+        "variable_move_type",
+        "trigger_saving_throw",
+        "multi_hit_aoe"
       ],
       "description": "You tap into the elemental energy field around you, and release a powerful blast of concentrated elemental energy. All creatures caught in the line have to succeed a DEX saving throw or take 4d12 + MOVE damage. Roll a d20 to determine the damage type: 1: Bug 2: Dark 3: Dragon 4: Electric: 5: Fairy 6: Fighting 7: Fire 8: Flying 9: Ghost 10: Grass 11: Ground 12: Ice 13: Normal 14: Poison 15: Psychic 16: Rock 17: Steel 18: Water 19: Cosmic 20: Typeless",
       "moveStat": "Roll 1d6:\n1: STR\n2: DEX\n3: CON\n4: INT\n5: WIS\n6: CHA",

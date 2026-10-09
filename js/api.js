@@ -1031,6 +1031,11 @@ export class CombatAPI {
     return API.request('combat', 'stand-up', { id }, { useCache: false });
   }
 
+  /** The type multiplier a hit would get (chart + live type changes + abilities) -- read-only (routes_combat.py's _type_preview). */
+  static async typePreview(attackerId, targetId, moveType, moveName = '') {
+    return API.request('combat', 'type-preview', { id: attackerId, targetId, moveType, moveName }, { useCache: false });
+  }
+
   /** Rapid Orders: on the trainer's turn, their Pokemon takes an extra action now (routes_combat.py's _rapid_orders). */
   static async rapidOrders(trainerId, pokemonId) {
     return API.request('combat', 'rapid-orders', { id: trainerId, targetId: pokemonId }, { useCache: false });

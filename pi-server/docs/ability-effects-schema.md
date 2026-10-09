@@ -25,7 +25,9 @@ Status 2026-10-09: all 348 abilities done -- 305 with effects, 43 `unknown`, 18 
   - server: the attacker's `ignore_target_abilities`, `ignore_immunity` (moveTypes vs vsTypes), `ignore_resistance`
     (target_* gates judged); damage auras `damage_mod` with `totalMultiplier` and target all/others within
     `radiusFt` of the attacker, Aura Break reversing Dark/Fairy Aura.
-- Not yet: superEffective filters on the client (no type chart there), firstUseInEncounter, ally auras that change
+  - superEffective / vulnerable filters on the client: the damage step asks the server for the hit's multiplier
+    (`type-preview` -- the chart plus live type changes and abilities, read-only) and shows it ("Super effective (×2)").
+- Not yet: firstUseInEncounter, ally auras that change
   dice or flat damage (Battery, Flower Gift, Victory Star), triggered effects (slice 3), reminders (slice 4).
 
 `DnD_abilities.json` -- one entry per ability (built from the Pi's cached dex by

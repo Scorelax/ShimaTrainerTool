@@ -509,6 +509,11 @@ def handle(conn, action, params):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _stand_up(s, params['id']))
 
+    if action == 'type-preview':
+        # Read-only: the type multiplier a hit WOULD get, for the damage-roll step (super-effective ability conditions).
+        return {'status': 'success', 'data': _type_preview(conn, load_state(conn), params.get('id'), params.get('targetId'),
+                                                           params.get('moveType', ''), params.get('moveName', ''))}
+
     if action == 'rapid-orders':
         if not params.get('id') or not params.get('targetId'):
             raise ValueError('Missing trainer id or Pokemon id')
@@ -2616,6 +2621,21 @@ def _move_has_flag(move_name, flag):
         return False
     move = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None)
     return bool(move and move.get(flag))
+
+
+def _type_preview(conn, state, pid, target_id, move_type, move_name=''):
+    """The type multiplier (2 / 1 / 0.5 / 0) a hit from `pid` on `target_id` would get -- the same chart, live type
+    changes and abilities _apply_damage_to_target uses, without changing anything. None for an unknown participant."""
+    attacker = state['participants'].get(pid)
+    target = state['participants'].get(target_id)
+    if not attacker or not target:
+        return {'multiplier': None}
+    record = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None) if move_name else None
+    multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target, attacker)
+    in_gravity = any(t.get('rule') == 'gravity' for t in terrains_affecting(state, target_id))
+    multiplier, _, absorb, _ = abilities.adjust_incoming_damage(
+        state, pid, target_id, move_type, record, False, multiplier, _hostile(state, attacker, target), in_gravity, _grid_distance_ft)
+    return {'multiplier': 0 if absorb is not None else multiplier}
 
 
 def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False, pool='hp', turn_check=True):

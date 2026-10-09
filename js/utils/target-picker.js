@@ -347,6 +347,7 @@ function _ensureDom() {
           <div class="target-picker-anim-media" id="targetPickerAnimMedia"></div>
           <div class="target-picker-roll-target" id="targetPickerDamageTarget"></div>
           <div class="target-picker-roll-notes" id="targetPickerDamageNote"></div>
+          <div class="target-picker-roll-notes" id="targetPickerAbilityNote"></div>
           <div class="target-picker-dice-row" id="targetPickerDamageDiceRow"></div>
           <label class="target-picker-roll-label" for="targetPickerRollInput">Damage roll<span id="targetPickerModifierNote"></span></label>
           <input type="number" id="targetPickerRollInput" class="target-picker-roll-input" placeholder="Enter roll…">
@@ -675,13 +676,7 @@ function _showStep3() {
   // total, folded in below same as _damageModifier.
   const { diceMultiplier, diceOverride, flatBonus, advantage, extraDiceCount, note } =
     targetDamageNoteResult(_damageNotes, { attacker: _attacker, target: _selectedTarget, moveModValue: _moveModValue, nextTierDice: _nextTierDice, attackRoll: _attackRoll, targetDamagedMeThisRound: _targetDamagedMeThisRound(), targetDamagedThisRound: _targetDamagedThisRound(), adjacentAllies: _adjacentAlliesOfAttacker(), moveAbilities: _moveAbilityResolver(_moveName) });
-  // The attacker's ability against THIS target (Merciless, Rivalry, Magnet Pull...) and the target's own crit/reroll
-  // rules (Battle Armor, Paper Thin, Prism Armor) -- ability-mods.js. Its flat damage joins the total like Crush Grip's.
-  const row = _moveRowResolver(_moveName);
-  const abilityDamage = row
-    ? targetAbilityDamage(_attacker, _selectedTarget, row, { type: moveAbilityMods(_attacker, row).type, melee: isMeleeMoveRow(row) })
-    : { flat: 0, notes: [] };
-  _targetFlatBonus = flatBonus + abilityDamage.flat;
+  _baseTargetFlat = flatBonus;
   const noteEl = document.getElementById('targetPickerDamageNote');
   const noteParts = [];
   if (diceOverride && _damageDice) {
@@ -706,20 +701,57 @@ function _showStep3() {
   if (_presetRoll != null) {
     noteParts.push(`<div class="note">Pre-filled with ${_presetRoll} -- not rolled, edit it if it's wrong</div>`);
   }
-  abilityDamage.notes.forEach(n => noteParts.push(`<div class="note">${n}</div>`));
   noteEl.innerHTML = noteParts.join('');
 
   _damageDiceExtra = 0;
   _damageBattleDice = 0;
   _renderDamageDiceRow();
+  const input = document.getElementById('targetPickerRollInput');
+  input.value = _presetRoll != null ? _presetRoll : '';
+
+  // Abilities against THIS target (ability-mods.js): drawn now, then again once the server says how effective the hit
+  // is (type-preview: the chart plus live type changes and abilities) -- super-effective conditions need that.
+  const row = _moveRowResolver(_moveName);
+  const moveType = row ? moveAbilityMods(_attacker, row).type : '';
+  _renderAbilityDamage(row, moveType, null);
+  const token = ++_typePreviewToken;
+  if (row && _attacker?.id && _selectedTargetId) {
+    CombatAPI.typePreview(_attacker.id, _selectedTargetId, moveType, _moveName)
+      .then((res) => {
+        if (token === _typePreviewToken && !document.getElementById('targetPickerStep3').hidden) {
+          _renderAbilityDamage(row, moveType, res?.data?.multiplier ?? null);
+        }
+      })
+      .catch(() => {}); // no answer -- the step works without it, just without the super-effective lines
+  }
+  document.getElementById('targetPickerConfirmRoll').disabled = false;
+  setTimeout(() => input.focus(), 50);
+}
+
+// The damage step's own flat bonus from the move's target-conditional notes (Crush Grip); the attacker's ability adds
+// on top (_renderAbilityDamage). _typePreviewToken drops a type-preview answer that arrives after the step moved on.
+let _baseTargetFlat = 0;
+let _typePreviewToken = 0;
+
+/** The ability/type lines of the damage step and the flat damage they add: how effective the hit is (once known), the
+ * attacker's ability against this target (Merciless, Rivalry, Neuroforce on a super-effective hit...) and the
+ * defender's crit/reroll rules (Battle Armor, Paper Thin, Prism Armor). */
+function _renderAbilityDamage(row, moveType, typeMultiplier) {
+  const ab = row
+    ? targetAbilityDamage(_attacker, _selectedTarget, row, { type: moveType, melee: isMeleeMoveRow(row), typeMultiplier })
+    : { flat: 0, notes: [] };
+  _targetFlatBonus = _baseTargetFlat + ab.flat;
+  const lines = [];
+  if (typeMultiplier != null && typeMultiplier !== 1) {
+    const text = typeMultiplier === 0 ? 'No effect (×0)' : typeMultiplier > 1 ? `Super effective (×${typeMultiplier})` : 'Not very effective (×½)';
+    lines.push(`<div class="mode ${typeMultiplier > 1 ? 'advantage' : 'disadvantage'}">${text}</div>`);
+  }
+  ab.notes.forEach(n => lines.push(`<div class="note">${n}</div>`));
+  document.getElementById('targetPickerAbilityNote').innerHTML = lines.join('');
   const totalMod = _damageModifier + _targetFlatBonus;
   document.getElementById('targetPickerModifierNote').textContent =
     totalMod ? ` (${totalMod >= 0 ? '+' : ''}${totalMod} modifier added automatically)` : '';
-  const input = document.getElementById('targetPickerRollInput');
-  input.value = _presetRoll != null ? _presetRoll : '';
   _updateRollTotal();
-  document.getElementById('targetPickerConfirmRoll').disabled = false;
-  setTimeout(() => input.focus(), 50);
 }
 
 function _updateRollTotal() {

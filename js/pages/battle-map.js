@@ -42,14 +42,27 @@ function render() {
 
   const active = !!(session.active && session.board);
   stage.classList.toggle('active', active);
-  // Idle state (no active battle) is pure CSS -- see battle-map.html's own
-  // .map-empty-bg rule -- nothing else to update while it's showing.
-  if (!active) return;
+  // Idle state (no active battle): battle-map.html's .map-empty-bg shows the
+  // Shima map -- but the token layer sits above it (z-index 3), so the
+  // battle's tokens, grid, legend and terrain wash are cleared here, or the
+  // last battle's trainer and Pokemon would stay drawn over the map.
+  if (!active) {
+    clearBattleLayers(stage);
+    return;
+  }
 
   updateBackground();
   updateGrid();
   updateTokens();
   updateTerrainOverlay();
+}
+
+function clearBattleLayers(stage) {
+  ['mapTokens', 'mapGrid', 'mapLegend'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+  stage.className = stage.className.replace(/\bglobal-\w+/g, '').trim();
 }
 
 /** Whole-map terrain washes the stage; the legend lists everything active and for how long. */

@@ -433,6 +433,8 @@ async function _afterTargetSelected(p, name) {
     document.getElementById('targetPickerReactionWaitTimer').textContent = `${secs}s`;
   });
   document.getElementById('targetPickerReactionWait').hidden = true;
+  // A reaction that only softens the hit (Protect used again: half the damage drains VP) rides along to the damage step.
+  _reactionDamage = reaction?.multiplier ? { multiplier: reaction.multiplier, pool: reaction.pool || null } : null;
   if (reaction?.blocked) {
     if (_feintMoveName) {
       const useFeint = await showCombatConfirm(
@@ -738,6 +740,7 @@ function _showStep3() {
 // The damage step's own flat bonus from the move's target-conditional notes (Crush Grip); the attacker's ability adds
 // on top (_renderAbilityDamage). _typePreviewToken drops a type-preview answer that arrives after the step moved on.
 let _baseTargetFlat = 0;
+let _reactionDamage = null; // {multiplier, pool} from the target's reaction (_afterTargetSelected)
 let _typePreviewToken = 0;
 
 /** The ability/type lines of the damage step and the flat damage they add: how effective the hit is (once known), the
@@ -789,6 +792,7 @@ async function _confirmDamageRoll() {
     targetId: _selectedTargetId, hit: true, rawRoll: raw + _targetFlatBonus + _damageDiceExtra,
     attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _effectiveAttackMod(),
     rollMode: _atkCtx?.mode || 'normal',
+    ...(_reactionDamage ? { reactionMultiplier: _reactionDamage.multiplier, reactionPool: _reactionDamage.pool } : {}),
   };
   _consume(_atkCtx);
   await _playAnimation();
@@ -870,6 +874,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _forcedRollNote = '';
   _feintMoveName = feintMoveName;
   _targetFlatBonus = 0;
+  _reactionDamage = null;
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   document.getElementById('targetPickerBack').style.display = '';
   document.getElementById('targetPickerBackToAttack').style.display = '';

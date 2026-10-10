@@ -330,7 +330,8 @@ def _handle(conn, action, params):
         if not params.get('id'):
             raise ValueError('Missing participant id')
         multiplier = float(params.get('multiplier', 0.5))
-        return _mutate(conn, lambda s: _apply_reaction_damage_multiplier(s, params['id'], multiplier))
+        pool = 'vp' if params.get('pool') == 'vp' else None  # Protect's repeat use: half the damage drains VP instead
+        return _mutate(conn, lambda s: _apply_reaction_damage_multiplier(s, params['id'], multiplier, pool))
 
     if action == 'close-reaction-window':
         return _mutate(conn, _close_reaction_window)
@@ -2058,7 +2059,7 @@ def _negate_reaction_block(state, pid, moves_data):
                actorId=pid, actorName=attacker['name'], move='Feint', vpCost=feint_vp or 0)
 
 
-def _apply_reaction_damage_multiplier(state, pid, multiplier):
+def _apply_reaction_damage_multiplier(state, pid, multiplier, pool=None):
     """Wide Guard's own mechanism: "As a reaction, when a creature activates
     a damaging move that damages multiple allies within range, you may halve
     the damage dealt." Recorded the same way `_block_pending_attack` records
@@ -2082,10 +2083,12 @@ def _apply_reaction_damage_multiplier(state, pid, multiplier):
     state['reactionDamageMultiplier'] = {
         'windowId': pr['id'], 'anchorId': pr['anchorId'], 'attackerId': pr['attackerId'],
         'reactorId': pid, 'reactorName': participant['name'], 'multiplier': multiplier,
+        **({'pool': pool} if pool else {}),
     }
     pct = round((1 - multiplier) * 100)
-    _log_event(state, 'reaction-block', text=f"{participant['name']} reduces the incoming damage by {pct}%!",
-               actorId=pid, actorName=participant['name'])
+    text = (f"{participant['name']} takes the hit on its VP -- half the damage drains VP instead of HP" if pool == 'vp'
+            else f"{participant['name']} reduces the incoming damage by {pct}%!")
+    _log_event(state, 'reaction-block', text=text, actorId=pid, actorName=participant['name'])
 
 
 def _maybe_close_reaction_window(state):
@@ -3047,15 +3050,23 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         # this dataset gives VP an analogous shield, and these moves' own
         # text never mentions one, so there's nothing to apply here. A
         # genuinely smaller code path, not the HP one with a field swapped.
-        target['currentVP'] -= actual_damage  # no floor, same reasoning as the HP path below
+        # VP floors at 0 and whatever is left over drains HP instead (HP has no floor) -- the same rule as a move's VP cost.
+        vp_before = target.get('currentVP') or 0
+        overflow = max(0, actual_damage - vp_before)
+        target['currentVP'] = max(0, vp_before - actual_damage)
+        hp_before = target['currentHP']
+        if overflow:
+            target['currentHP'] -= overflow
+            _note_faint(target, hp_before)
         move_label = f' with {move_name}' if move_name else ''
         _log_event(
             state, 'damage',
-            text=f"{attacker['name']} drained {actual_damage} VP from {target['name']}{move_label} ({multiplier}x)",
+            text=f"{attacker['name']} drained {actual_damage} VP from {target['name']}{move_label} ({multiplier}x)"
+                 + (f" -- out of VP, {overflow} came off HP" if overflow else ''),
             actorId=pid, actorName=attacker['name'], targetId=target_id, targetName=target['name'],
             move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier, crit=bool(crit), pool='vp',
         )
-        return {'multiplier': multiplier, 'damageApplied': actual_damage}
+        return {'multiplier': multiplier, 'damageApplied': actual_damage, 'targetFainted': target['currentHP'] <= 0}
 
     # Mat Block/Testudo Formation's own standing damage reductions -- applied
     # AFTER the type multiplier (kept separate, not folded into `multiplier`
@@ -3228,6 +3239,8 @@ def _list_move_categories():
             marks['noAttackRoll'] = True  # migrate_effects_v97.py -- the move popup shows no attack modifier
         if m.get('doubleDamageVsStates'):
             marks['doubleDamageVsStates'] = m['doubleDamageVsStates']
+        if m.get('repeatUse'):
+            marks['repeatUse'] = m['repeatUse']  # migrate_effects_v99.py -- the Protect family's d20 after the first use
         # Limit Break / Feint Attack / Close Combat ...: the move's OWN attack roll is always made with advantage, and Limit
         # Break's "scores a critical hit on 18-20" widens the crit range for that attack only (base_crit is the 19-20 case).
         if m.get('attackRollMode'):

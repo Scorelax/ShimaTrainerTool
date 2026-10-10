@@ -872,8 +872,8 @@ export class CombatAPI {
    * floor via reaction-start), same caller shape as blockPendingAttack, not
    * negateReactionBlock's attacker-identity one. See routes_combat.py's own
    * _apply_reaction_damage_multiplier. */
-  static async applyReactionDamageMultiplier(id, multiplier) {
-    return API.request('combat', 'apply-reaction-damage-multiplier', { id, multiplier }, { useCache: false });
+  static async applyReactionDamageMultiplier(id, multiplier, pool = null) {
+    return API.request('combat', 'apply-reaction-damage-multiplier', { id, multiplier, ...(pool ? { pool } : {}) }, { useCache: false });
   }
 
   /** Called once the caller's own local clock reaches the window's expiresAt

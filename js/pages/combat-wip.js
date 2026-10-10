@@ -850,6 +850,7 @@ function _enterBattleSync() {
   setOnCombatStateSave(_onLocalCombatStateSave);
   setOnLogEvent((event) => {
     const sent = CombatAPI.logEvent(event).catch(() => {});
+    _lastLogSent = sent; // _repeatUseCheck counts move-used entries -- it waits for this one to land first
     if (event.type === 'move-used' && event.move) sent.then(() => _abilityMoveUsed(event.actorId, event.move)); // Protean, Dancer...
   });
   setOnSwitchPokemon((bench, options) => _switchPokemonShared(bench, options)); // swaps on the server, not the local mirror
@@ -2246,6 +2247,11 @@ let _focusManuallySet = false;
 // for THAT participant -- showing a different one of the viewer's own
 // combatants needs a fresh attach, not just a re-render (see _syncMainFocus).
 let _attachedFocusId = null;
+// The state object combat.js's card handlers were attached with (attachBattleListeners keeps it in its click handler's
+// closure). Live updates refresh THIS object's contents (_syncMainFocus) -- handing rerenderBattle a new copy instead
+// left the handlers reading the HP/VP from when the card was first attached, so a move used after being hit charged
+// its VP from the old numbers and wrote them back over the server's.
+let _attachedFocusState = null;
 
 /** The viewer's own next combatant in turn order after `fromId`, wrapping
  * round to the start of the order. Returns `fromId` itself when it's the only
@@ -2475,6 +2481,7 @@ function _attachMainFocusListeners(state) {
 
   attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, onMultiHitAoe: _handleMultiHitAoe, onEffectsOnly: _handleEffectsOnly, onBideResolve: _handleBideResolve, ...ctx.cardOptions });
   _attachedFocusId = ctx.p.id;
+  _attachedFocusState = ctx.filteredState;
 
   document.getElementById('battleList')?.addEventListener('click', (e) => {
     const reactBtn = e.target.closest('.wip-react-btn');
@@ -2623,7 +2630,11 @@ function _syncMainFocus(state) {
     const oldVideo = document.querySelector('#battleList video.combat-card-img');
     const oldSrc = oldVideo?.getAttribute('src') || null;
     const oldTime = oldVideo?.currentTime || 0;
-    rerenderBattle(ctx.filteredState);
+    if (_attachedFocusState) {
+      Object.keys(_attachedFocusState).forEach((k) => { if (!(k in ctx.filteredState)) delete _attachedFocusState[k]; });
+      Object.assign(_attachedFocusState, ctx.filteredState);
+    }
+    rerenderBattle(_attachedFocusState || ctx.filteredState);
     if (oldSrc) {
       try {
         const newVideo = document.querySelector('#battleList video.combat-card-img');
@@ -3619,7 +3630,41 @@ async function _handleRepositionNear({ moverId, anchorId, maxFt, moveName }) {
   }).catch(() => {});
 }
 
+let _lastLogSent = Promise.resolve();
+
+/** The Protect family's rising cost (migrate_effects_v99.py's `repeatUse`): the first use in a battle just works; every
+ * later one needs a d20 of `min`+ (16). Returns 'ok', 'fail' (nothing happens -- the attack goes through), or 'vp_half'
+ * (Protect / Detect / Spiky Shield on a 16-19: half the damage drains VP instead of being ignored). Uses are counted from
+ * the battle log's move-used entries, this one included. */
+async function _repeatUseCheck(userId, moveName, rule) {
+  await _lastLogSent;
+  let log = session?.log || [];
+  try {
+    const fresh = await CombatAPI.getState();
+    if (fresh?.status === 'success') log = fresh.data.log || log;
+  } catch { /* use what we have */ }
+  const uses = log.filter(e => e.type === 'move-used' && e.actorId === userId && e.move === moveName).length;
+  if (uses <= 1) return 'ok';
+  const user = session?.participants?.[userId];
+  const rolled = await promptValueRoll({
+    dice: `1${rule.die || 'd20'}`, moveName,
+    description: `${user?.name || 'It'} has used ${moveName} ${uses - 1}× already this battle -- it only works on a ${rule.min}+ now`
+      + `${rule.vpHalfUnlessNatural20 ? ' (and below a natural 20, half the damage drains VP instead)' : ''}.`,
+  });
+  const ok = rolled != null && rolled >= rule.min;
+  CombatAPI.logEvent({
+    type: 'save', actorId: userId, actorName: user?.name,
+    text: `${user?.name || '?'}'s ${moveName} (use ${uses} this battle): rolled ${rolled ?? '-'} -- ${!ok ? 'it fails' : rolled < 20 && rule.vpHalfUnlessNatural20 ? 'it works, but half the damage drains VP' : 'it works'}`,
+  }).catch(() => {});
+  if (!ok) return 'fail';
+  return rule.vpHalfUnlessNatural20 && rolled < 20 ? 'vp_half' : 'ok';
+}
+
 async function _offerMoveEffects({ attackerId, targetId = null, moveName, computedData, ctx, includeSelf = true }) {
+  // Protect, Endure, King's Shield...: after the first use this battle the move only works on a d20 roll.
+  const repeatRule = moveFlagsFor(moveName).repeatUse;
+  const repeat = repeatRule ? await _repeatUseCheck(attackerId, moveName, repeatRule) : 'ok';
+  if (repeat === 'fail') return;
   // Weather variants (Surface Glide's "if raining, all surfaces are water", Shore Up's "doubled in a Sandstorm") are
   // resolved against the weather the user stands in, once, as the effects are offered.
   const userWeathers = weathersAffecting(session, attackerId);
@@ -3690,7 +3735,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
     if (effect.kind === 'negate_damage') {
       // Spiky Shield's own "ignore damage" half -- same no-attackerId-needed
       // reasoning as undo_crit_damage above.
-      await _handleNegateDamage({ reactorId: attackerId, moveName });
+      await _handleNegateDamage({ reactorId: attackerId, moveName, vpHalf: repeat === 'vp_half' });
       continue;
     }
     if (effect.kind === 'cancel_switch') {
@@ -4056,7 +4101,8 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
       // the reactor themselves, using the move -- same as any other
       // self-only reaction effect.
       try {
-        await CombatAPI.blockPendingAttack(attackerId, moveName);
+        if (repeat === 'vp_half') await CombatAPI.applyReactionDamageMultiplier(attackerId, 0.5, 'vp'); // a 16-19 on a repeat use
+        else await CombatAPI.blockPendingAttack(attackerId, moveName);
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });
       }
@@ -4474,7 +4520,7 @@ async function _handleUndoCritDamage({ reactorId, moveName }) {
  * deliberately NOT modeled -- same manual-after-first-use precedent every
  * other Protect-family move in this schema already gets (no resource-
  * tracking mechanism for "which use number is this" exists anywhere). */
-async function _handleNegateDamage({ reactorId, moveName }) {
+async function _handleNegateDamage({ reactorId, moveName, vpHalf = false }) {
   const reactor = session?.participants?.[reactorId];
   if (!reactor) return;
 
@@ -4484,16 +4530,18 @@ async function _handleNegateDamage({ reactorId, moveName }) {
     return;
   }
   const refund = original.amount;
+  // A repeat use that rolled 16-19: the HP comes back, but half the damage drains VP instead.
+  const vpLoss = vpHalf ? Math.floor(refund / 2) : 0;
   CombatAPI.logEvent({
     type: 'save', actorId: reactorId, actorName: reactor.name, targetId: original.actorId, targetName: original.actorName || '?',
-    text: `${reactor.name} used ${moveName} -- ignores the ${refund} damage, refunding it in full`,
+    text: `${reactor.name} used ${moveName} -- ignores the ${refund} damage, refunding it in full${vpLoss ? ` (but loses ${vpLoss} VP instead)` : ''}`,
   }).catch(() => {});
 
   if (refund > 0) {
     const maxHp = Number.isFinite(reactor.maxHP) ? reactor.maxHP : Infinity;
     const newHp = Math.min(maxHp, reactor.currentHP + refund);
     try {
-      await CombatAPI.updateStats(reactorId, { currentHP: newHp });
+      await CombatAPI.updateStats(reactorId, { currentHP: newHp, ...(vpLoss ? { currentVP: Math.max(0, (reactor.currentVP || 0) - vpLoss) } : {}) });
     } catch (err) {
       showCombatAlert(err.message, { title: 'Error' });
     }
@@ -5199,6 +5247,9 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   if (picked) damageMultiplier *= _stateDamageMultiplier(moveName, picked.targetId);
   if (!picked) return null; // "no target" / closed -- move's own cost still applied, nothing more to do
   if (picked.blocked) return null; // a reactor's block_attack effect (Protect, ...) ended this attack entirely -- routes_combat.py's own block-pending-attack already logged it (reaction-block), nothing left to do
+  // Protect / Detect used again (a 16-19): the hit lands at half, on the target's VP instead of its HP.
+  if (picked.reactionMultiplier) damageMultiplier *= picked.reactionMultiplier;
+  const damagePool = picked.reactionPool === 'vp' ? 'vp' : 'hp';
   // Pressure: targeting it directly (the first hit of a single-target move, hit or miss) costs the move's VP again.
   if (direct) await _abilityTargetedTriggers(combatantId, picked.targetId, move);
   if (!picked.hit) {
@@ -5275,7 +5326,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     // own post-type-multiplier result, just one round trip cheaper.
     const rawTotal = rawRoll + damageModifier;
     const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
-    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit);
+    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit, damagePool);
     damageDealt = dmgResult?.damageApplied;
     targetFainted = dmgResult?.targetFainted;
     lastTypeMultiplier = dmgResult?.multiplier ?? null;
@@ -5334,8 +5385,8 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
  * `tag_for` derives it from any effect kind, so rebuild_categories never
  * retires it) -- already-reliable, already-present data, not something
  * this pass had to add. */
-async function _applyPrimaryDamage(casterId, targetId, diceRoll, moveType, speciesName, moveName, crit = false) {
-  const pool = moveCategoriesFor(moveName).includes('damage_vp') ? 'vp' : 'hp';
+async function _applyPrimaryDamage(casterId, targetId, diceRoll, moveType, speciesName, moveName, crit = false, poolOverride = null) {
+  const pool = poolOverride || (moveCategoriesFor(moveName).includes('damage_vp') ? 'vp' : 'hp');
   return CombatAPI.applyDamage(casterId, targetId, diceRoll, moveType, speciesName, moveName, crit, pool);
 }
 
@@ -5376,7 +5427,9 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
     targetIds = targetIds.filter((id) => id !== anchorId);
     if (!targetIds.length) return false; // that was the only target -- nothing left to resolve
   }
-  const damageMultiplier = aoeReaction?.multiplier || 1;
+  // Wide Guard halves everyone's share; Protect used again (half, to VP) only the protected creature's own.
+  const vpHalfId = aoeReaction?.pool === 'vp' ? anchorId : null;
+  const damageMultiplier = vpHalfId ? 1 : (aoeReaction?.multiplier || 1);
 
   const isSaveTriggered = moveCategoriesFor(moveName).includes('trigger_saving_throw');
   const guaranteedHit = moveCategoriesFor(moveName).includes('guaranteed_hit');
@@ -5427,9 +5480,10 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
           // doubly true in a loop over several AoE targets, one popup per target.
           // damageMultiplier: see this function's own Wide Guard note above.
           const rawTotal = outcome.rawRoll + damageModifier;
-          const targetMultiplier = damageMultiplier * _stateDamageMultiplier(moveName, targetId);
+          const targetMultiplier = damageMultiplier * _stateDamageMultiplier(moveName, targetId) * (targetId === vpHalfId ? 0.5 : 1);
           const finalDamage = targetMultiplier !== 1 ? Math.floor(rawTotal * targetMultiplier) : rawTotal;
-          const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName);
+          const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, false,
+            targetId === vpHalfId ? 'vp' : null);
           if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
           await waitForDamagedReactions(targetId, combatantId, moveName);
           await _maybeMeleeRetaliate(combatantId, targetId, moveName);

@@ -82,7 +82,8 @@ export async function waitForOpenWindow(onStatus) {
       result = { blocked: true, blockerName: session.reactionBlock.blockerName };
     }
     if (session?.reactionDamageMultiplier?.windowId && session.reactionDamageMultiplier.windowId === windowId) {
-      result = { ...result, multiplier: session.reactionDamageMultiplier.multiplier, reactorName: session.reactionDamageMultiplier.reactorName };
+      result = { ...result, multiplier: session.reactionDamageMultiplier.multiplier, reactorName: session.reactionDamageMultiplier.reactorName,
+        ...(session.reactionDamageMultiplier.pool ? { pool: session.reactionDamageMultiplier.pool } : {}) }; // Protect's repeat use: VP
     }
     if (!pr) return result; // closed -- everyone answered, or someone's client already timed it out
 

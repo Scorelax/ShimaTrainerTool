@@ -8972,7 +8972,12 @@
           ]
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "repeatUse": {
+        "die": "d20",
+        "min": 16,
+        "vpHalfUnlessNatural20": true
+      }
     },
     {
       "name": "Double Kick",
@@ -16367,7 +16372,12 @@
       ],
       "reactionTrigger": "damaged",
       "reactionRange": 0,
-      "attackRoll": false
+      "attackRoll": false,
+      "repeatUse": {
+        "die": "d20",
+        "min": 16,
+        "vpHalfUnlessNatural20": true
+      }
     },
     {
       "name": "Spore",
@@ -20729,7 +20739,11 @@
           ]
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "repeatUse": {
+        "die": "d20",
+        "min": 16
+      }
     },
     {
       "name": "Enter Formation",
@@ -23030,7 +23044,12 @@
           ]
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "repeatUse": {
+        "die": "d20",
+        "min": 16,
+        "vpHalfUnlessNatural20": true
+      }
     },
     {
       "name": "Psych Up",
@@ -31778,7 +31797,11 @@
           ]
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "repeatUse": {
+        "die": "d20",
+        "min": 16
+      }
     },
     {
       "name": "Magnet Bomb",
@@ -32205,7 +32228,11 @@
           ]
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "repeatUse": {
+        "die": "d20",
+        "min": 16
+      }
     },
     {
       "name": "Shift Gear",

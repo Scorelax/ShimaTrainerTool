@@ -18,7 +18,7 @@ import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteR
 import { targetAbilityDamage, moveAbilityMods, attackRollReminders } from './ability-mods.js';
 import { waitForReactionWindow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
-import { filterTargetable } from './targetability.js';
+import { filterTargetable, markOutOfRange } from './targetability.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
 
 function _injectStyles() {
@@ -848,7 +848,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
 
-  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== attackerId), moveName);
+  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== attackerId), moveName, session, attackerId);
   if (!participants.length) return null;
 
   _ensureDom();
@@ -876,6 +876,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _showStep1();
   const grid = document.getElementById('targetPickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
+  markOutOfRange(grid, participants); // beyond the move's reach: greyed out, not pickable
   grid.querySelectorAll('[data-target-id]').forEach(card => {
     card.addEventListener('click', () => {
       const p = session.participants[card.dataset.targetId];

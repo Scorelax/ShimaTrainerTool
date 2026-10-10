@@ -13,6 +13,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { injectBattleMapStyles, squareCells, ZONE_RGB, spriteTransform } from './battle-map-view.js';
+import { cellDistanceFt } from './move-range.js';
 
 /** A move's area radius from its range text: the distance next to "radius"/"circle" if there is one ("Self (30ft. radius)"
  * -> 30, "100ft., 50ft. radius" -> 50), otherwise the first distance ("Self, 50ft." -> 50). null if none. */
@@ -60,7 +61,7 @@ function _injectStyles() {
  * @param {string} confirmLabel  the confirm button's text
  * @returns {Promise<{cells: string[]} | {all: true} | null>}
  */
-export function pickTerrainArea({ session, casterId, title, kind, radiusFt, centeredOnCaster = true, heightFt = null, allowCancel = false, confirmLabel = 'Confirm area' }) {
+export function pickTerrainArea({ session, casterId, title, kind, radiusFt, centeredOnCaster = true, heightFt = null, allowCancel = false, confirmLabel = 'Confirm area', maxCenterFt = null }) {
   _injectStyles();
   return new Promise((resolve) => {
     const board = session.board;
@@ -161,6 +162,12 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
       e.preventDefault();
       if (stamp) {
         const [col, row] = key.split(',').map(Number);
+        // "50ft., 10ft. radius": the centre must be within the move's range of the caster.
+        const away = maxCenterFt != null ? cellDistanceFt(board, caster, col, row) : null;
+        if (away != null && away > maxCenterFt) {
+          countEl.textContent = `Too far -- that's ${away}ft away, the centre must be within ${maxCenterFt}ft`;
+          return;
+        }
         stamped = squareCells(board, col, row, 1, radiusFt / 5); // replaces the previous stamp
         rebuild();
         refresh();

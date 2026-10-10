@@ -37,7 +37,8 @@ import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-
 import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { setTargetabilityResolver } from '../utils/targetability.js';
+import { setTargetabilityResolver, setMoveRangeResolver } from '../utils/targetability.js';
+import { areaPlacementFt } from '../utils/move-range.js';
 import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
@@ -1117,6 +1118,9 @@ setWeatherAttackModeResolver((moveName, attackerId) => {
   if (smog) return { mode: 'disadvantage', note: `Attacking from inside ${smog.name}: disadvantage` };
   return weatherAttackMode(moveEffectsFor(moveName), weathersAffecting(session, attackerId));
 });
+// Every picker greys out creatures beyond the move's reach -- the reach comes from the move's range text (move-range.js).
+setMoveRangeResolver(moveName => String((findMoveRow(moveName) || [])[6] || ''));
+
 // Semi-invulnerable targets (underground, airborne, ...) are hidden from every picker unless the move
 // lists their state in `hitsStates`.
 setTargetabilityResolver((participant, moveName) => {
@@ -5874,7 +5878,8 @@ function _aoeAreaFor(moveName) {
   const radiusFt = radiusFtFromRange(range);
   if (!radiusFt) return null;
   const high = /(\d+)\s*(?:ft|feet|foot)\.?\s*high/i.exec(String(row[7] || ''));
-  return { radiusFt, heightFt: high ? Number(high[1]) : null, centeredOnCaster: /\bself\b/i.test(range) };
+  // "50ft., 10ft. radius": the centre has to be dropped within 50ft of the caster.
+  return { radiusFt, heightFt: high ? Number(high[1]) : null, centeredOnCaster: /\bself\b/i.test(range), maxCenterFt: areaPlacementFt(range) };
 }
 
 const _hazardsPrompted = new Set();

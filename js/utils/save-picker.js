@@ -18,7 +18,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { filterTargetable } from './targetability.js';
+import { filterTargetable, markOutOfRange } from './targetability.js';
 import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, saveAutoFails } from './move-effects.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
 import { noDamageOnPassedSave } from './ability-mods.js';
@@ -559,7 +559,7 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
 
-  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== casterId), moveName);
+  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== casterId), moveName, session, casterId);
   if (!participants.length) return null;
 
   _ensureDom();
@@ -577,6 +577,7 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _showStep1();
   const grid = document.getElementById('savePickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
+  markOutOfRange(grid, participants); // beyond the move's reach: greyed out, not pickable
   grid.querySelectorAll('[data-target-id]').forEach(card => {
     card.addEventListener('click', () => {
       const p = session.participants[card.dataset.targetId];

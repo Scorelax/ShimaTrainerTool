@@ -10,7 +10,7 @@
 import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { filterTargetable } from './targetability.js';
+import { filterTargetable, markOutOfRange } from './targetability.js';
 import { pickTerrainArea } from './terrain-area-picker.js';
 import { pickLineArea } from './line-area-picker.js';
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
@@ -107,16 +107,18 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
 
-  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== casterId), moveName);
+  const participants = filterTargetable(Object.values(session.participants).filter(p => p.id !== casterId), moveName, session, casterId);
   if (!participants.length) return null;
 
   _ensureDom();
   _selected = new Set();
   const grid = document.getElementById('mtpGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
+  markOutOfRange(grid, participants); // beyond the move's reach: greyed out, not pickable
   const confirmBtn = document.getElementById('mtpConfirm');
   confirmBtn.disabled = true;
   const toggle = (card, on) => {
+    if (on && card.disabled) return; // out of range
     const id = card.dataset.targetId;
     if (on) { _selected.add(id); card.classList.add('selected'); } else { _selected.delete(id); card.classList.remove('selected'); }
     confirmBtn.disabled = _selected.size === 0;
@@ -141,6 +143,7 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
     const res = await pickTerrainArea({
       session, casterId, title: moveName || 'Blast area', kind: 'other', radiusFt: area.radiusFt,
       centeredOnCaster: area.centeredOnCaster, heightFt: area.heightFt, allowCancel: true, confirmLabel: 'Select targets inside',
+      maxCenterFt: area.maxCenterFt ?? null,
     });
     if (!res) return;
     const inArea = new Set(res.cells || []);

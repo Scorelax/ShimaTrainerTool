@@ -19,6 +19,7 @@ import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
 import { lineFtFromRange } from '../utils/line-area.js';
+import { coneFtFromRange } from '../utils/line-area-picker.js';
 import { setAbilitySession, abilityTriggers, activatedAbilityEffects } from '../utils/ability-mods.js';
 import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
@@ -5867,13 +5868,16 @@ const WIP_SAVE_PROMPT_KEY = 'combatWipLastSavePrompt';
  * DM's enemies) aren't prompted here -- anyone can roll their save from the status badge. */
 /** A blast move's area for the multi-target picker's "select from the map": radius from its range text ("Self (20ft. radius)",
  * "50ft., 10ft. radius"), height from its description ("40ft. high cylinder"), and whether it's centered on the caster or
- * on a point the caster places. null for moves with no circular area (lines and cones aren't supported yet). */
+ * on a point the caster places. Lines and cones are aimed from the caster instead ({lineFt} / {coneFt}). */
 function _aoeAreaFor(moveName) {
   const row = findMoveRow(moveName) || [];
   const range = String(row[6] || '');
   // A line move ("Self (80ft. line)") is aimed as a 5ft-wide strip instead (line-area-picker.js).
   const lineFt = lineFtFromRange(range);
   if (lineFt) return { lineFt };
+  // A cone move ("Self (15ft. cone)", "40ft. cone") is aimed from the caster in one of the 8 grid directions.
+  const coneFt = coneFtFromRange(range);
+  if (coneFt) return { coneFt };
   if (!/radius|circle|cylinder/i.test(range)) return null;
   const radiusFt = radiusFtFromRange(range);
   if (!radiusFt) return null;

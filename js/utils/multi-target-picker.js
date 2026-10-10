@@ -12,7 +12,7 @@ import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { pickTerrainArea } from './terrain-area-picker.js';
-import { pickLineArea } from './line-area-picker.js';
+import { pickLineArea, pickConeArea } from './line-area-picker.js';
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
 
 function _injectStyles() {
@@ -131,6 +131,15 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   const hasBoard = !!session.board?.tokens?.[casterId] || Object.keys(session.board?.tokens || {}).length > 0;
   mapBtn.hidden = !(area && hasBoard);
   mapBtn.onclick = async () => {
+    if (area.coneFt) {
+      const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt });
+      if (!cone) return;
+      participants.forEach(p => {
+        const card = grid.querySelector(`[data-target-id="${p.id}"]`);
+        if (card) toggle(card, cone.ids.includes(p.id));
+      });
+      return;
+    }
     if (area.lineFt) {
       const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt });
       if (!line) return;
@@ -158,5 +167,8 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   };
 
   _overlay.style.display = 'flex';
-  return new Promise((resolve) => { _resolve = resolve; });
+  const promise = new Promise((resolve) => { _resolve = resolve; });
+  // A cone or a line is aimed, not picked: open the aimer straight away (its hits come back ticked here, still adjustable).
+  if ((area?.coneFt || area?.lineFt) && !mapBtn.hidden) mapBtn.onclick();
+  return promise;
 }

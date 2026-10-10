@@ -4,8 +4,8 @@
 // multi-target picker to tick (still adjustable there). See line-area.js for the geometry.
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
-import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from './battle-map-grid.js';
+import { injectBattleMapStyles, spriteTransform, coneCells } from './battle-map-view.js';
 import { lineGeometry, lineHitIds, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 function _injectStyles() {
@@ -121,6 +121,114 @@ export function pickLineArea({ session, casterId, title, lengthFt, confirmLabel 
       if (!act) return;
       if (act === 'left') { angle = (angle + 355) % 360; refresh(); }
       else if (act === 'right') { angle = (angle + 5) % 360; refresh(); }
+      else if (act === 'cancel') { overlay.remove(); resolve(null); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle }); }
+    });
+  });
+}
+
+/** "Self (15ft. cone)" / "40ft. cone" -> 15 / 40; null for anything else. */
+export function coneFtFromRange(rangeText) {
+  const m = /(\d+)\s*ft\.?\s*cone/i.exec(String(rangeText || ''));
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * "Aim the cone" -- the cone counterpart of pickLineArea. The cone comes out of the caster and points in one of the 8 grid
+ * directions (the table's grid cones: straight ahead each row is 2 squares wider, a diagonal is a square block off the
+ * corner -- battle-map-view.js's coneCells). Drag or tap toward where it should point, or turn it 45° at a time; the squares
+ * it covers are shaded and everyone standing on one is listed (a flyer higher than the cone is long is out of it).
+ * @returns {Promise<{ids: string[], angle: number} | null>}  null when cancelled
+ */
+export function pickConeArea({ session, casterId, title, lengthFt, confirmLabel = 'Select targets in the cone' }) {
+  _injectStyles();
+  return new Promise((resolve) => {
+    const board = session.board;
+    const { cols, rows } = board.grid;
+    const casterPos = board.tokens[casterId];
+    const caster = session.participants[casterId];
+    if (!casterPos) { resolve(null); return; }
+    const casterSize = footprintForSize(caster?.size);
+    const snap = (deg) => ((Math.round(deg / 45) * 45) % 360 + 360) % 360;
+    let angle = snap(casterPos.facing || 0);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'lap-overlay';
+    overlay.innerHTML = `
+      <div class="lap-card">
+        <h3 class="lap-title">${title}</h3>
+        <div class="lap-sub">A ${lengthFt}ft cone from ${caster?.name || 'the caster'}. Drag or tap toward where it should point (it turns in 8 directions), or use the buttons. Everyone in the shaded squares is selected.</div>
+        <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
+          <div class="bmap-grid"></div>
+          <div class="bmap-tokens"></div>
+        </div>
+        <div class="lap-hits"></div>
+        <div class="lap-actions">
+          <button type="button" data-act="left" title="Turn 45° left">⟲ 45°</button>
+          <button type="button" data-act="right" title="Turn 45° right">⟳ 45°</button>
+          <button type="button" data-act="cancel">Cancel</button>
+          <button type="button" class="lap-confirm" data-act="confirm">${confirmLabel}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const stage = overlay.querySelector('.lap-stage');
+    const grid = overlay.querySelector('.bmap-grid');
+    const tokenLayer = overlay.querySelector('.bmap-tokens');
+    const hitsEl = overlay.querySelector('.lap-hits');
+    if (board.backgroundImage) {
+      stage.classList.add('has-bg');
+      stage.style.backgroundImage = `url(${board.backgroundImage})`;
+    }
+    grid.setAttribute('style', gridTemplateStyle(board));
+    grid.innerHTML = gridCellsHtml(board, 'bmap-cell');
+    const cellEls = new Map([...grid.querySelectorAll('[data-cell]')].map(el => [el.dataset.cell, el]));
+
+    const tokenEls = new Map();
+    Object.entries(board.tokens).forEach(([id, pos]) => {
+      const p = session.participants[id];
+      if (!p) return;
+      const el = document.createElement('div');
+      el.className = `bmap-token ${p.side}${id === casterId ? ' mine' : ''}${(pos.z || 0) > 0 ? ' airborne' : ''}`;
+      Object.assign(el.style, cellRect(board, pos.col, pos.row, footprintForSize(p.size)));
+      const name = visibleToViewer(p, 'name') ? p.name : '???';
+      el.title = name;
+      el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
+      patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
+      tokenLayer.appendChild(el);
+      tokenEls.set(id, el);
+    });
+
+    let hits = [];
+    const refresh = () => {
+      const cells = coneCells(board, casterPos, casterSize, angle, lengthFt / 5);
+      cellEls.forEach((el, key) => el.classList.toggle('cone', cells.has(key)));
+      const casterZ = casterPos.z || 0;
+      hits = Object.entries(board.tokens).filter(([id, pos]) => {
+        if (id === casterId || !session.participants[id]) return false;
+        if (Math.abs((pos.z || 0) - casterZ) > lengthFt) return false;
+        return footprintCells(pos.col, pos.row, footprintForSize(session.participants[id].size)).some(c => cells.has(`${c.col},${c.row}`));
+      }).map(([id]) => id);
+      tokenEls.forEach((el, id) => el.classList.toggle('line-hit', hits.includes(id)));
+      const names = hits.map(id => (visibleToViewer(session.participants[id], 'name') ? session.participants[id].name : '???'));
+      hitsEl.textContent = names.length ? `In the cone: ${names.join(', ')}` : 'Nobody in the cone yet.';
+    };
+    refresh();
+
+    const origin = lineGeometry(casterPos, casterSize, 0, lengthFt).o;
+    let aiming = false;
+    const aim = (e) => { angle = snap(angleToPointer(stage, board, origin, e.clientX, e.clientY)); refresh(); };
+    stage.addEventListener('pointerdown', (e) => { e.preventDefault(); aiming = true; stage.setPointerCapture?.(e.pointerId); aim(e); });
+    stage.addEventListener('pointermove', (e) => { if (aiming) aim(e); });
+    const stop = () => { aiming = false; };
+    stage.addEventListener('pointerup', stop);
+    stage.addEventListener('pointercancel', stop);
+
+    overlay.addEventListener('click', (e) => {
+      const act = e.target.closest('button')?.dataset.act;
+      if (!act) return;
+      if (act === 'left') { angle = (angle + 315) % 360; refresh(); }
+      else if (act === 'right') { angle = (angle + 45) % 360; refresh(); }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
       else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle }); }
     });

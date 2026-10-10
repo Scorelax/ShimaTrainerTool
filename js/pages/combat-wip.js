@@ -5297,8 +5297,9 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   // roll to have crossed a threshold or crit on).
   const guaranteedHit = _guaranteedHitFor(combatantId, categories, moveName);
   const attacker = session?.participants?.[combatantId];
-  let crit = false; // a guaranteed hit has no roll to crit on
-  if (!guaranteedHit) {
+  let crit = false; // a guaranteed hit with no roll entered can't crit
+  // A guaranteed hit still rolls -- only to see whether it crits (target-picker.js's crit roll), so a roll counts here too.
+  if (!guaranteedHit || attackRoll !== null) {
     // undefined (not false) when the roll wasn't entered, so a crit-only effect asks a human.
     // effectiveStats, not the raw record -- a live crit-range status (Focus Energy) has to
     // actually change whether this roll counts, not just show up as a number on the card.

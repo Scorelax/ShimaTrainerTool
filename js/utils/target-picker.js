@@ -14,7 +14,7 @@ import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
-import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode, isMeleeMoveRow } from './move-effects.js';
+import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode, isMeleeMoveRow, guaranteedCritStatusId } from './move-effects.js';
 import { targetAbilityDamage, moveAbilityMods, attackRollReminders } from './ability-mods.js';
 import { waitForReactionWindow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
@@ -444,7 +444,7 @@ async function _afterTargetSelected(p, name) {
       if (useFeint) {
         try {
           await CombatAPI.negateReactionBlock(_attacker.id);
-          if (_guaranteedHit) _autoHit(p, name);
+          if (_skipsAttackRoll()) _autoHit(p, name);
           else _showStep2(p, name);
           return;
         } catch (err) {
@@ -457,8 +457,14 @@ async function _afterTargetSelected(p, name) {
     _close({ targetId: p.id, blocked: true, blockerName: reaction.blockerName });
     return;
   }
-  if (_guaranteedHit) _autoHit(p, name);
+  if (_skipsAttackRoll()) _autoHit(p, name);
   else _showStep2(p, name);
+}
+
+/** A guaranteed hit still gets the attack roll -- only to see whether it crits (any roll hits). The one exception is a
+ * guaranteed crit (Laser Focus): nothing left to roll for. */
+function _skipsAttackRoll() {
+  return _guaranteedHit && !!guaranteedCritStatusId(_attacker);
 }
 
 /** Attack-roll step -- entered fresh from a target card, or returned to via
@@ -472,7 +478,7 @@ function _showStep2(p, name) {
   document.getElementById('targetPickerRollTarget').innerHTML = `
     <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
-  _atkCtx = _guaranteedHit ? null : attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges, ignoreTargetAcBoosts: !!_moveFlagResolver(_moveName)?.ignoresTargetAcBoosts });
+  _atkCtx = attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges, ignoreTargetAcBoosts: !!_moveFlagResolver(_moveName)?.ignoresTargetAcBoosts });
   const weatherMode = _atkCtx ? _weatherModeResolver(_moveName, _attacker?.id) : null;
   if (weatherMode) {
     _atkCtx.mode = mergeRollMode(_atkCtx.mode, weatherMode.mode);
@@ -512,8 +518,13 @@ function _showStep2(p, name) {
   // combat-wip.js's own note on that) -- once one exists, it slots in between the roll
   // and the outcome, here.
   const acUnknown = _effectiveTargetAc() === null;
-  document.getElementById('targetPickerMiss').hidden = !acUnknown;
-  document.getElementById('targetPickerHit').textContent = acUnknown ? 'Attack Hit' : 'Attack';
+  document.getElementById('targetPickerMiss').hidden = !acUnknown || _guaranteedHit;
+  document.getElementById('targetPickerHit').textContent = _guaranteedHit ? 'Roll for crit' : acUnknown ? 'Attack Hit' : 'Attack';
+  if (_guaranteedHit) {
+    document.getElementById('targetPickerTitle').textContent = 'Crit Roll';
+    document.getElementById('targetPickerRollNotes').insertAdjacentHTML('afterbegin',
+      `<div class="mode advantage">${_moveName || 'This move'} always hits -- roll only to see if it crits</div>`);
+  }
   const input = document.getElementById('targetPickerAttackInput');
   input.value = '';
   _updateAttackTotal();
@@ -566,7 +577,8 @@ function _confirmAttack() {
   if (attackRoll === null) return;
   _attackRoll = attackRoll;
   const targetAc = _effectiveTargetAc();
-  if (targetAc !== null && attackRoll + _effectiveAttackMod() < targetAc) {
+  // A guaranteed hit can't miss -- the roll only decides a crit (_resolveOneHit).
+  if (!_guaranteedHit && targetAc !== null && attackRoll + _effectiveAttackMod() < targetAc) {
     _confirmMiss();
     return;
   }
@@ -578,7 +590,7 @@ function _confirmAttack() {
  * target. A guaranteed hit has no attack-roll step to return to, so it goes
  * back to target selection instead. */
 function _backFromDamage() {
-  if (_guaranteedHit) _showStep1();
+  if (_skipsAttackRoll()) _showStep1();
   else _showStep2();
 }
 
@@ -928,7 +940,7 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   document.getElementById('targetPickerAnimMedia').innerHTML = '';
   _selectedTargetId = target.id;
   document.getElementById('targetPickerBack').style.display = 'none';
-  document.getElementById('targetPickerBackToAttack').style.display = guaranteedHit ? 'none' : '';
+  document.getElementById('targetPickerBackToAttack').style.display = _skipsAttackRoll() ? 'none' : '';
   document.getElementById('targetPickerStep1').hidden = true;
   document.getElementById('targetPickerStep2').hidden = true;
   document.getElementById('targetPickerStep3').hidden = true;

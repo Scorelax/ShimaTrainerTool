@@ -42,6 +42,11 @@ def _by_name():
     return _cache['by_name']
 
 
+def description(name):
+    """The ability's rulebook text ('' if unknown)."""
+    return (_by_name().get(str(name or '').lower()) or {}).get('description') or ''
+
+
 def _ability_name(entry):
     """'0:Name;description' / 'Name;description' / 'Name' -> 'Name'."""
     head = str(entry or '').split(';', 1)[0].strip()
@@ -66,6 +71,12 @@ def client_effects():
     """{ability name: effects} for every ability with effects (not unknown-tagged) -- sent to the client with the move
     data (list-move-categories) for its half of the engine."""
     return {a['name']: a['effects'] for a in _by_name().values()
+            if a.get('effects') and 'unknown' not in a.get('categories', [])}
+
+
+def client_texts():
+    """{ability name: description} for the same abilities -- the app's reminders quote them."""
+    return {a['name']: a.get('description') or '' for a in _by_name().values()
             if a.get('effects') and 'unknown' not in a.get('categories', [])}
 
 

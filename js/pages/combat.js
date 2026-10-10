@@ -75,7 +75,7 @@ function loadMoveCategories() {
     _moveCategories = normalized;
     _moveEffects = result.effects || {};
     _moveFlags = result.flags || {};
-    setAbilityData(result.abilities || {}); // the shared battle's ability engine (ability-mods.js)
+    setAbilityData(result.abilities || {}, result.abilityTexts || {}); // the shared battle's ability engine (ability-mods.js)
   }).catch(() => {}).finally(() => { _moveCategoriesLoading = false; });
 }
 
@@ -3096,7 +3096,7 @@ async function _handleBideClick(c, move, state, onBideResolve) {
     c.currentVp = newVp;
     saveCombatState(state);
     rerenderBattle(state);
-    logBattleEvent({ type: 'move-used', actorId: c.id, actorName: c.name, text: `${c.name} used Bide (-${vpCost} VP)` });
+    logBattleEvent({ type: 'move-used', actorId: c.id, actorName: c.name, move: 'Bide', text: `${c.name} used Bide (-${vpCost} VP)` });
 
     try { await CombatAPI.bideUse(c.id); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
     return;
@@ -3493,7 +3493,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       if (moveCategoriesFor(usedMoveName).includes('self_faint')) newHp = 0;
       target.currentHp = newHp;
       target.currentVp = newVp;
-      logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)` });
+      logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, move: usedMoveName, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)` });
       // Spend the session's one bonus action for the round (the server rejects a second one).
       if (_isSharedCombat && _isBonusActionMove(usedMoveName)) {
         target.bonusActionUsed = true;

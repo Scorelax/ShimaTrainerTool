@@ -25,6 +25,7 @@ function _injectStyles() {
     .blog-entry.type-damage .blog-text { color: #ff8a8a; }
     .blog-entry.type-miss .blog-text { color: #a0a0c0; font-style: italic; }
     .blog-entry.type-heal .blog-text { color: #7ee787; }
+    .blog-entry.type-ability-reminder .blog-text { color: #ffd76b; font-style: italic; }
     .blog-entry.type-status-applied .blog-text { color: #d9a4ff; }
     .blog-entry.type-status-removed .blog-text { color: #a0a0c0; }
     .blog-entry.type-turn-advance .blog-text { color: #ffd76b; font-weight: 600; }
@@ -38,6 +39,7 @@ const _ICONS = {
   'move-used': '✨', damage: '💥', miss: '💨', heal: '💚',
   'status-applied': '🌀', 'status-removed': '✅',
   'turn-advance': '🔄', 'reaction-start': '⚡', 'reaction-end': '⚡',
+  ability: '🧬', 'ability-reminder': '💡',
   move: '👣', placement: '📍',
 };
 

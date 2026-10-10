@@ -15,7 +15,7 @@ import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { getBattleAnimationUrl } from './battle-animation.js';
 import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode, isMeleeMoveRow } from './move-effects.js';
-import { targetAbilityDamage, moveAbilityMods } from './ability-mods.js';
+import { targetAbilityDamage, moveAbilityMods, attackRollReminders } from './ability-mods.js';
 import { waitForReactionWindow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 import { filterTargetable } from './targetability.js';
@@ -72,6 +72,7 @@ function _injectStyles() {
     .target-picker-roll-notes .mode { font-weight: 800; }
     .target-picker-roll-notes .mode.advantage { color: #2ecc71; }
     .target-picker-roll-notes .mode.disadvantage { color: #e74c3c; }
+    .target-picker-roll-notes .ability-reminder-note { color: #ffd76b; margin-top: 0.25rem; }
     .target-picker-roll-notes .note { color: #a0a0c0; }
     .target-picker-anim-media { width: 100%; max-height: 40vh; display: flex; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
     .target-picker-anim-media:empty { display: none; }
@@ -485,7 +486,13 @@ function _showStep2(p, name) {
     _atkCtx.mode = mergeRollMode(_atkCtx.mode, ownMode);
     _atkCtx.notes.push(`${_moveName}: always rolled with ${ownMode}`);
   }
-  document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx);
+  // Abilities that have to be called before this roll (Intimidate, Heavy Metal, Lightning Rod, Huge Power...).
+  const atkRow = _moveRowResolver(_moveName);
+  const reminders = atkRow
+    ? attackRollReminders(_attacker, _selectedTarget, moveAbilityMods(_attacker, atkRow).type, { damaging: !!_damageDice })
+    : [];
+  document.getElementById('targetPickerRollNotes').innerHTML = _notesHtml(_atkCtx)
+    + reminders.map(r => `<div class="note ability-reminder-note">${r}</div>`).join('');
   _diceBonusExtra = 0;
   _diceBonusConsume = [];
   _attackBattleDice = 0;

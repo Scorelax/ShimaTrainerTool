@@ -1033,6 +1033,11 @@ export class CombatAPI {
 
   /** An ability effect the client detected (being hit, hitting): the server checks `holderId` has it and applies it
    * (routes_combat.py's _ability_trigger). `amount` = the rolled number when the effect has dice. */
+  /** An ability moment the app spotted but can't play out -- the server logs it and pops it up for the trainers involved. */
+  static async abilityReminder(holderId, ability, index, aboutId = null) {
+    return API.request('combat', 'ability-reminder', { id: holderId, ability, index, ...(aboutId ? { aboutId } : {}) }, { useCache: false });
+  }
+
   static async abilityTrigger(holderId, ability, index, targetId, amount = null, value = null, spend = false) {
     return API.request('combat', 'ability-trigger', {
       id: holderId, ability, index, targetId, ...(amount != null ? { amount } : {}), ...(value != null ? { value } : {}),

@@ -646,7 +646,40 @@ export async function renderCombatWip() {
   const result = await CombatAPI.getState();
   session = result.status === 'success' ? result.data : { active: false };
   setAbilitySession(session); // ability-mods.js reads weather, round and positions from it
+  _reminderLogSeen = session.log?.length || 0; // only reminders from now on pop up
   return _renderCurrentView();
+}
+
+// Ability reminders (routes_combat.py's _ability_reminder): each new one addressed to this trainer (`notify`) pops up
+// at the bottom for a few seconds -- they stay in the battle log for everyone.
+let _reminderLogSeen = 0;
+
+function _showNewAbilityReminders(s) {
+  const log = s?.log || [];
+  if (log.length < _reminderLogSeen) _reminderLogSeen = 0; // a new battle
+  const me = _currentTrainerName();
+  const fresh = log.slice(_reminderLogSeen).filter(e => e.type === 'ability-reminder' && (e.notify || []).includes(me));
+  _reminderLogSeen = log.length;
+  fresh.forEach(e => _abilityToast(e.text));
+}
+
+function _abilityToast(text) {
+  let box = document.getElementById('abilityToastBox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'abilityToastBox';
+    box.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:10050;display:flex;'
+      + 'flex-direction:column;gap:6px;width:min(92vw,420px);pointer-events:none;';
+    document.body.appendChild(box);
+  }
+  const toast = document.createElement('div');
+  toast.style.cssText = 'background:rgba(30,30,46,0.96);color:#ffd76b;border:1px solid #ffd76b;border-radius:10px;'
+    + 'padding:8px 12px;font-size:0.85rem;line-height:1.3;box-shadow:0 4px 14px rgba(0,0,0,0.4);pointer-events:auto;cursor:pointer;';
+  toast.textContent = `💡 ${text}`;
+  const close = () => toast.remove();
+  toast.addEventListener('click', close);
+  box.appendChild(toast);
+  setTimeout(close, 10000);
 }
 
 function _renderCurrentView() {
@@ -813,7 +846,10 @@ function _enterBattleSync() {
   _battleSyncActive = true;
   setCombatStateKey(WIP_COMBAT_STATE_KEY);
   setOnCombatStateSave(_onLocalCombatStateSave);
-  setOnLogEvent((event) => CombatAPI.logEvent(event).catch(() => {}));
+  setOnLogEvent((event) => {
+    const sent = CombatAPI.logEvent(event).catch(() => {});
+    if (event.type === 'move-used' && event.move) sent.then(() => _abilityMoveUsed(event.actorId, event.move)); // Protean, Dancer...
+  });
   setOnSwitchPokemon((bench, options) => _switchPokemonShared(bench, options)); // swaps on the server, not the local mirror
   setOnAddStatus(_addSharedStatus);
   setOnLocalStatusClick(_openLocalStatusDetail);
@@ -2613,6 +2649,7 @@ export function attachCombatWipListeners() {
   combatUpdateHandler = (e) => {
     session = e.detail;
     setAbilitySession(session);
+    _showNewAbilityReminders(session);
     if (_joinStage === 'placement') {
       if (_placementQueue.length) {
         _renderPlacementTokens(session, _placementQueue[0]);
@@ -6027,6 +6064,37 @@ async function _promptAbilityTurn(pid, trigger) {
   }
 }
 
+/** A move was just used: the user's own `move_used` effects -- Protean takes the move's type, Water Vein's fixed heal;
+ * anything else (Stance Change, Ether Dawn) is a reminder -- and every onlooker's `creature_used_move` (Dancer). */
+async function _abilityMoveUsed(userId, moveName) {
+  const user = session?.participants?.[userId];
+  if (!user) return;
+  const moveType = (findMoveRow(moveName) || [])[1] || '';
+  const event = { moveName, moveType };
+  for (const { ability, index, effect: e } of abilityTriggers(user, 'move_used', event)) {
+    try {
+      if (e.kind === 'condition' && e.valueFrom === 'used_move_type') {
+        const current = (user.statuses || []).find(s => s.kind === 'condition' && s.apply === 'type_changed')?.value || user.type1;
+        if (moveType && String(current).toLowerCase() !== moveType.toLowerCase()) {
+          await CombatAPI.abilityTrigger(userId, ability, index, userId, null, moveType);
+        }
+      } else if (e.kind === 'heal' && !e.amount?.dice) {
+        await CombatAPI.abilityTrigger(userId, ability, index, userId);
+      } else {
+        await CombatAPI.abilityReminder(userId, ability, index);
+      }
+    } catch (err) {
+      showCombatAlert(err.message, { title: ability });
+    }
+  }
+  for (const p of Object.values(session?.participants || {})) {
+    if (p.id === userId || p.status !== 'participating') continue;
+    for (const { ability, index } of abilityTriggers(p, 'creature_used_move', event, user)) {
+      await CombatAPI.abilityReminder(p.id, ability, index, userId).catch(() => {});
+    }
+  }
+}
+
 /** Pressure: targeting its holder with a single-target move costs the attacker that move's VP again. */
 async function _abilityTargetedTriggers(attackerId, targetId, move) {
   const target = session?.participants?.[targetId];
@@ -6103,16 +6171,31 @@ async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attac
   // First the target's chance to soften the hit (Sturdy, Fur Coat...) -- it can turn a knockout into a survival.
   const refunded = await _abilityDamageReactions({ attacker, target, event, damageDealt }) || 0;
   const fainted = targetFainted && (hpBefore ?? 0) - (damageDealt ?? 0) + refunded <= 0;
-  const fired = [
+  if (hpBefore != null) event.hpAfter = hpBefore - (damageDealt ?? 0) + refunded; // Wimp Out / Emergency Exit
+  const all = [
     ...abilityTriggers(target, 'hit_by', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),
     ...abilityTriggers(target, 'damaged', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),
     ...abilityTriggers(target, 'targeted', event, attacker).map(t => ({ ...t, holder: target, other: attacker })), // Liquid Ooze (drain)
     ...(fainted ? abilityTriggers(target, 'knocked_out', event, attacker).map(t => ({ ...t, holder: target, other: attacker })) : []), // Aftermath, Innards Out
     ...abilityTriggers(attacker, 'hits', event, target).map(t => ({ ...t, holder: attacker, other: target })),
     ...(crit ? abilityTriggers(attacker, 'crit_dealt', event, target).map(t => ({ ...t, holder: attacker, other: target })) : []), // Hustle
-  ].filter(t => _TRIGGER_KINDS.has(t.effect.kind) && !t.effect.reaction
+    ...(crit ? abilityTriggers(target, 'crit_taken', event, attacker).map(t => ({ ...t, holder: target, other: attacker })) : []), // Anger Point
+    ...(event.melee ? abilityTriggers(target, 'contact', event, attacker).map(t => ({ ...t, holder: target, other: attacker })) : []), // Sedative Spines
+  ];
+  const handled = t => _TRIGGER_KINDS.has(t.effect.kind) && !t.effect.reaction
     && (!t.effect.valueFrom || t.effect.valueFrom === 'hit_move_type') // Color Change gets the move's type below
-    && !(t.effect.save && t.effect.save.dc == null));      // a save with no DC yet (Frigid Aura -- asked of Benjakronk)
+    && !(t.effect.save && t.effect.save.dc == null);       // a save with no DC yet (Frigid Aura -- asked of Benjakronk)
+  const fired = all.filter(handled);
+  // The rest is the table's -- a reminder each (Mummy, Ether Mirror, Water Compaction, Wimp Out, Anger Point...). The
+  // softening reactions (_abilityDamageReactions) and Pressure (_abilityTargetedTriggers) were already handled.
+  const reminded = new Set();
+  for (const { ability, index, effect: e, holder, other } of all) {
+    if (handled({ effect: e }) || e.kind === 'vp_cost_mod'
+      || (e.kind === 'damage_taken_mod' && (!e.ends?.length || e.ends[0].type === 'instant'))) continue;
+    if (reminded.has(`${holder.id}:${ability}`)) continue;
+    reminded.add(`${holder.id}:${ability}`);
+    await CombatAPI.abilityReminder(holder.id, ability, index, other.id).catch(() => {});
+  }
   const decided = new Map(); // ability -> did its die / save let it through (asked once)
   for (const { ability, index, effect: e, holder, other } of fired) {
     const affected = e.target === 'attacker' || e.target === 'target' ? other : holder;

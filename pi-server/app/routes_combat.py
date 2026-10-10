@@ -528,6 +528,18 @@ def _handle(conn, action, params):
                                                         params.get('targetId') or params['id'], js_parse_int(params.get('amount')),
                                                         params.get('value'), params.get('spend') == '1'))
 
+    if action == 'ability-reminder':
+        # One the app spotted (around a hit or a move) but can't play out -- logged and popped up like the server's own.
+        def remind(s):
+            holder = s['participants'].get(params.get('id') or '')
+            index = js_parse_int(params.get('index'))
+            entry = next(((ab, i, e) for ab, i, e in abilities.indexed_effects(holder or {})
+                          if ab.lower() == str(params.get('ability') or '').lower() and i == index), None)
+            if not holder or not entry:
+                raise ValueError("That creature doesn't have that ability effect")
+            _ability_reminder(s, holder['id'], entry[0], entry[2], about_id=params.get('aboutId') or None)
+        return _mutate(conn, remind)
+
     if action == 'type-preview':
         # Read-only: the type multiplier a hit WOULD get, for the damage-roll step (super-effective ability conditions).
         return {'status': 'success', 'data': _type_preview(conn, load_state(conn), params.get('id'), params.get('targetId'),
@@ -1329,6 +1341,11 @@ def _perform_switch(state, pending):
         _rebuild_turn_order(state)
     _log_event(state, 'switch', text=f"{owner} withdraws {out['name']} and sends out {inn['name']}{' (passing along its effects)' if pending.get('pass') else ''}",
                actorId=in_id, actorName=inn['name'])
+    if state.get('started'):
+        for hid, h in state['participants'].items():  # Stakeout: double damage against the replacement
+            if h.get('status') == 'participating' and (h.get('owner') or '') != (inn.get('owner') or ''):
+                for ab, _, e in abilities.triggered(state, hid, 'enemy_switched_in'):
+                    _ability_reminder(state, hid, ab, e, about_id=in_id)
     if state.get('started') and in_id in state['board']['tokens']:
         _queue_hazards(state, in_id, 'enter')  # sent out onto Spikes
         # Sticky Web / Toxic Spikes: "when a creature is switched into battle, you may use your reaction".
@@ -1577,13 +1594,16 @@ def _advance_turn(state):
     # in the new turn/round.
     if ending_id:
         _ability_auto(state, ending_id, 'end_of_turn')  # Rain Dish, Ice Body, Dry Skin
+        _ability_turn_auras(state, ending_id, 'end')  # Bad Dreams, Freezing Aura
         _apply_condition_turn_damage(state, ending_id, 'end')
         _queue_status_ticks(state, ending_id, 'end')
         _expire_statuses_on_turn_point(state, ending_id, 'end')
     if new_round:
         _expire_statuses_by_round(state)
+        _ability_start_of_round(state)  # Primordial Shift, Prankster
     starting_id = state['turnOrder'][state['turnIndex']]
     _ability_auto(state, starting_id, 'start_of_turn')  # Chlorophyll, Psychic Barrier, Energy Intensive, Cosmic Slumber
+    _ability_turn_auras(state, starting_id, 'start')  # Frigid Aura, Time Warp
     _expire_fields(state, starting_id)
     _apply_condition_turn_damage(state, starting_id, 'start')
     _queue_status_ticks(state, starting_id, 'start')
@@ -2702,19 +2722,51 @@ def _ability_stat(state, holder_id, target_id, ability, effect):
         _apply_status(state, target_id, spec)
 
 
+def _ability_reminder(state, holder_id, ability, effect=None, about_id=None, text=None):
+    """An ability's moment came but the engine can't play it out (a choice, a roll, something it doesn't model): a log
+    line for everyone, and a pop-up (`notify`) on the devices of the holder's trainer, the creature it's about and
+    whoever's turn it is."""
+    holder = state['participants'].get(holder_id)
+    if not holder:
+        return
+    about = state['participants'].get(about_id) if about_id else None
+    active = state['participants'].get(_active_participant_id(state) or '')
+    if not text:
+        text = (effect or {}).get('note') or abilities.description(ability) or 'its moment has come'
+        if len(text) > 240:
+            text = text[:237].rsplit(' ', 1)[0] + '...'
+    owners = sorted({p.get('owner') for p in (holder, about, active) if p and p.get('owner')})
+    who = f" ({about['name']})" if about and about_id != holder_id else ''
+    line = f"{holder['name']}'s {ability}{who}: {text}"
+    if any(e.get('type') == 'ability-reminder' and e.get('text') == line for e in state.get('log', [])[-8:]):
+        return  # an ability with several effects (Time Warp) reminds once
+    _log_event(state, 'ability-reminder', text=line,
+               actorId=holder_id, actorName=holder['name'], targetId=about_id, notify=owners)
+
+
+def _client_prompted(event, e):
+    """Turn effects the app asks for itself (combat-wip.js's _abilityTurnPrompts) -- no reminder for those."""
+    return event in ('start_of_turn', 'end_of_turn') and (
+        (e.get('kind') == 'cure_condition' and e.get('chance'))
+        or (e.get('kind') == 'heal' and (e.get('amount') or {}).get('dice') and (e.get('target') or 'self') == 'self'))
+
+
 def _ability_auto(state, pid, event, **ctx):
-    """Runs the participant's `event` effects that need no roll. Anything that does is left to the client (being hit)
-    or to the table (the rest -- slice 4's reminders)."""
+    """Runs the participant's `event` effects that need no roll. The app asks for the dice ones it knows
+    (_client_prompted); everything else gets a reminder for the table."""
     holder = state['participants'].get(pid)
     if not holder or holder.get('status') != 'participating' and event != 'switched_out':
         return
     for ab, i, e in abilities.triggered(state, pid, event):
         kind = e.get('kind')
         amount = abilities.resolve_amount(holder, e.get('amount'))
-        if kind in ('heal', 'lose_hp', 'temp_hp') and amount is None:
-            continue  # dice -- rolled at the table
-        if (e.get('optional') and kind != 'extra_action') or e.get('chance') or e.get('save'):
-            continue  # a choice or a roll -- not automatic (Moxie's "may take another action" just re-opens the action)
+        if _client_prompted(event, e):
+            continue
+        if (kind in ('heal', 'lose_hp', 'temp_hp') and amount is None) \
+                or (e.get('optional') and kind != 'extra_action') or e.get('chance') or e.get('save'):
+            # dice, a choice or a roll -- the table's (Moxie's "may take another action" just re-opens the action)
+            _ability_reminder(state, pid, ab, e)
+            continue
         if not _ability_use_ok(state, holder, ab, i, e):
             continue
         if kind == 'heal' and not e.get('setTo') and (e.get('target') or 'self') == 'self':
@@ -2747,6 +2799,50 @@ def _ability_auto(state, pid, event, **ctx):
         elif kind == 'cure_condition' and e.get('negativeConditions'):
             for s in [s for s in _statuses_of(holder) if s.get('kind') == 'condition' and s.get('apply') in abilities.NEGATIVE_CONDITIONS]:
                 _remove_status(state, pid, s['id'], f'cured by {ab}')
+        else:
+            _ability_reminder(state, pid, ab, e)  # Toxic Surge, Trace, Harvest, Toxic Aura, Primordial Shift...
+
+
+def _ability_start_of_round(state):
+    """Primordial Shift, Prankster -- reminders at the top of each round."""
+    for pid, p in state['participants'].items():
+        if p.get('status') == 'participating':
+            _ability_auto(state, pid, 'start_of_round')
+
+
+def _ability_turn_auras(state, pid, point):
+    """Other creatures' auras when `pid` starts / ends its turn near them (`creature_<point>_of_turn_within`):
+    Bad Dreams' damage to a sleeping enemy and Frigid Aura's speed drop are applied; ones with a save (Time Warp,
+    Freezing Aura) are a reminder naming the creature."""
+    creature = state['participants'].get(pid)
+    if not creature or creature.get('status') != 'participating':
+        return
+    for hid, holder in state['participants'].items():
+        if hid == pid or holder.get('status') != 'participating':
+            continue
+        for ab, i, e in abilities.triggered(state, hid, f'creature_{point}_of_turn_within'):
+            enemy = (creature.get('owner') or '') != (holder.get('owner') or '') or (creature.get('side') or '') != (holder.get('side') or '')
+            if e.get('target') == 'enemies' and not enemy:
+                continue
+            radius = e.get('radiusFt')
+            if radius is not None:
+                ft = _grid_distance_ft(state, hid, pid)
+                if ft is None or ft > radius:
+                    continue
+            wanted = (e.get('targetFilter') or {}).get('conditions')
+            if wanted and not any(s.get('kind') == 'condition' and s.get('apply') in wanted for s in _statuses_of(creature)):
+                continue
+            amount = abilities.resolve_amount(holder, e.get('amount'))
+            if e.get('save') or e.get('optional') or e.get('chance'):
+                _ability_reminder(state, hid, ab, e, about_id=pid)
+            elif e.get('kind') == 'deal_damage' and amount:
+                creature['currentHP'] -= _absorb_temp_hp(state, creature, amount)
+                _log_event(state, 'damage', text=f"{holder['name']}'s {ab}: {creature['name']} takes {amount} damage",
+                           actorId=hid, actorName=holder['name'], targetId=pid, targetName=creature['name'], amount=amount)
+            elif e.get('kind') == 'stat' and isinstance(e.get('amount'), (int, float)):
+                _ability_stat(state, hid, pid, ab, e)
+            else:
+                _ability_reminder(state, hid, ab, e, about_id=pid)
 
 
 def _ability_prevent_faint(state, pid):
@@ -3148,7 +3244,7 @@ def _list_move_categories():
             flags[m['name']] = marks
     # Ability effects for the client's half of the engine (js/utils/ability-mods.js): name -> effects, unknown-tagged ones left out.
     return {'status': 'success', 'categories': categories, 'effects': effects, 'flags': flags,
-            'abilities': abilities.client_effects()}
+            'abilities': abilities.client_effects(), 'abilityTexts': abilities.client_texts()}
 
 
 def _set_board_background(state, url):

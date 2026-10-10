@@ -52,10 +52,22 @@ Status 2026-10-09: all 348 abilities done -- 305 with effects, 43 `unknown`, 18 
     `crit_dealt` (Hustle), `attack_missed` (Analytic), valueFrom hit_move_type (Color Change). Turn prompts: a
     `chance` cure (Shed Skin, end of turn) and a dice heal (start of turn). The card's Actions row gets an ability
     button for `activated` effects -- a `choice.option` picker (Transformer) and a dice heal roll (scaling by level).
-- Not yet: redirect (Lightning Rod, Storm Drain), crossesBelowFraction (Wimp Out, Emergency Exit), lasting
-  damage_taken_mod reactions (Water Compaction), enemy_attack_roll (Intimidate, Cute Charm), start_of_round,
-  creature_used_move (Dancer), area turn effects with saves, firstUseInEncounter, ally auras that change dice or flat
-  damage (Battery, Flower Gift, Victory Star) -- reminders (slice 4).
+- Slice 4, reminders: whatever triggers but can't be played out becomes an `ability-reminder` log entry (💡) with
+  `notify` = the trainers of the holder, the creature it's about and the active one -- those devices pop it up as a
+  toast (combat-wip.js `_showNewAbilityReminders`). Text: the effect's `note`, else the ability description.
+  - server (`_ability_reminder`): `_ability_auto` reminds for any effect it skips (dice, optional, chance, save, a
+    kind it doesn't apply) except the turn rolls the app asks itself (`_client_prompted`); `start_of_round`;
+    `creature_start/end_of_turn_within` auras (`_ability_turn_auras`: radius, enemies, targetFilter conditions --
+    fixed damage like Bad Dreams and a plain stat like Frigid Aura's speed are applied, saves are reminders);
+    `enemy_switched_in` (Stakeout).
+  - client: after a hit, every fired effect it doesn't apply (plus `crit_taken`, `contact` on melee,
+    `crossesBelowFraction` from the HP before/after) goes to the `ability-reminder` action; `move_used` (Protean's
+    valueFrom used_move_type and fixed heals applied, the rest reminded) and others' `creature_used_move`
+    (nameMatch -- Dancer). The attack step lists `attack_roll_against`, an ally side's `enemy_attack_roll` and
+    `ally_targeted` redirects in range, and the attacker's `before_attack_roll` (`attackRollReminders`).
+- Not modelled at all yet: item-driven triggers (berry_eaten, enemy_used_consumable_item), ally_drain_heal,
+  save_failed (Steadfast), firstUseInEncounter, ally auras that change dice or flat damage (Battery, Flower Gift,
+  Victory Star).
 
 `DnD_abilities.json` -- one entry per ability (built from the Pi's cached dex by
 `build_abilities_list.py`; the rebuild only refreshes `description` and `pokemon`, so

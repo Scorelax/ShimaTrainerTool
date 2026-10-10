@@ -15,11 +15,13 @@
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
 
 let _data = {};       // ability name (lower case) -> { name, effects }
+let _abilityText = {}; // ability name -> rulebook text (reminders quote it)
 let _session = null;  // the live shared session, for weather/terrain/round/positions (set by combat-wip.js)
 
-export function setAbilityData(map) {
+export function setAbilityData(map, texts = {}) {
   _data = {};
   for (const [name, effects] of Object.entries(map || {})) _data[name.toLowerCase()] = { name, effects };
+  _abilityText = texts || {};
 }
 
 export function setAbilitySession(session) { _session = session; }
@@ -81,9 +83,60 @@ export function abilityTriggers(p, trigger, event = {}, target = null) {
     if (w.direct && !event.direct) return false;
     // Sturdy: a hit of at least that share of its HP before the hit.
     if (w.minFractionOfCurrentHP != null && !((event.damageDealt ?? 0) >= w.minFractionOfCurrentHP * (event.hpBefore ?? Infinity))) return false;
-    if (w.crossesBelowFraction != null || w.includeSelf != null) return false; // Wimp Out, redirection -- reminders (slice 4)
+    // Wimp Out / Emergency Exit: this hit took it from above that share of its max HP to below it.
+    if (w.crossesBelowFraction != null) {
+      const line = w.crossesBelowFraction * (Number(p.maxHP) || 0);
+      if (!(event.hpBefore != null && event.hpAfter != null && event.hpBefore >= line && event.hpAfter < line)) return false;
+    }
+    // Dancer: a move with that in its name.
+    if (w.nameMatch && !w.nameMatch.some(n => String(event.moveName || '').toLowerCase().includes(String(n).toLowerCase()))) return false;
     return _gatesHold(p, e, target);
   });
+}
+
+const _sameSide = (a, b) => (a?.owner || '') === (b?.owner || '') && (a?.side || '') === (b?.side || '');
+function _feetBetween(a, b) {
+  const ta = _session?.board?.tokens?.[a?.id], tb = _session?.board?.tokens?.[b?.id];
+  return ta && tb ? Math.max(Math.abs(ta.col - tb.col), Math.abs(ta.row - tb.row)) * 5 : null;
+}
+
+/** Abilities to think of BEFORE an attack roll against `target` -- the attack step lists them so they can be used in
+ * time: the target's own (Heavy Metal, Proper Form), any creature on its side that can spoil an enemy's roll
+ * (Intimidate, Cute Charm) or pull this move onto itself (Lightning Rod, Storm Drain -- `includeSelf`, `radiusFt`), and
+ * the attacker's "announce it before rolling" ones (Huge Power). Returns plain text lines. */
+export function attackRollReminders(attacker, target, moveType, { damaging = true } = {}) {
+  const out = [];
+  if (!attacker || !target) return out;
+  const say = (holder, ability, e) => {
+    const uses = e.limit ? ` (${e.limit.uses}× per ${String(e.limit.per).replace('_', ' ')})` : '';
+    const line = `💡 ${holder.name}'s ${ability}${uses}: ${e.note || _describe(ability)}`;
+    if (!out.includes(line)) out.push(line);
+  };
+  for (const { ability, effect: e } of abilityEffectsOf(target)) {
+    if (e.when?.type === 'attack_roll_against' && _gatesHold(target, e, attacker)) say(target, ability, e);
+  }
+  for (const p of Object.values(_session?.participants || {})) {
+    if (p.status !== 'participating' || p.id === attacker.id || !_sameSide(p, target)) continue;
+    for (const { ability, effect: e } of abilityEffectsOf(p)) {
+      const w = e.when || {};
+      if (w.type === 'enemy_attack_roll' && _gatesHold(p, e, attacker)) say(p, ability, e);
+      if (w.type === 'ally_targeted' && e.kind === 'redirect' && (p.id !== target.id || w.includeSelf)
+        && (!w.moveTypes || w.moveTypes.map(t => t.toLowerCase()).includes(String(moveType || '').toLowerCase()))
+        && (!w.damaging || damaging)) {
+        const ft = p.id === target.id ? 0 : _feetBetween(p, target);
+        if (e.radiusFt == null || (ft != null && ft <= e.radiusFt)) say(p, ability, e);
+      }
+    }
+  }
+  for (const { ability, effect: e } of abilityEffectsOf(attacker)) {
+    if (e.when?.type === 'before_attack_roll' && _gatesHold(attacker, e, target)) say(attacker, ability, e);
+  }
+  return out;
+}
+
+function _describe(ability) {
+  const d = String(_abilityText?.[ability] || '');
+  return d.length > 200 ? `${d.slice(0, 197).replace(/\s+\S*$/, '')}...` : d || 'its moment has come';
 }
 
 // --- gates ---------------------------------------------------------------------------------------------------------

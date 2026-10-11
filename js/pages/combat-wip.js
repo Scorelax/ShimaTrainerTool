@@ -38,7 +38,7 @@ import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-
 import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { setTargetabilityResolver, setMoveRangeResolver } from '../utils/targetability.js';
+import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler } from '../utils/targetability.js';
 import { areaPlacementFt, creatureDistanceFt } from '../utils/move-range.js';
 import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
@@ -848,7 +848,9 @@ function _enterBattleSync() {
   _battleSyncActive = true;
   setCombatStateKey(WIP_COMBAT_STATE_KEY);
   setOnCombatStateSave(_onLocalCombatStateSave);
-  setOnLogEvent((event) => {
+  setOnLogEvent(({ spend, ...event }) => {
+    // What the move cost and the HP/VP before it -- refunded if it turns out to have nobody to aim at (_refundMoveCost).
+    if (event.type === 'move-used' && spend) _lastMoveSpend[event.actorId] = { move: event.move, ...spend };
     const sent = CombatAPI.logEvent(event).catch(() => {});
     _lastLogSent = sent; // _repeatUseCheck counts move-used entries -- it waits for this one to land first
     if (event.type === 'move-used' && event.move) sent.then(() => _abilityMoveUsed(event.actorId, event.move)); // Protean, Dancer...
@@ -858,6 +860,7 @@ function _enterBattleSync() {
   setOnLocalStatusClick(_openLocalStatusDetail);
   setOnBasicAction(_onBasicAction);
   setOnUseTrainerBuff(_useTrainerBuff);
+  setNoTargetHandler(_refundMoveCost); // a move with nobody in reach gets its VP back
 }
 
 function _exitBattleSync() {
@@ -876,6 +879,7 @@ function _exitBattleSync() {
   setOnLocalStatusClick(null);
   setOnBasicAction(null);
   setOnUseTrainerBuff(null);
+  setNoTargetHandler(null);
   _focusedParticipantId = null;
   _focusManuallySet = false;
 }
@@ -969,6 +973,20 @@ function _persistStatsToDb(combatant, hp, vp) {
 // the value that ultimately reaches the server is always whatever this
 // device's local state actually holds by the time the in-flight request
 // clears -- never a stale intermediate one.
+/** A move that turned out to have nobody it could be aimed at (targetability.js -- everyone out of reach or hidden):
+ * its VP comes back, and any HP the VP overflow took. Only once per use, and only for the move just used. */
+const _lastMoveSpend = {}; // participantId -> { move, vpCost, hpBefore, vpBefore }
+function _refundMoveCost(casterId, moveName) {
+  const spend = _lastMoveSpend[casterId];
+  if (!spend || spend.move !== moveName || !(spend.vpCost > 0)) return;
+  delete _lastMoveSpend[casterId];
+  const name = session?.participants?.[casterId]?.name || '?';
+  _lastSyncedStats[casterId] = { hp: spend.hpBefore, vp: spend.vpBefore };
+  _pushStatsSync(casterId, spend.hpBefore, spend.vpBefore); // queued behind the spend itself, so it lands last
+  CombatAPI.logEvent({ type: 'refund', actorId: casterId, actorName: name,
+    text: `${name}'s ${moveName} had nobody it could reach -- ${spend.vpCost} VP refunded` }).catch(() => {});
+}
+
 let _statsSyncInFlight = {}; // participantId -> true while a request is in flight
 let _statsSyncPending = {}; // participantId -> {hp, vp} latest value waiting behind it
 

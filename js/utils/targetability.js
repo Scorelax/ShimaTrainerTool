@@ -9,6 +9,13 @@ import { moveReachFt, creatureDistanceFt } from './move-range.js';
 
 let _resolver = () => null;
 let _rangeResolver = () => '';
+let _noTargetHandler = null;
+
+/** `fn(casterId, moveName)` -- runs when a move turns out to have nobody it can be aimed at (all out of reach or hidden):
+ * the move's VP was already paid, so the shared battle refunds it (combat-wip.js). */
+export function setNoTargetHandler(fn) {
+  _noTargetHandler = typeof fn === 'function' ? fn : null;
+}
 
 /** `fn(participant, moveName)` -> the state hiding the participant from that move, or null. */
 export function setTargetabilityResolver(fn) {
@@ -34,6 +41,7 @@ export function filterTargetable(participants, moveName, session = null, casterI
   });
   if (!list.length && hidden.length) {
     showCombatAlert(`${moveName} can't target ${hidden.join(', ')} right now.`, { title: 'No valid target' });
+    if (casterId) _noTargetHandler?.(casterId, moveName);
   }
   list.outOfRange = new Map();
   const caster = session?.participants?.[casterId];
@@ -45,6 +53,7 @@ export function filterTargetable(participants, moveName, session = null, casterI
   });
   if (list.length && list.outOfRange.size === list.length) {
     showCombatAlert(`Nobody is within ${moveName}'s reach (${reach}ft) -- move closer first.`, { title: 'Out of range' });
+    _noTargetHandler?.(casterId, moveName);
     const none = [];
     none.outOfRange = new Map();
     return none;

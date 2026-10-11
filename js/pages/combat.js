@@ -3486,6 +3486,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;
 
+      const spend = { vpCost, hpBefore: target.currentHp, vpBefore: target.currentVp }; // the shared battle's refund (combat-wip.js)
       let newVp = target.currentVp - vpCost;
       let newHp = target.currentHp;
       if (newVp < 0) { newHp = newHp + newVp; newVp = 0; } // no floor -- see handleHpVpDelta
@@ -3499,7 +3500,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       if (moveCategoriesFor(usedMoveName).includes('self_faint')) newHp = 0;
       target.currentHp = newHp;
       target.currentVp = newVp;
-      logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, move: usedMoveName, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)` });
+      logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, move: usedMoveName, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)`, spend });
       // Spend the session's one bonus action for the round (the server rejects a second one).
       if (_isSharedCombat && _isBonusActionMove(usedMoveName)) {
         target.bonusActionUsed = true;

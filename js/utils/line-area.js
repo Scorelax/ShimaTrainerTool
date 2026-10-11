@@ -71,6 +71,7 @@ export function lineHitIds(session, casterId, angleDeg, lengthFt) {
   const box = lineReachBox(casterPos, casterSize, lengthFt);
   return Object.entries(board.tokens)
     .filter(([id, pos]) => id !== casterId && session.participants[id]
+      && Math.abs((pos.z || 0) - (casterPos.z || 0)) <= lengthFt // a flyer higher up than the line is long is out of it (same as cones)
       && _inReachBox(box, pos, footprintForSize(session.participants[id].size))
       && lineTouchesFootprint(g, pos, footprintForSize(session.participants[id].size)))
     .map(([id]) => id);

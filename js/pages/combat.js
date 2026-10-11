@@ -3251,8 +3251,10 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     }
     if (computedData.damageDice) {
       let dice = computedData.damageDice;
-      const m = /^(\d+)(d\d+)$/i.exec(dice);
-      if (_abilityMods.diceMultiplier !== 1 && m) dice = `${Math.ceil(parseInt(m[1], 10) * _abilityMods.diceMultiplier)}${m[2]}`;
+      // Every dice term ("2d6 + 1d4" -> "3d6 + 2d4"), not just a plain "2d6".
+      if (_abilityMods.diceMultiplier !== 1) {
+        dice = String(dice).replace(/(\d+)(d\d+)/gi, (_, n, d) => `${Math.ceil(parseInt(n, 10) * _abilityMods.diceMultiplier)}${d}`);
+      }
       for (const d of _abilityMods.extraDice) dice = `${dice} + ${d}`;
       computedData.damageDice = dice;
       computedData.damageBonus += _abilityMods.damageFlat;

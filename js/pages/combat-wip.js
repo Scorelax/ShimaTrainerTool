@@ -39,7 +39,7 @@ import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver } from '../utils/targetability.js';
-import { areaPlacementFt } from '../utils/move-range.js';
+import { areaPlacementFt, creatureDistanceFt } from '../utils/move-range.js';
 import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
@@ -1848,11 +1848,19 @@ function _syncPlacementBackground(state) {
   const bgSelect = document.getElementById('placementBgSelect');
   if (bgSelect && document.activeElement !== bgSelect) bgSelect.value = state.board.backgroundImage || '';
 
+  // A size being typed (not Set yet) stays put through other players' updates -- unless someone else Sets a new size.
   const colsInput = document.getElementById('placementGridCols');
   const rowsInput = document.getElementById('placementGridRows');
-  if (colsInput && document.activeElement !== colsInput) colsInput.value = state.board.grid.cols;
-  if (rowsInput && document.activeElement !== rowsInput) rowsInput.value = state.board.grid.rows;
+  const serverSize = `${state.board.grid.cols}x${state.board.grid.rows}`;
+  if (_gridDraftBase && _gridDraftBase !== serverSize) _gridDraftBase = null;
+  if (!_gridDraftBase) {
+    if (colsInput && document.activeElement !== colsInput) colsInput.value = state.board.grid.cols;
+    if (rowsInput && document.activeElement !== rowsInput) rowsInput.value = state.board.grid.rows;
+  }
 }
+
+// The board size when the grid-size fields were last edited; null when they just mirror the server.
+let _gridDraftBase = null;
 
 // Which way the token being placed faces (degrees clockwise from up, 45-degree steps) -- turned with the buttons next to
 // Confirm (or Q / E) and sent with confirm-placement.
@@ -1975,17 +1983,24 @@ function attachPlacementListeners(state, currentId) {
   const colsField = document.getElementById('placementGridCols');
   const rowsField = document.getElementById('placementGridRows');
   const TV_ASPECT = 16 / 9;
+  const markDraft = () => {
+    const grid = (session?.board || state.board).grid; // the live size, not the one when these listeners were attached
+    _gridDraftBase = _gridDraftBase || `${grid.cols}x${grid.rows}`;
+  };
   colsField?.addEventListener('input', () => {
+    markDraft();
     const cols = parseInt(colsField.value, 10);
     if (cols > 0) rowsField.value = Math.max(1, Math.round(cols * TV_ASPECT));
   });
   rowsField?.addEventListener('input', () => {
+    markDraft();
     const rows = parseInt(rowsField.value, 10);
     if (rows > 0) colsField.value = Math.max(1, Math.round(rows / TV_ASPECT));
   });
   document.getElementById('placementSetGridBtn')?.addEventListener('click', async () => {
     const cols = parseInt(colsField.value, 10) || 11;
     const rows = parseInt(rowsField.value, 10) || 20; // matches routes_combat.py's PvP default
+    _gridDraftBase = null;
     try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
   });
 
@@ -4552,9 +4567,11 @@ async function _handleNegateDamage({ reactorId, moveName, vpHalf = false }) {
 
   if (refund > 0) {
     const maxHp = Number.isFinite(reactor.maxHP) ? reactor.maxHP : Infinity;
-    const newHp = Math.min(maxHp, reactor.currentHP + refund);
+    // VP floors at 0; whatever VP can't cover comes off HP instead.
+    const vpLeft = (reactor.currentVP || 0) - vpLoss;
+    const newHp = Math.min(maxHp, reactor.currentHP + refund) + Math.min(0, vpLeft);
     try {
-      await CombatAPI.updateStats(reactorId, { currentHP: newHp, ...(vpLoss ? { currentVP: Math.max(0, (reactor.currentVP || 0) - vpLoss) } : {}) });
+      await CombatAPI.updateStats(reactorId, { currentHP: newHp, ...(vpLoss ? { currentVP: Math.max(0, vpLeft) } : {}) });
     } catch (err) {
       showCombatAlert(err.message, { title: 'Error' });
     }
@@ -6195,8 +6212,7 @@ async function _abilityDamageReactions({ attacker, target, event, damageDealt })
   ];
   for (const p of Object.values(session?.participants || {})) {
     if (p.id === target.id || p.status !== 'participating' || (p.owner || '') !== (target.owner || '') || (p.side || '') !== (target.side || '')) continue;
-    const a = session.board?.tokens?.[p.id], b = session.board?.tokens?.[target.id];
-    const ft = a && b ? Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row)) * 5 : null;
+    const ft = creatureDistanceFt(session.board, p, target);
     abilityTriggers(p, 'ally_hit', event, attacker).forEach(t => {
       if (t.effect.radiusFt == null || (ft != null && ft <= t.effect.radiusFt)) candidates.push({ ...t, holder: p });
     });

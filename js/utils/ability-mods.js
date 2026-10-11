@@ -13,6 +13,7 @@
 // A creature has ONE ability (its `abilities` text), with ability swaps applied and none under abilities_suppressed;
 // `unknown`-tagged abilities never reach the client. A gate this side can't judge counts as not met.
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
+import { creatureDistanceFt } from './move-range.js';
 
 let _data = {};       // ability name (lower case) -> { name, effects }
 let _abilityText = {}; // ability name -> rulebook text (reminders quote it)
@@ -95,10 +96,8 @@ export function abilityTriggers(p, trigger, event = {}, target = null) {
 }
 
 const _sameSide = (a, b) => (a?.owner || '') === (b?.owner || '') && (a?.side || '') === (b?.side || '');
-function _feetBetween(a, b) {
-  const ta = _session?.board?.tokens?.[a?.id], tb = _session?.board?.tokens?.[b?.id];
-  return ta && tb ? Math.max(Math.abs(ta.col - tb.col), Math.abs(ta.row - tb.row)) * 5 : null;
-}
+// Nearest squares of the two footprints (a Large creature reaches from any of its squares) -- move-range.js.
+const _feetBetween = (a, b) => creatureDistanceFt(_session?.board, a, b);
 
 /** Abilities to think of BEFORE an attack roll against `target` -- the attack step lists them so they can be used in
  * time: the target's own (Heavy Metal, Proper Form), any creature on its side that can spoil an enemy's roll
@@ -169,8 +168,8 @@ function _allyAdjacentTo(attacker, target) {
   return Object.values(s.participants || {}).some(p => {
     if (p.id === attacker.id || p.id === target.id || p.status !== 'participating') return false;
     if ((p.side || '') !== (attacker.side || '') || (s.battleType === 'pvp' && (p.owner || '') !== (attacker.owner || ''))) return false;
-    const pt = s.board.tokens[p.id];
-    return pt && Math.max(Math.abs(pt.col - t.col), Math.abs(pt.row - t.row)) <= 1;
+    const ft = creatureDistanceFt(s.board, p, target);
+    return ft != null && ft <= 5;
   });
 }
 

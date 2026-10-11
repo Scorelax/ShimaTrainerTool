@@ -2780,7 +2780,9 @@ def _ability_auto(state, pid, event, **ctx):
             if e.get('pool') == 'VP':
                 holder['currentVP'] = max(0, (holder.get('currentVP') or 0) - amount)
             else:
+                hp_before = holder['currentHP']
                 holder['currentHP'] -= _absorb_temp_hp(state, holder, amount)
+                _note_faint(holder, hp_before)
             _log_event(state, 'status-damage', text=f"{holder['name']}'s {ab}: -{amount} {e.get('pool') or 'HP'}", actorId=pid, actorName=holder['name'])
         elif kind == 'temp_hp':
             cap = (e.get('stacks') or {}).get('capLevelMultiple')
@@ -2841,7 +2843,9 @@ def _ability_turn_auras(state, pid, point):
             if e.get('save') or e.get('optional') or e.get('chance'):
                 _ability_reminder(state, hid, ab, e, about_id=pid)
             elif e.get('kind') == 'deal_damage' and amount:
+                hp_before = creature['currentHP']
                 creature['currentHP'] -= _absorb_temp_hp(state, creature, amount)
+                _note_faint(creature, hp_before)
                 _log_event(state, 'damage', text=f"{holder['name']}'s {ab}: {creature['name']} takes {amount} damage",
                            actorId=hid, actorName=holder['name'], targetId=pid, targetName=creature['name'], amount=amount)
             elif e.get('kind') == 'stat' and isinstance(e.get('amount'), (int, float)):

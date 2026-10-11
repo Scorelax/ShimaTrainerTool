@@ -1,7 +1,8 @@
-// Line areas ("Self (80ft. line)", "50ft. line" -- always 5ft wide) as a real strip laid over the map rather than a set
-// of grid cells: it starts at the caster, can point in ANY direction (not just the 8 grid directions the cone uses), and a
-// creature is in it when any part of its footprint square overlaps the strip. Used by the map's line tool
-// (battle-map-popup.js) and the "select from the map" line placer (line-area-picker.js).
+// Line areas ("Self (80ft. line)", "50ft. line" -- always 5ft wide) as a real beam rather than a set of grid cells: it
+// starts in the middle of the caster, can point in ANY direction (not just the 8 grid directions the cone uses) and tilt
+// up or down at a flyer, and a creature is in it when the beam (5ft wide, 5ft tall) touches its cube -- its footprint,
+// from its flying height up as high as it is wide. Used by the map's line tool (battle-map-popup.js, always level) and
+// the "select from the map" line placer (line-area-picker.js).
 //
 // Coordinates are in cells, y pointing down, with a token's footprint the NxN square whose bottom-left cell is its
 // (col, row) -- the same convention as battle-map-grid.js's cellRect. Angles are degrees clockwise from straight up,
@@ -16,72 +17,113 @@ export function lineFtFromRange(rangeText) {
   return m ? Number(m[1]) : null;
 }
 
-/** The strip: origin (the caster's centre), unit direction `u`, length and half-width, all in cells. The length runs
- * `lengthFt` past the caster's own half-size, so the line reaches its full distance beyond the caster's edge. */
-export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt) {
+/** The beam, in 3D: origin (the middle of the caster's cube), unit direction `d` (z is up), its length and half-size
+ * (5ft wide AND 5ft tall), all in cells. `pitchDeg` tilts it up (+) or down (-) from level -- 0, the default, fires it
+ * straight out at the caster's own height. `u` / `drawLen` are its shadow on the map, for drawing the strip. The length
+ * runs `lengthFt` past the caster's own half-size, so the line reaches its full distance beyond the caster's edge. */
+export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0) {
   const n = casterSize || 1;
   const a = (angleDeg * Math.PI) / 180;
+  const p = (pitchDeg * Math.PI) / 180;
   const u = { x: Math.sin(a), y: -Math.cos(a) };
-  // Grid distance counts a diagonal square as 5ft (move-range.js), so the reach is a square box round the caster, not a
-  // circle: the strip runs to that box's edge, e.g. a 30ft line reaches 6 squares straight ahead AND 6 diagonally.
-  const stretch = 1 / Math.max(Math.abs(u.x), Math.abs(u.y));
+  const d = { x: u.x * Math.cos(p), y: u.y * Math.cos(p), z: Math.sin(p) };
+  // Grid distance counts a diagonal square (or a square up) as 5ft (move-range.js), so the reach is a box round the
+  // caster, not a sphere: the beam runs to that box's edge, e.g. a 30ft line reaches 6 squares straight ahead, 6
+  // diagonally, or 30ft straight up.
+  const stretch = 1 / Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
+  const len = (lengthFt / 5 + n / 2) * stretch;
   return {
-    o: { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2 },
-    u,
-    len: (lengthFt / 5 + n / 2) * stretch,
+    o: { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2, z: (casterPos.z || 0) / 5 + n / 2 },
+    u, d, len,
+    drawLen: len * Math.cos(p),
     half: LINE_WIDTH_FT / 10,
+    // Across the beam: level and sideways (v), and "up" for the beam (w = d x v).
+    v: { x: Math.cos(a), y: Math.sin(a), z: 0 },
+    w: { x: -d.z * Math.sin(a), y: d.z * Math.cos(a), z: d.x * Math.sin(a) - d.y * Math.cos(a) },
   };
 }
 
-/** The squares within `lengthFt` of the caster's footprint (the line's reach box): {c0, c1, r0, r1}, inclusive. */
+/** The squares within `lengthFt` of the caster's footprint (the line's reach box on the map): {c0, c1, r0, r1}, inclusive. */
 export function lineReachBox(casterPos, casterSize, lengthFt) {
   const n = casterSize || 1;
   const reach = Math.floor(lengthFt / 5);
   return { c0: casterPos.col - reach, c1: casterPos.col + n - 1 + reach, r0: casterPos.row - n + 1 - reach, r1: casterPos.row + reach };
 }
 
-function _inReachBox(box, pos, n) {
-  return pos.col <= box.c1 && pos.col + n - 1 >= box.c0 && pos.row - n + 1 <= box.r1 && pos.row >= box.r0;
+/** Whether creature `id` is within the line's reach -- on the map AND in height (a flyer 40ft up is 40ft away). */
+export function inLineReach(session, casterId, id, lengthFt) {
+  const board = session.board;
+  const casterPos = board.tokens[casterId];
+  const pos = board.tokens[id];
+  if (!casterPos || !pos || !session.participants[id]) return false;
+  const n = footprintForSize(session.participants[casterId]?.size);
+  const m = footprintForSize(session.participants[id].size);
+  const box = lineReachBox(casterPos, n, lengthFt);
+  const reach = Math.floor(lengthFt / 5);
+  const cz = (casterPos.z || 0) / 5, z = (pos.z || 0) / 5;
+  return pos.col <= box.c1 && pos.col + m - 1 >= box.c0 && pos.row - m + 1 <= box.r1 && pos.row >= box.r0
+    && z < cz + n + reach && z + m > cz - reach;
 }
 
-/** Whether the strip overlaps the NxN footprint at `pos` (separating-axis test). A strip that only grazes an edge
- * (overlap of `eps` cells or less) doesn't count. */
-export function lineTouchesFootprint(g, pos, n, eps = 0.05) {
-  const x0 = pos.col, y0 = pos.row - n + 1;
-  const square = [[x0, y0], [x0 + n, y0], [x0 + n, y0 + n], [x0, y0 + n]];
-  const v = { x: -g.u.y, y: g.u.x };
-  const strip = [[0, -g.half], [g.len, -g.half], [g.len, g.half], [0, g.half]]
-    .map(([s, t]) => [g.o.x + g.u.x * s + v.x * t, g.o.y + g.u.y * s + v.y * t]);
-  for (const [ax, ay] of [[1, 0], [0, 1], [g.u.x, g.u.y], [v.x, v.y]]) {
-    const a = square.map(([x, y]) => x * ax + y * ay);
-    const b = strip.map(([x, y]) => x * ax + y * ay);
+const _dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+const _cross = (a, b) => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
+
+/** Whether the beam overlaps the NxNxN cube of the creature at `pos` (its footprint, from its flying height up) --
+ * a separating-axis test. A beam that only grazes a face (overlap of `eps` cells or less) doesn't count. */
+export function lineTouchesCube(g, pos, n, eps = 0.05) {
+  const x0 = pos.col, y0 = pos.row - n + 1, z0 = (pos.z || 0) / 5;
+  const cube = [];
+  for (const x of [x0, x0 + n]) for (const y of [y0, y0 + n]) for (const z of [z0, z0 + n]) cube.push({ x, y, z });
+  const beam = [];
+  for (const s of [0, g.len]) for (const t of [-g.half, g.half]) for (const q of [-g.half, g.half]) {
+    beam.push({ x: g.o.x + g.d.x * s + g.v.x * t + g.w.x * q, y: g.o.y + g.d.y * s + g.v.y * t + g.w.y * q, z: g.o.z + g.d.z * s + g.v.z * t + g.w.z * q });
+  }
+  const unit = [{ x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: 0, z: 1 }];
+  const own = [g.d, g.v, g.w];
+  const axes = [...unit, ...own];
+  unit.forEach(e => own.forEach(f => { const c = _cross(e, f); if (_dot(c, c) > 1e-9) axes.push(c); }));
+  for (const ax of axes) {
+    const l = Math.sqrt(_dot(ax, ax));
+    const a = cube.map(pt => _dot(pt, ax) / l);
+    const b = beam.map(pt => _dot(pt, ax) / l);
     if (Math.min(Math.max(...a), Math.max(...b)) - Math.max(Math.min(...a), Math.min(...b)) <= eps) return false;
   }
   return true;
 }
 
-/** Ids of every creature on the board (except the caster) the line touches. */
-export function lineHitIds(session, casterId, angleDeg, lengthFt) {
+/** Ids of every creature (except the caster) in the line's reach that the beam touches. Level by default (pitch 0), so
+ * it passes under a flyer and over nothing on the ground; tilted (aimAtCreature) it can climb to one. */
+export function lineHitIds(session, casterId, angleDeg, lengthFt, pitchDeg = 0) {
   const board = session.board;
   const casterPos = board.tokens[casterId];
   if (!casterPos) return [];
   const casterSize = footprintForSize(session.participants[casterId]?.size);
-  const g = lineGeometry(casterPos, casterSize, angleDeg, lengthFt);
-  // The strip's 5ft-wide end pokes a little past the reach box's corner on a diagonal; whoever stands out there isn't hit.
-  const box = lineReachBox(casterPos, casterSize, lengthFt);
+  const g = lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg);
+  // The beam's square end pokes a little past the reach box's corner on a diagonal; whoever stands out there isn't hit.
   return Object.entries(board.tokens)
-    .filter(([id, pos]) => id !== casterId && session.participants[id]
-      && Math.abs((pos.z || 0) - (casterPos.z || 0)) <= lengthFt // a flyer higher up than the line is long is out of it (same as cones)
-      && _inReachBox(box, pos, footprintForSize(session.participants[id].size))
-      && lineTouchesFootprint(g, pos, footprintForSize(session.participants[id].size)))
+    .filter(([id, pos]) => id !== casterId && inLineReach(session, casterId, id, lengthFt)
+      && lineTouchesCube(g, pos, footprintForSize(session.participants[id].size)))
     .map(([id]) => id);
 }
 
-/** Inline style for the strip element, positioned in percent of the map stage (cells are square, see the stage's
- * aspect-ratio, so one transform keeps the 5ft width true at every angle). */
+/** The aim {angle, pitch} that points the beam from the middle of the caster's cube at the middle of creature `id`'s. */
+export function aimAtCreature(session, casterId, id, fallbackAngle = 0) {
+  const board = session.board;
+  const casterPos = board.tokens[casterId];
+  const pos = board.tokens[id];
+  const o = lineGeometry(casterPos, footprintForSize(session.participants[casterId]?.size), 0, 5).o;
+  const m = footprintForSize(session.participants[id]?.size);
+  const dx = pos.col + m / 2 - o.x, dy = pos.row - m + 1 + m / 2 - o.y, dz = (pos.z || 0) / 5 + m / 2 - o.z;
+  const flat = Math.hypot(dx, dy);
+  const angle = flat < 1e-6 ? fallbackAngle : (((Math.atan2(dx, -dy) * 180) / Math.PI) + 360) % 360;
+  return { angle, pitch: (Math.atan2(dz, flat) * 180) / Math.PI };
+}
+
+/** Inline style for the strip element (the beam's shadow on the map), positioned in percent of the map stage (cells
+ * are square, see the stage's aspect-ratio, so one transform keeps the 5ft width true at every angle). */
 export function lineStyle(board, g, angleDeg) {
   const { cols, rows } = board.grid;
-  return `left:${(g.o.x / cols) * 100}%;top:${((g.o.y - g.half) / rows) * 100}%;width:${(g.len / cols) * 100}%;`
+  return `left:${(g.o.x / cols) * 100}%;top:${((g.o.y - g.half) / rows) * 100}%;width:${((g.drawLen ?? g.len) / cols) * 100}%;`
     + `height:${((2 * g.half) / rows) * 100}%;transform:rotate(${angleDeg - 90}deg);`;
 }
 

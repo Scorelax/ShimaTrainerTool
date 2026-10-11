@@ -6,7 +6,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from './battle-map-grid.js';
 import { injectBattleMapStyles, spriteTransform, coneCells } from './battle-map-view.js';
-import { lineGeometry, lineHitIds, lineReachBox, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
+import { lineGeometry, lineHitIds, lineReachBox, inLineReach, aimAtCreature, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 function _injectStyles() {
   if (document.getElementById('line-area-picker-styles')) return;
@@ -23,7 +23,9 @@ function _injectStyles() {
     .lap-stage .bmap-tokens { z-index: 2; pointer-events: none; }
     .lap-stage .bmap-token.untargetable { opacity: 0.35; filter: grayscale(1); }
     .lap-stage .bmap-cell.line-reach { background: rgba(255,140,60,0.1); box-shadow: inset 0 0 0 1px rgba(255,160,80,0.25); }
-    .lap-hits { font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2em; color: #ffcf9e; }
+    .lap-stage .bmap-token.line-aim .bmap-token-portrait { outline: 2px dashed #fff3; outline-offset: 3px; }
+    .lap-aim { font-size: 0.82rem; margin-top: 0.6rem; color: #c8cff5; }
+    .lap-hits { font-size: 0.85rem; margin-top: 0.3rem; min-height: 1.2em; color: #ffcf9e; }
     .lap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
     .lap-actions button { border: none; border-radius: 999px; padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.1); color: #e8ecff; }
     .lap-actions button:hover { background: rgba(255,255,255,0.2); }
@@ -58,7 +60,7 @@ function _buildTokens(session, board, casterId, tokenLayer, targetable) {
  * @param {string} casterId the line comes out of this creature's token
  * @param {string} title    e.g. "Hyper Beam"
  * @param {number} lengthFt the line's length (lineFtFromRange of the move's range)
- * @returns {Promise<{ids: string[], angle: number} | null>}  null when cancelled
+ * @returns {Promise<{ids: string[], angle: number, pitch: number} | null>}  null when cancelled
  */
 export function pickLineArea({ session, casterId, title, lengthFt, targetableIds = null, confirmLabel = 'Select targets in the line' }) {
   _injectStyles();
@@ -76,12 +78,13 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     overlay.innerHTML = `
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
-        <div class="lap-sub">A ${lengthFt}ft line, 5ft wide, from ${caster?.name || 'the caster'}. Drag or tap anywhere on the map to aim it — any angle, not just along the grid. It reaches the edge of the shaded squares (${lengthFt / 5} squares straight or diagonally). Everyone it touches is selected.</div>
+        <div class="lap-sub">A ${lengthFt}ft line, a 5ft-wide beam from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the beam straight at it (up at a flyer, down from the air). It reaches the edge of the shaded squares (${lengthFt / 5} squares straight, diagonally or up); greyed-out creatures are out of its reach. Everyone the beam touches is selected.</div>
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
           <div class="bmap-line"></div>
           <div class="bmap-tokens"></div>
         </div>
+        <div class="lap-aim"></div>
         <div class="lap-hits"></div>
         <div class="lap-actions">
           <button type="button" data-act="left" title="Turn 5° left">⟲ 5°</button>
@@ -96,6 +99,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     const grid = overlay.querySelector('.bmap-grid');
     const tokenLayer = overlay.querySelector('.bmap-tokens');
     const lineEl = overlay.querySelector('.bmap-line');
+    const aimEl = overlay.querySelector('.lap-aim');
     const hitsEl = overlay.querySelector('.lap-hits');
     if (board.backgroundImage) {
       stage.classList.add('has-bg');
@@ -112,22 +116,60 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
 
     const targetable = targetableIds ? new Set(targetableIds) : null;
     const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable);
+    // Who the beam could reach at all (on the map and in height) -- everyone else is greyed out, and only these can be
+    // tapped to aim at.
+    const aimable = new Set(Object.keys(board.tokens).filter(id => id !== casterId && (!targetable || targetable.has(id))
+      && inLineReach(session, casterId, id, lengthFt)));
+    tokenEls.forEach((el, id) => { if (id !== casterId && !aimable.has(id)) el.classList.add('untargetable'); });
+    const nameOf = id => (visibleToViewer(session.participants[id], 'name') ? session.participants[id].name : '???');
+    const heightOf = id => { const z = board.tokens[id]?.z || 0; return z > 0 ? ` (${z}ft up)` : ''; };
 
+    let pitch = 0;       // level unless aimed at a creature
+    let aimedAt = null;  // the creature it was aimed at
     let hits = [];
     const refresh = () => {
-      const g = lineGeometry(casterPos, casterSize, angle, lengthFt);
+      const g = lineGeometry(casterPos, casterSize, angle, lengthFt, pitch);
       lineEl.setAttribute('style', lineStyle(board, g, angle));
-      hits = lineHitIds(session, casterId, angle, lengthFt).filter(id => !targetable || targetable.has(id));
-      tokenEls.forEach((el, id) => el.classList.toggle('line-hit', hits.includes(id)));
-      const names = hits.map(id => (visibleToViewer(session.participants[id], 'name') ? session.participants[id].name : '???'));
+      hits = lineHitIds(session, casterId, angle, lengthFt, pitch).filter(id => aimable.has(id));
+      tokenEls.forEach((el, id) => {
+        el.classList.toggle('line-hit', hits.includes(id));
+        el.classList.toggle('line-aim', id === aimedAt);
+      });
+      const tilt = Math.round(Math.abs(pitch));
+      aimEl.textContent = aimedAt && tilt
+        ? `Aimed at ${nameOf(aimedAt)}${heightOf(aimedAt)}: tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}. Drag to level it again.`
+        : `Level, at ${caster?.name || 'the caster'}'s height${heightOf(casterId)} -- it passes under flyers. Tap a creature to aim the beam at it.`;
+      const names = hits.map(id => `${nameOf(id)}${heightOf(id)}`);
       hitsEl.textContent = names.length ? `In the line: ${names.join(', ')}` : 'Nobody in the line yet.';
     };
     refresh();
 
     const origin = lineGeometry(casterPos, casterSize, 0, lengthFt).o;
+    // The creature (one that can be aimed at) whose footprint covers the square under the pointer.
+    const creatureAt = (e) => {
+      const r = stage.getBoundingClientRect();
+      const c = Math.floor(((e.clientX - r.left) / r.width) * cols);
+      const rr = Math.floor(((e.clientY - r.top) / r.height) * rows);
+      return [...aimable].find((id) => {
+        const pos = board.tokens[id];
+        const n = footprintForSize(session.participants[id].size);
+        return c >= pos.col && c <= pos.col + n - 1 && rr >= pos.row - n + 1 && rr <= pos.row;
+      }) || null;
+    };
     let aiming = false;
-    const aim = (e) => { angle = angleToPointer(stage, board, origin, e.clientX, e.clientY); refresh(); };
-    stage.addEventListener('pointerdown', (e) => { e.preventDefault(); aiming = true; stage.setPointerCapture?.(e.pointerId); aim(e); });
+    const aim = (e) => { angle = angleToPointer(stage, board, origin, e.clientX, e.clientY); pitch = 0; aimedAt = null; refresh(); };
+    stage.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const id = creatureAt(e);
+      if (id) {
+        // Tap a creature: the beam tilts to go straight through the middle of it.
+        ({ angle, pitch } = aimAtCreature(session, casterId, id, angle));
+        aimedAt = id;
+        refresh();
+        return;
+      }
+      aiming = true; stage.setPointerCapture?.(e.pointerId); aim(e);
+    });
     stage.addEventListener('pointermove', (e) => { if (aiming) aim(e); });
     const stop = () => { aiming = false; };
     stage.addEventListener('pointerup', stop);
@@ -136,10 +178,10 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     overlay.addEventListener('click', (e) => {
       const act = e.target.closest('button')?.dataset.act;
       if (!act) return;
-      if (act === 'left') { angle = (angle + 355) % 360; refresh(); }
-      else if (act === 'right') { angle = (angle + 5) % 360; refresh(); }
+      if (act === 'left') { angle = (angle + 355) % 360; aimedAt = null; refresh(); }
+      else if (act === 'right') { angle = (angle + 5) % 360; aimedAt = null; refresh(); }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
-      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle }); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch }); }
     });
   });
 }

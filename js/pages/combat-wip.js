@@ -849,8 +849,10 @@ function _enterBattleSync() {
   setCombatStateKey(WIP_COMBAT_STATE_KEY);
   setOnCombatStateSave(_onLocalCombatStateSave);
   setOnLogEvent(({ spend, ...event }) => {
-    // What the move cost and the HP/VP before it -- refunded if it turns out to have nobody to aim at (_refundMoveCost).
-    if (event.type === 'move-used' && spend) _lastMoveSpend[event.actorId] = { move: event.move, ...spend };
+    // What the move cost and the HP/VP before it -- refunded if it turns out to have nobody to aim at (_onTargetCheck).
+    if (event.type === 'move-used' && spend) {
+      _lastMoveSpend[event.actorId] = { move: event.move, ...spend, turn: `${session?.round}:${session?.turnIndex}` };
+    }
     const sent = CombatAPI.logEvent(event).catch(() => {});
     _lastLogSent = sent; // _repeatUseCheck counts move-used entries -- it waits for this one to land first
     if (event.type === 'move-used' && event.move) sent.then(() => _abilityMoveUsed(event.actorId, event.move)); // Protean, Dancer...
@@ -860,7 +862,7 @@ function _enterBattleSync() {
   setOnLocalStatusClick(_openLocalStatusDetail);
   setOnBasicAction(_onBasicAction);
   setOnUseTrainerBuff(_useTrainerBuff);
-  setNoTargetHandler(_refundMoveCost); // a move with nobody in reach gets its VP back
+  setNoTargetHandler(_onTargetCheck); // a move with nobody in reach gets its VP back
 }
 
 function _exitBattleSync() {
@@ -974,15 +976,27 @@ function _persistStatsToDb(combatant, hp, vp) {
 // device's local state actually holds by the time the in-flight request
 // clears -- never a stale intermediate one.
 /** A move that turned out to have nobody it could be aimed at (targetability.js -- everyone out of reach or hidden):
- * its VP comes back, and any HP the VP overflow took. Only once per use, and only for the move just used. */
-const _lastMoveSpend = {}; // participantId -> { move, vpCost, hpBefore, vpBefore }
-function _refundMoveCost(casterId, moveName) {
+ * its VP comes back, and any HP the VP overflow took. Only for the move just used, and only before it found anyone --
+ * once a picker had a target (`found`) or its damage landed (_landHit), the spend is forgotten, so a multi-hit's next
+ * pick or Harmony Breath's ally pick coming up empty never refunds a move that already went off. */
+const _lastMoveSpend = {}; // participantId -> { move, vpCost, hpTaken, vpTaken, turn }
+function _onTargetCheck(casterId, moveName, found) {
   const spend = _lastMoveSpend[casterId];
-  if (!spend || spend.move !== moveName || !(spend.vpCost > 0)) return;
+  if (!spend || spend.move !== moveName) return;
   delete _lastMoveSpend[casterId];
+  // Only the use just made, this same turn (a move that never opened a picker leaves its record behind).
+  if (found || !(spend.vpCost > 0) || spend.turn !== `${session?.round}:${session?.turnIndex}`) return;
+  // What the use took is added back onto this device's own copy (already past the spend -- the server's may lag).
+  const state = JSON.parse(sessionStorage.getItem(WIP_COMBAT_STATE_KEY) || 'null');
+  const c = state?.combatants?.find(x => x.id === casterId);
+  if (!c) return;
+  c.currentVp = Math.min(c.maxVp ?? Infinity, (c.currentVp || 0) + (spend.vpTaken || 0));
+  c.currentHp = Math.min(c.maxHp ?? Infinity, (c.currentHp || 0) + (spend.hpTaken || 0));
+  sessionStorage.setItem(WIP_COMBAT_STATE_KEY, JSON.stringify(state));
+  _lastSyncedStats[casterId] = { hp: c.currentHp, vp: c.currentVp };
+  _pushStatsSync(casterId, c.currentHp, c.currentVp); // queued behind the spend itself, so it lands last
+  _persistStatsToDb(c, c.currentHp, c.currentVp);
   const name = session?.participants?.[casterId]?.name || '?';
-  _lastSyncedStats[casterId] = { hp: spend.hpBefore, vp: spend.vpBefore };
-  _pushStatsSync(casterId, spend.hpBefore, spend.vpBefore); // queued behind the spend itself, so it lands last
   CombatAPI.logEvent({ type: 'refund', actorId: casterId, actorName: name,
     text: `${name}'s ${moveName} had nobody it could reach -- ${spend.vpCost} VP refunded` }).catch(() => {});
 }
@@ -5456,11 +5470,14 @@ async function _landHit({ attackerId, targetId, damage, moveType, speciesName, m
     });
   }
   const dmgResult = await CombatAPI.applyDamage(attackerId, targetId, damage, moveType, speciesName, moveName, !!crit, pool, soften);
+  delete _lastMoveSpend[attackerId]; // the move landed -- no "nobody in reach" refund for it any more (_onTargetCheck)
   // 'damaged'-family reactions fire right here -- after the damage lands, before anything else about this hit.
   await waitForDamagedReactions(targetId, attackerId, moveName);
   await _maybeMeleeRetaliate(attackerId, targetId, moveName);
+  // The server's own HP before / after (this device's copy may lag a hit behind on a multi-hit move).
   await _abilityHitTriggers({ attackerId, targetId, moveName, move, attackRoll, damageDealt: dmgResult?.damageApplied,
-    typeMultiplier: dmgResult?.multiplier ?? null, hpBefore, crit: !!crit, targetFainted: !!dmgResult?.targetFainted, drain });
+    typeMultiplier: dmgResult?.multiplier ?? null, hpBefore: dmgResult?.hpBefore ?? hpBefore, hpAfter: dmgResult?.hpAfter ?? null,
+    crit: !!crit, targetFainted: !!dmgResult?.targetFainted, drain });
   return dmgResult;
 }
 
@@ -6297,7 +6314,7 @@ async function _abilityDamageReactions({ attacker, target, event, damageDealt })
  * creature's save is asked here -- once per ability, so Static Wool's one save covers both its effects -- and each
  * effect that goes through is applied by the server (ability-trigger), which checks the ability is really there. */
 async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attackRoll, damageDealt, typeMultiplier,
-  hpBefore = null, crit = false, targetFainted = false, drain = false }) {
+  hpBefore = null, hpAfter = null, crit = false, targetFainted = false, drain = false }) {
   const attacker = session?.participants?.[attackerId];
   const target = session?.participants?.[targetId];
   if (!attacker || !target || attackerId === targetId) return;
@@ -6309,7 +6326,8 @@ async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attac
   // The target's Sturdy / Fur Coat was already asked before the hit landed (_abilityDamageReactions) -- damageDealt is
   // what got through.
   const fainted = targetFainted;
-  if (hpBefore != null) event.hpAfter = hpBefore - (damageDealt ?? 0); // Wimp Out / Emergency Exit
+  if (hpAfter != null) event.hpAfter = hpAfter; // Wimp Out / Emergency Exit
+  else if (hpBefore != null) event.hpAfter = hpBefore - (damageDealt ?? 0);
   const all = [
     ...abilityTriggers(target, 'hit_by', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),
     ...abilityTriggers(target, 'damaged', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),

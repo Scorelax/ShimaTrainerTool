@@ -137,8 +137,8 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
         el.classList.toggle('line-aim', id === aimedAt);
       });
       const tilt = Math.round(Math.abs(pitch));
-      aimEl.textContent = aimedAt && tilt
-        ? `Aimed at ${nameOf(aimedAt)}${heightOf(aimedAt)}: tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}. Drag to level it again.`
+      aimEl.textContent = aimedAt
+        ? `Aimed at ${nameOf(aimedAt)}${heightOf(aimedAt)}${tilt ? `: tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}. Drag to level it again` : ' (level)'}. Tap the same square again for another creature there.`
         : `Level, at ${caster?.name || 'the caster'}'s height${heightOf(casterId)} -- it passes under flyers. Tap a creature to aim the beam at it.`;
       const names = hits.map(id => `${nameOf(id)}${heightOf(id)}`);
       hitsEl.textContent = names.length ? `In the line: ${names.join(', ')}` : 'Nobody in the line yet.';
@@ -150,7 +150,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     const aim = (e) => { angle = angleToPointer(stage, board, origin, e.clientX, e.clientY); pitch = 0; aimedAt = null; refresh(); };
     stage.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      const id = _creatureAt(stage, session, aimable, e);
+      const id = _creatureAt(stage, session, aimable, e, aimedAt);
       if (id) {
         // Tap a creature: the beam tilts to go straight through the middle of it.
         ({ angle, pitch } = aimAtCreature(session, casterId, id, angle));
@@ -263,7 +263,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
       });
       const tilt = tilted ? Math.round(Math.abs(tilted.pitch)) : 0;
       aimEl.textContent = tilted
-        ? `Aimed at ${nameOf(tilted.id)}${heightOf(tilted.id)}${tilt ? `: tilted ${tilt}° ${tilted.pitch > 0 ? 'up' : 'down'}` : ''}. Drag to level it again.`
+        ? `Aimed at ${nameOf(tilted.id)}${heightOf(tilted.id)}${tilt ? `: tilted ${tilt}° ${tilted.pitch > 0 ? 'up' : 'down'}` : ''}. Drag to level it again; tap the same square again for another creature there.`
         : `Level, at ${caster?.name || 'the caster'}'s height${heightOf(casterId)} -- it spreads upward as it goes (as high as it is wide). Tap a creature to aim the cone at it.`;
       const names = hits.map(id => `${nameOf(id)}${heightOf(id)}`);
       hitsEl.textContent = names.length ? `In the cone: ${names.join(', ')}` : 'Nobody in the cone yet.';
@@ -275,7 +275,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     const aim = (e) => { angle = snap(angleToPointer(stage, board, origin, e.clientX, e.clientY)); tilted = null; refresh(); };
     stage.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      const id = _creatureAt(stage, session, aimable, e);
+      const id = _creatureAt(stage, session, aimable, e, tilted?.id);
       if (id) {
         // Tap a creature: the cone tilts to point straight at it.
         tilted = { id, ...coneAimAt(session, casterId, id) };
@@ -300,15 +300,20 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
   });
 }
 
-/** The creature (one of `ids`) whose footprint covers the map square under the pointer, or null. */
-function _creatureAt(stage, session, ids, e) {
+/** The creature (one of `ids`) whose footprint covers the map square under the pointer, or null. Creatures stacked on
+ * one square (a flyer above one on the ground) take turns: tapping again moves on from `current` to the next, lowest
+ * first. */
+function _creatureAt(stage, session, ids, e, current = null) {
   const { cols, rows } = session.board.grid;
   const r = stage.getBoundingClientRect();
   const c = Math.floor(((e.clientX - r.left) / r.width) * cols);
   const rr = Math.floor(((e.clientY - r.top) / r.height) * rows);
-  return [...ids].find((id) => {
+  const here = [...ids].filter((id) => {
     const pos = session.board.tokens[id];
     const n = footprintForSize(session.participants[id].size);
     return c >= pos.col && c <= pos.col + n - 1 && rr >= pos.row - n + 1 && rr <= pos.row;
-  }) || null;
+  }).sort((a, b) => (session.board.tokens[a].z || 0) - (session.board.tokens[b].z || 0));
+  if (!here.length) return null;
+  const i = here.indexOf(current);
+  return here[(i + 1) % here.length];
 }

@@ -11,8 +11,10 @@ let _resolver = () => null;
 let _rangeResolver = () => '';
 let _noTargetHandler = null;
 
-/** `fn(casterId, moveName)` -- runs when a move turns out to have nobody it can be aimed at (all out of reach or hidden):
- * the move's VP was already paid, so the shared battle refunds it (combat-wip.js). */
+/** `fn(casterId, moveName, found)` -- runs each time a picker checks a move's targets: found = false when nobody can be
+ * aimed at (all out of reach or hidden) -- the move's VP was already paid, so the shared battle refunds it -- and true
+ * once somebody could, which ends that chance (a later pick in the same move, e.g. a multi-hit's next target, never
+ * refunds a move that already went off). See combat-wip.js's _onTargetCheck. */
 export function setNoTargetHandler(fn) {
   _noTargetHandler = typeof fn === 'function' ? fn : null;
 }
@@ -41,23 +43,27 @@ export function filterTargetable(participants, moveName, session = null, casterI
   });
   if (!list.length && hidden.length) {
     showCombatAlert(`${moveName} can't target ${hidden.join(', ')} right now.`, { title: 'No valid target' });
-    if (casterId) _noTargetHandler?.(casterId, moveName);
+    if (casterId) _noTargetHandler?.(casterId, moveName, false);
   }
   list.outOfRange = new Map();
   const caster = session?.participants?.[casterId];
   const reach = caster ? moveReachFt(_rangeResolver(moveName), caster.size) : null;
-  if (reach == null) return list;
+  if (reach == null) {
+    if (list.length && casterId) _noTargetHandler?.(casterId, moveName, true);
+    return list;
+  }
   list.forEach((p) => {
     const ft = creatureDistanceFt(session.board, caster, p);
     if (ft != null && ft > reach) list.outOfRange.set(p.id, `${ft}ft away`);
   });
   if (list.length && list.outOfRange.size === list.length) {
     showCombatAlert(`Nobody is within ${moveName}'s reach (${reach}ft) -- move closer first.`, { title: 'Out of range' });
-    _noTargetHandler?.(casterId, moveName);
+    _noTargetHandler?.(casterId, moveName, false);
     const none = [];
     none.outOfRange = new Map();
     return none;
   }
+  if (list.length) _noTargetHandler?.(casterId, moveName, true);
   if (list.outOfRange.size) list.reachFt = reach;
   return list;
 }

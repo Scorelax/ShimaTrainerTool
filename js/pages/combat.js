@@ -3500,6 +3500,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       if (moveCategoriesFor(usedMoveName).includes('self_faint')) newHp = 0;
       target.currentHp = newHp;
       target.currentVp = newVp;
+      spend.hpTaken = spend.hpBefore - newHp; spend.vpTaken = spend.vpBefore - newVp;
       logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, move: usedMoveName, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)`, spend });
       // Spend the session's one bonus action for the round (the server rejects a second one).
       if (_isSharedCombat && _isBonusActionMove(usedMoveName)) {

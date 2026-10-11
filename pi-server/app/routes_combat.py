@@ -3175,7 +3175,10 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         actorId=pid, actorName=attacker['name'], targetId=target_id, targetName=target['name'],
         move=move_name, moveType=move_type, amount=actual_damage, multiplier=multiplier, crit=bool(crit),
     )
-    return {'multiplier': multiplier, 'damageApplied': actual_damage, 'targetFainted': target['currentHP'] <= 0}
+    # hpBefore / hpAfter: the target's real HP around this hit -- Wimp Out / Emergency Exit read them (a multi-hit move's
+    # second hit can't trust the client's copy, which may not have caught up with the first yet).
+    return {'multiplier': multiplier, 'damageApplied': actual_damage, 'targetFainted': target['currentHP'] <= 0,
+            'hpBefore': hp_before, 'hpAfter': target['currentHP']}
 
 
 # ---------------------------------------------------------------------------

@@ -2726,6 +2726,7 @@ export function attachCombatWipListeners() {
     session = e.detail;
     setAbilitySession(session);
     _showNewAbilityReminders(session);
+    _answerPromptsForMe(session); // another player's attack asking this player to roll (their Sturdy, Rough Skin...)
     if (_joinStage === 'placement') {
       if (_placementQueue.length) {
         _renderPlacementTokens(session, _placementQueue[0]);
@@ -6260,6 +6261,81 @@ async function _abilityTargetedTriggers(attackerId, targetId, move) {
 
 /** Whether the target or someone on its side has a softening ability at all (Sturdy, Fur Coat, Friend Guard...) -- only
  * then is the hit previewed first (see _abilityDamageReactions). */
+// --- Asking the player who makes the roll ---------------------------------------------------------------------------
+// A roll, a "use it?" or a saving throw that belongs to a creature another player controls (the target's Sturdy d4, its
+// Rough Skin roll, its save against the attacker's Static) pops up on THAT player's screen: the attacking device puts the
+// question on the session (prompt-ask), the owner's device shows it and answers (prompt-answer), and the attacker waits
+// with a "Waiting for ..." banner. Their own creatures, and ones nobody controls (a DM's enemies), are asked right here,
+// as is anything the owner doesn't answer in time or that the attacker chooses to enter themselves.
+const PROMPT_WAIT_MS = 90000;
+const _promptsShown = new Set(); // prompt ids this device already popped up
+
+/** One popup on this device: a roll (promptValueRoll's args), a "use it?" ({text, opts} for showCombatConfirm) or a saving
+ * throw ({affectedId, moveUserId, opts} for confirmSecondarySave). Resolves with what the popup gave back. */
+async function _runPrompt(kind, args) {
+  if (kind === 'roll') return promptValueRoll(args);
+  if (kind === 'confirm') return showCombatConfirm(args.text, args.opts || {});
+  if (kind === 'save') {
+    const affected = session?.participants?.[args.affectedId];
+    if (!affected) return null;
+    return confirmSecondarySave(affected, affected.name, { ...(args.opts || {}), moveUser: session?.participants?.[args.moveUserId] || null });
+  }
+  return null;
+}
+
+/** Asks `kind` (see _runPrompt) on the screen of whoever controls `participant`; `label` names it on the waiting banner
+ * ("Skarmory's Sturdy roll"). Resolves with the answer, the same as _runPrompt would. */
+async function _askOwnerOf(participant, kind, args, label) {
+  const me = _currentTrainerName();
+  const owner = participant?.owner || '';
+  if (!owner || owner === me || !participant?.id) return _runPrompt(kind, args);
+  let promptId = null;
+  try { promptId = (await CombatAPI.askPrompt(participant.id, kind, args, me))?.promptId || null; } catch { /* asked here instead */ }
+  if (!promptId) return _runPrompt(kind, args);
+  const result = await _waitForPromptAnswer(promptId, owner, label);
+  CombatAPI.clearPrompt(promptId).catch(() => {});
+  return result.answered ? result.answer : _runPrompt(kind, args);
+}
+
+/** The attacker's side: a banner while the owner answers, with "Enter it here instead". Resolves {answered, answer} --
+ * answered false when the banner's button was used, the wait ran out, or the question disappeared. */
+function _waitForPromptAnswer(promptId, owner, label) {
+  return new Promise((resolve) => {
+    const banner = document.createElement('div');
+    banner.className = 'prompt-wait-banner';
+    banner.style.cssText = 'position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);z-index:1300;max-width:92%;'
+      + 'background:#1a1d36;border:1px solid rgba(255,203,5,0.6);border-radius:14px;padding:0.7rem 1rem;color:#e8ecff;'
+      + 'box-shadow:0 8px 30px rgba(0,0,0,0.6);display:flex;gap:0.8rem;align-items:center;font-size:0.9rem;';
+    banner.innerHTML = `<span>⏳ Waiting for <strong>${owner}</strong>: ${label}</span>`
+      + '<button type="button" style="border:none;border-radius:999px;padding:0.35rem 0.8rem;font-weight:700;cursor:pointer;'
+      + 'background:rgba(255,255,255,0.12);color:#e8ecff;white-space:nowrap;">Enter it here instead</button>';
+    document.body.appendChild(banner);
+    const started = Date.now();
+    let done = false;
+    const finish = (out) => { if (done) return; done = true; clearInterval(timer); banner.remove(); resolve(out); };
+    banner.querySelector('button').addEventListener('click', () => finish({ answered: false }));
+    const timer = setInterval(() => {
+      const p = session?.pendingPrompts?.[promptId];
+      if (p?.answered) finish({ answered: true, answer: p.answer });
+      else if (Date.now() - started > PROMPT_WAIT_MS) finish({ answered: false });
+    }, 300);
+  });
+}
+
+/** The owner's side (every live update): pops up each question for one of this player's creatures, once, and sends
+ * the answer back. */
+function _answerPromptsForMe(s) {
+  const me = _currentTrainerName();
+  if (!me || _spectating) return;
+  for (const p of Object.values(s?.pendingPrompts || {})) {
+    if (p.answered || p.owner !== me || p.askedBy === me || _promptsShown.has(p.id)) continue;
+    _promptsShown.add(p.id);
+    _runPrompt(p.kind, p.args || {})
+      .then(answer => CombatAPI.answerPrompt(p.id, answer ?? null))
+      .catch(() => {});
+  }
+}
+
 function _mayBeSoftened(target) {
   return Object.values(session?.participants || {}).some(p => (p.id === target.id
     || (p.status === 'participating' && (p.owner || '') === (target.owner || '') && (p.side || '') === (target.side || '')))
@@ -6289,18 +6365,19 @@ async function _abilityDamageReactions({ attacker, target, event, damageDealt })
     const cut = Math.floor(damageDealt * (1 - (e.multiplier ?? 1)));
     if (!(cut > 0)) continue;
     const ko = event.hpBefore != null && event.hpBefore - damageDealt <= 0 ? ', which would knock it out' : '';
+    // Asked on the screen of whoever controls the holder (_askOwnerOf) -- it's their roll / their choice.
     if (e.chance) {
-      const rolled = await promptValueRoll({
+      const rolled = await _askOwnerOf(holder, 'roll', {
         dice: `1${e.chance.die}`, moveName: ability,
         description: `${holder.name}'s ${ability} -- ${target.name} is about to take ${damageDealt} damage${ko}. Roll a ${e.chance.die}: on ${e.chance.min}+ it ${e.multiplier === 0 ? 'avoids the hit' : 'halves the hit'} (${cut} less).`,
-      });
+      }, `${holder.name}'s ${ability} roll (${e.chance.die})`);
       if (rolled == null || rolled < e.chance.min) continue;
     } else if (e.optional || e.limit || e.reaction) {
       const uses = e.limit ? ` (${e.limit.uses}× per ${String(e.limit.per).replace('_', ' ')})` : '';
-      const ok = await showCombatConfirm(
-        `Use ${holder.name}'s ${ability}${uses}${e.reaction ? ', spending its reaction' : ''}? ${target.name} is about to take ${damageDealt} damage${ko} -- it takes ${cut} less.`,
-        { title: ability, yesLabel: `Use ${ability}`, noLabel: 'Not now' },
-      );
+      const ok = await _askOwnerOf(holder, 'confirm', {
+        text: `Use ${holder.name}'s ${ability}${uses}${e.reaction ? ', spending its reaction' : ''}? ${target.name} is about to take ${damageDealt} damage${ko} -- it takes ${cut} less.`,
+        opts: { title: ability, yesLabel: `Use ${ability}`, noLabel: 'Not now' },
+      }, `use ${holder.name}'s ${ability}?`);
       if (!ok) continue;
     }
     return { holderId: holder.id, ability, index }; // one softening per hit -- apply-damage checks and spends it
@@ -6358,17 +6435,20 @@ async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attac
     const key = `${holder.id}:${ability}`;
     if (!decided.has(key)) {
       let ok = true;
+      // The holder's die is rolled by whoever controls the holder, a save by whoever controls the creature saving
+      // (_askOwnerOf) -- the attacker's Static save on the attacker's own screen, Rough Skin's d4 on the target's.
       if (e.chance) {
-        const rolled = await promptValueRoll({
+        const rolled = await _askOwnerOf(holder, 'roll', {
           dice: `1${e.chance.die}`, moveName: ability,
           description: `${holder.name}'s ${ability} -- roll a ${e.chance.die}: it works on ${e.chance.min}${e.chance.min < Number(String(e.chance.die).slice(1)) ? '+' : ''}.`,
-        });
+        }, `${holder.name}'s ${ability} roll (${e.chance.die})`);
         ok = rolled != null && rolled >= e.chance.min;
       }
       if (ok && e.save) {
-        const outcome = await confirmSecondarySave(affected, affected.name, {
-          dc: Number(e.save.dc) || 0, ability: e.save.ability, title: `${holder.name}'s ${ability} -- ${e.save.ability} save`, moveUser: holder,
-        });
+        const outcome = await _askOwnerOf(affected, 'save', {
+          affectedId: affected.id, moveUserId: holder.id,
+          opts: { dc: Number(e.save.dc) || 0, ability: e.save.ability, title: `${holder.name}'s ${ability} -- ${e.save.ability} save` },
+        }, `${affected.name}'s ${e.save.ability} save against ${holder.name}'s ${ability}`);
         ok = !!outcome && !outcome.passed;
       }
       decided.set(key, ok);
@@ -6381,8 +6461,9 @@ async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attac
     const a = e.amount;
     if (a && typeof a === 'object' && a.dice) {
       const bonus = a.plus === 'proficiency' ? Number(holder.proficiency) || 0 : 0;
-      amount = await promptValueRoll({ dice: a.dice, moveModBonus: bonus, moveName: ability,
-        description: `${holder.name}'s ${ability} -- enter the ${a.dice} roll${bonus ? ` (+${bonus} added)` : ''}.` });
+      amount = await _askOwnerOf(holder, 'roll', { dice: a.dice, moveModBonus: bonus, moveName: ability,
+        description: `${holder.name}'s ${ability} -- enter the ${a.dice} roll${bonus ? ` (+${bonus} added)` : ''}.` },
+      `${holder.name}'s ${ability} ${a.dice} roll`);
       if (amount == null) continue;
     } else if (a && typeof a === 'object' && (a.fractionOfDamage != null || a.fractionOfDamageDealt != null)) {
       amount = Math.floor((damageDealt || 0) * (a.fractionOfDamage ?? a.fractionOfDamageDealt));

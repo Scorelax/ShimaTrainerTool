@@ -90,6 +90,10 @@ _EMPTY_STATE = {
     # damage that still lands) -- reaction-window.js's waitForReactionWindow
     # reads both and a caller can act on either or neither.
     'reactionDamageMultiplier': None,
+    # Questions one player's device asks another's (see _ask_prompt): a roll, a "use it?" or a saving throw that belongs
+    # to a creature someone else controls -- the target's Sturdy d4, its Rough Skin roll, the save against a Static.
+    # {promptId: {id, participantId, owner, kind, args, askedBy, answered, answer}}. The asker removes it once read.
+    'pendingPrompts': {},
     'participants': {},
     'fieldEffects': [],
     # Shared weather/terrain -- {name, effect} freeform (the DM types both,
@@ -595,7 +599,51 @@ def _handle(conn, action, params):
             js_parse_int(params.get('col')), js_parse_int(params.get('row')),
         )
 
+    if action == 'prompt-ask':
+        if not params.get('id') or not params.get('kind'):
+            raise ValueError('Missing participant id or prompt kind')
+        prompt_id = uuid.uuid4().hex[:10]
+        result = _mutate(conn, lambda s: _ask_prompt(s, prompt_id, params['id'], params['kind'],
+                                                     params.get('args') or '{}', params.get('askedBy') or ''))
+        result['promptId'] = prompt_id
+        return result
+
+    if action == 'prompt-answer':
+        if not params.get('promptId'):
+            raise ValueError('Missing prompt id')
+        return _mutate(conn, lambda s: _answer_prompt(s, params['promptId'], params.get('answer')))
+
+    if action == 'prompt-clear':
+        if not params.get('promptId'):
+            raise ValueError('Missing prompt id')
+        return _mutate(conn, lambda s: s.setdefault('pendingPrompts', {}).pop(params['promptId'], None))
+
     raise ValueError('Unknown combat action: ' + str(action))
+
+
+def _ask_prompt(state, prompt_id, pid, kind, args_json, asked_by):
+    """Puts a question for the player who controls `pid` on the session -- their device shows it (combat-wip.js's
+    _answerPromptsForMe) and answers with prompt-answer; the asking device waits for that and then clears it. `args` is
+    the popup's own settings as JSON (dice, text, DC...), passed through untouched."""
+    p = state['participants'].get(pid)
+    if not p:
+        raise ValueError('Unknown participant: ' + pid)
+    if kind not in ('roll', 'confirm', 'save'):
+        raise ValueError('Unknown prompt kind: ' + kind)
+    state.setdefault('pendingPrompts', {})[prompt_id] = {
+        'id': prompt_id, 'participantId': pid, 'owner': p.get('owner') or '', 'kind': kind,
+        'args': json.loads(args_json), 'askedBy': asked_by, 'answered': False, 'answer': None,
+    }
+
+
+def _answer_prompt(state, prompt_id, answer_json):
+    """The owner's answer (JSON: a number, true/false, a save outcome, or null for "closed without answering"). A prompt
+    the asker already cleared (they entered it themselves) is ignored."""
+    prompt = state.setdefault('pendingPrompts', {}).get(prompt_id)
+    if not prompt or prompt['answered']:
+        return
+    prompt['answered'] = True
+    prompt['answer'] = json.loads(answer_json) if answer_json not in (None, '') else None
 
 
 # ---------------------------------------------------------------------------

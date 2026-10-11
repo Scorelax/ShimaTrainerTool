@@ -1093,6 +1093,21 @@ export class CombatAPI {
     return API.request('combat', 'hover-token', { id, col, row }, { useCache: false });
   }
 
+  /** A question for the player who controls participant `id` (a roll, a "use it?" or a save -- routes_combat.py's
+   * _ask_prompt). `args` is the popup's settings; resolves with `promptId` alongside the usual {status, data}. */
+  static async askPrompt(id, kind, args, askedBy) {
+    return API.request('combat', 'prompt-ask', { id, kind, args: JSON.stringify(args || {}), askedBy }, { useCache: false });
+  }
+
+  /** The owner's answer to a prompt (any JSON value; null = closed without answering). */
+  static async answerPrompt(promptId, answer) {
+    return API.request('combat', 'prompt-answer', { promptId, answer: JSON.stringify(answer ?? null) }, { useCache: false });
+  }
+
+  static async clearPrompt(promptId) {
+    return API.request('combat', 'prompt-clear', { promptId }, { useCache: false });
+  }
+
   /** Battle-map background images available on the Pi (see
    * upstream.BATTLE_IMAGE_DIR) -- {status, backgrounds: [{key, label, url}]}.
    * Not session state -- safe to call any time, active session or not. */

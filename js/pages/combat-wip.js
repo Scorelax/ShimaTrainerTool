@@ -27,7 +27,7 @@ import { playBattleAnimationFloating } from '../utils/move-popup.js';
 import { pickRepositionCell } from '../utils/reposition-picker.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells, mapObjectsHtml } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
-import { visibleToViewer } from '../utils/combat-visibility.js';
+import { visibleToViewer, setViewerSeesEverything } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm, showCombatPrompt } from '../utils/combat-alert.js';
 import { showBattleLog, updateBattleLog } from '../utils/battle-log-popup.js';
 import { showEffectsPopup } from '../utils/effects-popup.js';
@@ -85,6 +85,10 @@ const WIP_CSS = `
   }
   .combat-wip-title img { height: 1.6em; width: auto; }
   .wip-map-btn, .wip-log-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
+  /* The battle log's button, floating in the bottom-left corner of the screen. */
+  .wip-log-fab { position: fixed; left: 1rem; bottom: 1rem; z-index: 50; }
+  .wip-log-fab:empty { display: none; }
+  .wip-log-fab .wip-log-btn { background: rgba(20,20,35,0.92); box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
   .wip-header-btn-group { display: flex; gap: 0.5rem; }
   /* The turn order is a strip ABOVE the info box, not a column beside it, so
      on a phone the info box gets the full width instead of what's left after
@@ -160,6 +164,18 @@ const WIP_CSS = `
   .wip-foreign-focus-row { color: #cfd0e0; margin-top: 0.25rem; font-size: 0.95rem; }
   .wip-foreign-focus-statuses { display: flex; flex-wrap: wrap; gap: 0.3rem; justify-content: center; margin-top: 0.6rem; }
   .wip-foreign-focus-statuses .status-badge { cursor: pointer; }
+  .wip-foreign-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 0.6rem 0 0.2rem; }
+  .wip-foreign-stats div { display: flex; flex-direction: column; align-items: center; padding: 0.25rem 0; border-radius: 6px; background: rgba(255,255,255,0.06); }
+  .wip-foreign-stats span { font-size: 0.6rem; font-weight: 800; color: #a0a0c0; }
+  .wip-foreign-stats strong { font-size: 0.95rem; }
+  .wip-foreign-stats small { font-size: 0.65rem; color: #a0a0c0; }
+  .wip-foreign-section { margin-top: 0.7rem; font-size: 0.68rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #FFD700; }
+  .wip-foreign-ability { font-size: 0.82rem; color: #cfd0e0; margin-top: 0.25rem; text-align: left; }
+  .wip-foreign-moves { display: flex; flex-wrap: wrap; gap: 0.3rem; justify-content: center; margin-top: 0.3rem; }
+  .wip-foreign-moves span { font-size: 0.8rem; padding: 0.15rem 0.55rem; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); cursor: help; }
+  /* The DM console's own column of "players can see" checkboxes, left of the focused card (see setOnDmFocusChange). */
+  .wip-dm-row { display: flex; gap: 0.9rem; align-items: flex-start; }
+  .wip-dm-row > #wipBattlePhase { flex: 1; min-width: 0; }
   .wip-foreign-focus-portrait { width: 140px; height: 140px; margin: 0 auto 0.8rem; }
   .wip-foreign-focus-portrait img, .wip-foreign-focus-portrait video { width: 100%; height: 100%; object-fit: contain; }
   /* Centered both ways within the viewport, not just horizontally --
@@ -731,6 +747,7 @@ function _renderCurrentView() {
         <div class="combat-wip-turnorder" id="wipTurnOrder"></div>
         <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
       </div>
+      <div class="wip-log-fab" id="wipLogFab"></div>
     </div>`;
 }
 
@@ -2143,6 +2160,11 @@ function renderBody(state) {
       </div>`;
   }
 
+  // The DM console puts its "what the players can see" checkboxes in #dmFocusSide, left of the card (see
+  // setOnDmFocusChange) -- outside #wipBattlePhase, so the card's in-place updates never touch it.
+  if (_dmName) {
+    return `<div class="wip-dm-row"><div id="dmFocusSide"></div><div id="wipBattlePhase">${_renderMainFocusHtml(state)}</div></div>`;
+  }
   return `
     <div id="wipBattlePhase">${_renderMainFocusHtml(state)}</div>`;
 }
@@ -2164,17 +2186,25 @@ function _syncHeaderBar(state) {
   const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
   if (leftBtnEl) {
     leftBtnEl.innerHTML = state?.active
-      ? '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button><button class="combat-wip-btn-secondary wip-log-btn" id="battleLogBtn">📜 Log</button></div>'
+      ? '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button></div>'
       : _dmName ? '' : '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">← Back</button>';
     document.getElementById('battleMapBtn')?.addEventListener('click', () => {
       showBattleMap(session, _currentTrainerName());
     });
-    document.getElementById('battleLogBtn')?.addEventListener('click', () => {
-      showBattleLog(session);
-    });
     document.getElementById('wipHeaderBackBtn')?.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
     });
+  }
+  // The battle log opens from a button floating in the bottom-left corner, out of the header.
+  const logFab = document.getElementById('wipLogFab');
+  if (logFab) {
+    const want = !!state?.active;
+    if (want && !logFab.firstElementChild) {
+      logFab.innerHTML = '<button class="combat-wip-btn-secondary wip-log-btn" id="battleLogBtn">📜 Log</button>';
+      document.getElementById('battleLogBtn').addEventListener('click', () => showBattleLog(session));
+    } else if (!want) {
+      logFab.innerHTML = '';
+    }
   }
   const endBtnEl = document.getElementById('wipHeaderEndBtn');
   if (endBtnEl) {
@@ -2279,6 +2309,17 @@ function _syncTurnOrderSidebar(state) {
 
     if (el.children[index] !== node) el.insertBefore(node, el.children[index] || null);
   });
+
+  // Runs on every push and every focus change -- the DM console redraws its checkbox column for whoever is focused.
+  if (_dmName && _dmFocusListener) _dmFocusListener(focusId, state);
+}
+
+let _dmFocusListener = null;
+
+/** DM console: `fn(focusedParticipantId, session)` after every update of the battle view or change of focus, to keep
+ * its column left of the card (#dmFocusSide) about the participant shown. */
+export function setOnDmFocusChange(fn) {
+  _dmFocusListener = fn;
 }
 
 function _setFocus(id) {
@@ -2463,11 +2504,6 @@ function _ensureCombatCardStyles() {
  * for PvE fog-of-war; _renderForeignFocusFull above is the PvP-only upgrade to
  * the full card, gated in _renderMainFocusHtml/_syncMainFocus by battleType. */
 function _renderForeignFocusInfo(p) {
-  const showName = visibleToViewer(p, 'name');
-  const showHp = visibleToViewer(p, 'hp');
-  const showVp = visibleToViewer(p, 'vp');
-  const name = showName ? p.name : '???';
-  const typesText = [p.type1, p.type2].filter(Boolean).join(' / ');
   // data-focus-id marks which participant this panel is currently showing --
   // _syncMainFocus checks it to tell "still the same focus, just updated
   // stats" (patch in place, portrait untouched) from "focus actually
@@ -2475,13 +2511,57 @@ function _renderForeignFocusInfo(p) {
   return `
     <div class="wip-foreign-focus" data-focus-id="${p.id}">
       <div class="wip-foreign-focus-portrait" id="wipForeignFocusPortrait"></div>
-      <div class="wip-foreign-focus-name" id="wipForeignFocusName">${name}</div>
-      ${typesText ? `<div class="wip-foreign-focus-row">${typesText}</div>` : ''}
-      ${p.level ? `<div class="wip-foreign-focus-row">Level ${p.level}</div>` : ''}
-      ${showHp ? `<div class="wip-foreign-focus-row" id="wipForeignFocusHp">HP: ${p.currentHP}/${p.maxHP}</div>` : '<div id="wipForeignFocusHp" hidden></div>'}
-      ${showVp ? `<div class="wip-foreign-focus-row" id="wipForeignFocusVp">VP: ${p.currentVP}/${p.maxVP}</div>` : '<div id="wipForeignFocusVp" hidden></div>'}
-      <div class="wip-foreign-focus-statuses" id="wipForeignFocusStatuses">${_statusBadgesHtml(p)}</div>
+      <div id="wipForeignFocusDetails">${_foreignFocusDetailsHtml(p)}</div>
     </div>`;
+}
+
+/** Everything in the PvE info panel except the portrait -- each part only when the DM lets the players see it (the
+ * DM console's checkboxes, see visibleToViewer), plus the moves this creature has used so far, which are always shown. */
+function _foreignFocusDetailsHtml(p) {
+  const see = (field) => visibleToViewer(p, field);
+  const row = (html) => `<div class="wip-foreign-focus-row">${html}</div>`;
+  const types = [p.type1, p.type2].filter(Boolean).join(' / ');
+  const eff = effectiveStats(p);
+  const sign = (n) => (n >= 0 ? `+${n}` : `${n}`);
+  const parts = [`<div class="wip-foreign-focus-name" id="wipForeignFocusName">${see('name') ? p.name : '???'}</div>`];
+  if (see('type') && types) parts.push(row(types));
+  if (see('level') && p.level) parts.push(row(`Level ${p.level}`));
+  if (see('size') && p.size) parts.push(row(`Size: ${p.size}`));
+  if (see('hp')) parts.push(row(`HP: ${p.currentHP}/${p.maxHP}`));
+  if (see('vp')) parts.push(row(`VP: ${p.currentVP}/${p.maxVP}`));
+  if (see('ac') && (eff.ac ?? p.ac) != null) parts.push(row(`AC: ${eff.ac ?? p.ac}`));
+  if (see('stats') && p.str != null) {
+    parts.push(`<div class="wip-foreign-stats">${['str', 'dex', 'con', 'int', 'wis', 'cha'].map(k => {
+      const score = eff[k] ?? p[k];
+      const mod = eff[`${k}Mod`] ?? Math.floor(((score ?? 10) - 10) / 2);
+      return `<div><span>${k.toUpperCase()}</span><strong>${score ?? '?'}</strong><small>${sign(mod)}</small></div>`;
+    }).join('')}</div>`);
+  }
+  if (see('abilities')) {
+    const abilities = parseAbilityList(effectiveAbilities(p));
+    if (abilities.length) {
+      parts.push(`<div class="wip-foreign-section">Abilities</div>${abilities.map(a => `<div class="wip-foreign-ability"><strong>${a.name}</strong>${a.desc ? ` -- ${a.desc}` : ''}</div>`).join('')}`);
+    }
+  }
+  const seen = _movesSeen(session, p.id);
+  if (seen.length) {
+    const rows = JSON.parse(sessionStorage.getItem('moves') || '[]');
+    parts.push(`<div class="wip-foreign-section">Moves seen</div><div class="wip-foreign-moves">${seen.map(name => {
+      const desc = (rows.find(r => r[0] === name) || [])[7] || '';
+      return `<span title="${String(desc).replace(/"/g, '&quot;')}">${name}</span>`;
+    }).join('')}</div>`);
+  }
+  parts.push(`<div class="wip-foreign-focus-statuses" id="wipForeignFocusStatuses">${_statusBadgesHtml(p)}</div>`);
+  return parts.join('');
+}
+
+/** The moves `pid` has used this battle, in the order first used -- from the shared log's move-used entries. */
+function _movesSeen(state, pid) {
+  const out = [];
+  for (const e of state?.log || []) {
+    if (e.type === 'move-used' && e.actorId === pid && e.move && !out.includes(e.move)) out.push(e.move);
+  }
+  return out;
 }
 
 /** One status as a clickable badge -- click opens the detail popup. Shared by
@@ -2514,17 +2594,10 @@ function _statusBadgesHtml(p) {
  * player's roll, etc.), same discipline as the turn-order sidebar. PvE only
  * -- see _renderForeignFocusInfo. */
 function _updateForeignFocusInfo(p) {
-  const showName = visibleToViewer(p, 'name');
-  const name = showName ? p.name : '???';
+  const name = visibleToViewer(p, 'name') ? p.name : '???';
   patchPortraitMedia(document.getElementById('wipForeignFocusPortrait'), p.image, name);
-  const nameEl = document.getElementById('wipForeignFocusName');
-  if (nameEl) nameEl.textContent = name;
-  const hpEl = document.getElementById('wipForeignFocusHp');
-  if (hpEl) { hpEl.hidden = !visibleToViewer(p, 'hp'); hpEl.textContent = `HP: ${p.currentHP}/${p.maxHP}`; }
-  const vpEl = document.getElementById('wipForeignFocusVp');
-  if (vpEl) { vpEl.hidden = !visibleToViewer(p, 'vp'); vpEl.textContent = `VP: ${p.currentVP}/${p.maxVP}`; }
-  const statusEl = document.getElementById('wipForeignFocusStatuses');
-  if (statusEl) statusEl.innerHTML = _statusBadgesHtml(p);
+  const details = document.getElementById('wipForeignFocusDetails');
+  if (details) details.innerHTML = _foreignFocusDetailsHtml(p);
 }
 
 /** Builds the #wipBattlePhase HTML string -- used before the DOM exists
@@ -2624,7 +2697,8 @@ let _resyncStarted = false;
 let _resyncInFlight = false;
 
 function _onBattlePage() {
-  return location.hash === '#combat-wip' && document.visibilityState === 'visible';
+  // The DM console (its own page, no #combat-wip hash) always has the battle on screen while one runs.
+  return (location.hash === '#combat-wip' || !!_dmName) && document.visibilityState === 'visible';
 }
 
 async function _resyncSession() {
@@ -6614,6 +6688,7 @@ const DM_OWNER = 'DM'; // routes_combat.py's DM_OWNER
 
 export function enableDmMode(name = DM_OWNER) {
   _dmName = name;
+  setViewerSeesEverything(true); // the visibility toggles are about what the players see, never the DM
 }
 
 /** DM console: a built combatant (combat.js's buildPokemonCombatant shape) as an enemy participant the DM owns --

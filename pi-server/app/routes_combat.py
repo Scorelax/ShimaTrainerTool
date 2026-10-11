@@ -167,6 +167,15 @@ _EMPTY_STATE = {
 
 MAP_MARK_KINDS = ('difficult', 'blocked')
 
+# What the players can see of an enemy, per field -- the DM ticks these per creature in the DM console. `stats` covers all
+# six ability scores together. Starts with what players have always seen (name, type, level, HP/VP bars) plus its size
+# (it shows on the map anyway); AC, ability scores and abilities start hidden. The moves an enemy has used are always
+# shown (read from the battle log). Mirrored by combat-visibility.js's VISIBILITY_DEFAULTS.
+VISIBILITY_DEFAULTS = {
+    'name': True, 'type': True, 'level': True, 'hp': True, 'vp': True, 'size': True,
+    'ac': False, 'stats': False, 'abilities': False,
+}
+
 
 # The trainers' basic attack -- an ordinary entry in the moves file (1d6 + STR, typeless), used from the card's Attack button.
 TRAINER_ATTACK_MOVE = 'Attack'
@@ -268,8 +277,8 @@ def _handle(conn, action, params):
         return _mutate(conn, lambda s: _set_status(s, params['id'], params['status']))
 
     if action == 'set-visibility':
-        if not params.get('id') or params.get('field') not in ('hp', 'vp', 'name'):
-            raise ValueError('Missing participant id, or field must be hp/vp/name')
+        if not params.get('id') or params.get('field') not in VISIBILITY_DEFAULTS:
+            raise ValueError('Missing participant id, or field must be one of ' + '/'.join(VISIBILITY_DEFAULTS))
         visible = params.get('visible', '1') != '0'
         return _mutate(conn, lambda s: _set_visibility(s, params['id'], params['field'], visible))
 
@@ -1218,8 +1227,9 @@ def _add_participant(state, data):
         # every reader goes through _statuses_of.
         'statuses': [],
         # Meaningful for side='enemy' only -- allies are always fully visible
-        # to their own team. DM toggles these per-enemy from the DM module.
-        'visibility': {'hp': True, 'vp': True, 'name': True},
+        # to their own team. DM toggles these per-enemy from the DM console
+        # (see VISIBILITY_DEFAULTS for each field and where it starts).
+        'visibility': dict(VISIBILITY_DEFAULTS),
     }
     if status == 'participating':
         _apply_switch_heal(state, state['participants'][pid])
@@ -1614,7 +1624,7 @@ def _set_visibility(state, pid, field, visible):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
-    participant['visibility'][field] = visible
+    participant.setdefault('visibility', dict(VISIBILITY_DEFAULTS))[field] = visible
 
 
 def _rebuild_turn_order(state):

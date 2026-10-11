@@ -5,8 +5,9 @@
 // screens, the DM's creatures in the fight, and reinforcements.
 import { CombatAPI, DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
+import { VISIBILITY_DEFAULTS } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { renderCombatWip, attachCombatWipListeners, startDmPlacement } from '../pages/combat-wip.js';
+import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFocusChange } from '../pages/combat-wip.js';
 import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow, natureOptions } from './dm-common.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
@@ -16,6 +17,7 @@ let adding = false;
 
 export async function mountLive(stageEl, toolsEl, currentSession) {
   session = currentSession;
+  setOnDmFocusChange(renderVisibilityColumn);
   stageEl.innerHTML = await renderCombatWip();
   attachCombatWipListeners();
   renderTools(toolsEl);
@@ -26,6 +28,49 @@ export async function mountLive(stageEl, toolsEl, currentSession) {
 export function updateLive(currentSession) {
   session = currentSession;
   renderCreatures();
+}
+
+// ---------------------------------------------------------------------------
+// "Players can see" -- a column of checkboxes left of the card, for whichever of the DM's creatures is selected in the
+// turn order (combat-wip.js's #dmFocusSide). Each one is a per-creature visibility field on the server; the players'
+// info panel, the table TV and the pickers all go by it (combat-visibility.js). The moves a creature uses are always
+// shown to the players, so there's no box for those.
+// ---------------------------------------------------------------------------
+
+const VISIBILITY_FIELDS = [
+  ['hp', 'HP'], ['vp', 'VP'], ['ac', 'AC'], ['stats', 'Other stats', 'STR, DEX, CON, INT, WIS, CHA'],
+  ['name', 'Name'], ['type', 'Type'], ['level', 'Level'], ['abilities', 'Abilities'], ['size', 'Size'],
+];
+
+function renderVisibilityColumn(focusId, currentSession) {
+  const el = document.getElementById('dmFocusSide');
+  if (!el) return;
+  const p = currentSession?.participants?.[focusId];
+  if (!p || p.owner !== DM) {
+    el.innerHTML = '';
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  const vis = { ...VISIBILITY_DEFAULTS, ...(p.visibility || {}) };
+  el.innerHTML = `
+    <div class="dm-vis" data-id="${p.id}">
+      <div class="dm-vis-title">Players see</div>
+      ${VISIBILITY_FIELDS.map(([field, label, sub]) => `
+        <label class="dm-vis-row" ${sub ? `title="${sub}"` : ''}>
+          <input type="checkbox" data-vis="${field}" ${vis[field] ? 'checked' : ''}>
+          <span>${label}${sub ? `<small>${sub}</small>` : ''}</span>
+        </label>`).join('')}
+      <div class="dm-vis-note">Moves it uses are shown to the players as it uses them.</div>
+    </div>`;
+  el.querySelectorAll('[data-vis]').forEach(cb => cb.addEventListener('change', async () => {
+    try {
+      await CombatAPI.setVisibility(p.id, cb.dataset.vis, cb.checked);
+    } catch (err) {
+      cb.checked = !cb.checked;
+      showCombatAlert(err.message, { title: p.name });
+    }
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -239,11 +284,8 @@ function renderCreatures() {
       <div class="dm-creature-sub">Lv ${p.level ?? '?'} · HP ${p.currentHP}/${p.maxHP} · VP ${p.currentVP}/${p.maxVP} · init ${p.initiative ?? '-'} · ${where}</div>
       <div class="dm-bar hp"><i style="width:${pct(p.currentHP, p.maxHP)}%"></i></div>
       <div class="dm-bar vp"><i style="width:${pct(p.currentVP, p.maxVP)}%"></i></div>`;
-    const vis = p.visibility || {};
+    // What the players can see of it is set in the checkbox column left of its card (renderVisibilityColumn).
     row.querySelector('.dm-creature-actions').innerHTML = `
-      <button class="dm-icon-btn${vis.name === false ? ' off' : ''}" data-act="vis" data-field="name" title="Players see its name">Nm</button>
-      <button class="dm-icon-btn${vis.hp === false ? ' off' : ''}" data-act="vis" data-field="hp" title="Players see its HP bar">HP</button>
-      <button class="dm-icon-btn${vis.vp === false ? ' off' : ''}" data-act="vis" data-field="vp" title="Players see its VP bar">VP</button>
       <button class="dm-icon-btn" data-act="status" title="${p.status === 'spectating' ? 'Send it into the fight' : 'Hold it back (out of the turn order)'}">${p.status === 'spectating' ? '▶' : '⏸'}</button>
       <button class="dm-icon-btn danger" data-act="remove" title="Remove from the battle">✕</button>`;
     if (box.children[index] !== row) box.insertBefore(row, box.children[index] || null);
@@ -264,10 +306,7 @@ async function onCreatureAction(e) {
   const p = session.participants?.[id];
   if (!p) return;
   try {
-    if (btn.dataset.act === 'vis') {
-      const field = btn.dataset.field;
-      await CombatAPI.setVisibility(id, field, (p.visibility || {})[field] === false);
-    } else if (btn.dataset.act === 'status') {
+    if (btn.dataset.act === 'status') {
       await CombatAPI.setStatus(id, p.status === 'spectating' ? 'participating' : 'spectating');
     } else if (btn.dataset.act === 'remove') {
       if (!await showCombatConfirm(`Remove ${p.name} from the battle?`, { title: 'Remove', yesLabel: 'Remove', noLabel: 'Cancel' })) return;

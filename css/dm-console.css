@@ -68,6 +68,19 @@ body.dm-console {
 body.dm-console #content .combat-wip-page { width: auto; margin: 0; min-height: 100%; }
 body.dm-console #content .placement-page { min-height: 100%; }
 body.dm-console #content .combat-wip-title { display: none; }
+/* The battle log button floats bottom-left -- here that's the battle's own corner, just right of the module rail. */
+body.dm-console #content .wip-log-fab { left: calc(76px + 1rem); }
+/* Room for the "Players see" column beside the card. */
+body.dm-console #content .combat-wip-body, body.dm-console #content .combat-wip-turnorder { max-width: 900px; }
+#dmFocusSide { flex: none; width: 168px; position: sticky; top: 0.6rem; }
+#dmFocusSide[hidden] { display: none; }
+.dm-vis { background: #1f2038; border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 12px; padding: 0.7rem 0.65rem; }
+.dm-vis-title { font-size: 0.72rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--dm-gold); margin-bottom: 0.45rem; }
+.dm-vis-row { display: flex; align-items: flex-start; gap: 0.45rem; padding: 0.28rem 0.2rem; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+.dm-vis-row:hover { background: rgba(255, 255, 255, 0.06); }
+.dm-vis-row input { margin-top: 0.18rem; accent-color: #f1c40f; }
+.dm-vis-row small { display: block; font-size: 0.66rem; font-weight: 500; color: var(--dm-muted); }
+.dm-vis-note { margin-top: 0.5rem; font-size: 0.7rem; color: var(--dm-muted); line-height: 1.3; }
 
 /* ---- DM tools panel ---- */
 .dm-tools {

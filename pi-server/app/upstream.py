@@ -255,9 +255,11 @@ def _sanitize_species_name(name):
     return re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(name).lower()))
 
 
-def get_image_url(conn, pokemon_name, pokemon_id):
+def get_image_url(conn, pokemon_name, pokemon_id, probe=True):
     """Port of getImageUrl: probe GitHub for the sprite in each format.
-    Successful lookups are cached in SQLite so this stays fast."""
+    Successful lookups are cached in SQLite so this stays fast. probe=False
+    only reads that cache (None when this species was never looked up) --
+    for bulk lists where hundreds of network probes would stall the reply."""
     padded = str(pokemon_id).zfill(3)
     sanitized = _sanitize_species_name(pokemon_name)
     base = f'{padded}-{sanitized}'
@@ -265,6 +267,8 @@ def get_image_url(conn, pokemon_name, pokemon_id):
     row = conn.execute('SELECT url FROM image_cache WHERE key = ?', (base,)).fetchone()
     if row:
         return row[0]
+    if not probe:
+        return None
 
     for fmt in IMG_FORMATS:
         url = f'{IMG_BASE_URL}{base}.{fmt}'

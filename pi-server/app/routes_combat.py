@@ -160,6 +160,10 @@ _EMPTY_STATE = {
 # The trainers' basic attack -- an ordinary entry in the moves file (1d6 + STR, typeless), used from the card's Attack button.
 TRAINER_ATTACK_MOVE = 'Attack'
 
+# The `owner` of everything the DM console (dm-console.html) controls -- its enemies run through the same move engine
+# as a player's own creatures, on the DM's screen. Not a player: see _leave_session.
+DM_OWNER = 'DM'
+
 # The table TV (1920x1080) shows the board turned sideways -- rows across, cols down -- so 20 x 11 squares are
 # (near) square there: 96 x 98px. combat-wip.js's grid-size fields keep any size the user picks at that ratio.
 _PVP_DEFAULT_GRID = {'cols': 11, 'rows': 20}
@@ -1170,10 +1174,10 @@ def _leave_session(conn, owner):
     """combat-wip.js's End Battle button: removes only the calling trainer's
     own participants instead of end-session's blunt reset-for-everyone, so
     one player leaving doesn't throw everyone else out of a fight still in
-    progress. A DM's freeform enemies always have owner='' (see
-    _add_participant), so they never count as a "player" here -- once no
-    participant with a real owner is left, the session has no players left
-    in it either, and actually ends the same way end-session does."""
+    progress. A DM's enemies have owner='' (freeform) or DM_OWNER (the DM
+    console), so they never count as a "player" here -- once no participant
+    with a real player owner is left, the session has no players left in it
+    either, and actually ends the same way end-session does."""
     state = load_state(conn)
     if not state.get('active'):
         return {'status': 'success', 'data': state}
@@ -1188,7 +1192,7 @@ def _leave_session(conn, owner):
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
         _log_event(state, 'leave', text=f'{owner} left the battle', actorName=owner)
-    if not any(p.get('owner') for p in state['participants'].values()):
+    if not any(p.get('owner') and p.get('owner') != DM_OWNER for p in state['participants'].values()):
         _log_event(state, 'session-end', text='Battle ended (all players left)')
         return _save_and_publish(conn, dict(_EMPTY_STATE))
     _rebuild_turn_order(state)

@@ -145,6 +145,24 @@ def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
     # whatever the first attempt saw.
     new_pokemon_data[1] = upstream.get_image_url(conn, new_pokemon_data[2], new_pokemon_data[3]) or ''
 
+    apply_registration_stats(conn, new_pokemon_data)
+
+    db.insert_row(conn, 'pokemon', P, new_pokemon_data)
+
+    # Same trainer-data event _write_trainer_cell publishes for inventory/gear/
+    # money -- register is the other half of Benjakronk's external game-write
+    # API, and needs the same "already-open client picks this up live" fix.
+    live.publish({'type': 'trainer-data', 'trainer': trainer_name})
+
+    return {'status': 'success',
+            'message': f'{trainer_name} caught a {new_pokemon_data[2]}!',
+            'newPokemonData': new_pokemon_data}
+
+
+def apply_registration_stats(conn, new_pokemon_data):
+    """Fills in everything a freshly built Pokemon row leaves blank (nature-adjusted ability scores, HP/VP, initiative,
+    proficiency, STAB, modifiers, current HP/VP), in place. Shared by registering a Pokemon for a trainer and the DM
+    console's build-pokemon (routes_dm.py), so an enemy built there has exactly the numbers a player's would."""
     level = js_parse_int(new_pokemon_data[4])
     hd = js_parse_int(new_pokemon_data[9])
     vd = js_parse_int(new_pokemon_data[11])
@@ -196,17 +214,6 @@ def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
     new_pokemon_data[44] = floor_div2(cha)
     new_pokemon_data[45] = hp                            # currentHP
     new_pokemon_data[46] = vp                            # currentVP
-
-    db.insert_row(conn, 'pokemon', P, new_pokemon_data)
-
-    # Same trainer-data event _write_trainer_cell publishes for inventory/gear/
-    # money -- register is the other half of Benjakronk's external game-write
-    # API, and needs the same "already-open client picks this up live" fix.
-    live.publish({'type': 'trainer-data', 'trainer': trainer_name})
-
-    return {'status': 'success',
-            'message': f'{trainer_name} caught a {new_pokemon_data[2]}!',
-            'newPokemonData': new_pokemon_data}
 
 
 def update_pokemon_data(conn, new_pokemon_data):

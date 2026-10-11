@@ -1,0 +1,149 @@
+/* DM console (dm-console.html) -- landscape layout for a laptop screen: a top bar, a module rail on the left, and the
+   active module filling the rest. The battle module puts the shared battle screen (combat-wip.js, unchanged) in the
+   middle and the DM's own tools in a panel on the right. */
+
+body.dm-console {
+  --dm-bg: #0f1020;
+  --dm-panel: #17182b;
+  --dm-panel-2: #1f2038;
+  --dm-line: rgba(255, 255, 255, 0.09);
+  --dm-text: #e6e6f0;
+  --dm-muted: #9a9bb8;
+  --dm-gold: #ffd700;
+  --dm-green: #27ae60;
+  --dm-red: #c0392b;
+  --dm-hp: #2ecc71;
+  --dm-vp: #3498db;
+  margin: 0; height: 100vh; overflow: hidden;
+  background: var(--dm-bg); color: var(--dm-text);
+}
+
+.dm-app {
+  display: grid; height: 100vh;
+  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
+  grid-template-areas: "top top" "rail main";
+}
+
+/* ---- Top bar ---- */
+.dm-topbar {
+  grid-area: top; display: flex; align-items: center; gap: 1.5rem; padding: 0 1rem;
+  background: #0a0b17; border-bottom: 1px solid var(--dm-line);
+}
+.dm-brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--dm-gold); }
+.dm-brand img { width: 26px; height: 26px; }
+.dm-status { flex: 1; min-width: 0; font-size: 0.92rem; color: var(--dm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-status strong { color: var(--dm-text); }
+.dm-status .dm-status-turn { color: var(--dm-gold); font-weight: 700; }
+.dm-topbar-links { display: flex; gap: 0.5rem; }
+.dm-topbar-links a {
+  color: var(--dm-text); text-decoration: none; font-size: 0.85rem; padding: 0.35rem 0.7rem; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--dm-line);
+}
+.dm-topbar-links a:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* ---- Module rail ---- */
+.dm-rail {
+  grid-area: rail; display: flex; flex-direction: column; gap: 0.25rem; padding: 0.6rem 0.4rem;
+  background: #0c0d1b; border-right: 1px solid var(--dm-line);
+}
+.dm-rail-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0.55rem 0.2rem;
+  background: none; border: 1px solid transparent; border-radius: 10px; color: var(--dm-muted);
+  font-size: 0.66rem; font-weight: 600; cursor: pointer;
+}
+.dm-rail-btn span { font-size: 1.3rem; line-height: 1; }
+.dm-rail-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: var(--dm-text); }
+.dm-rail-btn.active { background: rgba(255, 215, 0, 0.1); border-color: rgba(255, 215, 0, 0.35); color: var(--dm-gold); }
+.dm-rail-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* ---- Main area ---- */
+.dm-main { grid-area: main; min-height: 0; }
+.dm-module { height: 100%; }
+.dm-battle { display: grid; grid-template-columns: minmax(0, 1fr) 380px; height: 100%; }
+.dm-battle-stage { min-width: 0; overflow-y: auto; background: #14141f; }
+.dm-loading { padding: 3rem; text-align: center; color: var(--dm-muted); }
+
+/* The battle screen is built for the player app's centered page (it stretches itself to the full window width). Here
+   it lives in a column, so it fills that column instead. #content raises specificity over its own injected styles. */
+body.dm-console #content .combat-wip-page { width: auto; margin: 0; min-height: 100%; }
+body.dm-console #content .placement-page { min-height: 100%; }
+
+/* ---- DM tools panel ---- */
+.dm-tools {
+  overflow-y: auto; background: var(--dm-panel); border-left: 1px solid var(--dm-line);
+  padding: 0.9rem; display: flex; flex-direction: column; gap: 0.9rem;
+}
+.dm-card { background: var(--dm-panel-2); border: 1px solid var(--dm-line); border-radius: 12px; padding: 0.8rem; }
+.dm-card-title {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  font-size: 0.78rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--dm-gold); margin-bottom: 0.6rem;
+}
+.dm-hint { font-size: 0.82rem; color: var(--dm-muted); line-height: 1.35; }
+
+.dm-input, .dm-select {
+  width: 100%; box-sizing: border-box; background: #121327; color: var(--dm-text);
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 7px; padding: 0.45rem 0.55rem; font-size: 0.88rem;
+}
+.dm-input:focus, .dm-select:focus { outline: none; border-color: rgba(255, 215, 0, 0.6); }
+.dm-row { display: flex; gap: 0.5rem; }
+.dm-row > * { flex: 1; min-width: 0; }
+.dm-field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.55rem; }
+.dm-field > label { font-size: 0.7rem; font-weight: 700; color: var(--dm-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.dm-check { display: flex; align-items: flex-start; gap: 0.45rem; font-size: 0.84rem; margin-bottom: 0.35rem; cursor: pointer; }
+.dm-check input { margin-top: 0.15rem; }
+.dm-check small { display: block; color: var(--dm-muted); font-size: 0.74rem; line-height: 1.3; }
+
+.dm-btn {
+  border: none; border-radius: 7px; padding: 0.5rem 0.9rem; font-size: 0.86rem; font-weight: 700; cursor: pointer;
+  color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.dm-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.dm-btn:disabled { opacity: 0.4; cursor: default; }
+.dm-btn.primary { background: linear-gradient(135deg, #27ae60, #1e8449); border-color: transparent; }
+.dm-btn.small { padding: 0.25rem 0.5rem; font-size: 0.76rem; }
+.dm-btn.wide { width: 100%; }
+
+/* Species search results */
+.dm-species-results { max-height: 230px; overflow-y: auto; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 2px; }
+.dm-species-item {
+  display: flex; align-items: center; gap: 0.55rem; padding: 0.3rem 0.4rem; border-radius: 7px; cursor: pointer;
+  background: none; border: 1px solid transparent; color: inherit; text-align: left; font: inherit;
+}
+.dm-species-item:hover { background: rgba(255, 255, 255, 0.06); }
+.dm-species-item.selected { background: rgba(255, 215, 0, 0.1); border-color: rgba(255, 215, 0, 0.35); }
+.dm-species-thumb { width: 34px; height: 34px; flex: none; display: flex; align-items: center; justify-content: center; }
+.dm-species-thumb img, .dm-species-thumb video { width: 100%; height: 100%; object-fit: contain; }
+.dm-species-name { font-weight: 700; font-size: 0.88rem; }
+.dm-species-meta { font-size: 0.72rem; color: var(--dm-muted); }
+.dm-species-empty { padding: 0.6rem; font-size: 0.82rem; color: var(--dm-muted); text-align: center; }
+
+.dm-type {
+  display: inline-block; padding: 0.05rem 0.4rem; border-radius: 4px; font-size: 0.68rem; font-weight: 700;
+  color: #fff; background: #777; margin-right: 0.2rem; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+.dm-selected-head { display: flex; align-items: center; gap: 0.6rem; margin: 0.7rem 0 0.6rem; padding-top: 0.7rem; border-top: 1px solid var(--dm-line); }
+.dm-selected-head .dm-species-thumb { width: 48px; height: 48px; }
+
+/* The DM's creatures in the battle */
+.dm-creature { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; padding: 0.45rem 0; border-top: 1px solid var(--dm-line); }
+.dm-creature:first-child { border-top: none; }
+.dm-creature.active .dm-creature-name { color: var(--dm-gold); }
+.dm-creature.spectating { opacity: 0.55; }
+.dm-creature-portrait { width: 40px; height: 40px; }
+.dm-creature-portrait img, .dm-creature-portrait video { width: 100%; height: 100%; object-fit: contain; }
+.dm-creature-name { font-weight: 700; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-creature-sub { font-size: 0.7rem; color: var(--dm-muted); }
+.dm-bar { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; margin-top: 3px; }
+.dm-bar i { display: block; height: 100%; }
+.dm-bar.hp i { background: var(--dm-hp); }
+.dm-bar.vp i { background: var(--dm-vp); }
+.dm-creature-actions { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; max-width: 128px; }
+.dm-icon-btn {
+  width: 28px; height: 26px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06); color: var(--dm-text); font-size: 0.72rem; font-weight: 800; cursor: pointer; padding: 0;
+}
+.dm-icon-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.dm-icon-btn.off { opacity: 0.35; text-decoration: line-through; }
+.dm-icon-btn.danger:hover { background: rgba(192, 57, 43, 0.5); }

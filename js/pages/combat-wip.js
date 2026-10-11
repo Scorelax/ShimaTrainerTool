@@ -616,6 +616,7 @@ let _lastSyncedStats = {}; // participantId -> {hp, vp} last pushed to the serve
 let _lastSyncedRecharge = {}; // combatantId -> KnownMoves string last written to the DB, same dedupe reasoning
 
 function _needsToJoin(state) {
+  if (_dmName) return false; // the DM adds creatures from the console, never through the players' join flow
   const name = _currentTrainerName();
   if (!name) return false;
   return !Object.values(state.participants).some(p => p.owner === name);
@@ -950,6 +951,7 @@ function _persistRechargeStates(state) {
  * server just stores). No-ops gracefully for a stand-in combatant with no
  * real entityKey to write back to. */
 function _persistStatsToDb(combatant, hp, vp) {
+  if (_dmName) return; // the DM's creatures only live in the battle -- nothing in the database to update
   const trainerName = _currentTrainerName();
   if (combatant.type === 'trainer') {
     const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
@@ -1637,6 +1639,10 @@ function _syncLocalCombatState(session) {
       const key = _resolveMyPokemonKey(p.name);
       if (key) {
         merged = { ...buildPokemonCombatant(key) };
+      } else if (_hasFullStatBlock(p)) {
+        // Nothing in this tab's storage to build it from (the DM console's creatures never are), but its own
+        // participant record carries the full stat block.
+        merged = _richCombatantFromParticipant(p);
       } else {
         merged = _standInCombatant(p);
         resolved = false;
@@ -1804,7 +1810,7 @@ function renderPlacementPhase(state, currentId) {
             <button type="button" id="placementSetGridBtn">Set</button>
           </div>
         </div>
-        ${state.battleType === 'pvp' ? `
+        ${state.battleType === 'pvp' || _dmName ? `
         <div class="placement-bg-picker">
           <label for="placementBgSelect">Battle Background</label>
           <select id="placementBgSelect">
@@ -1990,6 +1996,12 @@ function attachPlacementListeners(state, currentId) {
   // way out of joining instead, via the same leave-session cleanup as the
   // End Battle button, and drops the trainer back on their own card.
   document.getElementById('placementBackBtn')?.addEventListener('click', async () => {
+    if (_dmName) {
+      // The DM's creatures stay in the battle -- Back just stops placing (the rest can be placed later).
+      _placementQueue = []; _joinStage = null; _hoverGhosts = {};
+      _rerenderFull();
+      return;
+    }
     try { await CombatAPI.leaveSession(_currentTrainerName()); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
     sessionStorage.removeItem(WIP_COMBAT_STATE_KEY);
     _joinStage = null; _joinState = null; _placementQueue = []; _hoverGhosts = {};
@@ -2134,7 +2146,7 @@ function renderBody(state) {
   }
 
   return `
-    ${state.battleType === 'pve' && !_spectating ? `
+    ${state.battleType === 'pve' && !_spectating && !_dmName ? `
     <div class="combat-wip-section-label">Add Freeform Enemy (DM-controlled)</div>
     <form class="combat-wip-add-form" id="addParticipantForm">
       <input type="text" name="name" placeholder="Name" required>
@@ -2171,7 +2183,7 @@ function _syncHeaderBar(state) {
   if (leftBtnEl) {
     leftBtnEl.innerHTML = state?.active
       ? '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button><button class="combat-wip-btn-secondary wip-log-btn" id="battleLogBtn">📜 Log</button></div>'
-      : '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">← Back</button>';
+      : _dmName ? '' : '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">← Back</button>';
     document.getElementById('battleMapBtn')?.addEventListener('click', () => {
       showBattleMap(session, _currentTrainerName());
     });
@@ -2191,6 +2203,13 @@ function _syncHeaderBar(state) {
       ? '<button class="combat-wip-btn-secondary" id="stopSpectatingBtn">👁 Stop Spectating</button>'
       : '<button class="combat-wip-btn-danger" id="endSessionBtn">End Battle</button>';
     document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
+      if (_dmName) {
+        // The DM ends the battle for everyone (players leaving only takes their own creatures out).
+        if (!await showCombatConfirm('End this battle for everyone?', { title: 'End Battle', yesLabel: 'End Battle', noLabel: 'Cancel' })) return;
+        try { await CombatAPI.endSession(); } catch (err) { showCombatAlert(err.message, { title: 'End Battle' }); }
+        sessionStorage.removeItem(WIP_COMBAT_STATE_KEY);
+        return;
+      }
       await CombatAPI.leaveSession(_currentTrainerName());
       sessionStorage.removeItem(WIP_COMBAT_STATE_KEY);
       window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'trainer-card' } }));
@@ -6624,7 +6643,36 @@ function _bindStatusBadgeClicks() {
   document.addEventListener('click', _statusClickHandler);
 }
 
+// The DM console (dm-console.html) runs this same page as the DM: everything it controls is owned by 'DM'
+// (routes_combat.py's DM_OWNER), so its enemies go through exactly the card and move engine a player's own creatures
+// do, on the DM's screen. Only the DM console turns this on -- a player's screen never does.
+let _dmName = '';
+
+export function enableDmMode(name = 'DM') {
+  _dmName = name;
+}
+
+/** DM console: a built combatant (combat.js's buildPokemonCombatant shape) as an enemy participant the DM owns --
+ * the same payload a player's own Pokemon joins with, so every other screen can read its full stat block. */
+export function dmEnemyParticipant(c) {
+  return { ..._combatantToParticipant(c), side: 'enemy' };
+}
+
 function _currentTrainerName() {
+  if (_dmName) return _dmName;
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   return trainerData[1] || '';
+}
+
+/** DM console: places every one of the DM's creatures that isn't on the map yet, with the same placement screen the
+ * players use. False when there is nothing to place. */
+export function startDmPlacement() {
+  if (!_dmName || !session?.active) return false;
+  _placementQueue = Object.values(session.participants)
+    .filter(p => p.owner === _dmName && p.status === 'participating' && !session.board?.tokens?.[p.id])
+    .map(p => p.id);
+  if (!_placementQueue.length) return false;
+  _joinStage = 'placement';
+  _rerenderFull();
+  return true;
 }

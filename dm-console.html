@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DM Console</title>
+<link rel="icon" href="assets/Pokeball.png">
+<!-- The player app's stylesheet: the battle screen mounted in the middle (combat-wip.js) and its popups rely on it. -->
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/dm-console.css">
+</head>
+<body class="dm-console">
+  <div class="dm-app">
+    <header class="dm-topbar">
+      <div class="dm-brand"><img src="assets/Pokeball.png" alt=""><span>DM Console</span></div>
+      <div class="dm-status" id="dmStatus">Connecting…</div>
+      <div class="dm-topbar-links">
+        <a href="display.html" target="_blank" rel="noopener" title="The table TV's turn / HP screen">📺 Display</a>
+        <a href="battle-map.html" target="_blank" rel="noopener" title="The table's battle map screen">▦ Battle map</a>
+      </div>
+    </header>
+
+    <nav class="dm-rail" id="dmRail">
+      <button class="dm-rail-btn active" data-module="battle" title="Battle"><span>⚔️</span>Battle</button>
+      <button class="dm-rail-btn" data-module="party" disabled title="Coming later"><span>👥</span>Party</button>
+      <button class="dm-rail-btn" data-module="pokedex" disabled title="Coming later"><span>📖</span>Pokédex</button>
+      <button class="dm-rail-btn" data-module="npcs" disabled title="Coming later"><span>🎭</span>NPCs</button>
+      <button class="dm-rail-btn" data-module="encounters" disabled title="Coming later"><span>🗺️</span>Encounters</button>
+      <button class="dm-rail-btn" data-module="clock" disabled title="Coming later"><span>🕰️</span>Clock</button>
+      <button class="dm-rail-btn" data-module="reference" disabled title="Coming later"><span>📚</span>Reference</button>
+    </nav>
+
+    <main class="dm-main">
+      <section class="dm-module dm-battle" id="dmModuleBattle">
+        <!-- combat-wip.js renders the shared battle here, as the DM (see enableDmMode). Must be #content. -->
+        <div class="dm-battle-stage" id="content"><div class="dm-loading">Loading game data…</div></div>
+        <aside class="dm-tools" id="dmTools"></aside>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="js/dm/dm-console.js"></script>
+</body>
+</html>

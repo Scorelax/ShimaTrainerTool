@@ -1219,6 +1219,28 @@ export class CombatAPI {
 }
 
 // ============================================================================
+// DM CONSOLE API (dm-console.html -- see pi-server/app/routes_dm.py)
+// ============================================================================
+
+export class DmAPI {
+  /** Every species in the encyclopedia (not only the ones unlocked for players), as compact summaries for the
+   * enemy picker: {name, dex, type1, type2, size, rarity, habitat, behavior, activity, level, abilities, image}. */
+  static async speciesList() {
+    return API.request('dm', 'species-list', {}, {
+      cacheKey: 'dm:species-list', useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT,
+    });
+  }
+
+  /** A full Pokemon row (the same 62-column shape a player's Pokemon has) for a DM-controlled Pokemon -- never
+   * stored. `abilities` is the list of ability slots it has (0 primary, 1 secondary, 2 hidden). */
+  static async buildPokemon({ species, level, nature = '', abilities = [0], nickname = '', item = '', shiny = false }) {
+    return API.request('dm', 'build-pokemon', {
+      species, level, nature, abilities: abilities.join(','), nickname, item, shiny: shiny ? '1' : '',
+    }, { useCache: false });
+  }
+}
+
+// ============================================================================
 // OFFLINE DETECTION
 // ============================================================================
 

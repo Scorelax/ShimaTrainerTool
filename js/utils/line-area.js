@@ -21,12 +21,27 @@ export function lineFtFromRange(rangeText) {
 export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt) {
   const n = casterSize || 1;
   const a = (angleDeg * Math.PI) / 180;
+  const u = { x: Math.sin(a), y: -Math.cos(a) };
+  // Grid distance counts a diagonal square as 5ft (move-range.js), so the reach is a square box round the caster, not a
+  // circle: the strip runs to that box's edge, e.g. a 30ft line reaches 6 squares straight ahead AND 6 diagonally.
+  const stretch = 1 / Math.max(Math.abs(u.x), Math.abs(u.y));
   return {
     o: { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2 },
-    u: { x: Math.sin(a), y: -Math.cos(a) },
-    len: lengthFt / 5 + n / 2,
+    u,
+    len: (lengthFt / 5 + n / 2) * stretch,
     half: LINE_WIDTH_FT / 10,
   };
+}
+
+/** The squares within `lengthFt` of the caster's footprint (the line's reach box): {c0, c1, r0, r1}, inclusive. */
+export function lineReachBox(casterPos, casterSize, lengthFt) {
+  const n = casterSize || 1;
+  const reach = Math.floor(lengthFt / 5);
+  return { c0: casterPos.col - reach, c1: casterPos.col + n - 1 + reach, r0: casterPos.row - n + 1 - reach, r1: casterPos.row + reach };
+}
+
+function _inReachBox(box, pos, n) {
+  return pos.col <= box.c1 && pos.col + n - 1 >= box.c0 && pos.row - n + 1 <= box.r1 && pos.row >= box.r0;
 }
 
 /** Whether the strip overlaps the NxN footprint at `pos` (separating-axis test). A strip that only grazes an edge
@@ -50,9 +65,13 @@ export function lineHitIds(session, casterId, angleDeg, lengthFt) {
   const board = session.board;
   const casterPos = board.tokens[casterId];
   if (!casterPos) return [];
-  const g = lineGeometry(casterPos, footprintForSize(session.participants[casterId]?.size), angleDeg, lengthFt);
+  const casterSize = footprintForSize(session.participants[casterId]?.size);
+  const g = lineGeometry(casterPos, casterSize, angleDeg, lengthFt);
+  // The strip's 5ft-wide end pokes a little past the reach box's corner on a diagonal; whoever stands out there isn't hit.
+  const box = lineReachBox(casterPos, casterSize, lengthFt);
   return Object.entries(board.tokens)
     .filter(([id, pos]) => id !== casterId && session.participants[id]
+      && _inReachBox(box, pos, footprintForSize(session.participants[id].size))
       && lineTouchesFootprint(g, pos, footprintForSize(session.participants[id].size)))
     .map(([id]) => id);
 }

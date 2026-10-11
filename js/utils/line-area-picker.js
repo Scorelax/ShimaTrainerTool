@@ -6,7 +6,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from './battle-map-grid.js';
 import { injectBattleMapStyles, spriteTransform, coneCells } from './battle-map-view.js';
-import { lineGeometry, lineHitIds, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
+import { lineGeometry, lineHitIds, lineReachBox, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 function _injectStyles() {
   if (document.getElementById('line-area-picker-styles')) return;
@@ -21,6 +21,7 @@ function _injectStyles() {
     .lap-sub { font-size: 0.82rem; color: #a0a8d0; margin-bottom: 0.7rem; }
     .lap-stage { touch-action: none; user-select: none; cursor: crosshair; }
     .lap-stage .bmap-tokens { z-index: 2; pointer-events: none; }
+    .lap-stage .bmap-cell.line-reach { background: rgba(255,140,60,0.1); box-shadow: inset 0 0 0 1px rgba(255,160,80,0.25); }
     .lap-hits { font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2em; color: #ffcf9e; }
     .lap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
     .lap-actions button { border: none; border-radius: 999px; padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.1); color: #e8ecff; }
@@ -53,7 +54,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, confirmLabel 
     overlay.innerHTML = `
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
-        <div class="lap-sub">A ${lengthFt}ft line, 5ft wide, from ${caster?.name || 'the caster'}. Drag or tap anywhere on the map to aim it — any angle, not just along the grid. Everyone it touches is selected.</div>
+        <div class="lap-sub">A ${lengthFt}ft line, 5ft wide, from ${caster?.name || 'the caster'}. Drag or tap anywhere on the map to aim it — any angle, not just along the grid. It reaches the edge of the shaded squares (${lengthFt / 5} squares straight or diagonally). Everyone it touches is selected.</div>
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
           <div class="bmap-line"></div>
@@ -80,6 +81,12 @@ export function pickLineArea({ session, casterId, title, lengthFt, confirmLabel 
     }
     grid.setAttribute('style', gridTemplateStyle(board));
     grid.innerHTML = gridCellsHtml(board, 'bmap-cell');
+    // Lightly shade every square within the line's reach (diagonals count 5ft, so it's a square box).
+    const box = lineReachBox(casterPos, casterSize, lengthFt);
+    grid.querySelectorAll('[data-cell]').forEach((el) => {
+      const [c, r] = el.dataset.cell.split(',').map(Number);
+      if (c >= box.c0 && c <= box.c1 && r >= box.r0 && r <= box.r1) el.classList.add('line-reach');
+    });
 
     const tokenEls = new Map();
     Object.entries(board.tokens).forEach(([id, pos]) => {

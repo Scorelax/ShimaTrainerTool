@@ -20,7 +20,7 @@ import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
 import { pickTerrainArea, radiusFtFromRange } from '../utils/terrain-area-picker.js';
 import { lineFtFromRange } from '../utils/line-area.js';
 import { coneFtFromRange } from '../utils/line-area-picker.js';
-import { setAbilitySession, abilityTriggers, activatedAbilityEffects } from '../utils/ability-mods.js';
+import { setAbilitySession, abilityTriggers, abilityEffectsOf, activatedAbilityEffects } from '../utils/ability-mods.js';
 import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battle-map-view.js';
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { playBattleAnimationFloating } from '../utils/move-popup.js';
@@ -5357,7 +5357,21 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     // own post-type-multiplier result, just one round trip cheaper.
     const rawTotal = rawRoll + damageModifier;
     const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
-    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit, damagePool);
+    // Sturdy / Fur Coat / Friend Guard are asked BEFORE the hit lands (off a server preview of its real size), so a
+    // knockout one of them prevents never happens -- and never fires the attacker's Moxie / Beast Boost.
+    let soften = null;
+    const target = session?.participants?.[targetId];
+    if (damagePool !== 'vp' && target && targetId !== combatantId && _mayBeSoftened(target)) {
+      const preview = (await CombatAPI.previewDamage(combatantId, targetId, finalDamage, moveType, moveName, !!crit, damagePool))?.data || {};
+      const row = findMoveRow(moveName) || move || [];
+      soften = await _abilityDamageReactions({
+        attacker, target, damageDealt: preview.damageApplied,
+        event: { melee: isMeleeMoveRow(row), moveType: (move && move[1]) || row[1] || '', damaging: (preview.damageApplied ?? 0) > 0,
+          vulnerable: (preview.multiplier ?? 1) > 1, attackRoll, hpBefore: preview.hpBefore ?? hpBefore,
+          damageDealt: preview.damageApplied, drain: categories.includes('drain') },
+      });
+    }
+    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit, damagePool, soften);
     damageDealt = dmgResult?.damageApplied;
     targetFainted = dmgResult?.targetFainted;
     lastTypeMultiplier = dmgResult?.multiplier ?? null;
@@ -6201,11 +6215,20 @@ async function _abilityTargetedTriggers(attackerId, targetId, move) {
   }
 }
 
-/** A hit that already landed, softened by an ability (Sturdy, Fur Coat, Void Shift, Chronoshift -- the target's own --
- * and an ally's Friend Guard within range): its die, or a "use it?" for an optional / once-per-rest / reaction one, is
- * asked here; the share it takes away comes back as HP (the server's ability-trigger, kind damage_taken_mod). */
+/** Whether the target or someone on its side has a softening ability at all (Sturdy, Fur Coat, Friend Guard...) -- only
+ * then is the hit previewed first (see _abilityDamageReactions). */
+function _mayBeSoftened(target) {
+  return Object.values(session?.participants || {}).some(p => (p.id === target.id
+    || (p.status === 'participating' && (p.owner || '') === (target.owner || '') && (p.side || '') === (target.side || '')))
+    && abilityEffectsOf(p).some(({ effect: e }) => e.kind === 'damage_taken_mod'));
+}
+
+/** A hit about to land (previewed by the server, so `damageDealt` is its real size), softened by an ability (Sturdy, Fur
+ * Coat, Void Shift, Chronoshift -- the target's own -- and an ally's Friend Guard within range): its die, or a "use it?"
+ * for an optional / once-per-rest / reaction one, is asked here, BEFORE the hit -- so a knockout it prevents never fires
+ * the attacker's Moxie / Beast Boost. Returns {holderId, ability, index} for apply-damage's soften, or null. */
 async function _abilityDamageReactions({ attacker, target, event, damageDealt }) {
-  if (!(damageDealt > 0)) return;
+  if (!(damageDealt > 0)) return null;
   const candidates = [
     ...abilityTriggers(target, 'damaged', event, attacker).map(t => ({ ...t, holder: target })),
     ...abilityTriggers(target, 'hit_by', event, attacker).map(t => ({ ...t, holder: target })),
@@ -6220,30 +6243,26 @@ async function _abilityDamageReactions({ attacker, target, event, damageDealt })
   for (const { ability, index, effect: e, holder } of candidates) {
     if (e.kind !== 'damage_taken_mod' || e.ends?.length && e.ends[0].type !== 'instant') continue; // Water Compaction lasts -- a reminder
     if (e.reaction && holder.reactionUsed) continue;
-    const refund = Math.floor(damageDealt * (1 - (e.multiplier ?? 1)));
-    if (!(refund > 0)) continue;
+    const cut = Math.floor(damageDealt * (1 - (e.multiplier ?? 1)));
+    if (!(cut > 0)) continue;
+    const ko = event.hpBefore != null && event.hpBefore - damageDealt <= 0 ? ', which would knock it out' : '';
     if (e.chance) {
       const rolled = await promptValueRoll({
         dice: `1${e.chance.die}`, moveName: ability,
-        description: `${holder.name}'s ${ability} -- roll a ${e.chance.die}: on ${e.chance.min}+ it ${e.multiplier === 0 ? 'avoids the hit' : 'halves the hit'} (${refund} HP back).`,
+        description: `${holder.name}'s ${ability} -- ${target.name} is about to take ${damageDealt} damage${ko}. Roll a ${e.chance.die}: on ${e.chance.min}+ it ${e.multiplier === 0 ? 'avoids the hit' : 'halves the hit'} (${cut} less).`,
       });
       if (rolled == null || rolled < e.chance.min) continue;
     } else if (e.optional || e.limit || e.reaction) {
       const uses = e.limit ? ` (${e.limit.uses}× per ${String(e.limit.per).replace('_', ' ')})` : '';
       const ok = await showCombatConfirm(
-        `Use ${holder.name}'s ${ability}${uses}${e.reaction ? ', spending its reaction' : ''}? ${target.name} gets ${refund} HP of this ${damageDealt}-damage hit back.`,
+        `Use ${holder.name}'s ${ability}${uses}${e.reaction ? ', spending its reaction' : ''}? ${target.name} is about to take ${damageDealt} damage${ko} -- it takes ${cut} less.`,
         { title: ability, yesLabel: `Use ${ability}`, noLabel: 'Not now' },
       );
       if (!ok) continue;
     }
-    try {
-      await CombatAPI.abilityTrigger(holder.id, ability, index, target.id, refund);
-      return refund; // one softening per hit
-    } catch (err) {
-      showCombatAlert(err.message, { title: ability });
-    }
+    return { holderId: holder.id, ability, index }; // one softening per hit -- apply-damage checks and spends it
   }
-  return 0;
+  return null;
 }
 
 /** Abilities that fire on a landed hit (ability engine slice 3a): the target's hit_by / damaged effects (Rough Skin,
@@ -6261,10 +6280,10 @@ async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attac
     melee: isMeleeMoveRow(row), moveType: (move && move[1]) || row[1] || '', damaging: (damageDealt ?? 0) > 0,
     vulnerable: (typeMultiplier ?? 1) > 1, attackRoll, hpBefore, damageDealt, drain,
   };
-  // First the target's chance to soften the hit (Sturdy, Fur Coat...) -- it can turn a knockout into a survival.
-  const refunded = await _abilityDamageReactions({ attacker, target, event, damageDealt }) || 0;
-  const fainted = targetFainted && (hpBefore ?? 0) - (damageDealt ?? 0) + refunded <= 0;
-  if (hpBefore != null) event.hpAfter = hpBefore - (damageDealt ?? 0) + refunded; // Wimp Out / Emergency Exit
+  // The target's Sturdy / Fur Coat was already asked before the hit landed (_abilityDamageReactions) -- damageDealt is
+  // what got through.
+  const fainted = targetFainted;
+  if (hpBefore != null) event.hpAfter = hpBefore - (damageDealt ?? 0); // Wimp Out / Emergency Exit
   const all = [
     ...abilityTriggers(target, 'hit_by', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),
     ...abilityTriggers(target, 'damaged', event, attacker).map(t => ({ ...t, holder: target, other: attacker })),

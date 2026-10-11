@@ -964,8 +964,15 @@ export class CombatAPI {
    * Enervation Ray's own "damage_vp" category drains VP instead, see
    * combat-wip.js's _applyPrimaryDamage. Returns {multiplier,
    * damageApplied} alongside the usual {status, data}. */
-  static async applyDamage(id, targetId, diceRoll, moveType, species, moveName, crit = false, pool = 'hp') {
-    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName, crit, pool }, { useCache: false });
+  static async applyDamage(id, targetId, diceRoll, moveType, species, moveName, crit = false, pool = 'hp', soften = null) {
+    const extra = soften ? { softenHolderId: soften.holderId, softenAbility: soften.ability, softenIndex: soften.index } : {};
+    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName, crit, pool, ...extra }, { useCache: false });
+  }
+
+  /** What applyDamage WOULD do, without changing anything: {damageApplied, targetFainted, multiplier, hpBefore} under
+   * `data` -- the target's Sturdy / Fur Coat is asked off this before the hit lands. */
+  static async previewDamage(id, targetId, diceRoll, moveType, moveName, crit = false, pool = 'hp') {
+    return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, moveName, crit, pool, preview: true }, { useCache: false });
   }
 
   /** Fire Shield's passive retaliation -- `id` is the shield HOLDER, `targetId` the creature that

@@ -365,6 +365,15 @@ def _handle(conn, action, params):
         # explicit string check.
         crit = str(params.get('crit', '')).lower() == 'true'
         pool = params.get('pool', 'hp')
+        if str(params.get('preview', '')).lower() == 'true':
+            # Read-only: what the hit WOULD do (Sturdy / Fur Coat are asked before it lands -- see _preview_damage).
+            return {'status': 'success', 'data': _preview_damage(
+                conn, params['id'], params['targetId'], dice_roll, params.get('moveType', ''),
+                params.get('moveName', ''), crit, pool if pool == 'vp' else 'hp')}
+        soften = None
+        if params.get('softenHolderId'):
+            soften = {'holderId': params['softenHolderId'], 'ability': params.get('softenAbility', ''),
+                      'index': js_parse_int(params.get('softenIndex'))}
         return _apply_damage(
             conn, params['id'], params['targetId'], dice_roll,
             move_type=params.get('moveType', ''),
@@ -372,6 +381,7 @@ def _handle(conn, action, params):
             move_name=params.get('moveName', ''),
             crit=crit,
             pool=pool if pool == 'vp' else 'hp',
+            soften=soften,
         )
 
     if action == 'apply-retaliation':
@@ -2586,7 +2596,7 @@ def _apply_retaliation(conn, holder_id, target_id, dice_roll):
     return result
 
 
-def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name='', crit=False, pool='hp'):
+def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name='', crit=False, pool='hp', soften=None):
     """The other half of resolving an attack, split out from use-move: that
     action's VP cost was for a single-participant local engine (combat.js's
     own move popup, driven client-side) that already handles spending VP and
@@ -2606,10 +2616,14 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name
 
     `crit` is recorded on the log entry purely for Lucky Chant's own later
     use (a 'damaged' reaction reading `entry.crit` back off the most recent
-    damage entry against the reactor) -- nothing else here reads it."""
+    damage entry against the reactor) -- nothing else here reads it.
+
+    `soften` ({holderId, ability, index}): a Sturdy / Fur Coat / Friend Guard
+    the client already asked about (off _preview_damage) -- it cuts the hit
+    before it lands, so a knockout it prevents never fires Moxie & co."""
     outcome = {}
     result = _mutate(conn, lambda s: outcome.update(
-        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type, move_name, crit, pool)))
+        _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type, move_name, crit, pool, soften=soften)))
     result.update(outcome)
 
     attacker = result['data']['participants'].get(pid, {})
@@ -2619,6 +2633,39 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name
         'species': species or attacker.get('name', ''),
     })
     return result
+
+
+def _preview_damage(conn, pid, target_id, dice_roll, move_type, move_name='', crit=False, pool='hp'):
+    """What apply-damage WOULD do -- run on a throwaway copy of the session (no log file, nothing saved), so the
+    client can ask the target's Sturdy / Fur Coat before the hit lands. {damageApplied, targetFainted, multiplier,
+    hpBefore}."""
+    state = copy.deepcopy(load_state(conn))
+    if not state.get('active'):
+        raise ValueError('No active combat session')
+    state.pop('logFile', None)
+    hp_before = (state['participants'].get(target_id) or {}).get('currentHP')
+    result = _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name, crit, pool)
+    return {**result, 'hpBefore': hp_before}
+
+
+def _ability_soften(state, holder_id, ability, index):
+    """A damage_taken_mod reaction (Sturdy, Fur Coat, Void Shift, Chronoshift, Friend Guard) the client asked about before
+    the hit: checks the holder really has it, spends its use / reaction, and returns (holder, ability name, multiplier)."""
+    holder = state['participants'].get(holder_id)
+    if not holder:
+        raise ValueError('Unknown participant')
+    entry = next(((ab, i, e) for ab, i, e in abilities.indexed_effects(holder) if ab.lower() == str(ability).lower() and i == index), None)
+    if not entry or entry[2].get('kind') != 'damage_taken_mod':
+        raise ValueError(f"{holder['name']} doesn't have that ability effect")
+    ab, i, e = entry
+    if e.get('reaction') and holder.get('reactionUsed'):
+        raise ValueError(f"{holder['name']} has already used their reaction")
+    if not _ability_use_ok(state, holder, ab, i, e):
+        raise ValueError(f"{holder['name']}'s {ab} has no uses left this battle")
+    if e.get('reaction'):
+        holder['reactionUsed'] = True
+    multiplier = e.get('multiplier')
+    return holder, ab, float(multiplier if multiplier is not None else 1)
 
 
 def _retype_last_damage(conn, state, reactor_id, new_type):
@@ -3009,7 +3056,8 @@ def _type_preview(conn, state, pid, target_id, move_type, move_name=''):
     return {'multiplier': 0 if absorb is not None else multiplier}
 
 
-def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False, pool='hp', turn_check=True):
+def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, move_name='', crit=False, pool='hp', turn_check=True,
+                            soften=None):
     attacker = state['participants'].get(pid)
     if not attacker:
         raise ValueError('Unknown participant: ' + pid)
@@ -3091,6 +3139,13 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
     flat_reduction = incoming_flat_reduction(target)
     if flat_reduction:
         actual_damage = max(0, actual_damage - flat_reduction)
+    softened_note = ''
+    if soften and actual_damage > 0:
+        # Sturdy / Fur Coat... asked before the hit (the client previewed it): the share it takes away never lands.
+        soft_holder, soft_ab, soft_mult = _ability_soften(state, soften.get('holderId'), soften.get('ability'), soften.get('index'))
+        cut = max(0, int(actual_damage * (1 - soft_mult)))
+        actual_damage -= cut
+        softened_note = f" -- {soft_holder['name']}'s {soft_ab} softens it by {cut}"
     leftover = _absorb_temp_hp(state, target, actual_damage)
     hp_before = target['currentHP']
     target['currentHP'] -= leftover  # no floor, same reasoning as elsewhere in this module
@@ -3113,7 +3168,7 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
     condition_note = ' -- Mat Block/Testudo Formation reduces this' if condition_multiplier != 1 else ''
     condition_note += ' -- held back, left at 1 HP' if spared else ''
     condition_note += ' -- Harden reduces this' if flat_reduction else ''
-    condition_note += ability_note
+    condition_note += ability_note + softened_note
     _log_event(
         state, 'damage',
         text=f"{attacker['name']} hit {target['name']}{move_label} for {actual_damage} damage ({multiplier}x){condition_note}",

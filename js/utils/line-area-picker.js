@@ -21,6 +21,7 @@ function _injectStyles() {
     .lap-sub { font-size: 0.82rem; color: #a0a8d0; margin-bottom: 0.7rem; }
     .lap-stage { touch-action: none; user-select: none; cursor: crosshair; }
     .lap-stage .bmap-tokens { z-index: 2; pointer-events: none; }
+    .lap-stage .bmap-token.untargetable { opacity: 0.35; filter: grayscale(1); }
     .lap-stage .bmap-cell.line-reach { background: rgba(255,140,60,0.1); box-shadow: inset 0 0 0 1px rgba(255,160,80,0.25); }
     .lap-hits { font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2em; color: #ffcf9e; }
     .lap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
@@ -31,6 +32,27 @@ function _injectStyles() {
   document.head.appendChild(style);
 }
 
+// The board's tokens, greyed out when the move can't target them (underground, in another dimension... -- `targetable`
+// is the multi-target picker's own list of ids; null means everyone).
+function _buildTokens(session, board, casterId, tokenLayer, targetable) {
+  const tokenEls = new Map();
+  Object.entries(board.tokens).forEach(([id, pos]) => {
+    const p = session.participants[id];
+    if (!p) return;
+    const el = document.createElement('div');
+    const out = id !== casterId && targetable && !targetable.has(id);
+    el.className = `bmap-token ${p.side}${id === casterId ? ' mine' : ''}${(pos.z || 0) > 0 ? ' airborne' : ''}${out ? ' untargetable' : ''}`;
+    Object.assign(el.style, cellRect(board, pos.col, pos.row, footprintForSize(p.size)));
+    const name = visibleToViewer(p, 'name') ? p.name : '???';
+    el.title = out ? `${name} (can't be targeted by this move)` : name;
+    el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
+    patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
+    tokenLayer.appendChild(el);
+    tokenEls.set(id, el);
+  });
+  return tokenEls;
+}
+
 /**
  * @param {object} session  the shared combat session (board + participants)
  * @param {string} casterId the line comes out of this creature's token
@@ -38,7 +60,7 @@ function _injectStyles() {
  * @param {number} lengthFt the line's length (lineFtFromRange of the move's range)
  * @returns {Promise<{ids: string[], angle: number} | null>}  null when cancelled
  */
-export function pickLineArea({ session, casterId, title, lengthFt, confirmLabel = 'Select targets in the line' }) {
+export function pickLineArea({ session, casterId, title, lengthFt, targetableIds = null, confirmLabel = 'Select targets in the line' }) {
   _injectStyles();
   return new Promise((resolve) => {
     const board = session.board;
@@ -88,26 +110,14 @@ export function pickLineArea({ session, casterId, title, lengthFt, confirmLabel 
       if (c >= box.c0 && c <= box.c1 && r >= box.r0 && r <= box.r1) el.classList.add('line-reach');
     });
 
-    const tokenEls = new Map();
-    Object.entries(board.tokens).forEach(([id, pos]) => {
-      const p = session.participants[id];
-      if (!p) return;
-      const el = document.createElement('div');
-      el.className = `bmap-token ${p.side}${id === casterId ? ' mine' : ''}${(pos.z || 0) > 0 ? ' airborne' : ''}`;
-      Object.assign(el.style, cellRect(board, pos.col, pos.row, footprintForSize(p.size)));
-      const name = visibleToViewer(p, 'name') ? p.name : '???';
-      el.title = name;
-      el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
-      patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
-      tokenLayer.appendChild(el);
-      tokenEls.set(id, el);
-    });
+    const targetable = targetableIds ? new Set(targetableIds) : null;
+    const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable);
 
     let hits = [];
     const refresh = () => {
       const g = lineGeometry(casterPos, casterSize, angle, lengthFt);
       lineEl.setAttribute('style', lineStyle(board, g, angle));
-      hits = lineHitIds(session, casterId, angle, lengthFt);
+      hits = lineHitIds(session, casterId, angle, lengthFt).filter(id => !targetable || targetable.has(id));
       tokenEls.forEach((el, id) => el.classList.toggle('line-hit', hits.includes(id)));
       const names = hits.map(id => (visibleToViewer(session.participants[id], 'name') ? session.participants[id].name : '???'));
       hitsEl.textContent = names.length ? `In the line: ${names.join(', ')}` : 'Nobody in the line yet.';
@@ -147,7 +157,7 @@ export function coneFtFromRange(rangeText) {
  * it covers are shaded and everyone standing on one is listed (a flyer higher than the cone is long is out of it).
  * @returns {Promise<{ids: string[], angle: number} | null>}  null when cancelled
  */
-export function pickConeArea({ session, casterId, title, lengthFt, confirmLabel = 'Select targets in the cone' }) {
+export function pickConeArea({ session, casterId, title, lengthFt, targetableIds = null, confirmLabel = 'Select targets in the cone' }) {
   _injectStyles();
   return new Promise((resolve) => {
     const board = session.board;
@@ -191,20 +201,8 @@ export function pickConeArea({ session, casterId, title, lengthFt, confirmLabel 
     grid.innerHTML = gridCellsHtml(board, 'bmap-cell');
     const cellEls = new Map([...grid.querySelectorAll('[data-cell]')].map(el => [el.dataset.cell, el]));
 
-    const tokenEls = new Map();
-    Object.entries(board.tokens).forEach(([id, pos]) => {
-      const p = session.participants[id];
-      if (!p) return;
-      const el = document.createElement('div');
-      el.className = `bmap-token ${p.side}${id === casterId ? ' mine' : ''}${(pos.z || 0) > 0 ? ' airborne' : ''}`;
-      Object.assign(el.style, cellRect(board, pos.col, pos.row, footprintForSize(p.size)));
-      const name = visibleToViewer(p, 'name') ? p.name : '???';
-      el.title = name;
-      el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
-      patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
-      tokenLayer.appendChild(el);
-      tokenEls.set(id, el);
-    });
+    const targetable = targetableIds ? new Set(targetableIds) : null;
+    const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable);
 
     let hits = [];
     const refresh = () => {
@@ -212,7 +210,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, confirmLabel 
       cellEls.forEach((el, key) => el.classList.toggle('cone', cells.has(key)));
       const casterZ = casterPos.z || 0;
       hits = Object.entries(board.tokens).filter(([id, pos]) => {
-        if (id === casterId || !session.participants[id]) return false;
+        if (id === casterId || !session.participants[id] || (targetable && !targetable.has(id))) return false;
         if (Math.abs((pos.z || 0) - casterZ) > lengthFt) return false;
         return footprintCells(pos.col, pos.row, footprintForSize(session.participants[id].size)).some(c => cells.has(`${c.col},${c.row}`));
       }).map(([id]) => id);

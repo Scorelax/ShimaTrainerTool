@@ -132,7 +132,7 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   mapBtn.hidden = !(area && hasBoard);
   mapBtn.onclick = async () => {
     if (area.coneFt) {
-      const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt });
+      const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt, targetableIds: participants.map(p => p.id) });
       if (!cone) return;
       participants.forEach(p => {
         const card = grid.querySelector(`[data-target-id="${p.id}"]`);
@@ -141,7 +141,7 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
       return;
     }
     if (area.lineFt) {
-      const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt });
+      const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt, targetableIds: participants.map(p => p.id) });
       if (!line) return;
       participants.forEach(p => {
         const card = grid.querySelector(`[data-target-id="${p.id}"]`);

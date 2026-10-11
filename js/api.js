@@ -1272,6 +1272,43 @@ export class DmAPI {
   static async startBattle() {
     return API.request('dm', 'start-battle', {}, { useCache: false, timeout: 30000 });
   }
+
+  /** Everything the encyclopedia has on one species (Pokedex module). */
+  static async speciesDetail(name) {
+    return API.request('dm', 'species-detail', { name }, { cacheKey: `dm:species:${name}`, useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT });
+  }
+
+  /** The players' pokedex config ({registered, visibility, defaults, ...}) plus `editedHere`. Never cached. */
+  static async pokedexConfig() {
+    return API.request('dm', 'pokedex-config', {}, { useCache: false });
+  }
+
+  /** Saves what the players may see (POST -- main.py's /api/dm/pokedex-config); it's live-pushed to every device. */
+  static async savePokedexConfig(config) {
+    const res = await fetch(`${API_CONFIG.baseUrl}/dm/pokedex-config`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') throw new Error(data.error || `Saving the Pokédex settings failed (${res.status})`);
+    cache.remove('game-data:pokedex-config');
+    return data;
+  }
+
+  /** Every player trainer with all their Pokemon: [{trainer: row, pokemon: [rows]}] (Party module). */
+  static async party() {
+    return API.request('dm', 'party', {}, { useCache: false, timeout: HEAVY_TIMEOUT });
+  }
+
+  /** Adds `quantity` of an item (negative takes some away) to a trainer's inventory, on the server in one go. `custom`
+   * = an item of the DM's own, not from the items list (stored with its description). */
+  static async giveItem(trainer, item, quantity = 1, { custom = false, description = '' } = {}) {
+    return API.request('dm', 'give-item', { trainer, item, quantity, custom: custom ? '1' : '', description }, { useCache: false });
+  }
+
+  /** Adds `amount` (negative takes some away, never below 0) to a trainer's money. */
+  static async giveMoney(trainer, amount) {
+    return API.request('dm', 'give-money', { trainer, amount }, { useCache: false });
+  }
 }
 
 // ============================================================================

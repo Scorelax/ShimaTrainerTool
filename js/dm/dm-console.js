@@ -16,6 +16,8 @@ import { loadSetup, getSetup, flushSetup, resetSetup, resetMap, resetBattle, map
 import { renderMapEditor, mapPreviewHtml } from './map-editor.js';
 import { renderCreatureSetup } from './creature-setup.js';
 import { mountLive, updateLive } from './battle-live.js';
+import { renderPokedex, pokedexHasUnsaved } from './pokedex.js';
+import { renderParty } from './party.js';
 
 enableDmMode(DM);
 
@@ -49,6 +51,31 @@ async function init() {
   });
   // The battle screen asks the player app to go back to the trainer card in a few places; there is none here.
   window.addEventListener('navigate', () => { liveMounted = false; route(); });
+
+  document.getElementById('dmRail').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-module]:not(:disabled)');
+    if (btn) showModule(btn.dataset.module);
+  });
+  window.addEventListener('beforeunload', (e) => {
+    if (pokedexHasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Modules (the rail on the left): Battle, Party, Pokedex. The battle keeps running in its own section while another
+// module is open; Party is fetched fresh every time it's opened, the Pokedex keeps where the DM was.
+// ---------------------------------------------------------------------------
+
+const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex' };
+const _moduleOpened = new Set(['battle']);
+
+function showModule(name) {
+  Object.entries(MODULES).forEach(([key, id]) => { document.getElementById(id).hidden = key !== name; });
+  document.querySelectorAll('#dmRail [data-module]').forEach(b => b.classList.toggle('active', b.dataset.module === name));
+  const section = document.getElementById(MODULES[name]);
+  if (name === 'party') renderParty(section);
+  else if (name === 'pokedex' && !_moduleOpened.has('pokedex')) renderPokedex(section);
+  _moduleOpened.add(name);
 }
 
 /** The game data the battle screen reads from sessionStorage -- the same keys the player app stores at login

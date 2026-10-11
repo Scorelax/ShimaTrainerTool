@@ -174,6 +174,8 @@ def fetch_items(conn, force=False):
 
 
 def fetch_pokedex_config(conn, force=False):
+    if force and pokedex_config_edited_here(conn):
+        force = False  # edited in the DM console: the Pi's copy is the real one now, never replaced by GitHub's
     if not force:
         cached = _cache_get(conn, 'pokedexConfig')
         if cached is not None:
@@ -213,6 +215,25 @@ def store_pushed_dataset(conn, dataset, data):
         raise ValueError("'visibility' must be an object")
 
     _cache_put(conn, PUSHABLE_DATASETS[dataset], data)
+
+
+_LOCAL_CONFIG_MARK = 'pokedex-config-edited-here'
+
+
+def pokedex_config_edited_here(conn):
+    """True once the DM console has saved the pokedex config (store_local_pokedex_config) -- from then on the Pi holds
+    the real copy, so a cache refresh (warm_upstream / Reset Cache) keeps it instead of pulling GitHub's over it."""
+    row = conn.execute('SELECT json FROM dm_state WHERE key = ?', (_LOCAL_CONFIG_MARK,)).fetchone()
+    return bool(row and row[0])
+
+
+def store_local_pokedex_config(conn, data):
+    """The DM console's Pokedex module saving what players may see: same checks as Benjakronk's push, stored as the
+    pokedexConfig snapshot (fetched_at moves on, so clients refresh) and marked as edited here (see above)."""
+    store_pushed_dataset(conn, 'pokedex-config', data)
+    conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
+                 (_LOCAL_CONFIG_MARK, json.dumps(True), datetime.now(timezone.utc).isoformat()))
+    conn.commit()
 
 
 def registered_pokemon_names(conn):

@@ -57,6 +57,8 @@ export function initLiveUpdates() {
       refreshPokedexData();
     } else if (event.type === 'trainer-data' && event.trainer) {
       refreshActiveTrainerData(event.trainer);
+      // Pages watching every trainer (the DM console's Party module) hear about it too.
+      window.dispatchEvent(new CustomEvent('app:trainer-data', { detail: { trainer: event.trainer } }));
     } else if (event.type === 'combat') {
       window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: event.session }));
     } else if (event.type === 'combat-animation') {

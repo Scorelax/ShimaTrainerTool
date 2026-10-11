@@ -44,6 +44,30 @@ def handle(conn, action, params):
             # The battle setup's live preview of the numbers: no picture lookup (a network probe for a species never looked up).
             probe_image=str(params.get('preview', '')).lower() not in ('1', 'true'))}
 
+    if action == 'species-detail':
+        if not params.get('name'):
+            raise ValueError('Missing species name')
+        return {'status': 'success', 'data': species_detail(conn, params['name'])}
+
+    if action == 'pokedex-config':
+        return {'status': 'success', 'data': upstream.fetch_pokedex_config(conn),
+                'editedHere': upstream.pokedex_config_edited_here(conn)}
+
+    if action == 'party':
+        return {'status': 'success', 'data': party_overview(conn)}
+
+    if action == 'give-item':
+        if not params.get('trainer') or not params.get('item'):
+            raise ValueError('Missing trainer or item')
+        return give_item(conn, params['trainer'], params['item'], js_parse_int(params.get('quantity')) or 1,
+                         custom=str(params.get('custom', '')).lower() in ('1', 'true'),
+                         description=params.get('description', ''))
+
+    if action == 'give-money':
+        if not params.get('trainer'):
+            raise ValueError('Missing trainer')
+        return give_money(conn, params['trainer'], js_parse_int(params.get('amount')) or 0)
+
     if action == 'get-setup':
         return {'status': 'success', 'data': load_setup(conn)}
 
@@ -72,6 +96,141 @@ def handle(conn, action, params):
         return result
 
     raise ValueError('Unknown dm action: ' + str(action))
+
+
+def _find_species(conn, name):
+    row = next((r for r in upstream.fetch_pokemon_db(conn) if str(_cell(r, 2)).lower() == str(name).lower()), None)
+    if not row:
+        raise ValueError('Unknown species: ' + str(name))
+    return row
+
+
+def species_detail(conn, name):
+    """Everything the encyclopedia knows about one species, named -- for the DM console's Pokedex module."""
+    row = _find_species(conn, name)
+    evo = str(_cell(row, 14))
+    return {
+        'name': row[2], 'dex': _cell(row, 1), 'classification': _cell(row, 5), 'description': sanitize_string(_cell(row, 6)),
+        'type1': _cell(row, 7), 'type2': _cell(row, 8),
+        'size': _cell(row, 9), 'rarity': _cell(row, 10), 'habitat': _cell(row, 11), 'behavior': _cell(row, 12), 'activity': _cell(row, 13),
+        'evolution': evo, 'evolvesFrom': _evo_part(evo, 'from'), 'evolvesTo': _evo_part(evo, 'evolves'),
+        'catchDifficulty': _cell(row, 18), 'level': js_parse_int(_cell(row, 19)) or 1,
+        'ac': _cell(row, 20), 'hitDice': _cell(row, 21), 'hp': _cell(row, 22), 'vitalityDice': _cell(row, 23), 'vp': _cell(row, 24),
+        'speed': _cell(row, 25), 'movement': dict(zip(('walking', 'climbing', 'flying', 'hovering', 'swimming', 'burrowing'), (_cell(row, i) for i in _MOVEMENT_COLUMNS))),
+        'stats': {k: js_parse_int(_cell(row, i)) for k, i in zip(_STAT_KEYS, range(27, 33))},
+        'savingThrows': _cell(row, 33), 'skills': _cell(row, 34),
+        'abilities': _abilities(row),
+        'moves': {lvl: [m.strip() for m in sanitize_moves(_cell(row, i), keep).split(',') if m.strip()]
+                  for lvl, (i, keep) in zip((1, 2, 6, 10, 14, 18), _MOVE_COLUMNS)},
+        'senses': dict(zip(('sight', 'hearing', 'smell', 'tremorsense', 'echolocation', 'telepathy', 'blindsight', 'darkvision', 'truesight'),
+                           (_cell(row, i) for i in _SENSE_COLUMNS))),
+        'image': upstream.local_sprite_url(row[2]) or upstream.get_image_url(conn, row[2], _cell(row, 1)) or '',
+    }
+
+
+def _evo_part(text, which):
+    """'From: Sandit; Evolves: Bedouwara @ Level 14' -> 'Sandit' (which='from') or ['Bedouwara'] (which='evolves'); the
+    names after "Evolves:" can be several (", " / " or " / "/") and each may carry its condition after an "@"."""
+    import re
+    for part in str(text or '').split(';'):
+        key, _, value = part.partition(':')
+        if key.strip().lower() == which:
+            value = value.strip()
+            if which == 'from':
+                return value if value and value != '-' else ''
+            names = [re.split(r'\s*@', n)[0].strip() for n in re.split(r',|/|\bor\b', value)]
+            return [n for n in names if n and n != '-']
+    return '' if which == 'from' else []
+
+
+def party_overview(conn):
+    """Every player trainer with all their Pokemon -- the DM console's Party module. Trainer rows and Pokemon rows in
+    the usual positional shape (db.TRAINER_COLUMNS / db.POKEMON_COLUMNS), portraits and animated sprites swapped in."""
+    from . import db
+    from .routes_trainer import _with_character_image, _with_local_sprite
+    pokemon = [row for _, row in db.fetch_rows(conn, 'pokemon', db.POKEMON_COLUMNS)]
+    return [{
+        'trainer': _with_character_image(row),
+        'pokemon': [_with_local_sprite(p) for p in pokemon if str(p[0]).lower() == str(row[1]).lower()],
+    } for _, row in db.fetch_rows(conn, 'trainers', db.TRAINER_COLUMNS)]
+
+
+def _parse_inventory(text):
+    """A trainer's inventory cell -> (regular [[name, qty]], custom [{name, description, quantity}]). Regular items are
+    "Potion (x2), Antidote (x1)" (named after the items list); custom ones are JSON after a ##CUSTOM## marker -- the same
+    format trainer-info.js reads and writes."""
+    import re
+    text = str(text or '')
+    regular_text, _, custom_text = text.partition('##CUSTOM##')
+    regular = []
+    # Each entry runs up to its own "(xN)" -- some names have a comma in them ("Tent, small (x1)"), so a plain split on
+    # commas would cut them in two. Whatever is left after the last "(xN)" is entries without a count (1 each).
+    end = 0
+    for m in re.finditer(r'(.*?)\(x(\d+)\)\s*,?', regular_text):
+        name = m.group(1).strip().strip(',').strip()
+        if name:
+            regular.append([name, int(m.group(2))])
+        end = m.end()
+    for part in regular_text[end:].split(','):
+        part = part.strip()
+        if part and part.lower() != 'none':
+            regular.append([part, 1])
+    try:
+        custom = json.loads(custom_text) if custom_text else []
+    except ValueError:
+        custom = []
+    return regular, custom if isinstance(custom, list) else []
+
+
+def _format_inventory(regular, custom):
+    text = ', '.join(f'{name} (x{qty})' for name, qty in regular if qty > 0)
+    custom = [c for c in custom if (c.get('quantity') or 0) > 0]
+    return f'{text}##CUSTOM##{json.dumps(custom, ensure_ascii=False)}' if custom else text
+
+
+def give_item(conn, trainer_name, item, quantity, custom=False, description=''):
+    """Adds `quantity` of `item` to the trainer's inventory (a negative quantity takes some away; at 0 it's gone) --
+    read, changed and written in one go, so a change the player just made isn't overwritten."""
+    from . import db, live
+    from .routes_trainer import _find_trainer_rowid
+    rowid = _find_trainer_rowid(conn, trainer_name)
+    if rowid is None:
+        raise ValueError('Trainer not found: ' + trainer_name)
+    current = conn.execute('SELECT "inventory" FROM trainers WHERE rowid = ?', (rowid,)).fetchone()[0]
+    regular, custom_items = _parse_inventory(current)
+    item = item.strip()
+    if custom:
+        entry = next((c for c in custom_items if str(c.get('name', '')).lower() == item.lower()), None)
+        if entry:
+            entry['quantity'] = (js_parse_int(entry.get('quantity')) or 0) + quantity
+            if description:
+                entry['description'] = description
+        elif quantity > 0:
+            custom_items.append({'name': item, 'description': description or '', 'quantity': quantity})
+    else:
+        entry = next((r for r in regular if r[0].lower() == item.lower()), None)
+        if entry:
+            entry[1] += quantity
+        elif quantity > 0:
+            regular.append([item, quantity])
+    new_value = _format_inventory(regular, custom_items)
+    db.set_cell(conn, 'trainers', rowid, 'inventory', new_value)
+    live.publish({'type': 'trainer-data', 'trainer': trainer_name})
+    return {'status': 'success', 'inventory': new_value}
+
+
+def give_money(conn, trainer_name, amount):
+    """Adds `amount` (negative takes some away, never below 0) to the trainer's money, in one go."""
+    from . import db, live
+    from .routes_trainer import _find_trainer_rowid
+    rowid = _find_trainer_rowid(conn, trainer_name)
+    if rowid is None:
+        raise ValueError('Trainer not found: ' + trainer_name)
+    current = js_parse_int(conn.execute('SELECT "money" FROM trainers WHERE rowid = ?', (rowid,)).fetchone()[0]) or 0
+    new_value = max(0, current + amount)
+    db.set_cell(conn, 'trainers', rowid, 'money', json.dumps(new_value))  # same bare-number string the money route stores
+    live.publish({'type': 'trainer-data', 'trainer': trainer_name})
+    return {'status': 'success', 'money': new_value}
 
 
 def load_setup(conn):

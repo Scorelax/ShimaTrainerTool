@@ -201,6 +201,22 @@ def save_dm_setup(payload: dict):
     return JSONResponse({'status': 'success'})
 
 
+@app.post('/api/dm/pokedex-config')
+def save_dm_pokedex_config(payload: dict):
+    """The DM console's Pokedex module: what the players may see of each species (pokedexConfig -- registered,
+    visibility, defaults). Live-pushed the same way Benjakronk's own publish is, so open devices pick it up at once."""
+    conn = db.connect()
+    try:
+        upstream.store_local_pokedex_config(conn, payload.get('config'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    version = _data_version()
+    live.publish({'dataset': 'pokedex-config', 'version': version})
+    return JSONResponse({'status': 'success'}, headers={'X-Data-Version': version})
+
+
 @app.get('/api/events')
 async def live_events(request: Request):
     """Server-Sent Events stream: notifies connected devices the instant

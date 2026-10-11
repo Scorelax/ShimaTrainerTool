@@ -156,7 +156,9 @@ _EMPTY_STATE = {
 # The trainers' basic attack -- an ordinary entry in the moves file (1d6 + STR, typeless), used from the card's Attack button.
 TRAINER_ATTACK_MOVE = 'Attack'
 
-_PVP_DEFAULT_GRID = {'cols': 11, 'rows': 13}
+# The table TV (1920x1080) shows the board turned sideways -- rows across, cols down -- so 20 x 11 squares are
+# (near) square there: 96 x 98px. combat-wip.js's grid-size fields keep any size the user picks at that ratio.
+_PVP_DEFAULT_GRID = {'cols': 11, 'rows': 20}
 _PVP_DEFAULT_BACKGROUND = 'battle-forest.png'
 
 
@@ -187,7 +189,7 @@ def _handle(conn, action, params):
         state['active'] = True
         state['battleType'] = battle_type
         if battle_type == 'pvp':
-            # PvP starts on an 11x13 forest map (the user's call); still changeable on the placement screen.
+            # PvP starts on an 11x20 forest map (the user's call); still changeable on the placement screen.
             state['board']['grid'] = dict(_PVP_DEFAULT_GRID)
             if os.path.isfile(os.path.join(upstream.BATTLE_IMAGE_DIR, _PVP_DEFAULT_BACKGROUND)):
                 state['board']['backgroundImage'] = f'/battle-images/{_PVP_DEFAULT_BACKGROUND}'

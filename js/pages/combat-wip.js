@@ -1764,9 +1764,9 @@ function renderPlacementPhase(state, currentId) {
         <div class="placement-bg-picker">
           <label for="placementGridCols">Grid Size</label>
           <div class="placement-grid-size-row">
-            <input type="number" id="placementGridCols" min="1" value="${cols}" style="width:56px;">
+            <input type="number" id="placementGridCols" min="1" value="${cols}" style="width:56px;" title="Squares down the TV">
             <span>×</span>
-            <input type="number" id="placementGridRows" min="1" value="${rows}" style="width:56px;">
+            <input type="number" id="placementGridRows" min="1" value="${rows}" style="width:56px;" title="Squares across the TV (the other number follows, so the squares stay square on the TV)">
             <button type="button" id="placementSetGridBtn">Set</button>
           </div>
         </div>
@@ -1970,9 +1970,22 @@ function attachPlacementListeners(state, currentId) {
   // used to let anyone resize mid-fight -- see battle-map-popup.js's own
   // history). Any placer can still set it, same open-trust model as the
   // background picker above; whoever sets it last wins, same as before.
+  // The two fields are linked so the squares stay square on the table TV (16:9, board turned sideways: rows run across
+  // the screen, cols down it) -- change one and the other follows, e.g. 20 across -> 11 down, 25 across -> 14 down.
+  const colsField = document.getElementById('placementGridCols');
+  const rowsField = document.getElementById('placementGridRows');
+  const TV_ASPECT = 16 / 9;
+  colsField?.addEventListener('input', () => {
+    const cols = parseInt(colsField.value, 10);
+    if (cols > 0) rowsField.value = Math.max(1, Math.round(cols * TV_ASPECT));
+  });
+  rowsField?.addEventListener('input', () => {
+    const rows = parseInt(rowsField.value, 10);
+    if (rows > 0) colsField.value = Math.max(1, Math.round(rows / TV_ASPECT));
+  });
   document.getElementById('placementSetGridBtn')?.addEventListener('click', async () => {
-    const cols = parseInt(document.getElementById('placementGridCols').value, 10) || 10;
-    const rows = parseInt(document.getElementById('placementGridRows').value, 10) || 12; // matches routes_combat.py's own default
+    const cols = parseInt(colsField.value, 10) || 11;
+    const rows = parseInt(rowsField.value, 10) || 20; // matches routes_combat.py's PvP default
     try { await CombatAPI.setBoardTemplate(cols, rows); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
   });
 

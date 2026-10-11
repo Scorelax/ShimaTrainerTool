@@ -68,6 +68,20 @@ export async function resetSetup() {
   _listeners.forEach(l => l(_setup));
 }
 
+/** Back to a blank map (default size, no background, objects or marks, not ready). Where the creatures stood belonged
+ * to the old map, so those spots go too -- the creatures themselves stay. */
+export function resetMap() {
+  updateSetup(s => {
+    s.map = emptySetup().map;
+    s.creatures.forEach(c => { c.position = null; });
+  });
+}
+
+/** Removes every NPC trainer and Pokemon from the setup; the map stays. */
+export function resetBattle() {
+  updateSetup(s => { s.creatures = []; });
+}
+
 export function onSetupChange(fn) {
   _listeners.add(fn);
   return () => _listeners.delete(fn);

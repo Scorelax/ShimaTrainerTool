@@ -54,13 +54,10 @@
     position: fixed; inset: 0; background: rgba(0,0,0,0.92);
     display: flex; align-items: center; justify-content: center; z-index: 10;
   }
+  /* Only while a move animation plays -- display:flex above would otherwise beat the hidden attribute and leave this
+     92%-black layer over the whole screen all the time. */
+  .display-anim-overlay[hidden] { display: none; }
   .display-anim-overlay video { max-width: 90vw; max-height: 90vh; }
-
-  .display-volume {
-    position: fixed; bottom: 0.75rem; right: 1rem; z-index: 20;
-    background: rgba(0,0,0,0.4); border-radius: 20px; padding: 0.3rem 0.8rem;
-    display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem;
-  }
 </style>
 </head>
 <body>

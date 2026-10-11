@@ -8,7 +8,7 @@
 import { CombatAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { audioManager } from '../utils/audio.js';
-import { getSettings, saveSettings } from '../utils/settings.js';
+import { getSettings } from '../utils/settings.js';
 import { spriteMediaHtml, patchPortraitMedia } from '../utils/sprite-media.js';
 import { preloadBattleAnimation, getBattleAnimationUrl } from '../utils/battle-animation.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
@@ -40,7 +40,7 @@ function preloadAllAnimations() {
 }
 
 // ---------------------------------------------------------------------------
-// Render -- the skeleton (spotlight card, strip, overlay, volume slider) is
+// Render -- the skeleton (spotlight card, strip, animation overlay) is
 // built once and left alone; every subsequent push only patches text, bar
 // widths and classes in place. Critically, a participant's portrait
 // <video>/<img> is only ever rebuilt when its image URL actually changes --
@@ -89,14 +89,7 @@ function ensureSkeleton(root) {
     </div>
     <div class="display-strip" id="displayStrip"></div>
     <div class="display-anim-overlay" id="animOverlay" hidden></div>
-    <div class="display-volume">🔊 <input type="range" id="displayVolume" min="0" max="100" value="${getSettings().volume}"></div>
   `;
-
-  document.getElementById('displayVolume')?.addEventListener('input', (e) => {
-    const value = parseInt(e.target.value, 10);
-    audioManager.setVolume(value);
-    saveSettings({ volume: value });
-  });
 }
 
 function barsHtml(p) {
@@ -204,8 +197,8 @@ async function playAnimationOverlay(species) {
   video.disablePictureInPicture = true;
   // Unlike the idle sprite loop (always muted) and the current combat page's
   // move-confirm popup (unmuted but never actually routed through app
-  // volume), this ties playback volume to the same device-level setting the
-  // slider above controls.
+  // volume), this ties playback volume to the device's saved volume setting
+  // (no slider on this screen -- music comes from the DM's own laptop).
   video.volume = audioManager.volume;
   overlay.innerHTML = '';
   overlay.appendChild(video);

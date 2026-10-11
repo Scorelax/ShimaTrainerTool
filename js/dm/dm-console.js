@@ -12,7 +12,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { enableDmMode } from '../pages/combat-wip.js';
 import { injectBattleMapStyles } from '../utils/battle-map-view.js';
 import { DM, escapeHtml } from './dm-common.js';
-import { loadSetup, getSetup, flushSetup, resetSetup, mapReady, battleReady } from './setup-store.js';
+import { loadSetup, getSetup, flushSetup, resetSetup, resetMap, resetBattle, mapReady, battleReady } from './setup-store.js';
 import { renderMapEditor, mapPreviewHtml } from './map-editor.js';
 import { renderCreatureSetup } from './creature-setup.js';
 import { mountLive, updateLive } from './battle-live.js';
@@ -142,6 +142,9 @@ function renderHome(view) {
   const marks = Object.values(m.marks || {});
   const bgLabel = m.background ? m.background.replace(/^.*battle-|\.png$/g, '').replace(/[-_]/g, ' ') : 'no background';
   const trainers = s.creatures.filter(c => c.kind === 'trainer');
+  // Anything to reset? The map counts once it's been touched at all (marked ready, a background, objects, marks).
+  const mapTouched = okMap || !!m.background || objects > 0 || marks.length > 0;
+  const battleTouched = s.creatures.length > 0;
   const line = (c) => `
     <div class="dm-home-creature">
       <span class="dm-home-thumb" data-img="${escapeHtml(c.participant?.image || '')}"></span>
@@ -155,7 +158,7 @@ function renderHome(view) {
           <h2>Battle setup</h2>
           <div class="dm-hint">Set up the map and the battle, then start it -- the players can join once it has started.</div>
         </div>
-        <button class="dm-btn small" id="homeReset" ${!s.creatures.length && !objects && !marks.length ? 'disabled' : ''}>New setup</button>
+        <button class="dm-btn danger" id="homeReset" ${mapTouched || battleTouched ? '' : 'disabled'} title="Reset both the map and the battle">🗑 Clear battle</button>
       </div>
       <div class="dm-home-cards">
         <div class="dm-home-card">
@@ -166,7 +169,10 @@ function renderHome(view) {
           <div class="dm-home-preview">${mapPreviewHtml(s)}</div>
           <div class="dm-hint">${m.rows} × ${m.cols} squares · ${escapeHtml(bgLabel)} · ${objects} object${objects === 1 ? '' : 's'}
             · ${marks.filter(k => k === 'difficult').length} difficult · ${marks.filter(k => k === 'blocked').length} blocked</div>
-          <button class="dm-btn primary wide" id="homeMap">${okMap ? 'Change the map' : 'Set up map'}</button>
+          <div class="dm-home-actions">
+            <button class="dm-btn primary" id="homeMap">${okMap ? 'Change the map' : 'Set up map'}</button>
+            <button class="dm-btn danger" id="homeResetMap" ${mapTouched ? '' : 'disabled'}>Reset map</button>
+          </div>
         </div>
         <div class="dm-home-card">
           <div class="dm-home-card-head">
@@ -175,7 +181,10 @@ function renderHome(view) {
           </div>
           <div class="dm-home-creatures">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">No NPC trainers or Pokémon yet.</div>'}</div>
           ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them in the battle setup, or from the battle once it starts.</div>` : ''}
-          <button class="dm-btn primary wide" id="homeCreatures" ${okMap ? '' : 'disabled'}>${okBattle ? 'Change the battle' : 'Set up battle'}</button>
+          <div class="dm-home-actions">
+            <button class="dm-btn primary" id="homeCreatures" ${okMap ? '' : 'disabled'}>${okBattle ? 'Change the battle' : 'Set up battle'}</button>
+            <button class="dm-btn danger" id="homeResetBattle" ${battleTouched ? '' : 'disabled'}>Reset battle</button>
+          </div>
           ${okMap ? '' : '<div class="dm-hint">Set up the map first -- the battle setup places everyone on it.</div>'}
         </div>
       </div>
@@ -191,10 +200,26 @@ function renderHome(view) {
   document.getElementById('homeCreatures').addEventListener('click', () => showSetupView('creatures'));
   document.getElementById('homeStart').addEventListener('click', startBattle);
   document.getElementById('homeReset').addEventListener('click', async () => {
-    if (!await showCombatConfirm('Clear the map and the battle and start a new setup?', { title: 'New setup', yesLabel: 'Clear it', noLabel: 'Cancel' })) return;
-    try { await resetSetup(); } catch (err) { showCombatAlert(err.message, { title: 'New setup' }); }
+    if (!await showCombatConfirm('Reset both the map and the battle setup? Everything set up so far is removed.', { title: 'Clear battle', yesLabel: 'Clear it', noLabel: 'Cancel' })) return;
+    try { await resetSetup(); } catch (err) { showCombatAlert(err.message, { title: 'Clear battle' }); }
     renderHome(view);
   });
+  document.getElementById('homeResetMap').addEventListener('click', async () => {
+    if (!await showCombatConfirm('Reset the map? Its size, background, objects and terrain go back to blank, and everyone placed on it is taken off (the creatures themselves stay).', { title: 'Reset map', yesLabel: 'Reset map', noLabel: 'Cancel' })) return;
+    resetMap();
+    await saveNow();
+    renderHome(view);
+  });
+  document.getElementById('homeResetBattle').addEventListener('click', async () => {
+    if (!await showCombatConfirm('Reset the battle? Every NPC trainer and Pokémon is removed from the setup (the map stays).', { title: 'Reset battle', yesLabel: 'Reset battle', noLabel: 'Cancel' })) return;
+    resetBattle();
+    await saveNow();
+    renderHome(view);
+  });
+}
+
+async function saveNow() {
+  try { await flushSetup(); } catch (err) { showCombatAlert(err.message, { title: "Couldn't save the setup" }); }
 }
 
 async function startBattle() {

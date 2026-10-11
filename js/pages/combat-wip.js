@@ -5362,7 +5362,6 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
   if (laserFocusId) crit = true;
 
   let damageDealt, targetFainted, rawDamageDealt, lastTypeMultiplier = null;
-  const hpBefore = session?.participants?.[targetId]?.currentHP; // Sturdy: was the hit at least half its HP?
   try {
     // No "N damage applied" popup -- it's already in the shared battle log
     // (routes_combat.py's _apply_damage_to_target logs it server-side, same as
@@ -5375,21 +5374,9 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     // own post-type-multiplier result, just one round trip cheaper.
     const rawTotal = rawRoll + damageModifier;
     const finalDamage = damageMultiplier !== 1 ? Math.floor(rawTotal * damageMultiplier) : rawTotal;
-    // Sturdy / Fur Coat / Friend Guard are asked BEFORE the hit lands (off a server preview of its real size), so a
-    // knockout one of them prevents never happens -- and never fires the attacker's Moxie / Beast Boost.
-    let soften = null;
-    const target = session?.participants?.[targetId];
-    if (damagePool !== 'vp' && target && targetId !== combatantId && _mayBeSoftened(target)) {
-      const preview = (await CombatAPI.previewDamage(combatantId, targetId, finalDamage, moveType, moveName, !!crit, damagePool))?.data || {};
-      const row = findMoveRow(moveName) || move || [];
-      soften = await _abilityDamageReactions({
-        attacker, target, damageDealt: preview.damageApplied,
-        event: { melee: isMeleeMoveRow(row), moveType: (move && move[1]) || row[1] || '', damaging: (preview.damageApplied ?? 0) > 0,
-          vulnerable: (preview.multiplier ?? 1) > 1, attackRoll, hpBefore: preview.hpBefore ?? hpBefore,
-          damageDealt: preview.damageApplied, drain: categories.includes('drain') },
-      });
-    }
-    const dmgResult = await CombatAPI.applyDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, !!crit, damagePool, soften);
+    // The hit with its abilities (Sturdy first, then reactions, Rough Skin, Moxie...) -- see _landHit.
+    const dmgResult = await _landHit({ attackerId: combatantId, targetId, damage: finalDamage, moveType, speciesName, moveName, move,
+      crit: !!crit, pool: damagePool, attackRoll });
     damageDealt = dmgResult?.damageApplied;
     targetFainted = dmgResult?.targetFainted;
     lastTypeMultiplier = dmgResult?.multiplier ?? null;
@@ -5398,13 +5385,6 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     showCombatAlert(err.message, { title: 'Error' });
     return null;
   }
-  // 'damaged'-family reactions (Attract, Conversion 2, Lucky Chant, ...) fire
-  // right here -- after damage lands, before anything else about this hit is
-  // resolved.
-  await waitForDamagedReactions(targetId, combatantId, moveName);
-  await _maybeMeleeRetaliate(combatantId, targetId, moveName);
-  await _abilityHitTriggers({ attackerId: combatantId, targetId, moveName, move, attackRoll, damageDealt, typeMultiplier: lastTypeMultiplier,
-    hpBefore, crit: !!crit, targetFainted: !!targetFainted, drain: categories.includes('drain') });
 
   // Some moves land a hit AND separately make the hit creature save against
   // a secondary consequence (e.g. Temporal Fang: damage on the attack roll,
@@ -5447,10 +5427,41 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
  * needing its own branch. The tag survives migration untouched (nothing in
  * `tag_for` derives it from any effect kind, so rebuild_categories never
  * retires it) -- already-reliable, already-present data, not something
- * this pass had to add. */
+ * this pass had to add. The hit goes through _landHit, so a save move's or an area move's damage runs the same abilities
+ * as a single-target attack (Sturdy, Rough Skin, Static, Moxie...). */
 async function _applyPrimaryDamage(casterId, targetId, diceRoll, moveType, speciesName, moveName, crit = false, poolOverride = null) {
   const pool = poolOverride || (moveCategoriesFor(moveName).includes('damage_vp') ? 'vp' : 'hp');
-  return CombatAPI.applyDamage(casterId, targetId, diceRoll, moveType, speciesName, moveName, crit, pool);
+  return _landHit({ attackerId: casterId, targetId, damage: diceRoll, moveType, speciesName, moveName, crit, pool });
+}
+
+/** One move's damage landing on one creature, with every ability around it -- single-target attacks, area moves and save
+ * moves alike: the target's (or an ally's) Sturdy / Fur Coat / Friend Guard is asked BEFORE the hit (off a server
+ * preview of its real size, so a knockout it prevents never happens and never fires Moxie / Beast Boost), then the hit,
+ * the 'damaged'-family reactions (Attract, Lucky Chant...), melee retaliation, and the on-hit abilities (Rough Skin,
+ * Static, Flame Body, Poison Touch, Moxie, Aftermath...). Returns apply-damage's result; throws if the hit is refused. */
+async function _landHit({ attackerId, targetId, damage, moveType, speciesName, moveName, move = null, crit = false, pool = 'hp', attackRoll = null }) {
+  const attacker = session?.participants?.[attackerId];
+  const target = session?.participants?.[targetId];
+  const hpBefore = target?.currentHP; // Sturdy: was the hit at least half its HP?
+  const drain = moveCategoriesFor(moveName).includes('drain');
+  let soften = null;
+  if (pool !== 'vp' && target && targetId !== attackerId && _mayBeSoftened(target)) {
+    const preview = (await CombatAPI.previewDamage(attackerId, targetId, damage, moveType, moveName, !!crit, pool))?.data || {};
+    const row = findMoveRow(moveName) || move || [];
+    soften = await _abilityDamageReactions({
+      attacker, target, damageDealt: preview.damageApplied,
+      event: { melee: isMeleeMoveRow(row), moveType: (move && move[1]) || row[1] || moveType || '', damaging: (preview.damageApplied ?? 0) > 0,
+        vulnerable: (preview.multiplier ?? 1) > 1, attackRoll, hpBefore: preview.hpBefore ?? hpBefore,
+        damageDealt: preview.damageApplied, drain },
+    });
+  }
+  const dmgResult = await CombatAPI.applyDamage(attackerId, targetId, damage, moveType, speciesName, moveName, !!crit, pool, soften);
+  // 'damaged'-family reactions fire right here -- after the damage lands, before anything else about this hit.
+  await waitForDamagedReactions(targetId, attackerId, moveName);
+  await _maybeMeleeRetaliate(attackerId, targetId, moveName);
+  await _abilityHitTriggers({ attackerId, targetId, moveName, move, attackRoll, damageDealt: dmgResult?.damageApplied,
+    typeMultiplier: dmgResult?.multiplier ?? null, hpBefore, crit: !!crit, targetFainted: !!dmgResult?.targetFainted, drain });
+  return dmgResult;
 }
 
 /** Wired into combat.js's move-popup flow as onMultiHitAoe -- for moves
@@ -5548,8 +5559,6 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
           const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, false,
             targetId === vpHalfId ? 'vp' : null);
           if (Number.isFinite(dmgResult?.damageApplied)) totalDamageDealt += dmgResult.damageApplied;
-          await waitForDamagedReactions(targetId, combatantId, moveName);
-          await _maybeMeleeRetaliate(combatantId, targetId, moveName);
           if (outcome.passed) {
             CombatAPI.logEvent({
               type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
@@ -5758,7 +5767,6 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
     // No "N damage applied" popup -- see _resolveOneHit's own note on why.
     const dmgResult = await _applyPrimaryDamage(combatantId, picked.targetId, picked.rawRoll + damageModifier, moveType, speciesName, moveName);
     damageDealt = dmgResult?.damageApplied;
-    await waitForDamagedReactions(picked.targetId, combatantId, moveName);
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }

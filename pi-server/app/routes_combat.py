@@ -38,7 +38,7 @@ import uuid
 from datetime import datetime, timezone
 
 from . import abilities, db, live, routes_gamedata, upstream
-from .conditions import untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, weather_damage_kind, is_grounded, grounded_in, altitude_limits
+from .conditions import is_levitating, untargetable_state, UNTARGETABLE_STATES, INCAPACITATING_CONDITIONS, REACTION_BLOCKING_CONDITIONS, condition_turn_damage, effective_speed_multiplier, zero_speed_condition, blocking_shield, incoming_damage_multiplier, outgoing_damage_multiplier, speed_override, granted_speed_entries, disabled_moves, move_lock, speed_bonus_entries, speed_multiplier_entries, incoming_flat_reduction, terrain_kind, terrain_blocked_status, terrain_blocks_bonus_actions, MISTY_BLOCKED_CONDITIONS, footprint_cells, footprint_size, terrains_affecting, weathers_affecting, weather_damage_for, weather_damage_kind, is_grounded, grounded_in, altitude_limits
 from .jsutil import js_parse_int
 
 # Same os.environ-overridable, ~-expanded convention as upstream.py's other
@@ -155,8 +155,9 @@ _EMPTY_STATE = {
         # display) renders against.
         'backgroundImage': None,
         # The DM console's map editor (dm-console.html): pictures placed on the map -- [{id, kind, label, url, col, row,
-        # w, h, rot, crop}], (col, row) the TOP-LEFT cell, w x h cells, rot in 90-degree steps, crop the picture's
-        # visible part as fractions [x0, y0, x1, y1] (see battle-map-grid.js's mapObjectsHtml) -- purely visual...
+        # w, h, rot, crop, height, markKind}], (col, row) the TOP-LEFT cell, w x h cells, rot in 90-degree steps, crop
+        # the picture's visible part as fractions [x0, y0, x1, y1] (see battle-map-grid.js's mapObjectsHtml), height in
+        # ft (kept for line of sight / cover later) -- the picture itself doesn't change any rules...
         'objects': [],
         # ...and the squares the DM marked: "col,row" -> one of MAP_MARK_KINDS. These ARE rules: difficult doubles the
         # movement cost like a Fissure zone, blocked can't be walked through or stood on (see _move_cost_ft/_move_token).
@@ -196,9 +197,13 @@ def _handle(conn, action, params):
         return {'status': 'success', 'data': load_state(conn)}
 
     if action == 'create-session':
-        battle_type = params.get('battleType', 'pve')
-        if battle_type not in ('pvp', 'pve'):
-            raise ValueError('battleType must be pvp or pve')
+        battle_type = params.get('battleType', 'pvp')
+        if battle_type == 'pve':
+            # A PvE battle is the DM's: it's set up and started from the DM console (start_prepared_session), and the
+            # players join it once it's running. Players only ever create PvP battles themselves.
+            raise ValueError('PvE battles are started by the DM -- join it once the DM has started it.')
+        if battle_type != 'pvp':
+            raise ValueError('battleType must be pvp')
         if load_state(conn).get('active'):
             # One battle at a time -- a new one would silently replace the running one. It ends when its last
             # participant leaves (End Battle), so only the people in it can end it.
@@ -706,6 +711,8 @@ def _clean_map_objects(objects, cols, rows):
             'id': str(o.get('id') or uuid.uuid4().hex[:8]), 'kind': str(o.get('kind') or ''), 'label': str(o.get('label') or ''),
             'url': o['url'], 'col': col, 'row': row, 'w': max(1, min(w, cols)), 'h': max(1, min(h, rows)),
             'rot': (js_parse_int(o.get('rot')) or 0) % 360 // 90 * 90, 'crop': [max(0.0, min(1.0, float(v))) for v in crop],
+            'height': max(0, min(500, js_parse_int(o.get('height')) or 0)),
+            **({'markKind': o['markKind']} if o.get('markKind') in MAP_MARK_KINDS else {}),
         })
     return out
 
@@ -3674,7 +3681,8 @@ def _move_cost_ft(state, participant, c0, r0, c1, r1, z0=0, z1=0):
         for z in state.get('terrainZones') or []:
             if z.get('difficult'):
                 difficult.update(z.get('cells') or ())
-        difficult.update(cell for cell, kind in _map_marks(state).items() if kind == 'difficult')  # the DM's map marks
+        if not is_levitating(participant):  # the DM's map marks -- a Levitate / hovering creature floats over them
+            difficult.update(cell for cell, kind in _map_marks(state).items() if kind == 'difficult')
     horizontal = sum(10 if f"{c},{r}" in difficult else 5 for c, r in _path_cells(c0, r0, c1, r1))
     return max(horizontal, abs(z1 - z0))
 
@@ -4026,8 +4034,9 @@ def _move_token(state, pid, col, row, z=None):
         if z1 > z0:
             raise ValueError(f"{participant['name']} can't fly inside the Gravity field")
         z0 = z1 = 0  # flying into it: it lands (the fall itself costs no movement)
-    if current and z1 == 0:
-        # A flyer passes over the DM's blocked squares, and a burrower under them -- only a move on the ground is stopped.
+    if current and z1 == 0 and not is_levitating(participant):
+        # A flyer passes over the DM's blocked squares, a Levitate / hovering creature floats over them, and a burrower
+        # goes under them -- only a move on the ground is stopped.
         wall = _blocked_cell_on_path(state, current['col'], current['row'], col, row, footprint_size(participant.get('size')))
         if wall:
             raise ValueError(f"{participant['name']} can't move through ({wall[0]}, {wall[1]}) -- that square is blocked")
@@ -4075,7 +4084,8 @@ def _confirm_placement(state, pid, col, row, facing=None):
     for other_id, pos in state['board']['tokens'].items():
         if other_id != pid and pos['col'] == col and pos['row'] == row:
             raise ValueError('That square is already taken')
-    if any(_map_marks(state).get(f'{c},{r}') == 'blocked' for c, r in footprint_cells(col, row, footprint_size(participant.get('size')))):
+    if not is_levitating(participant) and any(_map_marks(state).get(f'{c},{r}') == 'blocked'
+                                              for c, r in footprint_cells(col, row, footprint_size(participant.get('size')))):
         raise ValueError("That square is blocked -- pick another one")
     facing = _facing_of(state, pid) if facing is None else (round(facing / 45) * 45) % 360
     state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing, 'z': _altitude_of(state, pid)}

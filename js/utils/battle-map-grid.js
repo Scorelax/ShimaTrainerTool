@@ -105,7 +105,8 @@ export function mapObjectHtml(o, rect, turn = 0) {
   const cw = Math.max(0.01, x1 - x0), ch = Math.max(0.01, y1 - y0);
   const img = `width:${(100 / cw).toFixed(3)}%;height:${(100 / ch).toFixed(3)}%;left:${(-x0 / cw * 100).toFixed(3)}%;top:${(-y0 / ch * 100).toFixed(3)}%`;
   const style = `left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height}`;
-  return `<div class="bmap-object" data-object-id="${o.id}" style="${style}" title="${o.label || o.kind || ''}">`
+  const title = `${o.label || o.kind || ''}${o.height ? ` · ${o.height}ft tall` : ''}`;
+  return `<div class="bmap-object" data-object-id="${o.id}" style="${style}" title="${title}">`
     + `<div class="bmap-object-art${rot % 180 ? ' swap' : ''}" style="transform:translate(-50%,-50%) rotate(${rot}deg)">`
     + `<img src="${o.url}" alt="" draggable="false" style="${img}"></div></div>`;
 }
@@ -127,8 +128,8 @@ export const MAP_OBJECT_CSS = `
 /** Styles for the DM's difficult / blocked squares (gridCellsHtml's mark-* classes) -- shared the same way. */
 export const MAP_MARK_CSS = `
   .mark-difficult {
-    background: repeating-linear-gradient(135deg, rgba(205,150,70,0.34) 0 4px, rgba(205,150,70,0.06) 4px 9px);
-    box-shadow: inset 0 0 0 1px rgba(214,160,70,0.6);
+    background: repeating-linear-gradient(135deg, rgba(215,155,65,0.46) 0 4px, rgba(215,155,65,0.12) 4px 9px);
+    box-shadow: inset 0 0 0 1px rgba(225,165,70,0.78);
   }
   .mark-blocked {
     background:

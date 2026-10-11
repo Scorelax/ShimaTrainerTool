@@ -39,7 +39,10 @@ def handle(conn, action, params):
             nickname=params.get('nickname', ''), held_item=params.get('item', ''),
             shiny=str(params.get('shiny', '')).lower() in ('1', 'true'),
             stats=json.loads(params['stats']) if params.get('stats') else None,
-            overrides=json.loads(params['overrides']) if params.get('overrides') else None)}
+            overrides=json.loads(params['overrides']) if params.get('overrides') else None,
+            extra_skills=[s for s in str(params.get('skills', '')).split(',') if s.strip()],
+            # The battle setup's live preview of the numbers: no picture lookup (a network probe for a species never looked up).
+            probe_image=str(params.get('preview', '')).lower() not in ('1', 'true'))}
 
     if action == 'get-setup':
         return {'status': 'success', 'data': load_setup(conn)}
@@ -127,6 +130,12 @@ def species_list(conn):
             'size': _cell(row, 9), 'rarity': _cell(row, 10), 'habitat': _cell(row, 11),
             'behavior': _cell(row, 12), 'activity': _cell(row, 13),
             'level': js_parse_int(_cell(row, 19)) or 1,
+            # The encyclopedia's own numbers (before level, nature or anything the DM changes).
+            'base': {
+                **{k: js_parse_int(_cell(row, i)) for k, i in zip(_STAT_KEYS, range(27, 33))},
+                'ac': js_parse_int(_cell(row, 20)), 'hitDice': js_parse_int(_cell(row, 21)), 'vitalityDice': js_parse_int(_cell(row, 23)),
+                'speed': _cell(row, 25), 'savingThrows': _cell(row, 33), 'skills': _cell(row, 34),
+            },
             'abilities': _abilities(row),
             'image': upstream.local_sprite_url(name) or upstream.get_image_url(conn, name, _cell(row, 1), probe=False) or '',
         })
@@ -135,14 +144,15 @@ def species_list(conn):
 
 
 def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), nickname='', held_item='', shiny=False,
-                  stats=None, overrides=None):
+                  stats=None, overrides=None, extra_skills=(), probe_image=True):
     """A full Pokemon row (db.POKEMON_COLUMNS order, the same 62-column shape a player's Pokemon has) for a wild /
     DM-controlled Pokemon, built from its encyclopedia entry the way pokemon-form.js builds one before registering,
     then run through the exact same stat maths -- but never stored. The DM console turns it into a battle
     participant with the same builder the players' own Pokemon go through (combat.js's buildPokemonCombatant).
 
     The DM's own changes: `stats` ({'str': 14, ...}) are final ability scores -- HP, VP, modifiers and initiative follow
-    them -- and `overrides` ({'ac', 'maxHP', 'maxVP'}) are set last, as typed."""
+    them -- `overrides` ({'ac', 'maxHP', 'maxVP'}) are set last, as typed, and `extra_skills` are proficiencies it has on
+    top of its species' own."""
     row = next((r for r in upstream.fetch_pokemon_db(conn) if str(_cell(r, 2)).lower() == str(species).lower()), None)
     if not row:
         raise ValueError('Unknown species: ' + str(species))
@@ -158,7 +168,7 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
 
     data = [
         '',                                                   # 0: trainer name -- none, the DM controls it
-        upstream.local_sprite_url(name, shiny=shiny) or upstream.get_image_url(conn, name, dex) or '',  # 1: image
+        upstream.local_sprite_url(name, shiny=shiny) or upstream.get_image_url(conn, name, dex, probe=probe_image) or '',  # 1: image
         name,                                                 # 2: name
         dex,                                                  # 3: dex entry
         level,                                                # 4: level
@@ -195,6 +205,11 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
         '', '', '',                                           # 58-60: cry, known moves, status condition
         'Y' if shiny else '',                                 # 61: shiny
     ]
+    skills = [s.strip() for s in str(data[22] or '').split(',') if s.strip()]
+    for extra in extra_skills or ():
+        if extra.strip() and extra.strip().lower() not in {s.lower() for s in skills}:
+            skills.append(extra.strip())
+    data[22] = ', '.join(skills)
     apply_registration_stats(conn, data, {k: v for k, v in (stats or {}).items() if k in _STAT_KEYS})
     o = overrides or {}
     if js_parse_int(o.get('ac')) is not None:

@@ -40,7 +40,7 @@ import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler } from '../utils/targetability.js';
 import { areaPlacementFt, creatureDistanceFt } from '../utils/move-range.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -1846,8 +1846,8 @@ function _isCellTaken(state, col, row, currentId) {
     .some(([id, pos]) => id !== currentId &&
       overlaps(pos.col, pos.row, footprintForSize(state.participants[id]?.size)));
   if (occupied) return true;
-  // The DM's blocked squares (board.marks) can't be stood on -- the server refuses them too.
-  if (myCells.some(c => state.board.marks?.[`${c.col},${c.row}`] === 'blocked')) return true;
+  // The DM's blocked squares (board.marks) can't be stood on, unless it floats (Levitate...) -- the server refuses them too.
+  if (!isLevitating(state.participants[currentId]) && myCells.some(c => state.board.marks?.[`${c.col},${c.row}`] === 'blocked')) return true;
 
   return Object.entries(_hoverGhosts)
     .some(([id, pos]) => pos && id !== currentId &&
@@ -2135,37 +2135,15 @@ function renderBody(state) {
     return `
       <div class="combat-wip-empty">
         <h2>Battle Mode</h2>
-        <div class="combat-wip-battle-type-choice">
-          <label>
-            <input type="radio" name="battleType" value="pve" checked>
-            <span>PvE</span>
-          </label>
-          <label>
-            <input type="radio" name="battleType" value="pvp">
-            <span>PvP</span>
-          </label>
-        </div>
-        <button class="combat-wip-btn-primary" id="createSessionBtn">Create Battle</button>
+        <!-- Players only create PvP battles: a PvE battle is set up and started by the DM (dm-console.html), and
+             the players join it from here once it's running. -->
+        <p style="color:#a0a0c0;margin:0 0 1.2rem;max-width:340px;">No battle is running. Start a PvP battle, or wait for the DM to start a PvE battle -- you can join it here.</p>
+        <input type="hidden" name="battleType" value="pvp">
+        <button class="combat-wip-btn-primary" id="createSessionBtn">Create PvP Battle</button>
       </div>`;
   }
 
   return `
-    ${state.battleType === 'pve' && !_spectating && !_dmName ? `
-    <div class="combat-wip-section-label">Add Freeform Enemy (DM-controlled)</div>
-    <form class="combat-wip-add-form" id="addParticipantForm">
-      <input type="text" name="name" placeholder="Name" required>
-      <select name="status">
-        <option value="participating">Participating</option>
-        <option value="spectating">Spectating</option>
-      </select>
-      <input type="number" name="level" placeholder="Lv" min="1" style="width:56px;">
-      <input type="number" name="maxHP" placeholder="HP" value="20" min="0">
-      <input type="number" name="maxVP" placeholder="VP" value="10" min="0">
-      <input type="text" name="type1" placeholder="Type 1 (optional)" style="width:110px;">
-      <input type="text" name="type2" placeholder="Type 2 (optional)" style="width:110px;">
-      <button type="submit" class="combat-wip-btn-primary">Add</button>
-    </form>` : ''}
-
     <div id="wipBattlePhase">${_renderMainFocusHtml(state)}</div>`;
 }
 
@@ -2467,9 +2445,9 @@ function _renderForeignFocusFull(p) {
 }
 
 /** Another trainer's own participants (themselves and their Pokemon) show their full card, read-only, in every battle type;
- * only a DM's enemy in PvE (no owner) keeps the short fog-of-war panel. */
+ * only a DM's enemy in PvE (no owner, or the DM console's 'DM') keeps the short fog-of-war panel. */
 function _showsFullForeignCard(state, p) {
-  return state.battleType === 'pvp' || !!p.owner;
+  return state.battleType === 'pvp' || (!!p.owner && p.owner !== DM_OWNER);
 }
 
 function _ensureCombatCardStyles() {
@@ -2896,7 +2874,7 @@ export function attachCombatWipListeners() {
 
 function attachBodyListeners() {
   document.getElementById('createSessionBtn')?.addEventListener('click', async () => {
-    const battleType = document.querySelector('input[name="battleType"]:checked')?.value || 'pve';
+    const battleType = 'pvp'; // PvE battles come from the DM console
     // See _justCreatedSession's own comment -- flags this device (and only this
     // one) to actually act on the live push this creates, rather than sitting
     // here doing nothing until the player happens to navigate back in.
@@ -2924,25 +2902,6 @@ function attachBodyListeners() {
   _syncHeaderBar(session);
 
   if (!session || !session.active) return; // empty-state view has nothing else to wire
-
-  document.getElementById('addParticipantForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const data = new FormData(form);
-    const maxHP = parseInt(data.get('maxHP'), 10) || 0;
-    const maxVP = parseInt(data.get('maxVP'), 10) || 0;
-    await CombatAPI.addParticipant({
-      name: data.get('name'),
-      side: 'enemy', // this form is PvE-only (see renderBody) -- freeform is always DM-controlled enemies
-      status: data.get('status'),
-      level: data.get('level') ? parseInt(data.get('level'), 10) : undefined,
-      maxHP, currentHP: maxHP,
-      maxVP, currentVP: maxVP,
-      type1: data.get('type1') || '',
-      type2: data.get('type2') || '',
-    });
-    form.reset();
-  });
 
   // combat.js's own battle engine (move list, HP/VP/AC/stat adjusters,
   // status effects, type calculator, inventory, trainer buffs, switching
@@ -6651,8 +6610,9 @@ function _bindStatusBadgeClicks() {
 // (routes_combat.py's DM_OWNER), so its enemies go through exactly the card and move engine a player's own creatures
 // do, on the DM's screen. Only the DM console turns this on -- a player's screen never does.
 let _dmName = '';
+const DM_OWNER = 'DM'; // routes_combat.py's DM_OWNER
 
-export function enableDmMode(name = 'DM') {
+export function enableDmMode(name = DM_OWNER) {
   _dmName = name;
 }
 

@@ -238,6 +238,44 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-stat { display: flex; flex-direction: column; gap: 0.15rem; }
 .dm-stat label { font-size: 0.68rem; font-weight: 800; color: var(--dm-muted); }
 .dm-stat input::placeholder { color: #7b7c99; }
+.dm-cs-work { gap: 1rem; }
+/* Stays in view while the form below scrolls, so placing someone never means scrolling back up. */
+.dm-cs-mapbox {
+  position: sticky; top: -1rem; z-index: 5; display: flex; flex-direction: column; gap: 0.4rem;
+  background: var(--dm-panel); border: 1px solid var(--dm-line); border-radius: 14px; padding: 0.7rem 0.8rem 0.8rem;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+}
+.dm-cs-mapbox .dm-map-wrap { flex: none; }
+.dm-cs-mapbox .dm-map-cell { cursor: pointer; }
+.dm-token-emoji { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 1.1rem; }
+.dm-cs-placement { display: flex; align-items: center; gap: 0.6rem; font-size: 0.86rem; margin-top: 0.3rem; min-height: 1.8rem; }
+.dm-warn-text { color: #f0b860; }
+.dm-base-grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 3px; }
+.dm-base-cell { display: flex; flex-direction: column; align-items: center; padding: 0.25rem 0.1rem; border-radius: 6px; background: rgba(255, 255, 255, 0.05); }
+.dm-base-cell span { font-size: 0.6rem; font-weight: 800; color: var(--dm-muted); text-transform: uppercase; white-space: nowrap; }
+.dm-base-cell strong { font-size: 0.9rem; }
+.dm-base-line { font-size: 0.76rem; color: var(--dm-muted); margin: 0.35rem 0; line-height: 1.35; }
+
+/* A dropdown with a checkbox per option (saving throws, skills) -- dm-common.js's multiSelectHtml. */
+.dm-multi { position: relative; }
+.dm-multi-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; text-align: left;
+  background: #121327; color: var(--dm-text); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 7px;
+  padding: 0.45rem 0.55rem; font-size: 0.88rem; cursor: pointer; font-family: inherit;
+}
+.dm-multi.empty .dm-multi-text { color: #7b7c99; }
+.dm-multi-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-multi-caret { color: var(--dm-muted); flex: none; }
+/* Opens in place (pushing what's below down) rather than floating over the next field. */
+.dm-multi-pop {
+  margin-top: 4px; max-height: 240px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr;
+  background: #1b1c33; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 8px; padding: 0.3rem;
+}
+.dm-multi-pop[hidden] { display: none; }
+.dm-multi-opt { display: flex; align-items: center; gap: 0.45rem; padding: 0.3rem 0.4rem; border-radius: 5px; font-size: 0.86rem; cursor: pointer; }
+.dm-multi-opt:hover { background: rgba(255, 255, 255, 0.06); }
+.dm-multi-opt.locked { opacity: 0.7; cursor: default; }
+.dm-multi-opt small { color: var(--dm-muted); }
 .dm-move-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .dm-move-chips span { font-size: 0.78rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--dm-line); }
 

@@ -422,6 +422,23 @@ def is_grounded(participant):
     return True
 
 
+def is_levitating(participant):
+    """Floating just above the ground even when standing at altitude 0: Levitate, Magnet Rise, an airborne status, or a
+    hovering speed -- unlike a creature with a flying speed, which walks on the ground until it takes off. Smack Down's
+    `grounded` brings it down. The DM's difficult / blocked map squares don't affect it (routes_combat.py's _map_marks).
+    Mirrored by move-effects.js's isLevitating."""
+    p = participant or {}
+    statuses = p.get('statuses', [])
+    if any(s.get('kind') == 'condition' and s.get('apply') == 'grounded' for s in statuses):
+        return False
+    if 'levitate' in str(p.get('abilities') or '').lower():
+        return True
+    if any(str(sp.get('type', '')).lower() == 'hovering' and (sp.get('ft') or 0) > 0 for sp in p.get('speeds') or []):
+        return True
+    return any(s.get('kind') == 'condition' and (s.get('apply') == 'airborne'
+               or (s.get('apply') == 'granted_immunity' and str(s.get('value') or '').lower() == 'ground')) for s in statuses)
+
+
 # Misty Terrain's "new status conditions" -- every rulebook condition that is an affliction
 # (see condition-rules.js), not the bookkeeping conditions moves also use (type_changed, mat_block, ...).
 MISTY_BLOCKED_CONDITIONS = SAFEGUARD_BLOCKED_CONDITIONS | {

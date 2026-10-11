@@ -174,8 +174,9 @@ function renderHome(view) {
             <span class="dm-pill ${okBattle ? 'ok' : 'todo'}">${okBattle ? `✓ ${s.creatures.length} ready` : 'Nobody yet'}</span>
           </div>
           <div class="dm-home-creatures">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">No NPC trainers or Pokémon yet.</div>'}</div>
-          ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them in the map setup, or from the battle once it starts.</div>` : ''}
-          <button class="dm-btn primary wide" id="homeCreatures">${okBattle ? 'Change the battle' : 'Set up battle'}</button>
+          ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them in the battle setup, or from the battle once it starts.</div>` : ''}
+          <button class="dm-btn primary wide" id="homeCreatures" ${okMap ? '' : 'disabled'}>${okBattle ? 'Change the battle' : 'Set up battle'}</button>
+          ${okMap ? '' : '<div class="dm-hint">Set up the map first -- the battle setup places everyone on it.</div>'}
         </div>
       </div>
       <div class="dm-home-start">

@@ -7,7 +7,7 @@ import { CombatAPI, DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { renderCombatWip, attachCombatWipListeners, startDmPlacement } from '../pages/combat-wip.js';
-import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow } from './dm-common.js';
+import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow, natureOptions } from './dm-common.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
@@ -33,7 +33,6 @@ export function updateLive(currentSession) {
 // ---------------------------------------------------------------------------
 
 function renderTools(el) {
-  const natures = JSON.parse(sessionStorage.getItem('natures') || '[]');
   el.innerHTML = `
     <div class="dm-card">
       <div class="dm-card-title">Table screens</div>
@@ -67,7 +66,7 @@ function renderTools(el) {
           <select class="dm-select" id="dmNature">
             <option value="">None</option>
             <option value="__random">🎲 Random (each one)</option>
-            ${natures.map(n => `<option value="${escapeHtml(n.name)}">${escapeHtml(n.name)}</option>`).join('')}
+            ${natureOptions('')}
           </select>
         </div>
         <div class="dm-field"><label>Abilities</label><div id="dmAbilities"></div></div>

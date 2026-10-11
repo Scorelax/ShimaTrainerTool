@@ -1169,6 +1169,17 @@ export function isGrounded(p) {
   return !statuses.some(s => s.kind === 'condition' && (s.apply === 'airborne' || (s.apply === 'granted_immunity' && String(s.value || '').toLowerCase() === 'ground')));
 }
 
+/** Floating just above the ground even at altitude 0 -- Levitate, Magnet Rise, an airborne status, a hovering speed (a
+ * flying-speed creature walks until it takes off); Smack Down's `grounded` ends it. The DM's difficult / blocked map
+ * squares don't affect it. Mirrors conditions.py's is_levitating. */
+export function isLevitating(p) {
+  const statuses = p?.statuses || [];
+  if (statuses.some(s => s.kind === 'condition' && s.apply === 'grounded')) return false;
+  if (/levitate/i.test(String(effectiveAbilities(p) || p?.abilities || ''))) return true;
+  if ((p?.speeds || []).some(sp => String(sp.type).toLowerCase() === 'hovering' && (Number(sp.ft) || 0) > 0)) return true;
+  return statuses.some(s => s.kind === 'condition' && (s.apply === 'airborne' || (s.apply === 'granted_immunity' && String(s.value || '').toLowerCase() === 'ground')));
+}
+
 /** isGrounded plus Gravity's zone (everyone standing in it is grounded) -- mirrors conditions.py's grounded_in. `terrains`
  * are the zones affecting `p` (terrainsAffecting). */
 export function isGroundedIn(p, terrains) {
@@ -1336,8 +1347,8 @@ export function moveCostFt(session, p, c0, r0, c1, r1, z0 = 0, z1 = 0) {
   const difficult = new Set();
   if (z1 === 0) {
     for (const z of session?.terrainZones || []) if (z.difficult) (z.cells || []).forEach(c => difficult.add(c));
-    // ...and the squares the DM marked difficult on the map (board.marks).
-    Object.entries(session?.board?.marks || {}).forEach(([c, kind]) => { if (kind === 'difficult') difficult.add(c); });
+    // ...and the squares the DM marked difficult on the map (board.marks) -- a Levitate / hovering creature floats over those.
+    if (!isLevitating(p)) Object.entries(session?.board?.marks || {}).forEach(([c, kind]) => { if (kind === 'difficult') difficult.add(c); });
   }
   const horizontal = pathCells(c0, r0, c1, r1).reduce((ft, [c, r]) => ft + (difficult.has(`${c},${r}`) ? 10 : 5), 0);
   return Math.max(horizontal, Math.abs(z1 - z0));

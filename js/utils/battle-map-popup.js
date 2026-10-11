@@ -31,7 +31,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
-import { moveCostFt, altitudeLimits, blockedCellOnPath } from './move-effects.js';
+import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 import { lineFtFromRange, lineGeometry, lineHitIds, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
@@ -433,11 +433,12 @@ function _renderGrid() {
   });
 }
 
-/** The DM's blocked squares only stop a move that ends on the ground (a flyer passes over, a burrower under) --
+/** The DM's blocked squares only stop a move that ends on the ground (a flyer passes over, a Levitate / hovering creature
+ * floats over, a burrower goes under) --
  * [col, row] of the first one in the way, or null. The server checks the same (routes_combat.py's _move_token). */
 function _blockedOnTheWay(sel, col, row) {
   const z1 = _stagedAlt ?? (sel.pos.z || 0);
-  return z1 === 0 ? blockedCellOnPath(_session, sel.pos.col, sel.pos.row, col, row, sel.size) : null;
+  return z1 === 0 && !isLevitating(sel.p) ? blockedCellOnPath(_session, sel.pos.col, sel.pos.row, col, row, sel.size) : null;
 }
 
 /** The DM's map pictures (trees, rocks...) -- under the tokens, above the grid. Rebuilt only when they change. */

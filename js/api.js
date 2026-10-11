@@ -783,9 +783,9 @@ export class CombatAPI {
     return API.request('combat', 'get-state', {}, { useCache: false });
   }
 
-  /** battleType: 'pvp' (players fight each other, no DM setup) or 'pve'
-   * (players vs DM-controlled enemies, the default). */
-  static async createSession(battleType = 'pve') {
+  /** A PvP battle (players fight each other). PvE battles are started by the DM console instead (DmAPI.startBattle) --
+   * the server refuses battleType 'pve' here. */
+  static async createSession(battleType = 'pvp') {
     return API.request('combat', 'create-session', { battleType }, { useCache: false });
   }
 
@@ -1233,9 +1233,11 @@ export class DmAPI {
 
   /** A full Pokemon row (the same 62-column shape a player's Pokemon has) for a DM-controlled Pokemon -- never
    * stored. `abilities` is the list of ability slots it has (0 primary, 1 secondary, 2 hidden). */
-  static async buildPokemon({ species, level, nature = '', abilities = [0], nickname = '', item = '', shiny = false, stats = null, overrides = null }) {
+  static async buildPokemon({ species, level, nature = '', abilities = [0], nickname = '', item = '', shiny = false, stats = null, overrides = null, extraSkills = [], preview = false }) {
     return API.request('dm', 'build-pokemon', {
       species, level, nature, abilities: abilities.join(','), nickname, item, shiny: shiny ? '1' : '',
+      ...(preview ? { preview: '1' } : {}), // just the numbers: skips looking up its picture
+      ...(extraSkills?.length ? { skills: extraSkills.join(',') } : {}), // proficiencies on top of its species' own
       // The DM's own changes: final ability scores ({str, ...}) and {ac, maxHP, maxVP}, each only when set.
       ...(stats && Object.keys(stats).length ? { stats: JSON.stringify(stats) } : {}),
       ...(overrides && Object.keys(overrides).length ? { overrides: JSON.stringify(overrides) } : {}),

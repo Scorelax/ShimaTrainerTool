@@ -1,12 +1,21 @@
-// DM console -- battle setup: the NPC trainers and Pokemon the players will face, prepared before the battle starts.
-// A Pokemon is built from the full encyclopedia at the level, nature and abilities the DM picks (routes_dm.py's
-// build-pokemon, the same maths a player's Pokemon gets) and the DM can override any of its numbers; an NPC trainer is
-// typed in. Each is saved with a ready battle participant (setup-store.js), so Start battle only has to send them in.
+// DM console -- battle setup: the NPC trainers and Pokemon the players will face, and where on the map (set up first, in
+// map-editor.js) each of them starts. A Pokemon is built from the full encyclopedia at the level, nature and abilities
+// the DM picks (routes_dm.py's build-pokemon, the same maths a player's Pokemon gets) and the DM can override any of
+// its numbers or give it extra skills; an NPC trainer is typed in. Each is saved with a ready battle participant
+// (setup-store.js), so Start battle only has to send them in.
+//
+// The map sits above the form: pick someone (from the list or by clicking their token) and click a square to stand
+// them there.
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
+import { footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { escapeHtml, typeBadges, getSpecies, newId, participantFromPokemonRow, participantFromTrainer, abilityMod } from './dm-common.js';
-import { getSetup, updateSetup, flushSetup } from './setup-store.js';
+import {
+  escapeHtml, typeBadges, getSpecies, newId, participantFromPokemonRow, participantFromTrainer, abilityMod,
+  natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect,
+} from './dm-common.js';
+import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
+import { mapStageHtml, tokenScreenRect, creatureSpotProblem } from './map-view.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
@@ -17,6 +26,10 @@ let _species = [];
 let _portraits = [];
 let _editing = null; // null | {mode: 'new-pokemon', species?} | {mode: 'pokemon', id} | {mode: 'new-trainer'} | {mode: 'trainer', id}
 let _busy = false;
+let _hover = null;
+let _unsub = null;
+let _previewTimer = null;
+let _previewSeq = 0;
 
 export async function renderCreatureSetup(root, { onDone }) {
   _root = root;
@@ -34,7 +47,13 @@ export async function renderCreatureSetup(root, { onDone }) {
         </div>
         <div id="csList" class="dm-cs-list"></div>
       </aside>
-      <section class="dm-editor-canvas dm-cs-editor" id="csEditor"></section>
+      <section class="dm-editor-canvas dm-cs-work">
+        <div class="dm-cs-mapbox">
+          <div class="dm-editor-hint" id="csMapHint"></div>
+          <div class="dm-map-wrap" id="csMap"></div>
+        </div>
+        <div class="dm-cs-editor" id="csEditor"></div>
+      </section>
     </div>`;
   document.getElementById('csBack').addEventListener('click', leave);
   document.getElementById('csAddPokemon').addEventListener('click', () => edit({ mode: 'new-pokemon' }));
@@ -45,20 +64,29 @@ export async function renderCreatureSetup(root, { onDone }) {
     const c = getSetup().creatures.find(x => x.id === row.dataset.creature);
     if (c) edit({ mode: c.kind, id: c.id });
   });
+  _unsub?.();
+  _unsub = onSetupChange(() => { if (document.body.contains(_root)) { renderList(); renderMap(); } });
   renderList();
+  renderMap();
   edit(_editing && (!_editing.id || getSetup().creatures.some(c => c.id === _editing.id)) ? _editing : null);
   [_species] = await Promise.all([
     getSpecies().catch(() => []),
     DmAPI.mapAssets().then(r => { _portraits = r.data?.portraits || []; }).catch(() => {}),
   ]);
-  // The open form needed these (a Pokemon's abilities, the portrait list) -- draw it again now they're here.
+  // The open form needed these (a Pokemon's abilities and base stats, the portrait list) -- draw it again now.
   if (!document.body.contains(root) || !_editing) return;
   if (_editing.mode === 'new-pokemon' && !_editing.species) renderSpeciesResults(); else edit(_editing);
 }
 
 async function leave() {
+  _unsub?.();
+  _unsub = null;
   try { await flushSetup(); } catch (err) { showCombatAlert(err.message, { title: "Couldn't save the battle" }); }
   _onDone?.();
+}
+
+function selectedCreature() {
+  return _editing?.id ? getSetup().creatures.find(x => x.id === _editing.id) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,13 +101,13 @@ function renderList() {
   const wild = all.filter(c => c.kind === 'pokemon' && !trainers.some(t => t.id === c.trainerId));
   const row = (c, nested = false) => {
     const p = c.participant || {};
-    const flags = [c.heldBack ? 'held back' : '', c.position ? 'on the map' : ''].filter(Boolean).join(' · ');
+    const where = c.heldBack ? 'held back' : c.position ? '📍 placed' : '⚠ not placed';
     return `
       <button class="dm-cs-row${nested ? ' nested' : ''}${_editing?.id === c.id ? ' selected' : ''}" data-creature="${c.id}">
         <span class="dm-cs-thumb" data-img="${escapeHtml(p.image || '')}"></span>
         <span class="dm-cs-main">
           <span class="dm-cs-name">${escapeHtml(c.name)}</span>
-          <span class="dm-cs-sub">Lv ${p.level ?? '?'} · HP ${p.maxHP ?? '?'} · VP ${p.maxVP ?? '?'}${flags ? ` · ${flags}` : ''}</span>
+          <span class="dm-cs-sub">Lv ${p.level ?? '?'} · HP ${p.maxHP ?? '?'} · <span class="${!c.heldBack && !c.position ? 'dm-warn-text' : ''}">${where}</span></span>
         </span>
       </button>`;
   };
@@ -91,16 +119,96 @@ function renderList() {
     ...trainers.map(t => `<div class="dm-cs-group">${row(t)}${all.filter(c => c.kind === 'pokemon' && c.trainerId === t.id).map(c => row(c, true)).join('')}</div>`),
     wild.length ? `<div class="dm-cs-group"><div class="dm-cs-group-title">Wild Pokémon</div>${wild.map(c => row(c)).join('')}</div>` : '',
   ].join('');
-  el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img) patchPortraitMedia(x, x.dataset.img, ''); else x.innerHTML = '<img src="assets/Pokeball.png" alt="" style="opacity:.35">'; });
+  el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img) patchPortraitMedia(x, x.dataset.img, ''); else x.innerHTML = '<span style="font-size:1.5rem">🎭</span>'; });
+}
+
+// ---------------------------------------------------------------------------
+// The map: click a square to stand the selected creature there; click someone's token to pick them.
+// ---------------------------------------------------------------------------
+
+function renderMap() {
+  const wrap = document.getElementById('csMap');
+  if (!wrap) return;
+  const s = getSetup();
+  const m = s.map;
+  const sel = selectedCreature();
+  wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: sel?.id });
+  const stage = wrap.querySelector('.dm-map-stage');
+  stage.style.width = `min(100%, calc(34vh * ${m.rows / m.cols}))`;
+  stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-token-emoji">🎭</span>'; });
+
+  const hint = document.getElementById('csMapHint');
+  if (hint) {
+    hint.textContent = !sel
+      ? (_editing?.mode === 'new-pokemon' || _editing?.mode === 'new-trainer' ? 'Add it to the battle first, then click the map to place it.' : 'Pick someone on the left (or click a token) to place them on the map.')
+      : sel.heldBack ? `${sel.name} is held back -- it joins later and doesn't start on the map.`
+        : `Click a square to place ${sel.name}${sel.position ? ' somewhere else' : ''}.`;
+  }
+
+  const grid = stage.querySelector('.dm-map-grid');
+  grid.addEventListener('click', (e) => {
+    const cell = e.target.closest('[data-cell]');
+    if (cell) onMapClick(...cell.dataset.cell.split(',').map(Number));
+  });
+  grid.addEventListener('mouseover', (e) => {
+    const cell = e.target.closest('[data-cell]');
+    if (!cell) return;
+    const [col, row] = cell.dataset.cell.split(',').map(Number);
+    _hover = { col, row };
+    renderGhost();
+  });
+  grid.addEventListener('mouseleave', () => { _hover = null; renderGhost(); });
+  renderGhost();
+}
+
+function creatureAt(col, row) {
+  return getSetup().creatures.find(c => c.position && !c.heldBack
+    && footprintCells(c.position.col, c.position.row, footprintForSize(c.participant?.size)).some(p => p.col === col && p.row === row));
+}
+
+function renderGhost() {
+  const ghost = document.querySelector('#csMap .dm-map-ghost');
+  if (!ghost) return;
+  const sel = selectedCreature();
+  if (!_hover || !sel || sel.heldBack || creatureAt(_hover.col, _hover.row)) { ghost.innerHTML = ''; return; }
+  const s = getSetup();
+  const r = tokenScreenRect(s.map, _hover.col, _hover.row, footprintForSize(sel.participant?.size));
+  ghost.innerHTML = `<div class="${creatureSpotProblem(s, sel, _hover.col, _hover.row) ? 'dm-ghost-bad' : 'dm-ghost-good'}" style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"></div>`;
+}
+
+function onMapClick(col, row) {
+  const other = creatureAt(col, row);
+  const sel = selectedCreature();
+  if (other && other.id !== sel?.id) { edit({ mode: other.kind, id: other.id }); return; }
+  if (!sel || sel.heldBack || other) return;
+  const problem = creatureSpotProblem(getSetup(), sel, col, row);
+  if (problem) { showCombatAlert(problem, { title: sel.name }); return; }
+  updateSetup(s => { s.creatures.find(x => x.id === sel.id).position = { col, row, facing: 0 }; });
+  renderPlacementLine();
+}
+
+/** The form's own line about where the selected creature starts. */
+function renderPlacementLine() {
+  const el = document.getElementById('csPlacement');
+  const c = selectedCreature();
+  if (!el || !c) return;
+  el.innerHTML = c.heldBack ? '<span class="dm-hint">Held back -- not on the map at the start.</span>'
+    : c.position ? `<span>📍 On the map.</span> <button type="button" class="dm-btn small" id="csUnplace">Take off the map</button>`
+      : '<span class="dm-warn-text">⚠ Not on the map yet -- click a square on the map above.</span>';
+  document.getElementById('csUnplace')?.addEventListener('click', () => {
+    updateSetup(s => { s.creatures.find(x => x.id === c.id).position = null; });
+    renderPlacementLine();
+  });
 }
 
 function edit(target) {
   _editing = target;
   renderList();
+  renderMap();
   const box = document.getElementById('csEditor');
   if (!box) return;
   if (!target) {
-    box.innerHTML = '<div class="dm-cs-empty">Pick something on the left to change it, or add a Pokémon or NPC trainer.</div>';
+    box.innerHTML = '<div class="dm-cs-empty">Pick someone on the left to change them, or add a Pokémon or NPC trainer.</div>';
     return;
   }
   if (target.mode === 'new-pokemon' && !target.species) return renderSpeciesPicker(box);
@@ -149,17 +257,37 @@ function trainerOptions(selected) {
   return `<option value="">Wild (no trainer)</option>${trainers.map(t => `<option value="${t.id}" ${t.id === selected ? 'selected' : ''}>${escapeHtml(t.name)}'s Pokémon</option>`).join('')}`;
 }
 
+function speciesSkills(s) {
+  return splitList(s?.base?.skills, SKILLS);
+}
+
+/** The encyclopedia's own numbers for a species -- before level, nature or anything the DM changes. */
+function baseStatsHtml(s) {
+  const b = s?.base;
+  if (!b) return '';
+  const cell = (label, v) => `<div class="dm-base-cell"><span>${label}</span><strong>${escapeHtml(v ?? '-')}</strong></div>`;
+  return `
+    <div class="dm-field"><label>Base stats <small class="dm-label-note">from the Pokédex, at base level ${s.level}</small></label>
+      <div class="dm-base-grid">
+        ${STATS.map(k => cell(k.toUpperCase(), b[k])).join('')}
+        ${cell('AC', b.ac)}${cell('Hit die', b.hitDice ? `d${b.hitDice}` : '-')}${cell('Vitality die', b.vitalityDice ? `d${b.vitalityDice}` : '-')}
+      </div>
+      <div class="dm-base-line">Speed: ${escapeHtml(b.speed || '-')} · Saves: ${escapeHtml(b.savingThrows || '-')} · Skills: ${escapeHtml(b.skills || '-')}</div>
+    </div>`;
+}
+
 function renderPokemonForm(box) {
   const isNew = _editing.mode === 'new-pokemon';
-  const c = isNew ? null : getSetup().creatures.find(x => x.id === _editing.id);
+  const c = isNew ? null : selectedCreature();
   const speciesName = isNew ? _editing.species : c.config.species;
   const s = _species.find(x => x.name === speciesName) || { name: speciesName, abilities: [], level: c?.config.level || 1 };
-  const cfg = c?.config || { species: s.name, level: s.level || 1, nature: '', abilities: [0], item: '', shiny: false, stats: {}, overrides: {} };
+  const cfg = c?.config || { species: s.name, level: s.level || 1, nature: '', abilities: [0], item: '', shiny: false, stats: {}, overrides: {}, extraSkills: [] };
   const p = c?.participant || {};
-  const natures = JSON.parse(sessionStorage.getItem('natures') || '[]');
-  const statInput = (key, label, current, override) => `
+  const statInput = (key, label, override) => `
     <div class="dm-stat"><label>${label}</label>
-      <input class="dm-input" data-stat="${key}" type="number" value="${override ?? ''}" placeholder="${current ?? '?'}"></div>`;
+      <input class="dm-input" data-stat="${key}" type="number" value="${override ?? ''}" placeholder="…"></div>`;
+  const ownSkills = speciesSkills(s);
+  const skillOptions = [...SKILLS, ...ownSkills.filter(k => !SKILLS.includes(k))];
 
   box.innerHTML = `
     <div class="dm-cs-head">
@@ -177,16 +305,17 @@ function renderPokemonForm(box) {
             ${isNew ? '<div class="dm-field" style="max-width:110px"><label for="csCount">How many</label><input class="dm-input" id="csCount" type="number" min="1" max="12" value="1"></div>' : ''}
           </div>
           <div class="dm-row">
-            <div class="dm-field"><label for="csLevel">Level</label><input class="dm-input" id="csLevel" type="number" min="1" max="20" value="${cfg.level}"></div>
+            <div class="dm-field" style="max-width:110px"><label for="csLevel">Level</label><input class="dm-input" id="csLevel" type="number" min="1" max="20" value="${cfg.level}"></div>
             <div class="dm-field"><label for="csNature">Nature</label>
-              <select class="dm-select" id="csNature"><option value="">None</option>
-                ${natures.map(n => `<option value="${escapeHtml(n.name)}" ${n.name === cfg.nature ? 'selected' : ''}>${escapeHtml(n.name)}</option>`).join('')}
-              </select></div>
+              <select class="dm-select" id="csNature"><option value="">None</option>${natureOptions(cfg.nature)}</select></div>
           </div>
           <div class="dm-field"><label>Abilities</label>
             ${(s.abilities || []).map(a => `
               <label class="dm-check"><input type="checkbox" name="csAbility" value="${a.slot}" ${(cfg.abilities || []).includes(a.slot) ? 'checked' : ''}>
                 <span>${escapeHtml(a.name)} <small>${SLOT_NAMES[a.slot] || ''} -- ${escapeHtml(a.description)}</small></span></label>`).join('') || '<div class="dm-hint">No abilities listed.</div>'}
+          </div>
+          <div class="dm-field"><label>Skills <small class="dm-label-note">its species' own are always on -- tick extra ones</small></label>
+            ${multiSelectHtml('csSkills', skillOptions, cfg.extraSkills || [], { locked: ownSkills, placeholder: 'No skills' })}
           </div>
           <div class="dm-row">
             <div class="dm-field"><label for="csItem">Held item</label><input class="dm-input" id="csItem" value="${escapeHtml(cfg.item || '')}" placeholder="None"></div>
@@ -199,18 +328,21 @@ function renderPokemonForm(box) {
               <label class="dm-check"><input type="checkbox" id="csHeld" ${c?.heldBack ? 'checked' : ''}>Held back (joins later)</label>
             </div>
           </div>
+          ${!isNew ? '<div class="dm-cs-placement" id="csPlacement"></div>' : ''}
         </div>
         <div>
-          <div class="dm-field"><label>Stats <small class="dm-label-note">${isNew ? 'Calculated when it\'s added -- change them afterwards.' : 'Grey = calculated. Type a number to change it.'}</small></label>
+          ${baseStatsHtml(s)}
+          <div class="dm-field"><label>At this level <small class="dm-label-note">grey = worked out from level and nature -- type a number to change it</small></label>
             <div class="dm-stat-grid">
-              ${STATS.map(k => statInput(k, k.toUpperCase(), p[k], cfg.stats?.[k])).join('')}
-              ${statInput('ac', 'AC', p.ac, cfg.overrides?.ac)}
-              ${statInput('maxHP', 'Max HP', p.maxHP, cfg.overrides?.maxHP)}
-              ${statInput('maxVP', 'Max VP', p.maxVP, cfg.overrides?.maxVP)}
+              ${STATS.map(k => statInput(k, k.toUpperCase(), cfg.stats?.[k])).join('')}
+              ${statInput('ac', 'AC', cfg.overrides?.ac)}
+              ${statInput('maxHP', 'Max HP', cfg.overrides?.maxHP)}
+              ${statInput('maxVP', 'Max VP', cfg.overrides?.maxVP)}
             </div>
-            ${!isNew ? '<button type="button" class="dm-btn small" id="csResetStats">↺ Back to calculated</button>' : ''}
+            <div class="dm-base-line" id="csDerived"></div>
+            <button type="button" class="dm-btn small" id="csResetStats">↺ Back to calculated</button>
           </div>
-          ${!isNew && (p.moves || []).length ? `<div class="dm-field"><label>Moves at this level</label><div class="dm-move-chips">${p.moves.map(mv => `<span>${escapeHtml(mv)}</span>`).join('')}</div></div>` : ''}
+          <div class="dm-field"><label>Moves at this level</label><div class="dm-move-chips" id="csMoves"></div></div>
         </div>
       </div>
       <div class="dm-cs-actions">
@@ -219,13 +351,49 @@ function renderPokemonForm(box) {
       </div>
     </form>`;
   box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
-  document.getElementById('csPokemonForm').addEventListener('submit', (e) => { e.preventDefault(); savePokemon(); });
+  bindMultiSelects(box);
+  const form = document.getElementById('csPokemonForm');
+  form.addEventListener('submit', (e) => { e.preventDefault(); savePokemon(); });
+  // Every change that moves the numbers works them out again (a preview build -- nothing is saved until Add / Save).
+  form.addEventListener('input', (e) => { if (!e.target.matches('#csName, #csCount, #csInit, #csItem')) schedulePreview(); });
+  form.addEventListener('change', (e) => { if (e.target.matches('select, input[type=checkbox]')) schedulePreview(); });
   document.getElementById('csCancel')?.addEventListener('click', () => edit({ mode: 'new-pokemon' }));
-  document.getElementById('csResetStats')?.addEventListener('click', () => {
+  document.getElementById('csResetStats').addEventListener('click', () => {
     box.querySelectorAll('[data-stat]').forEach(i => { i.value = ''; });
+    schedulePreview();
   });
   document.getElementById('csRemove')?.addEventListener('click', () => removeCreature(c));
   document.getElementById('csDuplicate')?.addEventListener('click', () => duplicatePokemon(c));
+  renderPlacementLine();
+  previewNow();
+}
+
+function schedulePreview() {
+  clearTimeout(_previewTimer);
+  _previewTimer = setTimeout(previewNow, 300);
+}
+
+/** Builds the Pokemon as the form stands (never saved) and shows the result: the calculated stats as the grey numbers,
+ * initiative / proficiency / STAB, and the moves it knows at this level. */
+async function previewNow() {
+  const form = document.getElementById('csPokemonForm');
+  if (!form) return;
+  const species = _editing?.mode === 'new-pokemon' ? _editing.species : selectedCreature()?.config.species;
+  if (!species) return;
+  const seq = ++_previewSeq;
+  const { config } = readPokemonForm();
+  try {
+    const res = await DmAPI.buildPokemon({ species, ...config, preview: true });
+    if (seq !== _previewSeq || !document.body.contains(form)) return;
+    const row = res.data;
+    const { participant: p } = participantFromPokemonRow(row);
+    form.querySelectorAll('[data-stat]').forEach(i => { i.placeholder = p[i.dataset.stat] ?? '?'; });
+    const sign = n => (n >= 0 ? `+${n}` : `${n}`);
+    document.getElementById('csDerived').textContent = `Initiative ${sign(Number(row[30]) || 0)} · Proficiency +${row[31]} · STAB +${row[34]} · Skills: ${row[22] || '-'}`;
+    document.getElementById('csMoves').innerHTML = (p.moves || []).map(mv => `<span>${escapeHtml(mv)}</span>`).join('') || '<span class="dm-hint">None</span>';
+  } catch (err) {
+    if (seq === _previewSeq) document.getElementById('csDerived').textContent = `Couldn't work the numbers out: ${err.message}`;
+  }
 }
 
 function readPokemonForm() {
@@ -249,6 +417,7 @@ function readPokemonForm() {
       shiny: document.getElementById('csShiny').checked,
       initiative: init === '' ? null : parseInt(init, 10),
       stats: statsIn, overrides,
+      extraSkills: readMultiSelect('csSkills'),
     },
     trainerId: document.getElementById('csTrainer').value || null,
     heldBack: document.getElementById('csHeld').checked,
@@ -306,7 +475,7 @@ async function savePokemon() {
       });
       edit({ mode: 'pokemon', id: built[0].id });
     } else {
-      const c = getSetup().creatures.find(x => x.id === _editing.id);
+      const c = selectedCreature();
       const name = form.name || c.name;
       const rebuilt = await buildPokemonCreature(c.id, c.config.species, name, form.config,
         { trainerId: form.trainerId, heldBack: form.heldBack, position: form.heldBack ? null : c.position });
@@ -367,7 +536,7 @@ function trainerHp(level, con) {
 
 function renderTrainerForm(box) {
   const isNew = _editing.mode === 'new-trainer';
-  const c = isNew ? null : getSetup().creatures.find(x => x.id === _editing.id);
+  const c = isNew ? null : selectedCreature();
   const t = { ...defaultTrainer(), ...(c?.config || {}) };
   if (!t.maxHP) t.maxHP = trainerHp(t.level, t.con);
   const portraitKnown = _portraits.some(pt => pt.url === t.image);
@@ -394,11 +563,10 @@ function renderTrainerForm(box) {
             <div class="dm-field"><label for="ctSpeed">Speed (ft)</label><input class="dm-input" id="ctSpeed" type="number" min="0" step="5" value="${t.speed}"></div>
             <div class="dm-field"><label for="ctInit">Initiative</label><input class="dm-input" id="ctInit" type="number" value="${t.initiative ?? ''}" placeholder="Rolled"></div>
           </div>
-          <div class="dm-row">
-            <div class="dm-field"><label for="ctSaves">Saving throws</label><input class="dm-input" id="ctSaves" value="${escapeHtml(t.savingThrows)}" placeholder="e.g. STR, CHA"></div>
-            <div class="dm-field"><label for="ctSkills">Skills</label><input class="dm-input" id="ctSkills" value="${escapeHtml(t.skills)}" placeholder="e.g. Athletics, Intimidation"></div>
-          </div>
+          <div class="dm-field"><label>Saving throws</label>${multiSelectHtml('ctSaves', SAVING_THROWS, splitList(t.savingThrows, SAVING_THROWS))}</div>
+          <div class="dm-field"><label>Skills</label>${multiSelectHtml('ctSkills', SKILLS, splitList(t.skills, SKILLS))}</div>
           <label class="dm-check"><input type="checkbox" id="ctHeld" ${c?.heldBack ? 'checked' : ''}>Held back (joins later)</label>
+          ${!isNew ? '<div class="dm-cs-placement" id="csPlacement"></div>' : ''}
         </div>
         <div>
           <div class="dm-field"><label>Stats</label>
@@ -417,6 +585,7 @@ function renderTrainerForm(box) {
         <button type="submit" class="dm-btn primary">${isNew ? 'Add to battle' : 'Save changes'}</button>
       </div>
     </form>`;
+  bindMultiSelects(box);
   const thumb = () => {
     const url = readTrainerImage();
     const el = document.getElementById('csTrainerThumb');
@@ -435,6 +604,7 @@ function renderTrainerForm(box) {
   });
   document.getElementById('csTrainerForm').addEventListener('submit', (e) => { e.preventDefault(); saveTrainer(c); });
   document.getElementById('ctRemove')?.addEventListener('click', () => removeCreature(c));
+  renderPlacementLine();
 }
 
 function readTrainerImage() {
@@ -453,8 +623,8 @@ function saveTrainer(existing) {
     ...Object.fromEntries(STATS.map(k => [k, stat(k) || 10])),
     ac: stat('ac') || 10, maxHP: stat('maxHP') || 1, maxVP: Number.isNaN(stat('maxVP')) ? 0 : stat('maxVP'),
     speed: parseInt(document.getElementById('ctSpeed').value, 10) || 30,
-    savingThrows: document.getElementById('ctSaves').value.trim(),
-    skills: document.getElementById('ctSkills').value.trim(),
+    savingThrows: readMultiSelect('ctSaves').join(', '),
+    skills: readMultiSelect('ctSkills').join(', '),
     initiative: init === '' ? null : parseInt(init, 10),
   };
   const { combatant, participant } = participantFromTrainer(config);

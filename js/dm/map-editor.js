@@ -1,26 +1,30 @@
-// DM console -- map setup: the DM builds the battle map before starting the battle. The map is shown the way the table
-// TV shows it (battle-map.js: board cols run DOWN the screen, board rows run ACROSS it, row 0 at the right edge), so
-// what the DM builds here is exactly what the table sees. Everything is stored in board coordinates (setup-store.js).
+// DM console -- map setup: the DM builds the battle map before setting up the battle (where the creatures are placed,
+// creature-setup.js). The map is shown the way the table TV shows it (map-view.js), so what the DM builds here is
+// exactly what the table sees.
 //
-// Tools: Objects (place a picture -- tree, rock, log... any object-*.png in the battle-images folder -- sized in squares
-// and turned in 90-degree steps; optionally marking its squares difficult or blocked too), Terrain (paint difficult /
-// blocked squares, which the battle enforces -- routes_combat.py's _move_cost_ft / _move_token), Creatures (stand the
-// DM's prepared creatures where the battle starts them) and Eraser.
+// Tools: Objects (place a picture -- tree, rock, log... any object-*.png in the battle-images folder -- sized in squares,
+// turned in 90-degree steps, with a height in feet for line of sight later, and optionally marking its squares
+// difficult or blocked), Terrain (paint difficult / blocked squares, which the battle enforces for creatures on the
+// ground -- routes_combat.py's _move_cost_ft / _move_token) and Eraser.
 import { DmAPI } from '../api.js';
-import { mapObjectsHtml, mapObjectHtml, objectScreenRect, objectCells, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
+import { mapObjectHtml, objectScreenRect, objectCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, newId } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange, TV_ASPECT } from './setup-store.js';
+import { mapStageHtml } from './map-view.js';
+
+// Starting height (ft) for an object the DM places -- changeable before placing. Anything not listed starts at 5ft.
+const DEFAULT_HEIGHTS = { tree: 30, rock: 5, bush: 5, log: 5 };
 
 let _assets = null; // {objects: [{key, label, url}], backgrounds: [...]}
 const _crops = new Map(); // object url -> Promise<[x0, y0, x1, y1]> (the picture's non-transparent part)
+const _cropResolved = new Map(); // url -> crop, once worked out
 
 const ed = {
   tool: 'objects',
-  objectKey: '', objW: 1, objH: 1, objRot: 0, objMark: '', // objW/objH/objRot as seen on screen
+  objectKey: '', objW: 1, objH: 1, objRot: 0, objMark: '', objHeight: 5, // objW/objH/objRot as seen on screen
   terrain: 'difficult',
-  creatureId: null,
   hover: null, // {col, row} under the pointer
   painting: false,
 };
@@ -64,24 +68,14 @@ function cropFor(url) {
       };
       img.onerror = () => resolve([0, 0, 1, 1]);
       img.src = url;
-    }));
+    }).then(c => { _cropResolved.set(url, c); return c; }));
   }
   return _crops.get(url);
 }
 
-// ---------------------------------------------------------------------------
-// Board <-> screen
-// ---------------------------------------------------------------------------
-
-function boardOf(setup) {
-  const m = setup.map;
-  return { grid: { cols: m.cols, rows: m.rows }, objects: m.objects || [], marks: m.marks || {}, cells: {}, tokens: {} };
-}
-
-/** A creature token's footprint on the sideways screen -- battle-map.js's screenCellRect. Its (col, row) anchor is the
- * footprint's bottom-left on the board, which is its top-left on this screen. */
-function tokenScreenRect(m, col, row, size) {
-  return { left: `${((m.rows - row - 1) / m.rows) * 100}%`, top: `${(col / m.cols) * 100}%`, width: `${(size / m.rows) * 100}%`, height: `${(size / m.cols) * 100}%` };
+function cropNow(url) {
+  cropFor(url);
+  return _cropResolved.get(url) || [0, 0, 1, 1];
 }
 
 /** The object the Objects tool would place with its top-left corner (as seen) on board cell (col, row), or null if
@@ -93,8 +87,8 @@ function objectAt(m, col, row) {
   const w = ed.objH, h = ed.objW;
   const o = {
     id: newId('obj'), kind: asset.key, label: asset.label, url: asset.url,
-    col, row: row - h + 1, w, h, rot: ((ed.objRot - 90) % 360 + 360) % 360, crop: [0, 0, 1, 1],
-    ...(ed.objMark ? { markKind: ed.objMark } : {}),
+    col, row: row - h + 1, w, h, rot: ((ed.objRot - 90) % 360 + 360) % 360, crop: cropNow(asset.url),
+    height: ed.objHeight, ...(ed.objMark ? { markKind: ed.objMark } : {}),
   };
   return o.row >= 0 && o.col + o.w <= m.cols && o.row + o.h <= m.rows ? o : null;
 }
@@ -113,7 +107,7 @@ export async function renderMapEditor(root, { onDone }) {
     root.innerHTML = `<div class="dm-loading">Couldn't load the map pictures: ${escapeHtml(err.message)}</div>`;
     return;
   }
-  if (!ed.objectKey && _assets.objects.length) ed.objectKey = _assets.objects[0].key;
+  if (!ed.objectKey && _assets.objects.length) selectObjectKind(_assets.objects[0].key);
   const m = getSetup().map;
 
   root.innerHTML = `
@@ -147,7 +141,6 @@ export async function renderMapEditor(root, { onDone }) {
           <div class="dm-tool-tabs" id="mapTools">
             <button data-tool="objects">🌲 Objects</button>
             <button data-tool="terrain">🟫 Terrain</button>
-            <button data-tool="creatures">🐾 Creatures</button>
             <button data-tool="erase">🧽 Eraser</button>
           </div>
           <div id="mapToolPanel"></div>
@@ -161,10 +154,11 @@ export async function renderMapEditor(root, { onDone }) {
       </aside>
       <section class="dm-editor-canvas">
         <div class="dm-editor-hint" id="mapHint"></div>
-        <div class="dm-map-wrap" id="mapWrap"><div class="dm-map-stage" id="mapStage"></div></div>
+        <div class="dm-map-wrap" id="mapWrap"></div>
         <div class="dm-map-legend">
-          <span><i class="mark-difficult"></i>Difficult terrain -- costs double movement</span>
+          <span><i class="mark-difficult"></i>Difficult terrain -- double movement on the ground</span>
           <span><i class="mark-blocked"></i>Blocked -- can't be walked through or stood on</span>
+          <span>Flying and floating (Levitate) creatures aren't affected by either.</span>
         </div>
       </section>
     </div>`;
@@ -174,6 +168,11 @@ export async function renderMapEditor(root, { onDone }) {
   renderStage();
   _unsub?.();
   _unsub = onSetupChange(() => { if (document.body.contains(_root)) renderStage(); });
+}
+
+function selectObjectKind(key) {
+  ed.objectKey = key;
+  ed.objHeight = DEFAULT_HEIGHTS[key] ?? 5;
 }
 
 function wireStatic() {
@@ -277,8 +276,11 @@ function renderToolPanel() {
         <div class="dm-field"><label for="objW">Width (squares)</label><input class="dm-input" id="objW" type="number" min="1" max="20" value="${ed.objW}"></div>
         <div class="dm-field"><label for="objH">Height (squares)</label><input class="dm-input" id="objH" type="number" min="1" max="20" value="${ed.objH}"></div>
       </div>
-      <div class="dm-field"><label>Turn</label>
-        <div class="dm-row"><button class="dm-btn" id="objRotL">⟲ Left</button><button class="dm-btn" id="objRotR">⟳ Right</button></div>
+      <div class="dm-row">
+        <div class="dm-field"><label for="objTall">How tall (ft)</label><input class="dm-input" id="objTall" type="number" min="0" max="500" step="5" value="${ed.objHeight}"></div>
+        <div class="dm-field"><label>Turn</label>
+          <div class="dm-row"><button class="dm-btn" id="objRotL" title="Turn left">⟲</button><button class="dm-btn" id="objRotR" title="Turn right">⟳</button></div>
+        </div>
       </div>
       <div class="dm-field"><label for="objMark">Its squares are also</label>
         <select class="dm-select" id="objMark">
@@ -288,33 +290,21 @@ function renderToolPanel() {
         </select>
       </div>` : '<div class="dm-hint">No object pictures found -- add object-&lt;name&gt;.png files to the battle-images folder on the Pi.</div>';
     hint.textContent = 'Click a square to place the object there (its top-left corner). The outline shows where it will go.';
-    document.getElementById('objKind')?.addEventListener('change', (e) => { ed.objectKey = e.target.value; renderToolPanel(); });
-    document.getElementById('objW')?.addEventListener('input', (e) => { ed.objW = clampInt(e.target.value, 1, 20); renderStage(); });
-    document.getElementById('objH')?.addEventListener('input', (e) => { ed.objH = clampInt(e.target.value, 1, 20); renderStage(); });
+    document.getElementById('objKind')?.addEventListener('change', (e) => { selectObjectKind(e.target.value); renderToolPanel(); });
+    document.getElementById('objW')?.addEventListener('input', (e) => { ed.objW = clampInt(e.target.value, 1, 20); renderGhost(); });
+    document.getElementById('objH')?.addEventListener('input', (e) => { ed.objH = clampInt(e.target.value, 1, 20); renderGhost(); });
+    document.getElementById('objTall')?.addEventListener('input', (e) => { ed.objHeight = clampInt(e.target.value, 0, 500); });
     document.getElementById('objRotL')?.addEventListener('click', () => turnObject(-90));
     document.getElementById('objRotR')?.addEventListener('click', () => turnObject(90));
     document.getElementById('objMark')?.addEventListener('change', (e) => { ed.objMark = e.target.value; });
   } else if (ed.tool === 'terrain') {
     panel.innerHTML = `
-      ${[['difficult', 'Difficult terrain', 'Costs double movement to walk through.'], ['blocked', 'Blocked', "Can't be walked through or stood on (flyers pass over)."], ['clear', 'Clear', 'Back to normal ground.']]
+      ${[['difficult', 'Difficult terrain', 'Double movement for creatures on the ground.'], ['blocked', 'Blocked', "Can't be walked through or stood on."], ['clear', 'Clear', 'Back to normal ground.']]
         .map(([k, label, sub]) => `<label class="dm-check"><input type="radio" name="terrainKind" value="${k}" ${ed.terrain === k ? 'checked' : ''}><span>${label} <small>${sub}</small></span></label>`).join('')}`;
     hint.textContent = 'Click or drag across squares to paint them.';
     panel.querySelectorAll('input[name="terrainKind"]').forEach(r => r.addEventListener('change', () => { ed.terrain = r.value; }));
-  } else if (ed.tool === 'creatures') {
-    const list = getSetup().creatures.filter(c => !c.heldBack);
-    if (ed.creatureId && !list.some(c => c.id === ed.creatureId)) ed.creatureId = null;
-    if (!ed.creatureId) ed.creatureId = list.find(c => !c.position)?.id || null;
-    panel.innerHTML = list.length ? list.map(c => `
-      <button class="dm-place-item${c.id === ed.creatureId ? ' selected' : ''}" data-creature="${c.id}">
-        <span class="dm-place-thumb" data-img="${escapeHtml(c.participant?.image || '')}"></span>
-        <span class="dm-place-name">${escapeHtml(c.name)}</span>
-        <span class="dm-place-state">${c.position ? '✓ placed' : 'not placed'}</span>
-      </button>`).join('') : '<div class="dm-hint">No creatures yet -- add them in the battle setup first. (Held-back ones join later and aren\'t placed.)</div>';
-    hint.textContent = list.length ? 'Pick a creature, then click the square where it starts. Click a placed one again to move it.' : '';
-    panel.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
-    panel.querySelectorAll('[data-creature]').forEach(b => b.addEventListener('click', () => { ed.creatureId = b.dataset.creature; renderToolPanel(); }));
   } else {
-    panel.innerHTML = '<div class="dm-hint">Click an object to remove it, a marked square to clear it, or a creature to take it off the map.</div>';
+    panel.innerHTML = '<div class="dm-hint">Click an object to remove it, or a marked square to clear it.</div>';
     hint.textContent = 'Eraser: click what you want to remove.';
   }
 }
@@ -323,45 +313,22 @@ function turnObject(delta) {
   ed.objRot = ((ed.objRot + delta) % 360 + 360) % 360;
   [ed.objW, ed.objH] = [ed.objH, ed.objW]; // a quarter turn swaps its width and height
   renderToolPanel();
-  renderStage();
+  renderGhost();
 }
 
 function clampInt(v, lo, hi) {
   return Math.max(lo, Math.min(hi, parseInt(v, 10) || lo));
 }
 
-/** The whole map, the way the table TV shows it. */
+/** The whole map, the way the table TV shows it. Creatures already placed in the battle setup show, for reference. */
 function renderStage() {
-  const stage = document.getElementById('mapStage');
-  if (!stage) return;
+  const wrap = document.getElementById('mapWrap');
+  if (!wrap) return;
   const s = getSetup();
   const m = s.map;
-  const board = boardOf(s);
-  // As big as fits: screen width = board rows, screen height = board cols.
-  stage.style.aspectRatio = `${m.rows} / ${m.cols}`;
+  wrap.innerHTML = mapStageHtml(s, { interactive: true });
+  const stage = wrap.querySelector('.dm-map-stage');
   stage.style.width = `min(100%, calc((100vh - 190px) * ${m.rows / m.cols}))`;
-
-  const cells = [];
-  for (let col = 0; col < m.cols; col++) {
-    for (let row = m.rows - 1; row >= 0; row--) {
-      const mark = m.marks?.[`${col},${row}`];
-      cells.push(`<div class="dm-map-cell${mark ? ` mark-${mark}` : ''}" data-cell="${col},${row}"></div>`);
-    }
-  }
-  const tokens = s.creatures.filter(c => c.position && !c.heldBack).map(c => {
-    const size = footprintForSize(c.participant?.size);
-    const r = tokenScreenRect(m, c.position.col, c.position.row, size);
-    return `<div class="dm-map-token${c.id === ed.creatureId && ed.tool === 'creatures' ? ' selected' : ''}" data-token="${c.id}" title="${escapeHtml(c.name)}"
-      style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"><div class="dm-map-token-art" data-img="${escapeHtml(c.participant?.image || '')}"></div></div>`;
-  }).join('');
-
-  stage.innerHTML = `
-    <div class="dm-map-bg"${m.background ? ` style="background-image:url('${escapeHtml(m.background)}')"` : ''}></div>
-    <div class="dm-map-grid" style="grid-template-columns:repeat(${m.rows},1fr);grid-template-rows:repeat(${m.cols},1fr)">${cells.join('')}</div>
-    <div class="bmap-objects">${mapObjectsHtml(board, { tv: true })}</div>
-    <div class="dm-map-tokens">${tokens}</div>
-    <div class="dm-map-ghost" id="mapGhost"></div>`;
-  stage.classList.toggle('has-bg', !!m.background);
   stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
 
   const grid = stage.querySelector('.dm-map-grid');
@@ -384,37 +351,22 @@ function renderStage() {
   renderGhost();
 }
 
-/** The outline of what a click would do here -- the object to place (red when it doesn't fit), or the creature. */
+/** The outline of the object a click would place here (red when it doesn't fit). */
 function renderGhost() {
-  const ghost = document.getElementById('mapGhost');
+  const ghost = document.querySelector('#mapWrap .dm-map-ghost');
   if (!ghost) return;
   const m = getSetup().map;
-  if (!ed.hover || (ed.tool !== 'objects' && ed.tool !== 'creatures')) { ghost.innerHTML = ''; return; }
+  if (!ed.hover || ed.tool !== 'objects') { ghost.innerHTML = ''; return; }
   const { col, row } = ed.hover;
-  if (ed.tool === 'objects') {
-    const o = objectAt(m, col, row);
-    if (o) {
-      o.crop = _cropNow(o.url);
-      ghost.innerHTML = mapObjectHtml(o, objectScreenRect({ grid: { cols: m.cols, rows: m.rows } }, o), 90).replace('class="bmap-object"', 'class="bmap-object dm-ghost-ok"');
-    } else {
-      // Where it would have gone, clipped to the map, in red.
-      const sx = m.rows - 1 - row;
-      const w = Math.min(ed.objW, m.rows - sx), h = Math.min(ed.objH, m.cols - col);
-      ghost.innerHTML = `<div class="dm-ghost-bad" style="left:${(sx / m.rows) * 100}%;top:${(col / m.cols) * 100}%;width:${(w / m.rows) * 100}%;height:${(h / m.cols) * 100}%"></div>`;
-    }
-    return;
+  const o = objectAt(m, col, row);
+  if (o) {
+    ghost.innerHTML = mapObjectHtml(o, objectScreenRect({ grid: { cols: m.cols, rows: m.rows } }, o), 90).replace('class="bmap-object"', 'class="bmap-object dm-ghost-ok"');
+  } else {
+    // Where it would have gone, clipped to the map, in red.
+    const sx = m.rows - 1 - row;
+    const w = Math.min(ed.objW, m.rows - sx), h = Math.min(ed.objH, m.cols - col);
+    ghost.innerHTML = `<div class="dm-ghost-bad" style="left:${(sx / m.rows) * 100}%;top:${(col / m.cols) * 100}%;width:${(w / m.rows) * 100}%;height:${(h / m.cols) * 100}%"></div>`;
   }
-  const c = getSetup().creatures.find(x => x.id === ed.creatureId);
-  if (!c) { ghost.innerHTML = ''; return; }
-  const size = footprintForSize(c.participant?.size);
-  const r = tokenScreenRect(m, col, row, size);
-  ghost.innerHTML = `<div class="${creatureSpotProblem(c, col, row) ? 'dm-ghost-bad' : 'dm-ghost-good'}" style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"></div>`;
-}
-
-const _cropResolved = new Map(); // url -> crop, once cropFor has worked it out (they're all started when the list loads)
-function _cropNow(url) {
-  if (!_cropResolved.has(url)) cropFor(url).then(c => _cropResolved.set(url, c));
-  return _cropResolved.get(url) || [0, 0, 1, 1];
 }
 
 function paint(col, row) {
@@ -428,26 +380,8 @@ function paint(col, row) {
   });
 }
 
-/** Why `c` can't start at (col, row), or '' -- off the map, on a blocked square, or on top of another creature. */
-function creatureSpotProblem(c, col, row) {
-  const s = getSetup();
-  const m = s.map;
-  const size = footprintForSize(c.participant?.size);
-  const cells = footprintCells(col, row, size);
-  if (cells.some(p => p.col < 0 || p.row < 0 || p.col >= m.cols || p.row >= m.rows)) return "It doesn't fit there.";
-  if (cells.some(p => m.marks?.[`${p.col},${p.row}`] === 'blocked')) return 'That square is blocked.';
-  const taken = new Set();
-  s.creatures.forEach(o => {
-    if (o.id === c.id || !o.position || o.heldBack) return;
-    footprintCells(o.position.col, o.position.row, footprintForSize(o.participant?.size)).forEach(p => taken.add(`${p.col},${p.row}`));
-  });
-  if (cells.some(p => taken.has(`${p.col},${p.row}`))) return 'Another creature is standing there.';
-  return '';
-}
-
 async function onCellClick(col, row) {
-  const s = getSetup();
-  const m = s.map;
+  const m = getSetup().map;
   if (ed.tool === 'objects') {
     const o = objectAt(m, col, row);
     if (!o) {
@@ -462,17 +396,8 @@ async function onCellClick(col, row) {
         objectCells(o).forEach(p => { st.map.marks[`${p.col},${p.row}`] = o.markKind; });
       }
     });
-  } else if (ed.tool === 'creatures') {
-    const c = s.creatures.find(x => x.id === ed.creatureId);
-    if (!c) return;
-    const problem = creatureSpotProblem(c, col, row);
-    if (problem) { showCombatAlert(problem, { title: c.name }); return; }
-    updateSetup(st => { st.creatures.find(x => x.id === c.id).position = { col, row, facing: 0 }; });
-    ed.creatureId = s.creatures.find(x => !x.heldBack && !x.position)?.id || ed.creatureId; // straight on to the next one
-    renderToolPanel();
   } else if (ed.tool === 'erase') {
-    const objects = m.objects || [];
-    const hit = [...objects].reverse().find(o => objectCells(o).some(p => p.col === col && p.row === row));
+    const hit = [...(m.objects || [])].reverse().find(o => objectCells(o).some(p => p.col === col && p.row === row));
     if (hit) {
       updateSetup(st => {
         st.map.objects = st.map.objects.filter(o => o.id !== hit.id);
@@ -487,36 +412,11 @@ async function onCellClick(col, row) {
       });
       return;
     }
-    const creature = s.creatures.find(c => c.position && !c.heldBack
-      && footprintCells(c.position.col, c.position.row, footprintForSize(c.participant?.size)).some(p => p.col === col && p.row === row));
-    if (creature) {
-      updateSetup(st => { st.creatures.find(x => x.id === creature.id).position = null; });
-      return;
-    }
     if (m.marks?.[`${col},${row}`]) updateSetup(st => { delete st.map.marks[`${col},${row}`]; });
   }
 }
 
 /** A small read-only picture of the map for the setup overview. */
 export function mapPreviewHtml(setup) {
-  const m = setup.map;
-  const board = boardOf(setup);
-  const tokens = setup.creatures.filter(c => c.position && !c.heldBack).map(c => {
-    const r = tokenScreenRect(m, c.position.col, c.position.row, footprintForSize(c.participant?.size));
-    return `<div class="dm-map-token" style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"><div class="dm-map-token-art" data-img="${escapeHtml(c.participant?.image || '')}"></div></div>`;
-  }).join('');
-  const cells = [];
-  for (let col = 0; col < m.cols; col++) {
-    for (let row = m.rows - 1; row >= 0; row--) {
-      const mark = m.marks?.[`${col},${row}`];
-      cells.push(`<div class="dm-map-cell${mark ? ` mark-${mark}` : ''}"></div>`);
-    }
-  }
-  return `
-    <div class="dm-map-stage dm-map-preview${m.background ? ' has-bg' : ''}" style="aspect-ratio:${m.rows} / ${m.cols}">
-      <div class="dm-map-bg"${m.background ? ` style="background-image:url('${escapeHtml(m.background)}')"` : ''}></div>
-      <div class="dm-map-grid" style="grid-template-columns:repeat(${m.rows},1fr);grid-template-rows:repeat(${m.cols},1fr)">${cells.join('')}</div>
-      <div class="bmap-objects">${mapObjectsHtml(board, { tv: true })}</div>
-      <div class="dm-map-tokens">${tokens}</div>
-    </div>`;
+  return mapStageHtml(setup, { preview: true });
 }

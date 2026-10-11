@@ -3001,7 +3001,7 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
   // Target-conditional damage_note effects (Brine, Smelling Salts, Venoshock,
   // ...) -- see move-effects-schema.md and target-picker.js's own use of these.
   const damageNotes = _targetDamageNotes(moveName);
-  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
+  const picked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, feintMoveName: _feintMoveNameFor(combatantId) });
   let hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { direct: true });
 
   const isSameTarget = categories.includes('multi_hit_same_target');
@@ -3028,9 +3028,9 @@ async function _handleDamageResolved({ combatantId, moveName, move, computedData
       if (!hitTargetId) return; // nothing landed yet (missed/closed) -- no target to repeat against
       const target = session?.participants?.[hitTargetId];
       if (!target) return; // target left the battle mid-chain
-      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+      nextPicked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice });
     } else {
-      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, feintMoveName: _feintMoveNameFor(combatantId) });
+      nextPicked = await pickTarget(combatantId, { attackModifier, damageModifier, speciesName, guaranteedHit: _guaranteedHitFor(combatantId, categories, moveName), moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, feintMoveName: _feintMoveNameFor(combatantId) });
     }
     hitTargetId = await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, nextPicked);
   }
@@ -5511,7 +5511,7 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
       // speciesName '' -- no clip inside each target's damage popup; it plays once at the end (_handleMultiHitAoe).
       const outcome = await confirmSecondarySave(target, target.name, {
         dc, hasDamage, damageModifier, speciesName: '', ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId],
-        damageOnPass: moveName === 'Self-Destruct',
+        damageOnPass: moveName === 'Self-Destruct', abilityDice: computedData.abilityDice,
       });
       if (!outcome) continue; // closed for this target -- move on to the next one
       const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
@@ -5562,7 +5562,7 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
       // so each selected target goes straight to its damage roll.
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice });
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier });
     }
   }
@@ -5698,7 +5698,7 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   const dc = computedData.moveDC ?? 0;
   const damageModifier = computedData.damageBonus || 0;
   const hasDamage = !!computedData.damageDice;
-  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName), moveName });
+  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName), moveName, abilityDice: computedData.abilityDice });
   if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
 
   const attackerName = session?.participants?.[combatantId]?.name || '?';

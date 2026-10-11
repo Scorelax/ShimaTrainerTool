@@ -21,6 +21,7 @@ import { getBattleAnimationUrl } from './battle-animation.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, saveAutoFails } from './move-effects.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
+import { renderAbilityDiceInputs, abilityDiceSum } from './ability-dice-inputs.js';
 import { noDamageOnPassedSave } from './ability-mods.js';
 
 function _injectStyles() {
@@ -166,6 +167,7 @@ function _ensureDom() {
           <div class="save-picker-dice-row" id="savePickerDamageDiceRow"></div>
           <label class="save-picker-roll-label" for="savePickerRollInput">Damage roll<span id="savePickerModifierNote"></span></label>
           <input type="number" id="savePickerRollInput" class="save-picker-roll-input" placeholder="Enter roll…">
+          <div id="savePickerAbilityDice"></div>
           <div class="save-picker-roll-total" id="savePickerRollTotal"></div>
           <button class="combat-use-move-btn" id="savePickerConfirmRoll">Confirm Damage</button>
         </div>
@@ -444,12 +446,16 @@ function _showStep3() {
   _damageDiceExtra = 0;
   _damageBattleDice = 0;
   _renderDamageDiceRow();
+  // Blaze / Torrent... -- their extra dice in a field of their own (ability-dice-inputs.js).
+  renderAbilityDiceInputs(document.getElementById('savePickerAbilityDice'), _abilityDice,
+    { labelClass: 'save-picker-roll-label', inputClass: 'save-picker-roll-input', onInput: _updateRollTotal, onEnter: _confirmDamageRoll });
   _updateRollTotal();
   setTimeout(() => input.focus(), 50);
 }
 
 // Ace Trainer's Battle Dice (battle-dice.js) added to this damage roll: the total and how many, spent on confirm.
 let _damageDiceExtra = 0;
+let _abilityDice = []; // Blaze / Torrent's own extra dice -- an input of their own on the damage step
 let _damageBattleDice = 0;
 
 function _renderDamageDiceRow() {
@@ -481,14 +487,21 @@ function _renderDamageDiceRow() {
 function _updateRollTotal() {
   const raw = parseInt(document.getElementById('savePickerRollInput').value, 10);
   const totalEl = document.getElementById('savePickerRollTotal');
-  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier + _damageDiceExtra}</strong>`;
+  const ability = abilityDiceSum(document.getElementById('savePickerAbilityDice'));
+  totalEl.innerHTML = Number.isNaN(raw) ? ''
+    : `Total: <strong>${raw + _damageModifier + _damageDiceExtra + (ability || 0)}</strong>${Number.isNaN(ability) ? ' (+ the ability roll below)' : ''}`;
 }
 
 function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('savePickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
+  const abilityRoll = abilityDiceSum(document.getElementById('savePickerAbilityDice'));
+  if (Number.isNaN(abilityRoll)) {
+    document.querySelector('#savePickerAbilityDice [data-ability-dice]:placeholder-shown')?.focus();
+    return;
+  }
   for (let i = 0; i < _damageBattleDice; i++) spendBattleDie();
-  const extra = _damageDiceExtra;
+  const extra = _damageDiceExtra + abilityRoll;
   _damageDiceExtra = 0;
   _damageBattleDice = 0;
   _close({ targetId: _selectedTargetId, passed: _pendingPassed, rawRoll: raw + extra, ...(_pendingSave || {}) });
@@ -524,7 +537,8 @@ function _cardHtml(p) {
  * save bonuses), folds the numeric ones into the total, uses up "next roll"
  * effects once Success/Fail is chosen, and reports the net rollMode.
  */
-export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false } = {}) {
+export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false, abilityDice = [] } = {}) {
+  _abilityDice = abilityDice || [];
   _ensureDom();
   _moveUser = moveUser;
   _dc = dc;
@@ -554,7 +568,8 @@ export async function confirmSecondarySave(target, targetName, { dc = 0, hasDama
  * {targetId, passed:true}, {targetId, passed:false} (no damage component),
  * {targetId, passed:false, rawRoll} (has one), or null if closed/no target.
  */
-export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null, moveName = '' } = {}) {
+export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null, moveName = '', abilityDice = [] } = {}) {
+  _abilityDice = abilityDice || [];
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;

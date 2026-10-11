@@ -284,8 +284,8 @@ export function moveAbilityMods(combatant, move, info = {}) {
   // combat.js's local combatant lacks some session fields (owner, side) -- fill them from the live record.
   const live = _session?.participants?.[combatant?.id];
   const p = live ? { ...live, ...combatant } : combatant;
-  const mods = { type: move[1], extraTypes: [], attack: 0, damageFlat: 0, diceMultiplier: 1, extraDice: [], stabMultiplier: 1,
-    vpMultiplier: 1, dcBonus: 0, atkParts: [], dmgParts: [], notes: [] };
+  const mods = { type: move[1], extraTypes: [], attack: 0, damageFlat: 0, diceMultiplier: 1, diceMultiplierFrom: [], extraDice: [],
+    stabMultiplier: 1, vpMultiplier: 1, dcBonus: 0, atkParts: [], dmgParts: [], notes: [] };
   const effs = abilityEffectsOf(p).filter(({ effect: e }) => _isPassiveSelf(e) && !_needsTarget(e) && _gatesHold(p, e, null));
   const ownTypes = () => [..._types(p), ...mods.extraTypes.map(t => t.toLowerCase())];
   const ctx = () => ({ ...info, type: mods.type, vpCost: move[4], ownType: ownTypes().includes(String(mods.type || '').toLowerCase()) });
@@ -311,7 +311,8 @@ export function moveAbilityMods(combatant, move, info = {}) {
       case 'damage_mod':
         if (!info.damaging) break;
         if (e.flatBonus != null) { const v = _amount(e.flatBonus, p); mods.damageFlat += v; mods.dmgParts.push(`${ability} ${v >= 0 ? '+' : ''}${v}`); }
-        if (e.diceMultiplier) { mods.diceMultiplier *= e.diceMultiplier; mods.dmgParts.push(`${ability} ×${e.diceMultiplier} dice`); }
+        // Blaze's "50% more dice": rolled on its own (abilityExtraDice), the move's own dice stay as they are.
+        if (e.diceMultiplier) { mods.diceMultiplier *= e.diceMultiplier; mods.diceMultiplierFrom.push(ability); }
         if (e.extraDice) { const d = _scaledDice(e, Number(p?.level) || 1); mods.extraDice.push(d); mods.dmgParts.push(`${ability} +${d}${e.damageType ? ` ${e.damageType}` : ''}`); }
         if (e.totalMultiplier) mods.notes.push(`${ability}: ${e.totalMultiplier === 0.5 ? 'halve' : `×${e.totalMultiplier}`} the total damage`);
         if (e.rerollKeep) mods.notes.push(`${ability}: roll the damage twice and keep ${e.rerollKeep === 'higher' ? 'the higher' : 'either'} total`);
@@ -335,6 +336,29 @@ export function moveAbilityMods(combatant, move, info = {}) {
   return mods;
 }
 
+/** The extra dice a dice multiplier adds (Blaze/Torrent/Overgrow/Swarm's ×1.5 -> half the dice again), never rounded:
+ * 2d8 -> "1d8", 4d6 -> "2d6", 1d6 -> "1d3", 3d6 -> "1d6 + 1d3" -- a half die is the same die rolled and halved, rounded
+ * up (a d6 read 1-2 = 1, 3-4 = 2, 5-6 = 3). Every dice term counts ("2d6 + 1d4" -> "1d6 + 1d2"). Returns
+ * { dice, hint } (hint explains any half die), or null when there's nothing to add. */
+export function abilityExtraDice(dice, multiplier) {
+  const extra = multiplier - 1;
+  if (!(extra > 0)) return null;
+  const parts = [];
+  const halves = new Set();
+  String(dice || '').replace(/(\d+)d(\d+)/gi, (_, n, x) => {
+    const want = parseInt(n, 10) * extra;
+    const whole = Math.floor(want + 1e-9);
+    if (whole) parts.push(`${whole}d${x}`);
+    if (want - whole > 1e-9) { parts.push(`1d${Math.ceil(parseInt(x, 10) / 2)}`); halves.add(Number(x)); }
+    return '';
+  });
+  if (!parts.length) return null;
+  // A real die (d8 halved is a d4) needs no explaining -- only a d2 / d3 / d5.
+  const hint = [...halves].filter(x => ![4, 6, 8, 10, 12, 20].includes(Math.ceil(x / 2)))
+    .map(x => `1d${Math.ceil(x / 2)}: roll a d${x} and halve it, rounding up`).join('; ');
+  return { dice: parts.join(' + '), hint };
+}
+
 // --- one move against one target ------------------------------------------------------------------------------------
 
 /** Damage that depends on who's hit -- the attacker's target-gated damage_mods (Merciless, Rivalry, Magnet Pull, Toxic
@@ -354,7 +378,7 @@ export function targetAbilityDamage(attacker, target, move, { type, damaging = t
     if (f.melee && !melee) continue;
     if (f.moveTypes && !f.moveTypes.map(t => t.toLowerCase()).includes(String(type || '').toLowerCase())) continue;
     if (e.flatBonus != null) { const v = _amount(e.flatBonus, attacker); out.flat += v; out.notes.push(`${ability}: ${v >= 0 ? '+' : ''}${v} damage (added)`); }
-    if (e.diceMultiplier) out.notes.push(`${ability}: roll ×${e.diceMultiplier} the damage dice`);
+    if (e.diceMultiplier) out.notes.push(`${ability}: roll ${Math.round((e.diceMultiplier - 1) * 100)}% more dice on their own and add them (a half die: roll it and halve, rounding up)`);
     if (e.extraDice) out.notes.push(`${ability}: add ${_scaledDice(e, Number(attacker.level) || 1)}${e.damageType ? ` ${e.damageType}` : ''} to the damage roll`);
     if (e.totalMultiplier) out.notes.push(`${ability}: ${e.totalMultiplier === 0.5 ? 'halve' : `×${e.totalMultiplier}`} the total damage`);
     if (e.rerollKeep) out.notes.push(`${ability}: roll the damage twice and keep the ${e.rerollKeep === 'higher' ? 'higher' : 'better'} total`);

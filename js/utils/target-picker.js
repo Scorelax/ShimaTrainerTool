@@ -20,6 +20,7 @@ import { waitForReactionWindow } from './reaction-window.js';
 import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
+import { renderAbilityDiceInputs, abilityDiceSum } from './ability-dice-inputs.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -104,6 +105,7 @@ let _damageModifier = 0;
 // (combat-wip.js) pass these in; harmless empty defaults for any caller
 // that doesn't (nothing shows).
 let _damageDice = '';
+let _abilityDice = []; // Blaze / Torrent's own extra dice -- an input of their own on the damage step
 let _damageNotes = [];
 // This attack's own target-conditional flat bonus (Crush Grip's
 // "+proficiency if target above 50% HP") -- computed alongside the dice/
@@ -352,6 +354,7 @@ function _ensureDom() {
           <div class="target-picker-dice-row" id="targetPickerDamageDiceRow"></div>
           <label class="target-picker-roll-label" for="targetPickerRollInput">Damage roll<span id="targetPickerModifierNote"></span></label>
           <input type="number" id="targetPickerRollInput" class="target-picker-roll-input" placeholder="Enter roll…">
+          <div id="targetPickerAbilityDice"></div>
           <div class="target-picker-roll-total" id="targetPickerRollTotal"></div>
           <div class="target-picker-roll-actions">
             <button class="combat-use-move-btn target-picker-roll-back" id="targetPickerBackToAttack">← Back</button>
@@ -729,6 +732,9 @@ function _showStep3() {
   _renderDamageDiceRow();
   const input = document.getElementById('targetPickerRollInput');
   input.value = _presetRoll != null ? _presetRoll : '';
+  // Blaze / Torrent... -- their extra dice in a field of their own (ability-dice-inputs.js). Not on a pre-filled amount.
+  renderAbilityDiceInputs(document.getElementById('targetPickerAbilityDice'), _presetRoll != null ? [] : _abilityDice,
+    { labelClass: 'target-picker-roll-label', inputClass: 'target-picker-roll-input', onInput: _updateRollTotal, onEnter: _confirmDamageRoll });
 
   // Abilities against THIS target (ability-mods.js): drawn now, then again once the server says how effective the hit
   // is (type-preview: the chart plus live type changes and abilities) -- super-effective conditions need that.
@@ -779,7 +785,9 @@ function _renderAbilityDamage(row, moveType, typeMultiplier) {
 function _updateRollTotal() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   const totalEl = document.getElementById('targetPickerRollTotal');
-  totalEl.innerHTML = Number.isNaN(raw) ? '' : `Total: <strong>${raw + _damageModifier + _targetFlatBonus + _damageDiceExtra}</strong>`;
+  const ability = abilityDiceSum(document.getElementById('targetPickerAbilityDice'));
+  totalEl.innerHTML = Number.isNaN(raw) ? ''
+    : `Total: <strong>${raw + _damageModifier + _targetFlatBonus + _damageDiceExtra + (ability || 0)}</strong>${Number.isNaN(ability) ? ' (+ the ability roll below)' : ''}`;
 }
 
 /** Confirm Damage -- plays the one-shot attack animation (see _playAnimation)
@@ -791,6 +799,11 @@ function _updateRollTotal() {
 async function _confirmDamageRoll() {
   const raw = parseInt(document.getElementById('targetPickerRollInput').value, 10);
   if (Number.isNaN(raw)) return;
+  const abilityRoll = abilityDiceSum(document.getElementById('targetPickerAbilityDice'));
+  if (Number.isNaN(abilityRoll)) {
+    document.querySelector('#targetPickerAbilityDice [data-ability-dice]:placeholder-shown')?.focus();
+    return;
+  }
   const btn = document.getElementById('targetPickerConfirmRoll');
   if (btn.disabled) return;
   btn.disabled = true;
@@ -800,8 +813,8 @@ async function _confirmDamageRoll() {
     // (combat-wip.js's _resolveOneHit) already adds its own damageModifier
     // on top of whatever rawRoll it's given, same as it always has, so
     // this needs no changes there to land correctly.
-    // _damageDiceExtra: Battle Dice added on this step (_renderDamageDiceRow).
-    targetId: _selectedTargetId, hit: true, rawRoll: raw + _targetFlatBonus + _damageDiceExtra,
+    // _damageDiceExtra: Battle Dice added on this step (_renderDamageDiceRow); abilityRoll: Blaze's own dice.
+    targetId: _selectedTargetId, hit: true, rawRoll: raw + _targetFlatBonus + _damageDiceExtra + abilityRoll,
     attackRoll: _attackRoll, attackTotal: _attackRoll === null ? null : _attackRoll + _effectiveAttackMod(),
     rollMode: _atkCtx?.mode || 'normal',
     ...(_reactionDamage ? { reactionMultiplier: _reactionDamage.multiplier, reactionPool: _reactionDamage.pool } : {}),
@@ -859,7 +872,7 @@ function _cardHtml(p) {
  * (self-only move)" button already covers "this doesn't hit anyone else",
  * so a separate self-card would just be the same choice twice.
  */
-export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null, feintMoveName = '' } = {}) {
+export async function pickTarget(attackerId, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null, feintMoveName = '', abilityDice = [] } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -878,6 +891,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _guaranteedHit = guaranteedHit;
   _moveName = moveName;
   _damageDice = damageDice;
+  _abilityDice = abilityDice || [];
   _damageNotes = damageNotes;
   _moveModValue = moveModValue;
   _nextTierDice = nextTierDice;
@@ -920,7 +934,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
  * null if closed. With guaranteedHit (see pickTarget) it opens directly at
  * the damage roll instead, with no step to go back to.
  */
-export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null, forcedRollMode = null, forcedRollNote = '' } = {}) {
+export async function pickTargetAgain(target, targetName, { attackModifier = 0, damageModifier = 0, speciesName = '', guaranteedHit = false, attacker = null, moveName = '', damageDice = '', damageNotes = [], moveModValue = 0, nextTierDice = null, presetRoll = null, forcedRollMode = null, forcedRollNote = '', abilityDice = [] } = {}) {
   _ensureDom();
   _attacker = attacker;
   _attackModifier = attackModifier;
@@ -929,6 +943,7 @@ export async function pickTargetAgain(target, targetName, { attackModifier = 0, 
   _guaranteedHit = guaranteedHit;
   _moveName = moveName;
   _damageDice = damageDice;
+  _abilityDice = abilityDice || [];
   _damageNotes = damageNotes;
   _moveModValue = moveModValue;
   _nextTierDice = nextTierDice;

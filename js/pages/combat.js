@@ -7,7 +7,7 @@ import { showMovePopup, playBattleAnimationFloating } from '../utils/move-popup.
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
 import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, selfRequirementUnmet, zoneRuleActive, isMeleeMoveRow } from '../utils/move-effects.js';
-import { setAbilityData, moveAbilityMods, activatedAbilityEffects } from '../utils/ability-mods.js';
+import { setAbilityData, moveAbilityMods, activatedAbilityEffects, abilityExtraDice } from '../utils/ability-mods.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
 
@@ -3241,8 +3241,9 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     heldItemEffects
   );
 
-  // The ability's numbers (see _abilityMods above): attack bonus, damage dice (Overgrow's "50% more dice", rounded up)
-  // and extra dice, flat damage, save DC. Breakdowns read "(Proficiency +3, STR +2)" -- the ability parts go inside.
+  // The ability's numbers (see _abilityMods above): attack bonus, extra dice, flat damage, save DC, and Overgrow's "50%
+  // more dice" -- rolled in its own field on the damage step (computedData.abilityDice), never rounded. Breakdowns read
+  // "(Proficiency +3, STR +2)" -- the ability parts go inside.
   if (_abilityMods) {
     const addParts = (text, parts) => (parts.length ? `(${[text.replace(/^\(|\)$/g, ''), ...parts].filter(Boolean).join(', ')})` : text);
     if (_abilityMods.attack) {
@@ -3251,14 +3252,17 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     }
     if (computedData.damageDice) {
       let dice = computedData.damageDice;
-      // Every dice term ("2d6 + 1d4" -> "3d6 + 2d4"), not just a plain "2d6".
-      if (_abilityMods.diceMultiplier !== 1) {
-        dice = String(dice).replace(/(\d+)(d\d+)/gi, (_, n, d) => `${Math.ceil(parseInt(n, 10) * _abilityMods.diceMultiplier)}${d}`);
+      const dmgParts = [..._abilityMods.dmgParts];
+      const half = _abilityMods.diceMultiplier !== 1 ? abilityExtraDice(dice, _abilityMods.diceMultiplier) : null;
+      if (half) {
+        const label = _abilityMods.diceMultiplierFrom.join(' + ');
+        computedData.abilityDice = [{ label, ...half }];
+        dmgParts.push(`${label} +${half.dice}, rolled on its own`);
       }
       for (const d of _abilityMods.extraDice) dice = `${dice} + ${d}`;
       computedData.damageDice = dice;
       computedData.damageBonus += _abilityMods.damageFlat;
-      computedData.damageBreakdown = addParts(computedData.damageBreakdown, _abilityMods.dmgParts);
+      computedData.damageBreakdown = addParts(computedData.damageBreakdown, dmgParts);
     }
     if (_abilityMods.dcBonus && computedData.moveDC != null) computedData.moveDC += _abilityMods.dcBonus;
   }

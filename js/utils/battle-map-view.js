@@ -7,6 +7,7 @@
 // instead of boxed cells, square tokens with a side-coloured frame whose sprite turns to face the way the token faces, and
 // colour-coded terrain zones. Nothing here knows about game rules beyond the terrain kinds' colours.
 import { terrainKindOf, weatherKindOf } from './move-effects.js';
+import { MAP_OBJECT_CSS, MAP_MARK_CSS } from './battle-map-grid.js';
 
 /** RGB triples (not hex) so CSS can use them at any alpha: rgba(var(--zc), .2). */
 export const ZONE_RGB = {
@@ -269,6 +270,11 @@ export function injectBattleMapStyles() {
     .bmap-toolbar button.on { background: rgba(255,140,60,0.55); }
     .bmap-toolbar .tb-sep { width: 1px; height: 1.3rem; background: rgba(255,255,255,0.18); }
     .bmap-toolbar .tb-label { font-size: 0.72rem; font-weight: 600; opacity: 0.75; padding: 0 0.3rem; }
+
+    /* ---- the DM's map: objects (trees, rocks...) and difficult / blocked squares ---- */
+    ${MAP_OBJECT_CSS}
+    ${MAP_MARK_CSS}
+    .bmap-cell.mark-blocked, .bmap-cell.mark-blocked:hover { cursor: not-allowed; }
   `;
   document.head.appendChild(style);
 }

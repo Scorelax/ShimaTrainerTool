@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DM Console</title>
-<link rel="icon" href="assets/Pokeball.png">
+<link rel="icon" href="assets/AppIcon.png">
 <!-- The player app's stylesheet: the battle screen mounted in the middle (combat-wip.js) and its popups rely on it. -->
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/dm-console.css">
@@ -12,16 +12,14 @@
 <body class="dm-console">
   <div class="dm-app">
     <header class="dm-topbar">
-      <div class="dm-brand"><img src="assets/Pokeball.png" alt=""><span>DM Console</span></div>
+      <div class="dm-brand"><img src="assets/AppIcon.png" alt=""><span>DM Console</span></div>
       <div class="dm-status" id="dmStatus">Connecting…</div>
-      <div class="dm-topbar-links">
-        <a href="display.html" target="_blank" rel="noopener" title="The table TV's turn / HP screen">📺 Display</a>
-        <a href="battle-map.html" target="_blank" rel="noopener" title="The table's battle map screen">▦ Battle map</a>
-      </div>
+      <!-- Room for the world clock, weather and other counters (coming with those modules). -->
+      <div class="dm-topbar-widgets" id="dmTopWidgets"></div>
     </header>
 
     <nav class="dm-rail" id="dmRail">
-      <button class="dm-rail-btn active" data-module="battle" title="Battle"><span>⚔️</span>Battle</button>
+      <button class="dm-rail-btn active" data-module="battle" title="Battle"><img src="assets/VS.png" alt="">Battle</button>
       <button class="dm-rail-btn" data-module="party" disabled title="Coming later"><span>👥</span>Party</button>
       <button class="dm-rail-btn" data-module="pokedex" disabled title="Coming later"><span>📖</span>Pokédex</button>
       <button class="dm-rail-btn" data-module="npcs" disabled title="Coming later"><span>🎭</span>NPCs</button>
@@ -31,10 +29,14 @@
     </nav>
 
     <main class="dm-main">
-      <section class="dm-module dm-battle" id="dmModuleBattle">
-        <!-- combat-wip.js renders the shared battle here, as the DM (see enableDmMode). Must be #content. -->
-        <div class="dm-battle-stage" id="content"><div class="dm-loading">Loading game data…</div></div>
-        <aside class="dm-tools" id="dmTools"></aside>
+      <section class="dm-module" id="dmModuleBattle">
+        <!-- No battle running: the setup (overview, map setup, battle setup). -->
+        <div class="dm-view" id="dmView"><div class="dm-loading">Loading…</div></div>
+        <!-- A battle running: combat-wip.js renders the shared battle here, as the DM (must be #content). -->
+        <div class="dm-battle" id="dmLive" hidden>
+          <div class="dm-battle-stage" id="content"></div>
+          <aside class="dm-tools" id="dmTools"></aside>
+        </div>
       </section>
     </main>
   </div>

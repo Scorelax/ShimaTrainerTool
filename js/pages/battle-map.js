@@ -9,12 +9,16 @@ import { CombatAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
-import { footprintForSize } from '../utils/battle-map-grid.js';
+import { footprintForSize, mapObjectsHtml, MAP_OBJECT_CSS, MAP_MARK_CSS } from '../utils/battle-map-grid.js';
 import { zoneKindsByCell, legendHtml, activeTerrainSummary, spriteTransform, unwrapAngle } from '../utils/battle-map-view.js';
 
 let session = { active: false, participants: {}, board: null };
 
 async function init() {
+  // The DM's map pictures and difficult / blocked squares -- the same styles the in-app maps use.
+  const style = document.createElement('style');
+  style.textContent = MAP_OBJECT_CSS + MAP_MARK_CSS;
+  document.head.appendChild(style);
   initLiveUpdates();
 
   const result = await CombatAPI.getState();
@@ -53,14 +57,24 @@ function render() {
 
   updateBackground();
   updateGrid();
+  updateObjects();
   updateTokens();
   updateTerrainOverlay();
 }
 
+/** The DM's map pictures (trees, rocks...), drawn turned with the rest of this sideways board. Pictures are rebuilt
+ * only when the objects actually change, never on an unrelated push. */
+function updateObjects() {
+  const layer = document.getElementById('mapObjects');
+  if (!layer) return;
+  const html = mapObjectsHtml(session.board, { tv: true });
+  if (layer._html !== html) { layer.innerHTML = html; layer._html = html; }
+}
+
 function clearBattleLayers(stage) {
-  ['mapTokens', 'mapGrid', 'mapLegend'].forEach(id => {
+  ['mapTokens', 'mapGrid', 'mapLegend', 'mapObjects'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = '';
+    if (el) { el.innerHTML = ''; el._html = ''; }
   });
   stage.className = stage.className.replace(/\bglobal-\w+/g, '').trim();
 }
@@ -129,7 +143,8 @@ function updateGrid() {
     for (let row = rows - 1; row >= 0; row--) {
       const terrain = session.board.cells[`${col},${row}`]?.terrain || '';
       const zone = zones.get(`${col},${row}`);
-      const classes = ['map-cell', terrain ? 'marked' : '', zone ? `zone-${zone[0]}` : ''].filter(Boolean).join(' ');
+      const mark = session.board.marks?.[`${col},${row}`]; // the DM's difficult / blocked squares
+      const classes = ['map-cell', terrain ? 'marked' : '', zone ? `zone-${zone[0]}` : '', mark ? `mark-${mark}` : ''].filter(Boolean).join(' ');
       cells.push(`<div class="${classes}"${terrain ? ` title="${terrain}"` : ''}>${terrain}</div>`);
     }
   }

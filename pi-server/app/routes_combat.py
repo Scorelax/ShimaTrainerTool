@@ -31,6 +31,7 @@ import copy
 import json
 import math
 import os
+import random
 import re
 import threading
 import uuid
@@ -153,8 +154,17 @@ _EMPTY_STATE = {
         # the same URL string every screen (in-app popup, placement, kiosk
         # display) renders against.
         'backgroundImage': None,
+        # The DM console's map editor (dm-console.html): pictures placed on the map -- [{id, kind, label, url, col, row,
+        # w, h, rot, crop}], (col, row) the TOP-LEFT cell, w x h cells, rot in 90-degree steps, crop the picture's
+        # visible part as fractions [x0, y0, x1, y1] (see battle-map-grid.js's mapObjectsHtml) -- purely visual...
+        'objects': [],
+        # ...and the squares the DM marked: "col,row" -> one of MAP_MARK_KINDS. These ARE rules: difficult doubles the
+        # movement cost like a Fissure zone, blocked can't be walked through or stood on (see _move_cost_ft/_move_token).
+        'marks': {},
     },
 }
+
+MAP_MARK_KINDS = ('difficult', 'blocked')
 
 
 # The trainers' basic attack -- an ordinary entry in the moves file (1d6 + STR, typeless), used from the card's Attack button.
@@ -623,6 +633,81 @@ def _handle(conn, action, params):
         return _mutate(conn, lambda s: s.setdefault('pendingPrompts', {}).pop(params['promptId'], None))
 
     raise ValueError('Unknown combat action: ' + str(action))
+
+
+_OBJECT_URL_RE = re.compile(r'^/battle-images/object-[\w.-]+\.png$', re.IGNORECASE)  # see list_map_objects
+
+
+def start_prepared_session(conn, setup):
+    """The DM console's Start battle: a PvE session built in one go from the DM's saved setup (routes_dm.py) -- the map
+    (size, background, objects, marks) and every creature the DM prepared, already standing where the DM placed them.
+    Players can only join once this has run, since before it there is no session at all.
+
+    Each setup creature carries a ready participant payload (built on the DM's screen with the same builder a player's
+    Pokemon goes through) plus `heldBack`, `initiativeBonus` (rolled d20 + this when no initiative was typed) and an
+    optional `position` {col, row, facing}."""
+    with _SESSION_LOCK:
+        if load_state(conn).get('active'):
+            raise ValueError('A battle is already in progress -- end it before starting a new one.')
+        m = setup.get('map') or {}
+        cols, rows = js_parse_int(m.get('cols')), js_parse_int(m.get('rows'))
+        if not cols or not rows or not (1 <= cols <= 60 and 1 <= rows <= 60):
+            raise ValueError('The map needs a size between 1 and 60 squares each way')
+        state = copy.deepcopy(_EMPTY_STATE)
+        state.update({'active': True, 'battleType': 'pve', 'round': 1, 'log': [], 'logFile': _new_log_filename('pve')})
+        board = state['board']
+        board['grid'] = {'cols': cols, 'rows': rows}
+        bg = m.get('background') or ''
+        board['backgroundImage'] = bg if bg.startswith('/battle-images/') else None
+        board['objects'] = _clean_map_objects(m.get('objects'), cols, rows)
+        board['marks'] = {cell: kind for cell, kind in (m.get('marks') or {}).items()
+                          if kind in MAP_MARK_KINDS and _in_grid(cell, cols, rows)}
+        _log_event(state, 'session-start', text='Battle started (PVE)')
+
+        for creature in setup.get('creatures') or []:
+            data = dict(creature.get('participant') or {})
+            if not data.get('name'):
+                continue
+            data.update({'side': 'enemy', 'owner': DM_OWNER, 'id': creature.get('id') or None,
+                         'status': 'spectating' if creature.get('heldBack') else 'participating'})
+            if js_parse_int(data.get('initiative')) is None:
+                data['initiative'] = random.randint(1, 20) + (js_parse_int(creature.get('initiativeBonus')) or 0)
+            _add_participant(state, data)
+            pid = data['id'] or next(reversed(state['participants']))  # _add_participant made one up if it had none
+            pos = creature.get('position') or {}
+            col, row = js_parse_int(pos.get('col')), js_parse_int(pos.get('row'))
+            if data['status'] == 'participating' and col is not None and row is not None and 0 <= col < cols and 0 <= row < rows:
+                board['tokens'][pid] = {'col': col, 'row': row, 'facing': (js_parse_int(pos.get('facing')) or 0) % 360, 'z': 0}
+                state['participants'][pid]['placed'] = True
+        return _save_and_publish(conn, state)
+
+
+def _in_grid(cell, cols, rows):
+    try:
+        c, r = (int(v) for v in str(cell).split(','))
+    except ValueError:
+        return False
+    return 0 <= c < cols and 0 <= r < rows
+
+
+def _clean_map_objects(objects, cols, rows):
+    out = []
+    for o in objects or []:
+        if not isinstance(o, dict) or not _OBJECT_URL_RE.match(str(o.get('url') or '')):
+            continue
+        col, row = js_parse_int(o.get('col')), js_parse_int(o.get('row'))
+        w, h = js_parse_int(o.get('w')) or 1, js_parse_int(o.get('h')) or 1
+        if col is None or row is None or not (0 <= col < cols and 0 <= row < rows):
+            continue
+        crop = o.get('crop')
+        if not (isinstance(crop, list) and len(crop) == 4 and all(isinstance(v, (int, float)) for v in crop)):
+            crop = [0, 0, 1, 1]
+        out.append({
+            'id': str(o.get('id') or uuid.uuid4().hex[:8]), 'kind': str(o.get('kind') or ''), 'label': str(o.get('label') or ''),
+            'url': o['url'], 'col': col, 'row': row, 'w': max(1, min(w, cols)), 'h': max(1, min(h, rows)),
+            'rot': (js_parse_int(o.get('rot')) or 0) % 360 // 90 * 90, 'crop': [max(0.0, min(1.0, float(v))) for v in crop],
+        })
+    return out
 
 
 def _ask_prompt(state, prompt_id, pid, kind, args_json, asked_by):
@@ -3291,6 +3376,24 @@ def _list_backgrounds():
     return {'status': 'success', 'backgrounds': backgrounds}
 
 
+_OBJECT_FILENAME_RE = re.compile(r'^object-(.+)\.png$', re.IGNORECASE)
+
+
+def list_map_objects():
+    """The pictures the DM console's map editor can place on the map -- object-<key>.png in the same folder as the
+    backgrounds (object-tree.png -> {"key": "tree", "label": "Tree", "url": "/battle-images/object-tree.png"}). A new
+    file dropped in there shows up in the editor's list on its own."""
+    if not os.path.isdir(upstream.BATTLE_IMAGE_DIR):
+        return []
+    out = []
+    for filename in sorted(os.listdir(upstream.BATTLE_IMAGE_DIR)):
+        m = _OBJECT_FILENAME_RE.match(filename)
+        if m:
+            key = m.group(1)
+            out.append({'key': key, 'label': key.replace('_', ' ').replace('-', ' ').title(), 'url': f'/battle-images/{filename}'})
+    return out
+
+
 _MOVE_DATA_CACHE = {'stamp': None, 'data': None}
 
 
@@ -3571,8 +3674,26 @@ def _move_cost_ft(state, participant, c0, r0, c1, r1, z0=0, z1=0):
         for z in state.get('terrainZones') or []:
             if z.get('difficult'):
                 difficult.update(z.get('cells') or ())
+        difficult.update(cell for cell, kind in _map_marks(state).items() if kind == 'difficult')  # the DM's map marks
     horizontal = sum(10 if f"{c},{r}" in difficult else 5 for c, r in _path_cells(c0, r0, c1, r1))
     return max(horizontal, abs(z1 - z0))
+
+
+def _map_marks(state):
+    return (state.get('board') or {}).get('marks') or {}
+
+
+def _blocked_cell_on_path(state, c0, r0, c1, r1, size=1):
+    """The first square the DM marked `blocked` that a ground-level move from (c0, r0) to (c1, r1) would pass through or
+    end on (the mover's whole footprint at the end), as (col, row) -- or None. Mirrored by move-effects.js's
+    blockedCellOnPath."""
+    blocked = {cell for cell, kind in _map_marks(state).items() if kind == 'blocked'}
+    if not blocked:
+        return None
+    for c, r in _path_cells(c0, r0, c1, r1) + footprint_cells(c1, r1, size):
+        if f'{c},{r}' in blocked:
+            return (c, r)
+    return None
 
 
 def _queue_hazards(state, pid, trigger):
@@ -3905,6 +4026,11 @@ def _move_token(state, pid, col, row, z=None):
         if z1 > z0:
             raise ValueError(f"{participant['name']} can't fly inside the Gravity field")
         z0 = z1 = 0  # flying into it: it lands (the fall itself costs no movement)
+    if current and z1 == 0:
+        # A flyer passes over the DM's blocked squares, and a burrower under them -- only a move on the ground is stopped.
+        wall = _blocked_cell_on_path(state, current['col'], current['row'], col, row, footprint_size(participant.get('size')))
+        if wall:
+            raise ValueError(f"{participant['name']} can't move through ({wall[0]}, {wall[1]}) -- that square is blocked")
     if participant.get('speeds'):
         distance_ft = _move_cost_ft(state, participant, current['col'], current['row'], col, row, z0, z1) if current else 0
         _, best_remaining = _movement_budget(participant)
@@ -3949,6 +4075,8 @@ def _confirm_placement(state, pid, col, row, facing=None):
     for other_id, pos in state['board']['tokens'].items():
         if other_id != pid and pos['col'] == col and pos['row'] == row:
             raise ValueError('That square is already taken')
+    if any(_map_marks(state).get(f'{c},{r}') == 'blocked' for c, r in footprint_cells(col, row, footprint_size(participant.get('size')))):
+        raise ValueError("That square is blocked -- pick another one")
     facing = _facing_of(state, pid) if facing is None else (round(facing / 45) * 45) % 360
     state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing, 'z': _altitude_of(state, pid)}
     participant['placed'] = True

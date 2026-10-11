@@ -25,7 +25,7 @@ import { injectBattleMapStyles, zoneKind, spriteTransform } from '../utils/battl
 import { promptHazard, closeHazardPopup, isHazardPopupOpen } from '../utils/hazard-popup.js';
 import { playBattleAnimationFloating } from '../utils/move-popup.js';
 import { pickRepositionCell } from '../utils/reposition-picker.js';
-import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells, mapObjectsHtml } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia, prefetchSprite } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm, showCombatPrompt } from '../utils/combat-alert.js';
@@ -1799,8 +1799,10 @@ function renderPlacementPhase(state, currentId) {
         <div class="placement-stage${bg ? ' has-bg' : ''}" id="placementStage"
              style="aspect-ratio:${cols} / ${rows};${bg ? ` background-image:url(${bg});` : ''}">
           <div class="placement-grid" id="placementGrid" style="${gridTemplateStyle(state.board)}">${gridCellsHtml(state.board, 'bmap-cell')}</div>
+          <div class="bmap-objects">${mapObjectsHtml(state.board)}</div>
           <div class="placement-tokens" id="placementTokens"></div>
         </div>
+        ${state.battleType === 'pvp' ? `
         <div class="placement-bg-picker">
           <label for="placementGridCols">Grid Size</label>
           <div class="placement-grid-size-row">
@@ -1809,8 +1811,8 @@ function renderPlacementPhase(state, currentId) {
             <input type="number" id="placementGridRows" min="1" value="${rows}" style="width:56px;" title="Squares across the TV (the other number follows, so the squares stay square on the TV)">
             <button type="button" id="placementSetGridBtn">Set</button>
           </div>
-        </div>
-        ${state.battleType === 'pvp' || _dmName ? `
+        </div>` : '' /* PvE: the DM made this map in the DM console -- its size and background stay as built */}
+        ${state.battleType === 'pvp' ? `
         <div class="placement-bg-picker">
           <label for="placementBgSelect">Battle Background</label>
           <select id="placementBgSelect">
@@ -1844,6 +1846,8 @@ function _isCellTaken(state, col, row, currentId) {
     .some(([id, pos]) => id !== currentId &&
       overlaps(pos.col, pos.row, footprintForSize(state.participants[id]?.size)));
   if (occupied) return true;
+  // The DM's blocked squares (board.marks) can't be stood on -- the server refuses them too.
+  if (myCells.some(c => state.board.marks?.[`${c.col},${c.row}`] === 'blocked')) return true;
 
   return Object.entries(_hoverGhosts)
     .some(([id, pos]) => pos && id !== currentId &&

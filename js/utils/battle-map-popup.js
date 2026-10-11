@@ -28,10 +28,10 @@
 import { CombatAPI } from '../api.js';
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
-import { moveCostFt, altitudeLimits } from './move-effects.js';
+import { moveCostFt, altitudeLimits, blockedCellOnPath } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 import { lineFtFromRange, lineGeometry, lineHitIds, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
@@ -123,6 +123,7 @@ function _ensureDom() {
         <div class="bmap-toolbar-slot" id="bmapToolbarSlot"></div>
         <div class="bmap-stage" id="bmapStage">
           <div class="bmap-grid" id="bmapGrid"></div>
+          <div class="bmap-objects" id="bmapObjects"></div>
           <div class="bmap-tokens" id="bmapTokens"></div>
         </div>
         <div class="bmap-legend" id="bmapLegend"></div>
@@ -279,6 +280,7 @@ function _render() {
   // While aiming a line, a drag on the map turns it instead of scrolling the page (phones).
   document.getElementById('bmapStage')?.classList.toggle('line-aiming', _lineOn && !!_selected());
   _renderGrid();
+  _renderObjects();
   _renderTokens();
   _renderToolbar();
   const legend = document.getElementById('bmapLegend');
@@ -405,7 +407,8 @@ function _renderGrid() {
     const zone = zones.get(key);
     if (zone) classes.push(`zone-${zone[0]}`);
     const z0 = sel?.pos.z || 0;
-    if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row, sel.p, z0, _stagedAlt ?? z0) <= bestRemaining) classes.push('reach');
+    if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row, sel.p, z0, _stagedAlt ?? z0) <= bestRemaining
+        && !_blockedOnTheWay(sel, col, row)) classes.push('reach');
     if (cone?.has(key)) classes.push('cone');
     if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) classes.push('staged');
     return classes.join(' ');
@@ -419,10 +422,30 @@ function _renderGrid() {
       const own = _selected();
       // Standing still isn't a move (movement comes in 5ft steps) -- unless an altitude change is staged with it.
       if (own && own.pos.col === col && own.pos.row === row && (_stagedAlt === null || _stagedAlt === (own.pos.z || 0))) return;
+      const wall = own && _blockedOnTheWay(own, col, row);
+      if (wall) {
+        showCombatAlert(`You can't move through (${wall[0]}, ${wall[1]}) -- that square is blocked.`, { title: 'Blocked' });
+        return;
+      }
       _stagedDestination = { col, row };
       _render();
     });
   });
+}
+
+/** The DM's blocked squares only stop a move that ends on the ground (a flyer passes over, a burrower under) --
+ * [col, row] of the first one in the way, or null. The server checks the same (routes_combat.py's _move_token). */
+function _blockedOnTheWay(sel, col, row) {
+  const z1 = _stagedAlt ?? (sel.pos.z || 0);
+  return z1 === 0 ? blockedCellOnPath(_session, sel.pos.col, sel.pos.row, col, row, sel.size) : null;
+}
+
+/** The DM's map pictures (trees, rocks...) -- under the tokens, above the grid. Rebuilt only when they change. */
+function _renderObjects() {
+  const layer = document.getElementById('bmapObjects');
+  if (!layer) return;
+  const html = mapObjectsHtml(_session.board);
+  if (layer._html !== html) { layer.innerHTML = html; layer._html = html; }
 }
 
 function _renderTokens() {

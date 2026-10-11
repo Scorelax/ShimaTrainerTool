@@ -3,11 +3,20 @@ from. Nothing here writes to the database: the DM's battle actions go through ro
 
 Unlike the player-facing pokemon/list, the species list here is EVERY species in the encyclopedia, not just the ones
 the shared pokedex has unlocked for players -- the DM sets up encounters with Pokemon the players haven't met yet."""
-from . import upstream
+import json
+import os
+from datetime import datetime, timezone
+
+from . import routes_combat, upstream
 from .calculations import sanitize_moves, sanitize_string
 from .jsutil import js_parse_int
 from .routes_gamedata import calculate_type_effectiveness
 from .routes_pokemon import apply_registration_stats
+
+# The DM's battle setup (map + creatures) waiting for Start battle -- one at a time, in the dm_state table. It stays after
+# the battle starts (and ends), so the same setup can be run again or tweaked; New setup clears it.
+_SETUP_KEY = 'battle-setup'
+_STAT_KEYS = ('str', 'dex', 'con', 'int', 'wis', 'cha')
 
 # Encyclopedia (upstream pokemon DB) row indices used below -- see pokedex.py's _format_row for the full layout.
 _ABILITY_SLOTS = ((15, 62), (16, 63), (17, 64))  # (name, description) for the primary, secondary and hidden ability
@@ -28,9 +37,63 @@ def handle(conn, action, params):
             conn, params['species'], js_parse_int(params.get('level')),
             nature=params.get('nature', ''), ability_slots=slots,
             nickname=params.get('nickname', ''), held_item=params.get('item', ''),
-            shiny=str(params.get('shiny', '')).lower() in ('1', 'true'))}
+            shiny=str(params.get('shiny', '')).lower() in ('1', 'true'),
+            stats=json.loads(params['stats']) if params.get('stats') else None,
+            overrides=json.loads(params['overrides']) if params.get('overrides') else None)}
+
+    if action == 'get-setup':
+        return {'status': 'success', 'data': load_setup(conn)}
+
+    if action == 'clear-setup':
+        save_setup(conn, None)
+        return {'status': 'success', 'data': None}
+
+    if action == 'map-assets':
+        return {'status': 'success', 'data': {
+            'objects': routes_combat.list_map_objects(),
+            'backgrounds': routes_combat._list_backgrounds()['backgrounds'],
+            'portraits': _portraits(),
+        }}
+
+    if action == 'start-battle':
+        setup = load_setup(conn)
+        if not setup:
+            raise ValueError('Nothing is set up yet')
+        if not (setup.get('map') or {}).get('ready'):
+            raise ValueError('Set up the map first')
+        if not setup.get('creatures'):
+            raise ValueError('Add at least one Pokémon or trainer to the battle first')
+        result = routes_combat.start_prepared_session(conn, setup)
+        setup['startedAt'] = datetime.now(timezone.utc).isoformat()
+        save_setup(conn, setup)
+        return result
 
     raise ValueError('Unknown dm action: ' + str(action))
+
+
+def load_setup(conn):
+    row = conn.execute('SELECT json FROM dm_state WHERE key = ?', (_SETUP_KEY,)).fetchone()
+    return json.loads(row[0]) if row and row[0] else None
+
+
+def save_setup(conn, setup):
+    """Stores the whole setup the DM console sends (POST /api/dm/setup in main.py -- too big for a query string), or
+    clears it (None). The console is the only writer, so last write wins."""
+    if setup is not None and not isinstance(setup, dict):
+        raise ValueError('setup must be an object')
+    conn.execute(
+        'INSERT INTO dm_state (key, json, updated_at) VALUES (?, ?, ?) '
+        'ON CONFLICT(key) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at',
+        (_SETUP_KEY, json.dumps(setup) if setup is not None else None, datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+
+
+def _portraits():
+    """The trainer portraits on the Pi (upstream.CHARACTER_IMAGE_DIR), offered for the DM's NPC trainers: [{name, url}]."""
+    if not os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
+        return []
+    names = sorted({os.path.splitext(f)[0] for f in os.listdir(upstream.CHARACTER_IMAGE_DIR)})
+    return [{'name': n, 'url': url} for n in names if (url := upstream.local_character_image_url(n))]
 
 
 def _cell(row, i):
@@ -71,11 +134,15 @@ def species_list(conn):
     return out
 
 
-def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), nickname='', held_item='', shiny=False):
+def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), nickname='', held_item='', shiny=False,
+                  stats=None, overrides=None):
     """A full Pokemon row (db.POKEMON_COLUMNS order, the same 62-column shape a player's Pokemon has) for a wild /
     DM-controlled Pokemon, built from its encyclopedia entry the way pokemon-form.js builds one before registering,
     then run through the exact same stat maths -- but never stored. The DM console turns it into a battle
-    participant with the same builder the players' own Pokemon go through (combat.js's buildPokemonCombatant)."""
+    participant with the same builder the players' own Pokemon go through (combat.js's buildPokemonCombatant).
+
+    The DM's own changes: `stats` ({'str': 14, ...}) are final ability scores -- HP, VP, modifiers and initiative follow
+    them -- and `overrides` ({'ac', 'maxHP', 'maxVP'}) are set last, as typed."""
     row = next((r for r in upstream.fetch_pokemon_db(conn) if str(_cell(r, 2)).lower() == str(species).lower()), None)
     if not row:
         raise ValueError('Unknown species: ' + str(species))
@@ -128,5 +195,12 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
         '', '', '',                                           # 58-60: cry, known moves, status condition
         'Y' if shiny else '',                                 # 61: shiny
     ]
-    apply_registration_stats(conn, data)
+    apply_registration_stats(conn, data, {k: v for k, v in (stats or {}).items() if k in _STAT_KEYS})
+    o = overrides or {}
+    if js_parse_int(o.get('ac')) is not None:
+        data[8] = js_parse_int(o['ac'])
+    if js_parse_int(o.get('maxHP')) is not None:
+        data[10] = data[45] = js_parse_int(o['maxHP'])
+    if js_parse_int(o.get('maxVP')) is not None:
+        data[12] = data[46] = js_parse_int(o['maxVP'])
     return data

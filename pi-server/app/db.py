@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS image_cache (key TEXT PRIMARY KEY, url TEXT);
 CREATE TABLE IF NOT EXISTS music_sync (track TEXT PRIMARY KEY, started_at TEXT, listeners INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS music_listeners (track TEXT, client_id TEXT, last_seen TEXT, PRIMARY KEY (track, client_id));
 CREATE TABLE IF NOT EXISTS combat_session (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT, updated_at TEXT);
+CREATE TABLE IF NOT EXISTS dm_state (key TEXT PRIMARY KEY, json TEXT, updated_at TEXT);
 """
 
 

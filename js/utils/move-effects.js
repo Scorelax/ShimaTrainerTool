@@ -1334,9 +1334,24 @@ export function pathCells(c0, r0, c1, r1) {
  * previews exactly what the server will charge. `p` is unused (altitude decides), kept so callers read naturally. */
 export function moveCostFt(session, p, c0, r0, c1, r1, z0 = 0, z1 = 0) {
   const difficult = new Set();
-  if (z1 === 0) for (const z of session?.terrainZones || []) if (z.difficult) (z.cells || []).forEach(c => difficult.add(c));
+  if (z1 === 0) {
+    for (const z of session?.terrainZones || []) if (z.difficult) (z.cells || []).forEach(c => difficult.add(c));
+    // ...and the squares the DM marked difficult on the map (board.marks).
+    Object.entries(session?.board?.marks || {}).forEach(([c, kind]) => { if (kind === 'difficult') difficult.add(c); });
+  }
   const horizontal = pathCells(c0, r0, c1, r1).reduce((ft, [c, r]) => ft + (difficult.has(`${c},${r}`) ? 10 : 5), 0);
   return Math.max(horizontal, Math.abs(z1 - z0));
+}
+
+/** The first square the DM marked `blocked` that a ground-level move from (c0, r0) to (c1, r1) passes through or ends on
+ * (the mover's whole `size` footprint at the end), as [col, row] -- or null. Mirrors routes_combat.py's
+ * _blocked_cell_on_path (a flyer above the ground or a burrower below it isn't stopped -- callers only ask for z = 0). */
+export function blockedCellOnPath(session, c0, r0, c1, r1, size = 1) {
+  const marks = session?.board?.marks || {};
+  if (!Object.values(marks).includes('blocked')) return null;
+  const end = [];
+  for (let dc = 0; dc < size; dc++) for (let dr = 0; dr < size; dr++) end.push([c1 + dc, r1 - dr]);
+  return [...pathCells(c0, r0, c1, r1), ...end].find(([c, r]) => marks[`${c},${r}`] === 'blocked') || null;
 }
 
 /** Whether `p` can leave the ground on the map: a way to fly (not grounded -- flying/hovering speed, Levitate, Magnet Rise,

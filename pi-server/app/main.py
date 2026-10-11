@@ -187,6 +187,20 @@ def push_upstream_dataset(payload: dict, x_push_key: str = Header(default='')):
                         headers={'X-Data-Version': version})
 
 
+@app.post('/api/dm/setup')
+def save_dm_setup(payload: dict):
+    """The DM console's battle setup (map + creatures, see routes_dm.py) -- a POST body rather than the usual GET
+    query string, since a setup with a handful of full stat blocks is far longer than a URL should be."""
+    conn = db.connect()
+    try:
+        routes_dm.save_setup(conn, payload.get('setup'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success'})
+
+
 @app.get('/api/events')
 async def live_events(request: Request):
     """Server-Sent Events stream: notifies connected devices the instant

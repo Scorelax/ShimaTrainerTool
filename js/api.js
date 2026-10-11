@@ -1233,10 +1233,42 @@ export class DmAPI {
 
   /** A full Pokemon row (the same 62-column shape a player's Pokemon has) for a DM-controlled Pokemon -- never
    * stored. `abilities` is the list of ability slots it has (0 primary, 1 secondary, 2 hidden). */
-  static async buildPokemon({ species, level, nature = '', abilities = [0], nickname = '', item = '', shiny = false }) {
+  static async buildPokemon({ species, level, nature = '', abilities = [0], nickname = '', item = '', shiny = false, stats = null, overrides = null }) {
     return API.request('dm', 'build-pokemon', {
       species, level, nature, abilities: abilities.join(','), nickname, item, shiny: shiny ? '1' : '',
+      // The DM's own changes: final ability scores ({str, ...}) and {ac, maxHP, maxVP}, each only when set.
+      ...(stats && Object.keys(stats).length ? { stats: JSON.stringify(stats) } : {}),
+      ...(overrides && Object.keys(overrides).length ? { overrides: JSON.stringify(overrides) } : {}),
     }, { useCache: false });
+  }
+
+  /** The DM's saved battle setup ({map, creatures, startedAt}) or null. */
+  static async getSetup() {
+    return API.request('dm', 'get-setup', {}, { useCache: false });
+  }
+
+  /** Saves the whole setup -- a POST (main.py's /api/dm/setup), since it's far longer than a query string allows. */
+  static async saveSetup(setup) {
+    const res = await fetch(`${API_CONFIG.baseUrl}/dm/setup`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setup }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') throw new Error(data.error || `Saving the setup failed (${res.status})`);
+    return data;
+  }
+
+  static async clearSetup() {
+    return API.request('dm', 'clear-setup', {}, { useCache: false });
+  }
+
+  /** {objects: [{key, label, url}], backgrounds: [...], portraits: [{name, url}]} for the map and battle setup. */
+  static async mapAssets() {
+    return API.request('dm', 'map-assets', {}, { useCache: false });
+  }
+
+  /** Starts the PvE battle from the saved setup -- only then can the players join. */
+  static async startBattle() {
+    return API.request('dm', 'start-battle', {}, { useCache: false, timeout: 30000 });
   }
 }
 

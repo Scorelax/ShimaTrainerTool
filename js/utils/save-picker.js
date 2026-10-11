@@ -206,12 +206,42 @@ function _showStep1() {
   _selectedTarget = null;
 }
 
+// The save belongs to whoever controls the saving creature: combat-wip.js registers a handler that, for a creature another
+// player controls, asks the save on THEIR screen -- `fn(target, {dc, ability, title, moveUserId})` returns null (do it
+// here) or a promise of their outcome ({passed, saveRoll, saveTotal, failBy, dc, rollMode}, or null when nobody answered
+// -- then it's done here after all). The damage roll that may follow stays on this screen: it's the attacker's roll.
+let _remoteSave = null;
+export function setRemoteSaveHandler(fn) { _remoteSave = typeof fn === 'function' ? fn : null; }
+let _saveTitle = null; // confirmSecondarySave's own title for the save step
+
 function _showStep2(p, name) {
   if (p) { _selectedTarget = p; _selectedTargetName = name; }
+  // Not a typed-in DC (the reactor's own save against whoever hit them, on their own screen anyway).
+  const remote = !_manualDc && _remoteSave
+    ? _remoteSave(_selectedTarget, { dc: _dc, ability: _saveAbility, title: _saveTitle || 'Saving Throw', moveUserId: _moveUser?.id || null })
+    : null;
+  if (remote) {
+    const wasShown = _overlay.style.display;
+    _overlay.style.display = 'none'; // the "Waiting for ..." banner shows instead
+    const targetId = _selectedTargetId;
+    remote.then((out) => {
+      if (_selectedTargetId !== targetId) return; // the picker moved on meanwhile
+      _overlay.style.display = wasShown && wasShown !== 'none' ? wasShown : 'flex';
+      if (!out) { _renderStep2(); return; }
+      _pendingSave = { saveRoll: out.saveRoll ?? null, saveTotal: out.saveTotal ?? null, failBy: out.failBy ?? null,
+        dc: out.dc ?? _dc, rollMode: out.rollMode || 'normal' };
+      _afterSave(!!out.passed); // the saver's own bonuses were spent on their screen
+    });
+    return;
+  }
+  _renderStep2();
+}
+
+function _renderStep2() {
   document.getElementById('savePickerStep1').hidden = true;
   document.getElementById('savePickerStep2').hidden = false;
   document.getElementById('savePickerStep3').hidden = true;
-  document.getElementById('savePickerTitle').textContent = 'Saving Throw';
+  document.getElementById('savePickerTitle').textContent = _saveTitle || 'Saving Throw';
   const ability = _saveAbility ? _saveAbilityResolver(_saveAbility, _selectedTarget) : _saveAbility;
   _saveCtx = saveRollContext(_selectedTarget, _moveUser, ability);
   _saveAutoFail = saveAutoFails(_selectedTarget, ability);
@@ -372,17 +402,31 @@ function _consume() {
 
 function _confirmPass() {
   _pendingSave = { ..._captureSave(true), dc: _currentDc(), rollMode: _saveCtx?.mode || 'normal' };
-  _pendingPassed = true;
   _consume();
-  // Self-Destruct's own "half as much on a success" -- everything else
-  // that's ever called this closes right away on a Pass, no damage step at
-  // all (see this file's own header comment).
-  // Magic Guard (the saver's ability, ability-mods.js): a passed save against a half-damage move means no damage.
-  if (_hasDamage && _damageOnPass && !noDamageOnPassedSave(_selectedTarget)) {
+  _afterSave(true);
+}
+
+/** What follows a declared save (here, or on the saver's own screen -- see _showStep2): the damage step, or done. */
+function _afterSave(passed) {
+  _pendingPassed = passed;
+  if (passed) {
+    // Self-Destruct's own "half as much on a success" -- everything else
+    // that's ever called this closes right away on a Pass, no damage step at
+    // all (see this file's own header comment).
+    // Magic Guard (the saver's ability, ability-mods.js): a passed save against a half-damage move means no damage.
+    if (_hasDamage && _damageOnPass && !noDamageOnPassedSave(_selectedTarget)) {
+      _showStep3();
+      _playAnimation();
+    } else {
+      _close({ targetId: _selectedTargetId, passed: true, ..._pendingSave });
+    }
+    return;
+  }
+  if (_hasDamage) {
     _showStep3();
     _playAnimation();
   } else {
-    _close({ targetId: _selectedTargetId, passed: true, ..._pendingSave });
+    _close({ targetId: _selectedTargetId, passed: false, ..._pendingSave });
   }
 }
 
@@ -396,14 +440,8 @@ function _confirmPass() {
  * get logged instead. */
 function _confirmFail() {
   _pendingSave = { ..._captureSave(false), dc: _currentDc(), rollMode: _saveCtx?.mode || 'normal' };
-  _pendingPassed = false;
   _consume();
-  if (_hasDamage) {
-    _showStep3();
-    _playAnimation();
-  } else {
-    _close({ targetId: _selectedTargetId, passed: false, ..._pendingSave });
-  }
+  _afterSave(false);
 }
 
 async function _playAnimation() {
@@ -550,10 +588,10 @@ export async function confirmSecondarySave(target, targetName, { dc = 0, hasDama
   _damageOnPass = damageOnPass;
   _pendingSave = null;
   _selectedTargetId = target.id;
-  _showStep2(target, targetName);
+  _saveTitle = title;
   document.getElementById('savePickerBack').style.display = 'none';
-  document.getElementById('savePickerTitle').textContent = title;
   _overlay.style.display = 'flex';
+  _showStep2(target, targetName); // may hand the save to its owner's screen (_remoteSave) and hide this meanwhile
   return new Promise((resolve) => { _resolve = resolve; });
 }
 
@@ -587,6 +625,7 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _saveAbility = ability;
   _damageOnPass = false; // single-target save flow -- no caller of this one needs it yet, unlike confirmSecondarySave
   _pendingSave = null;
+  _saveTitle = null;
   document.getElementById('savePickerAnimMedia').innerHTML = '';
   document.getElementById('savePickerBack').style.display = '';
   _showStep1();
@@ -630,6 +669,7 @@ export async function pickManualSaveTarget(casterId, { speciesName = '' } = {}) 
   _saveAbility = null;
   _moveUser = null;
   _pendingSave = null;
+  _saveTitle = null;
   _speciesName = speciesName;
   document.getElementById('savePickerAnimMedia').innerHTML = '';
   document.getElementById('savePickerBack').style.display = '';

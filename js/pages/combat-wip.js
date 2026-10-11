@@ -13,7 +13,7 @@ import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolve
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
 import { waitForOpenWindow } from '../utils/reaction-window.js';
-import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget } from '../utils/save-picker.js';
+import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
@@ -863,6 +863,7 @@ function _enterBattleSync() {
   setOnBasicAction(_onBasicAction);
   setOnUseTrainerBuff(_useTrainerBuff);
   setNoTargetHandler(_onTargetCheck); // a move with nobody in reach gets its VP back
+  setRemoteSaveHandler(_remoteSaveFor); // a save is made on the screen of whoever controls the saver
 }
 
 function _exitBattleSync() {
@@ -882,6 +883,7 @@ function _exitBattleSync() {
   setOnBasicAction(null);
   setOnUseTrainerBuff(null);
   setNoTargetHandler(null);
+  setRemoteSaveHandler(null);
   _focusedParticipantId = null;
   _focusManuallySet = false;
 }
@@ -6286,15 +6288,36 @@ async function _runPrompt(kind, args) {
 /** Asks `kind` (see _runPrompt) on the screen of whoever controls `participant`; `label` names it on the waiting banner
  * ("Skarmory's Sturdy roll"). Resolves with the answer, the same as _runPrompt would. */
 async function _askOwnerOf(participant, kind, args, label) {
+  const remote = _askRemote(participant, kind, args, label);
+  const result = remote ? await remote : null;
+  return result?.answered ? result.answer : _runPrompt(kind, args);
+}
+
+/** The remote half of _askOwnerOf: null when `participant` is this player's own or nobody's (ask it here), otherwise a
+ * promise of {answered, answer} -- answered false when the owner didn't answer in time, the attacker chose to enter it
+ * themselves, or the question couldn't be posted. */
+function _askRemote(participant, kind, args, label) {
   const me = _currentTrainerName();
   const owner = participant?.owner || '';
-  if (!owner || owner === me || !participant?.id) return _runPrompt(kind, args);
-  let promptId = null;
-  try { promptId = (await CombatAPI.askPrompt(participant.id, kind, args, me))?.promptId || null; } catch { /* asked here instead */ }
-  if (!promptId) return _runPrompt(kind, args);
-  const result = await _waitForPromptAnswer(promptId, owner, label);
-  CombatAPI.clearPrompt(promptId).catch(() => {});
-  return result.answered ? result.answer : _runPrompt(kind, args);
+  if (!owner || owner === me || !participant?.id) return null;
+  return (async () => {
+    let promptId = null;
+    try { promptId = (await CombatAPI.askPrompt(participant.id, kind, args, me))?.promptId || null; } catch { /* asked here instead */ }
+    if (!promptId) return { answered: false };
+    const result = await _waitForPromptAnswer(promptId, owner, label);
+    CombatAPI.clearPrompt(promptId).catch(() => {});
+    return result;
+  })();
+}
+
+/** save-picker.js's remote-save hook: a saving throw by a creature another player controls is made on their screen --
+ * every move save (single target, area, the secondary save after a hit) and every ability save. The save step only;
+ * the damage roll after it stays with the attacker. */
+function _remoteSaveFor(target, { dc, ability, title, moveUserId }) {
+  const mover = session?.participants?.[moveUserId];
+  const label = `${target.name}'s ${ability ? `${ability} ` : ''}save${mover ? ` against ${mover.name}` : ''} (DC ${dc})`;
+  const remote = _askRemote(target, 'save', { affectedId: target.id, moveUserId, opts: { dc, ability, title } }, label);
+  return remote ? remote.then(r => (r?.answered && r.answer ? r.answer : null)) : null;
 }
 
 /** The attacker's side: a banner while the owner answers, with "Enter it here instead". Resolves {answered, answer} --
@@ -6327,14 +6350,28 @@ function _waitForPromptAnswer(promptId, owner, label) {
 function _answerPromptsForMe(s) {
   const me = _currentTrainerName();
   if (!me || _spectating) return;
-  for (const p of Object.values(s?.pendingPrompts || {})) {
+  const pending = s?.pendingPrompts || {};
+  // A question still open here that the asker took back (entered it themselves, or waited too long): close its popup.
+  _promptsOpen.forEach((kind, id) => {
+    if (pending[id]) return;
+    _promptsOpen.delete(id);
+    document.getElementById(_PROMPT_CLOSE_BUTTON[kind])?.click();
+  });
+  for (const p of Object.values(pending)) {
     if (p.answered || p.owner !== me || p.askedBy === me || _promptsShown.has(p.id)) continue;
     _promptsShown.add(p.id);
+    _promptsOpen.set(p.id, p.kind);
     _runPrompt(p.kind, p.args || {})
-      .then(answer => CombatAPI.answerPrompt(p.id, answer ?? null))
+      .then((answer) => {
+        const stillAsked = _promptsOpen.delete(p.id);
+        return stillAsked ? CombatAPI.answerPrompt(p.id, answer ?? null) : null;
+      })
       .catch(() => {});
   }
 }
+const _promptsOpen = new Map(); // prompt id -> kind, while its popup is up on this screen
+// The button that closes each kind's popup without an answer.
+const _PROMPT_CLOSE_BUTTON = { roll: 'healPopupClose', confirm: 'combatConfirmNo2', save: 'savePickerClose' };
 
 function _mayBeSoftened(target) {
   return Object.values(session?.participants || {}).some(p => (p.id === target.id
@@ -6445,10 +6482,10 @@ async function _abilityHitTriggers({ attackerId, targetId, moveName, move, attac
         ok = rolled != null && rolled >= e.chance.min;
       }
       if (ok && e.save) {
-        const outcome = await _askOwnerOf(affected, 'save', {
-          affectedId: affected.id, moveUserId: holder.id,
-          opts: { dc: Number(e.save.dc) || 0, ability: e.save.ability, title: `${holder.name}'s ${ability} -- ${e.save.ability} save` },
-        }, `${affected.name}'s ${e.save.ability} save against ${holder.name}'s ${ability}`);
+        // Made on the screen of whoever controls the saver -- save-picker.js hands it over (_remoteSaveFor).
+        const outcome = await confirmSecondarySave(affected, affected.name, {
+          dc: Number(e.save.dc) || 0, ability: e.save.ability, title: `${holder.name}'s ${ability} -- ${e.save.ability} save`, moveUser: holder,
+        });
         ok = !!outcome && !outcome.passed;
       }
       decided.set(key, ok);

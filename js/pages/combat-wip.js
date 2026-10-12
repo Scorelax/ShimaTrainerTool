@@ -9,7 +9,7 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
-import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver } from '../utils/target-picker.js';
+import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver, setCoverAttackModeResolver } from '../utils/target-picker.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
 import { waitForOpenWindow } from '../utils/reaction-window.js';
@@ -38,7 +38,8 @@ import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-
 import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
-import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler } from '../utils/targetability.js';
+import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler, moveCover } from '../utils/targetability.js';
+import { coverText } from '../utils/cover.js';
 import { areaPlacementFt, creatureDistanceFt } from '../utils/move-range.js';
 import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
@@ -1172,6 +1173,12 @@ setWeatherAttackModeResolver((moveName, attackerId) => {
   const smog = terrainsAffecting(session, attackerId).find(t => t.rule === 'smog');
   if (smog) return { mode: 'disadvantage', note: `Attacking from inside ${smog.name}: disadvantage` };
   return weatherAttackMode(moveEffectsFor(moveName), weathersAffecting(session, attackerId));
+});
+// A target partly behind one of the DM's map objects (a rock, a tree...): the attack roll has disadvantage. Fully
+// behind one, it can't be picked at all (targetability.js) -- the attacker has to move first.
+setCoverAttackModeResolver((moveName, attackerId, targetId) => {
+  const cover = moveCover(session, attackerId, targetId, moveName);
+  return cover ? { mode: 'disadvantage', note: `${coverText(cover)}: disadvantage` } : null;
 });
 // Every picker greys out creatures beyond the move's reach -- the reach comes from the move's range text (move-range.js).
 setMoveRangeResolver(moveName => String((findMoveRow(moveName) || [])[6] || ''));

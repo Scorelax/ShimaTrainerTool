@@ -631,7 +631,8 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _showStep1();
   const grid = document.getElementById('savePickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
-  markOutOfRange(grid, participants); // beyond the move's reach: greyed out, not pickable
+  // Beyond the move's reach or behind full cover: greyed out, not pickable (partial cover doesn't change a save).
+  markOutOfRange(grid, participants, { partial: false });
   grid.querySelectorAll('[data-target-id]').forEach(card => {
     card.addEventListener('click', () => {
       const p = session.participants[card.dataset.targetId];

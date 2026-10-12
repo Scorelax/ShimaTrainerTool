@@ -2,10 +2,13 @@
 // (underground, underwater, airborne, vanished -- see move-effects.js's UNTARGETABLE_STATES) is hidden
 // from every target picker unless the move lists that state in its own `hitsStates` (Earthquake ->
 // underground). A creature beyond the move's range (move-range.js) stays in the list but is drawn greyed
-// out and can't be picked (markOutOfRange). The picker modules don't know about move data, so
-// combat-wip.js injects the rules.
+// out and can't be picked (markOutOfRange). So does one in reach but behind full cover from the DM's map objects
+// (cover.js); one behind partial cover can be picked, and its attack roll has disadvantage (moveCover). Cover only
+// counts for moves aimed at a creature within a reach -- not Self moves or areas. The picker modules don't know about
+// move data, so combat-wip.js injects the rules.
 import { showCombatAlert } from './combat-alert.js';
 import { moveReachFt, creatureDistanceFt } from './move-range.js';
+import { coverBetween, coverText } from './cover.js';
 
 let _resolver = () => null;
 let _rangeResolver = () => '';
@@ -30,9 +33,10 @@ export function setMoveRangeResolver(fn) {
 }
 
 /** `participants` minus anyone `moveName` can't target right now. With the `session` and the caster, the ones beyond
- * the move's reach are kept but listed in the returned array's `outOfRange` (id -> "45ft away") for markOutOfRange.
- * When that leaves nobody to pick (but there was somebody), says why, since the picker would otherwise just refuse
- * to open -- and returns an empty list. */
+ * the move's reach are kept but listed in the returned array's `outOfRange` (id -> "45ft away"), the ones behind full
+ * cover in `noSight` and the ones behind partial cover in `partialCover` (id -> "Full cover (Tree)"), for
+ * markOutOfRange. When that leaves nobody to pick (but there was somebody), says why, since the picker would otherwise
+ * just refuse to open -- and returns an empty list. */
 export function filterTargetable(participants, moveName, session = null, casterId = null) {
   if (!moveName) return participants;
   const hidden = [];
@@ -46,6 +50,8 @@ export function filterTargetable(participants, moveName, session = null, casterI
     if (casterId) _noTargetHandler?.(casterId, moveName, false);
   }
   list.outOfRange = new Map();
+  list.noSight = new Map();
+  list.partialCover = new Map();
   const caster = session?.participants?.[casterId];
   const reach = caster ? moveReachFt(_rangeResolver(moveName), caster.size) : null;
   if (reach == null) {
@@ -54,13 +60,22 @@ export function filterTargetable(participants, moveName, session = null, casterI
   }
   list.forEach((p) => {
     const ft = creatureDistanceFt(session.board, caster, p);
-    if (ft != null && ft > reach) list.outOfRange.set(p.id, `${ft}ft away`);
+    if (ft != null && ft > reach) { list.outOfRange.set(p.id, `${ft}ft away`); return; }
+    const cover = coverBetween(session, casterId, p.id);
+    if (cover.level === 'full') list.noSight.set(p.id, coverText(cover));
+    else if (cover.level === 'partial') list.partialCover.set(p.id, coverText(cover));
   });
-  if (list.length && list.outOfRange.size === list.length) {
-    showCombatAlert(`Nobody is within ${moveName}'s reach (${reach}ft) -- move closer first.`, { title: 'Out of range' });
+  if (list.length && list.outOfRange.size + list.noSight.size === list.length) {
+    if (list.noSight.size) {
+      showCombatAlert(`Everyone within ${moveName}'s reach is behind full cover -- move to where you can see them first.`, { title: 'No line of sight' });
+    } else {
+      showCombatAlert(`Nobody is within ${moveName}'s reach (${reach}ft) -- move closer first.`, { title: 'Out of range' });
+    }
     _noTargetHandler?.(casterId, moveName, false);
     const none = [];
     none.outOfRange = new Map();
+    none.noSight = new Map();
+    none.partialCover = new Map();
     return none;
   }
   if (list.length) _noTargetHandler?.(casterId, moveName, true);
@@ -68,17 +83,37 @@ export function filterTargetable(participants, moveName, session = null, casterI
   return list;
 }
 
-/** Greys out (and disables) the picker cards of creatures beyond the move's reach, with how far away they are. */
-export function markOutOfRange(grid, list) {
-  if (!grid || !list?.outOfRange?.size) return;
-  list.outOfRange.forEach((note, id) => {
+/** The cover creature `targetId` has from `attackerId` against `moveName` ({level: 'partial' | 'full', by, hidden},
+ * see cover.js), or null when there's none or the move isn't aimed at a creature within a reach (Self, areas). */
+export function moveCover(session, attackerId, targetId, moveName) {
+  const attacker = session?.participants?.[attackerId];
+  if (!attacker || !targetId || moveReachFt(_rangeResolver(moveName), attacker.size) == null) return null;
+  const cover = coverBetween(session, attackerId, targetId);
+  return cover.level === 'none' ? null : cover;
+}
+
+/** Greys out (and disables) the picker cards of creatures beyond the move's reach, with how far away they are, and
+ * of creatures behind full cover. Ones behind partial cover get a note but stay pickable -- unless `partial` is false
+ * (a saving-throw move, where partial cover changes nothing). */
+export function markOutOfRange(grid, list, { partial = true } = {}) {
+  if (!grid) return;
+  const disable = (id, note, title) => {
     const card = grid.querySelector(`[data-target-id="${id}"]`);
     if (!card) return;
     card.disabled = true;
     card.classList.add('out-of-range');
     card.style.opacity = '0.4';
     card.style.cursor = 'not-allowed';
-    card.title = `Out of range -- ${note} (reach ${list.reachFt}ft)`;
+    card.title = title;
     card.insertAdjacentHTML('beforeend', `<div class="target-range-note" style="font-size:0.7rem;color:#e74c3c;font-weight:700;">${note}</div>`);
+  };
+  list?.outOfRange?.forEach((note, id) => disable(id, note, `Out of range -- ${note} (reach ${list.reachFt}ft)`));
+  list?.noSight?.forEach((note, id) => disable(id, note, `${note} -- no line of sight. Move to where you can see it first.`));
+  if (!partial) return;
+  list?.partialCover?.forEach((note, id) => {
+    const card = grid.querySelector(`[data-target-id="${id}"]`);
+    if (!card) return;
+    card.title = `${note} -- the attack roll has disadvantage`;
+    card.insertAdjacentHTML('beforeend', `<div class="target-cover-note" style="font-size:0.7rem;color:#f0b232;font-weight:700;">${note}</div>`);
   });
 }

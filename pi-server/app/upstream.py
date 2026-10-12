@@ -8,6 +8,7 @@ A failed fetch keeps the previous snapshot.
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from urllib.parse import quote
 
@@ -30,6 +31,8 @@ MOVES_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_moves_ca
 
 IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/'
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
+# The same folder's file listing (GitHub contents API -- lists up to 1000 files), for cache_image_listing.
+IMG_LIST_URL = 'https://api.github.com/repos/Benjakronk/shima-pokedex/contents/images/pokemon'
 
 # User-uploaded animated sprites (mp4 only -- gif support was dropped, see
 # local_sprite_url()), local to the Pi -- unrelated to Benjakronk's
@@ -304,6 +307,44 @@ def get_image_url(conn, pokemon_name, pokemon_id, probe=True):
         except Exception:
             continue
     return None
+
+
+# GitHub allows 60 unauthenticated API calls an hour, so the listing is fetched at most this often.
+_IMG_LIST_RETRY_SECONDS = 600
+_img_list_checked = 0.0
+
+
+def cache_image_listing(conn):
+    """Fills image_cache for every species picture in Benjakronk's repo from ONE request (the folder's file listing)
+    instead of a probe per species -- for bulk lists (the DM console's species list), which otherwise only show the
+    pictures some earlier single lookup happened to cache. Same keys and format preference as get_image_url; rows
+    already cached are kept. Returns how many pictures the listing had (0 when it was skipped or failed -- the cache
+    then stays as it was)."""
+    global _img_list_checked
+    now = time.monotonic()
+    if _img_list_checked and now - _img_list_checked < _IMG_LIST_RETRY_SECONDS:
+        return 0
+    _img_list_checked = now
+    try:
+        resp = httpx.get(IMG_LIST_URL, timeout=15, follow_redirects=True, headers={'Accept': 'application/vnd.github+json'})
+        resp.raise_for_status()
+        files = resp.json()
+    except Exception:
+        return 0
+    best = {}  # cache key -> (format rank, file name)
+    for f in files if isinstance(files, list) else []:
+        name = str(f.get('name', ''))
+        base, _, ext = name.rpartition('.')
+        if not base or ext.lower() not in IMG_FORMATS:
+            continue
+        rank = IMG_FORMATS.index(ext.lower())
+        key = base.lower()
+        if key not in best or rank < best[key][0]:
+            best[key] = (rank, name)
+    conn.executemany('INSERT OR IGNORE INTO image_cache (key, url) VALUES (?, ?)',
+                     [(key, f'{IMG_BASE_URL}{quote(name)}') for key, (_, name) in best.items()])
+    conn.commit()
+    return len(best)
 
 
 def local_sprite_url(pokemon_name, shiny=False):

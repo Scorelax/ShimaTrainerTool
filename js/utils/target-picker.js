@@ -136,6 +136,10 @@ let _moveAbilityResolver = () => [];
 // attacker is actually standing in.
 let _weatherModeResolver = () => null;
 export function setWeatherAttackModeResolver(fn) { _weatherModeResolver = typeof fn === 'function' ? fn : () => null; }
+// (moveName, attackerId, targetId) -> { mode, note } | null: the target is partly behind one of the map's objects
+// (targetability.js's moveCover) -- injected by combat-wip.js, which has the live board.
+let _coverModeResolver = () => null;
+export function setCoverAttackModeResolver(fn) { _coverModeResolver = typeof fn === 'function' ? fn : () => null; }
 let _moveFlagResolver = () => ({});
 export function setMoveFlagResolver(fn) { _moveFlagResolver = typeof fn === 'function' ? fn : () => ({}); }
 // Same injection for the move's data row ([name, type, stat, action, vp, duration, range, description, scaling]) --
@@ -486,6 +490,11 @@ function _showStep2(p, name) {
   if (weatherMode) {
     _atkCtx.mode = mergeRollMode(_atkCtx.mode, weatherMode.mode);
     if (weatherMode.note) _atkCtx.notes.push(weatherMode.note);
+  }
+  const coverMode = _atkCtx ? _coverModeResolver(_moveName, _attacker?.id, _selectedTarget?.id) : null;
+  if (coverMode) {
+    _atkCtx.mode = mergeRollMode(_atkCtx.mode, coverMode.mode);
+    if (coverMode.note) _atkCtx.notes.push(coverMode.note);
   }
   if (_forcedRollMode && _atkCtx) {
     _atkCtx.mode = mergeRollMode(_atkCtx.mode, _forcedRollMode);
@@ -907,7 +916,7 @@ export async function pickTarget(attackerId, { attackModifier = 0, damageModifie
   _showStep1();
   const grid = document.getElementById('targetPickerGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
-  markOutOfRange(grid, participants); // beyond the move's reach: greyed out, not pickable
+  markOutOfRange(grid, participants); // beyond the move's reach or behind full cover: greyed out, not pickable
   grid.querySelectorAll('[data-target-id]').forEach(card => {
     card.addEventListener('click', () => {
       const p = session.participants[card.dataset.targetId];

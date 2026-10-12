@@ -114,7 +114,7 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   _selected = new Set();
   const grid = document.getElementById('mtpGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
-  markOutOfRange(grid, participants); // beyond the move's reach: greyed out, not pickable
+  markOutOfRange(grid, participants); // beyond the move's reach or behind full cover: greyed out, not pickable
   const confirmBtn = document.getElementById('mtpConfirm');
   confirmBtn.disabled = true;
   const toggle = (card, on) => {

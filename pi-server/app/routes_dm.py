@@ -346,6 +346,12 @@ def species_list(conn):
             'abilities': _abilities(row),
             'image': upstream.local_sprite_url(name) or upstream.get_image_url(conn, name, _cell(row, 1), probe=False) or '',
         })
+    # Species never looked up one by one have no cached picture yet: one listing of Benjakronk's picture folder fills
+    # them all in (the self-made mp4 sprite above still comes first).
+    missing = [s for s in out if not s['image']]
+    if missing and upstream.cache_image_listing(conn):
+        for s in missing:
+            s['image'] = upstream.get_image_url(conn, s['name'], s['dex'], probe=False) or ''
     out.sort(key=lambda s: js_parse_int(s['dex']) or 0)
     return out
 

@@ -1,16 +1,16 @@
-// Shared combat display screen. A separate, login-free static page
-// (see display.html) meant to run unattended on a TV or projector laptop --
-// unlike every other page in this app it has no trainer identity, no audio
-// preload sequence, no idle-splash screensaver, just: subscribe to the
-// shared combat session over SSE and render it. Strictly read-only -- no
-// control ever mutates combat state from here, so it's safe to leave open
-// and untouched all session.
+// The table TV's screen (display.html) -- not the battle map (battle-map.html,
+// the board), a separate screen. A login-free static page meant to run
+// unattended on the TV: no trainer identity, no audio preload sequence, no
+// idle-splash screensaver. Strictly read-only, so it's safe to leave open and
+// untouched all session.
 //
-// Behind the battle info sits the DM's scene -- a background picture and
-// pictures placed on it (js/utils/display-scene.js), set up in the DM
-// console's Display module and pushed here live. The DM also picks how much
-// battle info goes on top of it during a battle (all of it, the turn strip
-// only, or none).
+// What it shows is the DM's scene (js/utils/display-scene.js), set up in the
+// DM console's Display module and pushed here live: a background of wherever
+// the players are, with the trainers, NPCs and Pokemon they meet put on it.
+// When a battle starts the background stays and the battle goes on top --
+// whoever's turn it is, big, and the turn order along the bottom; the placed
+// pictures are put away until it ends (unless the DM keeps them on). With
+// nothing set up at all, the Shima Adventures title screen.
 //
 // display.html?preview is the DM console's small live preview of this screen:
 // no SSE connection of its own (the console posts it the battle and the scene
@@ -22,7 +22,7 @@ import { getSettings } from '../utils/settings.js';
 import { spriteMediaHtml, patchPortraitMedia } from '../utils/sprite-media.js';
 import { preloadBattleAnimation, getBattleAnimationUrl } from '../utils/battle-animation.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
-import { normaliseScene, renderScene, sceneHasContent } from '../utils/display-scene.js';
+import { normaliseScene, renderScene, sceneHasContent, sceneOnScreen } from '../utils/display-scene.js';
 
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 
@@ -35,8 +35,9 @@ async function init() {
   if (PREVIEW) {
     window.addEventListener('message', (e) => {
       if (e.origin !== location.origin || e.data?.source !== 'dm-display') return;
-      if (e.data.scene) { scene = normaliseScene(e.data.scene); drawScene(); render(); }
-      if (e.data.session) { session = e.data.session; render(); }
+      if (e.data.scene) scene = normaliseScene(e.data.scene);
+      if (e.data.session) session = e.data.session;
+      if (e.data.scene || e.data.session) { drawScene(); render(); }
     });
   } else {
     initLiveUpdates();
@@ -54,6 +55,7 @@ async function init() {
 
   window.addEventListener('app:combat-updated', (e) => {
     session = e.detail;
+    drawScene();
     render();
     preloadAllAnimations();
   });
@@ -78,7 +80,7 @@ async function init() {
 }
 
 function drawScene() {
-  renderScene(document.getElementById('sceneStage'), scene);
+  renderScene(document.getElementById('sceneStage'), sceneOnScreen(scene, !!session.active));
 }
 
 function preloadAllAnimations() {
@@ -97,44 +99,41 @@ function preloadAllAnimations() {
 // ---------------------------------------------------------------------------
 
 function render() {
-  const root = document.getElementById('displayRoot');
-  if (!root) return;
+  const layer = document.getElementById('battleLayer');
+  if (!layer) return;
+  const inBattle = !!session.active;
+  document.getElementById('idleLogo').hidden = inBattle || sceneHasContent(scene);
+  layer.hidden = !inBattle;
+  if (!inBattle) return;
 
-  if (!session.active) {
-    // The DM's scene on its own -- or, with nothing set up there, the old waiting screen.
-    root.hidden = sceneHasContent(scene);
-    root.innerHTML = '<div class="display-empty">⚔️ Waiting for battle to start…</div>';
-    return;
-  }
-  root.hidden = scene.battleInfo === 'off';
-  root.classList.toggle('strip-only', scene.battleInfo === 'strip');
-
-  ensureSkeleton(root);
+  ensureSkeleton(layer);
 
   const activeId = session.reactingParticipantId || session.turnOrder[session.turnIndex];
   const roundEl = document.getElementById('displayRound');
   if (roundEl) {
-    const battleLabel = session.battleType === 'pvp' ? 'PvP' : 'PvE';
-    roundEl.textContent = `Round ${session.round} · ${battleLabel}${session.reactingParticipantId ? ' · ⚡ Reaction in progress' : ''}`;
+    roundEl.textContent = `Round ${session.round}${session.reactingParticipantId ? ' · ⚡ Reaction' : ''}`;
   }
 
   updateSpotlight(activeId);
   updateStrip(activeId);
 }
 
-/** Builds the fixed page structure once. No-op (and, crucially, doesn't
- * touch existing children) if it's already there -- the whole point is that
+/** Builds the battle layer once. No-op (and, crucially, doesn't touch
+ * existing children) if it's already there -- the whole point is that
  * render() can be called on every SSE push without ever recreating this. */
-function ensureSkeleton(root) {
+function ensureSkeleton(layer) {
   if (document.getElementById('displaySpotlightCard')) return;
 
-  root.innerHTML = `
+  layer.innerHTML = `
     <div class="display-round" id="displayRound"></div>
     <div class="display-spotlight">
       <div class="display-spotlight-card" id="displaySpotlightCard" hidden>
         <div class="display-spotlight-portrait" id="spotlightPortrait"></div>
-        <div class="display-spotlight-name" id="spotlightName"></div>
-        <div class="display-spotlight-bars" id="spotlightBars"></div>
+        <div class="display-spotlight-plate">
+          <div class="display-spotlight-turn" id="spotlightTurn"></div>
+          <div class="display-spotlight-name" id="spotlightName"></div>
+          <div class="display-spotlight-bars" id="spotlightBars"></div>
+        </div>
       </div>
     </div>
     <div class="display-strip" id="displayStrip"></div>
@@ -159,8 +158,9 @@ function updateSpotlight(activeId) {
   card.hidden = false;
   const name = visibleToViewer(p, 'name') ? p.name : '???';
   patchPortraitMedia(document.getElementById('spotlightPortrait'), p.image, name);
+  document.getElementById('spotlightTurn').textContent = session.reactingParticipantId === activeId ? '⚡ Reacting' : 'Turn';
   document.getElementById('spotlightName').textContent = p.level ? `${name} · Lv ${p.level}` : name;
-  document.getElementById('spotlightBars').innerHTML = barsHtml(p);
+  document.getElementById('spotlightBars').innerHTML = barsHtml(p).trim();
 }
 
 function updateStrip(activeId) {

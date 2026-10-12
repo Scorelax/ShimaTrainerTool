@@ -1361,7 +1361,7 @@ export class DmAPI {
     return (await DmAPI._post('xp', { changes }, 'Saving the XP')).data;
   }
 
-  /** What the table TV shows ({background, items, battleInfo}) -- stored and pushed to the TV at once. */
+  /** What the table TV shows ({background, items, battlePictures}) -- stored and pushed to the TV at once. */
   static async saveDisplayScene(scene) {
     return DmAPI._post('display-scene', { scene }, 'Updating the TV');
   }

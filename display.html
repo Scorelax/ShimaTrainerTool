@@ -3,54 +3,70 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Combat Display</title>
-<link rel="icon" href="assets/Pokeball.png">
+<title>Shima TV Screen</title>
+<link rel="icon" href="assets/AppIcon.png">
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
     background: #0a0a12; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif;
   }
-  /* The DM's scene (background + pictures, js/utils/display-scene.js) fills the screen at 16:9 behind the battle info. */
+  /* The DM's scene (background of wherever the players are + pictures, js/utils/display-scene.js) fills the screen at 16:9. */
   #sceneStage {
     position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: min(100vw, calc(100vh * 16 / 9)); height: min(100vh, calc(100vw * 9 / 16));
   }
-  #displayRoot { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100vh; box-sizing: border-box; padding: 1.5rem 2rem; }
-  #displayRoot[hidden] { display: none; }
-  /* "Only the turn strip" (the DM's choice): no round line or spotlight, the strip stays at the bottom. */
-  #displayRoot.strip-only { justify-content: flex-end; }
-  #displayRoot.strip-only .display-round, #displayRoot.strip-only .display-spotlight { display: none; }
 
-  .display-empty { margin: auto; font-size: 1.6rem; color: #a0a0c0; text-align: center; }
+  /* Nothing set up in the DM console's Display yet: the title screen. */
+  #idleLogo { position: fixed; inset: 0; background: url("assets/TitleScreen.png") center / cover no-repeat; }
+  #idleLogo[hidden] { display: none; }
 
-  /* Dark backing behind the battle info, so it reads on any background picture. */
-  .display-round { align-self: flex-start; font-size: 1.3rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 2px; background: rgba(10, 10, 18, 0.65); padding: 0.3rem 0.8rem; border-radius: 10px; }
-
-  .display-spotlight { flex: 1; display: flex; align-items: center; justify-content: center; }
-  .display-spotlight-card { text-align: center; background: rgba(10, 10, 18, 0.55); padding: 1rem 1.5rem; border-radius: 18px; }
-  .display-spotlight-portrait { width: 320px; height: 320px; display: flex; align-items: center; justify-content: center; }
-  .display-spotlight-portrait img, .display-spotlight-portrait video { max-width: 100%; max-height: 100%; filter: drop-shadow(0 0 24px rgba(255,215,0,0.35)); }
-  .display-spotlight-name { font-size: 1.6rem; font-weight: 700; margin-top: 0.5rem; }
-  .display-spotlight-bars { width: 280px; margin: 0.75rem auto 0; }
-
-  .display-strip { display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.25rem; }
-  .display-strip-card {
-    position: relative; flex: 0 0 auto; width: 96px; text-align: center; padding: 0.5rem;
-    border-radius: 10px; border: 2px solid transparent; background: rgba(16,16,28,0.78);
+  /* During a battle, on top of the background: whoever's turn it is, big, and the turn order along the bottom. */
+  #battleLayer {
+    position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; box-sizing: border-box; padding: 1.5rem 2rem 1.25rem;
+    background: linear-gradient(to top, rgba(6, 6, 12, 0.82) 0, rgba(6, 6, 12, 0.35) 24%, rgba(6, 6, 12, 0) 45%);
   }
-  .display-strip-card.active { border-color: #FFD700; background: rgba(60,52,10,0.85); }
+  #battleLayer[hidden] { display: none; }
+
+  .display-round {
+    align-self: flex-start; font-size: 1.15rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 2px;
+    background: rgba(10, 10, 18, 0.7); padding: 0.3rem 0.9rem; border-radius: 10px;
+  }
+
+  .display-spotlight { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .display-spotlight-card { display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: center; }
+  .display-spotlight-card[hidden] { display: none; }
+  .display-spotlight-portrait { width: min(56vh, 600px); height: min(56vh, 600px); display: flex; align-items: center; justify-content: center; }
+  .display-spotlight-portrait img, .display-spotlight-portrait video {
+    max-width: 100%; max-height: 100%; border-radius: 18px;
+    filter: drop-shadow(0 0 28px rgba(255, 215, 0, 0.45)) drop-shadow(0 10px 30px rgba(0, 0, 0, 0.6));
+  }
+  .display-spotlight-plate {
+    margin-top: 0.9rem; text-align: center; background: rgba(10, 10, 18, 0.78); border: 2px solid rgba(255, 215, 0, 0.55);
+    border-radius: 14px; padding: 0.45rem 1.6rem 0.6rem; min-width: 300px;
+  }
+  .display-spotlight-turn { font-size: 0.85rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 2px; }
+  .display-spotlight-name { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+  .display-spotlight-bars { width: 300px; margin: 0.35rem auto 0; }
+  .display-spotlight-bars:empty { display: none; }
+
+  .display-strip { display: flex; justify-content: center; gap: 0.75rem; padding-top: 0.75rem; }
+  .display-strip-card {
+    position: relative; flex: 0 1 120px; min-width: 0; text-align: center; padding: 0.5rem;
+    border-radius: 12px; border: 2px solid rgba(255, 255, 255, 0.08); background: rgba(16, 16, 28, 0.82);
+  }
+  .display-strip-card.active { border-color: #FFD700; background: rgba(60, 52, 10, 0.9); box-shadow: 0 0 18px rgba(255, 215, 0, 0.35); }
   .display-strip-card.spectating { opacity: 0.4; }
-  .display-strip-portrait { width: 64px; height: 64px; margin: 0 auto; }
-  .display-strip-portrait img, .display-strip-portrait video { width: 100%; height: 100%; object-fit: contain; }
-  .display-strip-name { font-size: 0.75rem; font-weight: 600; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .display-strip-level { font-size: 0.68rem; color: #a0a0c0; }
+  .display-strip-portrait { width: 84px; height: 84px; margin: 0 auto; }
+  .display-strip-portrait img, .display-strip-portrait video { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+  .display-strip-name { font-size: 0.85rem; font-weight: 600; margin-top: 0.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .display-strip-level { font-size: 0.72rem; color: #a0a0c0; }
   .display-strip-reaction {
-    position: absolute; top: 2px; right: 4px; font-size: 0.8rem;
+    position: absolute; top: 3px; right: 5px; font-size: 0.85rem;
     filter: grayscale(1) opacity(0.35);
   }
   .display-strip-reaction.used { filter: none; }
   .display-strip-bonus {
-    position: absolute; top: 2px; left: 4px; font-size: 0.8rem;
+    position: absolute; top: 3px; left: 5px; font-size: 0.85rem;
     filter: grayscale(1) opacity(0.35);
   }
   .display-strip-bonus.used { filter: none; }
@@ -72,8 +88,8 @@
 </head>
 <body>
   <div id="sceneStage"></div>
-  <div id="displayRoot"><div class="display-empty">Loading…</div></div>
-  <!-- Outside #displayRoot: move animations play even when the DM has the battle info off. -->
+  <div id="idleLogo" hidden></div>
+  <div id="battleLayer" hidden></div>
   <div class="display-anim-overlay" id="animOverlay" hidden></div>
   <script type="module" src="js/pages/display.js"></script>
 </body>

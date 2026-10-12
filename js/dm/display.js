@@ -1,6 +1,8 @@
-// DM console -- the Display module (📺 in the top bar): what the table TV (display.html) shows. It replaces the slide
-// show the DM used to run on the TV, where a background was put in for wherever the players are and pictures of
-// Pokemon and NPCs were pasted on for a battle.
+// DM console -- the Display module (📺 in the top bar): what the table TV (display.html -- its own screen, not the
+// battle map) shows. It replaces the slide show the DM used to run on the TV, where a background was put in for
+// wherever the players are and pictures of the trainers, NPCs and Pokemon they meet were pasted on. During a battle the
+// TV keeps the background and shows the turn order and whoever's turn it is on top; the pictures are put away until it
+// ends, unless the DM keeps them on.
 //
 // Left: a live preview of the TV -- display.html itself in a frame, fed the battle and the scene by this page (no
 // connection of its own) -- with what's on it below. Right: the workspace -- every Pokemon, NPC and player trainer to
@@ -10,7 +12,7 @@
 // with one click.
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { renderScene, BATTLE_INFO, SCREEN_RATIO } from '../utils/display-scene.js';
+import { renderScene, BATTLE_PICTURES, SCREEN_RATIO } from '../utils/display-scene.js';
 import { escapeHtml, getSpecies, newId, toast, openDmModal } from './dm-common.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
 
@@ -45,7 +47,7 @@ export async function renderDisplay(root, { session, firstTime } = {}) {
       if (_editor) drawEditorStage();
       if (_dragging) return; // the lists catch up when the picture is let go
       drawLayers();
-      drawBattleInfo();
+      drawBattlePictures();
       if (_editor) drawEditorSide();
     });
   }
@@ -57,10 +59,12 @@ export function displayAway() {
   if (_editor) closeEditor();
 }
 
-/** The battle changed (dm-console.js) -- the preview shows the battle info just like the TV. */
+/** The battle changed (dm-console.js) -- the preview shows the battle just like the TV. */
 export function displaySessionChanged(session) {
+  const wasActive = !!_session?.active;
   _session = session;
   postToPreview({ session });
+  if (wasActive !== !!session?.active) drawLayers();
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +78,7 @@ function draw() {
         <div class="dm-disp-head">
           <div>
             <h2>📺 Display</h2>
-            <div class="dm-hint">What the table TV shows. Click the screen to move and resize the pictures -- every change is on the TV straight away.</div>
+            <div class="dm-hint">The table TV: where the players are and who they meet. Click the screen to move and resize the pictures -- every change is on the TV straight away.</div>
           </div>
           <a class="dm-btn small" href="display.html" target="_blank" rel="noopener" title="Open the TV's screen in a new tab (for the TV's browser)">Open the TV screen ↗</a>
         </div>
@@ -83,9 +87,9 @@ function draw() {
           <span class="dm-disp-live">● On the TV</span>
           <span class="dm-disp-preview-hint">🔍 Click to arrange</span>
         </div>
-        <div class="dm-disp-battleinfo">
-          <span>During a battle the TV shows</span>
-          <div class="dm-seg" id="dispBattleInfo"></div>
+        <div class="dm-disp-battleinfo" title="During a battle the background stays, with the turn order and whoever's turn it is on top">
+          <span>⚔️ During a battle</span>
+          <div class="dm-seg two" id="dispBattlePictures"></div>
         </div>
         <div class="dm-card dm-disp-layers">
           <div class="dm-card-title">
@@ -117,7 +121,7 @@ function draw() {
     </div>`;
 
   wirePreview();
-  drawBattleInfo();
+  drawBattlePictures();
   drawLayers();
   drawSource();
 
@@ -132,9 +136,9 @@ function draw() {
   document.getElementById('dispAddHidden').addEventListener('change', (e) => { _addHidden = e.target.checked; });
   document.getElementById('dispUpload').addEventListener('click', pickFiles);
   document.getElementById('dispGrid').addEventListener('click', onGridClick);
-  document.getElementById('dispBattleInfo').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-bi]');
-    if (b) updateScene((s) => { s.battleInfo = b.dataset.bi; });
+  document.getElementById('dispBattlePictures').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-bp]');
+    if (b) updateScene((s) => { s.battlePictures = b.dataset.bp; });
   });
   document.getElementById('dispHideAll').addEventListener('click', () => {
     const scene = getScene();
@@ -180,11 +184,11 @@ function postToPreview(msg) {
   try { frame?.contentWindow?.postMessage({ source: 'dm-display', ...msg }, location.origin); } catch { /* not loaded yet */ }
 }
 
-function drawBattleInfo() {
-  const box = document.getElementById('dispBattleInfo');
+function drawBattlePictures() {
+  const box = document.getElementById('dispBattlePictures');
   if (!box) return;
-  const current = getScene().battleInfo;
-  box.innerHTML = Object.entries(BATTLE_INFO).map(([k, l]) => `<button data-bi="${k}" class="${k === current ? 'active' : ''}">${l}</button>`).join('');
+  const current = getScene().battlePictures;
+  box.innerHTML = Object.entries(BATTLE_PICTURES).map(([k, l]) => `<button data-bp="${k}" class="${k === current ? 'active' : ''}">${l}</button>`).join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +213,9 @@ function drawLayers() {
     hideAll.disabled = !scene.items.length;
   }
   const items = [...scene.items].reverse(); // the top one first
+  const putAway = !!_session?.active && scene.battlePictures !== 'keep' && items.length;
   box.innerHTML = `
+    ${putAway ? '<div class="dm-disp-away">⚔️ A battle is on -- these pictures are put away until it ends. The background stays, with the turn order on top.</div>' : ''}
     ${items.length ? items.map(it => `
       <div class="dm-disp-layer${it.hidden ? ' hidden-item' : ''}" data-id="${escapeHtml(it.id)}">
         ${thumbHtml(it.still || it.src)}

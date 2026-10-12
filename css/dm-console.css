@@ -743,7 +743,12 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-disp-preview-hint { position: absolute; right: 10px; bottom: 10px; padding: 0.3rem 0.7rem; border-radius: 8px; background: rgba(10, 10, 18, 0.85); color: var(--dm-gold); font-size: 0.82rem; font-weight: 700; opacity: 0; transition: opacity 0.15s; }
 .dm-disp-preview:hover .dm-disp-preview-hint { opacity: 1; }
 .dm-disp-battleinfo { display: flex; align-items: center; gap: 0.7rem; font-size: 0.84rem; color: var(--dm-muted); }
-.dm-disp-battleinfo .dm-seg { flex: 1; max-width: 460px; }
+.dm-disp-battleinfo .dm-seg { flex: 1; max-width: 400px; }
+.dm-seg.two { grid-template-columns: repeat(2, 1fr); }
+.dm-disp-away {
+  margin-bottom: 0.4rem; padding: 0.4rem 0.6rem; border-radius: 8px; font-size: 0.8rem;
+  background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.3); color: var(--dm-gold);
+}
 .dm-disp-layers { flex: none; }
 .dm-disp-layer, .dm-disp-bgrow { display: flex; align-items: center; gap: 0.55rem; padding: 0.3rem 0.2rem; border-bottom: 1px solid var(--dm-line); }
 .dm-disp-bgrow { border-bottom: none; padding-top: 0.5rem; }

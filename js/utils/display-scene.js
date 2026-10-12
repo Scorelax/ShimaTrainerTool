@@ -1,24 +1,31 @@
-// What the table TV shows besides the battle info: a background picture and pictures placed on it (Pokemon, NPCs, the
-// players' trainers, uploads) -- set up in the DM console's Display module (js/dm/display.js), stored on the Pi
+// What the table TV shows: a background picture of wherever the players are and pictures placed on it (Pokemon, NPCs,
+// the players' trainers, uploads) -- set up in the DM console's Display module (js/dm/display.js), stored on the Pi
 // (dm_state 'display-scene') and drawn by the TV (display.js). Both draw it with renderScene below, so what the DM
-// arranges is exactly what the TV shows.
+// arranges is exactly what the TV shows. During a battle the background stays and the battle (turn order, whoever's
+// turn it is) goes on top; the placed pictures are put away until it ends unless `battlePictures` is 'keep'.
 //
-// Scene: { background: {url, name} | null, items: [Item], battleInfo: 'full' | 'strip' | 'off' }
+// Scene: { background: {url, name} | null, items: [Item], battlePictures: 'away' | 'keep' }
 // Item:  { id, kind: 'pokemon' | 'npc' | 'trainer' | 'image', label, src, still, animated, x, y, size, flip, hidden }
 //   x, y = the picture's middle, as a share of the screen's width / height (0..1); size = its side as a share of the
 //   screen's height -- pictures are always square (the picture itself fits inside, never stretched). The TV is 16:9.
 //   Later items are drawn on top. `still` / `animated` are the Pokemon's two pictures (`src` is the one in use).
 
 export const SCREEN_RATIO = 16 / 9;
-export const BATTLE_INFO = { full: 'Battle info on top', strip: 'Only the turn strip', off: 'Only the scene' };
+export const BATTLE_PICTURES = { away: 'Put the pictures away', keep: 'Keep the pictures on' };
 
 export function normaliseScene(s) {
   const out = {
     background: s?.background?.url ? { url: String(s.background.url), name: String(s.background.name || '') } : null,
     items: Array.isArray(s?.items) ? s.items.filter(i => i && i.id && i.src) : [],
-    battleInfo: BATTLE_INFO[s?.battleInfo] ? s.battleInfo : 'full',
+    battlePictures: BATTLE_PICTURES[s?.battlePictures] ? s.battlePictures : 'away',
   };
   return out;
+}
+
+/** The scene as the TV draws it right now -- during a battle without the placed pictures, unless they're kept on. */
+export function sceneOnScreen(scene, battleActive) {
+  if (!battleActive || scene.battlePictures === 'keep') return scene;
+  return { ...scene, items: [] };
 }
 
 /** Anything to show at all (a background, or a picture that isn't hidden)? */

@@ -1,8 +1,9 @@
-// DM console -- battle setup: the NPC trainers and Pokemon the players will face, and where on the map (set up first, in
-// map-editor.js) each of them starts. A Pokemon is built from the full encyclopedia at the level, nature and abilities
-// the DM picks (routes_dm.py's build-pokemon, the same maths a player's Pokemon gets) and the DM can override any of
-// its numbers or give it extra skills; an NPC trainer is typed in. Each is saved with a ready battle participant
-// (setup-store.js), so Start battle only has to send them in.
+// DM console -- Map setup's "Place on the map": where on the map (set up first, in map-editor.js) each NPC trainer and
+// Pokemon of the next battle starts. Who's in it comes from Encounter setup (encounters.js puts the encounter in play
+// here) or the NPC module; this screen doesn't add anyone. A Pokemon is built from the full encyclopedia at its level,
+// nature and abilities (routes_dm.py's build-pokemon, the same maths a player's Pokemon gets) and the DM can still
+// fine-tune it here -- override any of its numbers, give it extra skills; an NPC trainer's numbers likewise. Each is
+// saved with a ready battle participant (setup-store.js), so Start battle only has to send them in.
 //
 // The map sits above the form: pick someone (from the list or by clicking their token) and click a square to stand
 // them there.
@@ -19,12 +20,15 @@ import { mapStageHtml, tokenScreenRect, creatureSpotProblem } from './map-view.j
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
+// Which encounter (and which of its entries) a creature came from, and which NPC -- kept when the DM fine-tunes it here.
+const ORIGIN_KEYS = ['encId', 'encKey', 'encSig', 'npcId'];
+const originOf = c => Object.fromEntries(ORIGIN_KEYS.filter(k => c?.[k] !== undefined).map(k => [k, c[k]]));
 
 let _root = null;
 let _onDone = null;
 let _species = [];
 let _portraits = [];
-let _editing = null; // null | {mode: 'new-pokemon', species?} | {mode: 'pokemon', id} | {mode: 'new-trainer'} | {mode: 'trainer', id}
+let _editing = null; // null | {mode: 'pokemon', id} | {mode: 'trainer', id}
 let _busy = false;
 let _hover = null;
 let _unsub = null;
@@ -38,14 +42,10 @@ export async function renderCreatureSetup(root, { onDone }) {
     <div class="dm-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head">
-          <button class="dm-btn small" id="csBack">← Setup</button>
-          <h2>Battle</h2>
+          <button class="dm-btn small" id="csBack">← Map setup</button>
+          <h2>Place everyone</h2>
         </div>
-        <div class="dm-row">
-          <button class="dm-btn primary" id="csAddPokemon">+ Pokémon</button>
-          <button class="dm-btn" id="csAddTrainer">+ NPC trainer</button>
-        </div>
-        <button class="dm-btn wide" id="csFromNpc">🎭 + From the NPC library</button>
+        <button class="dm-btn wide" id="csToEnc" title="Who's in the battle is chosen in Encounter setup">🌿 Change who's in it</button>
         <div id="csList" class="dm-cs-list"></div>
       </aside>
       <section class="dm-editor-canvas dm-cs-work">
@@ -57,9 +57,10 @@ export async function renderCreatureSetup(root, { onDone }) {
       </section>
     </div>`;
   document.getElementById('csBack').addEventListener('click', leave);
-  document.getElementById('csAddPokemon').addEventListener('click', () => edit({ mode: 'new-pokemon' }));
-  document.getElementById('csAddTrainer').addEventListener('click', () => edit({ mode: 'new-trainer' }));
-  document.getElementById('csFromNpc').addEventListener('click', () => edit({ mode: 'from-npc' }));
+  document.getElementById('csToEnc').addEventListener('click', async () => {
+    await leave();
+    window.dispatchEvent(new CustomEvent('dm:battle-tab', { detail: { tab: 'library' } }));
+  });
   document.getElementById('csList').addEventListener('click', (e) => {
     const row = e.target.closest('[data-creature]');
     if (!row) return;
@@ -70,14 +71,14 @@ export async function renderCreatureSetup(root, { onDone }) {
   _unsub = onSetupChange(() => { if (document.body.contains(_root)) { renderList(); renderMap(); } });
   renderList();
   renderMap();
-  edit(_editing && (!_editing.id || getSetup().creatures.some(c => c.id === _editing.id)) ? _editing : null);
+  edit(_editing && getSetup().creatures.some(c => c.id === _editing.id) ? _editing : null);
   [_species] = await Promise.all([
     getSpecies().catch(() => []),
     DmAPI.mapAssets().then(r => { _portraits = r.data?.portraits || []; }).catch(() => {}),
   ]);
   // The open form needed these (a Pokemon's abilities and base stats, the portrait list) -- draw it again now.
   if (!document.body.contains(root) || !_editing) return;
-  if (_editing.mode === 'new-pokemon' && !_editing.species) renderSpeciesResults(); else edit(_editing);
+  edit(_editing);
 }
 
 async function leave() {
@@ -114,7 +115,7 @@ function renderList() {
       </button>`;
   };
   if (!all.length) {
-    el.innerHTML = '<div class="dm-hint">Nothing here yet. Add the Pokémon and NPC trainers the players will face.</div>';
+    el.innerHTML = '<div class="dm-hint">Nobody yet -- put an encounter in play under Encounter setup.</div>';
     return;
   }
   el.innerHTML = [
@@ -142,7 +143,7 @@ function renderMap() {
   const hint = document.getElementById('csMapHint');
   if (hint) {
     hint.textContent = !sel
-      ? (['new-pokemon', 'new-trainer', 'from-npc'].includes(_editing?.mode) ? 'Add it to the battle first, then click the map to place it.' : 'Pick someone on the left (or click a token) to place them on the map.')
+      ? 'Pick someone on the left (or click a token) to place them on the map.'
       : sel.heldBack ? `${sel.name} is held back -- it joins later and doesn't start on the map.`
         : `Click a square to place ${sel.name}${sel.position ? ' somewhere else' : ''}.`;
   }
@@ -210,50 +211,16 @@ function edit(target) {
   const box = document.getElementById('csEditor');
   if (!box) return;
   if (!target) {
-    box.innerHTML = '<div class="dm-cs-empty">Pick someone on the left to change them, or add a Pokémon or NPC trainer.</div>';
+    box.innerHTML = '<div class="dm-cs-empty">Pick someone on the left to place them, or to fine-tune them for this battle.</div>';
     return;
   }
-  if (target.mode === 'from-npc') return renderNpcPicker(box);
-  if (target.mode === 'new-pokemon' && !target.species) return renderSpeciesPicker(box);
-  if (target.mode === 'new-pokemon' || target.mode === 'pokemon') return renderPokemonForm(box);
+  if (target.mode === 'pokemon') return renderPokemonForm(box);
   return renderTrainerForm(box);
 }
 
 // ---------------------------------------------------------------------------
 // Pokemon
 // ---------------------------------------------------------------------------
-
-function renderSpeciesPicker(box) {
-  box.innerHTML = `
-    <h3 class="dm-cs-title">Add a Pokémon</h3>
-    <input class="dm-input" id="csSearch" placeholder="Search name, type or habitat…" autocomplete="off">
-    <div class="dm-cs-species" id="csSpecies"><div class="dm-species-empty">Loading the Pokédex…</div></div>`;
-  const input = document.getElementById('csSearch');
-  input.addEventListener('input', renderSpeciesResults);
-  input.focus();
-  document.getElementById('csSpecies').addEventListener('click', (e) => {
-    const item = e.target.closest('[data-species]');
-    if (item) edit({ mode: 'new-pokemon', species: item.dataset.species });
-  });
-  renderSpeciesResults();
-}
-
-function renderSpeciesResults() {
-  const box = document.getElementById('csSpecies');
-  if (!box || !_species.length) return;
-  const q = (document.getElementById('csSearch')?.value || '').trim().toLowerCase();
-  const matches = _species.filter(s => !q || s.name.toLowerCase().includes(q)
-    || String(s.type1).toLowerCase() === q || String(s.type2).toLowerCase() === q || String(s.habitat).toLowerCase().includes(q)).slice(0, 80);
-  box.innerHTML = matches.length ? matches.map(s => `
-    <button type="button" class="dm-species-item" data-species="${escapeHtml(s.name)}">
-      <span class="dm-species-thumb" data-img="${escapeHtml(s.image)}"></span>
-      <span>
-        <span class="dm-species-name">#${escapeHtml(s.dex)} ${escapeHtml(s.name)}</span>
-        <span class="dm-species-meta">${typeBadges(s.type1, s.type2)} ${escapeHtml(s.rarity || '')}${s.habitat ? ` · ${escapeHtml(s.habitat)}` : ''} · base Lv ${s.level}</span>
-      </span>
-    </button>`).join('') : '<div class="dm-species-empty">No Pokémon match that.</div>';
-  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<img src="assets/Pokeball.png" alt="" style="opacity:.35">'; });
-}
 
 function trainerOptions(selected) {
   const trainers = getSetup().creatures.filter(c => c.kind === 'trainer');
@@ -280,9 +247,8 @@ function baseStatsHtml(s) {
 }
 
 function renderPokemonForm(box) {
-  const isNew = _editing.mode === 'new-pokemon';
-  const c = isNew ? null : selectedCreature();
-  const speciesName = isNew ? _editing.species : c.config.species;
+  const c = selectedCreature();
+  const speciesName = c.config.species;
   const s = _species.find(x => x.name === speciesName) || { name: speciesName, abilities: [], level: c?.config.level || 1 };
   const cfg = c?.config || { species: s.name, level: s.level || 1, nature: '', abilities: [0], item: '', shiny: false, stats: {}, overrides: {}, extraSkills: [] };
   const p = c?.participant || {};
@@ -296,7 +262,7 @@ function renderPokemonForm(box) {
     <div class="dm-cs-head">
       <span class="dm-cs-head-thumb" data-img="${escapeHtml(p.image || s.image || '')}"></span>
       <div>
-        <h3 class="dm-cs-title">${isNew ? `New ${escapeHtml(s.name)}` : escapeHtml(c.name)}</h3>
+        <h3 class="dm-cs-title">${escapeHtml(c.name)}</h3>
         <div class="dm-species-meta">${typeBadges(s.type1 || p.type1, s.type2 || p.type2)} ${escapeHtml(s.size || p.size || '')}${s.behavior ? ` · ${escapeHtml(s.behavior)}` : ''}</div>
       </div>
     </div>
@@ -305,7 +271,6 @@ function renderPokemonForm(box) {
         <div>
           <div class="dm-row">
             <div class="dm-field"><label for="csName">Name</label><input class="dm-input" id="csName" value="${escapeHtml(c?.name || '')}" placeholder="${escapeHtml(s.name)} (letters added for several)"></div>
-            ${isNew ? '<div class="dm-field" style="max-width:110px"><label for="csCount">How many</label><input class="dm-input" id="csCount" type="number" min="1" max="12" value="1"></div>' : ''}
           </div>
           <div class="dm-row">
             <div class="dm-field" style="max-width:110px"><label for="csLevel">Level</label><input class="dm-input" id="csLevel" type="number" min="1" max="20" value="${cfg.level}"></div>
@@ -331,7 +296,7 @@ function renderPokemonForm(box) {
               <label class="dm-check"><input type="checkbox" id="csHeld" ${c?.heldBack ? 'checked' : ''}>Held back (joins later)</label>
             </div>
           </div>
-          ${!isNew ? '<div class="dm-cs-placement" id="csPlacement"></div>' : ''}
+          <div class="dm-cs-placement" id="csPlacement"></div>
         </div>
         <div>
           ${baseStatsHtml(s)}
@@ -349,8 +314,8 @@ function renderPokemonForm(box) {
         </div>
       </div>
       <div class="dm-cs-actions">
-        ${!isNew ? '<button type="button" class="dm-btn" id="csDuplicate">Duplicate</button><button type="button" class="dm-btn danger" id="csRemove">Remove</button>' : '<button type="button" class="dm-btn" id="csCancel">Back</button>'}
-        <button type="submit" class="dm-btn primary" id="csSave">${isNew ? 'Add to battle' : 'Save changes'}</button>
+        <button type="button" class="dm-btn" id="csDuplicate">Duplicate</button><button type="button" class="dm-btn danger" id="csRemove">Remove</button>
+        <button type="submit" class="dm-btn primary" id="csSave">Save changes</button>
       </div>
     </form>`;
   box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
@@ -358,15 +323,14 @@ function renderPokemonForm(box) {
   const form = document.getElementById('csPokemonForm');
   form.addEventListener('submit', (e) => { e.preventDefault(); savePokemon(); });
   // Every change that moves the numbers works them out again (a preview build -- nothing is saved until Add / Save).
-  form.addEventListener('input', (e) => { if (!e.target.matches('#csName, #csCount, #csInit, #csItem')) schedulePreview(); });
+  form.addEventListener('input', (e) => { if (!e.target.matches('#csName, #csInit, #csItem')) schedulePreview(); });
   form.addEventListener('change', (e) => { if (e.target.matches('select, input[type=checkbox]')) schedulePreview(); });
-  document.getElementById('csCancel')?.addEventListener('click', () => edit({ mode: 'new-pokemon' }));
   document.getElementById('csResetStats').addEventListener('click', () => {
     box.querySelectorAll('[data-stat]').forEach(i => { i.value = ''; });
     schedulePreview();
   });
-  document.getElementById('csRemove')?.addEventListener('click', () => removeCreature(c));
-  document.getElementById('csDuplicate')?.addEventListener('click', () => duplicatePokemon(c));
+  document.getElementById('csRemove').addEventListener('click', () => removeCreature(c));
+  document.getElementById('csDuplicate').addEventListener('click', () => duplicatePokemon(c));
   renderPlacementLine();
   previewNow();
 }
@@ -381,7 +345,7 @@ function schedulePreview() {
 async function previewNow() {
   const form = document.getElementById('csPokemonForm');
   if (!form) return;
-  const species = _editing?.mode === 'new-pokemon' ? _editing.species : selectedCreature()?.config.species;
+  const species = selectedCreature()?.config.species;
   if (!species) return;
   const seq = ++_previewSeq;
   const { config } = readPokemonForm();
@@ -411,7 +375,6 @@ function readPokemonForm() {
   const init = document.getElementById('csInit').value;
   return {
     name: document.getElementById('csName').value.trim(),
-    count: Math.max(1, Math.min(12, parseInt(document.getElementById('csCount')?.value, 10) || 1)),
     config: {
       level: Math.max(1, Math.min(20, parseInt(document.getElementById('csLevel').value, 10) || 1)),
       nature: document.getElementById('csNature').value,
@@ -458,37 +421,19 @@ function lettersFor(species, count) {
 async function savePokemon() {
   if (_busy) return;
   const form = readPokemonForm();
-  const isNew = _editing.mode === 'new-pokemon';
+  const c = selectedCreature();
+  if (!c) return;
   const btn = document.getElementById('csSave');
   _busy = true;
   if (btn) { btn.disabled = true; btn.textContent = 'Building…'; }
   try {
-    if (isNew) {
-      const species = _editing.species;
-      const { names, renameLone } = form.name && form.count === 1 ? { names: [form.name], renameLone: null } : lettersFor(species, form.count);
-      const built = [];
-      for (const name of names) {
-        built.push(await buildPokemonCreature(newId(), species, name, form.config, { trainerId: form.trainerId, heldBack: form.heldBack, position: null }));
-      }
-      updateSetup(s => {
-        if (renameLone) {
-          const lone = s.creatures.find(c => c.id === renameLone);
-          lone.name = lone.participant.name = `${species} A`;
-        }
-        s.creatures.push(...built);
-      });
-      edit({ mode: 'pokemon', id: built[0].id });
-    } else {
-      const c = selectedCreature();
-      const name = form.name || c.name;
-      const rebuilt = await buildPokemonCreature(c.id, c.config.species, name, form.config,
-        { trainerId: form.trainerId, heldBack: form.heldBack, position: form.heldBack ? null : c.position });
-      updateSetup(s => { s.creatures[s.creatures.findIndex(x => x.id === c.id)] = rebuilt; });
-      edit({ mode: 'pokemon', id: c.id });
-    }
+    const rebuilt = await buildPokemonCreature(c.id, c.config.species, form.name || c.name, form.config,
+      { ...originOf(c), trainerId: form.trainerId, heldBack: form.heldBack, position: form.heldBack ? null : c.position });
+    updateSetup(s => { s.creatures[s.creatures.findIndex(x => x.id === c.id)] = rebuilt; });
+    edit({ mode: 'pokemon', id: c.id });
   } catch (err) {
     showCombatAlert(err.message, { title: "Couldn't build that Pokémon" });
-    if (btn) { btn.disabled = false; btn.textContent = isNew ? 'Add to battle' : 'Save changes'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Save changes'; }
   } finally {
     _busy = false;
   }
@@ -516,7 +461,7 @@ async function duplicatePokemon(c) {
 }
 
 async function removeCreature(c) {
-  if (!await showCombatConfirm(`Remove ${c.name} from the battle setup?`, { title: 'Remove', yesLabel: 'Remove', noLabel: 'Cancel' })) return;
+  if (!await showCombatConfirm(`Remove ${c.name} from the next battle?`, { title: 'Remove', yesLabel: 'Remove', noLabel: 'Cancel' })) return;
   updateSetup(s => {
     s.creatures = s.creatures.filter(x => x.id !== c.id);
     if (c.kind === 'trainer') s.creatures.forEach(x => { if (x.trainerId === c.id) x.trainerId = null; }); // their Pokemon stay, as wild
@@ -533,15 +478,14 @@ function defaultTrainer() {
 }
 
 function renderTrainerForm(box) {
-  const isNew = _editing.mode === 'new-trainer';
-  const c = isNew ? null : selectedCreature();
+  const c = selectedCreature();
   const t = { ...defaultTrainer(), ...(c?.config || {}) };
   if (!t.maxHP) t.maxHP = trainerHp(t.level, t.con);
   const portraitKnown = _portraits.some(pt => pt.url === t.image);
   box.innerHTML = `
     <div class="dm-cs-head">
       <span class="dm-cs-head-thumb" id="csTrainerThumb"></span>
-      <div><h3 class="dm-cs-title">${isNew ? 'New NPC trainer' : escapeHtml(c.name)}</h3>
+      <div><h3 class="dm-cs-title">${escapeHtml(c.name)}</h3>
         <div class="dm-species-meta">Fights with the Attack action and commands the Pokémon that belong to them.</div></div>
     </div>
     <form id="csTrainerForm" class="dm-cs-form">
@@ -564,7 +508,7 @@ function renderTrainerForm(box) {
           <div class="dm-field"><label>Saving throws</label>${multiSelectHtml('ctSaves', SAVING_THROWS, splitList(t.savingThrows, SAVING_THROWS))}</div>
           <div class="dm-field"><label>Skills</label>${multiSelectHtml('ctSkills', SKILLS, splitList(t.skills, SKILLS))}</div>
           <label class="dm-check"><input type="checkbox" id="ctHeld" ${c?.heldBack ? 'checked' : ''}>Held back (joins later)</label>
-          ${!isNew ? '<div class="dm-cs-placement" id="csPlacement"></div>' : ''}
+          <div class="dm-cs-placement" id="csPlacement"></div>
         </div>
         <div>
           <div class="dm-field"><label>Stats</label>
@@ -579,8 +523,8 @@ function renderTrainerForm(box) {
         </div>
       </div>
       <div class="dm-cs-actions">
-        ${!isNew ? '<button type="button" class="dm-btn danger" id="ctRemove">Remove</button>' : ''}
-        <button type="submit" class="dm-btn primary">${isNew ? 'Add to battle' : 'Save changes'}</button>
+        <button type="button" class="dm-btn danger" id="ctRemove">Remove</button>
+        <button type="submit" class="dm-btn primary">Save changes</button>
       </div>
     </form>`;
   bindMultiSelects(box);
@@ -601,7 +545,7 @@ function renderTrainerForm(box) {
     box.querySelector('[data-tstat="maxHP"]').value = trainerHp(level, con);
   });
   document.getElementById('csTrainerForm').addEventListener('submit', (e) => { e.preventDefault(); saveTrainer(c); });
-  document.getElementById('ctRemove')?.addEventListener('click', () => removeCreature(c));
+  document.getElementById('ctRemove').addEventListener('click', () => removeCreature(c));
   renderPlacementLine();
 }
 
@@ -629,7 +573,7 @@ function saveTrainer(existing) {
   participant.initiative = config.initiative;
   const heldBack = document.getElementById('ctHeld').checked;
   const creature = {
-    id: existing?.id || newId(), kind: 'trainer', name: config.name, config, participant,
+    ...originOf(existing), id: existing?.id || newId(), kind: 'trainer', name: config.name, config, participant,
     initiativeBonus: combatant.initiativeTotal || 0, heldBack, position: heldBack ? null : existing?.position || null,
   };
   updateSetup(s => {
@@ -637,45 +581,6 @@ function saveTrainer(existing) {
     if (i >= 0) s.creatures[i] = creature; else s.creatures.unshift(creature);
   });
   edit({ mode: 'trainer', id: creature.id });
-}
-
-// ---------------------------------------------------------------------------
-// From the NPC library (npcs.js): the NPC as a trainer, with their team as their Pokemon
-// ---------------------------------------------------------------------------
-
-async function renderNpcPicker(box) {
-  box.innerHTML = '<h3 class="dm-cs-title">Add an NPC from the library</h3><div class="dm-cs-species" id="csNpcs"><div class="dm-species-empty">Loading the NPCs…</div></div>';
-  let npcs = [];
-  try { npcs = (await DmAPI.npcs()).data || []; } catch (err) { /* shown as empty below */ }
-  const list = document.getElementById('csNpcs');
-  if (!list || _editing?.mode !== 'from-npc') return;
-  const inSetup = new Set(getSetup().creatures.map(c => c.npcId).filter(Boolean));
-  list.innerHTML = npcs.length ? npcs.map(n => `
-    <button type="button" class="dm-species-item" data-npc="${escapeHtml(n.id)}">
-      <span class="dm-species-thumb" data-img="${escapeHtml(n.image || '')}"></span>
-      <span>
-        <span class="dm-species-name">${escapeHtml(n.name)}${inSetup.has(n.id) ? ' <small class="dm-warn-text">(already in this battle)</small>' : ''}</span>
-        <span class="dm-species-meta">Lv ${n.level || 1}${n.role ? ` · ${escapeHtml(n.role)}` : ''}${n.faction ? ` · ${escapeHtml(n.faction)}` : ''} ·
-          ${(n.team || []).filter(m => m.species).map(m => escapeHtml(m.nickname || m.species)).join(', ') || 'no Pokémon'}</span>
-      </span>
-    </button>`).join('') : '<div class="dm-species-empty">No NPCs yet -- make them in the NPCs module.</div>';
-  list.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span style="font-size:1.5rem">🎭</span>'; });
-  list.addEventListener('click', async (e) => {
-    const item = e.target.closest('[data-npc]');
-    const npc = item && npcs.find(n => n.id === item.dataset.npc);
-    if (!npc || _busy) return;
-    _busy = true;
-    item.querySelector('.dm-species-meta').textContent = 'Adding…';
-    try {
-      const { trainer } = await addNpcToSetup(npc);
-      edit({ mode: 'trainer', id: trainer.id });
-    } catch (err) {
-      showCombatAlert(err.message, { title: `Couldn't add ${npc.name}` });
-      renderNpcPicker(box);
-    } finally {
-      _busy = false;
-    }
-  });
 }
 
 /** Adds an NPC from the library to the battle setup: the NPC as an NPC trainer, each Pokemon of their team built at

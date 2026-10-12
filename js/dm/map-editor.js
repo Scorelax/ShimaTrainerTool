@@ -114,7 +114,7 @@ export async function renderMapEditor(root, { onDone }) {
     <div class="dm-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head">
-          <button class="dm-btn small" id="mapBack">← Setup</button>
+          <button class="dm-btn small" id="mapBack">← Map setup</button>
           <h2>Map</h2>
         </div>
 

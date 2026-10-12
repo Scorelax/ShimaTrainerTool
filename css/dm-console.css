@@ -557,6 +557,7 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-enc-tabs { display: flex; gap: 4px; padding: 0.5rem 0.8rem 0; border-bottom: 1px solid var(--dm-line); background: #0d0e1d; }
 .dm-enc-tabs button { padding: 0.5rem 1rem; border: 1px solid transparent; border-bottom: none; border-radius: 9px 9px 0 0; background: none; color: var(--dm-muted); font-weight: 700; font-size: 0.9rem; cursor: pointer; }
 .dm-enc-tabs button.active { background: var(--dm-panel); border-color: var(--dm-line); color: var(--dm-gold); }
+.dm-tab-icon { height: 1.15em; width: auto; vertical-align: -0.2em; margin-right: 0.35em; }
 .dm-enc-body { flex: 1; min-height: 0; }
 .dm-enc-body > .dm-editor { height: 100%; }
 .dm-enc-list { display: flex; flex-direction: column; gap: 2px; }
@@ -739,7 +740,6 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 }
 .dm-disp-preview:hover, .dm-disp-preview:focus-visible { border-color: var(--dm-gold); outline: none; }
 .dm-disp-preview iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; pointer-events: none; }
-.dm-disp-live { position: absolute; left: 10px; top: 10px; padding: 0.15rem 0.55rem; border-radius: 999px; background: rgba(10, 10, 18, 0.8); color: #ff6b6b; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.5px; }
 .dm-disp-preview-hint { position: absolute; right: 10px; bottom: 10px; padding: 0.3rem 0.7rem; border-radius: 8px; background: rgba(10, 10, 18, 0.85); color: var(--dm-gold); font-size: 0.82rem; font-weight: 700; opacity: 0; transition: opacity 0.15s; }
 .dm-disp-preview:hover .dm-disp-preview-hint { opacity: 1; }
 .dm-disp-battleinfo { display: flex; align-items: center; gap: 0.7rem; font-size: 0.84rem; color: var(--dm-muted); }
@@ -784,13 +784,11 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-disp-card .dm-disp-thumb { width: 72px; height: 72px; background: none; }
 .dm-disp-card-name { font-size: 0.76rem; font-weight: 700; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dm-disp-card small { font-size: 0.66rem; color: var(--dm-muted); }
-.dm-disp-anim { position: absolute; top: 4px; right: 6px; font-size: 0.62rem; color: var(--dm-gold); }
 .dm-disp-bg { position: relative; display: flex; flex-direction: column; border: 2px solid var(--dm-line); border-radius: 10px; overflow: hidden; background: var(--dm-panel-2); cursor: pointer; }
 .dm-disp-bg:hover { border-color: rgba(255, 215, 0, 0.6); }
 .dm-disp-bg.current { border-color: var(--dm-gold); }
 .dm-disp-bg-img { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: #0a0a12; }
 .dm-disp-bg-img img { position: absolute; inset: 0; }
-.dm-disp-head .dm-btn { white-space: nowrap; flex: none; }
 .dm-disp-bg-img img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .dm-disp-bg-name { padding: 0.3rem 0.45rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dm-disp-bg.current .dm-disp-bg-name { color: var(--dm-gold); }
@@ -819,3 +817,4 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-disp-ed-pick.active { border-color: rgba(255, 215, 0, 0.5); background: rgba(255, 215, 0, 0.08); }
 .dm-disp-ed-pick.hidden-item .dm-disp-thumb { opacity: 0.4; }
 .dm-disp-ed-pick small { color: var(--dm-muted); }
+.dm-enc-inplay { align-self: center; font-size: 0.82rem; margin-right: 0.2rem; }

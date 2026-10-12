@@ -1,11 +1,12 @@
 // DM console (dm-console.html) -- the landscape page the DM runs the game from, on their laptop. A separate page with
 // its own URL, like display.html and battle-map.html: no trainer login, no player SPA around it.
 //
-// The battle module: with no battle running, the DM prepares one -- the map (map-editor.js) and the NPC trainers and
-// Pokemon the players will face (creature-setup.js), both kept on the Pi (setup-store.js) -- and starts it, which is
-// the moment the players can join. Beside the setup, as tabs: the encounter library to load one from and the last
-// battle's aftermath (encounters.js). While a battle runs, the module is the running battle (battle-live.js). All the
-// DM's battles are PvE.
+// The battle module: with no battle running, three tabs. Encounter setup (encounters.js) is who the players will face --
+// the encounter library; the one put in play becomes the next battle's NPC trainers and Pokemon, and keeps it up to date
+// as it's changed. Map setup is the map (map-editor.js), where everyone starts on it (creature-setup.js) -- both kept on
+// the Pi (setup-store.js) -- and Start battle, the moment the players can join. Post battle (encounters.js) hands out
+// the last battle's rewards. While a battle runs, the module is the running battle (battle-live.js). All the DM's
+// battles are PvE.
 import { CombatAPI, DmAPI, GameDataAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
@@ -28,7 +29,7 @@ import { renderDisplay, displayAway, displaySessionChanged } from './display.js'
 enableDmMode(DM);
 
 let session = { active: false, participants: {}, turnOrder: [] };
-let battleTab = 'setup'; // with no battle running: 'setup' | 'library' (the encounters) | 'aftermath'
+let battleTab = 'setup'; // with no battle running: 'setup' (Map setup) | 'library' (Encounter setup) | 'aftermath' (Post battle)
 let setupView = 'home'; // the setup tab: 'home' | 'map' | 'creatures'
 let liveMounted = false;
 let starting = false;
@@ -72,11 +73,12 @@ async function init() {
   window.addEventListener('beforeunload', (e) => {
     if (pokedexHasUnsaved() || npcsHaveUnsaved() || encountersHaveUnsaved()) { e.preventDefault(); e.returnValue = ''; }
   });
-  // Loading an encounter into the battle setup brings the DM back to the setup to place everyone.
+  // Putting an encounter in play brings the DM to the map setup to place everyone.
   window.addEventListener('dm:show-module', (e) => {
     if (e.detail?.name === 'battle') { setupView = 'home'; showBattleTab('setup'); }
     if (e.detail?.name) showModule(e.detail.name);
   });
+  window.addEventListener('dm:battle-tab', (e) => { if (e.detail?.tab) showBattleTab(e.detail.tab); });
   window.addEventListener('dm:aftermath-changed', () => { if (!session?.active) renderAftermathBanner(); });
 }
 
@@ -103,7 +105,7 @@ function showModule(name) {
   _moduleOpened.add(name);
 }
 
-/** The battle module's tabs, with no battle running: the setup, the encounter library, the last battle's aftermath. */
+/** The battle module's tabs, with no battle running: Map setup, Encounter setup, Post battle. */
 function showBattleTab(name) {
   battleTab = name;
   document.querySelectorAll('#dmBattleTabs [data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === name));
@@ -216,7 +218,7 @@ function renderStatus() {
 }
 
 // ---------------------------------------------------------------------------
-// Setup overview: the map and the battle, side by side, and Start battle
+// Map setup: the map and who's in the battle (from Encounter setup), side by side, and Start battle
 // ---------------------------------------------------------------------------
 
 function renderHome(view) {
@@ -244,8 +246,8 @@ function renderHome(view) {
       <div id="dmAftermathBanner"></div>
       <div class="dm-home-head">
         <div>
-          <h2>Battle setup</h2>
-          <div class="dm-hint">Set up the map and the battle, then start it -- the players can join once it has started.</div>
+          <h2>Map setup</h2>
+          <div class="dm-hint">Who's in the battle comes from Encounter setup. Set up the map, place everyone and start -- the players can join once it has started.</div>
         </div>
         <button class="dm-btn danger" id="homeReset" ${mapTouched || battleTouched ? '' : 'disabled'} title="Reset both the map and the battle">🗑 Clear battle</button>
       </div>
@@ -265,32 +267,40 @@ function renderHome(view) {
         </div>
         <div class="dm-home-card">
           <div class="dm-home-card-head">
-            <h3>⚔️ Battle</h3>
+            <h3><img class="dm-tab-icon" src="assets/VS.png" alt="">Who's in it</h3>
             <span class="dm-pill ${okBattle ? 'ok' : 'todo'}">${okBattle ? `✓ ${s.creatures.length} ready` : 'Nobody yet'}</span>
           </div>
-          <div class="dm-home-creatures">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">No NPC trainers or Pokémon yet.</div>'}</div>
-          ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them in the battle setup, or from the battle once it starts.</div>` : ''}
+          <div class="dm-hint" id="homeEncName"></div>
+          <div class="dm-home-creatures">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">Nobody yet -- put an encounter in play under Encounter setup.</div>'}</div>
+          ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them here, or from the battle once it starts.</div>` : ''}
           <div class="dm-home-actions">
-            <button class="dm-btn primary" id="homeCreatures" ${okMap ? '' : 'disabled'}>${okBattle ? 'Change the battle' : 'Set up battle'}</button>
-            <button class="dm-btn danger" id="homeResetBattle" ${battleTouched ? '' : 'disabled'}>Reset battle</button>
+            <button class="dm-btn primary" id="homeCreatures" ${okMap && okBattle ? '' : 'disabled'} title="${okMap ? '' : 'Set up the map first'}">📍 Place on the map</button>
+            <button class="dm-btn" id="homeToEnc">🌿 Encounter setup</button>
+            <button class="dm-btn danger" id="homeResetBattle" ${battleTouched ? '' : 'disabled'} title="Take everyone out of the next battle">Clear</button>
           </div>
-          ${okMap ? '' : '<div class="dm-hint">Set up the map first -- the battle setup places everyone on it.</div>'}
         </div>
       </div>
       <div class="dm-home-start">
         <button class="dm-btn dm-start-btn" id="homeStart" ${okMap && okBattle && !starting ? '' : 'disabled'}>▶ Start battle</button>
         <div class="dm-hint">${okMap && okBattle ? 'Ready -- starting opens the battle for the players.'
-          : `Still to do: ${[!okMap && 'set up the map', !okBattle && 'add someone to the battle'].filter(Boolean).join(' and ')}.`}</div>
+          : `Still to do: ${[!okMap && 'set up the map', !okBattle && 'put an encounter in play'].filter(Boolean).join(' and ')}.`}</div>
       </div>
     </div>`;
 
   view.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
   renderAftermathBanner();
+  if (s.creatures.length) {
+    DmAPI.getState('encounter-run').then((run) => {
+      const el = document.getElementById('homeEncName');
+      if (el && run?.name && s.creatures.some(c => c.encId === run.encounterId)) el.textContent = `From the encounter "${run.name}"`;
+    }).catch(() => {});
+  }
   document.getElementById('homeMap').addEventListener('click', () => showSetupView('map'));
   document.getElementById('homeCreatures').addEventListener('click', () => showSetupView('creatures'));
+  document.getElementById('homeToEnc').addEventListener('click', () => showBattleTab('library'));
   document.getElementById('homeStart').addEventListener('click', startBattle);
   document.getElementById('homeReset').addEventListener('click', async () => {
-    if (!await showCombatConfirm('Reset both the map and the battle setup? Everything set up so far is removed.', { title: 'Clear battle', yesLabel: 'Clear it', noLabel: 'Cancel' })) return;
+    if (!await showCombatConfirm('Reset the map and take everyone out of the next battle? (The encounters themselves stay.)', { title: 'Clear battle', yesLabel: 'Clear it', noLabel: 'Cancel' })) return;
     try { await resetSetup(); } catch (err) { showCombatAlert(err.message, { title: 'Clear battle' }); }
     renderHome(view);
   });
@@ -301,14 +311,14 @@ function renderHome(view) {
     renderHome(view);
   });
   document.getElementById('homeResetBattle').addEventListener('click', async () => {
-    if (!await showCombatConfirm('Reset the battle? Every NPC trainer and Pokémon is removed from the setup (the map stays).', { title: 'Reset battle', yesLabel: 'Reset battle', noLabel: 'Cancel' })) return;
+    if (!await showCombatConfirm('Take every NPC trainer and Pokémon out of the next battle? The map and the encounters themselves stay.', { title: 'Clear', yesLabel: 'Clear', noLabel: 'Cancel' })) return;
     resetBattle();
     await saveNow();
     renderHome(view);
   });
 }
 
-/** A battle ended and its aftermath isn't marked done yet: a banner over the setup to go and hand out the rewards. */
+/** A battle ended and its post battle isn't marked done yet: a banner over the map setup to go and hand out the rewards. */
 async function renderAftermathBanner() {
   const last = await DmAPI.getState('last-battle').catch(() => null);
   document.getElementById('dmAfterDot').hidden = !last || !!last.done;
@@ -318,8 +328,8 @@ async function renderAftermathBanner() {
   const caught = (last.participants || []).filter(p => p.captured).length;
   el.innerHTML = `
     <div class="dm-after-banner">
-      <span>🏁 <strong>The last battle is over</strong> (${last.round || 1} round${last.round === 1 ? '' : 's'}${caught ? `, ${caught} caught` : ''}) -- XP, loot${caught ? ' and the caught Pokémon' : ''} are waiting in the aftermath.</span>
-      <button class="dm-btn primary small" id="dmToAftermath">Open the aftermath</button>
+      <span>🏁 <strong>The last battle is over</strong> (${last.round || 1} round${last.round === 1 ? '' : 's'}${caught ? `, ${caught} caught` : ''}) -- XP, loot${caught ? ' and the caught Pokémon' : ''} are waiting in Post battle.</span>
+      <button class="dm-btn primary small" id="dmToAftermath">Open Post battle</button>
     </div>`;
   document.getElementById('dmToAftermath').addEventListener('click', () => showBattleTab('aftermath'));
 }

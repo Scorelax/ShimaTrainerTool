@@ -1,13 +1,18 @@
-// DM console -- the battle module's Encounters and Aftermath tabs: Benjakronk's old encounter builder, rebuilt on the Pi.
+// DM console -- the battle module's Encounter setup and Post battle tabs: Benjakronk's old encounter builder, rebuilt on
+// the Pi.
 //
 // Library: encounters prepared ahead of a session (dm_encounters table) -- a name, notes and note categories, the
 // terrain and weather (they go into catching), the wild Pokemon, NPC trainers from the NPC library, round-based events,
 // and optionally a map. The old tool's random encounter / random trainer generators, saved-Pokemon library and exclusion
-// list are here too. "Load into battle setup" turns it into the battle setup (creature-setup.js), where the DM places
-// everyone and starts the battle as usual; the encounter becomes the one in play ('encounter-run'), whose events and
-// capture helper show beside the running battle (battle-live.js).
+// list are here too. "Put in play" makes it the next battle: its Pokemon and NPC trainers go into the battle setup
+// (setup-store.js), where Map setup places everyone and starts the battle; the encounter becomes the one in play
+// ('encounter-run'), whose events and capture helper show beside the running battle (battle-live.js). Until the battle
+// starts, the next battle follows the encounter in play as it's changed (syncInPlay) -- whoever keeps their entry keeps
+// their spot on the map.
 //
-// Aftermath: after a PvE battle ends (routes_combat._remember_battle keeps it as 'last-battle'), what happened -- who
+// Who's in the next battle is decided here and only here (Map setup doesn't add anyone), so the two never disagree.
+//
+// Post battle: after a PvE battle ends (routes_combat._remember_battle keeps it as 'last-battle'), what happened -- who
 // was defeated, caught or got away -- and what to hand out. Unlike the old tool, which exported files or called the
 // Trainer Tool's API, everything goes straight into the trainers' records here: caught Pokemon into their team, loot
 // and money into their inventory, all live-pushed to their phones. XP is DM-only (xp.js -- on the records, never in what
@@ -40,12 +45,14 @@ let _species = [];
 let _npcs = [];
 let _exclusions = [];
 let _saved = [];
-let _runId = null; // the encounter loaded into the battle
+let _runId = null; // the encounter in play (the next battle)
+let _runLinked = false; // put in play since the next battle follows it (older runs were a one-off copy)
 const _saveTimers = new Map();
 let _saveState = 'saved';
 let _adding = false; // the species search under "Wild Pokémon" is open
 
-/** One of the battle module's tabs (dm-console.js draws the tabs): `tab` 'library' (the encounters) or 'aftermath'. */
+/** One of the battle module's tabs (dm-console.js draws the tabs): `tab` 'library' (Encounter setup) or 'aftermath'
+ * (Post battle). */
 export async function renderEncounters(root, { tab } = {}) {
   _root = root;
   if (tab) _tab = tab;
@@ -86,18 +93,21 @@ async function renderLibrary(body) {
     _exclusions = Array.isArray(excl) ? excl : [];
     _saved = Array.isArray(saved) ? saved : [];
     _runId = run?.encounterId || null;
+    _runLinked = !!run?.linked;
   } catch (err) {
     body.innerHTML = `<div class="dm-loading">Couldn't load the encounters: ${escapeHtml(err.message)}</div>`;
     return;
   }
   if (_tab !== 'library') return;
+  // Opens on the encounter in play, unless another one was picked.
+  if (!_encounters.some(e => e.id === _selectedId)) _selectedId = _encounters.some(e => e.id === _runId) ? _runId : null;
   body.innerHTML = `
     <div class="dm-editor">
       <aside class="dm-editor-tools">
-        <div class="dm-editor-head"><h2>Encounters</h2><span class="dm-pill ok" id="encSave">All saved</span></div>
+        <div class="dm-editor-head"><h2>Encounter setup</h2><span class="dm-pill ok" id="encSave">All saved</span></div>
         <div class="dm-row">
           <button class="dm-btn primary" id="encNew">+ New encounter</button>
-          <button class="dm-btn" id="encFromSetup" title="Save what's in the battle setup now as an encounter">⬇ From battle setup</button>
+          <button class="dm-btn" id="encFromSetup" title="Save who's in the next battle now as a new encounter">⬇ From the next battle</button>
         </div>
         <input class="dm-input" id="encSearch" placeholder="Search encounters…" autocomplete="off">
         <div class="dm-enc-list" id="encList"></div>
@@ -149,9 +159,9 @@ function renderList() {
   const list = _encounters.filter(e => !q || e.name.toLowerCase().includes(q));
   box.innerHTML = list.length ? list.map(e => `
     <button class="dm-enc-row${e.id === _selectedId ? ' selected' : ''}" data-enc="${escapeHtml(e.id)}">
-      <strong>${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' <span class="dm-enc-live" title="Loaded into the battle setup">● in play</span>' : ''}</strong>
+      <strong>${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' <span class="dm-enc-live" title="The next battle">● in play</span>' : ''}</strong>
       <small>${escapeHtml(summary(e))}${e.terrain && e.terrain !== 'flat' ? ` · ${escapeHtml(TERRAIN[e.terrain]?.name || '')}` : ''}</small>
-    </button>`).join('') : `<div class="dm-hint">${_encounters.length ? 'No encounter matches that.' : 'No encounters yet -- make one with "+ New encounter", or save the battle setup as one.'}</div>`;
+    </button>`).join('') : `<div class="dm-hint">${_encounters.length ? 'No encounter matches that.' : 'No encounters yet -- make one with "+ New encounter", or save the next battle as one.'}</div>`;
 }
 
 function npcById(id) {
@@ -177,7 +187,9 @@ function renderSheet() {
     <div class="dm-enc-head">
       <input class="dm-input dm-enc-name" id="encName" data-f="name" value="${escapeHtml(enc.name)}" placeholder="Encounter name">
       <div class="dm-enc-actions">
-        <button class="dm-btn primary" id="encLoad" title="Put this encounter into the battle setup">▶ Load into battle setup</button>
+        ${enc.id === _runId
+          ? '<span class="dm-enc-live dm-enc-inplay" title="This is the next battle -- changes here go straight into it">● In play</span><button class="dm-btn primary" id="encPlace">📍 Place on the map</button>'
+          : '<button class="dm-btn primary" id="encLoad" title="Make this the next battle -- then place everyone in Map setup">▶ Put in play</button>'}
         <button class="dm-btn" id="encDup">Duplicate</button>
         <button class="dm-btn danger" id="encDel">Delete</button>
       </div>
@@ -192,9 +204,9 @@ function renderSheet() {
             <select class="dm-select" id="encWeather" data-f="weather">${weatherOpts.map(([k, l]) => `<option value="${k}" ${k === enc.weather ? 'selected' : ''}>${escapeHtml(l)}${WEATHER_ROLL_MOD[k] ? ` (${WEATHER_ROLL_MOD[k]})` : ''}</option>`).join('')}</select></div>
         </div>
         <div class="dm-field"><label>Map</label>
-          <div class="dm-enc-mapline">${m ? `Saved with it: ${m.rows} × ${m.cols} squares, ${(m.objects || []).length} object${(m.objects || []).length === 1 ? '' : 's'}` : 'None -- loading it keeps the battle setup\'s map.'}</div>
+          <div class="dm-enc-mapline">${m ? `Saved with it: ${m.rows} × ${m.cols} squares, ${(m.objects || []).length} object${(m.objects || []).length === 1 ? '' : 's'}` : 'None -- putting it in play keeps the map setup\'s map.'}</div>
           <div class="dm-row">
-            <button class="dm-btn small" id="encMapTake" ${mapReady() ? '' : 'disabled'} title="${mapReady() ? '' : 'Set up a map in the battle setup first'}">Use the battle setup's map</button>
+            <button class="dm-btn small" id="encMapTake" ${mapReady() ? '' : 'disabled'} title="${mapReady() ? '' : 'Set up a map in Map setup first'}">Use the map setup's map</button>
             ${m ? '<button class="dm-btn small" id="encMapForget">Forget the map</button>' : ''}
           </div>
         </div>
@@ -252,7 +264,12 @@ function renderSheet() {
     </div>`;
   box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">🎭</span>'; });
   if (_adding) { renderMonResults(); document.getElementById('encMonSearch')?.focus(); }
-  document.getElementById('encLoad').addEventListener('click', () => loadIntoSetup(enc));
+  document.getElementById('encLoad')?.addEventListener('click', () => loadIntoSetup(enc));
+  document.getElementById('encPlace')?.addEventListener('click', async () => {
+    await flushEncounter(enc);
+    await _syncing;
+    window.dispatchEvent(new CustomEvent('dm:show-module', { detail: { name: 'battle' } }));
+  });
   document.getElementById('encDup').addEventListener('click', () => {
     const copy = { ...JSON.parse(JSON.stringify(enc)), id: newId('enc'), name: `${enc.name} (copy)`, createdAt: new Date().toISOString() };
     _encounters.unshift(copy);
@@ -804,7 +821,7 @@ async function randomTrainerDialog(enc) {
   });
 }
 
-// ---- Loading into / saving from the battle setup ----
+// ---- Putting in play (the next battle) / saving the next battle as an encounter ----
 
 function monConfig(p) {
   return {
@@ -817,21 +834,21 @@ async function loadIntoSetup(enc) {
   await flushEncounter(enc);
   const state = await CombatAPI.getState().catch(() => null);
   if (state?.data?.active) {
-    showCombatAlert('A battle is running -- end it first, or send these in as reinforcements from the battle.', { title: 'Load encounter' });
+    showCombatAlert('A battle is running -- end it first, or send these in as reinforcements from the battle.', { title: 'Put in play' });
     return;
   }
   const setup = getSetup();
   const have = setup.creatures.length;
   const choice = await openDmModal({
-    title: `Load "${enc.name}"`,
+    title: `Put "${enc.name}" in play`,
     html: `
-      <div class="dm-hint">${summary(enc)} go into the battle setup, where you place them on the map and start the battle as usual.</div>
+      <div class="dm-hint">${summary(enc)} become the next battle -- place them on the map in Map setup and start it. Changes made to this encounter afterwards go into it too.</div>
       ${have ? `<div class="dm-field" style="margin-top:0.7rem">
-        <label class="dm-check"><input type="radio" name="loadMode" value="replace" checked><span>Replace what's in the battle setup now <small>${have} creature${have === 1 ? '' : 's'} there</small></span></label>
-        <label class="dm-check"><input type="radio" name="loadMode" value="add"><span>Add to it</span></label></div>` : ''}
-      ${enc.map ? `<label class="dm-check" style="margin-top:0.4rem"><input type="checkbox" id="loadMap" checked><span>Use the map saved with it <small>${enc.map.rows} × ${enc.map.cols} squares -- replaces the setup's map</small></span></label>` : ''}`,
+        <label class="dm-check"><input type="radio" name="loadMode" value="replace" checked><span>Replace who's in the next battle now <small>${have} creature${have === 1 ? '' : 's'} there</small></span></label>
+        <label class="dm-check"><input type="radio" name="loadMode" value="add"><span>Add to them</span></label></div>` : ''}
+      ${enc.map ? `<label class="dm-check" style="margin-top:0.4rem"><input type="checkbox" id="loadMap" checked><span>Use the map saved with it <small>${enc.map.rows} × ${enc.map.cols} squares -- replaces the map setup's map</small></span></label>` : ''}`,
     buttons: [{ label: 'Cancel', value: null }, {
-      label: 'Load', kind: 'primary', keepOpen: true,
+      label: 'Put in play', kind: 'primary', keepOpen: true,
       onClick: (body) => { body.dataset.mode = body.querySelector('input[name="loadMode"]:checked')?.value || 'replace'; body.dataset.map = body.querySelector('#loadMap')?.checked ? '1' : ''; return true; },
       value: 'load',
     }],
@@ -843,9 +860,7 @@ async function loadIntoSetup(enc) {
   const useMap = body.dataset.map === '1';
   try {
     const built = [];
-    for (const p of enc.pokemon) {
-      built.push(await buildPokemonCreature(newId(), p.species, p.name || p.species, monConfig(p), { trainerId: null, heldBack: !!p.heldBack, position: null }));
-    }
+    for (const p of enc.pokemon) built.push(await buildEncounterMon(enc, p, null));
     updateSetup((s) => {
       if (replace) s.creatures = [];
       if (useMap) {
@@ -857,29 +872,28 @@ async function loadIntoSetup(enc) {
     const missing = [];
     for (const id of enc.npcs) {
       const npc = npcById(id);
-      if (npc) await addNpcToSetup(npc); else missing.push(id);
+      if (npc) await addEncounterNpc(enc, npc); else missing.push(id);
     }
     await flushSetup();
-    await DmAPI.saveState('encounter-run', {
-      encounterId: enc.id, name: enc.name, terrain: enc.terrain, weather: enc.weather, notes: enc.notes,
-      noteCategories: enc.noteCategories, events: enc.events, eventState: {}, loadedAt: new Date().toISOString(),
-    });
+    await DmAPI.saveState('encounter-run', { ...runFields(enc), eventState: {}, loadedAt: new Date().toISOString(), linked: true });
     _runId = enc.id;
+    _runLinked = true;
     renderList();
-    toast(`"${enc.name}" is in the battle setup${missing.length ? ` (${missing.length} NPC no longer in the library was left out)` : ''} -- place everyone and start the battle.`);
+    renderSheet();
+    toast(`"${enc.name}" is the next battle${missing.length ? ` (${missing.length} NPC no longer in the library was left out)` : ''} -- place everyone and start it.`);
     window.dispatchEvent(new CustomEvent('dm:show-module', { detail: { name: 'battle' } }));
   } catch (err) {
     showCombatAlert(err.message, { title: `Couldn't load "${enc.name}"` });
   }
 }
 
-/** The battle setup as a new encounter: its wild Pokemon, its NPC trainers (ones typed into the battle setup are added
+/** The next battle as a new encounter: its wild Pokemon, its NPC trainers (ones typed into the battle setup are added
  * to the NPC library with their Pokemon as their team) and its map. */
 async function fromBattleSetup() {
   const s = getSetup();
-  if (!s.creatures.length) { showCombatAlert('The battle setup is empty.', { title: 'From battle setup' }); return; }
+  if (!s.creatures.length) { showCombatAlert('Nobody is in the next battle.', { title: 'From the next battle' }); return; }
   const enc = blankEncounter();
-  enc.name = 'From the battle setup';
+  enc.name = 'From the next battle';
   const trainerNpc = new Map(); // setup trainer id -> NPC id
   try {
     for (const t of s.creatures.filter(c => c.kind === 'trainer')) {
@@ -897,7 +911,7 @@ async function fromBattleSetup() {
       trainerNpc.set(t.id, npc.id);
     }
   } catch (err) {
-    showCombatAlert(err.message, { title: 'From battle setup' });
+    showCombatAlert(err.message, { title: 'From the next battle' });
     return;
   }
   enc.npcs = [...new Set(trainerNpc.values())];
@@ -912,6 +926,77 @@ async function fromBattleSetup() {
   renderList();
   renderSheet();
   document.getElementById('encName')?.select();
+}
+
+// ---- The encounter in play: the next battle follows it ----
+// Each creature put in from an encounter carries encId (the encounter), encKey ('mon:<entry id>' for a wild Pokemon,
+// 'npc:<NPC id>' for an NPC trainer; their team only encId) and, for a wild Pokemon, encSig (what it was built from).
+// Only what changed is rebuilt, and a rebuilt Pokemon keeps its spot on the map. Creatures that came from elsewhere (the
+// NPC module, a duplicate made in Map setup) are left alone.
+
+const monSig = p => JSON.stringify([p.species, p.name || p.species, monConfig(p), !!p.heldBack]);
+
+function runFields(enc) {
+  return {
+    encounterId: enc.id, name: enc.name, terrain: enc.terrain, weather: enc.weather, notes: enc.notes,
+    noteCategories: enc.noteCategories, events: enc.events,
+  };
+}
+
+function buildEncounterMon(enc, p, had) {
+  return buildPokemonCreature(had?.id || newId(), p.species, p.name || p.species, monConfig(p), {
+    encId: enc.id, encKey: `mon:${p.id}`, encSig: monSig(p), trainerId: null, heldBack: !!p.heldBack,
+    position: p.heldBack ? null : had?.position || null,
+  });
+}
+
+async function addEncounterNpc(enc, npc) {
+  const { trainer, pokemon } = await addNpcToSetup(npc);
+  const ids = new Set([trainer.id, ...pokemon.map(c => c.id)]);
+  updateSetup((s) => s.creatures.forEach((c) => {
+    if (!ids.has(c.id)) return;
+    c.encId = enc.id;
+    if (c.id === trainer.id) c.encKey = `npc:${npc.id}`;
+  }));
+}
+
+let _syncing = Promise.resolve();
+function syncInPlay(enc) {
+  _syncing = _syncing.then(() => doSyncInPlay(enc)).catch((err) => toast(`Couldn't update the next battle: ${err.message}`));
+  return _syncing;
+}
+
+async function doSyncInPlay(enc) {
+  if (enc.id !== _runId || !_runLinked) return;
+  const state = await CombatAPI.getState().catch(() => null);
+  if (state?.data?.active) return; // the battle has started -- the setup is what it started from
+  const from = () => getSetup().creatures.filter(c => c.encId === enc.id);
+  const monKeys = new Set(enc.pokemon.map(p => `mon:${p.id}`));
+  const npcKeys = new Set(enc.npcs.map(id => `npc:${id}`));
+
+  const rebuilt = [];
+  for (const p of enc.pokemon) {
+    const had = from().find(c => c.encKey === `mon:${p.id}`);
+    if (!had || had.encSig !== monSig(p)) rebuilt.push(await buildEncounterMon(enc, p, had));
+  }
+  const goneMon = c => c.encKey?.startsWith('mon:') && !monKeys.has(c.encKey);
+  const goneTrainers = new Set(from().filter(c => c.encKey?.startsWith('npc:') && !npcKeys.has(c.encKey)).map(c => c.id));
+  if (rebuilt.length || goneTrainers.size || from().some(goneMon)) {
+    updateSetup((s) => {
+      s.creatures = s.creatures.filter(c => !(c.encId === enc.id && goneMon(c)) && !goneTrainers.has(c.id) && !goneTrainers.has(c.trainerId));
+      rebuilt.forEach((c) => {
+        const i = s.creatures.findIndex(x => x.id === c.id);
+        if (i >= 0) s.creatures[i] = c; else s.creatures.push(c);
+      });
+    });
+  }
+  for (const id of enc.npcs) {
+    const npc = npcById(id);
+    if (npc && !from().some(c => c.encKey === `npc:${id}`)) await addEncounterNpc(enc, npc);
+  }
+  await flushSetup();
+  const run = await DmAPI.getState('encounter-run').catch(() => null);
+  if (run?.encounterId === enc.id) await DmAPI.saveState('encounter-run', { ...run, ...runFields(enc) });
 }
 
 // ---- Saving (each encounter a moment after its last change) ----
@@ -938,6 +1023,7 @@ async function saveNow(enc) {
     const stored = await DmAPI.saveEncounter(JSON.parse(JSON.stringify(enc)));
     enc.updatedAt = stored.updatedAt;
     if (!_saveTimers.size) setPill('saved');
+    if (enc.id === _runId) syncInPlay(enc);
   } catch (err) {
     setPill('error');
     toast(`Couldn't save "${enc.name}": ${err.message}`);
@@ -949,7 +1035,7 @@ async function flushEncounter(enc) {
 }
 
 // ---------------------------------------------------------------------------
-// Aftermath
+// Post battle
 // ---------------------------------------------------------------------------
 
 let _after = null; // {last, run, party}
@@ -966,7 +1052,7 @@ async function renderAftermath(body) {
     _npcs = npcs.data || [];
     _after = { last, run, party: party.data || [] };
   } catch (err) {
-    body.innerHTML = `<div class="dm-loading">Couldn't load the aftermath: ${escapeHtml(err.message)}</div>`;
+    body.innerHTML = `<div class="dm-loading">Couldn't load the post battle: ${escapeHtml(err.message)}</div>`;
     return;
   }
   if (_tab !== 'aftermath') return;
@@ -1028,7 +1114,7 @@ function drawAftermath(body) {
     <div class="dm-after">
       <div class="dm-after-head">
         <div>
-          <h2>${escapeHtml(run?.name || 'Battle')} -- aftermath</h2>
+          <h2>${escapeHtml(run?.name || 'Battle')} -- post battle</h2>
           <div class="dm-hint">Ended ${ended.toLocaleString()} · ${last.round || 1} round${last.round === 1 ? '' : 's'}${last.done ? ' · <strong>marked done</strong>' : ''}</div>
         </div>
         <button class="dm-btn ${last.done ? '' : 'primary'}" id="afDone">${last.done ? 'Done ✓' : '✓ Done with this battle'}</button>

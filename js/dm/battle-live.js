@@ -201,7 +201,7 @@ async function openCapture(p) {
   if (choice !== 'catch') return;
   try {
     await CombatAPI.capture(p.id);
-    toast(`${p.name} was caught -- hand it to its trainer in the aftermath (Encounters → Aftermath) after the battle.`);
+    toast(`${p.name} was caught -- hand it to its trainer in Post battle after the battle.`);
   } catch (err) {
     showCombatAlert(err.message, { title: `Catch ${p.name}` });
   }
@@ -259,7 +259,6 @@ function renderTools(el) {
     <div class="dm-card">
       <div class="dm-card-title">Table screens</div>
       <div class="dm-row">
-        <a class="dm-btn" href="display.html" target="_blank" rel="noopener" title="Opens the table TV's screen in a new tab -- what it shows is set in 📺 Display at the top">📺 TV screen ↗</a>
         <a class="dm-btn" href="battle-map.html" target="_blank" rel="noopener" title="Opens the table's battle map screen in a new tab">▦ Battle map ↗</a>
       </div>
     </div>

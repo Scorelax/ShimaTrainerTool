@@ -203,7 +203,7 @@ function renderSheet() {
         </div>
       </div>
       <div class="dm-npc-actions">
-        <button class="dm-btn primary" id="npcToBattle">⚔ Add to battle setup</button>
+        <button class="dm-btn primary" id="npcToBattle">⚔ Add to the next battle</button>
         <button class="dm-btn" id="npcDuplicate">Duplicate</button>
         <button class="dm-btn danger" id="npcDelete">Delete</button>
       </div>
@@ -515,12 +515,12 @@ function wireSheet(box, n) {
     try {
       await flushSave(n);
       const { pokemon } = await addNpcToSetup(n);
-      toast(`${n.name}${pokemon.length ? ` and ${pokemon.length} Pokémon` : ''} added to the battle setup -- place them on the map there.`);
+      toast(`${n.name}${pokemon.length ? ` and ${pokemon.length} Pokémon` : ''} added to the next battle -- place them in Map setup.`);
     } catch (err) {
       showCombatAlert(err.message, { title: `Couldn't add ${n.name}` });
     }
     btn.disabled = false;
-    btn.textContent = '⚔ Add to battle setup';
+    btn.textContent = '⚔ Add to the next battle';
   });
   document.getElementById('npcDuplicate').addEventListener('click', async () => {
     const copy = { ...JSON.parse(JSON.stringify(n)), id: newId('npc'), name: `${n.name} (copy)`, createdAt: new Date().toISOString() };

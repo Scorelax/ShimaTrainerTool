@@ -16,6 +16,8 @@ import { DmAPI } from '../api.js';
 export const TV_ASPECT = 16 / 9;
 export const DEFAULT_ACROSS = 20;
 export const DEFAULT_DOWN = 11;
+// A new map starts on the forest, like a PvP battle (routes_combat._PVP_DEFAULT_BACKGROUND).
+export const DEFAULT_BACKGROUND = '/battle-images/battle-forest.png';
 
 let _setup = null;
 let _saveTimer = null;
@@ -24,7 +26,7 @@ const _listeners = new Set();
 
 export function emptySetup() {
   return {
-    map: { cols: DEFAULT_DOWN, rows: DEFAULT_ACROSS, lockRatio: true, background: '', objects: [], marks: {}, ready: false },
+    map: { cols: DEFAULT_DOWN, rows: DEFAULT_ACROSS, lockRatio: true, background: DEFAULT_BACKGROUND, objects: [], marks: {}, ready: false },
     creatures: [],
     startedAt: null,
   };
@@ -34,6 +36,8 @@ export async function loadSetup() {
   const res = await DmAPI.getSetup();
   _setup = res.data || emptySetup();
   _setup.map = { ...emptySetup().map, ...(_setup.map || {}) };
+  // A map saved before the forest default that was never set up yet gets it too.
+  if (!_setup.map.ready && !_setup.map.background) _setup.map.background = DEFAULT_BACKGROUND;
   _setup.creatures = _setup.creatures || [];
   return _setup;
 }
@@ -68,7 +72,7 @@ export async function resetSetup() {
   _listeners.forEach(l => l(_setup));
 }
 
-/** Back to a blank map (default size, no background, objects or marks, not ready). Where the creatures stood belonged
+/** Back to a blank map (default size, the forest background, no objects or marks, not ready). Where the creatures stood belonged
  * to the old map, so those spots go too -- the creatures themselves stay. */
 export function resetMap() {
   updateSetup(s => {

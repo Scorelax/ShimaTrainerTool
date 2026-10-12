@@ -1,15 +1,15 @@
-// DM console -- the Display module (📺 in the top bar): what the table TV (display.html -- its own screen, not the
-// battle map) shows. It replaces the slide show the DM used to run on the TV, where a background was put in for
+// DM console -- the Display module (📺 in the top bar): what the display (display.html -- its own screen, not the
+// battle map) shows. It replaces the slide show the DM used to run on it, where a background was put in for
 // wherever the players are and pictures of the trainers, NPCs and Pokemon they meet were pasted on. During a battle the
-// TV keeps the background and shows the turn order and whoever's turn it is on top; the pictures are put away until it
-// ends, unless the DM keeps them on.
+// display keeps the background and shows the turn order and whoever's turn it is on top; the pictures are put away
+// until it ends, unless the DM keeps them on. (It's always called "the display" on screen, never "the TV".)
 //
-// Left: a live preview of the TV -- display.html itself in a frame, fed the battle and the scene by this page (no
+// Left: a live preview of the display -- display.html itself in a frame, fed the battle and the scene by this page (no
 // connection of its own) -- with what's on it below. Right: the workspace -- every Pokemon, NPC and player trainer to
 // put on the screen with a click, and the background pictures uploaded from the DM's computer (kept on the Pi).
 // Clicking the preview opens the big editor, where pictures are dragged around and resized from a corner (always
-// square). Every change goes to the TV straight away (display-store.js); a picture can be put on hidden first and shown
-// with one click.
+// square). Every change goes to the display straight away (display-store.js); a picture can be put on hidden first and
+// shown with one click. A Pokemon goes on as its animated sprite whenever it has one.
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { renderScene, BATTLE_PICTURES, SCREEN_RATIO } from '../utils/display-scene.js';
@@ -75,16 +75,9 @@ function draw() {
   _root.innerHTML = `
     <div class="dm-disp">
       <div class="dm-disp-left">
-        <div class="dm-disp-head">
-          <div>
-            <h2>📺 Display</h2>
-            <div class="dm-hint">The table TV: where the players are and who they meet. Click the screen to move and resize the pictures -- every change is on the TV straight away.</div>
-          </div>
-          <a class="dm-btn small" href="display.html" target="_blank" rel="noopener" title="Open the TV's screen in a new tab (for the TV's browser)">Open the TV screen ↗</a>
-        </div>
+        <div class="dm-disp-head"><h2>📺 Display</h2></div>
         <div class="dm-disp-preview" id="dispPreview" role="button" tabindex="0" title="Click to arrange the pictures">
-          <iframe id="dispFrame" src="display.html?preview" tabindex="-1" title="The TV" aria-hidden="true"></iframe>
-          <span class="dm-disp-live">● On the TV</span>
+          <iframe id="dispFrame" src="display.html?preview" tabindex="-1" title="The display" aria-hidden="true"></iframe>
           <span class="dm-disp-preview-hint">🔍 Click to arrange</span>
         </div>
         <div class="dm-disp-battleinfo" title="During a battle the background stays, with the turn order and whoever's turn it is on top">
@@ -109,11 +102,11 @@ function draw() {
         <div class="dm-disp-work-body">
           <div class="dm-row dm-disp-searchrow">
             <input class="dm-input" id="dispSearch" placeholder="Search…" autocomplete="off" value="${escapeHtml(_queries[_source] || '')}">
-            <label class="dm-check dm-disp-addhidden" title="Put new pictures on hidden -- they show on the TV once you click 👁"><input type="checkbox" id="dispAddHidden" ${_addHidden ? 'checked' : ''}><span>Add hidden</span></label>
+            <label class="dm-check dm-disp-addhidden" title="Put new pictures on hidden -- they show on the display once you click 👁"><input type="checkbox" id="dispAddHidden" ${_addHidden ? 'checked' : ''}><span>Add hidden</span></label>
           </div>
           <div id="dispUploadRow" class="dm-disp-upload" hidden>
             <button class="dm-btn primary" id="dispUpload">⬆ Upload pictures</button>
-            <span class="dm-hint">From your computer (or drop them here) -- kept on the Pi for next time. Click one to put it on the TV.</span>
+            <span class="dm-hint">From your computer (or drop them here) -- kept on the Pi for next time. Click one to put it on the display.</span>
           </div>
           <div class="dm-disp-grid" id="dispGrid"><div class="dm-loading">Loading…</div></div>
         </div>
@@ -147,7 +140,7 @@ function draw() {
   });
   document.getElementById('dispClear').addEventListener('click', async () => {
     if (!getScene().items.length) return;
-    if (!await showCombatConfirm('Take every picture off the TV? The background stays.', { title: 'Clear pictures', yesLabel: 'Clear', noLabel: 'Cancel' })) return;
+    if (!await showCombatConfirm('Take every picture off the display? The background stays.',{ title: 'Clear pictures', yesLabel: 'Clear', noLabel: 'Cancel' })) return;
     updateScene((s) => { s.items = []; });
   });
   document.getElementById('dispLayers').addEventListener('click', onLayerClick);
@@ -195,10 +188,10 @@ function drawBattlePictures() {
 // What's on the screen
 // ---------------------------------------------------------------------------
 
-function thumbHtml(src, cls = '') {
+function thumbHtml(src, cls = '', { lazyVideo = false } = {}) {
   if (!src) return `<span class="dm-disp-thumb ${cls}"><img src="assets/Pokeball.png" alt="" style="opacity:.3"></span>`;
   return IS_VIDEO.test(src)
-    ? `<span class="dm-disp-thumb ${cls}"><video src="${escapeHtml(src)}" muted loop autoplay playsinline disablepictureinpicture></video></span>`
+    ? `<span class="dm-disp-thumb ${cls}"><video src="${escapeHtml(src)}" muted loop playsinline disablepictureinpicture ${lazyVideo ? 'data-lazy preload="none"' : 'autoplay'}></video></span>`
     : `<span class="dm-disp-thumb ${cls}"><img src="${escapeHtml(src)}" alt="" loading="lazy" draggable="false"></span>`;
 }
 
@@ -215,23 +208,22 @@ function drawLayers() {
   const items = [...scene.items].reverse(); // the top one first
   const putAway = !!_session?.active && scene.battlePictures !== 'keep' && items.length;
   box.innerHTML = `
-    ${putAway ? '<div class="dm-disp-away">⚔️ A battle is on -- these pictures are put away until it ends. The background stays, with the turn order on top.</div>' : ''}
-    ${items.length ? items.map(it => `
+    ${putAway ? '<div class="dm-disp-away">⚔️ Put away during the battle</div>' : ''}
+    ${items.map(it => `
       <div class="dm-disp-layer${it.hidden ? ' hidden-item' : ''}" data-id="${escapeHtml(it.id)}">
-        ${thumbHtml(it.still || it.src)}
+        ${thumbHtml(it.src)}
         <span class="dm-disp-layer-name"><strong>${escapeHtml(it.label || 'Picture')}</strong>
-          <small>${KIND_LABEL[it.kind] || 'Picture'} · ${Math.round((Number(it.size) || 0) * 100)}% high${it.hidden ? ' · <span class="dm-warn-text">hidden -- not on the TV</span>' : ''}</small></span>
+          <small>${KIND_LABEL[it.kind] || 'Picture'} · ${Math.round((Number(it.size) || 0) * 100)}% high${it.hidden ? ' · <span class="dm-warn-text">hidden</span>' : ''}</small></span>
         ${it.still && it.animated ? `<button class="dm-icon-btn" data-l="anim" title="${it.src === it.animated ? 'Animated -- click for the still picture' : 'Still -- click for the animated sprite'}">${it.src === it.animated ? '▶' : '🖼'}</button>` : ''}
-        <button class="dm-icon-btn${it.hidden ? ' off' : ''}" data-l="hide" title="${it.hidden ? 'Show it on the TV' : 'Hide it from the TV (it stays here)'}">${it.hidden ? '🙈' : '👁'}</button>
+        <button class="dm-icon-btn${it.hidden ? ' off' : ''}" data-l="hide" title="${it.hidden ? 'Show it on the display' : 'Hide it from the display (it stays here)'}">${it.hidden ? '🙈' : '👁'}</button>
         <button class="dm-icon-btn" data-l="up" title="Bring forward">▲</button>
         <button class="dm-icon-btn" data-l="down" title="Send backward">▼</button>
         <button class="dm-icon-btn danger" data-l="remove" title="Take it off">✕</button>
-      </div>`).join('') : '<div class="dm-hint">No pictures yet -- click a Pokémon, NPC or trainer on the right to put them on.</div>'}
-    <div class="dm-disp-bgrow">
-      ${scene.background ? `${thumbHtml(scene.background.url, 'wide')}<span class="dm-disp-layer-name"><strong>${escapeHtml(scene.background.name || 'Background')}</strong><small>Background</small></span>
-        <button class="dm-btn small" data-l="bg-change">Change</button><button class="dm-btn small danger" data-l="bg-remove">Remove</button>`
-        : `<span class="dm-hint">No background -- pick one under <a href="#" data-l="bg-change">🖼️ Backgrounds</a>.</span>`}
-    </div>`;
+      </div>`).join('')}
+    ${scene.background ? `<div class="dm-disp-bgrow">
+      ${thumbHtml(scene.background.url, 'wide')}<span class="dm-disp-layer-name"><strong>${escapeHtml(scene.background.name || 'Background')}</strong><small>Background</small></span>
+      <button class="dm-btn small" data-l="bg-change">Change</button><button class="dm-btn small danger" data-l="bg-remove">Remove</button>
+    </div>` : ''}`;
 }
 
 function moveItem(id, by) {
@@ -325,7 +317,7 @@ function drawGrid() {
     const current = getScene().background?.url;
     const shown = list.filter(b => !q || b.name.toLowerCase().includes(q));
     grid.innerHTML = shown.length ? shown.map(b => `
-      <div class="dm-disp-bg${b.url === current ? ' current' : ''}" data-bg="${escapeHtml(b.id)}" role="button" tabindex="0" title="Put it on the TV as the background">
+      <div class="dm-disp-bg${b.url === current ? ' current' : ''}" data-bg="${escapeHtml(b.id)}" role="button" tabindex="0" title="Put it on the display as the background">
         <span class="dm-disp-bg-img"><img src="${escapeHtml(b.url)}" alt="" loading="lazy" draggable="false"></span>
         <span class="dm-disp-bg-name">${b.url === current ? '✓ ' : ''}${escapeHtml(b.name)}</span>
         <span class="dm-disp-bg-tools">
@@ -339,16 +331,28 @@ function drawGrid() {
   const shown = list.filter(e => !q || e.search.includes(q));
   grid.innerHTML = shown.length ? shown.slice(0, MAX_RESULTS).map(e => `
     <button class="dm-disp-card" data-add="${escapeHtml(e.key)}" ${e.still || e.animated ? '' : 'disabled title="No picture"'}>
-      ${thumbHtml(e.still || e.animated)}
-      ${e.animated ? '<span class="dm-disp-anim" title="Has an animated sprite">▶</span>' : ''}
+      ${thumbHtml(e.animated || e.still, '', { lazyVideo: true })}
       <span class="dm-disp-card-name">${escapeHtml(e.label)}</span>
       ${e.sub ? `<small>${escapeHtml(e.sub)}</small>` : ''}
     </button>`).join('') + (shown.length > MAX_RESULTS ? `<div class="dm-hint dm-disp-more">${shown.length - MAX_RESULTS} more -- search to narrow it down.</div>` : '')
     : `<div class="dm-hint">${list.length ? 'Nothing matches that.' : { npcs: 'No NPCs in the NPC library yet.', trainers: 'No trainers yet.', pokemon: 'No species.' }[_source]}</div>`;
+  playVisibleVideos(grid);
+}
+
+// The animated sprites in the workspace only play while they're scrolled into view (up to 150 of them are listed).
+let _videoObserver = null;
+function playVisibleVideos(grid) {
+  _videoObserver?.disconnect();
+  _videoObserver = new IntersectionObserver((entries) => {
+    entries.forEach(({ target: v, isIntersecting }) => {
+      if (isIntersecting) { v.preload = 'auto'; v.play().catch(() => {}); } else v.pause();
+    });
+  }, { root: grid.closest('.dm-disp-work-body') || null, rootMargin: '120px' });
+  grid.querySelectorAll('video[data-lazy]').forEach(v => _videoObserver.observe(v));
 }
 
 function addPicture({ kind, label, still = '', animated = '' }) {
-  const src = still || animated;
+  const src = animated || still; // the animated sprite whenever there is one
   if (!src) return;
   const n = getScene().items.length;
   const hidden = _addHidden;
@@ -356,7 +360,7 @@ function addPicture({ kind, label, still = '', animated = '' }) {
     // Side by side across the lower part of the screen, so a few added in a row don't land on top of each other.
     s.items.push({ id: newId('pic'), kind, label, src, still, animated, x: 0.12 + (n % 5) * 0.19, y: 0.64, size: 0.36, flip: false, hidden });
   });
-  toast(hidden ? `${label} is ready, hidden -- click 👁 to show it on the TV.` : `${label} is on the TV.`);
+  toast(hidden ? `${label} is ready, hidden -- click 👁 to show it.` : `${label} is on the display.`);
 }
 
 async function onGridClick(e) {
@@ -402,7 +406,7 @@ async function renameImage(img) {
 
 async function deleteImage(img) {
   const used = getScene().background?.url === img.url || getScene().items.some(i => i.src === img.url);
-  if (!await showCombatConfirm(`Delete "${img.name}" from the Pi?${used ? ' It comes off the TV too.' : ''}`, { title: 'Delete picture', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+  if (!await showCombatConfirm(`Delete "${img.name}" from the Pi?${used ? ' It comes off the display too.' : ''}`,{ title: 'Delete picture', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
   try { await DmAPI.deleteDisplayImage(img.id); } catch (err) { showCombatAlert(err.message, { title: 'Delete picture' }); return; }
   _data.backgrounds = _data.backgrounds.filter(b => b.id !== img.id);
   if (used) {
@@ -475,7 +479,7 @@ async function uploadFiles(files) {
   }
   if (btn) { btn.disabled = false; btn.textContent = '⬆ Upload pictures'; }
   if (failed.length) showCombatAlert(failed.join('\n'), { title: "Couldn't upload" });
-  else toast(files.length === 1 ? 'Uploaded -- click it to put it on the TV.' : `Uploaded ${files.length} pictures.`);
+  else toast(files.length === 1 ? 'Uploaded -- click it to put it on the display.' : `Uploaded ${files.length} pictures.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -488,8 +492,8 @@ function openEditor() {
   overlay.className = 'dm-disp-editor';
   overlay.innerHTML = `
     <div class="dm-disp-ed-bar">
-      <strong>📺 Arrange the TV</strong>
-      <span class="dm-hint">Drag a picture to move it · drag a corner to resize it · arrow keys nudge · Delete takes it off. The TV follows along.</span>
+      <strong>📺 Arrange the display</strong>
+      <span class="dm-hint">Drag a picture to move it · drag a corner to resize it · arrow keys nudge · Delete takes it off.</span>
       <button class="dm-btn primary" id="edDone">Done</button>
     </div>
     <div class="dm-disp-ed-main">
@@ -560,7 +564,7 @@ function drawEditorSide() {
       </div>
       <div class="dm-disp-ed-btns">
         <button class="dm-btn small" data-e="flip">↔ Flip</button>
-        <button class="dm-btn small" data-e="hide" title="${it.hidden ? 'Show it on the TV' : 'Hide it from the TV (it stays here)'}">${it.hidden ? '👁 Show' : '🙈 Hide'}</button>
+        <button class="dm-btn small" data-e="hide" title="${it.hidden ? 'Show it on the display' : 'Hide it from the display (it stays here)'}">${it.hidden ? '👁 Show' : '🙈 Hide'}</button>
         <button class="dm-btn small" data-e="up">▲ Forward</button>
         <button class="dm-btn small" data-e="down">▼ Backward</button>
         <button class="dm-btn small" data-e="dup">⧉ Duplicate</button>
@@ -571,7 +575,7 @@ function drawEditorSide() {
     <div class="dm-disp-ed-list">
       ${[...scene.items].reverse().map(i => `
         <button class="dm-disp-ed-pick${i.id === _editor.selectedId ? ' active' : ''}${i.hidden ? ' hidden-item' : ''}" data-pick="${escapeHtml(i.id)}">
-          ${thumbHtml(i.still || i.src)}<span>${escapeHtml(i.label || 'Picture')}${i.hidden ? ' <small>(hidden)</small>' : ''}</span>
+          ${thumbHtml(i.src)}<span>${escapeHtml(i.label || 'Picture')}${i.hidden ? ' <small>(hidden)</small>' : ''}</span>
         </button>`).join('') || '<div class="dm-hint">None yet -- put some on from the workspace.</div>'}
     </div>`;
 }

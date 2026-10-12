@@ -57,7 +57,7 @@ async function save() {
   try {
     await DmAPI.saveDisplayScene({ ..._scene, _tab: TAB });
   } catch (err) {
-    toast(`Couldn't update the TV: ${err.message}`);
+    toast(`Couldn't update the display: ${err.message}`);
   } finally {
     _saving = false;
     if (_dirty && !_timer) _timer = setTimeout(save, SAVE_EVERY_MS);

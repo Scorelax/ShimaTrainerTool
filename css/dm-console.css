@@ -560,7 +560,15 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-tab-icon { height: 1.15em; width: auto; vertical-align: -0.2em; margin-right: 0.35em; }
 .dm-enc-body { flex: 1; min-height: 0; }
 .dm-enc-body > .dm-editor { height: 100%; }
-.dm-enc-list { display: flex; flex-direction: column; gap: 2px; }
+.dm-enc-list { display: flex; flex-direction: column; gap: 2px; flex: none; max-height: 42%; overflow-y: auto; }
+/* Encounter setup's left column: the saved-Pokemon library fills what the encounter list leaves. */
+.dm-editor-tools:has(.dm-enc-savedlib) { overflow: hidden; }
+.dm-enc-savedlib { flex: 1; min-height: 120px; display: flex; flex-direction: column; border-top: 1px solid var(--dm-line); padding-top: 0.7rem; }
+.dm-enc-savedlib .dm-enc-saved { flex: 1; min-height: 0; overflow-y: auto; padding-right: 0.2rem; }
+.dm-enc-savedlib .dm-enc-savedrow { grid-template-columns: 34px 1fr auto auto; gap: 0.45rem; }
+.dm-enc-savedlib .dm-enc-savedrow strong { font-size: 0.86rem; }
+.dm-enc-savedlib .dm-enc-thumb { width: 34px; height: 34px; }
+.dm-enc-savedlib .dm-editor-foot, .dm-enc-savedlib + .dm-editor-foot { margin-top: 0; }
 .dm-enc-row { display: flex; flex-direction: column; gap: 0.1rem; width: 100%; padding: 0.45rem 0.55rem; text-align: left; background: none; border: 1px solid transparent; border-radius: 8px; color: inherit; font: inherit; cursor: pointer; }
 .dm-enc-row:hover { background: rgba(255, 255, 255, 0.06); }
 .dm-enc-row.selected { background: rgba(255, 215, 0, 0.1); border-color: rgba(255, 215, 0, 0.4); }
@@ -574,7 +582,8 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-enc-grid textarea.dm-input { resize: vertical; font-family: inherit; }
 .dm-enc-titlebtns { flex: none; gap: 0.3rem; }
 .dm-enc-titlebtns > * { flex: none; }
-.dm-enc-mapline { font-size: 0.84rem; margin-bottom: 0.35rem; }
+.dm-enc-mapline { font-size: 0.84rem; }
+.dm-enc-mapcard .dm-row { align-items: center; flex-wrap: wrap; }
 .dm-enc-cats { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.5rem 0; }
 .dm-enc-cat textarea { margin-top: 0.3rem; }
 .dm-enc-icon { flex: 0 0 56px !important; text-align: center; }

@@ -12,6 +12,7 @@ import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFoc
 import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow, natureOptions, openDmModal } from './dm-common.js';
 import { getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD, STATUS_CAPTURE_BONUS, captureDc, accuracyDc } from './encounter-rules.js';
+import { getSetup } from './setup-store.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
@@ -95,17 +96,26 @@ function saveRunSoon() {
   runSaveTimer = setTimeout(() => DmAPI.saveState('encounter-run', run).catch(() => {}), 500);
 }
 
+/** The terrain and weather a Poke Ball throw is up against: Map setup's (the map this battle started from); an encounter
+ * put in play before they moved there still has its own. */
+function battleSetting() {
+  const m = getSetup()?.map || {};
+  const terrain = m.terrain || run?.terrain || 'flat';
+  const chosen = m.weather || run?.weather || 'world';
+  return { terrain, chosen, weather: chosen === 'world' ? getClock()?.weather || 'clear' : chosen };
+}
+
 function renderEncounterCard() {
   const el = document.getElementById('dmEncCard');
   if (!el) return;
   if (!run) { el.hidden = true; return; }
   el.hidden = false;
   const round = session.started ? Number(session.round) || 1 : null;
-  const weatherKey = run.weather === 'world' ? getClock()?.weather || 'clear' : run.weather;
+  const { terrain: terrainKey, chosen, weather: weatherKey } = battleSetting();
   const open = el.querySelector('details')?.open;
   el.innerHTML = `
     <div class="dm-card-title"><span>🗺️ ${escapeHtml(run.name || 'Encounter')}</span><button class="dm-icon-btn" data-ev-act="unload" title="This battle isn't that encounter -- stop showing it">✕</button></div>
-    <div class="dm-hint">${escapeHtml(TERRAIN[run.terrain]?.name || 'Flat ground')} · ${WEATHER[weatherKey]?.icon || ''} ${escapeHtml(WEATHER[weatherKey]?.name || weatherKey)}${run.weather === 'world' ? ' (world clock)' : ''}</div>
+    <div class="dm-hint">${escapeHtml(TERRAIN[terrainKey]?.name || 'Flat ground')} · ${WEATHER[weatherKey]?.icon || ''} ${escapeHtml(WEATHER[weatherKey]?.name || weatherKey)}${chosen === 'world' ? ' (world clock)' : ''}</div>
     ${run.notes || run.noteCategories?.length ? `<details class="dm-live-notes" ${open ? 'open' : ''}><summary>Notes</summary>
       ${run.notes ? `<div class="dm-live-note">${escapeHtml(run.notes)}</div>` : ''}
       ${(run.noteCategories || []).map(c => `<div class="dm-live-note"><strong>${escapeHtml(c.icon || '📝')} ${escapeHtml(c.name)}</strong>\n${escapeHtml(c.content || '')}</div>`).join('')}</details>` : ''}
@@ -164,8 +174,7 @@ function renderEncounterCard() {
 
 async function openCapture(p) {
   const sp = species.find(s => s.name === p.speciesName) || {};
-  const terrainKey = run?.terrain || 'flat';
-  const weatherKey = !run || run.weather === 'world' ? getClock()?.weather || 'clear' : run.weather;
+  const { terrain: terrainKey, weather: weatherKey } = battleSetting();
   const cdc = captureDc(p, sp);
   const acc = accuracyDc(p, terrainKey);
   const wmod = WEATHER_ROLL_MOD[weatherKey] || 0;

@@ -14,7 +14,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { enableDmMode } from '../pages/combat-wip.js';
 import { injectBattleMapStyles } from '../utils/battle-map-view.js';
 import { DM, escapeHtml } from './dm-common.js';
-import { loadSetup, getSetup, flushSetup, resetSetup, resetMap, resetBattle, mapReady, battleReady } from './setup-store.js';
+import { loadSetup, getSetup, updateSetup, flushSetup, resetSetup, resetMap, resetBattle, mapReady, battleReady, DEFAULT_BACKGROUND } from './setup-store.js';
 import { renderMapEditor, mapPreviewHtml } from './map-editor.js';
 import { renderCreatureSetup } from './creature-setup.js';
 import { mountLive, updateLive } from './battle-live.js';
@@ -23,7 +23,8 @@ import { renderParty } from './party.js';
 import { renderNpcs, npcsHaveUnsaved } from './npcs.js';
 import { renderClock } from './clock.js';
 import { renderEncounters, encountersHaveUnsaved } from './encounters.js';
-import { loadClock, renderTopWidget, tickTurnTimers } from './world-clock.js';
+import { loadClock, renderTopWidget, tickTurnTimers, getClock, WEATHER } from './world-clock.js';
+import { TERRAIN, WEATHER_ROLL_MOD } from './encounter-rules.js';
 import { renderDisplay, displayAway, displaySessionChanged } from './display.js';
 
 enableDmMode(DM);
@@ -232,8 +233,12 @@ function renderHome(view) {
   const marks = Object.values(m.marks || {});
   const bgLabel = m.background ? m.background.replace(/^.*battle-|\.png$/g, '').replace(/[-_]/g, ' ') : 'no background';
   const trainers = s.creatures.filter(c => c.kind === 'trainer');
-  // Anything to reset? The map counts once it's been touched at all (marked ready, a background, objects, marks).
-  const mapTouched = okMap || !!m.background || objects > 0 || marks.length > 0;
+  // Anything to reset? The map counts once it's been touched at all (marked ready, another background, objects, marks,
+  // terrain or weather).
+  const mapTouched = okMap || m.background !== DEFAULT_BACKGROUND || objects > 0 || marks.length > 0
+    || (m.terrain || 'flat') !== 'flat' || (m.weather || 'world') !== 'world';
+  const weatherOpts = [['world', `The world clock's (${WEATHER[getClock()?.weather]?.name || 'clear'})`],
+    ...Object.entries(WEATHER).map(([k, w]) => [k, `${w.icon} ${w.name}`])];
   const battleTouched = s.creatures.length > 0;
   const line = (c) => `
     <div class="dm-home-creature">
@@ -260,6 +265,12 @@ function renderHome(view) {
           <div class="dm-home-preview">${mapPreviewHtml(s)}</div>
           <div class="dm-hint">${m.rows} × ${m.cols} squares · ${escapeHtml(bgLabel)} · ${objects} object${objects === 1 ? '' : 's'}
             · ${marks.filter(k => k === 'difficult').length} difficult · ${marks.filter(k => k === 'blocked').length} blocked</div>
+          <div class="dm-row dm-home-setting">
+            <div class="dm-field"><label for="homeTerrain">Terrain <span class="dm-label-note">(added to a throw's accuracy DC)</span></label>
+              <select class="dm-select" id="homeTerrain">${Object.entries(TERRAIN).map(([k, t]) => `<option value="${k}" ${k === (m.terrain || 'flat') ? 'selected' : ''}>${escapeHtml(t.name)} (+${t.mod})</option>`).join('')}</select></div>
+            <div class="dm-field"><label for="homeWeather">Weather <span class="dm-label-note">(changes a throw's roll)</span></label>
+              <select class="dm-select" id="homeWeather">${weatherOpts.map(([k, l]) => `<option value="${k}" ${k === (m.weather || 'world') ? 'selected' : ''}>${escapeHtml(l)}${WEATHER_ROLL_MOD[k] ? ` (${WEATHER_ROLL_MOD[k]})` : ''}</option>`).join('')}</select></div>
+          </div>
           <div class="dm-home-actions">
             <button class="dm-btn primary" id="homeMap">${okMap ? 'Change the map' : 'Set up map'}</button>
             <button class="dm-btn danger" id="homeResetMap" ${mapTouched ? '' : 'disabled'}>Reset map</button>
@@ -275,7 +286,7 @@ function renderHome(view) {
           ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them here, or from the battle once it starts.</div>` : ''}
           <div class="dm-home-actions">
             <button class="dm-btn primary" id="homeCreatures" ${okMap && okBattle ? '' : 'disabled'} title="${okMap ? '' : 'Set up the map first'}">📍 Place on the map</button>
-            <button class="dm-btn" id="homeToEnc">🌿 Encounter setup</button>
+            <button class="dm-btn" id="homeToEnc"><img class="dm-tab-icon" src="assets/VS.png" alt="">Encounter setup</button>
             <button class="dm-btn danger" id="homeResetBattle" ${battleTouched ? '' : 'disabled'} title="Take everyone out of the next battle">Clear</button>
           </div>
         </div>
@@ -296,6 +307,8 @@ function renderHome(view) {
     }).catch(() => {});
   }
   document.getElementById('homeMap').addEventListener('click', () => showSetupView('map'));
+  document.getElementById('homeTerrain').addEventListener('change', (e) => updateSetup((x) => { x.map.terrain = e.target.value; }));
+  document.getElementById('homeWeather').addEventListener('change', (e) => updateSetup((x) => { x.map.weather = e.target.value; }));
   document.getElementById('homeCreatures').addEventListener('click', () => showSetupView('creatures'));
   document.getElementById('homeToEnc').addEventListener('click', () => showBattleTab('library'));
   document.getElementById('homeStart').addEventListener('click', startBattle);
@@ -305,7 +318,7 @@ function renderHome(view) {
     renderHome(view);
   });
   document.getElementById('homeResetMap').addEventListener('click', async () => {
-    if (!await showCombatConfirm('Reset the map? Its size, background, objects and terrain go back to blank, and everyone placed on it is taken off (the creatures themselves stay).', { title: 'Reset map', yesLabel: 'Reset map', noLabel: 'Cancel' })) return;
+    if (!await showCombatConfirm('Reset the map? Its size, background, objects, terrain and weather go back to the start, and everyone placed on it is taken off (the creatures themselves stay).', { title: 'Reset map', yesLabel: 'Reset map', noLabel: 'Cancel' })) return;
     resetMap();
     await saveNow();
     renderHome(view);

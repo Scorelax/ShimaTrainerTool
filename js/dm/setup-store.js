@@ -3,7 +3,7 @@
 // shortly after it's made.
 //
 // Shape: {
-//   map: { cols, rows, lockRatio, background, objects: [...board.objects], marks: {"col,row": kind}, ready },
+//   map: { cols, rows, lockRatio, background, objects: [...board.objects], marks: {"col,row": kind}, ready, terrain, weather },
 //   creatures: [{ id, kind: 'pokemon'|'trainer', name, config, participant, computed, initiativeBonus, heldBack,
 //                 trainerId, position: {col, row, facing} | null }],
 //   startedAt,
@@ -26,7 +26,12 @@ const _listeners = new Set();
 
 export function emptySetup() {
   return {
-    map: { cols: DEFAULT_DOWN, rows: DEFAULT_ACROSS, lockRatio: true, background: DEFAULT_BACKGROUND, objects: [], marks: {}, ready: false },
+    // terrain / weather: what a Poke Ball throw is up against (encounter-rules.js TERRAIN, WEATHER_ROLL_MOD) -- 'world'
+    // is the world clock's weather at the time.
+    map: {
+      cols: DEFAULT_DOWN, rows: DEFAULT_ACROSS, lockRatio: true, background: DEFAULT_BACKGROUND, objects: [], marks: {}, ready: false,
+      terrain: 'flat', weather: 'world',
+    },
     creatures: [],
     startedAt: null,
   };

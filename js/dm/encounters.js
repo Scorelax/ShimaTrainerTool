@@ -1,10 +1,10 @@
 // DM console -- the battle module's Encounter setup and Post battle tabs: Benjakronk's old encounter builder, rebuilt on
 // the Pi.
 //
-// Library: encounters prepared ahead of a session (dm_encounters table) -- a name, notes and note categories, the
-// terrain and weather (they go into catching), the wild Pokemon, NPC trainers from the NPC library, round-based events,
-// and optionally a map. The old tool's random encounter / random trainer generators, saved-Pokemon library and exclusion
-// list are here too. "Put in play" makes it the next battle: its Pokemon and NPC trainers go into the battle setup
+// Library: encounters prepared ahead of a session (dm_encounters table) -- a name, the wild Pokemon, notes and note
+// categories, NPC trainers from the NPC library, round-based events, and optionally a map (with its terrain and weather,
+// which go into catching -- they're set in Map setup). The old tool's random encounter / random trainer generators,
+// saved-Pokemon library (always shown under the encounter list) and exclusion list are here too. "Put in play" makes it the next battle: its Pokemon and NPC trainers go into the battle setup
 // (setup-store.js), where Map setup places everyone and starts the battle; the encounter becomes the one in play
 // ('encounter-run'), whose events and capture helper show beside the running battle (battle-live.js). Until the battle
 // starts, the next battle follows the encounter in play as it's changed (syncInPlay) -- whoever keeps their entry keeps
@@ -23,10 +23,9 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, getSpecies, newId, toast, natureOptions, openDmModal } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, mapReady } from './setup-store.js';
 import { buildPokemonCreature, addNpcToSetup } from './creature-setup.js';
-import { blankNpc } from './npcs.js';
 import { getClock, updateClock, advanceMinutes, skipToPhase, rollWeather, formatDate, formatTime, phaseName, PHASES, WEATHER } from './world-clock.js';
 import {
-  TERRAIN, WEATHER_ROLL_MOD, levelFromXp, ROUND_SECONDS, ENCOUNTER_TEMPLATES, TRAINER_ARCHETYPES, STAT_METHODS,
+  levelFromXp, ROUND_SECONDS, ENCOUNTER_TEMPLATES, TRAINER_ARCHETYPES, STAT_METHODS,
   encounterPool, generateEncounter, generateTrainer, rangePick, evolutionStage, STAGE_LABEL,
 } from './encounter-rules.js';
 import { xpOrStart } from './xp.js';
@@ -76,7 +75,7 @@ function renderTab() {
 
 function blankEncounter() {
   return {
-    id: newId('enc'), name: 'New encounter', notes: '', noteCategories: [], terrain: 'flat', weather: 'world',
+    id: newId('enc'), name: 'New encounter', notes: '', noteCategories: [],
     pokemon: [], npcs: [], events: [], map: null, createdAt: new Date().toISOString(),
   };
 }
@@ -105,15 +104,15 @@ async function renderLibrary(body) {
     <div class="dm-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head"><h2>Encounter setup</h2><span class="dm-pill ok" id="encSave">All saved</span></div>
-        <div class="dm-row">
-          <button class="dm-btn primary" id="encNew">+ New encounter</button>
-          <button class="dm-btn" id="encFromSetup" title="Save who's in the next battle now as a new encounter">⬇ From the next battle</button>
-        </div>
+        <button class="dm-btn primary wide" id="encNew">+ New encounter</button>
         <input class="dm-input" id="encSearch" placeholder="Search encounters…" autocomplete="off">
         <div class="dm-enc-list" id="encList"></div>
+        <div class="dm-enc-savedlib">
+          <div class="dm-card-title"><span>📚 Saved Pokémon</span><span class="dm-hint" id="encSavedCount"></span></div>
+          <div class="dm-enc-saved" id="encSavedList"></div>
+        </div>
         <div class="dm-editor-foot">
           <button class="dm-btn small" id="encExclusions">🚫 Exclusions (${_exclusions.length})</button>
-          <button class="dm-btn small" id="encSavedLib">📚 Saved Pokémon (${_saved.length})</button>
         </div>
       </aside>
       <section class="dm-editor-canvas" id="encSheet"></section>
@@ -122,6 +121,7 @@ async function renderLibrary(body) {
   renderSheet();
   bindSheet();
   document.getElementById('encSearch').addEventListener('input', renderList);
+  document.getElementById('encSavedList').addEventListener('click', onSavedClick);
   document.getElementById('encList').addEventListener('click', (e) => {
     const row = e.target.closest('[data-enc]');
     if (row) { _selectedId = row.dataset.enc; _adding = false; renderList(); renderSheet(); }
@@ -135,9 +135,7 @@ async function renderLibrary(body) {
     renderSheet();
     document.getElementById('encName')?.select();
   });
-  document.getElementById('encFromSetup').addEventListener('click', fromBattleSetup);
   document.getElementById('encExclusions').addEventListener('click', editExclusions);
-  document.getElementById('encSavedLib').addEventListener('click', () => pickSaved(null));
 }
 
 function current() {
@@ -160,7 +158,7 @@ function renderList() {
   box.innerHTML = list.length ? list.map(e => `
     <button class="dm-enc-row${e.id === _selectedId ? ' selected' : ''}" data-enc="${escapeHtml(e.id)}">
       <strong>${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' <span class="dm-enc-live" title="The next battle">● in play</span>' : ''}</strong>
-      <small>${escapeHtml(summary(e))}${e.terrain && e.terrain !== 'flat' ? ` · ${escapeHtml(TERRAIN[e.terrain]?.name || '')}` : ''}</small>
+      <small>${escapeHtml(summary(e))}</small>
     </button>`).join('') : `<div class="dm-hint">${_encounters.length ? 'No encounter matches that.' : 'No encounters yet -- make one with "+ New encounter", or save the next battle as one.'}</div>`;
 }
 
@@ -176,12 +174,11 @@ function renderSheet() {
   const box = document.getElementById('encSheet');
   if (!box) return;
   const enc = current();
+  renderSaved(); // its ＋ adds to the open encounter
   if (!enc) {
     box.innerHTML = `<div class="dm-cs-empty">${_encounters.length ? 'Pick an encounter on the left.' : 'No encounters yet.'}</div>`;
     return;
   }
-  const weatherOpts = [['world', `The world clock's weather (${WEATHER[getClock()?.weather]?.name || 'clear'})`],
-    ...Object.entries(WEATHER).map(([k, w]) => [k, `${w.icon} ${w.name}`])];
   const m = enc.map;
   box.innerHTML = `
     <div class="dm-enc-head">
@@ -195,24 +192,17 @@ function renderSheet() {
       </div>
     </div>
     <div class="dm-enc-grid">
-      <div class="dm-card">
-        <div class="dm-card-title">Setting</div>
-        <div class="dm-row">
-          <div class="dm-field"><label for="encTerrain">Terrain <span class="dm-label-note">(added to the throw's accuracy DC)</span></label>
-            <select class="dm-select" id="encTerrain" data-f="terrain">${Object.entries(TERRAIN).map(([k, t]) => `<option value="${k}" ${k === enc.terrain ? 'selected' : ''}>${escapeHtml(t.name)} (+${t.mod})</option>`).join('')}</select></div>
-          <div class="dm-field"><label for="encWeather">Weather <span class="dm-label-note">(changes the throw's roll)</span></label>
-            <select class="dm-select" id="encWeather" data-f="weather">${weatherOpts.map(([k, l]) => `<option value="${k}" ${k === enc.weather ? 'selected' : ''}>${escapeHtml(l)}${WEATHER_ROLL_MOD[k] ? ` (${WEATHER_ROLL_MOD[k]})` : ''}</option>`).join('')}</select></div>
-        </div>
-        <div class="dm-field"><label>Map</label>
-          <div class="dm-enc-mapline">${m ? `Saved with it: ${m.rows} × ${m.cols} squares, ${(m.objects || []).length} object${(m.objects || []).length === 1 ? '' : 's'}` : 'None -- putting it in play keeps the map setup\'s map.'}</div>
-          <div class="dm-row">
-            <button class="dm-btn small" id="encMapTake" ${mapReady() ? '' : 'disabled'} title="${mapReady() ? '' : 'Set up a map in Map setup first'}">Use the map setup's map</button>
-            ${m ? '<button class="dm-btn small" id="encMapForget">Forget the map</button>' : ''}
-          </div>
-        </div>
+      <div class="dm-card dm-enc-wide">
+        <div class="dm-card-title"><span>Wild Pokémon (${enc.pokemon.length})</span>
+          <span class="dm-row dm-enc-titlebtns">
+            <button class="dm-btn small" data-act="mon-add">🔍 Add</button>
+            <button class="dm-btn small" data-act="mon-random">🎲 Random</button>
+          </span></div>
+        ${_adding ? `<div class="dm-enc-add"><input class="dm-input" id="encMonSearch" placeholder="Search name, type or habitat…" autocomplete="off"><div class="dm-cs-species dm-enc-results" id="encMonResults"></div></div>` : ''}
+        <div class="dm-enc-mons">${enc.pokemon.length ? enc.pokemon.map(monRowHtml).join('') : '<div class="dm-hint">No wild Pokémon yet.</div>'}</div>
       </div>
 
-      <div class="dm-card">
+      <div class="dm-card dm-enc-wide">
         <div class="dm-card-title">Notes</div>
         <textarea class="dm-input" data-f="notes" rows="4" placeholder="Pre-encounter notes, special rules, reminders…">${escapeHtml(enc.notes || '')}</textarea>
         <div class="dm-enc-cats">
@@ -227,17 +217,6 @@ function renderSheet() {
             </div>`).join('')}
         </div>
         <button class="dm-btn small" data-act="cat-add">+ Note category</button>
-      </div>
-
-      <div class="dm-card dm-enc-wide">
-        <div class="dm-card-title"><span>Wild Pokémon (${enc.pokemon.length})</span>
-          <span class="dm-row dm-enc-titlebtns">
-            <button class="dm-btn small" data-act="mon-add">🔍 Add</button>
-            <button class="dm-btn small" data-act="mon-random">🎲 Random</button>
-            <button class="dm-btn small" data-act="mon-saved">📚 Saved</button>
-          </span></div>
-        ${_adding ? `<div class="dm-enc-add"><input class="dm-input" id="encMonSearch" placeholder="Search name, type or habitat…" autocomplete="off"><div class="dm-cs-species dm-enc-results" id="encMonResults"></div></div>` : ''}
-        <div class="dm-enc-mons">${enc.pokemon.length ? enc.pokemon.map(monRowHtml).join('') : '<div class="dm-hint">No wild Pokémon yet.</div>'}</div>
       </div>
 
       <div class="dm-card">
@@ -260,6 +239,14 @@ function renderSheet() {
         <div class="dm-card-title"><span>⚡ Events (${enc.events.length})</span><button class="dm-btn small" data-act="evt-add">+ Event</button></div>
         <div class="dm-hint" style="margin-bottom:0.5rem">Shown beside the running battle, with a reminder when one is due (reinforcements, a collapsing cave, a timer…).</div>
         ${enc.events.map(evtHtml).join('') || '<div class="dm-hint">No events.</div>'}
+      </div>
+      <div class="dm-card dm-enc-wide dm-enc-mapcard">
+        <div class="dm-card-title">Map</div>
+        <div class="dm-row">
+          <span class="dm-enc-mapline">${m ? `Saved with it: ${m.rows} × ${m.cols} squares, ${(m.objects || []).length} object${(m.objects || []).length === 1 ? '' : 's'}` : "None -- putting it in play keeps the map setup's map."}</span>
+          <button class="dm-btn small" id="encMapTake" ${mapReady() ? '' : 'disabled'} title="${mapReady() ? 'Save the map from Map setup (with its terrain and weather) with this encounter' : 'Set up a map in Map setup first'}">Use the map setup's map</button>
+          ${m ? '<button class="dm-btn small" id="encMapForget">Forget the map</button>' : ''}
+        </div>
       </div>
     </div>`;
   box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">🎭</span>'; });
@@ -404,7 +391,6 @@ function onAction(e) {
   const changed = () => { scheduleSave(enc); renderSheet(); renderList(); };
   if (act === 'mon-add') { _adding = !_adding; renderSheet(); return; }
   if (act === 'mon-random') { randomEncounterDialog(enc); return; }
-  if (act === 'mon-saved') { pickSaved(enc); return; }
   if (act === 'mon-del') { enc.pokemon = enc.pokemon.filter(p => p.id !== monId); relabel(enc); changed(); return; }
   if (act === 'mon-dup') {
     const p = enc.pokemon.find(x => x.id === monId);
@@ -487,46 +473,44 @@ async function saveToLibrary(p) {
   _saved.push(entry);
   try { await DmAPI.saveState('saved-pokemon', _saved); } catch (err) { showCombatAlert(err.message, { title: 'Save Pokémon' }); return; }
   toast(`${p.name} saved to the Pokémon library.`);
-  const btn = document.getElementById('encSavedLib');
-  if (btn) btn.textContent = `📚 Saved Pokémon (${_saved.length})`;
+  renderSaved();
 }
 
-/** The saved-Pokemon library: pick one to add to `enc` (or just look and delete when `enc` is null). */
-async function pickSaved(enc) {
-  const html = () => (_saved.length ? _saved.map(s => `
-    <div class="dm-enc-savedrow" data-saved="${escapeHtml(s.id)}">
-      <span class="dm-enc-thumb" data-img="${escapeHtml(speciesByName(s.species)?.image || '')}"></span>
-      <span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.species)} · Lv ${s.level}${s.nature ? ` · ${escapeHtml(s.nature)}` : ''}${s.item ? ` · holds ${escapeHtml(s.item)}` : ''}${s.shiny ? ' · ✨' : ''}</small></span>
-      ${enc ? '<button class="dm-btn small primary" data-act="use">Add</button>' : ''}
+/** The saved-Pokemon library, under the encounter list: ＋ adds one to the open encounter. */
+function renderSaved() {
+  const box = document.getElementById('encSavedList');
+  if (!box) return;
+  const count = document.getElementById('encSavedCount');
+  if (count) count.textContent = _saved.length ? String(_saved.length) : '';
+  const enc = current();
+  box.innerHTML = _saved.length ? _saved.map(sv => `
+    <div class="dm-enc-savedrow" data-saved="${escapeHtml(sv.id)}">
+      <span class="dm-enc-thumb" data-img="${escapeHtml(speciesByName(sv.species)?.image || '')}"></span>
+      <span><strong>${escapeHtml(sv.name)}</strong><small>${escapeHtml(sv.species)} · Lv ${sv.level}${sv.nature ? ` · ${escapeHtml(sv.nature)}` : ''}${sv.item ? ` · holds ${escapeHtml(sv.item)}` : ''}${sv.shiny ? ' · ✨' : ''}</small></span>
+      <button class="dm-btn small" data-act="use" ${enc ? '' : 'disabled'} title="${enc ? `Add to ${escapeHtml(enc.name)}` : 'Pick an encounter first'}">＋ Add</button>
       <button class="dm-icon-btn danger" data-act="drop" title="Delete from the library">✕</button>
-    </div>`).join('') : '<div class="dm-hint">Nothing saved yet -- use 💾 on a Pokémon in an encounter.</div>');
-  await openDmModal({
-    title: 'Saved Pokémon', html: `<div class="dm-enc-saved">${html()}</div>`,
-    onOpen: (body, close) => {
-      const thumbs = () => body.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
-      thumbs();
-      body.addEventListener('click', async (e) => {
-        const act = e.target.closest('[data-act]')?.dataset.act;
-        const s = _saved.find(x => x.id === e.target.closest('[data-saved]')?.dataset.saved);
-        if (!act || !s) return;
-        if (act === 'use') {
-          enc.pokemon.push({ ...JSON.parse(JSON.stringify(s)), id: newId('mon'), heldBack: false });
-          relabel(enc);
-          scheduleSave(enc);
-          renderSheet();
-          renderList();
-          close(null);
-        } else {
-          _saved = _saved.filter(x => x !== s);
-          await DmAPI.saveState('saved-pokemon', _saved).catch(err => showCombatAlert(err.message, { title: 'Saved Pokémon' }));
-          body.querySelector('.dm-enc-saved').innerHTML = html();
-          thumbs();
-          const b = document.getElementById('encSavedLib');
-          if (b) b.textContent = `📚 Saved Pokémon (${_saved.length})`;
-        }
-      });
-    },
-  });
+    </div>`).join('') : '<div class="dm-hint">Use 💾 on a wild Pokémon to keep it here for other encounters.</div>';
+  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+}
+
+async function onSavedClick(e) {
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  const sv = _saved.find(x => x.id === e.target.closest('[data-saved]')?.dataset.saved);
+  if (!act || !sv) return;
+  if (act === 'use') {
+    const enc = current();
+    if (!enc) return;
+    enc.pokemon.push({ ...JSON.parse(JSON.stringify(sv)), id: newId('mon'), heldBack: false });
+    relabel(enc);
+    scheduleSave(enc);
+    renderSheet();
+    renderList();
+    return;
+  }
+  if (!await showCombatConfirm(`Delete ${sv.name} from the saved Pokémon?`, { title: 'Saved Pokémon', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+  _saved = _saved.filter(x => x !== sv);
+  await DmAPI.saveState('saved-pokemon', _saved).catch(err => showCombatAlert(err.message, { title: 'Saved Pokémon' }));
+  renderSaved();
 }
 
 // ---- Exclusions (left out of the random generators) ----
@@ -821,7 +805,7 @@ async function randomTrainerDialog(enc) {
   });
 }
 
-// ---- Putting in play (the next battle) / saving the next battle as an encounter ----
+// ---- Putting in play (the next battle) ----
 
 function monConfig(p) {
   return {
@@ -864,9 +848,12 @@ async function loadIntoSetup(enc) {
     updateSetup((s) => {
       if (replace) s.creatures = [];
       if (useMap) {
-        s.map = { ...JSON.parse(JSON.stringify(enc.map)), ready: true };
+        s.map = { ...s.map, ...JSON.parse(JSON.stringify(enc.map)), ready: true };
         s.creatures.forEach(c => { c.position = null; });
       }
+      // Encounters made before terrain and weather moved to Map setup had their own.
+      if (enc.terrain && enc.terrain !== 'flat') s.map.terrain = enc.terrain;
+      if (enc.weather && enc.weather !== 'world') s.map.weather = enc.weather;
       s.creatures.push(...built);
     });
     const missing = [];
@@ -887,47 +874,6 @@ async function loadIntoSetup(enc) {
   }
 }
 
-/** The next battle as a new encounter: its wild Pokemon, its NPC trainers (ones typed into the battle setup are added
- * to the NPC library with their Pokemon as their team) and its map. */
-async function fromBattleSetup() {
-  const s = getSetup();
-  if (!s.creatures.length) { showCombatAlert('Nobody is in the next battle.', { title: 'From the next battle' }); return; }
-  const enc = blankEncounter();
-  enc.name = 'From the next battle';
-  const trainerNpc = new Map(); // setup trainer id -> NPC id
-  try {
-    for (const t of s.creatures.filter(c => c.kind === 'trainer')) {
-      if (t.npcId) { trainerNpc.set(t.id, t.npcId); continue; }
-      const team = s.creatures.filter(c => c.kind === 'pokemon' && c.trainerId === t.id).map(c => ({
-        id: newId('mon'), species: c.config.species, nickname: c.name === c.config.species ? '' : c.name, level: c.config.level,
-        nature: c.config.nature || '', abilities: c.config.abilities || [0], item: c.config.item || '', shiny: !!c.config.shiny, notes: '', stats: c.config.stats || {},
-      }));
-      const cfg = t.config;
-      const npc = await DmAPI.saveNpc({
-        ...blankNpc(), name: cfg.name, image: cfg.image || '', level: cfg.level, str: cfg.str, dex: cfg.dex, con: cfg.con, int: cfg.int, wis: cfg.wis, cha: cfg.cha,
-        ac: cfg.ac, maxHP: cfg.maxHP, maxVP: cfg.maxVP, speed: cfg.speed, savingThrows: cfg.savingThrows, skills: cfg.skills, attitude: 'hostile', team,
-      });
-      _npcs.push(npc);
-      trainerNpc.set(t.id, npc.id);
-    }
-  } catch (err) {
-    showCombatAlert(err.message, { title: 'From the next battle' });
-    return;
-  }
-  enc.npcs = [...new Set(trainerNpc.values())];
-  enc.pokemon = s.creatures.filter(c => c.kind === 'pokemon' && !trainerNpc.has(c.trainerId)).map(c => newMon(c.config.species, c.config.level, {
-    name: c.name, nature: c.config.nature || '', abilities: c.config.abilities || [0], item: c.config.item || '', shiny: !!c.config.shiny,
-    heldBack: !!c.heldBack, stats: c.config.stats || {}, extraSkills: c.config.extraSkills || [],
-  }));
-  if (mapReady(s)) enc.map = JSON.parse(JSON.stringify(s.map));
-  _encounters.unshift(enc);
-  _selectedId = enc.id;
-  await saveNow(enc);
-  renderList();
-  renderSheet();
-  document.getElementById('encName')?.select();
-}
-
 // ---- The encounter in play: the next battle follows it ----
 // Each creature put in from an encounter carries encId (the encounter), encKey ('mon:<entry id>' for a wild Pokemon,
 // 'npc:<NPC id>' for an NPC trainer; their team only encId) and, for a wild Pokemon, encSig (what it was built from).
@@ -938,8 +884,7 @@ const monSig = p => JSON.stringify([p.species, p.name || p.species, monConfig(p)
 
 function runFields(enc) {
   return {
-    encounterId: enc.id, name: enc.name, terrain: enc.terrain, weather: enc.weather, notes: enc.notes,
-    noteCategories: enc.noteCategories, events: enc.events,
+    encounterId: enc.id, name: enc.name, notes: enc.notes, noteCategories: enc.noteCategories, events: enc.events,
   };
 }
 

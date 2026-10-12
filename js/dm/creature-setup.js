@@ -122,7 +122,7 @@ function renderList() {
     ...trainers.map(t => `<div class="dm-cs-group">${row(t)}${all.filter(c => c.kind === 'pokemon' && c.trainerId === t.id).map(c => row(c, true)).join('')}</div>`),
     wild.length ? `<div class="dm-cs-group"><div class="dm-cs-group-title">Wild Pokémon</div>${wild.map(c => row(c)).join('')}</div>` : '',
   ].join('');
-  el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img) patchPortraitMedia(x, x.dataset.img, ''); else x.innerHTML = '<span style="font-size:1.5rem">🎭</span>'; });
+  el.querySelectorAll('[data-img]').forEach(x => { if (x.dataset.img) patchPortraitMedia(x, x.dataset.img, ''); else x.innerHTML = '<span style="font-size:1.5rem">👤</span>'; });
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ function renderMap() {
   wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: sel?.id });
   const stage = wrap.querySelector('.dm-map-stage');
   stage.style.width = `min(100%, calc(34vh * ${m.rows / m.cols}))`;
-  stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-token-emoji">🎭</span>'; });
+  stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-token-emoji">👤</span>'; });
 
   const hint = document.getElementById('csMapHint');
   if (hint) {
@@ -531,7 +531,7 @@ function renderTrainerForm(box) {
   const thumb = () => {
     const url = readTrainerImage();
     const el = document.getElementById('csTrainerThumb');
-    if (url) patchPortraitMedia(el, url, ''); else el.innerHTML = '<span style="font-size:1.8rem">🎭</span>';
+    if (url) patchPortraitMedia(el, url, ''); else el.innerHTML = '<span style="font-size:1.8rem">👤</span>';
   };
   thumb();
   document.getElementById('ctPortrait').addEventListener('change', (e) => {

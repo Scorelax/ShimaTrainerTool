@@ -730,12 +730,6 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-xp-after { min-height: 1.3em; font-size: 0.95rem; }
 
 /* ---- Top bar: the Display button ---- */
-.dm-top-display {
-  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; border-radius: 10px; white-space: nowrap;
-  border: 1px solid rgba(255, 215, 0, 0.35); background: rgba(255, 215, 0, 0.08); color: var(--dm-text); font: inherit; font-size: 0.86rem; font-weight: 700; cursor: pointer;
-}
-.dm-top-display:hover { border-color: var(--dm-gold); }
-.dm-top-display.active { background: rgba(255, 215, 0, 0.2); border-color: var(--dm-gold); color: var(--dm-gold); }
 
 /* ---- Display module ---- */
 .dm-disp { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr); height: 100%; min-height: 0; }

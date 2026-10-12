@@ -66,7 +66,6 @@ async function init() {
     const btn = e.target.closest('[data-module]:not(:disabled)');
     if (btn) showModule(btn.dataset.module);
   });
-  document.getElementById('dmDisplayBtn').addEventListener('click', () => showModule('display'));
   document.getElementById('dmBattleTabs').addEventListener('click', (e) => {
     const b = e.target.closest('[data-btab]');
     if (b) showBattleTab(b.dataset.btab);
@@ -84,7 +83,7 @@ async function init() {
 }
 
 // ---------------------------------------------------------------------------
-// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock -- and Display, from the top bar. The battle
+// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock, Display. The battle
 // keeps running in its own section while another module is open; Party is fetched fresh every time it's opened, the
 // Clock is redrawn (the time may have moved), the Pokedex, NPCs and Display keep where the DM was.
 // ---------------------------------------------------------------------------
@@ -95,7 +94,6 @@ const _moduleOpened = new Set(['battle']);
 function showModule(name) {
   Object.entries(MODULES).forEach(([key, id]) => { document.getElementById(id).hidden = key !== name; });
   document.querySelectorAll('#dmRail [data-module]').forEach(b => b.classList.toggle('active', b.dataset.module === name));
-  document.getElementById('dmDisplayBtn').classList.toggle('active', name === 'display');
   if (name !== 'display') displayAway();
   const section = document.getElementById(MODULES[name]);
   if (name === 'party') renderParty(section);

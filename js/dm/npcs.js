@@ -128,7 +128,7 @@ function renderList() {
           <span class="dm-npc-dot" style="background:${color}" title="${label}"></span>
         </button>`;
     }).join('')}`).join('') || `<div class="dm-hint">${_npcs.length ? 'Nobody matches that.' : 'No NPCs yet. Make one, or import them from the old DM tool.'}</div>`;
-  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">🎭</span>'; });
+  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">👤</span>'; });
 }
 
 function select(id) {
@@ -300,7 +300,7 @@ const sign = v => (v >= 0 ? `+${v}` : `${v}`);
 function patchPortrait(url) {
   const el = document.getElementById('npcPortrait');
   if (!el) return;
-  if (url) patchPortraitMedia(el, url, ''); else el.innerHTML = '<span class="dm-npc-emoji big">🎭</span>';
+  if (url) patchPortraitMedia(el, url, ''); else el.innerHTML = '<span class="dm-npc-emoji big">👤</span>';
 }
 
 function teamMemberHtml(m, i) {

@@ -222,7 +222,7 @@ function renderSheet() {
       <div class="dm-card">
         <div class="dm-card-title"><span>NPC trainers (${enc.npcs.length})</span>
           <span class="dm-row dm-enc-titlebtns">
-            <button class="dm-btn small" data-act="npc-add">🎭 From the library</button>
+            <button class="dm-btn small" data-act="npc-add">👤 From the library</button>
             <button class="dm-btn small" data-act="npc-random">🎲 Random trainer</button>
           </span></div>
         <div class="dm-enc-npcs">${enc.npcs.length ? enc.npcs.map((id) => {
@@ -249,7 +249,7 @@ function renderSheet() {
         </div>
       </div>
     </div>`;
-  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">🎭</span>'; });
+  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">👤</span>'; });
   if (_adding) { renderMonResults(); document.getElementById('encMonSearch')?.focus(); }
   document.getElementById('encLoad')?.addEventListener('click', () => loadIntoSetup(enc));
   document.getElementById('encPlace')?.addEventListener('click', async () => {
@@ -699,7 +699,7 @@ async function pickNpc(enc) {
             <span class="dm-species-meta">Lv ${n.level || 1}${n.role ? ` · ${escapeHtml(n.role)}` : ''}${n.faction ? ` · ${escapeHtml(n.faction)}` : ''} · ${(n.team || []).filter(t => t.species).length} Pokémon</span></span>
         </button>`).join('')}</div>`,
     onOpen: (body, close) => {
-      body.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">🎭</span>'; });
+      body.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">👤</span>'; });
       body.querySelector('#npcPickSearch').addEventListener('input', (e) => {
         const q = e.target.value.trim().toLowerCase();
         body.querySelectorAll('[data-npc]').forEach(b => { b.hidden = !!q && !b.dataset.search.includes(q); });

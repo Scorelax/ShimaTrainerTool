@@ -16,7 +16,7 @@ import { renderScene, BATTLE_PICTURES, SCREEN_RATIO } from '../utils/display-sce
 import { escapeHtml, getSpecies, newId, toast, openDmModal } from './dm-common.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
 
-const SOURCES = { pokemon: '🐾 Pokémon', npcs: '🎭 NPCs', trainers: '👥 Trainers', backgrounds: '🖼️ Backgrounds' };
+const SOURCES = { pokemon: '🐾 Pokémon', npcs: '👤 NPCs', trainers: '👥 Trainers', backgrounds: '🖼️ Backgrounds' };
 const KIND_LABEL = { pokemon: 'Pokémon', npc: 'NPC', trainer: 'Trainer', image: 'Picture' };
 const IS_VIDEO = /\.mp4(\?|$)/i;
 const MAX_RESULTS = 150;

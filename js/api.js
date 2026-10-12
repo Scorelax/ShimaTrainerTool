@@ -1309,6 +1309,38 @@ export class DmAPI {
   static async giveMoney(trainer, amount) {
     return API.request('dm', 'give-money', { trainer, amount }, { useCache: false });
   }
+
+  /** The world clock ({year, month, day, hour, minute, weather, events, timers}) or null before it's ever been set. */
+  static async getClock() {
+    return API.request('dm', 'get-clock', {}, { useCache: false });
+  }
+
+  static async saveClock(clock) {
+    return DmAPI._post('clock', { clock }, 'Saving the clock');
+  }
+
+  /** The NPC library, sorted by name. */
+  static async npcs() {
+    return API.request('dm', 'npcs', {}, { useCache: false });
+  }
+
+  /** Saves one NPC (new or changed); resolves to the stored copy. */
+  static async saveNpc(npc) {
+    return (await DmAPI._post('npc', { npc }, 'Saving the NPC')).data;
+  }
+
+  static async deleteNpc(id) {
+    return API.request('dm', 'delete-npc', { id }, { useCache: false });
+  }
+
+  static async _post(path, body, what) {
+    const res = await fetch(`${API_CONFIG.baseUrl}/dm/${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'success') throw new Error(data.error || `${what} failed (${res.status})`);
+    return data;
+  }
 }
 
 // ============================================================================

@@ -378,6 +378,104 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-custom-item summary { cursor: pointer; color: var(--dm-muted); margin-bottom: 0.4rem; }
 .dm-custom-item .dm-input { margin-bottom: 0.4rem; }
 
+/* ---- Top bar: world clock + timers ---- */
+.dm-top-clock, .dm-top-timer {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.7rem; border-radius: 9px; cursor: pointer; font: inherit;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--dm-line); color: var(--dm-text); white-space: nowrap;
+}
+.dm-top-clock:hover, .dm-top-timer:hover { border-color: rgba(255, 215, 0, 0.45); }
+.dm-top-date { font-size: 0.82rem; color: var(--dm-muted); }
+.dm-top-time { font-size: 1.05rem; font-weight: 800; color: var(--dm-gold); font-variant-numeric: tabular-nums; }
+.dm-top-phase { font-size: 0.78rem; color: var(--dm-muted); }
+.dm-top-weather { font-size: 1.1rem; }
+.dm-top-timer { font-size: 0.8rem; }
+.dm-top-timer strong { font-variant-numeric: tabular-nums; }
+.dm-top-timer.expired { background: rgba(231, 76, 60, 0.25); border-color: #e74c3c; animation: dm-blink 1s ease-in-out infinite; }
+@keyframes dm-blink { 50% { background: rgba(231, 76, 60, 0.5); } }
+
+/* ---- Clock module ---- */
+.dm-clock { display: grid; grid-template-columns: 370px minmax(0, 1fr) 350px; height: 100%; }
+.dm-clock-col { overflow-y: auto; padding: 1rem 1.1rem 2rem; border-right: 1px solid var(--dm-line); }
+.dm-clock-col:last-child { border-right: none; background: var(--dm-panel); }
+.dm-clock-col .dm-card-title { margin-top: 1rem; }
+.dm-clock-col .dm-card-title:first-child { margin-top: 0; }
+.dm-clock-now { background: var(--dm-panel-2); border: 1px solid var(--dm-line); border-radius: 14px; padding: 1rem; text-align: center; }
+.dm-clock-date { font-size: 1.35rem; font-weight: 800; }
+.dm-clock-formal { font-size: 0.82rem; color: var(--dm-muted); margin-top: 0.15rem; }
+.dm-clock-tags { display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap; margin: 0.5rem 0; }
+.dm-clock-time { font-size: 3rem; font-weight: 800; color: var(--dm-gold); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.dm-clock-time span { display: block; font-size: 0.95rem; font-weight: 600; color: var(--dm-muted); }
+.dm-clock-steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 0.8rem; }
+.dm-clock-phases { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+.dm-clock-phases small { color: var(--dm-muted); font-weight: 500; }
+.dm-clock-set { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; align-items: end; }
+.dm-clock-set label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.68rem; font-weight: 700; color: var(--dm-muted); text-transform: uppercase; }
+.dm-clock-foot { display: flex; gap: 0.4rem; justify-content: space-between; margin-top: 1.4rem; padding-top: 0.8rem; border-top: 1px solid var(--dm-line); }
+.dm-cal-head { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.7rem; }
+.dm-cal-title { flex: 1; text-align: center; display: flex; flex-direction: column; }
+.dm-cal-title strong { font-size: 1.15rem; color: var(--dm-gold); }
+.dm-cal-title small { color: var(--dm-muted); font-size: 0.76rem; }
+.dm-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dm-cal-wd { text-align: center; font-size: 0.7rem; font-weight: 800; color: var(--dm-muted); text-transform: uppercase; padding-bottom: 0.2rem; }
+.dm-cal-day {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; min-height: 74px; padding: 0.35rem 0.4rem; text-align: left;
+  background: var(--dm-panel); border: 1px solid var(--dm-line); border-radius: 8px; color: inherit; font: inherit; cursor: pointer; min-width: 0;
+}
+.dm-cal-day:hover { border-color: rgba(255, 255, 255, 0.3); }
+.dm-cal-day.today { border-color: var(--dm-gold); background: rgba(255, 215, 0, 0.08); }
+.dm-cal-day.selected { box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.8); }
+.dm-cal-num { font-weight: 800; font-size: 0.95rem; }
+.dm-cal-day.today .dm-cal-num { color: var(--dm-gold); }
+.dm-cal-marks { font-size: 0.78rem; }
+.dm-cal-first { font-size: 0.68rem; color: var(--dm-muted); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-cal-dayview { margin-top: 0.9rem; background: var(--dm-panel-2); border: 1px solid var(--dm-line); border-radius: 12px; padding: 0.8rem; }
+.dm-cal-dayhead { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.dm-cal-item { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 8px; margin-bottom: 0.35rem; background: rgba(255, 255, 255, 0.04); font-size: 0.88rem; }
+.dm-cal-item.fest { background: rgba(255, 215, 0, 0.1); }
+.dm-cal-item.bday { background: rgba(232, 67, 147, 0.12); }
+.dm-cal-notes { font-size: 0.8rem; color: var(--dm-muted); white-space: pre-wrap; margin-top: 0.2rem; }
+.dm-cal-form { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
+.dm-cal-up { display: flex; gap: 0.6rem; font-size: 0.86rem; padding: 0.3rem 0; border-top: 1px solid var(--dm-line); }
+.dm-cal-up span { width: 170px; flex: none; color: var(--dm-muted); font-size: 0.78rem; }
+.dm-clock-timerhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
+.dm-clock-timerhead .dm-card-title { margin: 0; }
+.dm-timer { background: var(--dm-panel-2); border: 1px solid var(--dm-line); border-radius: 12px; padding: 0.7rem; margin-bottom: 0.6rem; }
+.dm-timer.expired { border-color: #e74c3c; background: rgba(231, 76, 60, 0.12); }
+.dm-timer-head { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
+.dm-timer-head .dm-icon-btn:not(.on) { opacity: 0.35; }
+.dm-timer-value { font-size: 1.8rem; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; color: var(--dm-muted); margin: 0.3rem 0 0.1rem; }
+.dm-timer-value.running { color: var(--dm-gold); }
+.dm-timer.expired .dm-timer-value { color: #e74c3c; }
+.dm-timer-src { text-align: center; font-size: 0.72rem; color: var(--dm-muted); margin-bottom: 0.5rem; }
+.dm-timer-btns { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.dm-timer-form { display: flex; flex-direction: column; gap: 0.45rem; border-color: rgba(255, 215, 0, 0.4); }
+.dm-timer-dur { display: flex; gap: 0.4rem; }
+.dm-timer-dur[hidden] { display: none; }
+.dm-timer-dur label { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.7rem; color: var(--dm-muted); }
+
+/* ---- NPC module ---- */
+.dm-npc-thumb { border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.25); }
+.dm-npc-thumb img, .dm-npc-thumb video { object-fit: cover; }
+.dm-npc-emoji { font-size: 1.3rem; }
+.dm-npc-emoji.big { font-size: 3rem; }
+.dm-npc-dot { width: 10px; height: 10px; border-radius: 50%; }
+.dm-npc-head { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 1rem; align-items: start; margin-bottom: 1rem; }
+.dm-npc-portrait { width: 130px; height: 130px; border-radius: 16px; overflow: hidden; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; }
+.dm-npc-portrait img, .dm-npc-portrait video { width: 100%; height: 100%; object-fit: cover; }
+.dm-npc-name { font-size: 1.4rem; font-weight: 800; color: var(--dm-gold); margin-bottom: 0.5rem; }
+.dm-npc-headmain .dm-field[hidden] { display: none; }
+.dm-npc-actions { display: flex; flex-direction: column; gap: 0.4rem; }
+.dm-npc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 0.9rem; }
+.dm-npc-grid textarea.dm-input { resize: vertical; font-family: inherit; }
+.dm-npc-team { grid-column: 1 / -1; }
+.dm-stat-grid.six { grid-template-columns: repeat(6, 1fr); }
+.dm-npc-listrow { display: grid; grid-template-columns: 1fr 28px; gap: 0.3rem; margin-bottom: 0.55rem; }
+.dm-npc-listrow textarea, .dm-npc-listrow input[data-k="description"] { grid-column: 1 / -1; }
+.dm-npc-listrow.inv { grid-template-columns: 1fr 70px 28px; }
+.dm-npc-addmon { margin-top: 0.6rem; }
+.dm-npc-addmon .dm-cs-species { max-height: 300px; margin-top: 0.35rem; }
+.dm-npc-addmon .dm-cs-species[hidden] { display: none; }
+
 /* A dropdown with a checkbox per option (saving throws, skills) -- dm-common.js's multiSelectHtml. */
 .dm-multi { position: relative; }
 .dm-multi-btn {

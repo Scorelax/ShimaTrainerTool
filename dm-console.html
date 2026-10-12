@@ -14,7 +14,7 @@
     <header class="dm-topbar">
       <div class="dm-brand"><img src="assets/AppIcon.png" alt=""><span>DM Console</span></div>
       <div class="dm-status" id="dmStatus">Connecting…</div>
-      <!-- Room for the world clock, weather and other counters (coming with those modules). -->
+      <!-- The world clock and weather, plus timers that are pinned or done (world-clock.js). -->
       <div class="dm-topbar-widgets" id="dmTopWidgets"></div>
     </header>
 
@@ -22,15 +22,17 @@
       <button class="dm-rail-btn active" data-module="battle" title="Battle"><img src="assets/VS.png" alt="">Battle</button>
       <button class="dm-rail-btn" data-module="party" title="Party"><span>👥</span>Party</button>
       <button class="dm-rail-btn" data-module="pokedex" title="Pokédex"><span>📖</span>Pokédex</button>
-      <button class="dm-rail-btn" data-module="npcs" disabled title="Coming later"><span>🎭</span>NPCs</button>
+      <button class="dm-rail-btn" data-module="npcs" title="NPCs"><span>🎭</span>NPCs</button>
       <button class="dm-rail-btn" data-module="encounters" disabled title="Coming later"><span>🗺️</span>Encounters</button>
-      <button class="dm-rail-btn" data-module="clock" disabled title="Coming later"><span>🕰️</span>Clock</button>
+      <button class="dm-rail-btn" data-module="clock" title="Clock"><span>🕰️</span>Clock</button>
       <button class="dm-rail-btn" data-module="reference" disabled title="Coming later"><span>📚</span>Reference</button>
     </nav>
 
     <main class="dm-main">
       <section class="dm-module dm-view" id="dmModuleParty" hidden></section>
       <section class="dm-module" id="dmModulePokedex" hidden></section>
+      <section class="dm-module" id="dmModuleNpcs" hidden></section>
+      <section class="dm-module" id="dmModuleClock" hidden></section>
       <section class="dm-module" id="dmModuleBattle">
         <!-- No battle running: the setup (overview, map setup, battle setup). -->
         <div class="dm-view" id="dmView"><div class="dm-loading">Loading…</div></div>

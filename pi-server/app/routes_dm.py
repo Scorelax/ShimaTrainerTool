@@ -16,6 +16,8 @@ from .routes_pokemon import apply_registration_stats
 # The DM's battle setup (map + creatures) waiting for Start battle -- one at a time, in the dm_state table. It stays after
 # the battle starts (and ends), so the same setup can be run again or tweaked; New setup clears it.
 _SETUP_KEY = 'battle-setup'
+# The Shima world clock (date, time, weather, calendar events, timers) -- js/dm/world-clock.js owns its shape.
+_CLOCK_KEY = 'world-clock'
 _STAT_KEYS = ('str', 'dex', 'con', 'int', 'wis', 'cha')
 
 # Encyclopedia (upstream pokemon DB) row indices used below -- see pokedex.py's _format_row for the full layout.
@@ -67,6 +69,21 @@ def handle(conn, action, params):
         if not params.get('trainer'):
             raise ValueError('Missing trainer')
         return give_money(conn, params['trainer'], js_parse_int(params.get('amount')) or 0)
+
+    if action == 'get-clock':
+        return {'status': 'success', 'data': _load_state(conn, _CLOCK_KEY)}
+
+    if action == 'npcs':
+        return {'status': 'success', 'data': list_npcs(conn)}
+
+    if action == 'delete-npc':
+        if not params.get('id'):
+            raise ValueError('Missing id')
+        conn.execute('DELETE FROM dm_npcs WHERE id = ?', (params['id'],))
+        conn.commit()
+        from . import live
+        live.publish({'type': 'dm-npcs'})
+        return {'status': 'success'}
 
     if action == 'get-setup':
         return {'status': 'success', 'data': load_setup(conn)}
@@ -233,9 +250,40 @@ def give_money(conn, trainer_name, amount):
     return {'status': 'success', 'money': new_value}
 
 
-def load_setup(conn):
-    row = conn.execute('SELECT json FROM dm_state WHERE key = ?', (_SETUP_KEY,)).fetchone()
+def _load_state(conn, key):
+    row = conn.execute('SELECT json FROM dm_state WHERE key = ?', (key,)).fetchone()
     return json.loads(row[0]) if row and row[0] else None
+
+
+def save_clock(conn, clock):
+    """Stores the whole world clock the DM console sends (POST /api/dm/clock) -- the console is the only writer."""
+    if not isinstance(clock, dict) or not all(isinstance(clock.get(k), int) for k in ('year', 'month', 'day', 'hour', 'minute')):
+        raise ValueError('clock needs year, month, day, hour and minute')
+    conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
+                 (_CLOCK_KEY, json.dumps(clock), datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+
+
+def list_npcs(conn):
+    """The DM's NPC library (js/dm/npcs.js owns the shape), sorted by name."""
+    npcs = [json.loads(r[0]) for r in conn.execute('SELECT json FROM dm_npcs').fetchall() if r[0]]
+    return sorted(npcs, key=lambda n: str(n.get('name', '')).lower())
+
+
+def save_npc(conn, npc):
+    """Stores one NPC (POST /api/dm/npc), new or changed -- keyed by its `id`."""
+    if not isinstance(npc, dict) or not str(npc.get('id', '')).strip():
+        raise ValueError('npc needs an id')
+    now = datetime.now(timezone.utc).isoformat()
+    npc['updatedAt'] = now
+    conn.execute('INSERT OR REPLACE INTO dm_npcs (id, json, updated_at) VALUES (?, ?, ?)',
+                 (str(npc['id']), json.dumps(npc, ensure_ascii=False), now))
+    conn.commit()
+    return npc
+
+
+def load_setup(conn):
+    return _load_state(conn, _SETUP_KEY)
 
 
 def save_setup(conn, setup):

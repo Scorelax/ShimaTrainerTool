@@ -135,6 +135,12 @@ export function abilityMod(score) {
   return Math.floor(((Number(score) || 10) - 10) / 2);
 }
 
+/** A trainer's HP at a level -- a d8 hit die: 8 + CON at 1st level, then 5 + CON per level. */
+export function trainerHp(level, con) {
+  const mod = abilityMod(con);
+  return Math.max(1, 8 + mod + (Math.max(1, level) - 1) * (5 + mod));
+}
+
 export function proficiencyForLevel(level) {
   return 2 + Math.floor((Math.max(1, Number(level) || 1) - 1) / 4);
 }

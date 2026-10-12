@@ -11,7 +11,7 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import {
-  escapeHtml, typeBadges, getSpecies, newId, participantFromPokemonRow, participantFromTrainer, abilityMod,
+  escapeHtml, typeBadges, getSpecies, newId, participantFromPokemonRow, participantFromTrainer, trainerHp,
   natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect,
 } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
@@ -45,6 +45,7 @@ export async function renderCreatureSetup(root, { onDone }) {
           <button class="dm-btn primary" id="csAddPokemon">+ Pokémon</button>
           <button class="dm-btn" id="csAddTrainer">+ NPC trainer</button>
         </div>
+        <button class="dm-btn wide" id="csFromNpc">🎭 + From the NPC library</button>
         <div id="csList" class="dm-cs-list"></div>
       </aside>
       <section class="dm-editor-canvas dm-cs-work">
@@ -58,6 +59,7 @@ export async function renderCreatureSetup(root, { onDone }) {
   document.getElementById('csBack').addEventListener('click', leave);
   document.getElementById('csAddPokemon').addEventListener('click', () => edit({ mode: 'new-pokemon' }));
   document.getElementById('csAddTrainer').addEventListener('click', () => edit({ mode: 'new-trainer' }));
+  document.getElementById('csFromNpc').addEventListener('click', () => edit({ mode: 'from-npc' }));
   document.getElementById('csList').addEventListener('click', (e) => {
     const row = e.target.closest('[data-creature]');
     if (!row) return;
@@ -140,7 +142,7 @@ function renderMap() {
   const hint = document.getElementById('csMapHint');
   if (hint) {
     hint.textContent = !sel
-      ? (_editing?.mode === 'new-pokemon' || _editing?.mode === 'new-trainer' ? 'Add it to the battle first, then click the map to place it.' : 'Pick someone on the left (or click a token) to place them on the map.')
+      ? (['new-pokemon', 'new-trainer', 'from-npc'].includes(_editing?.mode) ? 'Add it to the battle first, then click the map to place it.' : 'Pick someone on the left (or click a token) to place them on the map.')
       : sel.heldBack ? `${sel.name} is held back -- it joins later and doesn't start on the map.`
         : `Click a square to place ${sel.name}${sel.position ? ' somewhere else' : ''}.`;
   }
@@ -211,6 +213,7 @@ function edit(target) {
     box.innerHTML = '<div class="dm-cs-empty">Pick someone on the left to change them, or add a Pokémon or NPC trainer.</div>';
     return;
   }
+  if (target.mode === 'from-npc') return renderNpcPicker(box);
   if (target.mode === 'new-pokemon' && !target.species) return renderSpeciesPicker(box);
   if (target.mode === 'new-pokemon' || target.mode === 'pokemon') return renderPokemonForm(box);
   return renderTrainerForm(box);
@@ -528,12 +531,6 @@ function defaultTrainer() {
   return { name: '', image: '', level: 5, str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, ac: 10, maxHP: 0, maxVP: 10, speed: 30, savingThrows: '', skills: '', initiative: null };
 }
 
-/** A trainer's HP at a level -- a d8 hit die: 8 + CON at 1st level, then 5 + CON per level. */
-function trainerHp(level, con) {
-  const mod = abilityMod(con);
-  return Math.max(1, 8 + mod + (Math.max(1, level) - 1) * (5 + mod));
-}
-
 function renderTrainerForm(box) {
   const isNew = _editing.mode === 'new-trainer';
   const c = isNew ? null : selectedCreature();
@@ -639,4 +636,73 @@ function saveTrainer(existing) {
     if (i >= 0) s.creatures[i] = creature; else s.creatures.unshift(creature);
   });
   edit({ mode: 'trainer', id: creature.id });
+}
+
+// ---------------------------------------------------------------------------
+// From the NPC library (npcs.js): the NPC as a trainer, with their team as their Pokemon
+// ---------------------------------------------------------------------------
+
+async function renderNpcPicker(box) {
+  box.innerHTML = '<h3 class="dm-cs-title">Add an NPC from the library</h3><div class="dm-cs-species" id="csNpcs"><div class="dm-species-empty">Loading the NPCs…</div></div>';
+  let npcs = [];
+  try { npcs = (await DmAPI.npcs()).data || []; } catch (err) { /* shown as empty below */ }
+  const list = document.getElementById('csNpcs');
+  if (!list || _editing?.mode !== 'from-npc') return;
+  const inSetup = new Set(getSetup().creatures.map(c => c.npcId).filter(Boolean));
+  list.innerHTML = npcs.length ? npcs.map(n => `
+    <button type="button" class="dm-species-item" data-npc="${escapeHtml(n.id)}">
+      <span class="dm-species-thumb" data-img="${escapeHtml(n.image || '')}"></span>
+      <span>
+        <span class="dm-species-name">${escapeHtml(n.name)}${inSetup.has(n.id) ? ' <small class="dm-warn-text">(already in this battle)</small>' : ''}</span>
+        <span class="dm-species-meta">Lv ${n.level || 1}${n.role ? ` · ${escapeHtml(n.role)}` : ''}${n.faction ? ` · ${escapeHtml(n.faction)}` : ''} ·
+          ${(n.team || []).filter(m => m.species).map(m => escapeHtml(m.nickname || m.species)).join(', ') || 'no Pokémon'}</span>
+      </span>
+    </button>`).join('') : '<div class="dm-species-empty">No NPCs yet -- make them in the NPCs module.</div>';
+  list.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span style="font-size:1.5rem">🎭</span>'; });
+  list.addEventListener('click', async (e) => {
+    const item = e.target.closest('[data-npc]');
+    const npc = item && npcs.find(n => n.id === item.dataset.npc);
+    if (!npc || _busy) return;
+    _busy = true;
+    item.querySelector('.dm-species-meta').textContent = 'Adding…';
+    try {
+      const { trainer } = await addNpcToSetup(npc);
+      edit({ mode: 'trainer', id: trainer.id });
+    } catch (err) {
+      showCombatAlert(err.message, { title: `Couldn't add ${npc.name}` });
+      renderNpcPicker(box);
+    } finally {
+      _busy = false;
+    }
+  });
+}
+
+/** Adds an NPC from the library to the battle setup: the NPC as an NPC trainer, each Pokemon of their team built at
+ * its level, nature and abilities (with any stats the DM gave it) and belonging to them. Nobody is placed yet. */
+export async function addNpcToSetup(npc) {
+  const level = Math.max(1, Math.min(20, Number(npc.level) || 1));
+  const config = {
+    name: npc.name || 'Trainer', image: npc.image || '', level,
+    ...Object.fromEntries(STATS.map(k => [k, Number(npc[k]) || 10])),
+    ac: Number(npc.ac) || 10, maxHP: Number(npc.maxHP) || trainerHp(level, Number(npc.con) || 10),
+    maxVP: Number(npc.maxVP) || 0, speed: Number(npc.speed) || 30,
+    savingThrows: npc.savingThrows || '', skills: npc.skills || '', initiative: null,
+  };
+  const { combatant, participant } = participantFromTrainer(config);
+  participant.initiative = null;
+  const trainer = {
+    id: newId(), kind: 'trainer', name: config.name, config, participant, npcId: npc.id,
+    initiativeBonus: combatant.initiativeTotal || 0, heldBack: false, position: null,
+  };
+  const pokemon = [];
+  for (const m of (npc.team || []).filter(x => x.species)) {
+    const cfg = {
+      level: Math.max(1, Math.min(20, Number(m.level) || 1)), nature: m.nature || '', abilities: m.abilities?.length ? m.abilities : [0],
+      item: m.item || '', shiny: !!m.shiny, initiative: null, stats: m.stats || {}, overrides: {}, extraSkills: [],
+    };
+    pokemon.push(await buildPokemonCreature(newId(), m.species, m.nickname || m.species, cfg, { trainerId: trainer.id, heldBack: false, position: null }));
+  }
+  updateSetup(s => { s.creatures.unshift(trainer); s.creatures.push(...pokemon); });
+  await flushSetup();
+  return { trainer, pokemon };
 }

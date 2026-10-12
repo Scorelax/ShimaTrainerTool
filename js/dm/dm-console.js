@@ -18,6 +18,9 @@ import { renderCreatureSetup } from './creature-setup.js';
 import { mountLive, updateLive } from './battle-live.js';
 import { renderPokedex, pokedexHasUnsaved } from './pokedex.js';
 import { renderParty } from './party.js';
+import { renderNpcs, npcsHaveUnsaved } from './npcs.js';
+import { renderClock } from './clock.js';
+import { loadClock, renderTopWidget, tickTurnTimers } from './world-clock.js';
 
 enableDmMode(DM);
 
@@ -35,11 +38,12 @@ async function init() {
   initLiveUpdates();
   const view = document.getElementById('dmView');
   try {
-    await Promise.all([loadGameData(), loadSetup()]);
+    await Promise.all([loadGameData(), loadSetup(), loadClock()]);
   } catch (err) {
     view.innerHTML = `<div class="dm-loading">Couldn't load: ${escapeHtml(err.message)}</div>`;
     return;
   }
+  renderTopWidget(document.getElementById('dmTopWidgets'), () => showModule('clock'));
   const res = await CombatAPI.getState().catch(() => null);
   if (res?.status === 'success') session = res.data;
   route();
@@ -57,16 +61,17 @@ async function init() {
     if (btn) showModule(btn.dataset.module);
   });
   window.addEventListener('beforeunload', (e) => {
-    if (pokedexHasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
+    if (pokedexHasUnsaved() || npcsHaveUnsaved()) { e.preventDefault(); e.returnValue = ''; }
   });
 }
 
 // ---------------------------------------------------------------------------
-// Modules (the rail on the left): Battle, Party, Pokedex. The battle keeps running in its own section while another
-// module is open; Party is fetched fresh every time it's opened, the Pokedex keeps where the DM was.
+// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock. The battle keeps running in its own section
+// while another module is open; Party is fetched fresh every time it's opened, the Clock is redrawn (the time may have
+// moved), the Pokedex and NPCs keep where the DM was.
 // ---------------------------------------------------------------------------
 
-const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex' };
+const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock' };
 const _moduleOpened = new Set(['battle']);
 
 function showModule(name) {
@@ -74,8 +79,19 @@ function showModule(name) {
   document.querySelectorAll('#dmRail [data-module]').forEach(b => b.classList.toggle('active', b.dataset.module === name));
   const section = document.getElementById(MODULES[name]);
   if (name === 'party') renderParty(section);
+  else if (name === 'clock') renderClock(section);
   else if (name === 'pokedex' && !_moduleOpened.has('pokedex')) renderPokedex(section);
+  else if (name === 'npcs' && !_moduleOpened.has('npcs')) renderNpcs(section);
   _moduleOpened.add(name);
+}
+
+// Turn timers (Clock module) move by one each time the running battle passes to the next turn.
+let _lastTurn = null;
+function watchTurns(s) {
+  if (!s?.active || !s.started) { _lastTurn = null; return; }
+  const key = (Number(s.round) || 0) * 1000 + (Number(s.turnIndex) || 0);
+  if (_lastTurn !== null && key > _lastTurn) tickTurnTimers(1);
+  _lastTurn = key;
 }
 
 /** The game data the battle screen reads from sessionStorage -- the same keys the player app stores at login
@@ -99,6 +115,7 @@ async function loadGameData() {
 
 /** Shows whatever fits the current state: the running battle while there is one, otherwise the setup. */
 function route() {
+  watchTurns(session);
   renderStatus();
   const view = document.getElementById('dmView');
   const live = document.getElementById('dmLive');

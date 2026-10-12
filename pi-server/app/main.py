@@ -201,6 +201,35 @@ def save_dm_setup(payload: dict):
     return JSONResponse({'status': 'success'})
 
 
+@app.post('/api/dm/clock')
+def save_dm_clock(payload: dict):
+    """The DM console's world clock (routes_dm.save_clock), pushed to every open DM console so they stay in step."""
+    conn = db.connect()
+    try:
+        routes_dm.save_clock(conn, payload.get('clock'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    live.publish({'type': 'dm-clock', 'clock': payload.get('clock')})
+    return JSONResponse({'status': 'success'})
+
+
+@app.post('/api/dm/npc')
+def save_dm_npc(payload: dict):
+    """One NPC from the DM console's NPC library (routes_dm.save_npc) -- a POST, since a full NPC with a team and a
+    backstory is far longer than a query string."""
+    conn = db.connect()
+    try:
+        npc = routes_dm.save_npc(conn, payload.get('npc'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    live.publish({'type': 'dm-npcs', 'id': npc['id']})
+    return JSONResponse({'status': 'success', 'data': npc})
+
+
 @app.post('/api/dm/pokedex-config')
 def save_dm_pokedex_config(payload: dict):
     """The DM console's Pokedex module: what the players may see of each species (pokedexConfig -- registered,

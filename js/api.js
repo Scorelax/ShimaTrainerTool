@@ -1234,7 +1234,7 @@ export class DmAPI {
    * shape or the pictures change, so no device keeps an old copy.) */
   static async speciesList() {
     return API.request('dm', 'species-list', {}, {
-      cacheKey: 'dm:species-list-v3', useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT,
+      cacheKey: 'dm:species-list-v4', useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT,
     });
   }
 

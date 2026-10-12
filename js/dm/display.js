@@ -266,6 +266,7 @@ async function loadSource(name) {
       still: s.picture || '', animated: IS_VIDEO.test(s.image || '') ? s.image : '',
       search: `${s.name} ${s.type1} ${s.type2} ${s.dex}`.toLowerCase(),
     }));
+    refreshSpriteUrls();
   } else if (name === 'npcs') {
     _data.npcs = ((await DmAPI.npcs()).data || []).map(n => ({
       key: n.id, kind: 'npc', label: n.name || 'NPC', sub: n.role || n.location || '', still: n.image || '', animated: '',
@@ -279,6 +280,20 @@ async function loadSource(name) {
     _data.backgrounds = (await DmAPI.displayImages()).data || [];
   }
   return _data[name];
+}
+
+/** A sprite file replaced on the Pi (strip_sprite_audio.sh, a new export) gets a new `?t=` in its URL, but pictures
+ * already on the display still point at the old one, which browsers keep cached -- they're moved to the current one. */
+function refreshSpriteUrls() {
+  const base = url => String(url).split('?')[0];
+  const current = new Map(_data.pokemon.filter(e => e.animated).map(e => [base(e.animated), e.animated]));
+  const stale = getScene().items.filter(i => i.animated && current.has(base(i.animated)) && current.get(base(i.animated)) !== i.animated);
+  if (!stale.length) return;
+  updateScene(() => stale.forEach((i) => {
+    const now = current.get(base(i.animated));
+    if (i.src === i.animated) i.src = now;
+    i.animated = now;
+  }));
 }
 
 async function drawSource() {

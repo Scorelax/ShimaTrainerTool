@@ -18,6 +18,11 @@ from .routes_pokemon import apply_registration_stats
 _SETUP_KEY = 'battle-setup'
 # The Shima world clock (date, time, weather, calendar events, timers) -- js/dm/world-clock.js owns its shape.
 _CLOCK_KEY = 'world-clock'
+# Smaller DM-only records the console reads and writes whole (get-state / POST /api/dm/state), each owned by one module:
+# the encounter loaded into the battle (its events, notes, terrain and weather -- js/dm/encounters.js), the last PvE
+# battle that ended (routes_combat._remember_battle, marked done by the aftermath), saved Pokemon for reuse, species left
+# out of the random generators, and the XP ledger (XP is DM-only -- never in the players' records).
+_STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'xp-ledger'}
 _STAT_KEYS = ('str', 'dex', 'con', 'int', 'wis', 'cha')
 
 # Encyclopedia (upstream pokemon DB) row indices used below -- see pokedex.py's _format_row for the full layout.
@@ -84,6 +89,21 @@ def handle(conn, action, params):
         from . import live
         live.publish({'type': 'dm-npcs'})
         return {'status': 'success'}
+
+    if action == 'encounters':
+        return {'status': 'success', 'data': list_encounters(conn)}
+
+    if action == 'delete-encounter':
+        if not params.get('id'):
+            raise ValueError('Missing id')
+        conn.execute('DELETE FROM dm_encounters WHERE id = ?', (params['id'],))
+        conn.commit()
+        return {'status': 'success'}
+
+    if action == 'get-state':
+        if params.get('key') not in _STATE_KEYS:
+            raise ValueError('Unknown state: ' + str(params.get('key')))
+        return {'status': 'success', 'data': _load_state(conn, params['key'])}
 
     if action == 'get-setup':
         return {'status': 'success', 'data': load_setup(conn)}
@@ -282,6 +302,60 @@ def save_npc(conn, npc):
     return npc
 
 
+def list_encounters(conn):
+    """The DM's saved encounters (js/dm/encounters.js owns the shape), newest change first."""
+    out = [json.loads(r[0]) for r in conn.execute('SELECT json FROM dm_encounters ORDER BY updated_at DESC').fetchall() if r[0]]
+    return out
+
+
+def save_encounter(conn, encounter):
+    """Stores one encounter (POST /api/dm/encounter), new or changed -- keyed by its `id`."""
+    if not isinstance(encounter, dict) or not str(encounter.get('id', '')).strip():
+        raise ValueError('encounter needs an id')
+    now = datetime.now(timezone.utc).isoformat()
+    encounter['updatedAt'] = now
+    conn.execute('INSERT OR REPLACE INTO dm_encounters (id, json, updated_at) VALUES (?, ?, ?)',
+                 (str(encounter['id']), json.dumps(encounter, ensure_ascii=False), now))
+    conn.commit()
+    return encounter
+
+
+def save_state(conn, key, data):
+    """Stores one of the console's small records (_STATE_KEYS) whole, or clears it (None)."""
+    if key not in _STATE_KEYS:
+        raise ValueError('Unknown state: ' + str(key))
+    conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
+                 (key, json.dumps(data, ensure_ascii=False) if data is not None else None, datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+
+
+def give_pokemon(conn, trainer, cfg):
+    """The aftermath's "give to trainer": a Pokemon the players caught goes straight into that trainer's team -- built
+    the way the DM set it up (species, level, nature, abilities, held item, shiny, any ability scores the DM gave it),
+    with the same maths a player's own registration runs, stored with its static picture like register does."""
+    from . import db, live
+    tname = next((r[1] for _, r in db.fetch_rows(conn, 'trainers', db.TRAINER_COLUMNS) if str(r[1]).lower() == str(trainer).lower()), None)
+    if not tname:
+        raise ValueError('Unknown trainer: ' + str(trainer))
+    species = str((cfg or {}).get('species') or '').strip()
+    if not species:
+        raise ValueError('Missing species')
+    # The app finds a trainer's Pokemon by trainer + species name, so a second one of the same species would clash.
+    if any(str(r[0]).lower() == tname.lower() and str(r[2]).lower() == species.lower()
+           for _, r in db.fetch_rows(conn, 'pokemon', db.POKEMON_COLUMNS)):
+        raise ValueError(f'{tname} already has a {species} -- a trainer can only have one of each species in the app.')
+    row = build_pokemon(
+        conn, species, js_parse_int(cfg.get('level')), nature=cfg.get('nature') or '',
+        ability_slots=[str(s) for s in (cfg.get('abilities') or [0])], nickname=cfg.get('nickname') or '',
+        held_item=cfg.get('item') or '', shiny=bool(cfg.get('shiny')), stats=cfg.get('stats') or None,
+        extra_skills=cfg.get('extraSkills') or ())
+    row[0] = tname
+    row[1] = upstream.get_image_url(conn, row[2], row[3]) or ''
+    db.insert_row(conn, 'pokemon', db.POKEMON_COLUMNS, row)
+    live.publish({'type': 'trainer-data', 'trainer': tname})
+    return {'status': 'success', 'message': f'{tname} got {cfg.get("nickname") or row[2]}!', 'data': row}
+
+
 def load_setup(conn):
     return _load_state(conn, _SETUP_KEY)
 
@@ -336,6 +410,7 @@ def species_list(conn):
             'type1': _cell(row, 7), 'type2': _cell(row, 8),
             'size': _cell(row, 9), 'rarity': _cell(row, 10), 'habitat': _cell(row, 11),
             'behavior': _cell(row, 12), 'activity': _cell(row, 13),
+            'evolution': _cell(row, 14),  # "From: X; Evolves: Y @ Level 14" -- the encounter generator's stage filter
             'level': js_parse_int(_cell(row, 19)) or 1,
             # The encyclopedia's own numbers (before level, nature or anything the DM changes).
             'base': {

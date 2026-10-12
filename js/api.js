@@ -812,6 +812,11 @@ export class CombatAPI {
     return API.request('combat', 'set-status', { id, status }, { useCache: false });
   }
 
+  /** The DM console: a wild Pokemon the players caught leaves the battle, remembered as caught for the aftermath. */
+  static async capture(id) {
+    return API.request('combat', 'capture', { id }, { useCache: false });
+  }
+
   static async setVisibility(id, field, visible) {
     return API.request('combat', 'set-visibility', { id, field, visible: visible ? 1 : 0 }, { useCache: false });
   }
@@ -1224,10 +1229,11 @@ export class CombatAPI {
 
 export class DmAPI {
   /** Every species in the encyclopedia (not only the ones unlocked for players), as compact summaries for the
-   * enemy picker: {name, dex, type1, type2, size, rarity, habitat, behavior, activity, level, abilities, image}. */
+   * enemy picker: {name, dex, type1, type2, size, rarity, habitat, behavior, activity, evolution, level, abilities,
+   * image}. (The cache key's version goes up when the shape or the pictures change, so no device keeps an old copy.) */
   static async speciesList() {
     return API.request('dm', 'species-list', {}, {
-      cacheKey: 'dm:species-list', useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT,
+      cacheKey: 'dm:species-list-v2', useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT,
     });
   }
 
@@ -1331,6 +1337,36 @@ export class DmAPI {
 
   static async deleteNpc(id) {
     return API.request('dm', 'delete-npc', { id }, { useCache: false });
+  }
+
+  /** The encounter library, newest change first. */
+  static async encounters() {
+    return API.request('dm', 'encounters', {}, { useCache: false });
+  }
+
+  /** Saves one encounter (new or changed); resolves to the stored copy. */
+  static async saveEncounter(encounter) {
+    return (await DmAPI._post('encounter', { encounter }, 'Saving the encounter')).data;
+  }
+
+  static async deleteEncounter(id) {
+    return API.request('dm', 'delete-encounter', { id }, { useCache: false });
+  }
+
+  /** One of the console's small DM-only records ('encounter-run', 'last-battle', 'saved-pokemon',
+   * 'encounter-exclusions', 'xp-ledger') -- null when never set. */
+  static async getState(key) {
+    return (await API.request('dm', 'get-state', { key }, { useCache: false })).data ?? null;
+  }
+
+  static async saveState(key, data) {
+    return DmAPI._post('state', { key, data }, 'Saving');
+  }
+
+  /** A caught Pokemon straight into a trainer's team: `pokemon` = {species, level, nature, abilities, item, shiny,
+   * stats, extraSkills, nickname}. */
+  static async givePokemon(trainer, pokemon) {
+    return DmAPI._post('give-pokemon', { trainer, pokemon }, 'Giving the Pokémon');
   }
 
   static async _post(path, body, what) {

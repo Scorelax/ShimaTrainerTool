@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS music_listeners (track TEXT, client_id TEXT, last_see
 CREATE TABLE IF NOT EXISTS combat_session (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT, updated_at TEXT);
 CREATE TABLE IF NOT EXISTS dm_state (key TEXT PRIMARY KEY, json TEXT, updated_at TEXT);
 CREATE TABLE IF NOT EXISTS dm_npcs (id TEXT PRIMARY KEY, json TEXT, updated_at TEXT);
+CREATE TABLE IF NOT EXISTS dm_encounters (id TEXT PRIMARY KEY, json TEXT, updated_at TEXT);
 """
 
 

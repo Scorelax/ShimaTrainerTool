@@ -20,6 +20,7 @@ import { renderPokedex, pokedexHasUnsaved } from './pokedex.js';
 import { renderParty } from './party.js';
 import { renderNpcs, npcsHaveUnsaved } from './npcs.js';
 import { renderClock } from './clock.js';
+import { renderEncounters, encountersHaveUnsaved } from './encounters.js';
 import { loadClock, renderTopWidget, tickTurnTimers } from './world-clock.js';
 
 enableDmMode(DM);
@@ -61,24 +62,31 @@ async function init() {
     if (btn) showModule(btn.dataset.module);
   });
   window.addEventListener('beforeunload', (e) => {
-    if (pokedexHasUnsaved() || npcsHaveUnsaved()) { e.preventDefault(); e.returnValue = ''; }
+    if (pokedexHasUnsaved() || npcsHaveUnsaved() || encountersHaveUnsaved()) { e.preventDefault(); e.returnValue = ''; }
   });
+  // Loading an encounter into the battle setup brings the DM back to the battle module to place everyone.
+  window.addEventListener('dm:show-module', (e) => {
+    if (e.detail?.name === 'battle' && !session?.active) { setupView = 'home'; showSetupView('home'); }
+    if (e.detail?.name) showModule(e.detail.name);
+  });
+  window.addEventListener('dm:aftermath-changed', () => { if (!session?.active && setupView === 'home') renderAftermathBanner(); });
 }
 
 // ---------------------------------------------------------------------------
-// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock. The battle keeps running in its own section
-// while another module is open; Party is fetched fresh every time it's opened, the Clock is redrawn (the time may have
-// moved), the Pokedex and NPCs keep where the DM was.
+// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Encounters, Clock. The battle keeps running in its own
+// section while another module is open; Party and Encounters are fetched fresh every time they're opened, the Clock is
+// redrawn (the time may have moved), the Pokedex and NPCs keep where the DM was.
 // ---------------------------------------------------------------------------
 
-const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock' };
+const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', encounters: 'dmModuleEncounters', clock: 'dmModuleClock' };
 const _moduleOpened = new Set(['battle']);
 
-function showModule(name) {
+function showModule(name, opts = {}) {
   Object.entries(MODULES).forEach(([key, id]) => { document.getElementById(id).hidden = key !== name; });
   document.querySelectorAll('#dmRail [data-module]').forEach(b => b.classList.toggle('active', b.dataset.module === name));
   const section = document.getElementById(MODULES[name]);
   if (name === 'party') renderParty(section);
+  else if (name === 'encounters') renderEncounters(section, opts);
   else if (name === 'clock') renderClock(section);
   else if (name === 'pokedex' && !_moduleOpened.has('pokedex')) renderPokedex(section);
   else if (name === 'npcs' && !_moduleOpened.has('npcs')) renderNpcs(section);
@@ -197,6 +205,7 @@ function renderHome(view) {
 
   view.innerHTML = `
     <div class="dm-home">
+      <div id="dmAftermathBanner"></div>
       <div class="dm-home-head">
         <div>
           <h2>Battle setup</h2>
@@ -240,6 +249,7 @@ function renderHome(view) {
     </div>`;
 
   view.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+  renderAftermathBanner();
   document.getElementById('homeMap').addEventListener('click', () => showSetupView('map'));
   document.getElementById('homeCreatures').addEventListener('click', () => showSetupView('creatures'));
   document.getElementById('homeStart').addEventListener('click', startBattle);
@@ -260,6 +270,21 @@ function renderHome(view) {
     await saveNow();
     renderHome(view);
   });
+}
+
+/** A battle ended and its aftermath isn't marked done yet: a banner over the setup to go and hand out the rewards. */
+async function renderAftermathBanner() {
+  const last = await DmAPI.getState('last-battle').catch(() => null);
+  const el = document.getElementById('dmAftermathBanner');
+  if (!el) return;
+  if (!last || last.done) { el.innerHTML = ''; return; }
+  const caught = (last.participants || []).filter(p => p.captured).length;
+  el.innerHTML = `
+    <div class="dm-after-banner">
+      <span>🏁 <strong>The last battle is over</strong> (${last.round || 1} round${last.round === 1 ? '' : 's'}${caught ? `, ${caught} caught` : ''}) -- XP, loot${caught ? ' and the caught Pokémon' : ''} are waiting in the aftermath.</span>
+      <button class="dm-btn primary small" id="dmToAftermath">Open the aftermath</button>
+    </div>`;
+  document.getElementById('dmToAftermath').addEventListener('click', () => showModule('encounters', { tab: 'aftermath' }));
 }
 
 async function saveNow() {

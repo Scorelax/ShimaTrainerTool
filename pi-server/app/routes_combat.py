@@ -239,7 +239,23 @@ def _handle(conn, action, params):
         state = load_state(conn)
         if state.get('active'):
             _log_event(state, 'session-end', text='Battle ended')
+            _remember_battle(conn, state)
         return _save_and_publish(conn, dict(_EMPTY_STATE))
+
+    if action == 'capture':
+        # The DM console's capture helper: a wild Pokemon the players caught leaves the battle (and the turn order),
+        # remembered as caught for the aftermath, where the DM hands it to the trainer who caught it.
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+
+        def _capture(s):
+            p = s['participants'].get(params['id'])
+            if not p:
+                raise ValueError('Unknown participant: ' + params['id'])
+            s.setdefault('departed', {})[p['id']] = _battle_memory(p, captured=True)
+            _remove_participant(s, p['id'])
+            _log_event(s, 'capture', text=f"{p.get('name', 'The Pokémon')} was caught!", targetId=p['id'], targetName=p.get('name'))
+        return _mutate(conn, _capture)
 
     if action == 'leave-session':
         return _leave_session(conn, params.get('owner', ''))
@@ -1262,7 +1278,38 @@ def _entered_battle(state, participant):
     _ability_auto(state, participant['id'], 'enter_battle')  # Drizzle & co., Frisk & co., Disguise
 
 
+# What the DM console's aftermath needs to know of everyone who was in a PvE battle (see _remember_battle).
+_MEMORY_FIELDS = ('id', 'name', 'owner', 'side', 'combatantType', 'speciesName', 'level', 'image', 'item', 'size',
+                  'type1', 'type2', 'dex', 'currentHP', 'maxHP', 'currentVP', 'maxVP', 'status')
+
+
+def _battle_memory(p, **flags):
+    return {**{k: p.get(k) for k in _MEMORY_FIELDS}, **flags}
+
+
+def _remember_battle(conn, state):
+    """A PvE battle that just ended, kept for the DM console's aftermath (dm_state 'last-battle'): its rounds, everyone
+    who was in it -- including whoever left or was caught before the end (state['departed']) -- and the log's lines.
+    The next PvE battle to end replaces it."""
+    if state.get('battleType') != 'pve':
+        return
+    everyone = {pid: p for pid, p in (state.get('departed') or {}).items()}
+    everyone.update({pid: _battle_memory(p) for pid, p in state.get('participants', {}).items()})
+    now = datetime.now(timezone.utc).isoformat()
+    memory = {
+        'endedAt': now, 'round': state.get('round'), 'started': bool(state.get('started')),
+        'participants': list(everyone.values()),
+        'log': [e['text'] for e in (state.get('log') or [])[-200:] if e.get('text')],
+        'done': False,
+    }
+    conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
+                 ('last-battle', json.dumps(memory), now))
+    conn.commit()
+
+
 def _remove_participant(state, pid):
+    if pid in state['participants'] and pid not in state.setdefault('departed', {}):
+        state['departed'][pid] = _battle_memory(state['participants'][pid], left=True)
     _end_source_leaves(state, pid)
     if (state.get('pendingForcedSwitch') or {}).get('pokemonId') == pid:
         state['pendingForcedSwitch'] = None
@@ -1291,11 +1338,13 @@ def _leave_session(conn, owner):
         if (state.get('pendingForcedSwitch') or {}).get('pokemonId') in leaving:
             state['pendingForcedSwitch'] = None
         for pid in leaving:
+            state.setdefault('departed', {})[pid] = _battle_memory(state['participants'][pid], left=True)
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
         _log_event(state, 'leave', text=f'{owner} left the battle', actorName=owner)
     if not any(p.get('owner') and p.get('owner') != DM_OWNER for p in state['participants'].values()):
         _log_event(state, 'session-end', text='Battle ended (all players left)')
+        _remember_battle(conn, state)
         return _save_and_publish(conn, dict(_EMPTY_STATE))
     _rebuild_turn_order(state)
     return _save_and_publish(conn, state)

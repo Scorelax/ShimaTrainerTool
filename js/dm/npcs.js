@@ -137,7 +137,7 @@ function select(id) {
   renderSheet();
 }
 
-function blankNpc() {
+export function blankNpc() {
   return {
     id: newId('npc'), name: 'New NPC', image: '', role: '', faction: '', attitude: 'neutral', location: '', region: '', species: 'Human',
     age: '', firstMet: '', birthday: null, level: 5, str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, ac: 10, maxHP: 0, maxVP: 10,

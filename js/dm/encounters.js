@@ -1,0 +1,1370 @@
+// DM console -- the Encounters module: Benjakronk's old encounter builder, rebuilt on the Pi.
+//
+// Library: encounters prepared ahead of a session (dm_encounters table) -- a name, notes and note categories, the
+// terrain and weather (they go into catching), the wild Pokemon, NPC trainers from the NPC library, round-based events,
+// and optionally a map. The old tool's random encounter / random trainer generators, saved-Pokemon library and exclusion
+// list are here too. "Load into battle setup" turns it into the battle setup (creature-setup.js), where the DM places
+// everyone and starts the battle as usual; the encounter becomes the one in play ('encounter-run'), whose events and
+// capture helper show beside the running battle (battle-live.js).
+//
+// Aftermath: after a PvE battle ends (routes_combat._remember_battle keeps it as 'last-battle'), what happened -- who
+// was defeated, caught or got away -- and what to hand out. Unlike the old tool, which exported files or called the
+// Trainer Tool's API, everything goes straight into the trainers' records here: caught Pokemon into their team, loot
+// and money into their inventory, all live-pushed to their phones. XP is DM-only (the 'xp-ledger' record, never in the
+// players' data); the old tool's XP can be imported from its trainer backup.
+import { DmAPI, CombatAPI } from '../api.js';
+import { patchPortraitMedia } from '../utils/sprite-media.js';
+import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
+import { escapeHtml, typeBadges, getSpecies, newId, toast, natureOptions, openDmModal } from './dm-common.js';
+import { getSetup, updateSetup, flushSetup, mapReady } from './setup-store.js';
+import { buildPokemonCreature, addNpcToSetup } from './creature-setup.js';
+import { blankNpc } from './npcs.js';
+import { getClock, updateClock, advanceMinutes, skipToPhase, rollWeather, formatDate, formatTime, phaseName, PHASES, WEATHER } from './world-clock.js';
+import {
+  TERRAIN, WEATHER_ROLL_MOD, XP_TO_LEVEL, levelFromXp, ROUND_SECONDS, ENCOUNTER_TEMPLATES, TRAINER_ARCHETYPES, STAT_METHODS,
+  encounterPool, generateEncounter, generateTrainer, rangePick, evolutionStage, STAGE_LABEL,
+} from './encounter-rules.js';
+
+const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
+const EVENT_ICONS = ['⚡', '🎯', '⚠️', '💥', '🔥', '❄️', '🌊', '🌪️', '⏰', '🚪', '👥', '🎭', '🏚️', '🌋'];
+const TRIGGERS = { recurring: '♻️ Every round', countdown: '⏱️ Countdown', once: '1️⃣ Once (you trigger it)' };
+const TYPES = ['Normal', 'Fire', 'Water', 'Grass', 'Electric', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy', 'Cosmic'];
+const SIZES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
+
+let _root = null;
+let _tab = 'library'; // 'library' | 'aftermath'
+let _encounters = [];
+let _selectedId = null;
+let _species = [];
+let _npcs = [];
+let _exclusions = [];
+let _saved = [];
+let _runId = null; // the encounter loaded into the battle
+const _saveTimers = new Map();
+let _saveState = 'saved';
+let _adding = false; // the species search under "Wild Pokémon" is open
+
+export async function renderEncounters(root, { tab } = {}) {
+  _root = root;
+  if (tab) _tab = tab;
+  root.innerHTML = `
+    <div class="dm-enc">
+      <div class="dm-enc-tabs">
+        <button data-tab="library" class="${_tab === 'library' ? 'active' : ''}">🗺️ Encounters</button>
+        <button data-tab="aftermath" class="${_tab === 'aftermath' ? 'active' : ''}">🏁 Aftermath</button>
+      </div>
+      <div class="dm-enc-body" id="encBody"><div class="dm-loading">Loading…</div></div>
+    </div>`;
+  root.querySelector('.dm-enc-tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tab]');
+    if (!b || b.dataset.tab === _tab) return;
+    _tab = b.dataset.tab;
+    root.querySelectorAll('.dm-enc-tabs [data-tab]').forEach(x => x.classList.toggle('active', x === b));
+    renderTab();
+  });
+  renderTab();
+}
+
+export function encountersHaveUnsaved() {
+  return _saveTimers.size > 0 || _saveState === 'saving';
+}
+
+function renderTab() {
+  const body = document.getElementById('encBody');
+  if (!body) return;
+  if (_tab === 'aftermath') renderAftermath(body); else renderLibrary(body);
+}
+
+// ---------------------------------------------------------------------------
+// Library
+// ---------------------------------------------------------------------------
+
+function blankEncounter() {
+  return {
+    id: newId('enc'), name: 'New encounter', notes: '', noteCategories: [], terrain: 'flat', weather: 'world',
+    pokemon: [], npcs: [], events: [], map: null, createdAt: new Date().toISOString(),
+  };
+}
+
+async function renderLibrary(body) {
+  body.innerHTML = '<div class="dm-loading">Loading the encounters…</div>';
+  try {
+    const [encs, species, npcs, excl, saved, run] = await Promise.all([
+      DmAPI.encounters(), getSpecies(), DmAPI.npcs(), DmAPI.getState('encounter-exclusions'), DmAPI.getState('saved-pokemon'), DmAPI.getState('encounter-run'),
+    ]);
+    _encounters = encs.data || [];
+    _species = species;
+    _npcs = npcs.data || [];
+    _exclusions = Array.isArray(excl) ? excl : [];
+    _saved = Array.isArray(saved) ? saved : [];
+    _runId = run?.encounterId || null;
+  } catch (err) {
+    body.innerHTML = `<div class="dm-loading">Couldn't load the encounters: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  if (_tab !== 'library') return;
+  body.innerHTML = `
+    <div class="dm-editor">
+      <aside class="dm-editor-tools">
+        <div class="dm-editor-head"><h2>Encounters</h2><span class="dm-pill ok" id="encSave">All saved</span></div>
+        <div class="dm-row">
+          <button class="dm-btn primary" id="encNew">+ New encounter</button>
+          <button class="dm-btn" id="encFromSetup" title="Save what's in the battle setup now as an encounter">⬇ From battle setup</button>
+        </div>
+        <input class="dm-input" id="encSearch" placeholder="Search encounters…" autocomplete="off">
+        <div class="dm-enc-list" id="encList"></div>
+        <div class="dm-editor-foot">
+          <button class="dm-btn small" id="encExclusions">🚫 Exclusions (${_exclusions.length})</button>
+          <button class="dm-btn small" id="encSavedLib">📚 Saved Pokémon (${_saved.length})</button>
+        </div>
+      </aside>
+      <section class="dm-editor-canvas" id="encSheet"></section>
+    </div>`;
+  renderList();
+  renderSheet();
+  bindSheet();
+  document.getElementById('encSearch').addEventListener('input', renderList);
+  document.getElementById('encList').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-enc]');
+    if (row) { _selectedId = row.dataset.enc; _adding = false; renderList(); renderSheet(); }
+  });
+  document.getElementById('encNew').addEventListener('click', () => {
+    const enc = blankEncounter();
+    _encounters.unshift(enc);
+    _selectedId = enc.id;
+    saveNow(enc);
+    renderList();
+    renderSheet();
+    document.getElementById('encName')?.select();
+  });
+  document.getElementById('encFromSetup').addEventListener('click', fromBattleSetup);
+  document.getElementById('encExclusions').addEventListener('click', editExclusions);
+  document.getElementById('encSavedLib').addEventListener('click', () => pickSaved(null));
+}
+
+function current() {
+  return _encounters.find(e => e.id === _selectedId) || null;
+}
+
+function summary(enc) {
+  const parts = [];
+  if (enc.pokemon.length) parts.push(`${enc.pokemon.length} Pokémon`);
+  if (enc.npcs.length) parts.push(`${enc.npcs.length} NPC${enc.npcs.length === 1 ? '' : 's'}`);
+  if (enc.events.length) parts.push(`${enc.events.length} event${enc.events.length === 1 ? '' : 's'}`);
+  return parts.join(' · ') || 'Empty';
+}
+
+function renderList() {
+  const box = document.getElementById('encList');
+  if (!box) return;
+  const q = (document.getElementById('encSearch')?.value || '').trim().toLowerCase();
+  const list = _encounters.filter(e => !q || e.name.toLowerCase().includes(q));
+  box.innerHTML = list.length ? list.map(e => `
+    <button class="dm-enc-row${e.id === _selectedId ? ' selected' : ''}" data-enc="${escapeHtml(e.id)}">
+      <strong>${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' <span class="dm-enc-live" title="Loaded into the battle setup">● in play</span>' : ''}</strong>
+      <small>${escapeHtml(summary(e))}${e.terrain && e.terrain !== 'flat' ? ` · ${escapeHtml(TERRAIN[e.terrain]?.name || '')}` : ''}</small>
+    </button>`).join('') : `<div class="dm-hint">${_encounters.length ? 'No encounter matches that.' : 'No encounters yet -- make one with "+ New encounter", or save the battle setup as one.'}</div>`;
+}
+
+function npcById(id) {
+  return _npcs.find(n => n.id === id) || null;
+}
+
+function speciesByName(name) {
+  return _species.find(s => s.name === name) || null;
+}
+
+function renderSheet() {
+  const box = document.getElementById('encSheet');
+  if (!box) return;
+  const enc = current();
+  if (!enc) {
+    box.innerHTML = `<div class="dm-cs-empty">${_encounters.length ? 'Pick an encounter on the left.' : 'No encounters yet.'}</div>`;
+    return;
+  }
+  const weatherOpts = [['world', `The world clock's weather (${WEATHER[getClock()?.weather]?.name || 'clear'})`],
+    ...Object.entries(WEATHER).map(([k, w]) => [k, `${w.icon} ${w.name}`])];
+  const m = enc.map;
+  box.innerHTML = `
+    <div class="dm-enc-head">
+      <input class="dm-input dm-enc-name" id="encName" data-f="name" value="${escapeHtml(enc.name)}" placeholder="Encounter name">
+      <div class="dm-enc-actions">
+        <button class="dm-btn primary" id="encLoad" title="Put this encounter into the battle setup">▶ Load into battle setup</button>
+        <button class="dm-btn" id="encDup">Duplicate</button>
+        <button class="dm-btn danger" id="encDel">Delete</button>
+      </div>
+    </div>
+    <div class="dm-enc-grid">
+      <div class="dm-card">
+        <div class="dm-card-title">Setting</div>
+        <div class="dm-row">
+          <div class="dm-field"><label for="encTerrain">Terrain <span class="dm-label-note">(added to the throw's accuracy DC)</span></label>
+            <select class="dm-select" id="encTerrain" data-f="terrain">${Object.entries(TERRAIN).map(([k, t]) => `<option value="${k}" ${k === enc.terrain ? 'selected' : ''}>${escapeHtml(t.name)} (+${t.mod})</option>`).join('')}</select></div>
+          <div class="dm-field"><label for="encWeather">Weather <span class="dm-label-note">(changes the throw's roll)</span></label>
+            <select class="dm-select" id="encWeather" data-f="weather">${weatherOpts.map(([k, l]) => `<option value="${k}" ${k === enc.weather ? 'selected' : ''}>${escapeHtml(l)}${WEATHER_ROLL_MOD[k] ? ` (${WEATHER_ROLL_MOD[k]})` : ''}</option>`).join('')}</select></div>
+        </div>
+        <div class="dm-field"><label>Map</label>
+          <div class="dm-enc-mapline">${m ? `Saved with it: ${m.rows} × ${m.cols} squares, ${(m.objects || []).length} object${(m.objects || []).length === 1 ? '' : 's'}` : 'None -- loading it keeps the battle setup\'s map.'}</div>
+          <div class="dm-row">
+            <button class="dm-btn small" id="encMapTake" ${mapReady() ? '' : 'disabled'} title="${mapReady() ? '' : 'Set up a map in the battle setup first'}">Use the battle setup's map</button>
+            ${m ? '<button class="dm-btn small" id="encMapForget">Forget the map</button>' : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="dm-card">
+        <div class="dm-card-title">Notes</div>
+        <textarea class="dm-input" data-f="notes" rows="4" placeholder="Pre-encounter notes, special rules, reminders…">${escapeHtml(enc.notes || '')}</textarea>
+        <div class="dm-enc-cats">
+          ${enc.noteCategories.map(c => `
+            <div class="dm-enc-cat" data-cat="${escapeHtml(c.id)}">
+              <div class="dm-row">
+                <input class="dm-input dm-enc-icon" data-k="icon" value="${escapeHtml(c.icon || '📝')}" maxlength="4">
+                <input class="dm-input" data-k="name" value="${escapeHtml(c.name)}" placeholder="Category (e.g. Loot, Tactics, Lore)">
+                <button class="dm-icon-btn danger" data-act="cat-del" title="Remove">✕</button>
+              </div>
+              <textarea class="dm-input" data-k="content" rows="2" placeholder="Notes…">${escapeHtml(c.content || '')}</textarea>
+            </div>`).join('')}
+        </div>
+        <button class="dm-btn small" data-act="cat-add">+ Note category</button>
+      </div>
+
+      <div class="dm-card dm-enc-wide">
+        <div class="dm-card-title"><span>Wild Pokémon (${enc.pokemon.length})</span>
+          <span class="dm-row dm-enc-titlebtns">
+            <button class="dm-btn small" data-act="mon-add">🔍 Add</button>
+            <button class="dm-btn small" data-act="mon-random">🎲 Random</button>
+            <button class="dm-btn small" data-act="mon-saved">📚 Saved</button>
+          </span></div>
+        ${_adding ? `<div class="dm-enc-add"><input class="dm-input" id="encMonSearch" placeholder="Search name, type or habitat…" autocomplete="off"><div class="dm-cs-species dm-enc-results" id="encMonResults"></div></div>` : ''}
+        <div class="dm-enc-mons">${enc.pokemon.length ? enc.pokemon.map(monRowHtml).join('') : '<div class="dm-hint">No wild Pokémon yet.</div>'}</div>
+      </div>
+
+      <div class="dm-card">
+        <div class="dm-card-title"><span>NPC trainers (${enc.npcs.length})</span>
+          <span class="dm-row dm-enc-titlebtns">
+            <button class="dm-btn small" data-act="npc-add">🎭 From the library</button>
+            <button class="dm-btn small" data-act="npc-random">🎲 Random trainer</button>
+          </span></div>
+        <div class="dm-enc-npcs">${enc.npcs.length ? enc.npcs.map((id) => {
+          const n = npcById(id);
+          return `<div class="dm-enc-npc" data-npc="${escapeHtml(id)}">
+            <span class="dm-enc-thumb" data-img="${escapeHtml(n?.image || '')}"></span>
+            <span><strong>${escapeHtml(n?.name || 'Deleted NPC')}</strong><small>${n ? `Lv ${n.level || 1} · ${(n.team || []).filter(t => t.species).map(t => escapeHtml(`${t.nickname || t.species} ${t.level}`)).join(', ') || 'no Pokémon'}` : 'No longer in the NPC library'}</small></span>
+            <button class="dm-icon-btn danger" data-act="npc-del" title="Take out of this encounter">✕</button>
+          </div>`;
+        }).join('') : '<div class="dm-hint">No NPC trainers. Their Pokémon come with them.</div>'}</div>
+      </div>
+
+      <div class="dm-card">
+        <div class="dm-card-title"><span>⚡ Events (${enc.events.length})</span><button class="dm-btn small" data-act="evt-add">+ Event</button></div>
+        <div class="dm-hint" style="margin-bottom:0.5rem">Shown beside the running battle, with a reminder when one is due (reinforcements, a collapsing cave, a timer…).</div>
+        ${enc.events.map(evtHtml).join('') || '<div class="dm-hint">No events.</div>'}
+      </div>
+    </div>`;
+  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">🎭</span>'; });
+  if (_adding) { renderMonResults(); document.getElementById('encMonSearch')?.focus(); }
+  document.getElementById('encLoad').addEventListener('click', () => loadIntoSetup(enc));
+  document.getElementById('encDup').addEventListener('click', () => {
+    const copy = { ...JSON.parse(JSON.stringify(enc)), id: newId('enc'), name: `${enc.name} (copy)`, createdAt: new Date().toISOString() };
+    _encounters.unshift(copy);
+    _selectedId = copy.id;
+    saveNow(copy);
+    renderList();
+    renderSheet();
+  });
+  document.getElementById('encDel').addEventListener('click', async () => {
+    if (!await showCombatConfirm(`Delete "${enc.name}"? This can't be undone.`, { title: 'Delete encounter', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+    clearTimeout(_saveTimers.get(enc.id));
+    _saveTimers.delete(enc.id);
+    try { await DmAPI.deleteEncounter(enc.id); } catch (err) { showCombatAlert(err.message, { title: 'Delete encounter' }); return; }
+    _encounters = _encounters.filter(e => e.id !== enc.id);
+    _selectedId = null;
+    renderList();
+    renderSheet();
+  });
+  document.getElementById('encMapTake')?.addEventListener('click', () => {
+    const s = getSetup();
+    enc.map = JSON.parse(JSON.stringify(s.map));
+    scheduleSave(enc);
+    renderSheet();
+  });
+  document.getElementById('encMapForget')?.addEventListener('click', () => { enc.map = null; scheduleSave(enc); renderSheet(); });
+}
+
+function monRowHtml(p) {
+  const sp = speciesByName(p.species);
+  return `
+    <div class="dm-enc-mon" data-mon="${escapeHtml(p.id)}">
+      <span class="dm-enc-thumb" data-img="${escapeHtml(sp?.image || '')}"></span>
+      <div class="dm-enc-mon-main">
+        <div class="dm-enc-mon-top">
+          <input class="dm-input" data-k="name" value="${escapeHtml(p.name || p.species)}" title="Name in the battle">
+          <span class="dm-enc-species">${escapeHtml(p.species)} ${sp ? typeBadges(sp.type1, sp.type2) : ''}</span>
+        </div>
+        <div class="dm-enc-mon-fields">
+          <label>Lv <input class="dm-input" data-k="level" type="number" min="1" max="20" value="${p.level}"></label>
+          <select class="dm-select" data-k="nature"><option value="">No nature</option>${natureOptions(p.nature)}</select>
+          <input class="dm-input" data-k="item" value="${escapeHtml(p.item || '')}" placeholder="Held item" list="encItems">
+          <span class="dm-enc-abil">${(sp?.abilities || []).map(a => `<label title="${escapeHtml(a.description)}"><input type="checkbox" data-abil="${a.slot}" ${(p.abilities || [0]).includes(a.slot) ? 'checked' : ''}>${escapeHtml(a.name)}</label>`).join('')}</span>
+          <label title="Shiny"><input type="checkbox" data-k="shiny" ${p.shiny ? 'checked' : ''}>✨</label>
+          <label title="Starts held back (not fighting yet)"><input type="checkbox" data-k="heldBack" ${p.heldBack ? 'checked' : ''}>Held back</label>
+        </div>
+      </div>
+      <div class="dm-enc-mon-btns">
+        <button class="dm-icon-btn" data-act="mon-save" title="Save to the Pokémon library, for other encounters">💾</button>
+        <button class="dm-icon-btn" data-act="mon-dup" title="One more of these">⧉</button>
+        <button class="dm-icon-btn danger" data-act="mon-del" title="Remove">✕</button>
+      </div>
+    </div>`;
+}
+
+function evtHtml(ev) {
+  return `
+    <div class="dm-enc-evt" data-evt="${escapeHtml(ev.id)}">
+      <div class="dm-row">
+        <select class="dm-select dm-enc-icon" data-k="icon">${EVENT_ICONS.map(i => `<option ${i === ev.icon ? 'selected' : ''}>${i}</option>`).join('')}</select>
+        <input class="dm-input" data-k="name" value="${escapeHtml(ev.name)}" placeholder="Event name (e.g. Reinforcements arrive)">
+        <button class="dm-icon-btn danger" data-act="evt-del" title="Remove">✕</button>
+      </div>
+      <textarea class="dm-input" data-k="description" rows="2" placeholder="What happens…">${escapeHtml(ev.description || '')}</textarea>
+      <div class="dm-row dm-enc-evt-opts">
+        <select class="dm-select" data-k="trigger">${Object.entries(TRIGGERS).map(([k, l]) => `<option value="${k}" ${k === ev.trigger ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <label ${ev.trigger === 'countdown' ? '' : 'hidden'}>after <input class="dm-input" data-k="countdown" type="number" min="1" value="${ev.countdown || 3}"> rounds</label>
+        <label ${ev.trigger === 'countdown' ? '' : 'hidden'}>from round <input class="dm-input" data-k="startRound" type="number" min="1" value="${ev.startRound || 1}"></label>
+        <label><input type="checkbox" data-k="notify" ${ev.notify !== false ? 'checked' : ''}> Remind me</label>
+      </div>
+      <div class="dm-enc-stages">
+        ${(ev.stages || []).map((st, i) => `
+          <div class="dm-enc-stage" data-stage="${i}">
+            <span class="dm-enc-stage-n">${i + 1}</span>
+            <input class="dm-input" data-sk="name" value="${escapeHtml(st.name)}" placeholder="Stage name">
+            <input class="dm-input" data-sk="description" value="${escapeHtml(st.description || '')}" placeholder="What happens at this stage">
+            <button class="dm-icon-btn danger" data-act="stage-del" title="Remove stage">✕</button>
+          </div>`).join('')}
+        <button class="dm-btn small" data-act="stage-add">+ Stage <span class="dm-label-note">(e.g. a collapsing building)</span></button>
+      </div>
+    </div>`;
+}
+
+/** One set of listeners on the sheet for every field (it's redrawn, they stay). */
+function bindSheet() {
+  const sheet = document.getElementById('encSheet');
+  if (!document.getElementById('encItems')) {
+    const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+    sheet.insertAdjacentHTML('afterend', `<datalist id="encItems">${items.map(i => `<option value="${escapeHtml(i.name)}">`).join('')}</datalist>`);
+  }
+  const onField = (e) => {
+    const enc = current();
+    const t = e.target;
+    if (!enc || !t.matches('input, select, textarea')) return;
+    const val = t.type === 'checkbox' ? t.checked : t.type === 'number' ? (t.value === '' ? null : Number(t.value)) : t.value;
+    if (t.dataset.f) {
+      enc[t.dataset.f] = val;
+      if (t.dataset.f === 'name') renderList();
+    } else if (t.closest('[data-mon]')) {
+      const p = enc.pokemon.find(x => x.id === t.closest('[data-mon]').dataset.mon);
+      if (!p) return;
+      if (t.dataset.abil !== undefined) {
+        p.abilities = [...t.closest('[data-mon]').querySelectorAll('[data-abil]:checked')].map(x => Number(x.dataset.abil));
+      } else if (t.dataset.k === 'level') p.level = Math.max(1, Math.min(20, val || 1));
+      else p[t.dataset.k] = val;
+    } else if (t.closest('[data-evt]')) {
+      const ev = enc.events.find(x => x.id === t.closest('[data-evt]').dataset.evt);
+      if (!ev) return;
+      const stage = t.closest('[data-stage]');
+      if (stage) ev.stages[Number(stage.dataset.stage)][t.dataset.sk] = val;
+      else {
+        ev[t.dataset.k] = val;
+        if (t.dataset.k === 'trigger' && e.type === 'change') renderSheet();
+      }
+    } else if (t.closest('[data-cat]')) {
+      const c = enc.noteCategories.find(x => x.id === t.closest('[data-cat]').dataset.cat);
+      if (c) c[t.dataset.k] = val;
+    } else return;
+    scheduleSave(enc);
+  };
+  sheet.addEventListener('input', onField);
+  sheet.addEventListener('change', onField);
+  sheet.addEventListener('click', onAction);
+}
+
+function onAction(e) {
+  const btn = e.target.closest('[data-act]');
+  const enc = current();
+  if (!btn || !enc) return;
+  const act = btn.dataset.act;
+  const monId = btn.closest('[data-mon]')?.dataset.mon;
+  const evtId = btn.closest('[data-evt]')?.dataset.evt;
+  const changed = () => { scheduleSave(enc); renderSheet(); renderList(); };
+  if (act === 'mon-add') { _adding = !_adding; renderSheet(); return; }
+  if (act === 'mon-random') { randomEncounterDialog(enc); return; }
+  if (act === 'mon-saved') { pickSaved(enc); return; }
+  if (act === 'mon-del') { enc.pokemon = enc.pokemon.filter(p => p.id !== monId); relabel(enc); changed(); return; }
+  if (act === 'mon-dup') {
+    const p = enc.pokemon.find(x => x.id === monId);
+    enc.pokemon.splice(enc.pokemon.indexOf(p) + 1, 0, { ...JSON.parse(JSON.stringify(p)), id: newId('mon') });
+    relabel(enc);
+    changed();
+    return;
+  }
+  if (act === 'mon-save') { saveToLibrary(enc.pokemon.find(x => x.id === monId)); return; }
+  if (act === 'npc-add') { pickNpc(enc); return; }
+  if (act === 'npc-random') { randomTrainerDialog(enc); return; }
+  if (act === 'npc-del') { enc.npcs = enc.npcs.filter(id => id !== btn.closest('[data-npc]').dataset.npc); changed(); return; }
+  if (act === 'evt-add') {
+    enc.events.push({ id: newId('evt'), name: '', icon: '⚡', description: '', trigger: 'countdown', countdown: 3, startRound: 1, notify: true, stages: [] });
+    changed();
+    return;
+  }
+  if (act === 'evt-del') { enc.events = enc.events.filter(x => x.id !== evtId); changed(); return; }
+  if (act === 'stage-add') { const ev = enc.events.find(x => x.id === evtId); ev.stages = ev.stages || []; ev.stages.push({ name: `Stage ${ev.stages.length + 1}`, description: '' }); changed(); return; }
+  if (act === 'stage-del') { const ev = enc.events.find(x => x.id === evtId); ev.stages.splice(Number(btn.closest('[data-stage]').dataset.stage), 1); changed(); return; }
+  if (act === 'cat-add') { enc.noteCategories.push({ id: newId('cat'), icon: '📝', name: '', content: '' }); changed(); return; }
+  if (act === 'cat-del') { enc.noteCategories = enc.noteCategories.filter(c => c.id !== btn.closest('[data-cat]').dataset.cat); changed(); }
+}
+
+// ---- Wild Pokémon ----
+
+function renderMonResults() {
+  const box = document.getElementById('encMonResults');
+  const input = document.getElementById('encMonSearch');
+  if (!box || !input) return;
+  if (!input.dataset.bound) {
+    input.dataset.bound = '1';
+    input.addEventListener('input', renderMonResults);
+    box.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-species]');
+      const enc = current();
+      if (!item || !enc) return;
+      const sp = speciesByName(item.dataset.species);
+      enc.pokemon.push(newMon(sp.name, sp.level || 1));
+      relabel(enc);
+      scheduleSave(enc);
+      renderSheet();
+      renderList();
+    });
+  }
+  const q = input.value.trim().toLowerCase();
+  const matches = _species.filter(s => !q || s.name.toLowerCase().includes(q) || String(s.type1).toLowerCase() === q
+    || String(s.type2).toLowerCase() === q || String(s.habitat).toLowerCase().includes(q)).slice(0, 40);
+  box.innerHTML = matches.map(s => `
+    <button type="button" class="dm-species-item" data-species="${escapeHtml(s.name)}">
+      <span class="dm-species-thumb" data-img="${escapeHtml(s.image)}"></span>
+      <span><span class="dm-species-name">#${escapeHtml(s.dex)} ${escapeHtml(s.name)}</span>
+        <span class="dm-species-meta">${typeBadges(s.type1, s.type2)} base level ${s.level}${s.habitat ? ` · ${escapeHtml(s.habitat)}` : ''}</span></span>
+    </button>`).join('') || '<div class="dm-species-empty">No Pokémon match that.</div>';
+  box.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+}
+
+function newMon(species, level, extra = {}) {
+  return { id: newId('mon'), species, name: species, level, nature: '', abilities: [0], item: '', shiny: false, heldBack: false, ...extra };
+}
+
+/** "Zubat A", "Zubat B" for species that appear more than once (a name the DM typed is left alone). */
+function relabel(enc) {
+  const counts = {};
+  enc.pokemon.forEach(p => { counts[p.species] = (counts[p.species] || 0) + 1; });
+  const seen = {};
+  enc.pokemon.forEach((p) => {
+    const auto = p.name === p.species || new RegExp(`^${p.species.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} [A-Z]$`).test(p.name);
+    if (!auto) return;
+    if (counts[p.species] > 1) { seen[p.species] = (seen[p.species] || 0) + 1; p.name = `${p.species} ${String.fromCharCode(64 + seen[p.species])}`; } else p.name = p.species;
+  });
+}
+
+// ---- Saved Pokémon library ----
+
+async function saveToLibrary(p) {
+  if (!p) return;
+  const entry = { ...JSON.parse(JSON.stringify(p)), id: newId('saved') };
+  delete entry.heldBack;
+  _saved.push(entry);
+  try { await DmAPI.saveState('saved-pokemon', _saved); } catch (err) { showCombatAlert(err.message, { title: 'Save Pokémon' }); return; }
+  toast(`${p.name} saved to the Pokémon library.`);
+  const btn = document.getElementById('encSavedLib');
+  if (btn) btn.textContent = `📚 Saved Pokémon (${_saved.length})`;
+}
+
+/** The saved-Pokemon library: pick one to add to `enc` (or just look and delete when `enc` is null). */
+async function pickSaved(enc) {
+  const html = () => (_saved.length ? _saved.map(s => `
+    <div class="dm-enc-savedrow" data-saved="${escapeHtml(s.id)}">
+      <span class="dm-enc-thumb" data-img="${escapeHtml(speciesByName(s.species)?.image || '')}"></span>
+      <span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.species)} · Lv ${s.level}${s.nature ? ` · ${escapeHtml(s.nature)}` : ''}${s.item ? ` · holds ${escapeHtml(s.item)}` : ''}${s.shiny ? ' · ✨' : ''}</small></span>
+      ${enc ? '<button class="dm-btn small primary" data-act="use">Add</button>' : ''}
+      <button class="dm-icon-btn danger" data-act="drop" title="Delete from the library">✕</button>
+    </div>`).join('') : '<div class="dm-hint">Nothing saved yet -- use 💾 on a Pokémon in an encounter.</div>');
+  await openDmModal({
+    title: 'Saved Pokémon', html: `<div class="dm-enc-saved">${html()}</div>`,
+    onOpen: (body, close) => {
+      const thumbs = () => body.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+      thumbs();
+      body.addEventListener('click', async (e) => {
+        const act = e.target.closest('[data-act]')?.dataset.act;
+        const s = _saved.find(x => x.id === e.target.closest('[data-saved]')?.dataset.saved);
+        if (!act || !s) return;
+        if (act === 'use') {
+          enc.pokemon.push({ ...JSON.parse(JSON.stringify(s)), id: newId('mon'), heldBack: false });
+          relabel(enc);
+          scheduleSave(enc);
+          renderSheet();
+          renderList();
+          close(null);
+        } else {
+          _saved = _saved.filter(x => x !== s);
+          await DmAPI.saveState('saved-pokemon', _saved).catch(err => showCombatAlert(err.message, { title: 'Saved Pokémon' }));
+          body.querySelector('.dm-enc-saved').innerHTML = html();
+          thumbs();
+          const b = document.getElementById('encSavedLib');
+          if (b) b.textContent = `📚 Saved Pokémon (${_saved.length})`;
+        }
+      });
+    },
+  });
+}
+
+// ---- Exclusions (left out of the random generators) ----
+
+async function editExclusions() {
+  const out = new Set(_exclusions.map(n => n.toLowerCase()));
+  await openDmModal({
+    title: 'Left out of the random generators',
+    wide: true,
+    html: `<div class="dm-hint">Ticked Pokémon never come up in a random encounter or a random trainer's team (unless "include left-out ones" is ticked there) -- legendaries, story Pokémon…</div>
+      <input class="dm-input" id="exclSearch" placeholder="Search…" autocomplete="off" style="margin:0.6rem 0">
+      <div class="dm-enc-excl" id="exclList">${_species.map(s => `<label data-name="${escapeHtml(s.name.toLowerCase())}"><input type="checkbox" value="${escapeHtml(s.name)}" ${out.has(s.name.toLowerCase()) ? 'checked' : ''}>${escapeHtml(s.name)}</label>`).join('')}</div>`,
+    buttons: [{ label: 'Cancel', value: null }, {
+      label: 'Save', kind: 'primary', keepOpen: true,
+      onClick: async (body) => {
+        _exclusions = [...body.querySelectorAll('#exclList input:checked')].map(i => i.value);
+        try { await DmAPI.saveState('encounter-exclusions', _exclusions); } catch (err) { showCombatAlert(err.message, { title: 'Exclusions' }); return false; }
+        const b = document.getElementById('encExclusions');
+        if (b) b.textContent = `🚫 Exclusions (${_exclusions.length})`;
+        return true;
+      },
+    }],
+    onOpen: (body) => {
+      body.querySelector('#exclSearch').addEventListener('input', (e) => {
+        const q = e.target.value.trim().toLowerCase();
+        body.querySelectorAll('#exclList label').forEach(l => { l.hidden = !!q && !l.dataset.name.includes(q); });
+      });
+    },
+  });
+}
+
+// ---- Random encounter ----
+
+function optionList(values, selected, blank) {
+  return `<option value="">${blank}</option>${values.map(v => `<option ${v === selected ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('')}`;
+}
+
+function distinct(key) {
+  return [...new Set(_species.map(s => s[key]).filter(Boolean))].sort();
+}
+
+async function randomEncounterDialog(enc) {
+  let selected = []; // [{name, quantity}] for "Selected species"
+  const read = (body) => {
+    const v = id => body.querySelector(`#${id}`)?.value;
+    return {
+      count: Number(v('reCount')) || 3, minLevel: Number(v('reMin')) || 1, maxLevel: Number(v('reMax')) || 1,
+      levelMode: v('reLevelMode'), speciesMode: v('reSpeciesMode'), selected, includeEvolutions: body.querySelector('#reEvos').checked,
+      stage: v('reStage'), habitat: v('reHabitat'), rarity: v('reRarity'), behavior: v('reBehavior'), size: v('reSize'), activity: v('reActivity'),
+      types: [...body.querySelectorAll('#reTypes input:checked')].map(i => i.value),
+      autoLabels: body.querySelector('#reLabels').checked, includeExcluded: body.querySelector('#reExcluded').checked,
+      randomNature: body.querySelector('#reNature').checked,
+    };
+  };
+  await openDmModal({
+    title: 'Random encounter', wide: true,
+    html: `
+      <div class="dm-enc-templates" id="reTemplates">${Object.entries(ENCOUNTER_TEMPLATES).map(([k, t]) => `<button class="dm-btn small${k === 'custom' ? ' active' : ''}" data-tpl="${k}" title="${escapeHtml(t.description)}">${escapeHtml(t.name)}</button>`).join('')}</div>
+      <div class="dm-enc-gen">
+        <div>
+          <div class="dm-card-title">Encounter</div>
+          <div class="dm-row">
+            <div class="dm-field"><label>How many</label><input class="dm-input" id="reCount" type="number" min="1" max="12" value="3"></div>
+            <div class="dm-field"><label>Min level</label><input class="dm-input" id="reMin" type="number" min="1" max="20" value="1"></div>
+            <div class="dm-field"><label>Max level</label><input class="dm-input" id="reMax" type="number" min="1" max="20" value="5"></div>
+          </div>
+          <div class="dm-field"><label>Levels</label><select class="dm-select" id="reLevelMode">
+            <option value="uniform">Random in the range</option><option value="identical">All the same level</option>
+            <option value="ascending">Ascending (weak → strong)</option><option value="leader">A leader + the rest lower</option></select></div>
+          <div class="dm-field"><label>Species</label><select class="dm-select" id="reSpeciesMode">
+            <option value="random">Any (repeats allowed)</option><option value="unique">All different</option><option value="same">All the same (a swarm)</option>
+            <option value="evolutionLine">One evolution line</option><option value="selected">The species I pick</option></select></div>
+          <div id="reSelectedBox" hidden>
+            <input class="dm-input" id="reSelSearch" placeholder="Search to add a species…" autocomplete="off">
+            <div class="dm-enc-selresults" id="reSelResults"></div>
+            <div id="reSelList"></div>
+          </div>
+          <label class="dm-check"><input type="checkbox" id="reEvos">Spread over their evolution lines</label>
+          <label class="dm-check"><input type="checkbox" id="reNature">Random natures</label>
+          <label class="dm-check"><input type="checkbox" id="reLabels" checked>Letter the duplicates (A, B, C…)</label>
+        </div>
+        <div>
+          <div class="dm-card-title">Filters</div>
+          <div class="dm-field"><label>Evolution stage</label><select class="dm-select" id="reStage">
+            <option value="">Any stage</option><option value="basic">Basic only</option><option value="stage1">Middle stage only</option>
+            <option value="final">Final evolutions only</option><option value="evolved">Any evolved</option></select></div>
+          <div class="dm-field"><label>Habitat</label><select class="dm-select" id="reHabitat">${optionList(distinct('habitat'), '', 'Any habitat')}</select></div>
+          <div class="dm-field"><label>Types (any of)</label><div class="dm-enc-types" id="reTypes">${TYPES.map(t => `<label><input type="checkbox" value="${t}">${t}</label>`).join('')}</div></div>
+        </div>
+        <div>
+          <div class="dm-card-title">More filters</div>
+          <div class="dm-field"><label>Rarity</label><select class="dm-select" id="reRarity">${optionList(distinct('rarity'), '', 'Any rarity')}</select></div>
+          <div class="dm-field"><label>Behaviour</label><select class="dm-select" id="reBehavior">${optionList(distinct('behavior'), '', 'Any behaviour')}</select></div>
+          <div class="dm-field"><label>Size</label><select class="dm-select" id="reSize">${optionList(SIZES, '', 'Any size')}</select></div>
+          <div class="dm-field"><label>Active</label><select class="dm-select" id="reActivity">${optionList(distinct('activity'), '', 'Any time')}</select></div>
+          <label class="dm-check"><input type="checkbox" id="reExcluded">Include left-out ones (${_exclusions.length})</label>
+        </div>
+      </div>
+      <div class="dm-enc-pool" id="rePool"></div>`,
+    buttons: [{ label: 'Cancel', value: null }, {
+      label: 'Generate and add', kind: 'primary', keepOpen: true,
+      onClick: (body) => {
+        const o = read(body);
+        let made;
+        try { made = generateEncounter(_species, o, _exclusions); } catch (err) { showCombatAlert(err.message, { title: 'Random encounter' }); return false; }
+        const natures = JSON.parse(sessionStorage.getItem('natures') || '[]').map(n => n.name);
+        made.forEach(m => enc.pokemon.push(newMon(m.species, m.level, { name: m.name, nature: o.randomNature && natures.length ? natures[Math.floor(Math.random() * natures.length)] : '' })));
+        relabel(enc);
+        scheduleSave(enc);
+        renderSheet();
+        renderList();
+        toast(`Added ${made.length} Pokémon: ${[...new Set(made.map(m => m.species))].join(', ')}`);
+        return true;
+      },
+    }],
+    onOpen: (body) => {
+      const pool = () => {
+        const o = read(body);
+        const el = body.querySelector('#rePool');
+        if (o.speciesMode === 'selected') { el.textContent = `${selected.reduce((a, s) => a + s.quantity, 0)} picked`; return; }
+        const list = encounterPool(_species, o, _exclusions);
+        el.className = `dm-enc-pool ${list.length ? (list.length < 5 ? 'few' : 'ok') : 'none'}`;
+        el.innerHTML = `<strong>${list.length}</strong> Pokémon match the filters${list.length ? `: ${list.slice(0, 18).map(s => `${escapeHtml(s.name)} <small>(${STAGE_LABEL[evolutionStage(s)]})</small>`).join(', ')}${list.length > 18 ? ` … and ${list.length - 18} more` : ''}` : ''}`;
+      };
+      const renderSel = () => {
+        body.querySelector('#reSelList').innerHTML = selected.map((s, i) => `
+          <div class="dm-enc-selrow" data-i="${i}"><span>${escapeHtml(s.name)}</span>
+            <input class="dm-input" type="number" min="1" max="12" value="${s.quantity}" data-q><button class="dm-icon-btn danger" data-rm>✕</button></div>`).join('') || '<div class="dm-hint">None picked yet.</div>';
+        body.querySelector('#reCount').value = selected.reduce((a, s) => a + s.quantity, 0) || 1;
+        pool();
+      };
+      body.addEventListener('input', pool);
+      body.addEventListener('change', (e) => {
+        if (e.target.id === 'reSpeciesMode') { body.querySelector('#reSelectedBox').hidden = e.target.value !== 'selected'; renderSel(); }
+        if (e.target.matches('[data-q]')) { selected[Number(e.target.closest('[data-i]').dataset.i)].quantity = Math.max(1, Number(e.target.value) || 1); renderSel(); }
+        pool();
+      });
+      body.querySelector('#reSelSearch').addEventListener('input', (e) => {
+        const q = e.target.value.trim().toLowerCase();
+        body.querySelector('#reSelResults').innerHTML = q.length < 2 ? '' : _species.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8)
+          .map(s => `<button class="dm-btn small" data-add="${escapeHtml(s.name)}">${escapeHtml(s.name)}</button>`).join('');
+      });
+      body.addEventListener('click', (e) => {
+        const tpl = e.target.closest('[data-tpl]')?.dataset.tpl;
+        if (tpl) {
+          body.querySelectorAll('[data-tpl]').forEach(b => b.classList.toggle('active', b.dataset.tpl === tpl));
+          const t = ENCOUNTER_TEMPLATES[tpl];
+          if (tpl !== 'custom') {
+            if (t.count) body.querySelector('#reCount').value = rangePick(t.count);
+            body.querySelector('#reSpeciesMode').value = t.speciesMode || 'random';
+            body.querySelector('#reLevelMode').value = t.levelMode || 'uniform';
+            body.querySelector('#reStage').value = t.stage || '';
+            body.querySelector('#reBehavior').value = t.behavior && distinct('behavior').includes(t.behavior) ? t.behavior : '';
+            body.querySelector('#reSelectedBox').hidden = true;
+          }
+          pool();
+          return;
+        }
+        const add = e.target.closest('[data-add]')?.dataset.add;
+        if (add) {
+          const have = selected.find(s => s.name === add);
+          if (have) have.quantity++; else selected.push({ name: add, quantity: 1 });
+          body.querySelector('#reSelSearch').value = '';
+          body.querySelector('#reSelResults').innerHTML = '';
+          renderSel();
+          return;
+        }
+        if (e.target.closest('[data-rm]')) { selected.splice(Number(e.target.closest('[data-i]').dataset.i), 1); renderSel(); }
+      });
+      pool();
+    },
+  });
+}
+
+// ---- NPC trainers ----
+
+async function pickNpc(enc) {
+  if (!_npcs.length) { showCombatAlert('No NPCs yet -- make them in the NPCs module (or use 🎲 Random trainer).', { title: 'NPC trainers' }); return; }
+  await openDmModal({
+    title: 'Add an NPC from the library',
+    html: `<input class="dm-input" id="npcPickSearch" placeholder="Search…" autocomplete="off" style="margin-bottom:0.5rem">
+      <div class="dm-cs-species" id="npcPickList">${_npcs.map(n => `
+        <button type="button" class="dm-species-item" data-npc="${escapeHtml(n.id)}" data-search="${escapeHtml(`${n.name} ${n.faction} ${n.role}`.toLowerCase())}" ${enc.npcs.includes(n.id) ? 'disabled' : ''}>
+          <span class="dm-species-thumb" data-img="${escapeHtml(n.image || '')}"></span>
+          <span><span class="dm-species-name">${escapeHtml(n.name)}${enc.npcs.includes(n.id) ? ' <small>(already in it)</small>' : ''}</span>
+            <span class="dm-species-meta">Lv ${n.level || 1}${n.role ? ` · ${escapeHtml(n.role)}` : ''}${n.faction ? ` · ${escapeHtml(n.faction)}` : ''} · ${(n.team || []).filter(t => t.species).length} Pokémon</span></span>
+        </button>`).join('')}</div>`,
+    onOpen: (body, close) => {
+      body.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); else el.innerHTML = '<span class="dm-npc-emoji">🎭</span>'; });
+      body.querySelector('#npcPickSearch').addEventListener('input', (e) => {
+        const q = e.target.value.trim().toLowerCase();
+        body.querySelectorAll('[data-npc]').forEach(b => { b.hidden = !!q && !b.dataset.search.includes(q); });
+      });
+      body.addEventListener('click', (e) => {
+        const id = e.target.closest('[data-npc]:not(:disabled)')?.dataset.npc;
+        if (!id) return;
+        enc.npcs.push(id);
+        scheduleSave(enc);
+        renderSheet();
+        renderList();
+        close(null);
+      });
+    },
+  });
+}
+
+async function randomTrainerDialog(enc) {
+  const paths = JSON.parse(sessionStorage.getItem('trainerPaths') || '[]').map(p => p.name || p).filter(Boolean);
+  await openDmModal({
+    title: 'Random NPC trainer', wide: true,
+    html: `
+      <div class="dm-enc-templates" id="rtArch">${Object.entries(TRAINER_ARCHETYPES).map(([k, a]) => `<button class="dm-btn small${k === 'custom' ? ' active' : ''}" data-arch="${k}" title="${escapeHtml(a.description)}">${escapeHtml(a.name)}</button>`).join('')}</div>
+      <div class="dm-enc-gen">
+        <div>
+          <div class="dm-card-title">Trainer</div>
+          <div class="dm-field"><label>Name</label><input class="dm-input" id="rtName" placeholder="Leave empty for a random one"></div>
+          <div class="dm-row">
+            <div class="dm-field"><label>Level</label><input class="dm-input" id="rtLevel" type="number" min="1" max="20" value="5"></div>
+            <div class="dm-field"><label>Path</label><select class="dm-select" id="rtPath">${optionList(paths, '', 'None')}</select></div>
+          </div>
+          <div class="dm-field"><label>Ability scores</label><select class="dm-select" id="rtStats">${Object.entries(STAT_METHODS).map(([k, l]) => `<option value="${k}">${escapeHtml(l)}</option>`).join('')}</select></div>
+          <label class="dm-check"><input type="checkbox" id="rtInv" checked>Give them some items</label>
+        </div>
+        <div>
+          <div class="dm-card-title">Team</div>
+          <div class="dm-field"><label>How many Pokémon</label><input class="dm-input" id="rtCount" type="number" min="1" max="6" value="3"></div>
+          <div class="dm-field"><label>Their levels</label><select class="dm-select" id="rtRel">
+            <option value="custom">The range below</option><option value="match">The trainer's level</option><option value="below">1-3 below the trainer</option></select></div>
+          <div class="dm-row">
+            <div class="dm-field"><label>Min level</label><input class="dm-input" id="rtMin" type="number" min="1" max="20" value="3"></div>
+            <div class="dm-field"><label>Max level</label><input class="dm-input" id="rtMax" type="number" min="1" max="20" value="7"></div>
+          </div>
+          <div class="dm-field"><label>Evolution stage</label><select class="dm-select" id="rtStage"><option value="">Any</option><option value="basic">Basic only</option><option value="evolved">Evolved only</option></select></div>
+          <label class="dm-check"><input type="checkbox" id="rtAce">An ace (2-3 levels higher)</label>
+        </div>
+        <div>
+          <div class="dm-card-title">Types</div>
+          <div class="dm-row">
+            <div class="dm-field"><label>Main type</label><select class="dm-select" id="rtType">${optionList(TYPES, '', 'Any')}</select></div>
+            <div class="dm-field"><label>Second type</label><select class="dm-select" id="rtType2">${optionList(TYPES, '', 'None')}</select></div>
+          </div>
+          <div class="dm-field"><label>How strictly</label><select class="dm-select" id="rtStrength">
+            <option value="0.5">Loose (half)</option><option value="0.7" selected>Moderate (70%)</option><option value="0.9">Strong (90%)</option><option value="1">Specialist (all)</option></select></div>
+          <div class="dm-field"><label>Habitat</label><select class="dm-select" id="rtHabitat">${optionList(distinct('habitat'), '', 'Any')}</select></div>
+          <label class="dm-check"><input type="checkbox" id="rtExcluded">Include left-out ones (${_exclusions.length})</label>
+        </div>
+      </div>
+      <div class="dm-hint">The trainer is saved to the NPC library (with their team, ready to tweak there) and added to this encounter.</div>`,
+    buttons: [{ label: 'Cancel', value: null }, {
+      label: 'Generate and add', kind: 'primary', keepOpen: true,
+      onClick: async (body) => {
+        const v = id => body.querySelector(`#${id}`).value;
+        const arch = body.querySelector('[data-arch].active')?.dataset.arch || 'custom';
+        let npc;
+        try {
+          npc = generateTrainer(_species, {
+            archetype: arch, name: v('rtName').trim(), level: Number(v('rtLevel')) || 5, path: v('rtPath'), statMethod: v('rtStats'),
+            teamCount: Number(v('rtCount')) || 3, levelRelation: v('rtRel'), minLevel: Number(v('rtMin')) || 1, maxLevel: Number(v('rtMax')) || 1,
+            stage: v('rtStage'), ace: body.querySelector('#rtAce').checked, type: v('rtType'), type2: v('rtType2'),
+            typeStrength: Number(v('rtStrength')), habitat: v('rtHabitat'), autoInventory: body.querySelector('#rtInv').checked,
+            includeExcluded: body.querySelector('#rtExcluded').checked,
+          }, _exclusions, JSON.parse(sessionStorage.getItem('natures') || '[]').map(n => n.name));
+          npc = await DmAPI.saveNpc(npc);
+        } catch (err) { showCombatAlert(err.message, { title: 'Random trainer' }); return false; }
+        _npcs.push(npc);
+        enc.npcs.push(npc.id);
+        scheduleSave(enc);
+        renderSheet();
+        renderList();
+        toast(`${npc.name} (Lv ${npc.level}) with ${npc.team.map(t => `${t.species} ${t.level}`).join(', ')} -- saved to the NPC library.`);
+        return true;
+      },
+    }],
+    onOpen: (body) => {
+      body.querySelector('#rtArch').addEventListener('click', (e) => {
+        const key = e.target.closest('[data-arch]')?.dataset.arch;
+        if (!key) return;
+        body.querySelectorAll('[data-arch]').forEach(b => b.classList.toggle('active', b.dataset.arch === key));
+        const a = TRAINER_ARCHETYPES[key];
+        if (key === 'custom') return;
+        body.querySelector('#rtStats').value = a.statMethod;
+        if (a.teamSize) body.querySelector('#rtCount').value = rangePick(a.teamSize);
+        body.querySelector('#rtAce').checked = !!a.ace;
+        body.querySelector('#rtStage').value = a.stage || '';
+        if (a.typeStrength) body.querySelector('#rtStrength').value = String(a.typeStrength);
+        body.querySelector('#rtType').value = a.types ? a.types[Math.floor(Math.random() * a.types.length)] : '';
+        body.querySelector('#rtType2').value = '';
+        body.querySelector('#rtInv').checked = !!a.inventory;
+        body.querySelector('#rtRel').value = a.levelRelation || 'custom';
+      });
+    },
+  });
+}
+
+// ---- Loading into / saving from the battle setup ----
+
+function monConfig(p) {
+  return {
+    level: Math.max(1, Math.min(20, Number(p.level) || 1)), nature: p.nature || '', abilities: p.abilities?.length ? p.abilities : [0],
+    item: p.item || '', shiny: !!p.shiny, initiative: null, stats: p.stats || {}, overrides: {}, extraSkills: p.extraSkills || [],
+  };
+}
+
+async function loadIntoSetup(enc) {
+  await flushEncounter(enc);
+  const state = await CombatAPI.getState().catch(() => null);
+  if (state?.data?.active) {
+    showCombatAlert('A battle is running -- end it first, or send these in as reinforcements from the battle.', { title: 'Load encounter' });
+    return;
+  }
+  const setup = getSetup();
+  const have = setup.creatures.length;
+  const choice = await openDmModal({
+    title: `Load "${enc.name}"`,
+    html: `
+      <div class="dm-hint">${summary(enc)} go into the battle setup, where you place them on the map and start the battle as usual.</div>
+      ${have ? `<div class="dm-field" style="margin-top:0.7rem">
+        <label class="dm-check"><input type="radio" name="loadMode" value="replace" checked><span>Replace what's in the battle setup now <small>${have} creature${have === 1 ? '' : 's'} there</small></span></label>
+        <label class="dm-check"><input type="radio" name="loadMode" value="add"><span>Add to it</span></label></div>` : ''}
+      ${enc.map ? `<label class="dm-check" style="margin-top:0.4rem"><input type="checkbox" id="loadMap" checked><span>Use the map saved with it <small>${enc.map.rows} × ${enc.map.cols} squares -- replaces the setup's map</small></span></label>` : ''}`,
+    buttons: [{ label: 'Cancel', value: null }, {
+      label: 'Load', kind: 'primary', keepOpen: true,
+      onClick: (body) => { body.dataset.mode = body.querySelector('input[name="loadMode"]:checked')?.value || 'replace'; body.dataset.map = body.querySelector('#loadMap')?.checked ? '1' : ''; return true; },
+      value: 'load',
+    }],
+    onOpen: (body) => { loadIntoSetup._body = body; },
+  });
+  if (choice !== 'load') return;
+  const body = loadIntoSetup._body;
+  const replace = body.dataset.mode !== 'add';
+  const useMap = body.dataset.map === '1';
+  try {
+    const built = [];
+    for (const p of enc.pokemon) {
+      built.push(await buildPokemonCreature(newId(), p.species, p.name || p.species, monConfig(p), { trainerId: null, heldBack: !!p.heldBack, position: null }));
+    }
+    updateSetup((s) => {
+      if (replace) s.creatures = [];
+      if (useMap) {
+        s.map = { ...JSON.parse(JSON.stringify(enc.map)), ready: true };
+        s.creatures.forEach(c => { c.position = null; });
+      }
+      s.creatures.push(...built);
+    });
+    const missing = [];
+    for (const id of enc.npcs) {
+      const npc = npcById(id);
+      if (npc) await addNpcToSetup(npc); else missing.push(id);
+    }
+    await flushSetup();
+    await DmAPI.saveState('encounter-run', {
+      encounterId: enc.id, name: enc.name, terrain: enc.terrain, weather: enc.weather, notes: enc.notes,
+      noteCategories: enc.noteCategories, events: enc.events, eventState: {}, loadedAt: new Date().toISOString(),
+    });
+    _runId = enc.id;
+    renderList();
+    toast(`"${enc.name}" is in the battle setup${missing.length ? ` (${missing.length} NPC no longer in the library was left out)` : ''} -- place everyone and start the battle.`);
+    window.dispatchEvent(new CustomEvent('dm:show-module', { detail: { name: 'battle' } }));
+  } catch (err) {
+    showCombatAlert(err.message, { title: `Couldn't load "${enc.name}"` });
+  }
+}
+
+/** The battle setup as a new encounter: its wild Pokemon, its NPC trainers (ones typed into the battle setup are added
+ * to the NPC library with their Pokemon as their team) and its map. */
+async function fromBattleSetup() {
+  const s = getSetup();
+  if (!s.creatures.length) { showCombatAlert('The battle setup is empty.', { title: 'From battle setup' }); return; }
+  const enc = blankEncounter();
+  enc.name = 'From the battle setup';
+  const trainerNpc = new Map(); // setup trainer id -> NPC id
+  try {
+    for (const t of s.creatures.filter(c => c.kind === 'trainer')) {
+      if (t.npcId) { trainerNpc.set(t.id, t.npcId); continue; }
+      const team = s.creatures.filter(c => c.kind === 'pokemon' && c.trainerId === t.id).map(c => ({
+        id: newId('mon'), species: c.config.species, nickname: c.name === c.config.species ? '' : c.name, level: c.config.level,
+        nature: c.config.nature || '', abilities: c.config.abilities || [0], item: c.config.item || '', shiny: !!c.config.shiny, notes: '', stats: c.config.stats || {},
+      }));
+      const cfg = t.config;
+      const npc = await DmAPI.saveNpc({
+        ...blankNpc(), name: cfg.name, image: cfg.image || '', level: cfg.level, str: cfg.str, dex: cfg.dex, con: cfg.con, int: cfg.int, wis: cfg.wis, cha: cfg.cha,
+        ac: cfg.ac, maxHP: cfg.maxHP, maxVP: cfg.maxVP, speed: cfg.speed, savingThrows: cfg.savingThrows, skills: cfg.skills, attitude: 'hostile', team,
+      });
+      _npcs.push(npc);
+      trainerNpc.set(t.id, npc.id);
+    }
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'From battle setup' });
+    return;
+  }
+  enc.npcs = [...new Set(trainerNpc.values())];
+  enc.pokemon = s.creatures.filter(c => c.kind === 'pokemon' && !trainerNpc.has(c.trainerId)).map(c => newMon(c.config.species, c.config.level, {
+    name: c.name, nature: c.config.nature || '', abilities: c.config.abilities || [0], item: c.config.item || '', shiny: !!c.config.shiny,
+    heldBack: !!c.heldBack, stats: c.config.stats || {}, extraSkills: c.config.extraSkills || [],
+  }));
+  if (mapReady(s)) enc.map = JSON.parse(JSON.stringify(s.map));
+  _encounters.unshift(enc);
+  _selectedId = enc.id;
+  await saveNow(enc);
+  renderList();
+  renderSheet();
+  document.getElementById('encName')?.select();
+}
+
+// ---- Saving (each encounter a moment after its last change) ----
+
+function setPill(state) {
+  _saveState = state;
+  const el = document.getElementById('encSave');
+  if (!el) return;
+  el.className = `dm-pill ${state === 'error' ? 'todo' : 'ok'}`;
+  el.textContent = state === 'saving' ? 'Saving…' : state === 'error' ? 'Not saved!' : 'All saved';
+}
+
+function scheduleSave(enc) {
+  clearTimeout(_saveTimers.get(enc.id));
+  _saveTimers.set(enc.id, setTimeout(() => saveNow(enc), 700));
+  setPill('saving');
+}
+
+async function saveNow(enc) {
+  clearTimeout(_saveTimers.get(enc.id));
+  _saveTimers.delete(enc.id);
+  setPill('saving');
+  try {
+    const stored = await DmAPI.saveEncounter(JSON.parse(JSON.stringify(enc)));
+    enc.updatedAt = stored.updatedAt;
+    if (!_saveTimers.size) setPill('saved');
+  } catch (err) {
+    setPill('error');
+    toast(`Couldn't save "${enc.name}": ${err.message}`);
+  }
+}
+
+async function flushEncounter(enc) {
+  if (_saveTimers.has(enc.id)) await saveNow(enc);
+}
+
+// ---------------------------------------------------------------------------
+// Aftermath
+// ---------------------------------------------------------------------------
+
+let _after = null; // {last, run, party, ledger, setup}
+const _xpAdd = { trainers: {}, pokemon: {} }; // what's typed in, not saved yet
+const lower = s => String(s || '').toLowerCase();
+const monKey = (trainer, species) => `${lower(trainer)}|${lower(species)}`;
+
+async function renderAftermath(body) {
+  body.innerHTML = '<div class="dm-loading">Loading the last battle…</div>';
+  try {
+    const [last, run, party, ledger, npcs] = await Promise.all([
+      DmAPI.getState('last-battle'), DmAPI.getState('encounter-run'), DmAPI.party(), DmAPI.getState('xp-ledger'), DmAPI.npcs(),
+    ]);
+    _npcs = npcs.data || [];
+    _after = { last, run, party: party.data || [], ledger: { trainers: {}, pokemon: {}, ...(ledger || {}) } };
+  } catch (err) {
+    body.innerHTML = `<div class="dm-loading">Couldn't load the aftermath: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  if (_tab !== 'aftermath') return;
+  drawAftermath(body);
+}
+
+/** Everyone in the last battle, sorted into what the aftermath needs. */
+function battleSummary(last) {
+  const ps = last.participants || [];
+  const enemies = ps.filter(p => p.owner === 'DM' || !p.owner);
+  const players = ps.filter(p => p.owner && p.owner !== 'DM');
+  return {
+    caught: enemies.filter(p => p.captured),
+    defeated: enemies.filter(p => !p.captured && Number(p.currentHP) <= 0),
+    away: enemies.filter(p => !p.captured && Number(p.currentHP) > 0),
+    fainted: players.filter(p => p.combatantType === 'pokemon' && Number(p.currentHP) <= 0),
+    trainers: [...new Set(players.map(p => p.owner))],
+    present: new Set(players.filter(p => p.combatantType === 'pokemon').map(p => monKey(p.owner, p.speciesName || p.name))),
+  };
+}
+
+function trainerRecord(name) {
+  return _after.party.find(t => lower(t.trainer?.[1]) === lower(name)) || null;
+}
+
+function tags(list, cls) {
+  return list.map(p => `<span class="dm-enc-tag ${cls}">${escapeHtml(p.name)} <small>Lv ${p.level ?? '?'}</small></span>`).join('');
+}
+
+function drawAftermath(body) {
+  const { last, run } = _after;
+  if (!last) {
+    body.innerHTML = '<div class="dm-cs-empty">No PvE battle has ended yet. When one does, what happened and what to hand out shows up here.</div>';
+    return;
+  }
+  const s = battleSummary(last);
+  const ended = new Date(last.endedAt);
+  const allTrainers = _after.party.map(t => t.trainer?.[1]).filter(Boolean);
+  const trainerOptions = (sel = '') => [...s.trainers, ...allTrainers.filter(t => !s.trainers.some(x => lower(x) === lower(t)))]
+    .map(t => `<option ${lower(t) === lower(sel) ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
+  const minutes = Math.max(1, Math.ceil(((Number(last.round) || 1) * ROUND_SECONDS) / 60));
+  const clock = getClock();
+  last.given = last.given || {};
+  last.lootGiven = last.lootGiven || {};
+
+  // Loot: held items of the defeated wild Pokemon, and the items of defeated NPC trainers (from the NPC library).
+  const setup = getSetup();
+  const loot = [];
+  s.defeated.forEach((p) => {
+    if (p.combatantType === 'trainer') {
+      const npc = npcById(setup?.creatures.find(c => c.id === p.id)?.npcId);
+      (npc?.inventory || []).filter(i => i.name).forEach((it, i) => loot.push({ key: `${p.id}:${i}`, from: p.name, name: it.name, quantity: Number(it.quantity) || 1, description: it.description || '' }));
+    } else if (p.item && !/^none$/i.test(p.item)) {
+      loot.push({ key: `${p.id}:held`, from: p.name, name: p.item, quantity: 1, description: '' });
+    }
+  });
+
+  body.innerHTML = `
+    <div class="dm-after">
+      <div class="dm-after-head">
+        <div>
+          <h2>${escapeHtml(run?.name || 'Battle')} -- aftermath</h2>
+          <div class="dm-hint">Ended ${ended.toLocaleString()} · ${last.round || 1} round${last.round === 1 ? '' : 's'}${last.done ? ' · <strong>marked done</strong>' : ''}</div>
+        </div>
+        <button class="dm-btn ${last.done ? '' : 'primary'}" id="afDone">${last.done ? 'Done ✓' : '✓ Done with this battle'}</button>
+      </div>
+
+      <div class="dm-after-stats">
+        <div><strong>${s.defeated.length}</strong><span>Defeated</span></div>
+        <div><strong>${s.caught.length}</strong><span>Caught</span></div>
+        <div><strong>${s.away.length}</strong><span>Got away / still standing</span></div>
+        <div><strong>${s.fainted.length}</strong><span>Players' Pokémon fainted</span></div>
+      </div>
+      <div class="dm-after-tags">
+        ${s.defeated.length ? `<div><span>Defeated</span>${tags(s.defeated, 'def')}</div>` : ''}
+        ${s.caught.length ? `<div><span>Caught</span>${tags(s.caught, 'cau')}</div>` : ''}
+        ${s.away.length ? `<div><span>Got away</span>${tags(s.away, 'awy')}</div>` : ''}
+        ${s.fainted.length ? `<div><span>Fainted</span>${tags(s.fainted, 'fnt')}</div>` : ''}
+      </div>
+
+      <div class="dm-after-grid">
+        ${s.caught.length ? `
+        <div class="dm-card dm-after-wide">
+          <div class="dm-card-title">Caught Pokémon -- into a trainer's team</div>
+          ${s.caught.map(p => `
+            <div class="dm-after-caught" data-caught="${escapeHtml(p.id)}">
+              <span class="dm-enc-thumb" data-img="${escapeHtml(p.image || '')}"></span>
+              <span><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(p.speciesName || '')} · Lv ${p.level ?? '?'}</small></span>
+              ${last.given[p.id] ? `<span class="dm-pill ok">✓ In ${escapeHtml(last.given[p.id])}'s team</span>` : `
+                <select class="dm-select" data-k="trainer">${trainerOptions()}</select>
+                <input class="dm-input" data-k="nickname" placeholder="Nickname (optional)">
+                <button class="dm-btn primary small" data-act="give-mon">Give</button>`}
+            </div>`).join('')}
+          <div class="dm-hint">Built the way you set it up (level, nature, abilities, held item), with full HP -- it shows up on their phone straight away.</div>
+        </div>` : ''}
+
+        <div class="dm-card">
+          <div class="dm-card-title">Loot & money</div>
+          ${loot.length ? loot.map(it => `
+            <div class="dm-after-loot" data-loot="${escapeHtml(it.key)}" data-name="${escapeHtml(it.name)}" data-desc="${escapeHtml(it.description)}">
+              <span><strong>${escapeHtml(it.name)}</strong>${it.quantity > 1 ? ` ×${it.quantity}` : ''}<small>from ${escapeHtml(it.from)}</small></span>
+              ${last.lootGiven[it.key] ? `<span class="dm-pill ok">✓ ${escapeHtml(last.lootGiven[it.key])}</span>` : `
+                <input class="dm-input" type="number" min="1" value="${it.quantity}" data-k="qty">
+                <select class="dm-select" data-k="trainer">${trainerOptions()}</select>
+                <button class="dm-btn small primary" data-act="give-loot">Give</button>`}
+            </div>`).join('') : '<div class="dm-hint">No items from the defeated (held items, NPC trainers\' bags).</div>'}
+          <div class="dm-after-give">
+            <div class="dm-card-title" style="margin-top:0.8rem">Give something else</div>
+            <div class="dm-row">
+              <input class="dm-input" id="afItem" placeholder="Item" list="afItems">
+              <input class="dm-input" id="afItemQty" type="number" min="1" value="1" style="max-width:70px">
+              <select class="dm-select" id="afItemTo">${trainerOptions()}</select>
+              <button class="dm-btn small" id="afItemGive">Give</button>
+            </div>
+            <div class="dm-row" style="margin-top:0.4rem">
+              <input class="dm-input" id="afMoney" type="number" placeholder="Money" style="max-width:110px">
+              <select class="dm-select" id="afMoneyTo"><option value="__all">Each trainer in the battle</option>${trainerOptions()}</select>
+              <button class="dm-btn small" id="afMoneyGive">Give money</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dm-card">
+          <div class="dm-card-title">⏱ World clock</div>
+          <div class="dm-hint">Now: <strong>${clock ? `${escapeHtml(formatDate(clock))} -- ${formatTime(clock)} (${escapeHtml(phaseName(clock))})` : '?'}</strong>. The fight took ${last.round || 1} round${last.round === 1 ? '' : 's'} (~${minutes} min).</div>
+          <label class="dm-check" style="margin-top:0.5rem"><input type="radio" name="afTime" value="combat" checked><span>Move it on by the fight (${minutes} min)</span></label>
+          <label class="dm-check"><input type="radio" name="afTime" value="custom"><span>By <input class="dm-input dm-inline-num" id="afMinutes" type="number" min="0" step="5" value="60"> minutes</span></label>
+          <label class="dm-check"><input type="radio" name="afTime" value="phase"><span>On to <select class="dm-select dm-inline-sel" id="afPhase">${PHASES.map(p => `<option>${p.name}</option>`).join('')}</select></span></label>
+          <div class="dm-row" style="margin-top:0.4rem">
+            <button class="dm-btn small primary" id="afTimeGo">Move the clock</button>
+            <button class="dm-btn small" id="afWeather">🎲 Roll weather</button>
+            <button class="dm-btn small" id="afLog" ${last.logged ? 'disabled' : ''}>${last.logged ? 'Logged ✓' : '📌 Log as calendar event'}</button>
+          </div>
+        </div>
+
+        <div class="dm-card dm-after-wide">
+          <div class="dm-card-title"><span>Experience <span class="dm-label-note">(only you see XP)</span></span>
+            <span class="dm-row dm-enc-titlebtns"><button class="dm-btn small" id="afXpImport" title="Read the XP from the old DM tool's trainer backup (shima-trainers-....json)">📂 Import from the old DM tool</button></span></div>
+          ${s.trainers.length ? `
+          <div class="dm-after-quick">
+            <label>Every trainer <input class="dm-input dm-inline-num" id="afQuickT" type="number" placeholder="+XP"></label>
+            <button class="dm-btn small" id="afQuickTGo">Add</button>
+            <label>Every Pokémon that fought <input class="dm-input dm-inline-num" id="afQuickP" type="number" placeholder="+XP"></label>
+            <button class="dm-btn small" id="afQuickPGo">Add</button>
+          </div>
+          <div class="dm-after-xp">${s.trainers.map(t => xpCardHtml(t, s)).join('')}</div>
+          <div class="dm-row" style="justify-content:flex-end;margin-top:0.6rem"><button class="dm-btn primary" id="afXpSave">Save XP</button></div>` : '<div class="dm-hint">No player trainers were in this battle.</div>'}
+        </div>
+
+        <div class="dm-card">
+          <div class="dm-card-title">Notes</div>
+          ${run ? `<div class="dm-after-notes">${escapeHtml(run.notes || '') || '<span class="dm-hint">No notes.</span>'}</div>
+            ${(run.noteCategories || []).map(c => `<details class="dm-after-cat"><summary>${escapeHtml(c.icon || '📝')} ${escapeHtml(c.name || 'Notes')}</summary><div class="dm-after-notes">${escapeHtml(c.content || '')}</div></details>`).join('')}`
+            : '<div class="dm-hint">No encounter was loaded for this battle.</div>'}
+        </div>
+
+        <details class="dm-card dm-collapsible">
+          <summary class="dm-card-title">📜 Battle log (${(last.log || []).length})</summary>
+          <div class="dm-after-log">${(last.log || []).map(l => `<div>${escapeHtml(l)}</div>`).join('')}</div>
+        </details>
+      </div>
+    </div>`;
+  if (!document.getElementById('afItems')) {
+    const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+    document.body.insertAdjacentHTML('beforeend', `<datalist id="afItems">${items.map(i => `<option value="${escapeHtml(i.name)}">`).join('')}</datalist>`);
+  }
+  body.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+  wireAftermath(body, s, minutes);
+}
+
+function xpOf(kind, key, level) {
+  const stored = _after.ledger[kind][key];
+  return Number.isFinite(stored) ? stored : XP_TO_LEVEL[Math.max(1, Math.min(20, Number(level) || 1))];
+}
+
+function xpLine(current, add) {
+  const now = current + (Number(add) || 0);
+  const from = levelFromXp(current);
+  const to = levelFromXp(now);
+  return `${now.toLocaleString()} XP${to > from ? ` <span class="dm-after-lvup">↑ level ${to}</span>` : ''}`;
+}
+
+function xpCardHtml(name, s) {
+  const rec = trainerRecord(name);
+  const level = rec?.trainer?.[2] || 1;
+  const tKey = lower(name);
+  const tXp = xpOf('trainers', tKey, level);
+  const mons = rec?.pokemon || [];
+  return `
+    <div class="dm-after-xpcard" data-trainer="${escapeHtml(name)}">
+      <div class="dm-after-xprow head">
+        <strong>${escapeHtml(name)} <small>Lv ${level}</small></strong>
+        <span>${tXp.toLocaleString()}</span>
+        <input class="dm-input" type="number" data-xp-t value="${_xpAdd.trainers[tKey] ?? ''}" placeholder="+XP">
+        <span class="dm-after-new">${xpLine(tXp, _xpAdd.trainers[tKey])}</span>
+      </div>
+      ${mons.map((m) => {
+        const key = monKey(name, m[2]);
+        const xp = xpOf('pokemon', key, m[4]);
+        const fought = s.present.has(key);
+        return `
+        <div class="dm-after-xprow${fought ? '' : ' absent'}" data-mon="${escapeHtml(m[2])}">
+          <label><input type="checkbox" data-present ${fought ? 'checked' : ''} title="Fought in this battle (gets the 'every Pokémon' XP)"> ${escapeHtml(m[36] || m[2])} <small>Lv ${m[4]}</small></label>
+          <span>${xp.toLocaleString()}</span>
+          <input class="dm-input" type="number" data-xp-p value="${_xpAdd.pokemon[key] ?? ''}" placeholder="+XP">
+          <span class="dm-after-new">${xpLine(xp, _xpAdd.pokemon[key])}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function wireAftermath(body, s, minutes) {
+  const { last } = _after;
+  const saveLast = () => DmAPI.saveState('last-battle', last).catch(err => toast(`Couldn't save: ${err.message}`));
+  const redraw = () => drawAftermath(body);
+
+  body.querySelector('#afDone').addEventListener('click', async () => {
+    last.done = !last.done;
+    await saveLast();
+    redraw();
+    window.dispatchEvent(new CustomEvent('dm:aftermath-changed'));
+  });
+
+  body.addEventListener('click', async (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'give-mon') {
+      const row = e.target.closest('[data-caught]');
+      const p = last.participants.find(x => x.id === row.dataset.caught);
+      const trainer = row.querySelector('[data-k="trainer"]').value;
+      const nickname = row.querySelector('[data-k="nickname"]').value.trim();
+      const c = getSetup()?.creatures.find(x => x.id === p.id);
+      const cfg = c ? { species: c.config.species, ...monConfig(c.config) } : { species: p.speciesName || p.name, level: p.level, abilities: [0] };
+      e.target.disabled = true;
+      try {
+        await DmAPI.givePokemon(trainer, { ...cfg, nickname: nickname || (p.name !== cfg.species && !/ [A-Z]$/.test(p.name) ? p.name : '') });
+        last.given[p.id] = trainer;
+        await saveLast();
+        toast(`${nickname || p.name} is now in ${trainer}'s team.`);
+        redraw();
+      } catch (err) { e.target.disabled = false; showCombatAlert(err.message, { title: `Give ${p.name}` }); }
+    } else if (act === 'give-loot') {
+      const row = e.target.closest('[data-loot]');
+      const qty = Math.max(1, Number(row.querySelector('[data-k="qty"]').value) || 1);
+      const trainer = row.querySelector('[data-k="trainer"]').value;
+      e.target.disabled = true;
+      try {
+        await giveItem(trainer, row.dataset.name, qty, row.dataset.desc);
+        last.lootGiven[row.dataset.loot] = `${trainer}${qty > 1 ? ` ×${qty}` : ''}`;
+        await saveLast();
+        redraw();
+      } catch (err) { e.target.disabled = false; showCombatAlert(err.message, { title: 'Give item' }); }
+    }
+  });
+
+  body.querySelector('#afItemGive').addEventListener('click', async () => {
+    const name = body.querySelector('#afItem').value.trim();
+    if (!name) return;
+    const qty = Math.max(1, Number(body.querySelector('#afItemQty').value) || 1);
+    const trainer = body.querySelector('#afItemTo').value;
+    try { await giveItem(trainer, name, qty, ''); body.querySelector('#afItem').value = ''; toast(`Gave ${trainer} ${qty} × ${name}.`); } catch (err) { showCombatAlert(err.message, { title: 'Give item' }); }
+  });
+  body.querySelector('#afMoneyGive').addEventListener('click', async () => {
+    const amount = Number(body.querySelector('#afMoney').value) || 0;
+    if (!amount) return;
+    const to = body.querySelector('#afMoneyTo').value;
+    const who = to === '__all' ? s.trainers : [to];
+    try {
+      for (const t of who) await DmAPI.giveMoney(t, amount);
+      body.querySelector('#afMoney').value = '';
+      toast(`Gave ${amount} to ${who.join(', ')}.`);
+    } catch (err) { showCombatAlert(err.message, { title: 'Give money' }); }
+  });
+
+  // World clock
+  body.querySelector('#afTimeGo').addEventListener('click', () => {
+    const mode = body.querySelector('input[name="afTime"]:checked').value;
+    if (mode === 'combat') advanceMinutes(minutes);
+    else if (mode === 'custom') advanceMinutes(Number(body.querySelector('#afMinutes').value) || 0);
+    else skipToPhase(body.querySelector('#afPhase').value);
+    const c = getClock();
+    toast(`The clock is now ${formatDate(c)}, ${formatTime(c)}.`);
+    redraw();
+  });
+  body.querySelector('#afWeather').addEventListener('click', () => { const w = rollWeather(); toast(`New weather: ${WEATHER[w]?.icon || ''} ${WEATHER[w]?.name || w}`); });
+  body.querySelector('#afLog').addEventListener('click', async () => {
+    const c = getClock();
+    const parts = [`Rounds: ${last.round || 1}`];
+    if (s.defeated.length) parts.push(`Defeated: ${s.defeated.map(p => p.name).join(', ')}`);
+    if (s.caught.length) parts.push(`Caught: ${s.caught.map(p => p.name).join(', ')}`);
+    if (s.trainers.length) parts.push(`Trainers: ${s.trainers.join(', ')}`);
+    updateClock(cl => cl.events.push({ id: newId('evt'), year: c.year, month: c.month, day: c.day, title: _after.run?.name || 'Battle', notes: parts.join('\n'), recurring: false }));
+    last.logged = true;
+    await saveLast();
+    toast(`Logged on ${formatDate(c)}.`);
+    redraw();
+  });
+
+  // Experience
+  const xpBox = body.querySelector('.dm-after-xp');
+  if (xpBox) {
+    xpBox.addEventListener('input', (e) => {
+      const card = e.target.closest('[data-trainer]');
+      if (!card) return;
+      if (e.target.matches('[data-xp-t]')) _xpAdd.trainers[lower(card.dataset.trainer)] = e.target.value === '' ? undefined : Number(e.target.value);
+      if (e.target.matches('[data-xp-p]')) _xpAdd.pokemon[monKey(card.dataset.trainer, e.target.closest('[data-mon]').dataset.mon)] = e.target.value === '' ? undefined : Number(e.target.value);
+      const row = e.target.closest('.dm-after-xprow');
+      const cur = Number(row.children[1].textContent.replace(/\D/g, '')) || 0;
+      row.querySelector('.dm-after-new').innerHTML = xpLine(cur, e.target.value);
+    });
+    xpBox.addEventListener('change', (e) => {
+      if (e.target.matches('[data-present]')) e.target.closest('.dm-after-xprow').classList.toggle('absent', !e.target.checked);
+    });
+    body.querySelector('#afQuickTGo').addEventListener('click', () => {
+      const v = Number(body.querySelector('#afQuickT').value) || 0;
+      s.trainers.forEach(t => { _xpAdd.trainers[lower(t)] = (_xpAdd.trainers[lower(t)] || 0) + v; });
+      redraw();
+    });
+    body.querySelector('#afQuickPGo').addEventListener('click', () => {
+      const v = Number(body.querySelector('#afQuickP').value) || 0;
+      xpBox.querySelectorAll('[data-present]:checked').forEach((cb) => {
+        const k = monKey(cb.closest('[data-trainer]').dataset.trainer, cb.closest('[data-mon]').dataset.mon);
+        _xpAdd.pokemon[k] = (_xpAdd.pokemon[k] || 0) + v;
+      });
+      redraw();
+    });
+    body.querySelector('#afXpSave').addEventListener('click', async () => {
+      const ledger = _after.ledger;
+      const ups = [];
+      s.trainers.forEach((t) => {
+        const rec = trainerRecord(t);
+        const add = Number(_xpAdd.trainers[lower(t)]) || 0;
+        if (add) {
+          const before = xpOf('trainers', lower(t), rec?.trainer?.[2]);
+          ledger.trainers[lower(t)] = before + add;
+          if (levelFromXp(before + add) > levelFromXp(before)) ups.push(`${t} → level ${levelFromXp(before + add)}`);
+        }
+        (rec?.pokemon || []).forEach((m) => {
+          const k = monKey(t, m[2]);
+          const addP = Number(_xpAdd.pokemon[k]) || 0;
+          if (!addP) return;
+          const before = xpOf('pokemon', k, m[4]);
+          ledger.pokemon[k] = before + addP;
+          if (levelFromXp(before + addP) > levelFromXp(before)) ups.push(`${t}'s ${m[36] || m[2]} → level ${levelFromXp(before + addP)}`);
+        });
+      });
+      try { await DmAPI.saveState('xp-ledger', ledger); } catch (err) { showCombatAlert(err.message, { title: 'Save XP' }); return; }
+      _xpAdd.trainers = {};
+      _xpAdd.pokemon = {};
+      redraw();
+      if (ups.length) showCombatAlert(`Level ups -- tell the players to level up in their app:\n${ups.join('\n')}`, { title: 'XP saved' });
+      else toast('XP saved.');
+    });
+  }
+  body.querySelector('#afXpImport').addEventListener('click', importXp);
+}
+
+/** An item into a trainer's bag -- one from the items list, or the DM's own (kept with its description). */
+function giveItem(trainer, name, qty, description) {
+  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+  const known = items.some(i => lower(i.name) === lower(name));
+  return DmAPI.giveItem(trainer, name, qty, { custom: !known, description });
+}
+
+/** XP from the old DM tool's trainer backup (shima-trainers-....json): its player trainers and their Pokemon. */
+function importXp() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    let data;
+    try { data = JSON.parse(await file.text()); } catch { showCombatAlert("That file isn't a backup from the old DM tool.", { title: 'Import XP' }); return; }
+    const players = (Array.isArray(data) ? data : data.trainers || []).filter(t => t && !t.isNPC && t.name);
+    if (!players.length) { showCombatAlert('No player trainers in that file.', { title: 'Import XP' }); return; }
+    const ledger = JSON.parse(JSON.stringify(_after.ledger));
+    let count = 0;
+    players.forEach((t) => {
+      if (Number.isFinite(Number(t.xp))) { ledger.trainers[lower(t.name)] = Number(t.xp); count++; }
+      (t.pokemon || []).forEach((p) => { if (p.name && Number.isFinite(Number(p.xp))) { ledger.pokemon[monKey(t.name, p.name)] = Number(p.xp); count++; } });
+    });
+    if (!await showCombatConfirm(`Set the XP of ${players.length} trainers and their Pokémon (${count} values) from ${file.name}? XP already here for them is replaced.`, { title: 'Import XP', yesLabel: 'Import', noLabel: 'Cancel' })) return;
+    try { await DmAPI.saveState('xp-ledger', ledger); } catch (err) { showCombatAlert(err.message, { title: 'Import XP' }); return; }
+    _after.ledger = ledger;
+    toast(`Imported the XP of ${players.map(t => t.name).join(', ')}.`);
+    drawAftermath(document.getElementById('encBody'));
+  });
+  input.click();
+}

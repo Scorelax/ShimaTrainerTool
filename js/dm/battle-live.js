@@ -2,18 +2,24 @@
 // screen the players use -- running as the DM (enableDmMode, see dm-console.js): every creature the DM set up is owned
 // by 'DM', so it gets the same card, moves, saves, reactions and map tools a player's own Pokemon does, and anything a
 // player's attack asks of it (a save, a Sturdy roll) pops up here. The panel on the right is the DM's own: the table
-// screens, the DM's creatures in the fight, and reinforcements.
+// screens, the encounter in play (its events and notes -- encounters.js), the DM's creatures in the fight (with the
+// capture helper), and reinforcements.
 import { CombatAPI, DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { VISIBILITY_DEFAULTS } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFocusChange } from '../pages/combat-wip.js';
-import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow, natureOptions } from './dm-common.js';
+import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow, natureOptions, openDmModal } from './dm-common.js';
+import { getClock, WEATHER } from './world-clock.js';
+import { TERRAIN, WEATHER_ROLL_MOD, STATUS_CAPTURE_BONUS, captureDc, accuracyDc } from './encounter-rules.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
 let selectedSpecies = null;
 let adding = false;
+let run = null; // the encounter loaded into this battle ('encounter-run'), or null
+let lastRound = null;
+let runSaveTimer = null;
 
 export async function mountLive(stageEl, toolsEl, currentSession) {
   session = currentSession;
@@ -23,11 +29,182 @@ export async function mountLive(stageEl, toolsEl, currentSession) {
   renderTools(toolsEl);
   renderCreatures();
   getSpecies().then(list => { species = list; renderSpeciesResults(); }).catch(() => {});
+  lastRound = session.started ? Number(session.round) || 1 : null;
+  DmAPI.getState('encounter-run').then((r) => { run = r; if (run) run.eventState = run.eventState || {}; renderEncounterCard(); }).catch(() => {});
 }
 
 export function updateLive(currentSession) {
   session = currentSession;
   renderCreatures();
+  const round = session.started ? Number(session.round) || 1 : null;
+  if (round !== null && lastRound !== null && round > lastRound) newRound(round);
+  if (round !== null) lastRound = round;
+  renderEncounterCard();
+}
+
+// ---------------------------------------------------------------------------
+// The encounter in play: its notes, and its events with a reminder when one is due
+// ---------------------------------------------------------------------------
+
+function evState(ev) {
+  run.eventState[ev.id] = run.eventState[ev.id] || { done: false, stage: 0, firedAt: null };
+  return run.eventState[ev.id];
+}
+
+function dueRound(ev) {
+  return (Number(ev.startRound) || 1) + (Number(ev.countdown) || 0);
+}
+
+function eventStatus(ev, round) {
+  const st = evState(ev);
+  if (st.done) return st.firedAt ? `Happened in round ${st.firedAt}` : 'Done';
+  if (ev.trigger === 'recurring') return 'Every round';
+  if (ev.trigger === 'countdown') {
+    const due = dueRound(ev);
+    if (st.firedAt) return `Due since round ${st.firedAt}`;
+    if (round === null) return `Round ${due}`;
+    return round >= due ? 'Due now!' : `In ${due - round} round${due - round === 1 ? '' : 's'} (round ${due})`;
+  }
+  return 'When you trigger it';
+}
+
+/** A new round: recurring events remind the DM (a note), a countdown that has run out pops up. */
+function newRound(round) {
+  if (!run?.events?.length) return;
+  const every = [];
+  run.events.forEach((ev) => {
+    const st = evState(ev);
+    if (st.done || ev.notify === false) return;
+    if (ev.trigger === 'recurring') every.push(`${ev.icon || '⚡'} ${ev.name}`);
+    if (ev.trigger === 'countdown' && !st.firedAt && round >= dueRound(ev)) {
+      st.firedAt = round;
+      showCombatAlert(`${ev.description || ''}${currentStageText(ev)}`.trim() || ev.name, { title: `${ev.icon || '⚡'} ${ev.name || 'Event'} -- round ${round}` });
+    }
+  });
+  if (every.length) toast(`Round ${round}: ${every.join(' · ')}`);
+  saveRunSoon();
+}
+
+function currentStageText(ev) {
+  const stage = ev.stages?.[evState(ev).stage];
+  return stage ? `\n\nStage ${evState(ev).stage + 1}: ${stage.name}${stage.description ? ` -- ${stage.description}` : ''}` : '';
+}
+
+function saveRunSoon() {
+  clearTimeout(runSaveTimer);
+  runSaveTimer = setTimeout(() => DmAPI.saveState('encounter-run', run).catch(() => {}), 500);
+}
+
+function renderEncounterCard() {
+  const el = document.getElementById('dmEncCard');
+  if (!el) return;
+  if (!run) { el.hidden = true; return; }
+  el.hidden = false;
+  const round = session.started ? Number(session.round) || 1 : null;
+  const weatherKey = run.weather === 'world' ? getClock()?.weather || 'clear' : run.weather;
+  const open = el.querySelector('details')?.open;
+  el.innerHTML = `
+    <div class="dm-card-title"><span>🗺️ ${escapeHtml(run.name || 'Encounter')}</span><button class="dm-icon-btn" data-ev-act="unload" title="This battle isn't that encounter -- stop showing it">✕</button></div>
+    <div class="dm-hint">${escapeHtml(TERRAIN[run.terrain]?.name || 'Flat ground')} · ${WEATHER[weatherKey]?.icon || ''} ${escapeHtml(WEATHER[weatherKey]?.name || weatherKey)}${run.weather === 'world' ? ' (world clock)' : ''}</div>
+    ${run.notes || run.noteCategories?.length ? `<details class="dm-live-notes" ${open ? 'open' : ''}><summary>Notes</summary>
+      ${run.notes ? `<div class="dm-live-note">${escapeHtml(run.notes)}</div>` : ''}
+      ${(run.noteCategories || []).map(c => `<div class="dm-live-note"><strong>${escapeHtml(c.icon || '📝')} ${escapeHtml(c.name)}</strong>\n${escapeHtml(c.content || '')}</div>`).join('')}</details>` : ''}
+    ${(run.events || []).map((ev) => {
+      const st = evState(ev);
+      const due = !st.done && ev.trigger === 'countdown' && round !== null && round >= dueRound(ev);
+      const stage = ev.stages?.length ? ev.stages[st.stage] : null;
+      return `
+      <div class="dm-live-evt${st.done ? ' done' : ''}${due ? ' due' : ''}" data-ev="${escapeHtml(ev.id)}" title="${escapeHtml(ev.description || '')}">
+        <div class="dm-live-evt-top">
+          <span>${ev.icon || '⚡'} <strong>${escapeHtml(ev.name || 'Event')}</strong></span>
+          <span class="dm-live-evt-status">${escapeHtml(eventStatus(ev, round))}</span>
+        </div>
+        ${stage ? `<div class="dm-live-stage"><button class="dm-icon-btn" data-ev-act="prev" ${st.stage ? '' : 'disabled'}>‹</button>
+          <span>Stage ${st.stage + 1}/${ev.stages.length}: <strong>${escapeHtml(stage.name)}</strong>${stage.description ? ` -- ${escapeHtml(stage.description)}` : ''}</span>
+          <button class="dm-icon-btn" data-ev-act="next" ${st.stage < ev.stages.length - 1 ? '' : 'disabled'}>›</button></div>` : ''}
+        <div class="dm-live-evt-btns">
+          ${!st.done && ev.trigger === 'once' ? '<button class="dm-btn small" data-ev-act="fire">▶ Trigger</button>' : ''}
+          <button class="dm-btn small" data-ev-act="done">${st.done ? '↺ Bring back' : '✓ Done'}</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+  if (!el.dataset.bound) {
+    el.dataset.bound = '1';
+    el.addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-ev-act]')?.dataset.evAct;
+      if (!act || !run) return;
+      if (act === 'unload') {
+        if (!await showCombatConfirm(`Stop showing "${run.name}" here? (The encounter itself stays in the library.)`, { title: 'Encounter', yesLabel: 'Stop showing it', noLabel: 'Cancel' })) return;
+        run = null;
+        await DmAPI.saveState('encounter-run', null).catch(() => {});
+        renderEncounterCard();
+        return;
+      }
+      const ev = run.events.find(x => x.id === e.target.closest('[data-ev]')?.dataset.ev);
+      if (!ev) return;
+      const st = evState(ev);
+      if (act === 'fire') {
+        st.done = true;
+        st.firedAt = Number(session.round) || 1;
+        showCombatAlert(`${ev.description || ''}${currentStageText(ev)}`.trim() || ev.name, { title: `${ev.icon || '⚡'} ${ev.name || 'Event'}` });
+      } else if (act === 'done') {
+        st.done = !st.done;
+        if (!st.done) st.firedAt = null;
+      } else if (act === 'prev') st.stage = Math.max(0, st.stage - 1);
+      else if (act === 'next') st.stage = Math.min(ev.stages.length - 1, st.stage + 1);
+      renderEncounterCard();
+      saveRunSoon();
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The capture helper (the old tool's capture DC breakdown)
+// ---------------------------------------------------------------------------
+
+async function openCapture(p) {
+  const sp = species.find(s => s.name === p.speciesName) || {};
+  const terrainKey = run?.terrain || 'flat';
+  const weatherKey = !run || run.weather === 'world' ? getClock()?.weather || 'clear' : run.weather;
+  const cdc = captureDc(p, sp);
+  const acc = accuracyDc(p, terrainKey);
+  const wmod = WEATHER_ROLL_MOD[weatherKey] || 0;
+  const conditions = (p.statuses || []).filter(s => s.kind === 'condition').map(s => String(s.apply || '').toLowerCase());
+  const bonuses = Object.entries(STATUS_CAPTURE_BONUS).map(([name, bonus]) => ({ name, bonus, on: conditions.includes(name.toLowerCase()) }));
+  const sign = n => (n >= 0 ? `+${n}` : `${n}`);
+  const row = (label, value, cls = '') => `<div class="dm-cap-row ${cls}"><span>${label}</span><span>${value}</span></div>`;
+  const choice = await openDmModal({
+    title: `🔴 Catching ${p.name}`,
+    html: `
+      <div class="dm-cap-who">${typeBadges(p.type1, p.type2)} Lv ${p.level ?? '?'} · HP ${p.currentHP}/${p.maxHP} (${cdc.hpPct}%) · ${escapeHtml(p.size || sp.size || 'Medium')} · ${escapeHtml(sp.rarity || '?')} · ${escapeHtml(sp.behavior || '?')}</div>
+      <div class="dm-cap-cols">
+        <div>
+          <div class="dm-card-title">1 · The throw</div>
+          <div class="dm-hint">d20 + Animal Handling or Athletics, ${sign(wmod)} for the weather (${escapeHtml(WEATHER[weatherKey]?.name || weatherKey)}). A natural 20 adds +20 to the capture roll.</div>
+          ${row('Base', 10)}${row(`DEX (${p.dex ?? 10})`, sign(acc.dexMod))}${row(`Terrain (${escapeHtml(TERRAIN[terrainKey]?.name || '')})`, sign(acc.terrain))}
+          ${row('Accuracy DC', acc.total, 'total')}
+        </div>
+        <div>
+          <div class="dm-card-title">2 · The capture roll</div>
+          <div class="dm-hint">d100 + the ball's bonus + the bonuses below; meet or beat the capture DC.</div>
+          ${row('Base', 50)}${row(`Type (${escapeHtml([p.type1, p.type2].filter(Boolean).join('/'))})`, sign(cdc.types))}${row(`Size`, sign(cdc.size))}
+          ${row(`Rarity (${escapeHtml(sp.rarity || '?')})`, sign(cdc.rarity))}${row(`Behaviour (${escapeHtml(sp.behavior || '?')})`, sign(cdc.behavior))}
+          ${row(`Health (${cdc.hpPct}% HP)`, sign(cdc.health))}
+          ${row('Capture DC', cdc.total, 'total')}
+          <div class="dm-hint" style="margin-top:0.4rem">Your call on top: in its lair +10 to +20; weather it likes +10, weather it hates −10.</div>
+        </div>
+      </div>
+      <div class="dm-card-title" style="margin-top:0.8rem">Bonuses to the capture roll</div>
+      <div class="dm-cap-bonus">${bonuses.map(b => `<span class="${b.on ? 'on' : ''}">${b.name} +${b.bonus}${b.on ? ' ✓' : ''}</span>`).join('')}</div>`,
+    buttons: [{ label: 'Close', value: null }, { label: '🔴 Mark as caught', value: 'catch', kind: 'primary' }],
+  });
+  if (choice !== 'catch') return;
+  try {
+    await CombatAPI.capture(p.id);
+    toast(`${p.name} was caught -- hand it to its trainer in the aftermath (Encounters → Aftermath) after the battle.`);
+  } catch (err) {
+    showCombatAlert(err.message, { title: `Catch ${p.name}` });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +263,8 @@ function renderTools(el) {
         <a class="dm-btn" href="battle-map.html" target="_blank" rel="noopener" title="The table's battle map screen">▦ Battle map</a>
       </div>
     </div>
+
+    <div class="dm-card" id="dmEncCard" hidden></div>
 
     <div class="dm-card">
       <div class="dm-card-title">
@@ -286,6 +465,7 @@ function renderCreatures() {
       <div class="dm-bar vp"><i style="width:${pct(p.currentVP, p.maxVP)}%"></i></div>`;
     // What the players can see of it is set in the checkbox column left of its card (renderVisibilityColumn).
     row.querySelector('.dm-creature-actions').innerHTML = `
+      ${p.combatantType === 'pokemon' ? '<button class="dm-icon-btn" data-act="capture" title="Catch helper -- the capture DC, and mark it caught">🔴</button>' : ''}
       <button class="dm-icon-btn" data-act="status" title="${p.status === 'spectating' ? 'Send it into the fight' : 'Hold it back (out of the turn order)'}">${p.status === 'spectating' ? '▶' : '⏸'}</button>
       <button class="dm-icon-btn danger" data-act="remove" title="Remove from the battle">✕</button>`;
     if (box.children[index] !== row) box.insertBefore(row, box.children[index] || null);
@@ -305,6 +485,7 @@ async function onCreatureAction(e) {
   const id = btn.closest('[data-id]')?.dataset.id;
   const p = session.participants?.[id];
   if (!p) return;
+  if (btn.dataset.act === 'capture') { openCapture(p); return; }
   try {
     if (btn.dataset.act === 'status') {
       await CombatAPI.setStatus(id, p.status === 'spectating' ? 'participating' : 'spectating');

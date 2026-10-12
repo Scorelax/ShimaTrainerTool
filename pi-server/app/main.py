@@ -230,6 +230,45 @@ def save_dm_npc(payload: dict):
     return JSONResponse({'status': 'success', 'data': npc})
 
 
+@app.post('/api/dm/encounter')
+def save_dm_encounter(payload: dict):
+    """One encounter from the DM console's encounter library (routes_dm.save_encounter)."""
+    conn = db.connect()
+    try:
+        encounter = routes_dm.save_encounter(conn, payload.get('encounter'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success', 'data': encounter})
+
+
+@app.post('/api/dm/state')
+def save_dm_state(payload: dict):
+    """One of the DM console's small records (routes_dm._STATE_KEYS), stored whole."""
+    conn = db.connect()
+    try:
+        routes_dm.save_state(conn, payload.get('key'), payload.get('data'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success'})
+
+
+@app.post('/api/dm/give-pokemon')
+def dm_give_pokemon(payload: dict):
+    """The aftermath: a caught Pokemon straight into a trainer's team (routes_dm.give_pokemon)."""
+    conn = db.connect()
+    try:
+        result = routes_dm.give_pokemon(conn, payload.get('trainer'), payload.get('pokemon') or {})
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse(result)
+
+
 @app.post('/api/dm/pokedex-config')
 def save_dm_pokedex_config(payload: dict):
     """The DM console's Pokedex module: what the players may see of each species (pokedexConfig -- registered,

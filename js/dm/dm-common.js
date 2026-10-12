@@ -107,6 +107,35 @@ export function toast(text) {
   box._timer = setTimeout(() => { box.style.opacity = '0'; }, 4000);
 }
 
+/** A popup over the console: `title`, the body's HTML, and `buttons` ([{label, value, kind: 'primary'|'danger'|''}]).
+ * Resolves to the clicked button's value (null when closed with × or Escape); `onOpen(body)` wires the body first.
+ * A button with `keepOpen` calls `onClick(body)` instead of closing -- return true from it to close after all. */
+export function openDmModal({ title, html, buttons = [{ label: 'Close', value: null }], wide = false, onOpen = null }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'dm-modal-overlay';
+    overlay.innerHTML = `
+      <div class="dm-modal${wide ? ' wide' : ''}" role="dialog">
+        <div class="dm-modal-head"><h3>${escapeHtml(title)}</h3><button class="dm-icon-btn" data-close title="Close">✕</button></div>
+        <div class="dm-modal-body">${html}</div>
+        <div class="dm-modal-foot">${buttons.map((b, i) => `<button class="dm-btn ${b.kind || ''}" data-btn="${i}">${escapeHtml(b.label)}</button>`).join('')}</div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const body = overlay.querySelector('.dm-modal-body');
+    const close = (value) => { document.removeEventListener('keydown', onKey); overlay.remove(); resolve(value); };
+    const onKey = (e) => { if (e.key === 'Escape') close(null); };
+    document.addEventListener('keydown', onKey);
+    overlay.querySelector('[data-close]').addEventListener('click', () => close(null));
+    overlay.querySelector('.dm-modal-foot').addEventListener('click', async (e) => {
+      const b = buttons[e.target.closest('[data-btn]')?.dataset.btn];
+      if (!b) return;
+      if (b.keepOpen) { if (await b.onClick?.(body)) close(b.value); return; }
+      close(b.value);
+    });
+    onOpen?.(body, close);
+  });
+}
+
 let _species = null;
 let _speciesLoading = null;
 

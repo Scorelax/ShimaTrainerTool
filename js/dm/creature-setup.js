@@ -427,8 +427,9 @@ function readPokemonForm() {
   };
 }
 
-/** Builds one Pokemon creature (server maths + the player builder) from its config and display name. */
-async function buildPokemonCreature(id, species, name, config, extra) {
+/** Builds one Pokemon creature (server maths + the player builder) from its config and display name. Also used by the
+ * encounter builder (encounters.js) to load an encounter's Pokemon into the setup. */
+export async function buildPokemonCreature(id, species, name, config, extra) {
   const res = await DmAPI.buildPokemon({ species, nickname: name === species ? '' : name, ...config });
   const { combatant, participant } = participantFromPokemonRow(res.data);
   participant.initiative = config.initiative ?? null;

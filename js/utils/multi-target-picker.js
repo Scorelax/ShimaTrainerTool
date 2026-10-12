@@ -130,9 +130,12 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   const mapBtn = document.getElementById('mtpMapBtn');
   const hasBoard = !!session.board?.tokens?.[casterId] || Object.keys(session.board?.tokens || {}).length > 0;
   mapBtn.hidden = !(area && hasBoard);
+  // Lines and cones start at the caster: whoever is behind full cover from there isn't caught (targetability.js).
+  const aimableIds = participants.filter(p => !participants.noSight?.has(p.id)).map(p => p.id);
+  const blockedNotes = participants.noSight || null;
   mapBtn.onclick = async () => {
     if (area.coneFt) {
-      const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt, targetableIds: participants.map(p => p.id) });
+      const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt, targetableIds: aimableIds, blockedNotes });
       if (!cone) return;
       participants.forEach(p => {
         const card = grid.querySelector(`[data-target-id="${p.id}"]`);
@@ -141,7 +144,7 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
       return;
     }
     if (area.lineFt) {
-      const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt, targetableIds: participants.map(p => p.id) });
+      const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt, targetableIds: aimableIds, blockedNotes });
       if (!line) return;
       participants.forEach(p => {
         const card = grid.querySelector(`[data-target-id="${p.id}"]`);

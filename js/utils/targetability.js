@@ -3,12 +3,16 @@
 // from every target picker unless the move lists that state in its own `hitsStates` (Earthquake ->
 // underground). A creature beyond the move's range (move-range.js) stays in the list but is drawn greyed
 // out and can't be picked (markOutOfRange). So does one in reach but behind full cover from the DM's map objects
-// (cover.js); one behind partial cover can be picked, and its attack roll has disadvantage (moveCover). Cover only
-// counts for moves aimed at a creature within a reach -- not Self moves or areas. The picker modules don't know about
-// move data, so combat-wip.js injects the rules.
+// (cover.js); one behind partial cover can be picked, and its attack roll has disadvantage (moveCover). Cover counts
+// for moves aimed at a creature within a reach, and for lines and cones -- measured from the caster, where they start
+// (the line/cone aimers leave out whoever is behind full cover). Not for Self moves or other areas. The picker modules
+// don't know about move data, so combat-wip.js injects the rules.
 import { showCombatAlert } from './combat-alert.js';
 import { moveReachFt, creatureDistanceFt } from './move-range.js';
 import { coverBetween, coverText } from './cover.js';
+
+// "Self (15ft. cone)", "50ft. line": aimed from the caster, so cover from the caster counts for them too.
+const LINE_OR_CONE = /\d+\s*(?:ft|feet|foot)\.?\s*(?:line|cone)/i;
 
 let _resolver = () => null;
 let _rangeResolver = () => '';
@@ -53,13 +57,14 @@ export function filterTargetable(participants, moveName, session = null, casterI
   list.noSight = new Map();
   list.partialCover = new Map();
   const caster = session?.participants?.[casterId];
-  const reach = caster ? moveReachFt(_rangeResolver(moveName), caster.size) : null;
-  if (reach == null) {
+  const rangeText = _rangeResolver(moveName);
+  const reach = caster ? moveReachFt(rangeText, caster.size) : null;
+  if (reach == null && !(caster && LINE_OR_CONE.test(rangeText))) {
     if (list.length && casterId) _noTargetHandler?.(casterId, moveName, true);
     return list;
   }
   list.forEach((p) => {
-    const ft = creatureDistanceFt(session.board, caster, p);
+    const ft = reach == null ? null : creatureDistanceFt(session.board, caster, p);
     if (ft != null && ft > reach) { list.outOfRange.set(p.id, `${ft}ft away`); return; }
     const cover = coverBetween(session, casterId, p.id);
     if (cover.level === 'full') list.noSight.set(p.id, coverText(cover));
@@ -84,10 +89,12 @@ export function filterTargetable(participants, moveName, session = null, casterI
 }
 
 /** The cover creature `targetId` has from `attackerId` against `moveName` ({level: 'partial' | 'full', by, hidden},
- * see cover.js), or null when there's none or the move isn't aimed at a creature within a reach (Self, areas). */
+ * see cover.js), or null when there's none or the move is neither aimed at a creature within a reach nor a line or
+ * cone (Self, other areas). */
 export function moveCover(session, attackerId, targetId, moveName) {
   const attacker = session?.participants?.[attackerId];
-  if (!attacker || !targetId || moveReachFt(_rangeResolver(moveName), attacker.size) == null) return null;
+  const rangeText = _rangeResolver(moveName);
+  if (!attacker || !targetId || (moveReachFt(rangeText, attacker.size) == null && !LINE_OR_CONE.test(rangeText))) return null;
   const cover = coverBetween(session, attackerId, targetId);
   return cover.level === 'none' ? null : cover;
 }
@@ -113,7 +120,7 @@ export function markOutOfRange(grid, list, { partial = true } = {}) {
   list?.partialCover?.forEach((note, id) => {
     const card = grid.querySelector(`[data-target-id="${id}"]`);
     if (!card) return;
-    card.title = `${note} -- the attack roll has disadvantage`;
+    card.title = `${note} -- attack rolls against it have disadvantage`;
     card.insertAdjacentHTML('beforeend', `<div class="target-cover-note" style="font-size:0.7rem;color:#f0b232;font-weight:700;">${note}</div>`);
   });
 }

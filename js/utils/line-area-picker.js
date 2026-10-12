@@ -4,7 +4,7 @@
 // multi-target picker to tick (still adjustable there). See line-area.js for the geometry.
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
 import { coneOrigin, levelCone, inConeReach, coneHitIds, coneShadowCells, coneAimAt } from './cone-area.js';
 import { lineGeometry, lineHitIds, lineReachBox, inLineReach, aimAtCreature, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
@@ -35,9 +35,10 @@ function _injectStyles() {
   document.head.appendChild(style);
 }
 
-// The board's tokens, greyed out when the move can't target them (underground, in another dimension... -- `targetable`
-// is the multi-target picker's own list of ids; null means everyone).
-function _buildTokens(session, board, casterId, tokenLayer, targetable) {
+// The board's tokens, greyed out when the move can't target them (underground, in another dimension, behind full cover
+// from the caster... -- `targetable` is the multi-target picker's own list of ids; null means everyone). `blockedNotes`
+// (id -> "Full cover (Wall)") says why in the tooltip.
+function _buildTokens(session, board, casterId, tokenLayer, targetable, blockedNotes = null) {
   const tokenEls = new Map();
   Object.entries(board.tokens).forEach(([id, pos]) => {
     const p = session.participants[id];
@@ -47,7 +48,7 @@ function _buildTokens(session, board, casterId, tokenLayer, targetable) {
     el.className = `bmap-token ${p.side}${id === casterId ? ' mine' : ''}${(pos.z || 0) > 0 ? ' airborne' : ''}${out ? ' untargetable' : ''}`;
     Object.assign(el.style, cellRect(board, pos.col, pos.row, footprintForSize(p.size)));
     const name = visibleToViewer(p, 'name') ? p.name : '???';
-    el.title = out ? `${name} (can't be targeted by this move)` : name;
+    el.title = out ? `${name} (${blockedNotes?.get(id) || "can't be targeted by this move"})` : name;
     el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
     patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
     tokenLayer.appendChild(el);
@@ -63,7 +64,7 @@ function _buildTokens(session, board, casterId, tokenLayer, targetable) {
  * @param {number} lengthFt the line's length (lineFtFromRange of the move's range)
  * @returns {Promise<{ids: string[], angle: number, pitch: number} | null>}  null when cancelled
  */
-export function pickLineArea({ session, casterId, title, lengthFt, targetableIds = null, confirmLabel = 'Select targets in the line' }) {
+export function pickLineArea({ session, casterId, title, lengthFt, targetableIds = null, blockedNotes = null, confirmLabel = 'Select targets in the line' }) {
   _injectStyles();
   return new Promise((resolve) => {
     const board = session.board;
@@ -83,6 +84,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
           <div class="bmap-line"></div>
+          <div class="bmap-objects">${mapObjectsHtml(board)}</div>
           <div class="bmap-tokens"></div>
         </div>
         <div class="lap-aim"></div>
@@ -116,7 +118,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     });
 
     const targetable = targetableIds ? new Set(targetableIds) : null;
-    const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable);
+    const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable, blockedNotes);
     // Who the beam could reach at all (on the map and in height) -- everyone else is greyed out, and only these can be
     // tapped to aim at.
     const aimable = new Set(Object.keys(board.tokens).filter(id => id !== casterId && (!targetable || targetable.has(id))
@@ -190,7 +192,7 @@ export function coneFtFromRange(rangeText) {
  * in reach to tilt the cone straight at it. The squares under it are shaded and everyone it covers is listed.
  * @returns {Promise<{ids: string[], angle: number, pitch: number} | null>}  null when cancelled
  */
-export function pickConeArea({ session, casterId, title, lengthFt, targetableIds = null, confirmLabel = 'Select targets in the cone' }) {
+export function pickConeArea({ session, casterId, title, lengthFt, targetableIds = null, blockedNotes = null, confirmLabel = 'Select targets in the cone' }) {
   _injectStyles();
   return new Promise((resolve) => {
     const board = session.board;
@@ -210,6 +212,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
         <div class="lap-sub">A ${lengthFt}ft cone from ${caster?.name || 'the caster'}. Drag on the map toward where it should point (level, in 8 directions), or use the buttons — or tap a creature to tilt the cone straight at it (up at a flyer, down from the air). The shaded squares are where it covers the ground; ringed creatures are caught (in the air too); greyed-out ones are out of its reach.</div>
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
+          <div class="bmap-objects">${mapObjectsHtml(board)}</div>
           <div class="bmap-tokens"></div>
         </div>
         <div class="lap-aim"></div>
@@ -237,7 +240,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     const cellEls = new Map([...grid.querySelectorAll('[data-cell]')].map(el => [el.dataset.cell, el]));
 
     const targetable = targetableIds ? new Set(targetableIds) : null;
-    const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable);
+    const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable, blockedNotes);
     const lengthCells = Math.floor(lengthFt / 5);
     // Who the cone could reach at all (on the map and in height) -- everyone else is greyed out, and only these can be
     // tapped to aim at. Reach is measured from the middle of the caster (a level cone's own origin is on its edge).

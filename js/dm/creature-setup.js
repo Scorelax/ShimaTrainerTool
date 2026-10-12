@@ -384,6 +384,7 @@ function readPokemonForm() {
       initiative: init === '' ? null : parseInt(init, 10),
       stats: statsIn, overrides,
       extraSkills: readMultiSelect('csSkills'),
+      bonus: selectedCreature()?.config.bonus || {}, // Encounter setup's stat bonuses stay
     },
     trainerId: document.getElementById('csTrainer').value || null,
     heldBack: document.getElementById('csHeld').checked,

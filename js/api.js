@@ -1240,7 +1240,7 @@ export class DmAPI {
 
   /** A full Pokemon row (the same 62-column shape a player's Pokemon has) for a DM-controlled Pokemon -- never
    * stored. `abilities` is the list of ability slots it has (0 primary, 1 secondary, 2 hidden). */
-  static async buildPokemon({ species, level, nature = '', abilities = [0], nickname = '', item = '', shiny = false, stats = null, overrides = null, extraSkills = [], preview = false }) {
+  static async buildPokemon({ species, level, nature = '', abilities = [0], nickname = '', item = '', shiny = false, stats = null, overrides = null, bonus = null, extraSkills = [], preview = false }) {
     return API.request('dm', 'build-pokemon', {
       species, level, nature, abilities: abilities.join(','), nickname, item, shiny: shiny ? '1' : '',
       ...(preview ? { preview: '1' } : {}), // just the numbers: skips looking up its picture
@@ -1248,6 +1248,8 @@ export class DmAPI {
       // The DM's own changes: final ability scores ({str, ...}) and {ac, maxHP, maxVP}, each only when set.
       ...(stats && Object.keys(stats).length ? { stats: JSON.stringify(stats) } : {}),
       ...(overrides && Object.keys(overrides).length ? { overrides: JSON.stringify(overrides) } : {}),
+      // Encounter setup's bonuses on top of what the numbers come out as ({str: 2, ac: 1, ...}).
+      ...(bonus && Object.values(bonus).some(Boolean) ? { bonus: JSON.stringify(bonus) } : {}),
     }, { useCache: false });
   }
 

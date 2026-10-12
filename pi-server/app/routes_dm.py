@@ -55,6 +55,7 @@ def handle(conn, action, params):
             shiny=str(params.get('shiny', '')).lower() in ('1', 'true'),
             stats=json.loads(params['stats']) if params.get('stats') else None,
             overrides=json.loads(params['overrides']) if params.get('overrides') else None,
+            bonus=json.loads(params['bonus']) if params.get('bonus') else None,
             extra_skills=[s for s in str(params.get('skills', '')).split(',') if s.strip()],
             # The battle setup's live preview of the numbers: no picture lookup (a network probe for a species never looked up).
             probe_image=str(params.get('preview', '')).lower() not in ('1', 'true'))}
@@ -603,7 +604,7 @@ def species_list(conn):
 
 
 def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), nickname='', held_item='', shiny=False,
-                  stats=None, overrides=None, extra_skills=(), probe_image=True):
+                  stats=None, overrides=None, extra_skills=(), probe_image=True, bonus=None):
     """A full Pokemon row (db.POKEMON_COLUMNS order, the same 62-column shape a player's Pokemon has) for a wild /
     DM-controlled Pokemon, built from its encyclopedia entry the way pokemon-form.js builds one before registering,
     then run through the exact same stat maths -- but never stored. The DM console turns it into a battle
@@ -611,7 +612,8 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
 
     The DM's own changes: `stats` ({'str': 14, ...}) are final ability scores -- HP, VP, modifiers and initiative follow
     them -- `overrides` ({'ac', 'maxHP', 'maxVP'}) are set last, as typed, and `extra_skills` are proficiencies it has on
-    top of its species' own."""
+    top of its species' own. `bonus` (Encounter setup: {'str': 2, 'ac': 1, 'maxHP': 5, ...}) is added to what the
+    numbers come out as -- ability-score bonuses before HP/VP and modifiers follow them, AC/HP/VP ones at the end."""
     row = next((r for r in upstream.fetch_pokemon_db(conn) if str(_cell(r, 2)).lower() == str(species).lower()), None)
     if not row:
         raise ValueError('Unknown species: ' + str(species))
@@ -669,7 +671,9 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
         if extra.strip() and extra.strip().lower() not in {s.lower() for s in skills}:
             skills.append(extra.strip())
     data[22] = ', '.join(skills)
-    apply_registration_stats(conn, data, {k: v for k, v in (stats or {}).items() if k in _STAT_KEYS})
+    bonus = {k: js_parse_int(v) for k, v in (bonus or {}).items() if js_parse_int(v)}
+    apply_registration_stats(conn, data, {k: v for k, v in (stats or {}).items() if k in _STAT_KEYS},
+                             {k: v for k, v in bonus.items() if k in _STAT_KEYS})
     o = overrides or {}
     if js_parse_int(o.get('ac')) is not None:
         data[8] = js_parse_int(o['ac'])
@@ -677,4 +681,10 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
         data[10] = data[45] = js_parse_int(o['maxHP'])
     if js_parse_int(o.get('maxVP')) is not None:
         data[12] = data[46] = js_parse_int(o['maxVP'])
+    if bonus.get('ac'):
+        data[8] = (js_parse_int(data[8]) or 0) + bonus['ac']
+    if bonus.get('maxHP'):
+        data[10] = data[45] = max(1, (js_parse_int(data[10]) or 0) + bonus['maxHP'])
+    if bonus.get('maxVP'):
+        data[12] = data[46] = max(0, (js_parse_int(data[12]) or 0) + bonus['maxVP'])
     return data

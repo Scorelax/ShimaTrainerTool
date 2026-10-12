@@ -159,12 +159,13 @@ def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
             'newPokemonData': new_pokemon_data}
 
 
-def apply_registration_stats(conn, new_pokemon_data, stat_overrides=None):
+def apply_registration_stats(conn, new_pokemon_data, stat_overrides=None, stat_bonus=None):
     """Fills in everything a freshly built Pokemon row leaves blank (nature-adjusted ability scores, HP/VP, initiative,
     proficiency, STAB, modifiers, current HP/VP), in place. Shared by registering a Pokemon for a trainer and the DM
     console's build-pokemon (routes_dm.py), so an enemy built there has exactly the numbers a player's would.
     `stat_overrides` ({'str': 14, ...}, DM console only) replaces those final ability scores before everything that
-    depends on them (HP/VP, modifiers, initiative) is worked out."""
+    depends on them (HP/VP, modifiers, initiative) is worked out; `stat_bonus` ({'str': 2, ...}, DM console only) is
+    added on top of them, at the same point."""
     level = js_parse_int(new_pokemon_data[4])
     hd = js_parse_int(new_pokemon_data[9])
     vd = js_parse_int(new_pokemon_data[11])
@@ -198,6 +199,11 @@ def apply_registration_stats(conn, new_pokemon_data, stat_overrides=None):
         o = {k: js_parse_int(v) for k, v in stat_overrides.items() if js_parse_int(v) is not None}
         str_, dex, con, int_, wis, cha = (o.get('str', str_), o.get('dex', dex), o.get('con', con),
                                           o.get('int', int_), o.get('wis', wis), o.get('cha', cha))
+
+    if stat_bonus:
+        b = {k: js_parse_int(v) or 0 for k, v in stat_bonus.items()}
+        str_, dex, con, int_, wis, cha = (str_ + b.get('str', 0), dex + b.get('dex', 0), con + b.get('con', 0),
+                                          int_ + b.get('int', 0), wis + b.get('wis', 0), cha + b.get('cha', 0))
 
     new_pokemon_data[15] = str_
     new_pokemon_data[16] = dex

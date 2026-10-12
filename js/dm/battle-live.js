@@ -259,8 +259,8 @@ function renderTools(el) {
     <div class="dm-card">
       <div class="dm-card-title">Table screens</div>
       <div class="dm-row">
-        <a class="dm-btn" href="display.html" target="_blank" rel="noopener" title="The table TV's turn / HP screen">📺 Display</a>
-        <a class="dm-btn" href="battle-map.html" target="_blank" rel="noopener" title="The table's battle map screen">▦ Battle map</a>
+        <a class="dm-btn" href="display.html" target="_blank" rel="noopener" title="Opens the table TV's screen in a new tab -- what it shows is set in 📺 Display at the top">📺 TV screen ↗</a>
+        <a class="dm-btn" href="battle-map.html" target="_blank" rel="noopener" title="Opens the table's battle map screen in a new tab">▦ Battle map ↗</a>
       </div>
     </div>
 

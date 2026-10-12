@@ -7,6 +7,7 @@ import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, toast } from './dm-common.js';
+import { xpOrStart, xpPanelHtml, xpButtonHtml, giveXpPopup } from './xp.js';
 
 // Positions in a trainer row (db.TRAINER_COLUMNS) and a Pokemon row (db.POKEMON_COLUMNS).
 const T = { image: 0, name: 1, level: 2, hd: 3, vd: 4, str: 5, hp: 11, vp: 12, ac: 13, speed: 14, saves: 15, init: 16, prof: 17, skills: 18,
@@ -136,6 +137,8 @@ function drawTrainer(entry) {
   const name = t[T.name];
   const all = [...partyOf(entry), ...entry.pokemon.filter(p => !(num(p[P.slot]) >= 1 && num(p[P.slot]) <= 6))];
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+  // The DM-only XP that came with the rows (DmAPI.party), or where each record's level starts.
+  const xpFor = p => xpOrStart(entry.xp?.pokemon?.[entry.pokemon.indexOf(p)], p[P.level]);
   const scrollers = [..._root.querySelectorAll('.dm-trainer-col')].map(c => c.scrollTop);
 
   _root.innerHTML = `
@@ -147,10 +150,10 @@ function drawTrainer(entry) {
         <span class="dm-hint">Lv ${escapeHtml(t[T.level])} · ${escapeHtml(t[T.cls] || 'Trainer')}${t[T.region] ? ` · ${escapeHtml(t[T.region])}` : ''}</span>
       </div>
       <div class="dm-trainer-cols">
-        <div class="dm-trainer-col">${trainerStatsHtml(t)}</div>
+        <div class="dm-trainer-col">${trainerStatsHtml(t)}${xpPanelHtml(xpOrStart(entry.xp?.trainer, t[T.level]), t[T.level], 'id="trainerXp"')}</div>
         <div class="dm-trainer-col">
           <div class="dm-card-title">Pokémon (${all.length})</div>
-          ${all.map(p => pokemonRowHtml(name, p)).join('') || '<div class="dm-hint">No Pokémon.</div>'}
+          ${all.map(p => pokemonRowHtml(name, p, xpFor(p))).join('') || '<div class="dm-hint">No Pokémon.</div>'}
         </div>
         <div class="dm-trainer-col">${moneyAndItemsHtml(t, items)}</div>
       </div>
@@ -158,6 +161,15 @@ function drawTrainer(entry) {
   patchImages(_root);
   _root.querySelectorAll('.dm-trainer-col').forEach((c, i) => { if (scrollers[i]) c.scrollTop = scrollers[i]; });
   wireTrainer(name, items);
+  document.getElementById('trainerXp').addEventListener('click', async () => {
+    if (await giveXpPopup({ label: name, trainer: name, xp: xpOrStart(entry.xp?.trainer, t[T.level]), level: t[T.level] }) !== null) reload();
+  });
+  _root.querySelectorAll('[data-xp-mon]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation(); // not the card's open / close
+    const p = entry.pokemon.find(x => x[P.name] === b.dataset.xpMon);
+    if (!p) return;
+    if (await giveXpPopup({ label: `${name}'s ${pokemonName(p)}`, trainer: name, pokemon: p[P.name], xp: xpFor(p), level: p[P.level] }) !== null) reload();
+  }));
 }
 
 function trainerStatsHtml(t) {
@@ -203,13 +215,14 @@ function movesKnown(p) {
   return known;
 }
 
-function pokemonRowHtml(trainer, p) {
+function pokemonRowHtml(trainer, p, xp) {
   const key = `${trainer}|${p[P.name]}`;
   const open = _expanded.has(key);
   const slot = num(p[P.slot]);
   const hp = current(p, P.curHP, P.hp), vp = current(p, P.curVP, P.vp);
+  // A div rather than a button: it holds the XP button, and a button can't sit inside another one.
   const head = `
-    <button class="dm-tmon-head" data-toggle="${escapeHtml(key)}">
+    <div class="dm-tmon-head" data-toggle="${escapeHtml(key)}" role="button" tabindex="0">
       <span class="dm-party-sprite" data-img="${escapeHtml(p[P.image] || '')}"></span>
       <span class="dm-tmon-main">
         <strong>${escapeHtml(pokemonName(p))}${p[P.nick] ? ` <small>(${escapeHtml(p[P.name])})</small>` : ''}${p[P.shiny] === 'Y' ? ' ✨' : ''}</strong>
@@ -217,8 +230,9 @@ function pokemonRowHtml(trainer, p) {
         <span class="dm-party-hpvp">HP ${hp}/${num(p[P.hp])} · VP ${vp}/${num(p[P.vp])}</span>
         ${bars(hp, num(p[P.hp]), vp, num(p[P.vp]))}
       </span>
+      ${xpButtonHtml(xp, p[P.level], `data-xp-mon="${escapeHtml(p[P.name])}"`)}
       <span class="dm-tmon-caret">${open ? '▾' : '▸'}</span>
-    </button>`;
+    </div>`;
   if (!open) return `<div class="dm-tmon">${head}</div>`;
   const cell = (label, value) => `<div class="dm-tstat"><span>${label}</span><strong>${value}</strong></div>`;
   const line = (label, value) => (value ? `<div class="dm-tline"><span>${label}</span><span>${escapeHtml(value)}</span></div>` : '');
@@ -317,11 +331,15 @@ function moneyAndItemsHtml(t, items) {
 
 function wireTrainer(name, items) {
   document.getElementById('trainerBack').addEventListener('click', () => { _selected = null; draw(); });
-  _root.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => {
+  const toggle = (b) => {
     const key = b.dataset.toggle;
     if (_expanded.has(key)) _expanded.delete(key); else _expanded.add(key);
     draw();
-  }));
+  };
+  _root.querySelectorAll('[data-toggle]').forEach(b => {
+    b.addEventListener('click', () => toggle(b));
+    b.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); toggle(b); } });
+  });
   const run = async (fn, done) => {
     try { await fn(); if (done) toast(done); await reload(); } catch (err) { showCombatAlert(err.message, { title: name }); }
   };

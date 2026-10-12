@@ -14,16 +14,17 @@
     <header class="dm-topbar">
       <div class="dm-brand"><img src="assets/AppIcon.png" alt=""><span>DM Console</span></div>
       <div class="dm-status" id="dmStatus">Connecting…</div>
+      <!-- What the table TV shows (display.js) -- backgrounds and pictures, set up in the Display module. -->
+      <button class="dm-top-display" id="dmDisplayBtn" title="What the table TV shows -- backgrounds and pictures">📺 Display</button>
       <!-- The world clock and weather, plus timers that are pinned or done (world-clock.js). -->
       <div class="dm-topbar-widgets" id="dmTopWidgets"></div>
     </header>
 
     <nav class="dm-rail" id="dmRail">
-      <button class="dm-rail-btn active" data-module="battle" title="Battle"><img src="assets/VS.png" alt="">Battle</button>
+      <button class="dm-rail-btn active" data-module="battle" title="Battle -- the setup, the encounters and the aftermath"><img src="assets/VS.png" alt="">Battle</button>
       <button class="dm-rail-btn" data-module="party" title="Party"><span>👥</span>Party</button>
       <button class="dm-rail-btn" data-module="pokedex" title="Pokédex"><span>📖</span>Pokédex</button>
       <button class="dm-rail-btn" data-module="npcs" title="NPCs"><span>🎭</span>NPCs</button>
-      <button class="dm-rail-btn" data-module="encounters" title="Encounters"><span>🗺️</span>Encounters</button>
       <button class="dm-rail-btn" data-module="clock" title="Clock"><span>🕰️</span>Clock</button>
       <button class="dm-rail-btn" data-module="reference" disabled title="Coming later"><span>📚</span>Reference</button>
     </nav>
@@ -32,11 +33,17 @@
       <section class="dm-module dm-view" id="dmModuleParty" hidden></section>
       <section class="dm-module" id="dmModulePokedex" hidden></section>
       <section class="dm-module" id="dmModuleNpcs" hidden></section>
-      <section class="dm-module" id="dmModuleEncounters" hidden></section>
       <section class="dm-module" id="dmModuleClock" hidden></section>
-      <section class="dm-module" id="dmModuleBattle">
-        <!-- No battle running: the setup (overview, map setup, battle setup). -->
+      <section class="dm-module" id="dmModuleDisplay" hidden></section>
+      <section class="dm-module dm-battle-module" id="dmModuleBattle">
+        <!-- No battle running: the battle setup, the encounter library and the last battle's aftermath. -->
+        <div class="dm-enc-tabs" id="dmBattleTabs">
+          <button data-btab="setup" class="active">⚔️ Battle setup</button>
+          <button data-btab="library">🗺️ Encounters</button>
+          <button data-btab="aftermath">🏁 Aftermath<span class="dm-tab-dot" id="dmAfterDot" hidden title="The last battle's aftermath isn't done yet"></span></button>
+        </div>
         <div class="dm-view" id="dmView"><div class="dm-loading">Loading…</div></div>
+        <div class="dm-tabview" id="dmEncView" hidden></div>
         <!-- A battle running: combat-wip.js renders the shared battle here, as the DM (must be #content). -->
         <div class="dm-battle" id="dmLive" hidden>
           <div class="dm-battle-stage" id="content"></div>

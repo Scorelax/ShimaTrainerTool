@@ -95,6 +95,12 @@ CHARACTER_IMAGE_DIR = os.path.expanduser(
 CHARACTER_IMAGE_URL_PREFIX = '/character-images/'
 _CHARACTER_IMAGE_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.gif')
 
+# Pictures the DM uploads from the DM console for the table TV (backgrounds -- routes_dm.save_display_image). Each file
+# gets a new random name, so its URL never shows different content (cached hard, see main.py).
+DISPLAY_IMAGE_DIR = os.path.expanduser(
+    os.environ.get('DISPLAY_IMAGE_DIR', '~/pokemon-dnd/display-images'))
+DISPLAY_IMAGE_URL_PREFIX = '/display-images/'
+
 # Apps Script upstreams can be slow (cold starts)
 _FETCH_TIMEOUT = 120.0
 

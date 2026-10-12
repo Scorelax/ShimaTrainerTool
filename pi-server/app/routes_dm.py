@@ -21,8 +21,16 @@ _CLOCK_KEY = 'world-clock'
 # Smaller DM-only records the console reads and writes whole (get-state / POST /api/dm/state), each owned by one module:
 # the encounter loaded into the battle (its events, notes, terrain and weather -- js/dm/encounters.js), the last PvE
 # battle that ended (routes_combat._remember_battle, marked done by the aftermath), saved Pokemon for reuse, species left
-# out of the random generators, and the XP ledger (XP is DM-only -- never in the players' records).
-_STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'xp-ledger'}
+# out of the random generators, and what the table TV shows outside the battle (js/dm/display-store.js).
+_STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene'}
+# The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
+# Pokemon's dm_xp column (db._migrate); a record with none yet counts as the start of its level.
+XP_TO_LEVEL = [0, 0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000,
+               195000, 225000, 265000, 305000, 355000]
+# Where the XP was kept before it moved onto the records -- read once into dm_xp, then removed.
+_OLD_XP_LEDGER_KEY = 'xp-ledger'
+# The pictures the DM uploads for the table TV (backgrounds) -- the files in upstream.DISPLAY_IMAGE_DIR, their names here.
+_DISPLAY_IMAGES_KEY = 'display-images'
 _STAT_KEYS = ('str', 'dex', 'con', 'int', 'wis', 'cha')
 
 # Encyclopedia (upstream pokemon DB) row indices used below -- see pokedex.py's _format_row for the full layout.
@@ -105,6 +113,15 @@ def handle(conn, action, params):
             raise ValueError('Unknown state: ' + str(params.get('key')))
         return {'status': 'success', 'data': _load_state(conn, params['key'])}
 
+    if action == 'display-images':
+        return {'status': 'success', 'data': list_display_images(conn)}
+
+    if action == 'delete-display-image':
+        if not params.get('id'):
+            raise ValueError('Missing id')
+        delete_display_image(conn, params['id'])
+        return {'status': 'success'}
+
     if action == 'get-setup':
         return {'status': 'success', 'data': load_setup(conn)}
 
@@ -182,14 +199,93 @@ def _evo_part(text, which):
 
 def party_overview(conn):
     """Every player trainer with all their Pokemon -- the DM console's Party module. Trainer rows and Pokemon rows in
-    the usual positional shape (db.TRAINER_COLUMNS / db.POKEMON_COLUMNS), portraits and animated sprites swapped in."""
+    the usual positional shape (db.TRAINER_COLUMNS / db.POKEMON_COLUMNS), portraits and animated sprites swapped in,
+    plus the XP only the DM sees: `xp` = {trainer, pokemon: [one per Pokemon row, in the same order]}, each the stored
+    XP or None when there's none yet (the console counts that as the start of the record's level)."""
     from . import db
     from .routes_trainer import _with_character_image, _with_local_sprite
-    pokemon = [row for _, row in db.fetch_rows(conn, 'pokemon', db.POKEMON_COLUMNS)]
-    return [{
-        'trainer': _with_character_image(row),
-        'pokemon': [_with_local_sprite(p) for p in pokemon if str(p[0]).lower() == str(row[1]).lower()],
-    } for _, row in db.fetch_rows(conn, 'trainers', db.TRAINER_COLUMNS)]
+    _absorb_old_xp_ledger(conn)
+    xp = {'trainers': dict(conn.execute('SELECT rowid, dm_xp FROM trainers').fetchall()),
+          'pokemon': dict(conn.execute('SELECT rowid, dm_xp FROM pokemon').fetchall())}
+    pokemon = db.fetch_rows(conn, 'pokemon', db.POKEMON_COLUMNS)
+    out = []
+    for trowid, row in db.fetch_rows(conn, 'trainers', db.TRAINER_COLUMNS):
+        mine = [(prowid, p) for prowid, p in pokemon if str(p[0]).lower() == str(row[1]).lower()]
+        out.append({
+            'trainer': _with_character_image(row),
+            'pokemon': [_with_local_sprite(p) for _, p in mine],
+            'xp': {'trainer': xp['trainers'].get(trowid), 'pokemon': [xp['pokemon'].get(prowid) for prowid, _ in mine]},
+        })
+    return out
+
+
+def _xp_start(level):
+    lvl = js_parse_int(level) or 1
+    return XP_TO_LEVEL[max(1, min(20, lvl))]
+
+
+def level_for_xp(xp):
+    return max((lvl for lvl in range(1, 21) if xp >= XP_TO_LEVEL[lvl]), default=1)
+
+
+def change_xp(conn, changes):
+    """Gives (or takes, or sets) XP -- POST /api/dm/xp. `changes` = [{trainer, pokemon?, add? | set?}]: `pokemon` is
+    the species name of one of the trainer's Pokemon (the app's own key for them), left out for the trainer. A record
+    with no XP yet starts from the XP its current level begins at. Never below 0. Only the DM sees XP, so nothing is
+    pushed to the players' phones; levels aren't changed here -- the player levels up in their app (it has choices).
+    Returns [{trainer, pokemon, before, xp, level, xpLevel}]."""
+    from . import db
+    if not isinstance(changes, list) or not changes:
+        raise ValueError('Nothing to change')
+    trainers = {str(r[1]).lower(): (rowid, r) for rowid, r in db.fetch_rows(conn, 'trainers', db.TRAINER_COLUMNS)}
+    pokemon = {(str(r[0]).lower(), str(r[2]).lower()): (rowid, r) for rowid, r in db.fetch_rows(conn, 'pokemon', db.POKEMON_COLUMNS)}
+    out = []
+    for ch in changes:
+        tname = str(ch.get('trainer') or '')
+        species = str(ch.get('pokemon') or '')
+        if species:
+            found = pokemon.get((tname.lower(), species.lower()))
+            table, label = 'pokemon', f"{tname}'s {species}"
+            level_idx = 4
+        else:
+            found = trainers.get(tname.lower())
+            table, label = 'trainers', tname
+            level_idx = 2
+        if not found:
+            raise ValueError('Not found: ' + label)
+        rowid, row = found
+        stored = conn.execute(f'SELECT dm_xp FROM {table} WHERE rowid = ?', (rowid,)).fetchone()[0]
+        before = stored if isinstance(stored, int) else _xp_start(row[level_idx])
+        if ch.get('set') is not None:
+            new = js_parse_int(ch.get('set'))
+            if new is None:
+                raise ValueError('Not a number: ' + str(ch.get('set')))
+        else:
+            new = before + (js_parse_int(ch.get('add')) or 0)
+        new = max(0, new)
+        conn.execute(f'UPDATE {table} SET dm_xp = ? WHERE rowid = ?', (new, rowid))
+        out.append({'trainer': row[0] if species else row[1], 'pokemon': row[2] if species else None, 'before': before,
+                    'xp': new, 'level': js_parse_int(row[level_idx]) or 1, 'xpLevel': level_for_xp(new)})
+    conn.commit()
+    return out
+
+
+def _absorb_old_xp_ledger(conn):
+    """The XP the aftermath used to keep in one record ({trainers: {name: xp}, pokemon: {"trainer|species": xp}}, all
+    lower-case) moves onto the trainers' and Pokemon's own dm_xp, once; the record is removed afterwards."""
+    old = _load_state(conn, _OLD_XP_LEDGER_KEY)
+    if old is None:
+        return
+    for name, xp in (old.get('trainers') or {}).items():
+        if isinstance(xp, (int, float)):
+            conn.execute('UPDATE trainers SET dm_xp = ? WHERE lower(name) = ? AND dm_xp IS NULL', (int(xp), str(name).lower()))
+    for key, xp in (old.get('pokemon') or {}).items():
+        trainer, _, species = str(key).partition('|')
+        if isinstance(xp, (int, float)) and species:
+            conn.execute('UPDATE pokemon SET dm_xp = ? WHERE lower(trainername) = ? AND lower(name) = ? AND dm_xp IS NULL',
+                         (int(xp), trainer.lower(), species.lower()))
+    conn.execute('DELETE FROM dm_state WHERE key = ?', (_OLD_XP_LEDGER_KEY,))
+    conn.commit()
 
 
 def _parse_inventory(text):
@@ -329,6 +425,78 @@ def save_state(conn, key, data):
     conn.commit()
 
 
+def save_display_scene(conn, scene):
+    """What the table TV shows (POST /api/dm/display-scene): a background and the pictures on it -- js/dm/display-store.js
+    owns the shape. Stored, then pushed to the TV (display.html) and any other DM console."""
+    from . import live
+    if not isinstance(scene, dict):
+        raise ValueError('scene must be an object')
+    save_state(conn, 'display-scene', scene)
+    live.publish({'type': 'display-scene', 'scene': scene})
+
+
+_IMAGE_TYPES = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif'}
+_MAX_IMAGE_BYTES = 15 * 1024 * 1024
+
+
+def list_display_images(conn):
+    """The pictures uploaded for the table TV, newest first: [{id, name, url, createdAt}] -- a file that's gone from
+    the folder is left out."""
+    out = []
+    for img in _load_state(conn, _DISPLAY_IMAGES_KEY) or []:
+        if os.path.isfile(os.path.join(upstream.DISPLAY_IMAGE_DIR, img.get('file', ''))):
+            out.append({**img, 'url': upstream.DISPLAY_IMAGE_URL_PREFIX + img['file']})
+    return sorted(out, key=lambda i: i.get('createdAt', ''), reverse=True)
+
+
+def save_display_image(conn, payload):
+    """POST /api/dm/display-image: a new picture ({name, data: "data:image/...;base64,..."}) is written to
+    upstream.DISPLAY_IMAGE_DIR under a new random name; one already there ({id, name}) is renamed. Returns it."""
+    import base64
+    import re
+    import secrets
+    images = _load_state(conn, _DISPLAY_IMAGES_KEY) or []
+    name = str(payload.get('name') or '').strip()[:80] or 'Picture'
+    if payload.get('id'):
+        img = next((i for i in images if i.get('id') == payload['id']), None)
+        if not img:
+            raise ValueError('No such picture')
+        img['name'] = name
+    else:
+        m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
+        if not m or m.group(1) not in _IMAGE_TYPES:
+            raise ValueError('That isn\'t a picture (JPG, PNG, WebP or GIF)')
+        raw = base64.b64decode(m.group(2))
+        if len(raw) > _MAX_IMAGE_BYTES:
+            raise ValueError('That picture is too big (15 MB at most)')
+        os.makedirs(upstream.DISPLAY_IMAGE_DIR, exist_ok=True)
+        img_id = secrets.token_hex(8)
+        img = {'id': img_id, 'name': name, 'file': img_id + _IMAGE_TYPES[m.group(1)],
+               'createdAt': datetime.now(timezone.utc).isoformat()}
+        with open(os.path.join(upstream.DISPLAY_IMAGE_DIR, img['file']), 'wb') as f:
+            f.write(raw)
+        images.append(img)
+    conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
+                 (_DISPLAY_IMAGES_KEY, json.dumps(images, ensure_ascii=False), datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+    return {**img, 'url': upstream.DISPLAY_IMAGE_URL_PREFIX + img['file']}
+
+
+def delete_display_image(conn, img_id):
+    images = _load_state(conn, _DISPLAY_IMAGES_KEY) or []
+    img = next((i for i in images if i.get('id') == img_id), None)
+    if not img:
+        return
+    try:
+        os.remove(os.path.join(upstream.DISPLAY_IMAGE_DIR, img['file']))
+    except OSError:
+        pass
+    conn.execute('INSERT OR REPLACE INTO dm_state (key, json, updated_at) VALUES (?, ?, ?)',
+                 (_DISPLAY_IMAGES_KEY, json.dumps([i for i in images if i is not img], ensure_ascii=False),
+                  datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+
+
 def give_pokemon(conn, trainer, cfg):
     """The aftermath's "give to trainer": a Pokemon the players caught goes straight into that trainer's team -- built
     the way the DM set it up (species, level, nature, abilities, held item, shiny, any ability scores the DM gave it),
@@ -419,14 +587,17 @@ def species_list(conn):
                 'speed': _cell(row, 25), 'savingThrows': _cell(row, 33), 'skills': _cell(row, 34),
             },
             'abilities': _abilities(row),
-            'image': upstream.local_sprite_url(name) or upstream.get_image_url(conn, name, _cell(row, 1), probe=False) or '',
+            # The still picture (Benjakronk's) -- the table TV's Display module offers it beside the animated sprite.
+            'picture': upstream.get_image_url(conn, name, _cell(row, 1), probe=False) or '',
         })
+        out[-1]['image'] = upstream.local_sprite_url(name) or out[-1]['picture']
     # Species never looked up one by one have no cached picture yet: one listing of Benjakronk's picture folder fills
     # them all in (the self-made mp4 sprite above still comes first).
-    missing = [s for s in out if not s['image']]
+    missing = [s for s in out if not s['picture']]
     if missing and upstream.cache_image_listing(conn):
         for s in missing:
-            s['image'] = upstream.get_image_url(conn, s['name'], s['dex'], probe=False) or ''
+            s['picture'] = upstream.get_image_url(conn, s['name'], s['dex'], probe=False) or ''
+            s['image'] = s['image'] or s['picture']
     out.sort(key=lambda s: js_parse_int(s['dex']) or 0)
     return out
 

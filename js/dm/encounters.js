@@ -1,4 +1,4 @@
-// DM console -- the Encounters module: Benjakronk's old encounter builder, rebuilt on the Pi.
+// DM console -- the battle module's Encounters and Aftermath tabs: Benjakronk's old encounter builder, rebuilt on the Pi.
 //
 // Library: encounters prepared ahead of a session (dm_encounters table) -- a name, notes and note categories, the
 // terrain and weather (they go into catching), the wild Pokemon, NPC trainers from the NPC library, round-based events,
@@ -10,8 +10,8 @@
 // Aftermath: after a PvE battle ends (routes_combat._remember_battle keeps it as 'last-battle'), what happened -- who
 // was defeated, caught or got away -- and what to hand out. Unlike the old tool, which exported files or called the
 // Trainer Tool's API, everything goes straight into the trainers' records here: caught Pokemon into their team, loot
-// and money into their inventory, all live-pushed to their phones. XP is DM-only (the 'xp-ledger' record, never in the
-// players' data); the old tool's XP can be imported from its trainer backup.
+// and money into their inventory, all live-pushed to their phones. XP is DM-only (xp.js -- on the records, never in what
+// the players' app gets); the old tool's XP can be imported from its trainer backup.
 import { DmAPI, CombatAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
@@ -21,9 +21,10 @@ import { buildPokemonCreature, addNpcToSetup } from './creature-setup.js';
 import { blankNpc } from './npcs.js';
 import { getClock, updateClock, advanceMinutes, skipToPhase, rollWeather, formatDate, formatTime, phaseName, PHASES, WEATHER } from './world-clock.js';
 import {
-  TERRAIN, WEATHER_ROLL_MOD, XP_TO_LEVEL, levelFromXp, ROUND_SECONDS, ENCOUNTER_TEMPLATES, TRAINER_ARCHETYPES, STAT_METHODS,
+  TERRAIN, WEATHER_ROLL_MOD, levelFromXp, ROUND_SECONDS, ENCOUNTER_TEMPLATES, TRAINER_ARCHETYPES, STAT_METHODS,
   encounterPool, generateEncounter, generateTrainer, rangePick, evolutionStage, STAGE_LABEL,
 } from './encounter-rules.js';
+import { xpOrStart } from './xp.js';
 
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
 const EVENT_ICONS = ['⚡', '🎯', '⚠️', '💥', '🔥', '❄️', '🌊', '🌪️', '⏰', '🚪', '👥', '🎭', '🏚️', '🌋'];
@@ -44,24 +45,11 @@ const _saveTimers = new Map();
 let _saveState = 'saved';
 let _adding = false; // the species search under "Wild Pokémon" is open
 
+/** One of the battle module's tabs (dm-console.js draws the tabs): `tab` 'library' (the encounters) or 'aftermath'. */
 export async function renderEncounters(root, { tab } = {}) {
   _root = root;
   if (tab) _tab = tab;
-  root.innerHTML = `
-    <div class="dm-enc">
-      <div class="dm-enc-tabs">
-        <button data-tab="library" class="${_tab === 'library' ? 'active' : ''}">🗺️ Encounters</button>
-        <button data-tab="aftermath" class="${_tab === 'aftermath' ? 'active' : ''}">🏁 Aftermath</button>
-      </div>
-      <div class="dm-enc-body" id="encBody"><div class="dm-loading">Loading…</div></div>
-    </div>`;
-  root.querySelector('.dm-enc-tabs').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-tab]');
-    if (!b || b.dataset.tab === _tab) return;
-    _tab = b.dataset.tab;
-    root.querySelectorAll('.dm-enc-tabs [data-tab]').forEach(x => x.classList.toggle('active', x === b));
-    renderTab();
-  });
+  root.innerHTML = '<div class="dm-enc"><div class="dm-enc-body" id="encBody"><div class="dm-loading">Loading…</div></div></div>';
   renderTab();
 }
 
@@ -964,7 +952,7 @@ async function flushEncounter(enc) {
 // Aftermath
 // ---------------------------------------------------------------------------
 
-let _after = null; // {last, run, party, ledger, setup}
+let _after = null; // {last, run, party}
 const _xpAdd = { trainers: {}, pokemon: {} }; // what's typed in, not saved yet
 const lower = s => String(s || '').toLowerCase();
 const monKey = (trainer, species) => `${lower(trainer)}|${lower(species)}`;
@@ -972,11 +960,11 @@ const monKey = (trainer, species) => `${lower(trainer)}|${lower(species)}`;
 async function renderAftermath(body) {
   body.innerHTML = '<div class="dm-loading">Loading the last battle…</div>';
   try {
-    const [last, run, party, ledger, npcs] = await Promise.all([
-      DmAPI.getState('last-battle'), DmAPI.getState('encounter-run'), DmAPI.party(), DmAPI.getState('xp-ledger'), DmAPI.npcs(),
+    const [last, run, party, npcs] = await Promise.all([
+      DmAPI.getState('last-battle'), DmAPI.getState('encounter-run'), DmAPI.party(), DmAPI.npcs(),
     ]);
     _npcs = npcs.data || [];
-    _after = { last, run, party: party.data || [], ledger: { trainers: {}, pokemon: {}, ...(ledger || {}) } };
+    _after = { last, run, party: party.data || [] };
   } catch (err) {
     body.innerHTML = `<div class="dm-loading">Couldn't load the aftermath: ${escapeHtml(err.message)}</div>`;
     return;
@@ -1149,9 +1137,12 @@ function drawAftermath(body) {
   wireAftermath(body, s, minutes);
 }
 
-function xpOf(kind, key, level) {
-  const stored = _after.ledger[kind][key];
-  return Number.isFinite(stored) ? stored : XP_TO_LEVEL[Math.max(1, Math.min(20, Number(level) || 1))];
+/** The DM-only XP that came with the party (DmAPI.party): a trainer's, or one of their Pokemon's (by species name). */
+function xpOf(rec, species = null) {
+  if (!rec) return 0;
+  if (!species) return xpOrStart(rec.xp?.trainer, rec.trainer?.[2]);
+  const i = rec.pokemon.findIndex(m => lower(m[2]) === lower(species));
+  return i < 0 ? 0 : xpOrStart(rec.xp?.pokemon?.[i], rec.pokemon[i][4]);
 }
 
 function xpLine(current, add) {
@@ -1165,7 +1156,7 @@ function xpCardHtml(name, s) {
   const rec = trainerRecord(name);
   const level = rec?.trainer?.[2] || 1;
   const tKey = lower(name);
-  const tXp = xpOf('trainers', tKey, level);
+  const tXp = xpOf(rec);
   const mons = rec?.pokemon || [];
   return `
     <div class="dm-after-xpcard" data-trainer="${escapeHtml(name)}">
@@ -1177,7 +1168,7 @@ function xpCardHtml(name, s) {
       </div>
       ${mons.map((m) => {
         const key = monKey(name, m[2]);
-        const xp = xpOf('pokemon', key, m[4]);
+        const xp = xpOf(rec, m[2]);
         const fought = s.present.has(key);
         return `
         <div class="dm-after-xprow${fought ? '' : ' absent'}" data-mon="${escapeHtml(m[2])}">
@@ -1305,34 +1296,38 @@ function wireAftermath(body, s, minutes) {
       redraw();
     });
     body.querySelector('#afXpSave').addEventListener('click', async () => {
-      const ledger = _after.ledger;
-      const ups = [];
+      const changes = [];
       s.trainers.forEach((t) => {
         const rec = trainerRecord(t);
+        if (!rec) return;
         const add = Number(_xpAdd.trainers[lower(t)]) || 0;
-        if (add) {
-          const before = xpOf('trainers', lower(t), rec?.trainer?.[2]);
-          ledger.trainers[lower(t)] = before + add;
-          if (levelFromXp(before + add) > levelFromXp(before)) ups.push(`${t} → level ${levelFromXp(before + add)}`);
-        }
-        (rec?.pokemon || []).forEach((m) => {
-          const k = monKey(t, m[2]);
-          const addP = Number(_xpAdd.pokemon[k]) || 0;
-          if (!addP) return;
-          const before = xpOf('pokemon', k, m[4]);
-          ledger.pokemon[k] = before + addP;
-          if (levelFromXp(before + addP) > levelFromXp(before)) ups.push(`${t}'s ${m[36] || m[2]} → level ${levelFromXp(before + addP)}`);
+        if (add) changes.push({ trainer: rec.trainer[1], add });
+        rec.pokemon.forEach((m) => {
+          const addP = Number(_xpAdd.pokemon[monKey(t, m[2])]) || 0;
+          if (addP) changes.push({ trainer: rec.trainer[1], pokemon: m[2], add: addP });
         });
       });
-      try { await DmAPI.saveState('xp-ledger', ledger); } catch (err) { showCombatAlert(err.message, { title: 'Save XP' }); return; }
+      if (!changes.length) { toast('No XP typed in yet.'); return; }
+      let results;
+      try { results = await DmAPI.changeXp(changes); } catch (err) { showCombatAlert(err.message, { title: 'Save XP' }); return; }
       _xpAdd.trainers = {};
       _xpAdd.pokemon = {};
+      // Ready for a level it wasn't ready for before this XP.
+      const ups = results.filter(r => r.xpLevel > r.level && r.xpLevel > levelFromXp(r.before)).map((r) => {
+        const m = r.pokemon && trainerRecord(r.trainer)?.pokemon.find(x => lower(x[2]) === lower(r.pokemon));
+        return `${r.trainer}${r.pokemon ? `'s ${m?.[36] || r.pokemon}` : ''} → level ${r.xpLevel}`;
+      });
+      await reloadParty();
       redraw();
-      if (ups.length) showCombatAlert(`Level ups -- tell the players to level up in their app:\n${ups.join('\n')}`, { title: 'XP saved' });
+      if (ups.length) showCombatAlert(`Ready to level up -- tell the players to level up in their app:\n${ups.join('\n')}`, { title: 'XP saved' });
       else toast('XP saved.');
     });
   }
   body.querySelector('#afXpImport').addEventListener('click', importXp);
+}
+
+async function reloadParty() {
+  try { _after.party = (await DmAPI.party()).data || _after.party; } catch { /* keep what's there */ }
 }
 
 /** An item into a trainer's bag -- one from the items list, or the DM's own (kept with its description). */
@@ -1354,17 +1349,27 @@ function importXp() {
     try { data = JSON.parse(await file.text()); } catch { showCombatAlert("That file isn't a backup from the old DM tool.", { title: 'Import XP' }); return; }
     const players = (Array.isArray(data) ? data : data.trainers || []).filter(t => t && !t.isNPC && t.name);
     if (!players.length) { showCombatAlert('No player trainers in that file.', { title: 'Import XP' }); return; }
-    const ledger = JSON.parse(JSON.stringify(_after.ledger));
-    let count = 0;
+    // Only trainers and Pokemon that are in the app too (the old tool's copies may be out of date).
+    const changes = [];
+    const skipped = [];
     players.forEach((t) => {
-      if (Number.isFinite(Number(t.xp))) { ledger.trainers[lower(t.name)] = Number(t.xp); count++; }
-      (t.pokemon || []).forEach((p) => { if (p.name && Number.isFinite(Number(p.xp))) { ledger.pokemon[monKey(t.name, p.name)] = Number(p.xp); count++; } });
+      const rec = trainerRecord(t.name);
+      if (!rec) { skipped.push(t.name); return; }
+      if (Number.isFinite(Number(t.xp))) changes.push({ trainer: rec.trainer[1], set: Number(t.xp) });
+      (t.pokemon || []).forEach((p) => {
+        if (!p.name || !Number.isFinite(Number(p.xp))) return;
+        const m = rec.pokemon.find(x => lower(x[2]) === lower(p.name));
+        if (m) changes.push({ trainer: rec.trainer[1], pokemon: m[2], set: Number(p.xp) });
+        else skipped.push(`${t.name}'s ${p.name}`);
+      });
     });
-    if (!await showCombatConfirm(`Set the XP of ${players.length} trainers and their Pokémon (${count} values) from ${file.name}? XP already here for them is replaced.`, { title: 'Import XP', yesLabel: 'Import', noLabel: 'Cancel' })) return;
-    try { await DmAPI.saveState('xp-ledger', ledger); } catch (err) { showCombatAlert(err.message, { title: 'Import XP' }); return; }
-    _after.ledger = ledger;
-    toast(`Imported the XP of ${players.map(t => t.name).join(', ')}.`);
-    drawAftermath(document.getElementById('encBody'));
+    if (!changes.length) { showCombatAlert('None of the trainers or Pokémon in that file are in the app.', { title: 'Import XP' }); return; }
+    if (!await showCombatConfirm(`Set the XP of ${changes.length} trainers and Pokémon from ${file.name}? The XP they have here now is replaced.${skipped.length ? `\n\nNot in the app, left out: ${skipped.join(', ')}` : ''}`, { title: 'Import XP', yesLabel: 'Import', noLabel: 'Cancel' })) return;
+    try { await DmAPI.changeXp(changes); } catch (err) { showCombatAlert(err.message, { title: 'Import XP' }); return; }
+    await reloadParty();
+    toast(`Imported the XP of ${changes.length} trainers and Pokémon.`);
+    const body = document.getElementById('encBody');
+    if (body) drawAftermath(body);
   });
   input.click();
 }

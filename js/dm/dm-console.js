@@ -3,8 +3,9 @@
 //
 // The battle module: with no battle running, the DM prepares one -- the map (map-editor.js) and the NPC trainers and
 // Pokemon the players will face (creature-setup.js), both kept on the Pi (setup-store.js) -- and starts it, which is
-// the moment the players can join. While a battle runs, the module is the running battle (battle-live.js). All the DM's
-// battles are PvE.
+// the moment the players can join. Beside the setup, as tabs: the encounter library to load one from and the last
+// battle's aftermath (encounters.js). While a battle runs, the module is the running battle (battle-live.js). All the
+// DM's battles are PvE.
 import { CombatAPI, DmAPI, GameDataAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
@@ -22,11 +23,13 @@ import { renderNpcs, npcsHaveUnsaved } from './npcs.js';
 import { renderClock } from './clock.js';
 import { renderEncounters, encountersHaveUnsaved } from './encounters.js';
 import { loadClock, renderTopWidget, tickTurnTimers } from './world-clock.js';
+import { renderDisplay, displayAway, displaySessionChanged } from './display.js';
 
 enableDmMode(DM);
 
 let session = { active: false, participants: {}, turnOrder: [] };
-let setupView = 'home'; // with no battle running: 'home' | 'map' | 'creatures'
+let battleTab = 'setup'; // with no battle running: 'setup' | 'library' (the encounters) | 'aftermath'
+let setupView = 'home'; // the setup tab: 'home' | 'map' | 'creatures'
 let liveMounted = false;
 let starting = false;
 
@@ -49,10 +52,10 @@ async function init() {
   if (res?.status === 'success') session = res.data;
   route();
 
-  window.addEventListener('app:combat-updated', (e) => { session = e.detail; route(); });
+  window.addEventListener('app:combat-updated', (e) => { session = e.detail; route(); displaySessionChanged(session); });
   window.addEventListener('app:live-resync', async () => {
     const r = await CombatAPI.getState().catch(() => null);
-    if (r?.status === 'success') { session = r.data; route(); }
+    if (r?.status === 'success') { session = r.data; route(); displaySessionChanged(session); }
   });
   // The battle screen asks the player app to go back to the trainer card in a few places; there is none here.
   window.addEventListener('navigate', () => { liveMounted = false; route(); });
@@ -61,36 +64,56 @@ async function init() {
     const btn = e.target.closest('[data-module]:not(:disabled)');
     if (btn) showModule(btn.dataset.module);
   });
+  document.getElementById('dmDisplayBtn').addEventListener('click', () => showModule('display'));
+  document.getElementById('dmBattleTabs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-btab]');
+    if (b) showBattleTab(b.dataset.btab);
+  });
   window.addEventListener('beforeunload', (e) => {
     if (pokedexHasUnsaved() || npcsHaveUnsaved() || encountersHaveUnsaved()) { e.preventDefault(); e.returnValue = ''; }
   });
-  // Loading an encounter into the battle setup brings the DM back to the battle module to place everyone.
+  // Loading an encounter into the battle setup brings the DM back to the setup to place everyone.
   window.addEventListener('dm:show-module', (e) => {
-    if (e.detail?.name === 'battle' && !session?.active) { setupView = 'home'; showSetupView('home'); }
+    if (e.detail?.name === 'battle') { setupView = 'home'; showBattleTab('setup'); }
     if (e.detail?.name) showModule(e.detail.name);
   });
-  window.addEventListener('dm:aftermath-changed', () => { if (!session?.active && setupView === 'home') renderAftermathBanner(); });
+  window.addEventListener('dm:aftermath-changed', () => { if (!session?.active) renderAftermathBanner(); });
 }
 
 // ---------------------------------------------------------------------------
-// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Encounters, Clock. The battle keeps running in its own
-// section while another module is open; Party and Encounters are fetched fresh every time they're opened, the Clock is
-// redrawn (the time may have moved), the Pokedex and NPCs keep where the DM was.
+// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock -- and Display, from the top bar. The battle
+// keeps running in its own section while another module is open; Party is fetched fresh every time it's opened, the
+// Clock is redrawn (the time may have moved), the Pokedex, NPCs and Display keep where the DM was.
 // ---------------------------------------------------------------------------
 
-const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', encounters: 'dmModuleEncounters', clock: 'dmModuleClock' };
+const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock', display: 'dmModuleDisplay' };
 const _moduleOpened = new Set(['battle']);
 
-function showModule(name, opts = {}) {
+function showModule(name) {
   Object.entries(MODULES).forEach(([key, id]) => { document.getElementById(id).hidden = key !== name; });
   document.querySelectorAll('#dmRail [data-module]').forEach(b => b.classList.toggle('active', b.dataset.module === name));
+  document.getElementById('dmDisplayBtn').classList.toggle('active', name === 'display');
+  if (name !== 'display') displayAway();
   const section = document.getElementById(MODULES[name]);
   if (name === 'party') renderParty(section);
-  else if (name === 'encounters') renderEncounters(section, opts);
   else if (name === 'clock') renderClock(section);
+  else if (name === 'display') renderDisplay(section, { session, firstTime: !_moduleOpened.has('display') });
   else if (name === 'pokedex' && !_moduleOpened.has('pokedex')) renderPokedex(section);
   else if (name === 'npcs' && !_moduleOpened.has('npcs')) renderNpcs(section);
   _moduleOpened.add(name);
+}
+
+/** The battle module's tabs, with no battle running: the setup, the encounter library, the last battle's aftermath. */
+function showBattleTab(name) {
+  battleTab = name;
+  document.querySelectorAll('#dmBattleTabs [data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === name));
+  if (session?.active) return; // the running battle fills the module; the tab shows again once it ends
+  const view = document.getElementById('dmView');
+  const enc = document.getElementById('dmEncView');
+  view.hidden = name !== 'setup';
+  enc.hidden = name === 'setup';
+  if (name === 'setup') { if (setupView === 'home' || !view.dataset.view) showSetupView(setupView); } // the map / battle editors keep where the DM was
+  else renderEncounters(enc, { tab: name });
 }
 
 // Turn timers (Clock module) move by one each time the running battle passes to the next turn.
@@ -127,8 +150,12 @@ function route() {
   renderStatus();
   const view = document.getElementById('dmView');
   const live = document.getElementById('dmLive');
+  const tabs = document.getElementById('dmBattleTabs');
+  const enc = document.getElementById('dmEncView');
   if (session?.active) {
     view.hidden = true;
+    enc.hidden = true;
+    tabs.hidden = true;
     live.hidden = false;
     if (!liveMounted) {
       liveMounted = true;
@@ -144,9 +171,18 @@ function route() {
     document.getElementById('content').innerHTML = '';
     document.getElementById('dmTools').innerHTML = '';
     setupView = 'home';
+    battleTab = 'setup';
   }
+  const wasLive = !live.hidden;
   live.hidden = true;
+  tabs.hidden = false;
+  if (battleTab !== 'setup') {
+    if (wasLive) showBattleTab(battleTab);
+    return;
+  }
+  document.querySelectorAll('#dmBattleTabs [data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === 'setup'));
   view.hidden = false;
+  enc.hidden = true;
   if (setupView === 'home' || !view.dataset.view || view.dataset.view !== setupView) showSetupView(setupView);
 }
 
@@ -275,6 +311,7 @@ function renderHome(view) {
 /** A battle ended and its aftermath isn't marked done yet: a banner over the setup to go and hand out the rewards. */
 async function renderAftermathBanner() {
   const last = await DmAPI.getState('last-battle').catch(() => null);
+  document.getElementById('dmAfterDot').hidden = !last || !!last.done;
   const el = document.getElementById('dmAftermathBanner');
   if (!el) return;
   if (!last || last.done) { el.innerHTML = ''; return; }
@@ -284,7 +321,7 @@ async function renderAftermathBanner() {
       <span>🏁 <strong>The last battle is over</strong> (${last.round || 1} round${last.round === 1 ? '' : 's'}${caught ? `, ${caught} caught` : ''}) -- XP, loot${caught ? ' and the caught Pokémon' : ''} are waiting in the aftermath.</span>
       <button class="dm-btn primary small" id="dmToAftermath">Open the aftermath</button>
     </div>`;
-  document.getElementById('dmToAftermath').addEventListener('click', () => showModule('encounters', { tab: 'aftermath' }));
+  document.getElementById('dmToAftermath').addEventListener('click', () => showBattleTab('aftermath'));
 }
 
 async function saveNow() {

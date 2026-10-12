@@ -100,6 +100,12 @@ def _migrate(conn):
     cols = [r[1] for r in conn.execute('PRAGMA table_info(music_sync)')]
     if 'listeners' not in cols:
         conn.execute('ALTER TABLE music_sync ADD COLUMN listeners INTEGER DEFAULT 0')
+    # XP, which only the DM sees (routes_dm.change_xp). Deliberately NOT in TRAINER_COLUMNS / POKEMON_COLUMNS: those are
+    # the rows sent to the players' app and written back by it, so this column never leaves the Pi through them and no
+    # player save touches it -- and since it sits on the row itself, a Pokemon keeps its XP when it evolves.
+    for table in ('trainers', 'pokemon'):
+        if 'dm_xp' not in [r[1] for r in conn.execute(f'PRAGMA table_info({table})')]:
+            conn.execute(f'ALTER TABLE {table} ADD COLUMN dm_xp INTEGER')
 
 
 def fetch_rows(conn, table, columns):

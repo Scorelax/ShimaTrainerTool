@@ -5,24 +5,52 @@
 // shared combat session over SSE and render it. Strictly read-only -- no
 // control ever mutates combat state from here, so it's safe to leave open
 // and untouched all session.
-import { CombatAPI } from '../api.js';
+//
+// Behind the battle info sits the DM's scene -- a background picture and
+// pictures placed on it (js/utils/display-scene.js), set up in the DM
+// console's Display module and pushed here live. The DM also picks how much
+// battle info goes on top of it during a battle (all of it, the turn strip
+// only, or none).
+//
+// display.html?preview is the DM console's small live preview of this screen:
+// no SSE connection of its own (the console posts it the battle and the scene
+// as they change -- see js/dm/display.js) and no move animations.
+import { CombatAPI, DmAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { audioManager } from '../utils/audio.js';
 import { getSettings } from '../utils/settings.js';
 import { spriteMediaHtml, patchPortraitMedia } from '../utils/sprite-media.js';
 import { preloadBattleAnimation, getBattleAnimationUrl } from '../utils/battle-animation.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
+import { normaliseScene, renderScene, sceneHasContent } from '../utils/display-scene.js';
+
+const PREVIEW = new URLSearchParams(location.search).has('preview');
 
 let session = { active: false, participants: {}, turnOrder: [], turnIndex: 0, round: 0, reactingParticipantId: null };
+let scene = normaliseScene(null);
 
 async function init() {
   audioManager.setVolume(getSettings().volume);
-  initLiveUpdates();
 
-  const result = await CombatAPI.getState();
+  if (PREVIEW) {
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin || e.data?.source !== 'dm-display') return;
+      if (e.data.scene) { scene = normaliseScene(e.data.scene); drawScene(); render(); }
+      if (e.data.session) { session = e.data.session; render(); }
+    });
+  } else {
+    initLiveUpdates();
+  }
+
+  const [result, savedScene] = await Promise.all([
+    CombatAPI.getState(),
+    DmAPI.getState('display-scene').catch(() => null),
+  ]);
   if (result.status === 'success') session = result.data;
+  if (savedScene) scene = normaliseScene(savedScene);
+  drawScene();
   render();
-  preloadAllAnimations();
+  if (!PREVIEW) preloadAllAnimations();
 
   window.addEventListener('app:combat-updated', (e) => {
     session = e.detail;
@@ -33,6 +61,24 @@ async function init() {
   window.addEventListener('app:combat-animation', (e) => {
     playAnimationOverlay(e.detail.species);
   });
+
+  window.addEventListener('app:display-scene', (e) => {
+    scene = normaliseScene(e.detail?.scene);
+    drawScene();
+    render();
+  });
+  // Back after the connection dropped: whatever changed meanwhile.
+  window.addEventListener('app:live-resync', async () => {
+    const [r, s] = await Promise.all([CombatAPI.getState().catch(() => null), DmAPI.getState('display-scene').catch(() => null)]);
+    if (r?.status === 'success') session = r.data;
+    if (s) scene = normaliseScene(s);
+    drawScene();
+    render();
+  });
+}
+
+function drawScene() {
+  renderScene(document.getElementById('sceneStage'), scene);
 }
 
 function preloadAllAnimations() {
@@ -40,7 +86,7 @@ function preloadAllAnimations() {
 }
 
 // ---------------------------------------------------------------------------
-// Render -- the skeleton (spotlight card, strip, animation overlay) is
+// Render -- the skeleton (spotlight card, strip) is
 // built once and left alone; every subsequent push only patches text, bar
 // widths and classes in place. Critically, a participant's portrait
 // <video>/<img> is only ever rebuilt when its image URL actually changes --
@@ -55,9 +101,13 @@ function render() {
   if (!root) return;
 
   if (!session.active) {
+    // The DM's scene on its own -- or, with nothing set up there, the old waiting screen.
+    root.hidden = sceneHasContent(scene);
     root.innerHTML = '<div class="display-empty">⚔️ Waiting for battle to start…</div>';
     return;
   }
+  root.hidden = scene.battleInfo === 'off';
+  root.classList.toggle('strip-only', scene.battleInfo === 'strip');
 
   ensureSkeleton(root);
 
@@ -88,7 +138,6 @@ function ensureSkeleton(root) {
       </div>
     </div>
     <div class="display-strip" id="displayStrip"></div>
-    <div class="display-anim-overlay" id="animOverlay" hidden></div>
   `;
 }
 
@@ -186,6 +235,7 @@ function updateStrip(activeId) {
 // ---------------------------------------------------------------------------
 
 async function playAnimationOverlay(species) {
+  if (PREVIEW) return;
   preloadBattleAnimation(species);
   const url = await getBattleAnimationUrl(species);
   const overlay = document.getElementById('animOverlay');

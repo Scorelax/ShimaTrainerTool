@@ -10,14 +10,24 @@
     margin: 0; padding: 0; height: 100%; overflow: hidden;
     background: #0a0a12; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif;
   }
-  #displayRoot { display: flex; flex-direction: column; justify-content: space-between; height: 100vh; box-sizing: border-box; padding: 1.5rem 2rem; }
+  /* The DM's scene (background + pictures, js/utils/display-scene.js) fills the screen at 16:9 behind the battle info. */
+  #sceneStage {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(100vw, calc(100vh * 16 / 9)); height: min(100vh, calc(100vw * 9 / 16));
+  }
+  #displayRoot { position: relative; z-index: 1; display: flex; flex-direction: column; justify-content: space-between; height: 100vh; box-sizing: border-box; padding: 1.5rem 2rem; }
+  #displayRoot[hidden] { display: none; }
+  /* "Only the turn strip" (the DM's choice): no round line or spotlight, the strip stays at the bottom. */
+  #displayRoot.strip-only { justify-content: flex-end; }
+  #displayRoot.strip-only .display-round, #displayRoot.strip-only .display-spotlight { display: none; }
 
   .display-empty { margin: auto; font-size: 1.6rem; color: #a0a0c0; text-align: center; }
 
-  .display-round { font-size: 1.3rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 2px; }
+  /* Dark backing behind the battle info, so it reads on any background picture. */
+  .display-round { align-self: flex-start; font-size: 1.3rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 2px; background: rgba(10, 10, 18, 0.65); padding: 0.3rem 0.8rem; border-radius: 10px; }
 
   .display-spotlight { flex: 1; display: flex; align-items: center; justify-content: center; }
-  .display-spotlight-card { text-align: center; }
+  .display-spotlight-card { text-align: center; background: rgba(10, 10, 18, 0.55); padding: 1rem 1.5rem; border-radius: 18px; }
   .display-spotlight-portrait { width: 320px; height: 320px; display: flex; align-items: center; justify-content: center; }
   .display-spotlight-portrait img, .display-spotlight-portrait video { max-width: 100%; max-height: 100%; filter: drop-shadow(0 0 24px rgba(255,215,0,0.35)); }
   .display-spotlight-name { font-size: 1.6rem; font-weight: 700; margin-top: 0.5rem; }
@@ -26,9 +36,9 @@
   .display-strip { display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.25rem; }
   .display-strip-card {
     position: relative; flex: 0 0 auto; width: 96px; text-align: center; padding: 0.5rem;
-    border-radius: 10px; border: 2px solid transparent; background: rgba(255,255,255,0.05);
+    border-radius: 10px; border: 2px solid transparent; background: rgba(16,16,28,0.78);
   }
-  .display-strip-card.active { border-color: #FFD700; background: rgba(255,215,0,0.1); }
+  .display-strip-card.active { border-color: #FFD700; background: rgba(60,52,10,0.85); }
   .display-strip-card.spectating { opacity: 0.4; }
   .display-strip-portrait { width: 64px; height: 64px; margin: 0 auto; }
   .display-strip-portrait img, .display-strip-portrait video { width: 100%; height: 100%; object-fit: contain; }
@@ -61,7 +71,10 @@
 </style>
 </head>
 <body>
+  <div id="sceneStage"></div>
   <div id="displayRoot"><div class="display-empty">Loading…</div></div>
+  <!-- Outside #displayRoot: move animations play even when the DM has the battle info off. -->
+  <div class="display-anim-overlay" id="animOverlay" hidden></div>
   <script type="module" src="js/pages/display.js"></script>
 </body>
 </html>

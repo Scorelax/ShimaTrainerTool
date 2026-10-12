@@ -50,7 +50,8 @@ db.init()
 # stamp a `?t=<mtime>` onto the URL itself, so a replaced file gets a brand
 # new URL automatically -- nothing for the browser to revalidate, nothing to
 # ever go stale, nothing to manually clear.
-_VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', upstream.CHARACTER_IMAGE_URL_PREFIX)
+_VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', upstream.CHARACTER_IMAGE_URL_PREFIX,
+                             upstream.DISPLAY_IMAGE_URL_PREFIX)
 
 # Benjakronk's splash mirror and the bundled PWA assets aren't stamped with a
 # version (their filenames stay constant even when the content behind them
@@ -269,6 +270,45 @@ def dm_give_pokemon(payload: dict):
     return JSONResponse(result)
 
 
+@app.post('/api/dm/xp')
+def dm_change_xp(payload: dict):
+    """XP only the DM sees, given / taken / set on trainers and their Pokemon (routes_dm.change_xp)."""
+    conn = db.connect()
+    try:
+        result = routes_dm.change_xp(conn, payload.get('changes'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success', 'data': result})
+
+
+@app.post('/api/dm/display-scene')
+def dm_save_display_scene(payload: dict):
+    """What the table TV shows -- a background and pictures (routes_dm.save_display_scene), pushed to the TV at once."""
+    conn = db.connect()
+    try:
+        routes_dm.save_display_scene(conn, payload.get('scene'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success'})
+
+
+@app.post('/api/dm/display-image')
+def dm_save_display_image(payload: dict):
+    """A picture uploaded from the DM's computer for the table TV, or a new name for one (routes_dm.save_display_image)."""
+    conn = db.connect()
+    try:
+        img = routes_dm.save_display_image(conn, payload)
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success', 'data': img})
+
+
 @app.post('/api/dm/pokedex-config')
 def save_dm_pokedex_config(payload: dict):
     """The DM console's Pokedex module: what the players may see of each species (pokedexConfig -- registered,
@@ -349,6 +389,12 @@ if os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
 if os.path.isdir(upstream.BATTLE_IMAGE_DIR):
     app.mount('/battle-images', StaticFiles(directory=upstream.BATTLE_IMAGE_DIR),
               name='battle-images')
+
+# Pictures the DM uploads for the table TV (see upstream.DISPLAY_IMAGE_DIR) -- made here if it isn't there yet, since the
+# first upload comes after startup and a mount needs the folder to exist.
+os.makedirs(upstream.DISPLAY_IMAGE_DIR, exist_ok=True)
+app.mount(upstream.DISPLAY_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=upstream.DISPLAY_IMAGE_DIR),
+          name='display-images')
 
 # Serve the PWA from the same origin (mounted last so /api and /exec win)
 _default_pwa = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))

@@ -1230,10 +1230,11 @@ export class CombatAPI {
 export class DmAPI {
   /** Every species in the encyclopedia (not only the ones unlocked for players), as compact summaries for the
    * enemy picker: {name, dex, type1, type2, size, rarity, habitat, behavior, activity, evolution, level, abilities,
-   * image}. (The cache key's version goes up when the shape or the pictures change, so no device keeps an old copy.) */
+   * image (the animated sprite if there is one), picture (the still one)}. (The cache key's version goes up when the
+   * shape or the pictures change, so no device keeps an old copy.) */
   static async speciesList() {
     return API.request('dm', 'species-list', {}, {
-      cacheKey: 'dm:species-list-v2', useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT,
+      cacheKey: 'dm:species-list-v3', useCache: true, cacheTtl: STATIC_DATA_TTL, timeout: HEAVY_TIMEOUT,
     });
   }
 
@@ -1300,7 +1301,8 @@ export class DmAPI {
     return data;
   }
 
-  /** Every player trainer with all their Pokemon: [{trainer: row, pokemon: [rows]}] (Party module). */
+  /** Every player trainer with all their Pokemon: [{trainer: row, pokemon: [rows], xp: {trainer, pokemon: [one per
+   * row]}}] (Party module). XP is null where none is stored yet. */
   static async party() {
     return API.request('dm', 'party', {}, { useCache: false, timeout: HEAVY_TIMEOUT });
   }
@@ -1353,8 +1355,33 @@ export class DmAPI {
     return API.request('dm', 'delete-encounter', { id }, { useCache: false });
   }
 
+  /** XP only the DM sees: `changes` = [{trainer, pokemon? (species name), add? | set?}]. Resolves to
+   * [{trainer, pokemon, before, xp, level, xpLevel}]. */
+  static async changeXp(changes) {
+    return (await DmAPI._post('xp', { changes }, 'Saving the XP')).data;
+  }
+
+  /** What the table TV shows ({background, items, battleInfo}) -- stored and pushed to the TV at once. */
+  static async saveDisplayScene(scene) {
+    return DmAPI._post('display-scene', { scene }, 'Updating the TV');
+  }
+
+  /** The pictures uploaded for the TV, newest first: [{id, name, url, createdAt}]. */
+  static async displayImages() {
+    return API.request('dm', 'display-images', {}, { useCache: false });
+  }
+
+  /** Uploads a picture ({name, data: a data: URL}), or renames one ({id, name}); resolves to it. */
+  static async saveDisplayImage(image) {
+    return (await DmAPI._post('display-image', image, 'Uploading the picture')).data;
+  }
+
+  static async deleteDisplayImage(id) {
+    return API.request('dm', 'delete-display-image', { id }, { useCache: false });
+  }
+
   /** One of the console's small DM-only records ('encounter-run', 'last-battle', 'saved-pokemon',
-   * 'encounter-exclusions', 'xp-ledger') -- null when never set. */
+   * 'encounter-exclusions', 'display-scene') -- null when never set. */
   static async getState(key) {
     return (await API.request('dm', 'get-state', { key }, { useCache: false })).data ?? null;
   }

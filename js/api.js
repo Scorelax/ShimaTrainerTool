@@ -1320,9 +1320,15 @@ export class DmAPI {
 
   /** Every player trainer with all their Pokemon: [{trainer: row, pokemon: [rows], xp: {trainer, pokemon: [one per
    * row]}}] (Party module). XP is null where none is stored yet. */
-  /** The species the players have caught: [lowercase species name]. */
+  /** The species the players have caught -- {caught: [ever caught, kept after evolving], owned: [a player has one
+   * now]}, lowercase names. */
   static async caughtSpecies() {
-    return (await API.request('dm', 'caught-species', {}, { useCache: false })).data || [];
+    return (await API.request('dm', 'caught-species', {}, { useCache: false })).data || { caught: [], owned: [] };
+  }
+
+  /** The DM ticks / unticks a species as caught by the players. Returns caughtSpecies' shape. */
+  static async setCaught(species, caught) {
+    return (await API.request('dm', 'set-caught', { species, caught: caught ? '1' : '0' }, { useCache: false })).data;
   }
 
   static async party() {

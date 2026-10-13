@@ -137,6 +137,9 @@ def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
     apply_registration_stats(conn, new_pokemon_data)
 
     db.insert_row(conn, 'pokemon', P, new_pokemon_data)
+    # Remembered as caught for good -- the DM console's Pokedex keeps its Poke Ball after this Pokemon evolves.
+    from .routes_dm import record_caught
+    record_caught(conn, new_pokemon_data[2])
 
     # Same trainer-data event _write_trainer_cell publishes for inventory/gear/
     # money -- register is the other half of Benjakronk's external game-write

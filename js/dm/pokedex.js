@@ -68,8 +68,15 @@ let _filter = 'all';
 let _saveTimer = null;
 let _saveState = 'saved';
 const _details = new Map();
-let _caught = new Set();  // the species the players have caught (lowercase)
+let _caught = new Set();  // the species the players have ever caught (lowercase) -- kept after a Pokemon evolves
+let _owned = new Set();   // ... and the ones a player has right now
 let _caughtTimer = null;
+
+function setCaughtState(data) {
+  if (!data) return;
+  _caught = new Set(data.caught || []);
+  _owned = new Set(data.owned || []);
+}
 
 export async function renderPokedex(root) {
   _root = root;
@@ -79,16 +86,20 @@ export async function renderPokedex(root) {
     window.addEventListener('app:trainer-data', () => {
       clearTimeout(_caughtTimer);
       _caughtTimer = setTimeout(async () => {
-        try { _caught = new Set(await DmAPI.caughtSpecies()); refreshListFlags(); } catch (e) { /* keep the old marks */ }
+        try {
+          setCaughtState(await DmAPI.caughtSpecies());
+          refreshListFlags();
+          if (_selected && _selected !== DEFAULTS && _selected !== MOVES) refreshCaughtBox();
+        } catch (e) { /* keep the old marks */ }
       }, 1000);
     });
   }
   root.innerHTML = '<div class="dm-loading">Loading the Pokédex…</div>';
   try {
-    const [cfg, species, caught] = await Promise.all([DmAPI.pokedexConfig(), getSpecies(), DmAPI.caughtSpecies().catch(() => [])]);
+    const [cfg, species, caught] = await Promise.all([DmAPI.pokedexConfig(), getSpecies(), DmAPI.caughtSpecies().catch(() => null)]);
     _config = cfg.data || {};
     _species = species;
-    _caught = new Set(caught);
+    setCaughtState(caught);
   } catch (err) {
     root.innerHTML = `<div class="dm-loading">Couldn't load the Pokédex: ${escapeHtml(err.message)}</div>`;
     return;
@@ -226,8 +237,11 @@ function effectiveSettings(name) {
   return { ...fallbackSettings(), ...(ownSettings(name) || _config.defaults || {}) };
 }
 
-/** Changes `name`'s switches -- a species without its own settings gets a copy of the defaults first. */
-function editSettings(name, fn) {
+/** Changes `name`'s switches -- a species without its own settings gets a copy of the defaults first. The evolution
+ * switches then settle (settleEvolution) and, unless `link` is off, carry over to the species it evolves from / into
+ * (linkEvolution). */
+function editSettings(name, fn, { link = true } = {}) {
+  const before = name !== DEFAULTS ? evoSnapshot(name) : null;
   if (name === DEFAULTS) {
     _config.defaults = { ...fallbackSettings(), ...(_config.defaults || {}) };
     fn(_config.defaults);
@@ -241,14 +255,97 @@ function editSettings(name, fn) {
       _config.visibility[key] = copy;
     }
     fn(_config.visibility[key]);
+    settleEvolution(name, before);
+    if (link) linkEvolution(name, before, evoSnapshot(name));
   }
   scheduleSave();
   refreshListFlags();
 }
 
+// ---------------------------------------------------------------------------
+// Evolution switches: a species' "Evolves into" and its targets agree, and a target shown on one species is the
+// "Evolves from" shown on the other (both ways).
+// ---------------------------------------------------------------------------
+
+const evoNames = text => String(text || '').split('@')[0].split('+').map(s => s.trim()).filter(s => s && s !== '-');
+const speciesNamed = n => _species.find(s => s.name.toLowerCase() === String(n).toLowerCase())?.name || null;
+
+/** Each evolution target of `name` and whether the players see it (as the players' Pokedex reads it). */
+function targetStates(name) {
+  const own = ownSettings(name);
+  const list = [...new Set([...(_details.get(name)?.evolvesTo || []), ...Object.keys(own?.evoToTargets || {})])]
+    .filter(t => t.toLowerCase() !== name.toLowerCase()); // (old settings can name the species itself -- not a target)
+  const v = effectiveSettings(name);
+  return Object.fromEntries(list.map(t => [t, own ? !!own.evoToTargets?.[t] : !!v.evoTo]));
+}
+
+function evoSnapshot(name) {
+  const v = effectiveSettings(name);
+  return { evoFrom: !!v.evoFrom, evoTo: !!v.evoTo, targets: targetStates(name) };
+}
+
+/** After a change: "Evolves into" turned on with a single target shows that target, turned off hides them all; a
+ * target turned on or off turns "Evolves into" on while any is on. */
+function settleEvolution(name, before) {
+  const s = _config.visibility[name.toLowerCase()];
+  if (!s || !before) return;
+  const targets = Object.keys(targetStates(name));
+  if (!targets.length) return;
+  s.evoToTargets = { ...(s.evoToTargets || {}) };
+  if (!!s.evoTo !== before.evoTo) {
+    if (!s.evoTo) targets.forEach((t) => { s.evoToTargets[t] = false; });
+    else if (targets.length === 1) s.evoToTargets[targets[0]] = true;
+  } else if (targets.some(t => !!s.evoToTargets[t] !== before.targets[t])) {
+    s.evoTo = targets.some(t => s.evoToTargets[t]);
+  }
+}
+
+async function detailOf(name) {
+  if (!_details.has(name)) _details.set(name, (await DmAPI.speciesDetail(name)).data);
+  return _details.get(name);
+}
+
+/** Carries `name`'s changed evolution switches over: a target shown or hidden -> that species' "Evolves from"; its
+ * "Evolves from" shown or hidden -> the target naming it on the species it evolves from. */
+async function linkEvolution(name, before, after) {
+  if (!before) return;
+  const linked = [];
+  try {
+    for (const [target, on] of Object.entries(after.targets)) {
+      if (before.targets[target] === on) continue;
+      const child = speciesNamed(evoNames(target)[0]);
+      if (!child) continue;
+      const cd = await detailOf(child);
+      if (!evoNames(cd.evolvesFrom).some(n => n.toLowerCase() === name.toLowerCase())) continue;
+      if (!!effectiveSettings(child).evoFrom === on) continue;
+      editSettings(child, (s) => { s.evoFrom = on; }, { link: false });
+      linked.push(child);
+    }
+    if (after.evoFrom !== before.evoFrom) {
+      for (const from of evoNames(_details.get(name)?.evolvesFrom)) {
+        const parent = speciesNamed(from);
+        if (!parent) continue;
+        const pd = await detailOf(parent);
+        const key = (pd.evolvesTo || []).find(t => (evoNames(t)[0] || '').toLowerCase() === name.toLowerCase());
+        if (!key || targetStates(parent)[key] === after.evoFrom) continue;
+        editSettings(parent, (s) => { s.evoToTargets = { ...(s.evoToTargets || {}), [key]: after.evoFrom }; }, { link: false });
+        linked.push(parent);
+      }
+    }
+  } catch (err) {
+    console.warn('[Pokedex] Could not link the evolution switches:', err);
+  }
+  if (linked.includes(_selected)) renderDetail();
+}
+
 function renderDetail() {
   const box = document.getElementById('pdxDetail');
   const name = _selected;
+  if (box.dataset.shows === name) {
+    const scroll = box.scrollTop;
+    requestAnimationFrame(() => { box.scrollTop = scroll; }); // the same species drawn again: where the DM was
+  }
+  box.dataset.shows = name;
   const isDefaults = name === DEFAULTS;
   const d = isDefaults ? null : _details.get(name);
   const v = effectiveSettings(name);
@@ -277,6 +374,7 @@ function renderDetail() {
         ${isDefaults ? '' : `
           <div class="dm-pdx-head-row">
             <label class="dm-pdx-reg"><input type="checkbox" id="pdxRegistered" ${isRegistered(name) ? 'checked' : ''}> In the players' Pokédex</label>
+            <label class="dm-pdx-reg" id="pdxCaughtBox"><input type="checkbox" id="pdxCaught"> Caught by the players</label>
             <span class="dm-pill ${own ? 'ok' : 'todo'}">${own ? 'Own settings' : 'Using the defaults'}</span>
             ${own ? '<button class="dm-btn small" id="pdxBackToDefaults">Back to defaults</button>' : ''}
           </div>`}
@@ -289,7 +387,19 @@ function renderDetail() {
     </div>`;
 
   if (!isDefaults && d.image) patchPortraitMedia(document.getElementById('pdxThumb'), d.image, d.name);
+  refreshCaughtBox();
   wireDetail(name, d);
+}
+
+/** The species page's "Caught by the players" tick -- locked on while a player has one (it would only come back). */
+function refreshCaughtBox() {
+  const cb = document.getElementById('pdxCaught');
+  if (!cb || !_selected) return;
+  const lower = _selected.toLowerCase();
+  const owned = _owned.has(lower);
+  cb.checked = _caught.has(lower) || owned;
+  cb.disabled = owned;
+  document.getElementById('pdxCaughtBox').title = owned ? 'A player has one right now' : '';
 }
 
 /** The per-target switches under "Evolves into" -- the evolution page offers a target only when it's ticked here. */
@@ -297,7 +407,8 @@ function evoTargetsHtml(d, v) {
   if (!d) return ''; // the defaults: targets are always a species' own
   // Its own evolution targets, plus any its OWN settings already name (not the defaults', which are other species').
   const own = ownSettings(d.name)?.evoToTargets || {};
-  const targets = [...new Set([...(d.evolvesTo || []), ...Object.keys(own)])];
+  const targets = [...new Set([...(d.evolvesTo || []), ...Object.keys(own)])]
+    .filter(t => t.toLowerCase() !== d.name.toLowerCase()); // (old settings can name the species itself)
   if (!targets.length) return '';
   v = { ...v, evoToTargets: ownSettings(d.name) ? own : Object.fromEntries(targets.map(t => [t, !!v.evoTo])) };
   return `<div class="dm-pdx-sub">Evolution targets the players can see
@@ -330,11 +441,13 @@ function wireDetail(name, d) {
   const box = document.getElementById('pdxDetail');
   box.querySelectorAll('[data-key]').forEach(cb => cb.addEventListener('change', () => {
     editSettings(name, s => { s[cb.dataset.key] = cb.checked; });
-    if (cb.dataset.key === 'moves') renderDetail(); else cb.closest('.dm-pdx-field')?.classList.toggle('on', cb.checked);
+    // (an evolution switch can move the others with it -- drawn again to show them)
+    if (['moves', 'evoTo', 'evoFrom'].includes(cb.dataset.key)) renderDetail();
+    else cb.closest('.dm-pdx-field')?.classList.toggle('on', cb.checked);
   }));
   box.querySelectorAll('[data-evo]').forEach(cb => cb.addEventListener('change', () => {
     editSettings(name, s => { s.evoToTargets = { ...(s.evoToTargets || {}), [cb.dataset.evo]: cb.checked }; });
-    cb.closest('.dm-pdx-field')?.classList.toggle('on', cb.checked);
+    renderDetail();
   }));
   box.querySelectorAll('[data-extra]').forEach(cb => cb.addEventListener('change', () => {
     editSettings(name, s => {
@@ -376,6 +489,20 @@ function wireDetail(name, d) {
     refreshListFlags();
     applyFilter();
   });
+  document.getElementById('pdxCaught')?.addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    const lower = name.toLowerCase();
+    if (on) _caught.add(lower); else _caught.delete(lower);
+    refreshListFlags();
+    try {
+      setCaughtState(await DmAPI.setCaught(name, on));
+    } catch (err) {
+      showCombatAlert(err.message, { title: "Couldn't save" });
+      if (on) _caught.delete(lower); else _caught.add(lower);
+    }
+    refreshListFlags();
+    if (_selected === name) refreshCaughtBox();
+  });
   document.getElementById('pdxBackToDefaults')?.addEventListener('click', async () => {
     if (!await showCombatConfirm(`Drop ${name}'s own settings? It goes back to showing what the default settings show.`, { title: 'Back to defaults', yesLabel: 'Use defaults', noLabel: 'Cancel' })) return;
     delete _config.visibility[name.toLowerCase()];
@@ -393,6 +520,7 @@ function wireDetail(name, d) {
  * searchable anyway (ticked and greyed); the others are the DM's own picks (extraSearchableMoves). */
 async function renderMovesPage() {
   const box = document.getElementById('pdxDetail');
+  box.dataset.shows = MOVES;
   box.innerHTML = '<div class="dm-loading">Loading…</div>';
   let overview;
   try {

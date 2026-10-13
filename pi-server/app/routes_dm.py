@@ -24,7 +24,10 @@ _CLOCK_KEY = 'world-clock'
 # battle that ended (routes_combat._remember_battle, marked done by the aftermath), saved Pokemon for reuse, species left
 # out of the random generators, what the table TV shows outside the battle (js/dm/display-store.js), and where the
 # region map on the board screen is looking (js/dm/pokenav.js).
-_STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene', 'region-map-view'}
+_STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene', 'region-map-view',
+               'pokedex-caught'}
+# The species the players have ever caught (lowercase names) -- see caught_species.
+_CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
 # Pokemon's dm_xp column (db._migrate); a record with none yet counts as the start of its level.
 XP_TO_LEVEL = [0, 0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000,
@@ -77,10 +80,13 @@ def handle(conn, action, params):
         return {'status': 'success', 'data': party_overview(conn)}
 
     if action == 'caught-species':
-        # The species the players have caught (any trainer's Pokemon, by species name, lowercase) -- the Pokedex
-        # module's Poke Ball marks.
-        rows = conn.execute('SELECT DISTINCT lower(trim(name)) FROM pokemon WHERE trim(coalesce(name, \'\')) != \'\'').fetchall()
-        return {'status': 'success', 'data': sorted(r[0] for r in rows)}
+        return {'status': 'success', 'data': caught_species(conn)}
+
+    if action == 'set-caught':
+        if not params.get('species'):
+            raise ValueError('Missing species')
+        set_caught(conn, params['species'], str(params.get('caught', '')).lower() in ('1', 'true'))
+        return {'status': 'success', 'data': caught_species(conn)}
 
     if action == 'give-item':
         if not params.get('trainer') or not params.get('item'):
@@ -206,6 +212,41 @@ def _evo_part(text, which):
             value = value.strip()
             return value if value and value != '-' else ''
     return ''
+
+
+def _owned_species(conn):
+    """The species the players have right now (any trainer's Pokemon, lowercase)."""
+    rows = conn.execute("SELECT DISTINCT lower(trim(name)) FROM pokemon WHERE trim(coalesce(name, '')) != ''").fetchall()
+    return {r[0] for r in rows}
+
+
+def caught_species(conn):
+    """The species the players have caught -- the Pokedex module's Poke Ball marks: {caught, owned} (lowercase names).
+    `caught` is a lasting record (dm_state 'pokedex-caught'), so a species stays caught after its Pokemon evolves or is
+    released: everything a player has now is added to it, as is every Pokemon registered or given (record_caught), and
+    the DM can tick or untick one (set_caught). `owned`: the ones a player has right now."""
+    stored = set(_load_state(conn, _CAUGHT_KEY) or [])
+    owned = _owned_species(conn)
+    if not owned <= stored:
+        stored |= owned
+        save_state(conn, _CAUGHT_KEY, sorted(stored))
+    return {'caught': sorted(stored), 'owned': sorted(owned)}
+
+
+def record_caught(conn, species):
+    """A Pokemon of `species` was just caught (registered, or given by the DM): remembered for good."""
+    name = str(species or '').strip().lower()
+    stored = set(_load_state(conn, _CAUGHT_KEY) or [])
+    if name and name not in stored:
+        save_state(conn, _CAUGHT_KEY, sorted(stored | {name}))
+
+
+def set_caught(conn, species, caught):
+    """The DM's own tick: `species` caught by the players or not."""
+    name = str(species or '').strip().lower()
+    stored = set(_load_state(conn, _CAUGHT_KEY) or [])
+    stored = stored | {name} if caught else stored - {name}
+    save_state(conn, _CAUGHT_KEY, sorted(stored))
 
 
 def party_overview(conn):
@@ -554,6 +595,7 @@ def give_pokemon(conn, trainer, cfg):
     row[0] = tname
     row[1] = upstream.local_pokemon_image_url(row[2], row[3]) or ''
     db.insert_row(conn, 'pokemon', db.POKEMON_COLUMNS, row)
+    record_caught(conn, row[2])
     live.publish({'type': 'trainer-data', 'trainer': tname})
     return {'status': 'success', 'message': f'{tname} got {cfg.get("nickname") or row[2]}!', 'data': row}
 

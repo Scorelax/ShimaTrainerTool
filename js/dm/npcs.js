@@ -197,6 +197,7 @@ function renderSheet() {
         </div>
       </div>
       <div class="dm-npc-actions">
+        <button class="dm-btn primary" id="npcSaveNow" title="Keeps this NPC in the library, to use again any time (changes also save on their own)">💾 Save</button>
         <button class="dm-btn primary" id="npcToBattle">⚔ Add to the next battle</button>
         <button class="dm-btn" id="npcDuplicate">Duplicate</button>
         <button class="dm-btn danger" id="npcDelete">Delete</button>
@@ -522,6 +523,13 @@ function wireSheet(box, n) {
     renderSheet();
   });
 
+  document.getElementById('npcSaveNow').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    await saveNow(n); // at once, not waiting for the automatic save; says so itself if it fails
+    btn.disabled = false;
+    if (_saveState === 'saved') toast(`${n.name || 'The NPC'} is saved in the NPC library.`);
+  });
   document.getElementById('npcToBattle').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;

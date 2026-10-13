@@ -471,13 +471,23 @@
   background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.7), transparent 45%), var(--type);
 }
 .pdx-move-type-count { margin-left: auto; font-size: 0.72rem; color: #ffe27a; background: rgba(0,0,0,0.3); padding: 1px 9px; border-radius: 10px; text-shadow: none; }
+/* each type's list in the light grey of the card panels: white rows, dark text */
 .pdx-move-list {
-  background: var(--pdx-screen);
+  --pdx-bg-elevated: #eef0f1;
+  --pdx-bg-hover: #e6e9eb;
+  --pdx-border: #d3d7da;
+  --pdx-text: #1d2124;
+  --pdx-text-2: #485157;
+  --pdx-text-muted: #79828a;
+  color: var(--pdx-text);
+  background: #ffffff;
   border: 2px solid var(--pdx-ink);
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 4px 0 rgba(0,0,0,0.25);
 }
+.pdx-move-list .pdx-move-vp-tag { background: #e4e7e9; }
+.pdx-move-list .pdx-move-row.expanded { background: #f4f5f6; }
 .pdx-move-row { border-bottom: 1px solid var(--pdx-border); border-left: 4px solid var(--type); }
 .pdx-move-row:last-child { border-bottom: none; }
 .pdx-move-row-summary {

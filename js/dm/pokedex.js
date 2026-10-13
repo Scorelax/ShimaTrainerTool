@@ -85,7 +85,7 @@ export async function renderPokedex(root) {
   root.innerHTML = `
     <div class="dm-editor">
       <aside class="dm-editor-tools">
-        <div class="dm-editor-head"><h2>Pokédex</h2><span class="dm-pill ok" id="pdxSave">All saved</span></div>
+        <div class="dm-editor-head"><span class="dm-pdx-lens" aria-hidden="true"></span><span class="dm-pdx-lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>Pokédex</h2><span class="dm-pill ok" id="pdxSave">All saved</span></div>
         <div class="dm-hint">Tick what the players get to see. Changes save on their own and reach the players straight away.</div>
         <input class="dm-input" id="pdxSearch" placeholder="Search name, type or habitat…" autocomplete="off">
         <div class="dm-seg" id="pdxFilter">

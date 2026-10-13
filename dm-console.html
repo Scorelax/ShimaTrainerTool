@@ -8,6 +8,9 @@
 <!-- The player app's stylesheet: the battle screen mounted in the middle (combat-wip.js) and its popups rely on it. -->
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/dm-console.css">
+<!-- The Pokedex module's fonts (the players' Pokedex look), loaded without holding up the page. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 </head>
 <body class="dm-console">
   <div class="dm-app">
@@ -21,7 +24,7 @@
     <nav class="dm-rail" id="dmRail">
       <button class="dm-rail-btn active" data-module="battle" title="Battle -- map setup, encounter setup and post battle"><img src="assets/VS.png" alt="">Battle</button>
       <button class="dm-rail-btn" data-module="party" title="Party"><span>👥</span>Party</button>
-      <button class="dm-rail-btn" data-module="pokedex" title="Pokédex"><span>📖</span>Pokédex</button>
+      <button class="dm-rail-btn" data-module="pokedex" title="Pokédex"><img src="assets/pokedex.png" alt="">Pokédex</button>
       <button class="dm-rail-btn" data-module="npcs" title="NPCs"><span>👤</span>NPCs</button>
       <button class="dm-rail-btn" data-module="clock" title="Clock"><span>🕰️</span>Clock</button>
       <button class="dm-rail-btn" data-module="display" title="Display -- the backgrounds and pictures on the display"><span>📺</span>Display</button>

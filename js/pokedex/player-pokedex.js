@@ -86,10 +86,18 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
     renderMoves();
   }
 
+  // One fetch at a time; a change that arrives while one is running gets one more fetch after it (that running one may
+  // have been answered before the change was saved).
   let refreshing = null;
+  let again = false;
   async function refresh() {
-    if (refreshing) return refreshing;
-    refreshing = load().catch((err) => toast(`Couldn't update the Pokédex: ${err.message}`, 'error')).finally(() => { refreshing = null; });
+    if (refreshing) { again = true; return refreshing; }
+    refreshing = (async () => {
+      do {
+        again = false;
+        await load().catch((err) => toast(`Couldn't update the Pokédex: ${err.message}`, 'error'));
+      } while (again);
+    })().finally(() => { refreshing = null; });
     return refreshing;
   }
 
@@ -366,5 +374,13 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
   window.addEventListener('app:pokedex-config', refresh);
   window.addEventListener('app:live-resync', refresh);
 
-  return { ready: load(), refresh };
+  // destroy(): for when it's mounted inside the app and the player leaves it -- stops listening for changes.
+  function destroy() {
+    window.removeEventListener('app:pokedex-config', refresh);
+    window.removeEventListener('app:live-resync', refresh);
+    clearTimeout(searchTimer);
+    clearTimeout(toastTimer);
+  }
+
+  return { ready: load(), refresh, destroy };
 }

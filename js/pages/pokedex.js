@@ -63,13 +63,13 @@ async function start() {
   // Opened from another page of the app: a back button to return there.
   const cameFromApp = document.referrer.startsWith(window.location.origin) && window.history.length > 1;
   const pokedex = mountPlayerPokedex(document.getElementById('pokedexRoot'), cameFromApp ? { onBack: () => window.history.back() } : {});
+  listenLive(); // already now, so a change the DM saves while the first load runs isn't missed
   try {
     await pokedex.ready;
   } catch (err) {
     setProgress(100, `Couldn't load the Pokédex: ${err.message}`);
     return;
   }
-  listenLive();
   hideLoading();
 }
 

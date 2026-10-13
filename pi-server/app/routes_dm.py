@@ -188,18 +188,18 @@ def species_detail(conn, name):
 
 
 def _evo_part(text, which):
-    """'From: Sandit; Evolves: Bedouwara @ Level 14' -> 'Sandit' (which='from') or ['Bedouwara'] (which='evolves'); the
-    names after "Evolves:" can be several (", " / " or " / "/") and each may carry its condition after an "@"."""
-    import re
+    """'From: Sandit; Evolves: Bedouwara @ Level 14' -> 'Sandit' (which='from') or ['Bedouwara'] (which='evolves').
+    The targets come from every "Evolves:" part (a species can have several), read exactly as the players' Pokedex
+    reads them (player_pokedex.evolution_targets), so the per-target switches match what it shows."""
+    if which == 'evolves':
+        from .player_pokedex import evolution_targets
+        return evolution_targets(text)
     for part in str(text or '').split(';'):
         key, _, value = part.partition(':')
         if key.strip().lower() == which:
             value = value.strip()
-            if which == 'from':
-                return value if value and value != '-' else ''
-            names = [re.split(r'\s*@', n)[0].strip() for n in re.split(r',|/|\bor\b', value)]
-            return [n for n in names if n and n != '-']
-    return '' if which == 'from' else []
+            return value if value and value != '-' else ''
+    return ''
 
 
 def party_overview(conn):

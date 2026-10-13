@@ -77,27 +77,40 @@ def _visibility(vis):
     return out
 
 
-def _evolution(text):
-    """'From: Sandit; Evolves: Bedouwara @ Level 14' -> ({'fusion': False, 'name': 'Sandit'}, ['Bedouwara']).
-    The part after "From:" can be a fusion ('A + B @ ...'); the names after "Evolves:" can be several, each with its
-    condition after an "@" (the same split as routes_dm._evo_part, which the DM console's switches are keyed by)."""
-    text = re.sub(r'\s+', ' ', str(text or '').replace('\\n', ' ')).strip()
-    evolves_from, evolves_to = None, []
+def _evolution_parts(text):
+    """(key, value) of each ';'-separated part of an evolution cell, multi-line cells collapsed to one line."""
+    text = re.sub(r'\s+', ' ', fix_mojibake(str(text or '')).replace('\\n', ' ')).strip()
     for part in text.split(';'):
         key, _, value = part.partition(':')
-        key, value = key.strip().lower(), value.strip()
+        yield key.strip().lower(), value.strip()
+
+
+def evolution_targets(text):
+    """'Evolves: Sargent @ Level 7; Evolves: Merchent @ Level 7 Near ports' -> ['Sargent', 'Merchent']: the names of
+    every "Evolves:" part (a part can also name several: ', ' / ' or ' / '/'), each without its condition after the
+    "@". The DM console's per-target switches (routes_dm.species_detail's evolvesTo) are keyed by exactly these."""
+    targets = []
+    for key, value in _evolution_parts(text):
+        if key == 'evolves':
+            for n in re.split(r',|/|\bor\b', value):
+                n = re.split(r'\s*@', n)[0].strip()
+                if n and n != '-' and n not in targets:
+                    targets.append(n)
+    return targets
+
+
+def _evolution(text):
+    """'From: Sandit; Evolves: Bedouwara @ Level 14' -> ({'fusion': False, 'name': 'Sandit'}, ['Bedouwara']).
+    The part after "From:" can be a fusion ('A + B @ ...')."""
+    evolves_from = None
+    for key, value in _evolution_parts(text):
         if key == 'from' and value and value != '-':
             names = value.split('@')[0].strip()
             if '+' in names:
                 evolves_from = {'fusion': True, 'name': ' + '.join(n.strip() for n in names.split('+'))}
             else:
                 evolves_from = {'fusion': False, 'name': names}
-        elif key == 'evolves':
-            for n in re.split(r',|/|\bor\b', value):
-                n = re.split(r'\s*@', n)[0].strip()
-                if n and n != '-':
-                    evolves_to.append(n)
-    return evolves_from, evolves_to
+    return evolves_from, evolution_targets(text)
 
 
 def _shown_sense(value):

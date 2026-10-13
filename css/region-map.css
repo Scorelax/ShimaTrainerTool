@@ -108,6 +108,16 @@
   background: inherit;
 }
 
+/* View only (the table's board screen, js/pages/battle-map.js, steered from the DM console's PokeNav): nothing reacts
+   to a touch, and the names are a size up to read from the chairs. */
+.rmap.view-only, .rmap.view-only * { pointer-events: none !important; }
+.rmap.view-only .rmap-canvas { cursor: default; }
+.rmap.view-only .rmap-name { font-size: 1.05rem; padding: 3px 10px; }
+.rmap.view-only .rmap-pin { width: 12px; height: 12px; }
+.rmap.view-only.painted .rmap-pin { width: 16px; height: 16px; }
+.rmap.view-only .rmap-spot { width: 16px; height: 16px; }
+.rmap.view-only .rmap-label.water { font-size: 1.35rem; }
+
 @media (max-width: 520px) {
   .rmap-title { font-size: 1.05rem; }
   .rmap-btn, .rmap-seg button { padding: 7px 10px; font-size: 0.8rem; }

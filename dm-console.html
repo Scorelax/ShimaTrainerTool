@@ -8,6 +8,8 @@
 <!-- The player app's stylesheet: the battle screen mounted in the middle (combat-wip.js) and its popups rely on it. -->
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/dm-console.css">
+<!-- PokeNav's region map (everything under .rmap). -->
+<link rel="stylesheet" href="css/region-map.css">
 <!-- The Pokedex module's fonts (the players' Pokedex look), loaded without holding up the page. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -27,6 +29,7 @@
       <button class="dm-rail-btn" data-module="pokedex" title="Pokédex"><img src="assets/pokedex.png" alt="">Pokédex</button>
       <button class="dm-rail-btn" data-module="npcs" title="NPCs"><span>👤</span>NPCs</button>
       <button class="dm-rail-btn" data-module="clock" title="Clock"><span>🕰️</span>Clock</button>
+      <button class="dm-rail-btn" data-module="pokenav" title="PokéNav -- the region map on the table screen"><span>🧭</span>PokéNav</button>
       <button class="dm-rail-btn" data-module="display" title="Display -- the backgrounds and pictures on the display"><span>📺</span>Display</button>
     </nav>
 
@@ -35,6 +38,7 @@
       <section class="dm-module" id="dmModulePokedex" hidden></section>
       <section class="dm-module" id="dmModuleNpcs" hidden></section>
       <section class="dm-module" id="dmModuleClock" hidden></section>
+      <section class="dm-module" id="dmModulePokenav" hidden></section>
       <section class="dm-module" id="dmModuleDisplay" hidden></section>
       <section class="dm-module dm-battle-module" id="dmModuleBattle">
         <!-- No battle running: the map and where everyone starts, who's in the battle (the encounters), the last battle's

@@ -6,8 +6,11 @@
 // Drag to turn, scroll / pinch to zoom, right-drag / two fingers to move. Only drawn while something moves, so it
 // costs nothing while it's left alone.
 //
-// Self-contained so it can live in its own page (region-map.html) or be mounted inside the app later:
-// mountRegionMap(root, { onBack }) -> { ready, destroy }. Styles: css/region-map.css (.rmap-*).
+// Self-contained so it can live in its own page (region-map.html) or be mounted elsewhere -- the DM console's PokeNav
+// steers it (onView) and the table's board screen (battle-map.html) shows it view only, following along (setView):
+// mountRegionMap(root, { onBack, viewOnly, title, rememberStyle, onView }) -> { ready, destroy, getView, setView, home }.
+// A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
+// azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
 import { OrbitControls } from '../vendor/three/OrbitControls.js';
 
@@ -54,26 +57,30 @@ function loadTexture(renderer, file) {
   });
 }
 
-export function mountRegionMap(root, { onBack } = {}) {
+export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView } = {}) {
   root.classList.add('rmap');
+  root.classList.toggle('view-only', viewOnly); // nothing to press or drag: it follows setView
   let style = 'topo';
-  try { if (STYLES[localStorage.getItem(STYLE_KEY)]) style = localStorage.getItem(STYLE_KEY); } catch (e) { /* not kept */ }
+  if (rememberStyle) {
+    try { if (STYLES[localStorage.getItem(STYLE_KEY)]) style = localStorage.getItem(STYLE_KEY); } catch (e) { /* not kept */ }
+  }
   root.classList.toggle('painted', style === 'painted');
   root.innerHTML = `
     <canvas class="rmap-canvas"></canvas>
     <div class="rmap-labels"></div>
-    <header class="rmap-top">
+    ${!viewOnly && (onBack || title) ? `<header class="rmap-top">
       ${onBack ? '<button class="rmap-btn rmap-round" data-act="back" aria-label="Back">←</button>' : ''}
-      <h1 class="rmap-title">Shiman Federation</h1>
-    </header>
-    <div class="rmap-tools">
+      ${title ? '<h1 class="rmap-title">Shiman Federation</h1>' : ''}
+    </header>` : ''}
+    ${viewOnly ? '' : `<div class="rmap-tools">
       <div class="rmap-seg" role="group" aria-label="Map style">
         <button data-style="topo"${style === 'topo' ? ' class="active"' : ''}>Topographic</button>
         <button data-style="painted"${style === 'painted' ? ' class="active"' : ''}>Painted</button>
       </div>
       <button class="rmap-btn" data-act="home">Whole region</button>
-    </div>
-    <button class="rmap-compass" data-act="north" aria-label="North up"><span class="rmap-needle"></span><b>N</b></button>
+    </div>`}
+    ${viewOnly ? '<div class="rmap-compass"><span class="rmap-needle"></span></div>'
+      : '<button class="rmap-compass" data-act="north" aria-label="North up"><span class="rmap-needle"></span><b>N</b></button>'}
     <div class="rmap-loading">Loading the map…</div>`;
   const $ = sel => root.querySelector(sel);
   const canvas = $('.rmap-canvas');
@@ -91,6 +98,7 @@ export function mountRegionMap(root, { onBack } = {}) {
   controls.maxPolarAngle = 1.2;             // never under the horizon
   controls.rotateSpeed = 0.6;
   controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  controls.enabled = !viewOnly;
 
   let land = null;          // { W, H, metres, kind, vert }
   let places = null;
@@ -98,6 +106,9 @@ export function mountRegionMap(root, { onBack } = {}) {
   const textures = {};
   let dirty = true;
   let flight = null;
+  let follow = null;        // view only: the camera easing towards the last view it was sent
+  let lastView = null;      // ... and that view, put back when the screen changes size
+  let lastTick = 0;
   let frame = 0;
   let destroyed = false;
   const labels = [];
@@ -222,18 +233,84 @@ export function mountRegionMap(root, { onBack } = {}) {
     wake();
   }
 
-  /** The whole island in view, north up, tilted a little. */
-  function home(ms = 900) {
+  /** The whole island in view, tilted a little, turned the way it is now (or `azimuth`). */
+  function home({ ms = 900, azimuth = controls.getAzimuthalAngle() } = {}) {
+    if (!land) return;
     const t = new THREE.Vector3(land.cx - land.W / 2, 0, land.cy - land.H / 2);
-    flyTo(t, land.fit, 0.55, 0, ms);
+    flyTo(t, fitFor(azimuth), 0.55, azimuth, ms);
   }
 
   function stepFlight(now) {
-    const k = Math.min(1, (now - flight.t0) / flight.ms);
+    const k = flight.ms > 0 ? Math.min(1, (now - flight.t0) / flight.ms) : 1;
     const e = ease(k);
     controls.target.lerpVectors(flight.fromTarget, flight.toTarget, e);
     camera.position.lerpVectors(flight.fromPos, flight.toPos, e);
     if (k >= 1) flight = null;
+    return true;
+  }
+
+  const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
+  const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
+
+  function getView() {
+    if (!land) return null;
+    const t = controls.target;
+    return {
+      x: round(t.x + land.W / 2, 1), y: round(t.z + land.H / 2, 1),
+      zoom: round(camera.position.distanceTo(t) / land.fit, 4),
+      polar: round(controls.getPolarAngle(), 4), azimuth: round(controls.getAzimuthalAngle(), 4), style,
+    };
+  }
+
+  /** The view as camera numbers for this screen. */
+  function goalOf(view) {
+    return {
+      target: new THREE.Vector3(Number(view.x) - land.W / 2, 0, Number(view.y) - land.H / 2),
+      dist: Math.max(controls.minDistance, Math.min(controls.maxDistance, Number(view.zoom) * land.fit)),
+      polar: Math.max(0, Math.min(controls.maxPolarAngle, Number(view.polar))),
+      azimuth: wrapAngle(Number(view.azimuth)),
+    };
+  }
+
+  function placeCamera(target, dist, polar, azimuth) {
+    controls.target.copy(target);
+    camera.position.copy(viewFrom(target, dist, polar, azimuth));
+    camera.lookAt(target);
+  }
+
+  /** Shows `view` -- at once, or (`smooth`) easing there from where the camera is, so a stream of views sent a few
+   * times a second plays as one movement. */
+  function setView(view, { smooth = false } = {}) {
+    if (!view || !['x', 'y', 'zoom', 'polar', 'azimuth'].every(k => Number.isFinite(Number(view[k])))) return;
+    lastView = view;
+    if (STYLES[view.style] && view.style !== style) setStyle(view.style);
+    if (!land) return; // put in place once loaded
+    flight = null;
+    const goal = goalOf(view);
+    if (smooth && root.clientWidth) {
+      follow = goal;
+    } else {
+      follow = null;
+      placeCamera(goal.target, goal.dist, goal.polar, goal.azimuth);
+      dirty = true;
+    }
+    wake();
+  }
+
+  /** One frame of easing towards `follow` (about a seventh of a second to cover most of the way). */
+  function stepFollow(now) {
+    const k = 1 - Math.exp(-Math.min(100, now - (lastTick || now)) / 140);
+    const t = controls.target.clone().lerp(follow.target, k);
+    const d0 = camera.position.distanceTo(controls.target);
+    const dist = d0 * (follow.dist / d0) ** k;
+    const polar = controls.getPolarAngle() + (follow.polar - controls.getPolarAngle()) * k;
+    const az0 = controls.getAzimuthalAngle();
+    const azimuth = az0 + wrapAngle(follow.azimuth - az0) * k;
+    const done = t.distanceTo(follow.target) < 0.2 && Math.abs(dist / follow.dist - 1) < 0.002
+      && Math.abs(polar - follow.polar) < 0.001 && Math.abs(wrapAngle(follow.azimuth - azimuth)) < 0.001;
+    if (done) placeCamera(follow.target, follow.dist, follow.polar, follow.azimuth);
+    else placeCamera(t, dist, polar, azimuth);
+    if (done) follow = null;
     return true;
   }
 
@@ -248,10 +325,14 @@ export function mountRegionMap(root, { onBack } = {}) {
     }
   }
 
-  /** How far back the camera stands to see the whole island on this screen (its height and its width). */
-  function fitDistance() {
+  /** How far back the camera stands to see the whole island on this screen (its height and its width), turned
+   * `azimuth` -- sideways on a wide screen it can come closer. */
+  function fitFor(azimuth = 0) {
     const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    return Math.max(land.spanZ / (2 * tanV), land.spanX / (2 * tanV * camera.aspect)) * 0.95;
+    const c = Math.abs(Math.cos(azimuth)), s = Math.abs(Math.sin(azimuth));
+    const spanX = land.sizeX * c + land.sizeZ * s + 300;   // room for the names at the island's edges
+    const spanZ = land.sizeX * s + land.sizeZ * c + 160;
+    return Math.max(spanZ / (2 * tanV), spanX / (2 * tanV * camera.aspect)) * 0.95;
   }
 
   function resize() {
@@ -261,8 +342,9 @@ export function mountRegionMap(root, { onBack } = {}) {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     if (land) {
-      land.fit = fitDistance();
-      controls.maxDistance = land.fit * 1.8;
+      land.fit = fitFor(0); // what a view's zoom is a share of
+      controls.maxDistance = Math.max(land.fit, fitFor(Math.PI / 2)) * 1.8;
+      if (viewOnly && lastView) setView(lastView); // the same view on the new shape
     }
     dirty = true;
     wake();
@@ -273,21 +355,27 @@ export function mountRegionMap(root, { onBack } = {}) {
   function tick(now) {
     frame = 0;
     if (destroyed) return;
-    let moved = flight ? stepFlight(now) : false;
+    let moved = flight ? stepFlight(now) : follow ? stepFollow(now) : false;
+    lastTick = now;
     if (controls.update()) moved = true;
     clampTarget();
-    if (moved || dirty) {
+    if ((moved || dirty) && !root.clientWidth) {
+      dirty = true; // put away (the board screen during a battle): drawn when it's back (the resize wakes it)
+      quiet++;
+    } else if (moved || dirty) {
       renderer.render(scene, camera);
       placeLabels();
       const az = controls.getAzimuthalAngle();
       $('.rmap-needle').style.transform = `rotate(${(az * 180 / Math.PI).toFixed(1)}deg)`;
       $('.rmap-compass').classList.toggle('off-north', Math.abs(az) > 0.02);
+      if (moved && onView) onView(getView());
       dirty = false;
       quiet = 0;
     } else {
       quiet++;
     }
     if (quiet < 30) frame = requestAnimationFrame(tick);
+    else lastTick = 0;
   }
   function wake() {
     quiet = 0;
@@ -300,7 +388,9 @@ export function mountRegionMap(root, { onBack } = {}) {
 
   async function setStyle(next) {
     style = next;
-    try { localStorage.setItem(STYLE_KEY, next); } catch (e) { /* not kept */ }
+    if (rememberStyle) {
+      try { localStorage.setItem(STYLE_KEY, next); } catch (e) { /* not kept */ }
+    }
     root.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === next));
     root.classList.toggle('painted', next === 'painted'); // the painting has its own names and red dots
     if (!textures[next]) textures[next] = await loadTexture(renderer, STYLES[next]);
@@ -321,7 +411,11 @@ export function mountRegionMap(root, { onBack } = {}) {
       return;
     }
     const styleBtn = t.closest('[data-style]');
-    if (styleBtn) { setStyle(styleBtn.dataset.style); return; }
+    if (styleBtn) {
+      setStyle(styleBtn.dataset.style);
+      if (onView && land) onView(getView());
+      return;
+    }
     const town = t.closest('[data-fly]');
     if (town) {
       const l = labels[Number(town.dataset.fly)];
@@ -333,9 +427,10 @@ export function mountRegionMap(root, { onBack } = {}) {
 
   async function load() {
     places = await (await fetch(`${BASE}places.json`)).json();
-    const [heights, texture] = await Promise.all([loadHeights(places.seaOffset), loadTexture(renderer, STYLES[style])]);
+    const first = style;
+    const [heights, texture] = await Promise.all([loadHeights(places.seaOffset), loadTexture(renderer, STYLES[first])]);
     if (destroyed) return;
-    textures[style] = texture;
+    textures[first] = texture;
     land = { ...heights, vert: EXAG / (KM_PER_PX * 1000) };
     // the land's middle and how far back the camera has to be to see all of it
     let minX = heights.W, maxX = 0, minY = heights.H, maxY = 0;
@@ -346,16 +441,25 @@ export function mountRegionMap(root, { onBack } = {}) {
     }
     land.cx = (minX + maxX) / 2;
     land.cy = (minY + maxY) / 2;
-    land.spanX = maxX - minX + 300;            // room for the names at the island's edges
-    land.spanZ = maxY - minY + 160;
+    land.sizeX = maxX - minX;
+    land.sizeZ = maxY - minY;
     controls.minDistance = 60;
     buildMesh(texture);
+    if (style !== first) setStyle(style); // a view with the other style came in while loading
     buildLabels();
     observer.observe(root);
     resize();
-    camera.position.copy(viewFrom(new THREE.Vector3(land.cx - land.W / 2, 0, land.cy - land.H / 2), land.fit, 0.55, 0));
-    controls.target.set(land.cx - land.W / 2, 0, land.cy - land.H / 2);
+    if (!land.fit) {
+      // put away while loading (the board screen during a battle): sized for a 16:9 screen until it's shown
+      camera.aspect = 16 / 9;
+      camera.updateProjectionMatrix();
+      land.fit = fitFor(0);
+      controls.maxDistance = Math.max(land.fit, fitFor(Math.PI / 2)) * 1.8;
+    }
+    const middle = new THREE.Vector3(land.cx - land.W / 2, 0, land.cy - land.H / 2);
+    placeCamera(middle, land.fit, 0.55, 0);
     flight = null;
+    if (lastView) setView(lastView);
     controls.update();
     dirty = true;
     wake();
@@ -377,5 +481,5 @@ export function mountRegionMap(root, { onBack } = {}) {
     if (box) box.textContent = `Couldn't load the map: ${err.message}`;
     throw err;
   });
-  return { ready, destroy };
+  return { ready, destroy, getView, setView, home };
 }

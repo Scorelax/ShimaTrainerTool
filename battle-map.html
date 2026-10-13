@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Battle Map</title>
 <link rel="icon" href="assets/Pokeball.png">
+<!-- The region map shown outside a battle (js/region-map/region-map.js) and its names' font. -->
+<link rel="stylesheet" href="css/region-map.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Outfit:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -96,6 +100,12 @@
   }
   .map-stage:not(.active) .map-empty-bg { display: block; }
 
+  /* ...and over it, once loaded, the region map in 3D, as the DM steers it from the DM console's PokeNav
+     (battle-map.js). The painting stays under it while it loads, or if this screen can't draw 3D. */
+  .map-region { position: absolute; inset: 0; z-index: 6; display: none; opacity: 0; transition: opacity 0.4s; }
+  .map-stage:not(.active) .map-region { display: block; }
+  .map-region.ready { opacity: 1; }
+
   .map-tokens { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
   /* This screen's cells aren't square (the board stretches to fill the TV), so the token tile is sized off the
      token box's smaller side (container query) instead of filling it -- otherwise the sprite would stretch. */
@@ -140,6 +150,7 @@
       <div class="map-tokens" id="mapTokens"></div>
       <div class="bmap-legend" id="mapLegend"></div>
       <div class="map-empty-bg" id="mapEmptyBg"></div>
+      <div class="map-region" id="mapRegion"><div id="mapRegionMap"></div></div>
     </div>
   </div>
   <script type="module" src="js/pages/battle-map.js"></script>

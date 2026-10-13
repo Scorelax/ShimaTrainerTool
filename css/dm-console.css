@@ -983,3 +983,13 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
 }
 #dmModulePokedex .dm-pdx-movegrid .dm-pdx-move small { color: #5b646a; }
+
+/* ---- PokeNav (js/dm/pokenav.js): the region map as the table screen shows it, in that screen's 16:9 shape ---- */
+.dm-nav { height: 100%; box-sizing: border-box; padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.dm-nav-head { display: flex; align-items: center; gap: 1rem; }
+.dm-nav-head h2 { margin: 0; color: var(--dm-gold); font-size: 1.3rem; }
+.dm-nav-frame { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; container-type: size; }
+.dm-nav-screen {
+  width: min(100cqw, calc(100cqh * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px;
+  border: 2px solid rgba(255, 215, 0, 0.35); background: #081423; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}

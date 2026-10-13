@@ -67,9 +67,10 @@ export function initLiveUpdates() {
       window.dispatchEvent(new CustomEvent('app:combat-animation', { detail: event }));
     } else if (event.type === 'combat-hover') {
       window.dispatchEvent(new CustomEvent('app:combat-hover', { detail: event }));
-    } else if (event.type === 'dm-clock' || event.type === 'dm-npcs' || event.type === 'display-scene') {
-      // The DM console's world clock / NPC library / what the table TV shows changed (another DM tab, or this one's own
-      // save coming back -- the TV itself, display.html, listens for the last).
+    } else if (event.type === 'dm-clock' || event.type === 'dm-npcs' || event.type === 'display-scene' || event.type === 'region-map-view') {
+      // The DM console's world clock / NPC library / what the table TV shows / where the board screen's region map is
+      // looking changed (another DM tab, or this one's own save coming back -- display.html listens for the scene,
+      // battle-map.html for the region map).
       window.dispatchEvent(new CustomEvent(`app:${event.type}`, { detail: event }));
     }
   };

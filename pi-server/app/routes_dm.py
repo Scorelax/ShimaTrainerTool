@@ -21,8 +21,9 @@ _CLOCK_KEY = 'world-clock'
 # Smaller DM-only records the console reads and writes whole (get-state / POST /api/dm/state), each owned by one module:
 # the encounter loaded into the battle (its events, notes, terrain and weather -- js/dm/encounters.js), the last PvE
 # battle that ended (routes_combat._remember_battle, marked done by the aftermath), saved Pokemon for reuse, species left
-# out of the random generators, and what the table TV shows outside the battle (js/dm/display-store.js).
-_STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene'}
+# out of the random generators, what the table TV shows outside the battle (js/dm/display-store.js), and where the
+# region map on the board screen is looking (js/dm/pokenav.js).
+_STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene', 'region-map-view'}
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
 # Pokemon's dm_xp column (db._migrate); a record with none yet counts as the start of its level.
 XP_TO_LEVEL = [0, 0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000,
@@ -437,6 +438,22 @@ def save_display_scene(conn, scene):
         raise ValueError('scene must be an object')
     save_state(conn, 'display-scene', scene)
     live.publish({'type': 'display-scene', 'scene': scene})
+
+
+def save_region_map_view(conn, view):
+    """Where the region map on the board screen (battle-map.html, outside a battle) is looking -- POST
+    /api/dm/region-map-view from the DM console's PokeNav, a few times a second while the DM turns it. Stored, then
+    pushed to the board. {x, y, zoom, polar, azimuth, style} (js/region-map/region-map.js's getView)."""
+    from . import live
+    if not isinstance(view, dict):
+        raise ValueError('view must be an object')
+    try:
+        clean = {k: float(view[k]) for k in ('x', 'y', 'zoom', 'polar', 'azimuth')}
+    except (KeyError, TypeError, ValueError):
+        raise ValueError('view needs x, y, zoom, polar and azimuth')
+    clean['style'] = view.get('style') if view.get('style') in ('topo', 'painted') else 'topo'
+    save_state(conn, 'region-map-view', clean)
+    live.publish({'type': 'region-map-view', 'view': clean})
 
 
 _IMAGE_TYPES = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif'}

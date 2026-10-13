@@ -5,7 +5,11 @@
 // trainer identity, no SPA boot sequence, just subscribe to the shared
 // combat session over SSE and render its 'board' state (see
 // pi-server/app/routes_combat.py).
-import { CombatAPI } from '../api.js';
+//
+// Outside a battle it shows the region map in 3D (js/region-map/region-map.js), view only: the DM turns, zooms and
+// moves it from the DM console's PokeNav (js/dm/pokenav.js), pushed here live ('region-map-view'); nobody at the
+// table can touch it. The flat painting stays under it while it loads, or if this screen can't draw 3D.
+import { CombatAPI, DmAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
@@ -29,6 +33,33 @@ async function init() {
     session = e.detail;
     render();
   });
+
+  mountRegion();
+}
+
+/** The region map, loaded once and kept (put away during a battle, drawn nothing meanwhile), following the DM. */
+async function mountRegion() {
+  const box = document.getElementById('mapRegion');
+  try {
+    const [{ mountRegionMap }, view] = await Promise.all([
+      import('../region-map/region-map.js'),
+      DmAPI.getState('region-map-view').catch(() => null),
+    ]);
+    const map = mountRegionMap(document.getElementById('mapRegionMap'), { viewOnly: true, rememberStyle: false });
+    if (view) map.setView(view);
+    window.addEventListener('app:region-map-view', (e) => map.setView(e.detail?.view, { smooth: true }));
+    // Back after the connection dropped: wherever the DM left it meanwhile.
+    window.addEventListener('app:live-resync', async () => {
+      const v = await DmAPI.getState('region-map-view').catch(() => null);
+      if (v) map.setView(v, { smooth: true });
+    });
+    await map.ready;
+    // Never steered yet: the whole island lying along the screen, north to the right (like the painting was)
+    if (!view) map.home({ ms: 0, azimuth: Math.PI / 2 });
+    box.classList.add('ready');
+  } catch (err) {
+    console.warn('[BattleMap] The region map could not be shown -- the painting stays:', err);
+  }
 }
 
 // ---------------------------------------------------------------------------

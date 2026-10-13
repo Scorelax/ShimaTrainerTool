@@ -298,6 +298,19 @@ def dm_save_display_scene(payload: dict):
     return JSONResponse({'status': 'success'})
 
 
+@app.post('/api/dm/region-map-view')
+def dm_save_region_map_view(payload: dict):
+    """Where the region map on the board screen is looking (routes_dm.save_region_map_view), pushed to it at once."""
+    conn = db.connect()
+    try:
+        routes_dm.save_region_map_view(conn, payload.get('view'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success'})
+
+
 @app.post('/api/dm/display-image')
 def dm_save_display_image(payload: dict):
     """A picture uploaded from the DM's computer for the table TV, or a new name for one (routes_dm.save_display_image)."""

@@ -29,6 +29,7 @@ import { renderEncounters, encountersHaveUnsaved } from './encounters.js';
 import { loadClock, renderTopWidget, tickTurnTimers, getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD } from './encounter-rules.js';
 import { renderDisplay, displayAway, displaySessionChanged } from './display.js';
+import { renderPokenav, pokenavSessionChanged } from './pokenav.js';
 
 enableDmMode(DM);
 
@@ -57,10 +58,10 @@ async function init() {
   if (res?.status === 'success') session = res.data;
   route();
 
-  window.addEventListener('app:combat-updated', (e) => { session = e.detail; route(); displaySessionChanged(session); });
+  window.addEventListener('app:combat-updated', (e) => { session = e.detail; route(); displaySessionChanged(session); pokenavSessionChanged(session); });
   window.addEventListener('app:live-resync', async () => {
     const r = await CombatAPI.getState().catch(() => null);
-    if (r?.status === 'success') { session = r.data; route(); displaySessionChanged(session); }
+    if (r?.status === 'success') { session = r.data; route(); displaySessionChanged(session); pokenavSessionChanged(session); }
   });
   // The battle screen asks the player app to go back to the trainer card in a few places; there is none here.
   window.addEventListener('navigate', () => { liveMounted = false; route(); });
@@ -86,12 +87,12 @@ async function init() {
 }
 
 // ---------------------------------------------------------------------------
-// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock, Display. The battle
+// Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock, PokeNav, Display. The battle
 // keeps running in its own section while another module is open; Party is fetched fresh every time it's opened, the
-// Clock is redrawn (the time may have moved), the Pokedex, NPCs and Display keep where the DM was.
+// Clock is redrawn (the time may have moved), the Pokedex, NPCs, PokeNav and Display keep where the DM was.
 // ---------------------------------------------------------------------------
 
-const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock', display: 'dmModuleDisplay' };
+const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock', pokenav: 'dmModulePokenav', display: 'dmModuleDisplay' };
 const _moduleOpened = new Set(['battle']);
 
 function showModule(name) {
@@ -106,6 +107,7 @@ function showModule(name) {
   if (name === 'party') renderParty(section);
   else if (name === 'clock') renderClock(section);
   else if (name === 'display') renderDisplay(section, { session, firstTime: !_moduleOpened.has('display') });
+  else if (name === 'pokenav') renderPokenav(section, { session });
   else if (name === 'pokedex' && !_moduleOpened.has('pokedex')) renderPokedex(section);
   else if (name === 'npcs' && !_moduleOpened.has('npcs')) renderNpcs(section);
   _moduleOpened.add(name);

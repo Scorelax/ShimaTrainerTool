@@ -95,7 +95,7 @@ _CHARACTER_IMAGE_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.gif')
 # Benjakronk's original species pictures, copied onto the Pi (the same files as his repo's images/pokemon, named
 # <3-digit dex>-<sanitized name>.<png|jpg|jpeg|jfif>) -- served at /pokemon-images/ (local_pokemon_image_url).
 POKEMON_IMAGE_DIR = os.path.expanduser(
-    os.environ.get('POKEMON_IMAGE_DIR', '~/pokemon-dnd/images/original_pokemon'))
+    os.environ.get('POKEMON_IMAGE_DIR', '~/pokemon-dnd/images/pokemon-images'))
 POKEMON_IMAGE_URL_PREFIX = '/pokemon-images/'
 _POKEMON_IMAGE_EXTS = IMG_FORMATS + ['webp']
 

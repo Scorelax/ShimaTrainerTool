@@ -153,7 +153,7 @@ from GitHub. Copy his `images/` subfolders into `~/pokemon-dnd/images/`:
 
 | His folder          | Pi folder (env override)                          | Served at               |
 |---------------------|---------------------------------------------------|-------------------------|
-| `images/pokemon`    | `original_pokemon` (`POKEMON_IMAGE_DIR`)          | `/pokemon-images/`      |
+| `images/pokemon`    | `pokemon-images` (`POKEMON_IMAGE_DIR`)            | `/pokemon-images/`      |
 | `images/characters` | `npc` (`NPC_IMAGE_DIR`) -- also the DM console's NPC uploads | `/npc-images/` |
 | `images/badges`     | `badges` (`BADGE_DIR`)                            | `/badges/`              |
 | `images/splashes`   | `splashes` (`SPLASH_DIR`)                         | `/splashes/`            |

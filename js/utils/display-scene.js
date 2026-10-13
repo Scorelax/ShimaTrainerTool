@@ -10,6 +10,8 @@
 //   screen's height -- pictures are always square (the picture itself fits inside, never stretched). The TV is 16:9.
 //   Later items are drawn on top. `still` / `animated` are the Pokemon's two pictures (`src` is the one in use).
 
+import { spriteSrc } from './sprite-media.js';
+
 export const SCREEN_RATIO = 16 / 9;
 export const BATTLE_PICTURES = { away: 'Put the pictures away', keep: 'Keep the pictures on' };
 
@@ -36,6 +38,7 @@ export function sceneHasContent(scene) {
 const IS_VIDEO = /\.mp4(\?|$)/i;
 
 function mediaHtml(src) {
+  src = spriteSrc(src); // the small copy on the DM's pages (editor, preview); the display itself uses the original
   return IS_VIDEO.test(src)
     ? `<video class="scene-media" src="${src}" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback></video>`
     : `<img class="scene-media" src="${src}" alt="" draggable="false">`;

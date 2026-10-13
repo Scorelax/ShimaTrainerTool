@@ -9,7 +9,10 @@
 // battles are PvE.
 import { CombatAPI, DmAPI, GameDataAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
-import { patchPortraitMedia } from '../utils/sprite-media.js';
+import { patchPortraitMedia, useSpritePreviews } from '../utils/sprite-media.js';
+
+// Every sprite in the console is shown small (thumbnails, map tokens, the display preview): the Pi's small copies.
+useSpritePreviews(true);
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { enableDmMode } from '../pages/combat-wip.js';
 import { injectBattleMapStyles } from '../utils/battle-map-view.js';
@@ -92,7 +95,11 @@ const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dm
 const _moduleOpened = new Set(['battle']);
 
 function showModule(name) {
-  Object.entries(MODULES).forEach(([key, id]) => { document.getElementById(id).hidden = key !== name; });
+  Object.entries(MODULES).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    el.hidden = key !== name;
+    setVideosPlaying(el, key === name);
+  });
   document.querySelectorAll('#dmRail [data-module]').forEach(b => b.classList.toggle('active', b.dataset.module === name));
   if (name !== 'display') displayAway();
   const section = document.getElementById(MODULES[name]);
@@ -102,6 +109,15 @@ function showModule(name) {
   else if (name === 'pokedex' && !_moduleOpened.has('pokedex')) renderPokedex(section);
   else if (name === 'npcs' && !_moduleOpened.has('npcs')) renderNpcs(section);
   _moduleOpened.add(name);
+}
+
+/** The sprites of a module put away stop playing (they'd keep decoding behind the one showing), and start again when
+ * it's back. (The Display workspace's sprites play by their own rule -- only while scrolled into view.) */
+function setVideosPlaying(section, playing) {
+  section.querySelectorAll('video').forEach((v) => {
+    if (!playing) v.pause();
+    else if (v.paused && v.autoplay) v.play().catch(() => {});
+  });
 }
 
 /** The battle module's tabs, with no battle running: Map setup, Encounter setup, Post battle. */

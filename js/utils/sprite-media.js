@@ -10,6 +10,24 @@
 // matching the moment one gets appended.
 const IS_VIDEO = /\.mp4(\?|$)/i;
 
+// The Pi's small copies of the animated sprites (pi-server sprite_previews.py: 360 px instead of 1080, a fraction of
+// the size) -- for a page that only ever shows sprites small and many at once (the DM console, the display's preview).
+// The Pi sends the original until a copy is made, so a sprite always shows.
+let _previews = false;
+const SPRITE_FILE = /^\/gifs\/([^?#]+\.mp4)(\?[^#]*)?$/i;
+
+/** Turns the small sprite copies on for this page. */
+export function useSpritePreviews(on = true) {
+  _previews = !!on;
+}
+
+/** The URL to load for a sprite / picture: the small copy of an animated sprite when this page uses them. */
+export function spriteSrc(url) {
+  if (!_previews || !url) return url;
+  const m = SPRITE_FILE.exec(String(url));
+  return m ? `/sprite-previews/${m[1]}${m[2] || ''}` : url;
+}
+
 // A <video> can't just have its src swapped to a static fallback image and
 // render correctly -- the element itself has to be replaced with a real
 // <img>. Defined once here (not repeated per inline onerror string) and
@@ -30,6 +48,7 @@ window.__spriteFallback = spriteFallback;
 export function spriteMediaHtml(url, altText, className = '', id = '') {
   const classAttr = className ? ` class="${className}"` : '';
   const idAttr = id ? ` id="${id}"` : '';
+  url = spriteSrc(url);
   if (url && IS_VIDEO.test(url)) {
     // pointer-events:none is what actually stops Chrome's hover-triggered
     // play/pause + picture-in-picture overlay from appearing -- neither
@@ -91,6 +110,7 @@ export function patchPortraitMedia(containerEl, url, altText) {
  * .mp4 needs it specifically since Image() would just fail on it.
  */
 export function prefetchSprite(url) {
+  url = spriteSrc(url);
   if (!url) return Promise.resolve();
   if (IS_VIDEO.test(url)) {
     return fetch(url).catch(() => {});

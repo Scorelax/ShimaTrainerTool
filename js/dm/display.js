@@ -15,6 +15,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { renderScene, BATTLE_PICTURES, SCREEN_RATIO } from '../utils/display-scene.js';
 import { escapeHtml, getSpecies, newId, toast, openDmModal } from './dm-common.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
+import { spriteSrc } from '../utils/sprite-media.js';
 
 const SOURCES = { pokemon: '🐾 Pokémon', npcs: '👤 NPCs', trainers: '👥 Trainers', backgrounds: '🖼️ Backgrounds' };
 const KIND_LABEL = { pokemon: 'Pokémon', npc: 'NPC', trainer: 'Trainer', image: 'Picture' };
@@ -37,7 +38,7 @@ let _previewObserver = null;
 export async function renderDisplay(root, { session, firstTime } = {}) {
   _root = root;
   _session = session || _session;
-  if (!firstTime && root.querySelector('.dm-disp')) { drawLayers(); return; } // keeps the search, tab and preview as they were
+  if (!firstTime && root.querySelector('.dm-disp')) { postToPreview({ paused: false }); drawLayers(); return; } // keeps the search, tab and preview as they were
   root.innerHTML = '<div class="dm-loading">Loading…</div>';
   await loadScene();
   if (!_listening) {
@@ -54,9 +55,10 @@ export async function renderDisplay(root, { session, firstTime } = {}) {
   draw();
 }
 
-/** Another module was opened. */
+/** Another module was opened: the preview stops playing until the module is back. */
 export function displayAway() {
   if (_editor) closeEditor();
+  postToPreview({ paused: true });
 }
 
 /** The battle changed (dm-console.js) -- the preview shows the battle just like the TV. */
@@ -188,10 +190,13 @@ function drawBattlePictures() {
 // What's on the screen
 // ---------------------------------------------------------------------------
 
-function thumbHtml(src, cls = '', { lazyVideo = false } = {}) {
+/** A small picture. `still`: shown instead of an animated sprite -- for the little lists redrawn on every change (a video
+ * there would start over, and decode, each time). Animated ones load the Pi's small sprite copy. */
+function thumbHtml(src, cls = '', { lazyVideo = false, still = '' } = {}) {
   if (!src) return `<span class="dm-disp-thumb ${cls}"><img src="assets/Pokeball.png" alt="" style="opacity:.3"></span>`;
+  if (IS_VIDEO.test(src) && still) src = still;
   return IS_VIDEO.test(src)
-    ? `<span class="dm-disp-thumb ${cls}"><video src="${escapeHtml(src)}" muted loop playsinline disablepictureinpicture ${lazyVideo ? 'data-lazy preload="none"' : 'autoplay'}></video></span>`
+    ? `<span class="dm-disp-thumb ${cls}"><video src="${escapeHtml(spriteSrc(src))}" muted loop playsinline disablepictureinpicture ${lazyVideo ? 'data-lazy preload="none"' : 'autoplay'}></video></span>`
     : `<span class="dm-disp-thumb ${cls}"><img src="${escapeHtml(src)}" alt="" loading="lazy" draggable="false"></span>`;
 }
 
@@ -211,7 +216,7 @@ function drawLayers() {
     ${putAway ? '<div class="dm-disp-away">⚔️ Put away during the battle</div>' : ''}
     ${items.map(it => `
       <div class="dm-disp-layer${it.hidden ? ' hidden-item' : ''}" data-id="${escapeHtml(it.id)}">
-        ${thumbHtml(it.src)}
+        ${thumbHtml(it.src, '', { still: it.still })}
         <span class="dm-disp-layer-name"><strong>${escapeHtml(it.label || 'Picture')}</strong>
           <small>${KIND_LABEL[it.kind] || 'Picture'} · ${Math.round((Number(it.size) || 0) * 100)}% high${it.hidden ? ' · <span class="dm-warn-text">hidden</span>' : ''}</small></span>
         ${it.still && it.animated ? `<button class="dm-icon-btn" data-l="anim" title="${it.src === it.animated ? 'Animated -- click for the still picture' : 'Still -- click for the animated sprite'}">${it.src === it.animated ? '▶' : '🖼'}</button>` : ''}
@@ -575,7 +580,7 @@ function drawEditorSide() {
     <div class="dm-disp-ed-list">
       ${[...scene.items].reverse().map(i => `
         <button class="dm-disp-ed-pick${i.id === _editor.selectedId ? ' active' : ''}${i.hidden ? ' hidden-item' : ''}" data-pick="${escapeHtml(i.id)}">
-          ${thumbHtml(i.src)}<span>${escapeHtml(i.label || 'Picture')}${i.hidden ? ' <small>(hidden)</small>' : ''}</span>
+          ${thumbHtml(i.src, '', { still: i.still })}<span>${escapeHtml(i.label || 'Picture')}${i.hidden ? ' <small>(hidden)</small>' : ''}</span>
         </button>`).join('') || '<div class="dm-hint">None yet -- put some on from the workspace.</div>'}
     </div>`;
 }
@@ -627,7 +632,7 @@ function onStagePointerDown(e) {
   const rect = stage.getBoundingClientRect();
   const handle = e.target.closest('[data-handle]')?.dataset.handle;
   const start = { px: e.clientX, py: e.clientY, x: it.x, y: it.y };
-  let onMove;
+  let apply; // what one pointer position does to the picture
   if (handle) {
     // The corner opposite the one being dragged stays put; the picture stays square, so the side follows whichever
     // way the pointer has gone further.
@@ -639,7 +644,7 @@ function onStagePointerDown(e) {
     const ay = cy - (dir[1] * side0) / 2;
     const minSide = 0.04 * rect.height;
     const maxSide = 1.5 * rect.height;
-    onMove = (ev) => {
+    apply = (ev) => {
       const side = Math.max(minSide, Math.min(maxSide, Math.max((ev.clientX - ax) * dir[0], (ev.clientY - ay) * dir[1])));
       updateScene(() => {
         it.size = side / rect.height;
@@ -652,17 +657,27 @@ function onStagePointerDown(e) {
       if (range) range.value = Math.round(it.size * 100);
     };
   } else {
-    onMove = (ev) => {
+    apply = (ev) => {
       updateScene(() => {
         it.x = Math.max(0, Math.min(1, start.x + (ev.clientX - start.px) / rect.width));
         it.y = Math.max(0, Math.min(1, start.y + (ev.clientY - start.py) / rect.height));
       });
     };
   }
+  // The mouse can report far more often than the screen draws: only the latest position is used, once per frame.
+  let pending = null;
+  let frame = 0;
+  const flush = () => { frame = 0; if (pending) { const ev = pending; pending = null; apply(ev); } };
+  const onMove = (ev) => {
+    pending = ev;
+    if (!frame) frame = requestAnimationFrame(flush);
+  };
   const target = e.target;
   target.setPointerCapture?.(e.pointerId);
   _dragging = true;
   const onUp = () => {
+    cancelAnimationFrame(frame);
+    flush();
     _dragging = false;
     target.removeEventListener('pointermove', onMove);
     target.removeEventListener('pointerup', onUp);

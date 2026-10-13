@@ -19,7 +19,7 @@ import { CombatAPI, DmAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { audioManager } from '../utils/audio.js';
 import { getSettings } from '../utils/settings.js';
-import { spriteMediaHtml, patchPortraitMedia } from '../utils/sprite-media.js';
+import { spriteMediaHtml, patchPortraitMedia, useSpritePreviews } from '../utils/sprite-media.js';
 import { preloadBattleAnimation, getBattleAnimationUrl } from '../utils/battle-animation.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { normaliseScene, renderScene, sceneHasContent, sceneOnScreen } from '../utils/display-scene.js';
@@ -28,16 +28,29 @@ const PREVIEW = new URLSearchParams(location.search).has('preview');
 
 let session = { active: false, participants: {}, turnOrder: [], turnIndex: 0, round: 0, reactingParticipantId: null };
 let scene = normaliseScene(null);
+let previewPaused = false;
+
+/** The preview's videos pause while the DM console has the Display module put away, and play again when it's back. */
+function syncPreviewPlayback() {
+  document.querySelectorAll('video').forEach((v) => {
+    if (previewPaused) v.pause();
+    else if (v.paused && v.autoplay) v.play().catch(() => {});
+  });
+}
 
 async function init() {
   audioManager.setVolume(getSettings().volume);
 
   if (PREVIEW) {
+    // A small preview: the small sprite copies, and nothing plays while the DM is in another module.
+    useSpritePreviews(true);
     window.addEventListener('message', (e) => {
       if (e.origin !== location.origin || e.data?.source !== 'dm-display') return;
       if (e.data.scene) scene = normaliseScene(e.data.scene);
       if (e.data.session) session = e.data.session;
+      if ('paused' in e.data) previewPaused = !!e.data.paused;
       if (e.data.scene || e.data.session) { drawScene(); render(); }
+      if (e.data.scene || e.data.session || 'paused' in e.data) syncPreviewPlayback();
     });
   } else {
     initLiveUpdates();

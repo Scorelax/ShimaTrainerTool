@@ -17,10 +17,10 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, live, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, upstream
+from . import db, live, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, sprite_previews, upstream
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
@@ -53,7 +53,7 @@ db.init()
 # ever go stale, nothing to manually clear.
 _VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', upstream.CHARACTER_IMAGE_URL_PREFIX,
                              upstream.DISPLAY_IMAGE_URL_PREFIX, upstream.POKEMON_IMAGE_URL_PREFIX,
-                             upstream.ORIGINAL_CHARACTER_URL_PREFIX)
+                             upstream.ORIGINAL_CHARACTER_URL_PREFIX, sprite_previews.SPRITE_PREVIEW_URL_PREFIX)
 
 # The splashes, badges and the bundled PWA assets aren't stamped with a
 # version (their filenames stay constant even when the content behind them
@@ -80,7 +80,7 @@ async def caching_policy(request: Request, call_next):
     file comes back as an empty 304 instead of retransferring the full body."""
     response = await call_next(request)
     path = request.url.path
-    if path.startswith(_VERSIONED_MEDIA_PREFIXES):
+    if path.startswith(_VERSIONED_MEDIA_PREFIXES) and response.status_code in (200, 206, 304):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     elif path.startswith(_REVALIDATED_MEDIA_PREFIXES):
         response.headers['Cache-Control'] = 'no-cache'
@@ -365,6 +365,21 @@ for _folder, _prefix, _name in ((upstream.POKEMON_IMAGE_DIR, upstream.POKEMON_IM
                                 (upstream.SPLASH_DIR, upstream.SPLASH_URL_PREFIX, 'splashes')):
     os.makedirs(_folder, exist_ok=True)
     app.mount(_prefix.rstrip('/'), StaticFiles(directory=_folder), name=_name)
+
+# Small copies of the animated sprites (see sprite_previews.py) -- the original until the copy is made (not cached, so
+# the next load gets the copy). Every missing copy starts being made now, in the background.
+@app.get(sprite_previews.SPRITE_PREVIEW_URL_PREFIX + '{filename}')
+def sprite_preview(filename: str):
+    try:
+        path = sprite_previews.preview_file(filename)
+    except FileNotFoundError:
+        return Response(status_code=404)
+    if path:
+        return FileResponse(path, media_type='video/mp4')
+    return RedirectResponse(sprite_previews.original_url(filename), status_code=307)
+
+
+sprite_previews.queue_missing()
 
 # Self-uploaded animated sprites, mp4 only (see upstream.SPRITE_DIR /
 # upstream.local_sprite_url). URL prefix stays /gifs -- see

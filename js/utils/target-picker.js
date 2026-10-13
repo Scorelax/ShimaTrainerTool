@@ -483,7 +483,7 @@ function _showStep2(p, name) {
   document.getElementById('targetPickerStep3').hidden = true;
   document.getElementById('targetPickerTitle').textContent = 'Attack Roll';
   document.getElementById('targetPickerRollTarget').innerHTML = `
-    <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
+    <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName, '', '', { small: true })}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
   _atkCtx = attackRollContext(_attacker, _selectedTarget, _moveAbilityResolver(_moveName), { ignoreTargetStatChanges: !!_moveFlagResolver(_moveName)?.ignoresTargetStatChanges, ignoreTargetAcBoosts: !!_moveFlagResolver(_moveName)?.ignoresTargetAcBoosts });
   const weatherMode = _atkCtx ? _weatherModeResolver(_moveName, _attacker?.id) : null;
@@ -692,7 +692,7 @@ function _showStep3() {
   document.getElementById('targetPickerStep3').hidden = false;
   document.getElementById('targetPickerTitle').textContent = 'Damage Roll';
   document.getElementById('targetPickerDamageTarget').innerHTML = `
-    <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
+    <div class="target-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName, '', '', { small: true })}</div>
     <div class="target-picker-roll-target-name">${_selectedTargetName}</div>`;
   // The attacker's own regular (looping) sprite -- not the one-shot battle-animation
   // clip, which only plays once the roll is confirmed (see _playAnimation/
@@ -839,7 +839,7 @@ function _cardHtml(p) {
   const vpPct = p.maxVP > 0 ? Math.max(0, Math.min(100, (p.currentVP / p.maxVP) * 100)) : 0;
   return `
     <button type="button" class="target-picker-card" data-target-id="${p.id}">
-      <div class="target-picker-portrait">${spriteMediaHtml(p.image, name)}</div>
+      <div class="target-picker-portrait">${spriteMediaHtml(p.image, name, '', '', { small: true })}</div>
       <div class="target-picker-name">${name}</div>
       ${visibleToViewer(p, 'hp') ? `<div class="target-picker-bar hp"><div class="target-picker-bar-fill" style="width:${hpPct}%"></div></div>` : ''}
       ${visibleToViewer(p, 'vp') ? `<div class="target-picker-bar vp"><div class="target-picker-bar-fill" style="width:${vpPct}%"></div></div>` : ''}

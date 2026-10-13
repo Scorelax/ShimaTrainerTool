@@ -947,7 +947,7 @@ export function renderTrainerCard() {
           <div class="utility-label">Utility</div>
           ${utilityPokemon ? `
             <div class="utility-slot" data-pokemon-name="${utilityPokemon.name.toLowerCase()}">
-              ${spriteMediaHtml(utilityPokemon.image, utilityPokemon.name)}
+              ${spriteMediaHtml(utilityPokemon.image, utilityPokemon.name, '', '', { small: true })}
               <div class="pokemon-name">${utilityPokemon.nickname || utilityPokemon.name}</div>
               <div class="pokemon-level">Level ${utilityPokemon.level}</div>
             </div>
@@ -969,7 +969,7 @@ export function renderTrainerCard() {
               const displayName = pokemon.nickname || pokemon.name;
               return `
                 <div class="pokemon-slot" data-pokemon-name="${pokemon.name.toLowerCase()}">
-                  ${spriteMediaHtml(pokemon.image, pokemon.name)}
+                  ${spriteMediaHtml(pokemon.image, pokemon.name, '', '', { small: true })}
                   <div class="pokemon-name">${displayName}</div>
                   <div class="pokemon-level">Level ${pokemon.level}</div>
                 </div>

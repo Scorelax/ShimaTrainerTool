@@ -2007,7 +2007,7 @@ function _renderPlacementTokens(state, currentId) {
 
   layer.querySelectorAll('[data-portrait-id]').forEach(el => {
     const p = state.participants[el.dataset.portraitId];
-    if (p) patchPortraitMedia(el, p.image, p.name);
+    if (p) patchPortraitMedia(el, p.image, p.name, { small: true });
   });
 }
 
@@ -2299,7 +2299,7 @@ function _syncTurnOrderSidebar(state) {
       id === focusId ? 'focused' : '',
       p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');
     node.querySelector('.wip-turn-name').textContent = name;
-    patchPortraitMedia(node.querySelector('[data-portrait-id]'), p.image, name);
+    patchPortraitMedia(node.querySelector('[data-portrait-id]'), p.image, name, { small: true });
 
     const reactionEl = node.querySelector('.wip-turn-reaction');
     reactionEl.style.display = p.status === 'participating' ? 'flex' : 'none';

@@ -171,7 +171,7 @@ function _render() {
     el.title = name;
     Object.assign(el.style, cellRect(session.board, pos.col, pos.row, footprintForSize(p.size)));
     el.innerHTML = '<div class="rpick-token-portrait"></div>';
-    patchPortraitMedia(el.querySelector('.rpick-token-portrait'), p.image, name);
+    patchPortraitMedia(el.querySelector('.rpick-token-portrait'), p.image, name, { small: true });
     tokenLayer.appendChild(el);
   });
 }

@@ -912,7 +912,7 @@ function renderPokemonList() {
     // sprite renders as a <video>, not a broken image -- this was the one
     // spot in the file still missed when the rest of it moved over earlier.
     const imgWrapper = document.createElement('div');
-    imgWrapper.innerHTML = spriteMediaHtml(pokemon.image, pokemon.name, 'pokemon-image');
+    imgWrapper.innerHTML = spriteMediaHtml(pokemon.image, pokemon.name, 'pokemon-image', '', { small: true });
     const img = imgWrapper.firstElementChild;
 
     // Click listener on the whole slot, not the sprite element itself -- a
@@ -1137,7 +1137,7 @@ function _renderTypingDetail(type, allPokemon, section, moveMap) {
       const isMove = section === 'move';
       return `
         <div class="party-pokemon-row${isMove ? ' type-detail-expandable' : ''}">
-          ${spriteMediaHtml(image, name, 'party-pokemon-avatar')}
+          ${spriteMediaHtml(image, name, 'party-pokemon-avatar', '', { small: true })}
           <div class="party-pokemon-info">
             <div class="party-pokemon-label">${displayName}</div>
             <div class="party-pokemon-sublabel">Lv. ${data[4] || '?'} &nbsp;·&nbsp; ${data[5] || ''}${t2}</div>
@@ -1247,7 +1247,7 @@ function renderPartyModalList(pokemonFullData) {
 
     return `
       <div class="party-pokemon-row">
-        ${spriteMediaHtml(image, name, 'party-pokemon-avatar')}
+        ${spriteMediaHtml(image, name, 'party-pokemon-avatar', '', { small: true })}
         <div class="party-pokemon-info">
           <div class="party-pokemon-label">${displayName}</div>
           <div class="party-pokemon-sublabel">${subLabel}</div>

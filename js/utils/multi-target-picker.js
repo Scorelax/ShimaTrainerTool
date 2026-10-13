@@ -87,7 +87,7 @@ function _cardHtml(p) {
   return `
     <button type="button" class="mtp-card" data-target-id="${p.id}">
       <div class="mtp-check">✓</div>
-      <div class="mtp-portrait">${spriteMediaHtml(p.image, name)}</div>
+      <div class="mtp-portrait">${spriteMediaHtml(p.image, name, '', '', { small: true })}</div>
       <div class="mtp-name">${name}</div>
     </button>`;
 }

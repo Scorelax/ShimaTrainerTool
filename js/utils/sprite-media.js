@@ -11,8 +11,10 @@
 const IS_VIDEO = /\.mp4(\?|$)/i;
 
 // The Pi's small copies of the animated sprites (pi-server sprite_previews.py: 360 px instead of 1080, a fraction of
-// the size) -- for a page that only ever shows sprites small and many at once (the DM console, the display's preview).
-// The Pi sends the original until a copy is made, so a sprite always shows.
+// the size) -- for a page that only ever shows sprites small and many at once (the DM console, the display's preview),
+// or, with { small: true }, for one small spot (the trainer card's slots, lists, battle tokens and picker portraits).
+// The big views (Pokemon card, capture, evolution) keep the original. The Pi sends the original until a copy is made,
+// so a sprite always shows.
 let _previews = false;
 const SPRITE_FILE = /^\/gifs\/([^?#]+\.mp4)(\?[^#]*)?$/i;
 
@@ -21,9 +23,9 @@ export function useSpritePreviews(on = true) {
   _previews = !!on;
 }
 
-/** The URL to load for a sprite / picture: the small copy of an animated sprite when this page uses them. */
-export function spriteSrc(url) {
-  if (!_previews || !url) return url;
+/** The URL to load for a sprite / picture: the small copy of an animated sprite when asked for or this page uses them. */
+export function spriteSrc(url, small = false) {
+  if (!(small || _previews) || !url) return url;
   const m = SPRITE_FILE.exec(String(url));
   return m ? `/sprite-previews/${m[1]}${m[2] || ''}` : url;
 }
@@ -45,10 +47,10 @@ window.__spriteFallback = spriteFallback;
  * Builds the HTML for a sprite: <video> for a .mp4 URL, <img> otherwise (or
  * when url is falsy -- same Pokeball-fallback behavior as before).
  */
-export function spriteMediaHtml(url, altText, className = '', id = '') {
+export function spriteMediaHtml(url, altText, className = '', id = '', { small = false } = {}) {
   const classAttr = className ? ` class="${className}"` : '';
   const idAttr = id ? ` id="${id}"` : '';
-  url = spriteSrc(url);
+  url = spriteSrc(url, small);
   if (url && IS_VIDEO.test(url)) {
     // pointer-events:none is what actually stops Chrome's hover-triggered
     // play/pause + picture-in-picture overlay from appearing -- neither
@@ -96,12 +98,12 @@ export function renderSpriteInto(elementId, url, altText, className = '') {
  * where avoiding an unnecessary rebuild -- and the video-restart flicker
  * that comes with it -- is the entire point.
  */
-export function patchPortraitMedia(containerEl, url, altText) {
+export function patchPortraitMedia(containerEl, url, altText, { small = false } = {}) {
   if (!containerEl) return;
   const safeUrl = url || '';
   if (containerEl.dataset.image === safeUrl) return;
   containerEl.dataset.image = safeUrl;
-  containerEl.innerHTML = spriteMediaHtml(url, altText);
+  containerEl.innerHTML = spriteMediaHtml(url, altText, '', '', { small });
 }
 
 /**
@@ -109,8 +111,8 @@ export function patchPortraitMedia(containerEl, url, altText) {
  * new Image() doesn't work for video -- fetch() does, for either type, but
  * .mp4 needs it specifically since Image() would just fail on it.
  */
-export function prefetchSprite(url) {
-  url = spriteSrc(url);
+export function prefetchSprite(url, { small = false } = {}) {
+  url = spriteSrc(url, small);
   if (!url) return Promise.resolve();
   if (IS_VIDEO.test(url)) {
     return fetch(url).catch(() => {});

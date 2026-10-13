@@ -35,25 +35,26 @@ function _parseKnownMovesForSync(str) {
 
 // ============================================================================
 // SPRITE PREFETCH
-// Warms the browser's cache for self-uploaded animated sprites (MP4)
-// while the player is still on this loading screen, so the first view of a
-// screen showing them (trainer-card, pokemon-card, combat, ...) doesn't
-// stall on a multi-MB download. Fire-and-forget from the caller's
-// perspective (never awaited at the call sites below) -- but internally it
-// runs three strictly sequential tiers, each awaited before the next
-// starts, so a later tier's downloads never compete for bandwidth/
-// connection slots with a higher-priority one still in flight:
-//   1. active party + utility slot   (trainer-card, the very next screen)
-//   2. the rest of the trainer's owned roster (my-pokemon, combat swaps)
-//   3. the rest of the registered Pokedex (only needed if/when the player
-//      opens "register new pokemon")
+// Warms the browser's cache for the animated sprites (MP4) of the trainer's
+// own Pokemon while the player is still on this loading screen, so the first
+// screens showing them don't stall on a download. Fire-and-forget from the
+// caller's perspective (never awaited at the call sites below) -- but the two
+// steps run one after the other, so the second never competes for bandwidth
+// with the first:
+//   1. the small copies of every owned Pokemon (~300 KB each: the trainer
+//      card's slots, the My Pokemon lists, battle tokens and pickers)
+//   2. the originals of the active party + utility slot (their Pokemon card,
+//      the big view opened straight from the trainer card)
+// The rest of the Pokedex isn't fetched (up to ~7 MB per original) -- the
+// capture and evolution pages prefetch the ones they show themselves.
 // ============================================================================
 
-const SPRITE_EXTENSIONS = /\.mp4$/i;
+// Allows the ?t=<mtime> version every sprite URL carries.
+const SPRITE_EXTENSIONS = /\.mp4(\?|$)/i;
 
 async function prefetchAnimatedSprites() {
   const priorityUrls = new Set();
-  const otherUrls = new Set();
+  const allUrls = new Set();
 
   Object.keys(sessionStorage)
     .filter(k => k.startsWith('pokemon_'))
@@ -74,33 +75,12 @@ async function prefetchAnimatedSprites() {
       const isActiveParty = slotNumber >= 1 && slotNumber <= 6;
       const isUtility = pokemon[56] === 1;
 
-      (isActiveParty || isUtility ? priorityUrls : otherUrls).add(url);
+      allUrls.add(url);
+      if (isActiveParty || isUtility) priorityUrls.add(url);
     });
 
-  await Promise.all([...priorityUrls].map(prefetchSprite));
-
-  await Promise.all(
-    [...otherUrls]
-      .filter(url => !priorityUrls.has(url))
-      .map(prefetchSprite)
-  );
-
-  // Tier 3: the rest of the registered Pokedex (completePokemonData is
-  // already in sessionStorage by the time this runs -- see call sites).
-  // Each entry is [image, name, dexNumber, ...]; image is only an mp4 URL
-  // when a self-uploaded sprite exists for that species (see
-  // pokedex.py get_registered_pokemon_list).
-  let pokedexList;
-  try {
-    pokedexList = JSON.parse(sessionStorage.getItem('completePokemonData') || '[]');
-  } catch (err) {
-    return;
-  }
-
-  pokedexList
-    .map(entry => entry && entry[0])
-    .filter(url => typeof url === 'string' && SPRITE_EXTENSIONS.test(url) && !priorityUrls.has(url) && !otherUrls.has(url))
-    .forEach(prefetchSprite);
+  await Promise.all([...allUrls].map(url => prefetchSprite(url, { small: true })));
+  await Promise.all([...priorityUrls].map(url => prefetchSprite(url)));
 }
 
 function syncKnownMovesForAllPokemon() {

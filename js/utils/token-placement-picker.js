@@ -120,7 +120,7 @@ export function pickSwitchTile({ session, trainerId, outId, incoming }) {
       const name = visibleToViewer(p, 'name') ? p.name : '???';
       el.title = name;
       el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
-      patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
+      patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name, { small: true });
       tokenLayer.appendChild(el);
     });
 

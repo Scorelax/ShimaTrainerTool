@@ -50,7 +50,7 @@ function _buildTokens(session, board, casterId, tokenLayer, targetable, blockedN
     const name = visibleToViewer(p, 'name') ? p.name : '???';
     el.title = out ? `${name} (${blockedNotes?.get(id) || "can't be targeted by this move"})` : name;
     el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
-    patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
+    patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name, { small: true });
     tokenLayer.appendChild(el);
     tokenEls.set(id, el);
   });

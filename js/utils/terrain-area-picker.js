@@ -127,7 +127,7 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
       const name = visibleToViewer(p, 'name') ? p.name : '???';
       el.title = name;
       el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite" style="transform:${spriteTransform(pos.facing || 0)}"></div></div>`;
-      patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name);
+      patchPortraitMedia(el.querySelector('.bmap-sprite'), p.image, name, { small: true });
       if ((pos.z || 0) > 0) el.insertAdjacentHTML('beforeend', `<span class="bmap-alt">↑${pos.z}ft</span>`);
       tokenLayer.appendChild(el);
     });

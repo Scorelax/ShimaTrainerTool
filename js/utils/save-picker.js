@@ -263,7 +263,7 @@ function _renderStep2() {
   document.getElementById('savePickerSaveInput').value = '';
   _updateSaveTotal();
   document.getElementById('savePickerDcTarget').innerHTML = `
-    <div class="save-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
+    <div class="save-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName, '', '', { small: true })}</div>
     <div class="save-picker-dc-target-name">${_selectedTargetName}</div>`;
   document.getElementById('savePickerDcDisplay').hidden = _manualDc;
   document.getElementById('savePickerDcInputWrap').hidden = !_manualDc;
@@ -475,7 +475,7 @@ function _showStep3() {
   document.getElementById('savePickerStep3').hidden = false;
   document.getElementById('savePickerTitle').textContent = 'Damage Roll';
   document.getElementById('savePickerDamageTarget').innerHTML = `
-    <div class="save-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName)}</div>
+    <div class="save-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName, '', '', { small: true })}</div>
     <div class="save-picker-dc-target-name">${_selectedTargetName}</div>`;
   document.getElementById('savePickerModifierNote').textContent =
     _damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '';
@@ -549,7 +549,7 @@ function _cardHtml(p) {
   const name = visibleToViewer(p, 'name') ? p.name : '???';
   return `
     <button type="button" class="save-picker-card" data-target-id="${p.id}">
-      <div class="save-picker-portrait">${spriteMediaHtml(p.image, name)}</div>
+      <div class="save-picker-portrait">${spriteMediaHtml(p.image, name, '', '', { small: true })}</div>
       <div class="save-picker-name">${name}</div>
     </button>`;
 }

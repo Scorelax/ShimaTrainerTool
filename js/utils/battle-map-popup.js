@@ -494,7 +494,7 @@ function _renderTokens() {
     Object.assign(el.style, cellRect(_session.board, shownAt.col, shownAt.row, footprintForSize(p.size)));
     el.innerHTML = `<div class="bmap-token-portrait"><div class="bmap-sprite"></div></div>${shownZ > 0 ? `<span class="bmap-alt">↑${shownZ}ft</span>` : shownZ < 0 ? `<span class="bmap-alt">↓${-shownZ}ft</span>` : ''}`;
     const sprite = el.querySelector('.bmap-sprite');
-    patchPortraitMedia(sprite, p.image, name);
+    patchPortraitMedia(sprite, p.image, name, { small: true });
     // The tokens are rebuilt every render, so start at the last drawn angle and let the transition carry it to the new one.
     const previous = _spriteAngles.has(id) ? _spriteAngles.get(id) : (pos.facing || 0);
     const angle = unwrapAngle(previous, pos.facing || 0);

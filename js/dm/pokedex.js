@@ -8,6 +8,7 @@ import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, getSpecies } from './dm-common.js';
+import { dexQuery } from '../utils/dex-search.js';
 
 const DEFAULTS = '__defaults';
 // The page for moves the players can look up on their own (extraSearchableMoves -- the old site's "Move Search" tab).
@@ -87,7 +88,7 @@ export async function renderPokedex(root) {
       <aside class="dm-editor-tools">
         <div class="dm-editor-head"><span class="dm-pdx-lens" aria-hidden="true"></span><span class="dm-pdx-lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>Pokédex</h2><span class="dm-pill ok" id="pdxSave">All saved</span></div>
         <div class="dm-hint">Tick what the players get to see. Changes save on their own and reach the players straight away.</div>
-        <input class="dm-input" id="pdxSearch" placeholder="Search name, type or habitat…" autocomplete="off">
+        <input class="dm-input" id="pdxSearch" placeholder="Search name, type, habitat or #…" autocomplete="off">
         <div class="dm-seg" id="pdxFilter">
           <button data-f="all" class="active">All</button><button data-f="in">In players' Pokédex</button><button data-f="out">Not yet</button>
         </div>
@@ -133,7 +134,7 @@ function ownSettings(name) {
 function renderList() {
   const box = document.getElementById('pdxList');
   box.innerHTML = _species.map(s => `
-    <button class="dm-pdx-row" data-name="${escapeHtml(s.name)}" data-search="${escapeHtml(`${s.name} ${s.type1} ${s.type2} ${s.habitat}`.toLowerCase())}">
+    <button class="dm-pdx-row" data-name="${escapeHtml(s.name)}" data-dex="${escapeHtml(s.dex)}" data-search="${escapeHtml(`${s.name} ${s.type1} ${s.type2} ${s.habitat}`.toLowerCase())}">
       <span class="dm-pdx-thumb" data-img="${escapeHtml(s.image)}"></span>
       <span class="dm-pdx-main"><strong>#${escapeHtml(s.dex)} ${escapeHtml(s.name)}</strong><small>${typeBadges(s.type1, s.type2)}</small></span>
       <span class="dm-pdx-flags"></span>
@@ -155,9 +156,11 @@ function refreshListFlags() {
 
 function applyFilter() {
   const q = (document.getElementById('pdxSearch')?.value || '').trim().toLowerCase();
+  const dex = dexQuery(q); // "#5", "5", "No. 5" -> that number
   document.querySelectorAll('#pdxList [data-name]').forEach(row => {
     const reg = row.classList.contains('registered');
-    const show = (!q || row.dataset.search.includes(q)) && (_filter === 'all' || (_filter === 'in' ? reg : !reg));
+    const found = !q || (dex ? dex.all || dex.number === Number(row.dataset.dex) : row.dataset.search.includes(q));
+    const show = found && (_filter === 'all' || (_filter === 'in' ? reg : !reg));
     row.hidden = !show;
   });
 }

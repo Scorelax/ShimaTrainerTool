@@ -7,6 +7,7 @@
 // Self-contained so it can live in its own page (pokedex.html) or be mounted inside the player app later:
 // mountPlayerPokedex(root, { onBack }) -- onBack adds a back button to the header. Styles: css/pokedex.css (.pdx-*).
 import { GameDataAPI } from '../api.js';
+import { dexQuery } from '../utils/dex-search.js';
 
 const TYPE_COLORS = {
   normal: '#A8A878', fire: '#F08030', water: '#6890F0', electric: '#F8D030', grass: '#78C850', ice: '#98D8D8',
@@ -146,7 +147,8 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
     }
     const term = $('#pdxSearch').value.trim().toLowerCase();
     if (!term) return true;
-    if (/^#?\d+$/.test(term)) return Number(term.replace('#', '')) === Number(s.dex);
+    const dex = dexQuery(term);
+    if (dex) return dex.all || dex.number === Number(s.dex);
     return s.name.toLowerCase().includes(term)
       || String(s.primaryType || '').toLowerCase().includes(term)
       || String(s.secondaryType || '').toLowerCase().includes(term);

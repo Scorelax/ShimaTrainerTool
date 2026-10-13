@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#102540">
+<title>Shiman Federation</title>
+<link rel="icon" href="assets/AppIcon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Outfit:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="css/region-map.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #081423; overscroll-behavior: none; }
+  #regionMap { position: fixed; inset: 0; }
+</style>
+</head>
+<body>
+  <div id="regionMap"></div>
+  <script type="module">
+    // The region map on its own page (js/region-map/region-map.js). Opened from another page of the app: a back button.
+    import { mountRegionMap } from './js/region-map/region-map.js';
+    const cameFromApp = document.referrer.startsWith(window.location.origin) && window.history.length > 1;
+    mountRegionMap(document.getElementById('regionMap'), cameFromApp ? { onBack: () => window.history.back() } : {});
+  </script>
+</body>
+</html>

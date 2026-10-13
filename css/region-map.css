@@ -1,0 +1,115 @@
+/* The 3D region map (js/region-map/region-map.js). Everything is under .rmap / .rmap-* so it can also be mounted
+   inside the app. */
+
+.rmap {
+  --rmap-ink: #0b1626;
+  --rmap-glass: rgba(11, 22, 38, 0.72);
+  --rmap-line: rgba(255, 255, 255, 0.16);
+  --rmap-text: #eef3f8;
+  --rmap-gold: #ffd23f;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 35%, #24496f 0%, #102540 55%, #081423 100%);
+  color: var(--rmap-text);
+  font-family: 'Outfit', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.rmap *, .rmap *::before, .rmap *::after { box-sizing: border-box; }
+.rmap-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+.rmap-canvas:active { cursor: grabbing; }
+
+/* the labels over the canvas: each placed at its spot by a transform, centred on it */
+.rmap-labels { position: absolute; inset: 0; pointer-events: none; }
+.rmap-label { position: absolute; left: 0; top: 0; will-change: transform; }
+.rmap-label > * { position: relative; }
+.rmap-label.town {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  margin: 0; padding: 0; border: none; background: none; color: inherit; font: inherit; cursor: pointer;
+  pointer-events: auto;
+  translate: -50% -100%;
+}
+.rmap-name {
+  font-family: 'Chakra Petch', 'Outfit', sans-serif;
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap;
+  padding: 2px 8px; border-radius: 6px;
+  color: #2a1d10; background: linear-gradient(#fbf3e2, #e9d9b8); border: 1.5px solid #4a3520;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+.rmap-label.town:hover .rmap-name, .rmap-label.town:focus-visible .rmap-name { background: linear-gradient(#fff8e8, #f3e2bf); }
+.rmap-pin { order: 2; width: 10px; height: 10px; border-radius: 50%; background: #fbf3e2; border: 2px solid #4a3520; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.rmap-label.spot { translate: -50% -50%; transition: opacity 0.25s; }
+.rmap-spot {
+  display: block; width: 13px; height: 13px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff8a8a, #e01b24 55%, #9b0d14);
+  border: 1.5px solid #3a0508; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.rmap-label.water {
+  translate: -50% -50%;
+  font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 1.05rem; letter-spacing: 1px; white-space: nowrap;
+  color: rgba(235, 244, 255, 0.85); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.25s;
+}
+.rmap-label.far { opacity: 0; }
+/* the painted map has its own names and red dots: only the town pins (to fly there) */
+.rmap.painted .rmap-name, .rmap.painted .rmap-label.spot, .rmap.painted .rmap-label.water { display: none; }
+.rmap.painted .rmap-pin { width: 14px; height: 14px; }
+
+/* the controls on top */
+.rmap-top {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(12px + env(safe-area-inset-top, 0)) 16px 12px;
+  pointer-events: none;
+}
+.rmap-top > * { pointer-events: auto; }
+.rmap-title {
+  margin: 0; font-family: 'Chakra Petch', 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+.rmap-btn, .rmap-seg button {
+  font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--rmap-text); cursor: pointer;
+  padding: 8px 14px; border-radius: 10px;
+  background: var(--rmap-glass); border: 1px solid var(--rmap-line);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.rmap-btn:active, .rmap-seg button:active { transform: translateY(1px); }
+.rmap-round { width: 40px; height: 40px; padding: 0; border-radius: 50%; font-size: 1.2rem; }
+.rmap-tools {
+  position: absolute; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0));
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
+}
+.rmap-seg { display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--rmap-line); }
+.rmap-seg button { border: none; border-radius: 0; }
+.rmap-seg button + button { border-left: 1px solid var(--rmap-line); }
+.rmap-seg button.active { color: var(--rmap-ink); background: var(--rmap-gold); }
+.rmap-compass {
+  position: absolute; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0));
+  width: 52px; height: 52px; border-radius: 50%; padding: 0; cursor: pointer;
+  background: var(--rmap-glass); border: 1px solid var(--rmap-line); color: var(--rmap-text);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.rmap-compass b { position: absolute; top: 3px; left: 0; right: 0; font-size: 0.62rem; text-align: center; opacity: 0; }
+.rmap-needle { position: absolute; inset: 9px; }
+.rmap-needle::before, .rmap-needle::after {
+  content: ''; position: absolute; left: 50%; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent;
+  transform: translateX(-50%);
+}
+.rmap-needle::before { top: 0; border-bottom: 17px solid #e8343c; }
+.rmap-needle::after { bottom: 0; border-top: 17px solid #dfe6ee; }
+.rmap-compass.off-north { border-color: rgba(255, 210, 63, 0.6); }
+
+.rmap-loading {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: 'Chakra Petch', 'Outfit', sans-serif; font-size: 1.05rem; letter-spacing: 0.5px;
+  background: inherit;
+}
+
+@media (max-width: 520px) {
+  .rmap-title { font-size: 1.05rem; }
+  .rmap-btn, .rmap-seg button { padding: 7px 10px; font-size: 0.8rem; }
+  .rmap-name { font-size: 0.68rem; padding: 1px 6px; }
+}

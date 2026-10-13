@@ -1,0 +1,381 @@
+// The region map in 3D: the Shiman Federation as a block of land you can turn, tilt, zoom and move -- our own take on
+// the 3D map in Benjakronk's Nynorsk course. Shima is invented, so its heights come from his painted map
+// (tools/region-map/make_terrain.py writes assets/region-map/: the height map, the topographic and the painted map
+// pictures, and places.json with the towns and the red spots).
+//
+// Drag to turn, scroll / pinch to zoom, right-drag / two fingers to move. Only drawn while something moves, so it
+// costs nothing while it's left alone.
+//
+// Self-contained so it can live in its own page (region-map.html) or be mounted inside the app later:
+// mountRegionMap(root, { onBack }) -> { ready, destroy }. Styles: css/region-map.css (.rmap-*).
+import * as THREE from '../vendor/three/three.module.min.js';
+import { OrbitControls } from '../vendor/three/OrbitControls.js';
+
+const BASE = 'assets/region-map/';
+const KM_PER_PX = 0.12;      // one pixel of the painting is 120 m: the island is ~110 x 200 km
+const EXAG = 3;              // the heights exaggerated, so the mountains read from the air
+const STEP = 3;              // one corner of the land's mesh every this many pixels
+const BLOCK = 60;            // how deep the block of land goes under the sea
+const STYLES = { topo: 'topo.jpg', painted: 'painted.jpg' };
+const STYLE_KEY = 'rmapStyle';
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+
+/** The height map as tables: metres and what's there (0 sea, 1 land, 2 lake, 3 river) per painting pixel. */
+async function loadHeights(seaOffset) {
+  const blob = await (await fetch(`${BASE}height.png`)).blob();
+  const bitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0);
+  const px = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+  const n = bitmap.width * bitmap.height;
+  const metres = new Float32Array(n);
+  const kind = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    metres[i] = px[i * 4] * 256 + px[i * 4 + 1] - seaOffset;
+    kind[i] = px[i * 4 + 2];
+  }
+  return { W: bitmap.width, H: bitmap.height, metres, kind };
+}
+
+function loadTexture(renderer, file) {
+  return new Promise((resolve, reject) => {
+    new THREE.TextureLoader().load(`${BASE}${file}`, (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      resolve(tex);
+    }, undefined, () => reject(new Error(`Couldn't load ${file}`)));
+  });
+}
+
+export function mountRegionMap(root, { onBack } = {}) {
+  root.classList.add('rmap');
+  let style = 'topo';
+  try { if (STYLES[localStorage.getItem(STYLE_KEY)]) style = localStorage.getItem(STYLE_KEY); } catch (e) { /* not kept */ }
+  root.classList.toggle('painted', style === 'painted');
+  root.innerHTML = `
+    <canvas class="rmap-canvas"></canvas>
+    <div class="rmap-labels"></div>
+    <header class="rmap-top">
+      ${onBack ? '<button class="rmap-btn rmap-round" data-act="back" aria-label="Back">←</button>' : ''}
+      <h1 class="rmap-title">Shiman Federation</h1>
+    </header>
+    <div class="rmap-tools">
+      <div class="rmap-seg" role="group" aria-label="Map style">
+        <button data-style="topo"${style === 'topo' ? ' class="active"' : ''}>Topographic</button>
+        <button data-style="painted"${style === 'painted' ? ' class="active"' : ''}>Painted</button>
+      </div>
+      <button class="rmap-btn" data-act="home">Whole region</button>
+    </div>
+    <button class="rmap-compass" data-act="north" aria-label="North up"><span class="rmap-needle"></span><b>N</b></button>
+    <div class="rmap-loading">Loading the map…</div>`;
+  const $ = sel => root.querySelector(sel);
+  const canvas = $('.rmap-canvas');
+  const labelLayer = $('.rmap-labels');
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 1, 20000);
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.09;
+  controls.screenSpacePanning = false;     // moving slides over the land, not up into the sky
+  controls.zoomToCursor = true;
+  controls.maxPolarAngle = 1.2;             // never under the horizon
+  controls.rotateSpeed = 0.6;
+  controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+
+  let land = null;          // { W, H, metres, kind, vert }
+  let places = null;
+  let mesh = null;
+  const textures = {};
+  let dirty = true;
+  let flight = null;
+  let frame = 0;
+  let destroyed = false;
+  const labels = [];
+
+  // Painting pixel -> world: x to the east, z to the south, y up (metres scaled by vert).
+  const toWorld = (x, y, metres = 0) => new THREE.Vector3(x - land.W / 2, Math.max(metres, 0) * land.vert, y - land.H / 2);
+  function heightAt(x, y) {
+    const i = Math.min(land.H - 1, Math.max(0, Math.round(y))) * land.W + Math.min(land.W - 1, Math.max(0, Math.round(x)));
+    return land.kind[i] === 0 ? 0 : land.metres[i];
+  }
+
+  /** The land as one mesh on a grid every STEP pixels, with the block's sides going down under the sea. */
+  function buildMesh(texture) {
+    const { W, H, metres, kind, vert } = land;
+    const cols = Math.ceil((W - 1) / STEP) + 1;
+    const rows = Math.ceil((H - 1) / STEP) + 1;
+    const pos = new Float32Array(cols * rows * 3);
+    const uv = new Float32Array(cols * rows * 2);
+    for (let r = 0; r < rows; r++) {
+      const py = Math.min(H - 1, r * STEP);
+      for (let c = 0; c < cols; c++) {
+        const px = Math.min(W - 1, c * STEP);
+        const i = py * W + px;
+        const k = r * cols + c;
+        const m = kind[i] === 0 ? 0 : metres[i];
+        pos.set([px - W / 2, Math.max(m, 0) * vert, py - H / 2], k * 3);
+        uv.set([px / (W - 1), 1 - py / (H - 1)], k * 2);
+      }
+    }
+    const index = [];
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        const a = r * cols + c, b = a + 1, d = a + cols, e = d + 1;
+        index.push(a, d, b, b, d, e);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setIndex(index);
+    mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: texture }));
+    scene.add(mesh);
+
+    // the block: four sides hanging from the mesh's edge (up to the land where the painting cuts through it) and a
+    // bottom, the dark blue of deep water
+    const side = new THREE.MeshBasicMaterial({ color: 0x14365f, side: THREE.DoubleSide });
+    const bottom = -BLOCK;
+    const edge = (ks) => {
+      const p = new Float32Array(ks.length * 6);
+      ks.forEach((k, i) => {
+        p.set([pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]], i * 6);
+        p.set([pos[k * 3], bottom, pos[k * 3 + 2]], i * 6 + 3);
+      });
+      const idx = [];
+      for (let i = 0; i < ks.length - 1; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 2, i * 2 + 1, i * 2 + 3);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+      g.setIndex(idx);
+      scene.add(new THREE.Mesh(g, side));
+    };
+    const range = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+    edge(range(cols, c => c));                                  // north
+    edge(range(cols, c => (rows - 1) * cols + c));              // south
+    edge(range(rows, r => r * cols));                           // west
+    edge(range(rows, r => r * cols + cols - 1));                // east
+    const base = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ color: 0x0c2240, side: THREE.DoubleSide }));
+    base.rotation.x = -Math.PI / 2;
+    base.position.y = bottom;
+    scene.add(base);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Labels: HTML over the canvas, placed where their spot is on screen after every draw
+  // ---------------------------------------------------------------------------
+
+  function buildLabels() {
+    const add = (kind, name, x, y, lift) => {
+      const el = document.createElement(kind === 'town' ? 'button' : 'div');
+      el.className = `rmap-label ${kind}`;
+      if (kind === 'town') { el.innerHTML = `<span class="rmap-pin"></span><span class="rmap-name">${esc(name)}</span>`; el.dataset.fly = labels.length; }
+      else if (kind === 'spot') el.innerHTML = '<span class="rmap-spot"></span>';
+      else el.textContent = name;
+      labelLayer.appendChild(el);
+      labels.push({ el, kind, x, y, at: toWorld(x, y, heightAt(x, y) + lift) });
+    };
+    places.towns.forEach(t => add('town', t.name, t.x, t.y, 40));
+    places.spots.forEach(s => add('spot', '', s.x, s.y, 25));
+    places.water.forEach(w => add('water', w.name, w.x, w.y, 0));
+  }
+
+  const v = new THREE.Vector3();
+  function placeLabels() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const dist = camera.position.distanceTo(controls.target);
+    for (const l of labels) {
+      v.copy(l.at).project(camera);
+      const visible = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+      l.el.style.display = visible ? '' : 'none';
+      if (!visible) continue;
+      l.el.style.transform = `translate(${((v.x + 1) / 2 * w).toFixed(1)}px, ${((1 - v.y) / 2 * h).toFixed(1)}px)`;
+      // from far away only the towns: the spots and the sea names come in closer
+      if (l.kind !== 'town') l.el.classList.toggle('far', dist > land.fit * 0.75);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // The camera
+  // ---------------------------------------------------------------------------
+
+  /** Where the camera stands for `target`, `distance` away, `polar` from straight down, turned `azimuth`. */
+  function viewFrom(target, distance, polar, azimuth) {
+    const s = new THREE.Spherical(distance, polar, azimuth);
+    return new THREE.Vector3().setFromSpherical(s).add(target);
+  }
+
+  function flyTo(target, distance, polar, azimuth, ms = 900) {
+    flight = {
+      t0: performance.now(), ms,
+      fromTarget: controls.target.clone(), toTarget: target,
+      fromPos: camera.position.clone(), toPos: viewFrom(target, distance, polar, azimuth),
+    };
+    wake();
+  }
+
+  /** The whole island in view, north up, tilted a little. */
+  function home(ms = 900) {
+    const t = new THREE.Vector3(land.cx - land.W / 2, 0, land.cy - land.H / 2);
+    flyTo(t, land.fit, 0.55, 0, ms);
+  }
+
+  function stepFlight(now) {
+    const k = Math.min(1, (now - flight.t0) / flight.ms);
+    const e = ease(k);
+    controls.target.lerpVectors(flight.fromTarget, flight.toTarget, e);
+    camera.position.lerpVectors(flight.fromPos, flight.toPos, e);
+    if (k >= 1) flight = null;
+    return true;
+  }
+
+  // The target stays over the map.
+  function clampTarget() {
+    const t = controls.target;
+    const mx = land.W / 2, mz = land.H / 2;
+    const cx = Math.max(-mx, Math.min(mx, t.x)), cz = Math.max(-mz, Math.min(mz, t.z));
+    if (cx !== t.x || cz !== t.z || t.y !== 0) {
+      camera.position.x += cx - t.x; camera.position.z += cz - t.z;
+      t.set(cx, 0, cz);
+    }
+  }
+
+  /** How far back the camera stands to see the whole island on this screen (its height and its width). */
+  function fitDistance() {
+    const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    return Math.max(land.spanZ / (2 * tanV), land.spanX / (2 * tanV * camera.aspect)) * 0.95;
+  }
+
+  function resize() {
+    const w = root.clientWidth, h = root.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    if (land) {
+      land.fit = fitDistance();
+      controls.maxDistance = land.fit * 1.8;
+    }
+    dirty = true;
+    wake();
+  }
+
+  // Drawn only while something moves: the loop runs while the controls are settling or a flight is on, then stops.
+  let quiet = 0;
+  function tick(now) {
+    frame = 0;
+    if (destroyed) return;
+    let moved = flight ? stepFlight(now) : false;
+    if (controls.update()) moved = true;
+    clampTarget();
+    if (moved || dirty) {
+      renderer.render(scene, camera);
+      placeLabels();
+      const az = controls.getAzimuthalAngle();
+      $('.rmap-needle').style.transform = `rotate(${(az * 180 / Math.PI).toFixed(1)}deg)`;
+      $('.rmap-compass').classList.toggle('off-north', Math.abs(az) > 0.02);
+      dirty = false;
+      quiet = 0;
+    } else {
+      quiet++;
+    }
+    if (quiet < 30) frame = requestAnimationFrame(tick);
+  }
+  function wake() {
+    quiet = 0;
+    if (!frame && !destroyed) frame = requestAnimationFrame(tick);
+  }
+  controls.addEventListener('start', wake);
+  controls.addEventListener('change', wake);
+  canvas.addEventListener('wheel', wake, { passive: true });
+  canvas.addEventListener('pointerdown', wake);
+
+  async function setStyle(next) {
+    style = next;
+    try { localStorage.setItem(STYLE_KEY, next); } catch (e) { /* not kept */ }
+    root.querySelectorAll('[data-style]').forEach(b => b.classList.toggle('active', b.dataset.style === next));
+    root.classList.toggle('painted', next === 'painted'); // the painting has its own names and red dots
+    if (!textures[next]) textures[next] = await loadTexture(renderer, STYLES[next]);
+    if (style !== next || !mesh) return;
+    mesh.material.map = textures[next];
+    mesh.material.needsUpdate = true;
+    dirty = true;
+    wake();
+  }
+
+  root.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t.closest('[data-act="back"]')) { onBack?.(); return; }
+    if (t.closest('[data-act="home"]')) { home(); return; }
+    if (t.closest('[data-act="north"]')) {
+      const dist = camera.position.distanceTo(controls.target);
+      flyTo(controls.target.clone(), dist, controls.getPolarAngle(), 0, 600);
+      return;
+    }
+    const styleBtn = t.closest('[data-style]');
+    if (styleBtn) { setStyle(styleBtn.dataset.style); return; }
+    const town = t.closest('[data-fly]');
+    if (town) {
+      const l = labels[Number(town.dataset.fly)];
+      flyTo(toWorld(l.x, l.y), land.fit * 0.28, 0.85, controls.getAzimuthalAngle());
+    }
+  });
+
+  const observer = new ResizeObserver(resize);
+
+  async function load() {
+    places = await (await fetch(`${BASE}places.json`)).json();
+    const [heights, texture] = await Promise.all([loadHeights(places.seaOffset), loadTexture(renderer, STYLES[style])]);
+    if (destroyed) return;
+    textures[style] = texture;
+    land = { ...heights, vert: EXAG / (KM_PER_PX * 1000) };
+    // the land's middle and how far back the camera has to be to see all of it
+    let minX = heights.W, maxX = 0, minY = heights.H, maxY = 0;
+    for (let y = 0; y < heights.H; y += 4) {
+      for (let x = 0; x < heights.W; x += 4) {
+        if (heights.kind[y * heights.W + x] !== 0) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+      }
+    }
+    land.cx = (minX + maxX) / 2;
+    land.cy = (minY + maxY) / 2;
+    land.spanX = maxX - minX + 300;            // room for the names at the island's edges
+    land.spanZ = maxY - minY + 160;
+    controls.minDistance = 60;
+    buildMesh(texture);
+    buildLabels();
+    observer.observe(root);
+    resize();
+    camera.position.copy(viewFrom(new THREE.Vector3(land.cx - land.W / 2, 0, land.cy - land.H / 2), land.fit, 0.55, 0));
+    controls.target.set(land.cx - land.W / 2, 0, land.cy - land.H / 2);
+    flight = null;
+    controls.update();
+    dirty = true;
+    wake();
+    $('.rmap-loading').remove();
+  }
+
+  function destroy() {
+    destroyed = true;
+    cancelAnimationFrame(frame);
+    observer.disconnect();
+    controls.dispose();
+    scene.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+    Object.values(textures).forEach(t => t.dispose());
+    renderer.dispose();
+  }
+
+  const ready = load().catch((err) => {
+    const box = $('.rmap-loading');
+    if (box) box.textContent = `Couldn't load the map: ${err.message}`;
+    throw err;
+  });
+  return { ready, destroy };
+}

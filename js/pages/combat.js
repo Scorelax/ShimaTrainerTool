@@ -3176,6 +3176,14 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   const _weatherBlock = weatherRequirementUnmet(moveEffectsFor(moveName), _weathers) || roundRequirementUnmet(moveEffectsFor(moveName), state.round)
     || selfRequirementUnmet(moveEffectsFor(moveName), { hp: c.currentHp, maxHp: c.maxHp, statuses: c.liveStatuses, nearestHostileFt: c.nearestHostileFt,
       round: c.enteredRound != null ? state.round : null, enteredRound: c.enteredRound });
+  // The shared battle's "can't use this one now" (bridged onto `c` by combat-wip.js; never set on the legacy engine):
+  // Disable / Imprison / Throat Chop, Encore's lock, and burrowed underground -- from down there only a move like Dig
+  // or one on itself alone (range "Self") works; anything else has to wait until it's back up on the surface.
+  const _useBlock = (c.disabledMoves || []).includes(moveName) ? `${moveName} is disabled right now`
+    : c.lockedMove && c.lockedMove !== moveName ? `Only ${c.lockedMove} can be used right now (Encore)`
+    : c.burrowed && moveFlagsFor(moveName).semiInvulnerable !== 'underground' && String(move[6] || '').trim().toLowerCase() !== 'self'
+      ? 'Burrowed underground -- come up to the surface first (only a move like Dig, or one on itself, works from down there)'
+      : null;
 
   // Bide -- a genuinely different shape from every other move: no dice at
   // all, its payoff is computed server-side from damage actually taken
@@ -3455,8 +3463,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     spriteAlt: c.name,
     speciesName: c.speciesName,
     noteText: [_stackNote || _damageNote, ...(_abilityMods?.notes || [])].filter(Boolean).join(' · ') || undefined,
-    disableUse: (_isStackMove && _stacks === 0) || _bonusSpent || !!_weatherBlock,
-    disableUseMsg: _weatherBlock || (_bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first'),
+    disableUse: (_isStackMove && _stacks === 0) || _bonusSpent || !!_weatherBlock || !!_useBlock,
+    disableUseMsg: _useBlock || _weatherBlock || (_bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first'),
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,

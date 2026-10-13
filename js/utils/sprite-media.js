@@ -30,6 +30,31 @@ export function spriteSrc(url, small = false) {
   return m ? `/sprite-previews/${m[1]}${m[2] || ''}` : url;
 }
 
+// Android WebView (the kiosk screens' Fully Kiosk Browser) draws its own grey play-button picture on a <video> that has
+// no `poster` until it starts playing -- the play/pause icon seen on the display. Every sprite video gets this fully
+// transparent 1x1 poster instead, and once its first frame is in, the poster is dropped (below) so that frame shows even
+// if the video were held still.
+export const BLANK_POSTER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+document.addEventListener('loadeddata', (e) => {
+  const v = e.target;
+  if (v instanceof HTMLVideoElement && v.getAttribute('poster') === BLANK_POSTER) v.removeAttribute('poster');
+}, true);
+
+/** For the screens nobody touches (the display, the board screen): a looping sprite that gets paused or stalls -- the
+ * WebView does that now and then -- is started again, so none sits still. (Not for pages that pause videos on purpose:
+ * the DM console, the display's preview.) */
+export function keepVideosPlaying() {
+  const kick = (e) => {
+    const v = e.target;
+    if (!(v instanceof HTMLVideoElement) || !v.loop || !v.autoplay || document.hidden || !v.isConnected) return;
+    if (v.paused) v.play().catch(() => {});
+  };
+  ['pause', 'canplay', 'stalled', 'suspend'].forEach(type => document.addEventListener(type, kick, true));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) document.querySelectorAll('video[autoplay][loop]').forEach(v => { if (v.paused) v.play().catch(() => {}); });
+  });
+}
+
 // A <video> can't just have its src swapped to a static fallback image and
 // render correctly -- the element itself has to be replaced with a real
 // <img>. Defined once here (not repeated per inline onerror string) and
@@ -61,7 +86,7 @@ export function spriteMediaHtml(url, altText, className = '', id = '', { small =
     // pokemon-card.js's evolution-confirm trigger) listen on the *container*
     // instead -- the click still lands there since a pointer-events:none
     // child is skipped during hit-testing.
-    return `<video src="${url}"${idAttr}${classAttr} style="pointer-events:none" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback onerror="window.__spriteFallback(this)"></video>`;
+    return `<video src="${url}"${idAttr}${classAttr} style="pointer-events:none" poster="${BLANK_POSTER}" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback onerror="window.__spriteFallback(this)"></video>`;
   }
   // No src attribute at all when url is empty -- src="" triggers a real
   // (failing) request in some browsers before any real src is set, which

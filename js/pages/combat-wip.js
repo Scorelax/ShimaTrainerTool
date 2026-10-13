@@ -1753,6 +1753,11 @@ function _syncLocalCombatState(session) {
     merged.damageRollBonus = damageRollBonusOf(p);
     // Dig/Fly/...'s reappearing second use costs no VP again (see combat.js's vpCostOverride).
     merged.semiHeldMoves = (p.statuses || []).filter((s) => s.kind === 'condition' && UNTARGETABLE_STATES.includes(s.apply) && s.moveName).map((s) => s.moveName);
+    // What it can't use right now (combat.js's move popup refuses those): Disable / Imprison / Throat Chop's disabled
+    // moves, Encore's "only this one", and burrowed underground on the map (only a move like Dig, or one on itself).
+    merged.disabledMoves = (p.statuses || []).filter((s) => s.kind === 'condition' && s.apply === 'move_disabled' && s.value).map((s) => s.value);
+    merged.lockedMove = (p.statuses || []).find((s) => s.kind === 'condition' && s.apply === 'move_locked_to' && s.value)?.value || null;
+    merged.burrowed = (session?.board?.tokens?.[p.id]?.z || 0) < 0;
     merged.powerUpStacks = (p.statuses || []).find((s) => s.kind === 'condition' && s.apply === 'power_up')?.stacks || 0;
     // Spirit Growth: moves using these abilities cost half VP (see combat.js's vpCostOverride).
     merged.vpHalvedAbilities = (p.statuses || []).filter((s) => s.kind === 'condition' && s.apply === 'vp_cost_halved' && s.value).map((s) => String(s.value).toUpperCase());

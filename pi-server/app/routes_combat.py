@@ -2746,6 +2746,14 @@ def _apply_move(conn, state, pid, move_name, vp_cost, target_id, dice_roll, move
     lock = move_lock(attacker)
     if lock and move_name != lock:
         raise ValueError(f"{attacker['name']} can only use {lock} right now")
+    # Burrowed on the map (token below the ground): no attacking from down there -- only a move like Dig (which strikes
+    # from underneath) or one on itself alone (range "Self": a buff, no cone or line); for anything else it has to come
+    # back up to the surface first. (The user's rule, 2026-10-14.)
+    if _altitude_of(state, pid) < 0:
+        record = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None) or {}
+        if record.get('semiInvulnerable') != 'underground' and str(record.get('range') or '').strip().lower() != 'self':
+            raise ValueError(f"{attacker['name']} is burrowed underground -- it has to come up to the surface before using "
+                             f"{move_name} (only a move like Dig, or one on itself, works from down there)")
     if move_name == TRAINER_ATTACK_MOVE:
         # A trainer's basic Attack is their action, same as Disengage (see _disengage).
         if attacker.get('actionUsed'):

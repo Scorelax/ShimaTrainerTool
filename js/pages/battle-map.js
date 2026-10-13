@@ -11,7 +11,7 @@
 // table can touch it. The flat painting stays under it while it loads, or if this screen can't draw 3D.
 import { CombatAPI, DmAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
-import { patchPortraitMedia } from '../utils/sprite-media.js';
+import { patchPortraitMedia, keepVideosPlaying } from '../utils/sprite-media.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { footprintForSize, mapObjectsHtml, MAP_OBJECT_CSS, MAP_MARK_CSS } from '../utils/battle-map-grid.js';
 import { zoneKindsByCell, legendHtml, activeTerrainSummary, spriteTransform, unwrapAngle } from '../utils/battle-map-view.js';
@@ -24,6 +24,7 @@ async function init() {
   style.textContent = MAP_OBJECT_CSS + MAP_MARK_CSS;
   document.head.appendChild(style);
   initLiveUpdates();
+  keepVideosPlaying(); // nobody touches this screen: a sprite the WebView pauses starts again
 
   const result = await CombatAPI.getState();
   if (result.status === 'success') session = result.data;

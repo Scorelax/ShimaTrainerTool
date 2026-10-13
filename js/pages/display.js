@@ -19,7 +19,7 @@ import { CombatAPI, DmAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { audioManager } from '../utils/audio.js';
 import { getSettings } from '../utils/settings.js';
-import { spriteMediaHtml, patchPortraitMedia, useSpritePreviews } from '../utils/sprite-media.js';
+import { spriteMediaHtml, patchPortraitMedia, useSpritePreviews, keepVideosPlaying } from '../utils/sprite-media.js';
 import { preloadBattleAnimation, getBattleAnimationUrl } from '../utils/battle-animation.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { normaliseScene, renderScene, sceneHasContent, sceneOnScreen } from '../utils/display-scene.js';
@@ -54,6 +54,7 @@ async function init() {
     });
   } else {
     initLiveUpdates();
+    keepVideosPlaying(); // nobody touches this screen: a sprite the WebView pauses starts again
   }
 
   const [result, savedScene] = await Promise.all([

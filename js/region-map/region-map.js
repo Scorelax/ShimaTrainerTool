@@ -8,7 +8,8 @@
 //
 // Self-contained so it can live in its own page (region-map.html) or be mounted elsewhere -- the DM console's PokeNav
 // steers it (onView) and the table's board screen (battle-map.html) shows it view only, following along (setView):
-// mountRegionMap(root, { onBack, viewOnly, title, rememberStyle, onView }) -> { ready, destroy, getView, setView, home }.
+// mountRegionMap(root, { onBack, viewOnly, title, rememberStyle, onView }) -> { ready, destroy, getView, setView, home,
+// graphics: {renderer, software} }.
 // A view is { x, y (the painting pixel in the middle), zoom (the distance as a share of the whole-island one), polar,
 // azimuth, style }. Styles: css/region-map.css (.rmap-*).
 import * as THREE from '../vendor/three/three.module.min.js';
@@ -58,6 +59,21 @@ function loadTexture(renderer, file) {
   });
 }
 
+/** What draws the 3D here: { renderer (the graphics card's name), software (no graphics card: the browser draws it
+ * itself, far slower -- hardware acceleration off, or the card not allowed) }. */
+function graphicsInfo() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
+    if (!gl) return { renderer: '', software: false };
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return { renderer: name, software: /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name) };
+  } catch (e) {
+    return { renderer: '', software: false };
+  }
+}
+
 export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView } = {}) {
   root.classList.add('rmap');
   root.classList.toggle('view-only', viewOnly); // nothing to press or drag: it follows setView
@@ -87,8 +103,24 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   const canvas = $('.rmap-canvas');
   const labelLayer = $('.rmap-labels');
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // How it's drawn. The edges are smoothed (antialias) only on an ordinary screen with the graphics card at work -- a
+  // sharp screen (MacBook, phone) needs none, and without the card it costs too much.
+  const gpu = graphicsInfo();
+  const sharpRatio = Math.min(window.devicePixelRatio || 1, 2);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !gpu.software && sharpRatio < 1.5, alpha: true });
+  renderer.setPixelRatio(sharpRatio);
+  // While the map moves it's drawn as finely as this device keeps up with: these levels, stepped down when the frames
+  // come too slowly (and kept for the visit); still, it's always drawn at its best. Without the graphics card it
+  // starts two levels down.
+  const LEVELS = [
+    { ratio: sharpRatio, coarse: false },
+    { ratio: Math.min(sharpRatio, 1), coarse: false },
+    { ratio: Math.min(sharpRatio, 1), coarse: true },
+    { ratio: Math.min(sharpRatio, 1) * 0.6, coarse: true },
+  ];
+  const REST = gpu.software ? 1 : 0;   // still: the best -- without the card one notch less, or each stop would stall
+  let movingLevel = gpu.software ? 2 : 0;
+  let drawnLevel = 0;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 1, 20000);
   const controls = new OrbitControls(camera, canvas);
@@ -104,6 +136,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   let land = null;          // { W, H, metres, kind, vert }
   let places = null;
   let mesh = null;
+  const geometries = {};    // the land's surface: fine, and coarse (while moving on a slow device)
   const textures = {};
   let dirty = true;
   let flight = null;
@@ -121,17 +154,17 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     return land.kind[i] === 0 ? 0 : land.metres[i];
   }
 
-  /** The land as one mesh on a grid every STEP pixels, with the block's sides going down under the sea. */
-  function buildMesh(texture) {
+  /** The land's surface on a grid every `step` pixels. */
+  function gridGeometry(step) {
     const { W, H, metres, kind, vert } = land;
-    const cols = Math.ceil((W - 1) / STEP) + 1;
-    const rows = Math.ceil((H - 1) / STEP) + 1;
+    const cols = Math.ceil((W - 1) / step) + 1;
+    const rows = Math.ceil((H - 1) / step) + 1;
     const pos = new Float32Array(cols * rows * 3);
     const uv = new Float32Array(cols * rows * 2);
     for (let r = 0; r < rows; r++) {
-      const py = Math.min(H - 1, r * STEP);
+      const py = Math.min(H - 1, r * step);
       for (let c = 0; c < cols; c++) {
-        const px = Math.min(W - 1, c * STEP);
+        const px = Math.min(W - 1, c * step);
         const i = py * W + px;
         const k = r * cols + c;
         const m = kind[i] === 0 ? 0 : metres[i];
@@ -150,6 +183,16 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.setIndex(index);
+    return { geo, pos, cols, rows };
+  }
+
+  /** The land as one mesh (every STEP pixels, and a coarser one, every 2 x STEP, swapped in while moving on a slow
+   * device), with the block's sides going down under the sea. */
+  function buildMesh(texture) {
+    const { W, H } = land;
+    const { geo, pos, cols, rows } = gridGeometry(STEP);
+    geometries.fine = geo;
+    geometries.coarse = gridGeometry(STEP * 2).geo;
     mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: texture }));
     scene.add(mesh);
 
@@ -370,6 +413,8 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       dirty = true; // put away (the board screen during a battle): drawn when it's back (the resize wakes it)
       quiet++;
     } else if (moved || dirty) {
+      if (moved) keepUp(now);
+      useLevel(moved ? Math.max(movingLevel, REST) : REST);
       renderer.render(scene, camera);
       placeLabels();
       const az = controls.getAzimuthalAngle();
@@ -380,9 +425,39 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       quiet = 0;
     } else {
       quiet++;
+      lastDraw = 0;
+      // come to rest after moving at a lower level: drawn once more at its best
+      if (drawnLevel !== REST && root.clientWidth) {
+        useLevel(REST);
+        renderer.render(scene, camera);
+      }
     }
     if (quiet < 30) frame = requestAnimationFrame(tick);
     else lastTick = 0;
+  }
+
+  // Keeping up: the time between frames drawn one after the other while moving. Several in a row slower than ~30 a
+  // second: the next level down, for the rest of the visit.
+  let lastDraw = 0, slowAvg = 0, slowCount = 0;
+  function keepUp(now) {
+    if (lastDraw && now - lastDraw < 250) {
+      const dt = now - lastDraw;
+      slowAvg = slowCount ? slowAvg * 0.75 + dt * 0.25 : dt;
+      slowCount++;
+      if (slowCount >= 8 && slowAvg > 36 && movingLevel < LEVELS.length - 1) {
+        movingLevel++;
+        slowCount = 0;
+      }
+    }
+    lastDraw = now;
+  }
+
+  function useLevel(n) {
+    if (n === drawnLevel) return;
+    drawnLevel = n;
+    const { ratio, coarse } = LEVELS[n];
+    if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
+    if (mesh) mesh.geometry = coarse ? geometries.coarse : geometries.fine;
   }
   function wake() {
     quiet = 0;
@@ -482,6 +557,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     observer.disconnect();
     controls.dispose();
     scene.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+    Object.values(geometries).forEach(g => g.dispose());
     Object.values(textures).forEach(t => t.dispose());
     renderer.dispose();
   }
@@ -491,5 +567,5 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (box) box.textContent = `Couldn't load the map: ${err.message}`;
     throw err;
   });
-  return { ready, destroy, getView, setView, home };
+  return { ready, destroy, getView, setView, home, graphics: gpu };
 }

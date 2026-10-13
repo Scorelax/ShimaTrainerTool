@@ -31,6 +31,7 @@ export async function renderPokenav(section, { session } = {}) {
       <div class="dm-nav-head">
         <h2>🧭 PokéNav</h2>
         <span class="dm-pill" id="navStatus"></span>
+        <span class="dm-pill todo" id="navSlow" hidden></span>
       </div>
       <div class="dm-nav-frame"><div class="dm-nav-screen"><div id="navMap"></div></div></div>
     </div>`;
@@ -41,6 +42,13 @@ export async function renderPokenav(section, { session } = {}) {
       DmAPI.getState('region-map-view').catch(() => null),
     ]);
     _map = mountRegionMap(document.getElementById('navMap'), { title: false, rememberStyle: false, onView: queue });
+    // Drawn without the graphics card (hardware acceleration off in the browser): it moves slowly, and that's why.
+    if (_map.graphics.software) {
+      const slow = document.getElementById('navSlow');
+      slow.hidden = false;
+      slow.textContent = 'Slow: this browser isn\'t using the graphics card';
+      slow.title = 'Turn on hardware acceleration in the browser\'s settings (System), then restart it';
+    }
     if (saved) _map.setView(saved);
     await _map.ready;
     // Never steered yet: the whole island lying along the screen, north to the right

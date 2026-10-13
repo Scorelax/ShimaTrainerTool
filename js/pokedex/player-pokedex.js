@@ -14,9 +14,12 @@ const TYPE_COLORS = {
   rock: '#B8A038', ghost: '#705898', dragon: '#7038F8', dark: '#705848', steel: '#B8B8D0', fairy: '#EE99AC',
   cosmic: '#2E1F5E',
 };
-const UNKNOWN_COLOR = '#555555';
+// The Moves view's order: by type (this order, unlisted types after), then by name.
+const TYPE_ORDER = ['grass', 'fire', 'water', 'normal', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying',
+  'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy', 'cosmic'];
 const RESULTS_PER_PAGE = 10;
-const MOVE_RESULTS_MAX = 50;
+// A search that leaves this many moves or fewer shows them opened.
+const MOVES_OPEN_MAX = 3;
 const LEVEL_TITLES = { 1: 'Starting Moves', 2: 'Level 2', 6: 'Level 6', 10: 'Level 10', 14: 'Level 14', 18: 'Level 18' };
 // [filter id, label, where the value is, the "any" option]
 const FILTERS = [
@@ -30,6 +33,14 @@ const FILTERS = [
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const typeColor = t => TYPE_COLORS[String(t || '').toLowerCase()] || '#68A090';
+const typeKey = t => String(t || '').toLowerCase();
+const typeRank = (t) => { const i = TYPE_ORDER.indexOf(typeKey(t)); return i < 0 ? TYPE_ORDER.length : i; };
+const byTypeThenName = (a, b) => typeRank(a.type) - typeRank(b.type) || typeKey(a.type).localeCompare(typeKey(b.type))
+  || String(a.name).localeCompare(String(b.name));
+function rgba(hex, alpha) {
+  const n = parseInt(String(hex).slice(1), 16);
+  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 function infoValue(s, key) { return s.info.find(i => i.key === key)?.value || ''; }
 
 export function mountPlayerPokedex(root, { onBack } = {}) {
@@ -40,19 +51,25 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
     page: 1,
     openTabs: new Map(),        // species name -> open card tab
     expandedMoves: new Set(),   // `${species}|${move}` opened in a card's Moves tab
+    moveType: '',               // the Moves view's type key ('' = every type)
+    openMoves: new Set(),       // moves opened in the Moves view (lowercase names)
   };
 
   root.classList.add('pdx');
   root.innerHTML = `
     <header class="pdx-header">
-      <div class="pdx-header-row">
-        ${onBack ? '<button class="pdx-btn pdx-btn-ghost pdx-back" data-act="back" aria-label="Back">←</button>' : ''}
-        <h1 class="pdx-title">Shima Pokédex</h1>
+      <div class="pdx-lid">
+        <div class="pdx-header-row">
+          ${onBack ? '<button class="pdx-back" data-act="back" aria-label="Back">←</button>' : ''}
+          <span class="pdx-lens" aria-hidden="true"></span>
+          <span class="pdx-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+          <h1 class="pdx-title">Shima Pokédex</h1>
+        </div>
+        <nav class="pdx-nav">
+          <button class="pdx-nav-tab active" data-view="pokedex">Pokédex</button>
+          <button class="pdx-nav-tab" data-view="moves">Moves</button>
+        </nav>
       </div>
-      <nav class="pdx-nav">
-        <button class="pdx-nav-tab active" data-view="pokedex">📖 Pokédex</button>
-        <button class="pdx-nav-tab" data-view="moves">⚔️ Moves</button>
-      </nav>
     </header>
     <main class="pdx-main">
       <div class="pdx-view active" data-view-panel="pokedex">
@@ -65,6 +82,7 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
           <input type="text" id="pdxMoveSearch" placeholder="Search move or Pokémon name..." autocomplete="off">
           <label class="pdx-level"><span>Lv</span><input type="number" id="pdxMoveLevel" min="1" max="20" value="20"></label>
         </div>
+        <div class="pdx-type-keys" id="pdxTypeKeys"></div>
         <div class="pdx-results" id="pdxMoveResults"></div>
       </div>
     </main>
@@ -77,13 +95,19 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
   // ---------------------------------------------------------------------------
 
   async function load() {
-    const res = await GameDataAPI.getPlayerPokedex();
-    if (res?.status !== 'success' || !res.data) throw new Error(res?.error || res?.message || 'No data');
-    state.data = res.data;
-    state.moveByName = new Map(res.data.moves.map(m => [String(m.name).toLowerCase(), m]));
-    fillFilters();
-    renderPokemon();
-    renderMoves();
+    root.classList.add('pdx-busy'); // the lens blinks while it fetches
+    try {
+      const res = await GameDataAPI.getPlayerPokedex();
+      if (res?.status !== 'success' || !res.data) throw new Error(res?.error || res?.message || 'No data');
+      state.data = res.data;
+      state.moveByName = new Map(res.data.moves.map(m => [String(m.name).toLowerCase(), m]));
+      fillFilters();
+      renderPokemon();
+      renderTypeKeys();
+      renderMoves();
+    } finally {
+      root.classList.remove('pdx-busy');
+    }
   }
 
   // One fetch at a time; a change that arrives while one is running gets one more fetch after it (that running one may
@@ -144,13 +168,13 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
     const start = (state.page - 1) * RESULTS_PER_PAGE;
     const shown = results.slice(start, start + RESULTS_PER_PAGE);
     box.innerHTML = `
-      <p class="pdx-results-info">Showing ${start + 1}-${start + shown.length} of ${results.length} results</p>
+      <p class="pdx-results-info">Showing ${start + 1}-${start + shown.length} of ${results.length}</p>
       ${shown.map(cardHtml).join('')}
       ${pages > 1 ? `
         <div class="pdx-pagination">
-          <button class="pdx-btn pdx-btn-secondary" data-page="prev" ${state.page === 1 ? 'disabled' : ''}>← Prev</button>
-          <span>Page ${state.page} of ${pages}</span>
-          <button class="pdx-btn pdx-btn-secondary" data-page="next" ${state.page === pages ? 'disabled' : ''}>Next →</button>
+          <button class="pdx-pad" data-page="prev" aria-label="Previous page" ${state.page === 1 ? 'disabled' : ''}>◀</button>
+          <span class="pdx-lcd">Page ${state.page} / ${pages}</span>
+          <button class="pdx-pad" data-page="next" aria-label="Next page" ${state.page === pages ? 'disabled' : ''}>▶</button>
         </div>` : ''}`;
   }
 
@@ -160,10 +184,17 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
     return `<img class="pdx-header-image" src="${esc(s.image)}" alt="${esc(s.name)}" loading="lazy">`;
   }
 
+  // The picture's screen glows in the Pokemon's type colour(s).
+  function screenBg(s) {
+    const [first, second] = [s.primaryType, s.dualType ? s.secondaryType : ''].filter(Boolean).map(t => rgba(typeColor(t), 0.5));
+    if (!first) return '';
+    return second
+      ? `background: radial-gradient(circle at 25% 30%, ${first}, transparent 65%), radial-gradient(circle at 75% 75%, ${second}, transparent 65%), var(--pdx-screen)`
+      : `background: radial-gradient(circle at 50% 55%, ${first}, transparent 70%), var(--pdx-screen)`;
+  }
+
   function cardHtml(s) {
-    const left = s.primaryType ? typeColor(s.primaryType) : UNKNOWN_COLOR;
-    const right = s.secondaryType ? typeColor(s.secondaryType) : UNKNOWN_COLOR;
-    const headerBg = s.dualType ? `linear-gradient(135deg, ${left} 50%, ${right} 50%)` : left;
+    const dex = /^\d+$/.test(String(s.dex)) ? String(s.dex).padStart(3, '0') : s.dex;
     const types = [s.primaryType, s.secondaryType].filter(Boolean)
       .map(t => `<span class="pdx-type-pill" style="background:${typeColor(t)}">${esc(t)}</span>`).join('')
       || '<span class="pdx-type-pill unknown">Unknown</span>';
@@ -172,10 +203,10 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
     const open = tabs.some(t => t.id === state.openTabs.get(s.name)) ? state.openTabs.get(s.name) : null;
     return `
       <div class="pdx-card" data-species="${esc(s.name)}">
-        <div class="pdx-card-header" style="background:${headerBg}">
-          <div class="pdx-card-image">${imageHtml(s)}</div>
+        <div class="pdx-card-header">
+          <div class="pdx-bezel"><div class="pdx-card-image" style="${screenBg(s)}">${imageHtml(s)}</div></div>
           <div class="pdx-card-info">
-            <span class="pdx-card-number">#${esc(s.dex)}</span>
+            <span class="pdx-card-number">No. ${esc(dex)}</span>
             <h2 class="pdx-card-name">${esc(s.name)}</h2>
             <div class="pdx-card-types">${types}</div>
             ${s.classification ? `<p class="pdx-card-classification">${esc(s.classification)}</p>` : ''}
@@ -184,7 +215,7 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
         ${s.flavor ? `<p class="pdx-card-flavor">${esc(s.flavor)}</p>` : ''}
         ${tabs.length ? `
           <div class="pdx-card-tabs">
-            <div class="pdx-tab-bar">${tabs.map(t => `<button class="pdx-tab-btn${t.id === open ? ' active' : ''}" data-tab="${t.id}"><span class="pdx-tab-icon">${t.icon}</span><span class="pdx-tab-label">${t.label}</span></button>`).join('')}</div>
+            <div class="pdx-tab-bar" style="--keys:${tabs.length}">${tabs.map(t => `<button class="pdx-tab-btn${t.id === open ? ' active' : ''}" data-tab="${t.id}"><span class="pdx-tab-icon">${t.icon}</span><span class="pdx-tab-label">${t.label}</span></button>`).join('')}${'<span class="pdx-key-blank"></span>'.repeat((3 - (tabs.length % 3)) % 3)}</div>
             <div class="pdx-tab-panels${open ? ' open' : ''}">${tabs.map(t => `<div class="pdx-tab-panel${t.id === open ? ' active' : ''}" data-panel="${t.id}"><div class="pdx-tab-inner">${t.html}</div></div>`).join('')}</div>
           </div>` : ''}
       </div>`;
@@ -256,32 +287,65 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
   // Moves view
   // ---------------------------------------------------------------------------
 
-  function moveCardHtml(m) {
+  function moveRowHtml(m, opened) {
+    const open = opened || state.openMoves.has(String(m.name).toLowerCase());
     return `
-      <div class="pdx-move-card">
-        <div class="pdx-move-card-header" style="background:${typeColor(m.type)}"><span class="pdx-move-card-name">${esc(m.name)}</span><span class="pdx-move-card-type">${esc(m.type)}</span></div>
-        <div class="pdx-move-card-body">
+      <div class="pdx-move-row${open ? ' expanded' : ''}" data-move-row="${esc(m.name)}">
+        <button class="pdx-move-row-summary">
+          <span class="pdx-move-row-name">${esc(m.name)}</span>
+          <span class="pdx-move-vp-tag">${esc(m.vp || '-')} VP</span>
+        </button>
+        <div class="pdx-move-row-body">
           <div class="pdx-move-card-stats">
-            <div class="pdx-move-card-stat"><span>VP</span><span>${esc(m.vp || '-')}</span></div>
             <div class="pdx-move-card-stat"><span>Power</span><span>${esc(m.power || '-')}</span></div>
             <div class="pdx-move-card-stat"><span>Time</span><span>${esc(m.time || '-')}</span></div>
             <div class="pdx-move-card-stat"><span>Range</span><span>${esc(m.range || '-')}</span></div>
+            <div class="pdx-move-card-stat"><span>Duration</span><span>${esc(m.duration || '-')}</span></div>
           </div>
           <div class="pdx-move-card-desc">${esc(m.description)}</div>
-          ${m.higher ? `<div class="pdx-move-card-higher"><strong>Higher:</strong> ${esc(m.higher)}</div>` : ''}
+          ${m.higher ? `<div class="pdx-move-card-higher"><strong>Higher levels:</strong> ${esc(m.higher)}</div>` : ''}
         </div>
       </div>`;
+  }
+
+  /** The moves grouped by type (TYPE_ORDER), each group in alphabetical order. */
+  function moveGroupsHtml(moves) {
+    const opened = moves.length <= MOVES_OPEN_MAX;
+    const groups = [];
+    [...moves].sort(byTypeThenName).forEach((m) => {
+      const last = groups[groups.length - 1];
+      if (last && typeKey(last.type) === typeKey(m.type)) last.moves.push(m);
+      else groups.push({ type: m.type, moves: [m] });
+    });
+    return groups.map(g => `
+      <section class="pdx-move-type-group" style="--type:${typeColor(g.type)}">
+        <h3 class="pdx-move-type-title"><span class="pdx-move-type-led"></span>${esc(g.type || 'Unknown')}<span class="pdx-move-type-count">${g.moves.length}</span></h3>
+        <div class="pdx-move-list">${g.moves.map(m => moveRowHtml(m, opened)).join('')}</div>
+      </section>`).join('');
+  }
+
+  /** The type keys over the move list: every type a move has, in TYPE_ORDER. */
+  function renderTypeKeys() {
+    const types = [...new Set(state.data.moves.map(m => typeKey(m.type)).filter(Boolean))]
+      .sort((a, b) => typeRank(a) - typeRank(b) || a.localeCompare(b));
+    if (state.moveType && !types.includes(state.moveType)) state.moveType = '';
+    const label = t => esc(state.data.moves.find(m => typeKey(m.type) === t)?.type || t);
+    $('#pdxTypeKeys').innerHTML = !types.length ? '' : [
+      `<button class="pdx-type-key${state.moveType ? '' : ' active'}" data-move-type="">All</button>`,
+      ...types.map(t => `<button class="pdx-type-key${state.moveType === t ? ' active' : ''}" data-move-type="${esc(t)}" style="--type:${typeColor(t)}"><span class="pdx-type-key-led"></span>${label(t)}</button>`),
+    ].join('');
   }
 
   function renderMoves() {
     const box = $('#pdxMoveResults');
     const term = $('#pdxMoveSearch').value.trim().toLowerCase();
     const level = Math.max(1, Math.min(20, parseInt($('#pdxMoveLevel').value, 10) || 20));
-    if (!term) {
-      box.innerHTML = '<p class="pdx-placeholder">Search for moves or enter a Pokémon name</p>';
+    const ofType = list => (state.moveType ? list.filter(m => typeKey(m.type) === state.moveType) : list);
+    if (!state.data.moves.length) {
+      box.innerHTML = '<p class="pdx-placeholder">No moves to look up yet.</p>';
       return;
     }
-    const species = state.data.species.find(s => s.name.toLowerCase() === term);
+    const species = term && state.data.species.find(s => s.name.toLowerCase() === term);
     if (species) {
       if (!species.movesShown) {
         box.innerHTML = `<p class="pdx-placeholder">Move data for <strong>${esc(species.name)}</strong> has not been discovered yet.</p>`;
@@ -289,14 +353,16 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
       }
       const upTo = Math.min(level, species.movesMaxLevel || 1);
       const names = new Set(species.moves.filter(m => m.extra || m.level <= upTo).map(m => m.name.toLowerCase()));
-      const results = state.data.moves.filter(m => names.has(String(m.name).toLowerCase()));
-      box.innerHTML = `<h3 class="pdx-results-title">Moves for ${esc(species.name)} (up to Level ${upTo})</h3>
-        ${results.length ? `<div class="pdx-move-grid">${results.map(moveCardHtml).join('')}</div>` : '<p class="pdx-placeholder">No moves available at this level.</p>'}`;
+      const results = ofType(state.data.moves.filter(m => names.has(String(m.name).toLowerCase())));
+      box.innerHTML = `<p class="pdx-results-info">${esc(species.name)} · up to Lv ${upTo} · ${results.length} move${results.length === 1 ? '' : 's'}</p>
+        ${results.length ? moveGroupsHtml(results) : '<p class="pdx-placeholder">No moves available at this level.</p>'}`;
       return;
     }
-    const results = state.data.moves.filter(m => String(m.name).toLowerCase().includes(term) || String(m.type).toLowerCase().includes(term));
+    const results = ofType(term
+      ? state.data.moves.filter(m => String(m.name).toLowerCase().includes(term) || typeKey(m.type).includes(term))
+      : state.data.moves);
     box.innerHTML = results.length
-      ? `<p class="pdx-results-info">${results.length} move(s) found</p><div class="pdx-move-grid">${results.slice(0, MOVE_RESULTS_MAX).map(moveCardHtml).join('')}</div>`
+      ? `<p class="pdx-results-info">${results.length} move${results.length === 1 ? '' : 's'}</p>${moveGroupsHtml(results)}`
       : '<p class="pdx-placeholder">No moves found matching that search.</p>';
   }
 
@@ -350,6 +416,22 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
       const entry = summary.closest('.pdx-move-entry');
       const key = `${entry.closest('.pdx-card').dataset.species}|${entry.dataset.move}`;
       if (entry.classList.toggle('expanded')) state.expandedMoves.add(key); else state.expandedMoves.delete(key);
+      return;
+    }
+
+    const typeBtn = t.closest('[data-move-type]');
+    if (typeBtn) {
+      state.moveType = typeBtn.dataset.moveType;
+      root.querySelectorAll('[data-move-type]').forEach(b => b.classList.toggle('active', b === typeBtn));
+      renderMoves();
+      return;
+    }
+
+    const moveRow = t.closest('.pdx-move-row-summary');
+    if (moveRow) {
+      const row = moveRow.closest('.pdx-move-row');
+      const key = row.dataset.moveRow.toLowerCase();
+      if (row.classList.toggle('expanded')) state.openMoves.add(key); else state.openMoves.delete(key);
       return;
     }
 

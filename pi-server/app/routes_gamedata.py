@@ -6,10 +6,8 @@ from . import db, upstream
 from .jsutil import js_number
 from .routes_pokemon import get_nature_data
 
-# Local mirror of Benjakronk's images/splashes folder, synced by a daily
-# git pull on the Pi (see README). Served at /splashes by main.py.
-SPLASH_DIR = os.path.expanduser(
-    os.environ.get('SPLASH_DIR', '~/shima-splashes/images/splashes'))
+# The Pi's copy of Benjakronk's images/splashes folder (upstream.SPLASH_DIR). Served at /splashes by main.py.
+SPLASH_DIR = upstream.SPLASH_DIR
 
 
 def handle(conn, action, params):

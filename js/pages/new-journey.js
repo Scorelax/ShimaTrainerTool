@@ -608,11 +608,7 @@ async function handleFormSubmit() {
       }
     });
 
-    // Get trainer image
-    const imageUrl = await getTrainerImage(data.name);
-    data.image = imageUrl;
-
-    // Create trainer via API
+    // Create trainer via API (the Pi finds the trainer's picture by name)
     const response = await TrainerAPI.create(data);
 
     if (response.status === 'success') {
@@ -656,29 +652,3 @@ async function handleFormSubmit() {
   }
 }
 
-async function getTrainerImage(trainerName) {
-  const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/characters/';
-  const IMAGE_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
-
-  const sanitizedName = trainerName.toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  for (const format of IMAGE_FORMATS) {
-    const url = `${IMAGE_BASE_URL}${sanitizedName}.${format}`;
-    if (await imageExists(url)) {
-      return url;
-    }
-  }
-
-  return 'assets/Pokeball.png';
-}
-
-function imageExists(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = url;
-  });
-}

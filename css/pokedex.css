@@ -28,6 +28,9 @@
   -webkit-tap-highlight-color: transparent;
 }
 .pdx *, .pdx *::before, .pdx *::after { box-sizing: border-box; }
+/* Inside the player app (main.js's pokedex route): a page of its own over the whole screen, scrolling on its own --
+   under the app's toasts and loading screens. */
+.pdx-app-page { position: fixed; inset: 0; z-index: 900; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .pdx h1, .pdx h2, .pdx h3, .pdx p { margin: 0; }
 
 /* Buttons and inputs */

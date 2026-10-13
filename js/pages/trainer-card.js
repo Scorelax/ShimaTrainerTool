@@ -161,8 +161,8 @@ export function renderTrainerCard() {
   }
 
   // Load pokeball images
-  const unlockedSlot = sessionStorage.getItem('unlockedPokeSlotImage') || 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokeball.png';
-  const lockedSlot = sessionStorage.getItem('lockedPokeSlotImage') || 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Grey%20Pokeball.png';
+  const unlockedSlot = 'assets/Pokeball.png';
+  const lockedSlot = 'assets/Grey%20Pokeball.png';
 
   // Extract badges from inventory
   const earnedBadges = [];
@@ -1016,7 +1016,7 @@ export function renderTrainerCard() {
             const badge = earnedBadges[i];
             if (badge) {
               const kebabName = badge.name.replace(/\s*badge$/i, '').trim().toLowerCase().replace(/\s+/g, '-');
-              const imgUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/badges/' + kebabName + '.png';
+              const imgUrl = `/badges/${encodeURIComponent(kebabName)}.png`;
               return `
                 <div class="badge-slot earned" data-badge-index="${i}">
                   <img src="${imgUrl}" alt="${badge.name}" onerror="this.src='assets/Locked_Badge.png'">
@@ -1167,7 +1167,8 @@ export function attachTrainerCardListeners() {
   if (trainerUpdateHandler) window.removeEventListener('app:trainer-updated', trainerUpdateHandler);
   trainerUpdateHandler = () => {
     const content = document.getElementById('content');
-    if (!content) return;
+    // Only while this page is the one showing (the listener outlives it when the player moves on to another page).
+    if (!content || !document.getElementById('trainerImageContainer')) return;
     content.innerHTML = renderTrainerCard();
     attachTrainerCardListeners();
   };

@@ -52,13 +52,14 @@ db.init()
 # new URL automatically -- nothing for the browser to revalidate, nothing to
 # ever go stale, nothing to manually clear.
 _VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', upstream.CHARACTER_IMAGE_URL_PREFIX,
-                             upstream.DISPLAY_IMAGE_URL_PREFIX, upstream.POKEMON_IMAGE_URL_PREFIX)
+                             upstream.DISPLAY_IMAGE_URL_PREFIX, upstream.POKEMON_IMAGE_URL_PREFIX,
+                             upstream.ORIGINAL_CHARACTER_URL_PREFIX)
 
-# Benjakronk's splash mirror and the bundled PWA assets aren't stamped with a
+# The splashes, badges and the bundled PWA assets aren't stamped with a
 # version (their filenames stay constant even when the content behind them
 # changes), so they can't be cached hard the same way -- they keep
 # revalidating every load instead, same as before.
-_REVALIDATED_MEDIA_PREFIXES = ('/splashes/', '/assets/', '/battle-images/')
+_REVALIDATED_MEDIA_PREFIXES = (upstream.SPLASH_URL_PREFIX, upstream.BADGE_URL_PREFIX, '/assets/', '/battle-images/')
 
 
 @app.middleware('http')
@@ -353,11 +354,17 @@ async def live_events(request: Request):
     return StreamingResponse(event_stream(), media_type='text/event-stream')
 
 
-# Local mirror of Benjakronk's splash images (daily git pull on the Pi);
-# mounted before the PWA catch-all so /splashes wins
-if os.path.isdir(routes_gamedata.SPLASH_DIR):
-    app.mount('/splashes', StaticFiles(directory=routes_gamedata.SPLASH_DIR),
-              name='splashes')
+# Benjakronk's pictures, copied onto the Pi (see upstream.py): species, characters, badges and splashes. The folders are
+# made here if they aren't there yet, so files copied in later show up without a restart. Mounted before the PWA
+# catch-all so these paths win. Many species pictures are .jfif, which Python doesn't know as a JPEG -- without this
+# they'd be sent as plain text.
+mimetypes.add_type('image/jpeg', '.jfif')
+for _folder, _prefix, _name in ((upstream.POKEMON_IMAGE_DIR, upstream.POKEMON_IMAGE_URL_PREFIX, 'pokemon-images'),
+                                (upstream.ORIGINAL_CHARACTER_DIR, upstream.ORIGINAL_CHARACTER_URL_PREFIX, 'original-characters'),
+                                (upstream.BADGE_DIR, upstream.BADGE_URL_PREFIX, 'badges'),
+                                (upstream.SPLASH_DIR, upstream.SPLASH_URL_PREFIX, 'splashes')):
+    os.makedirs(_folder, exist_ok=True)
+    app.mount(_prefix.rstrip('/'), StaticFiles(directory=_folder), name=_name)
 
 # Self-uploaded animated sprites, mp4 only (see upstream.SPRITE_DIR /
 # upstream.local_sprite_url). URL prefix stays /gifs -- see
@@ -385,13 +392,6 @@ if os.path.isdir(upstream.BATTLE_ANIMATION_DIR):
 if os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
     app.mount(upstream.CHARACTER_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=upstream.CHARACTER_IMAGE_DIR),
               name='character-images')
-
-# Benjakronk's original species pictures (see upstream.POKEMON_IMAGE_DIR / upstream.local_pokemon_image_url). Many are
-# .jfif, which Python doesn't know as a JPEG -- without this they'd be sent as plain text.
-mimetypes.add_type('image/jpeg', '.jfif')
-if os.path.isdir(upstream.POKEMON_IMAGE_DIR):
-    app.mount(upstream.POKEMON_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=upstream.POKEMON_IMAGE_DIR),
-              name='pokemon-images')
 
 # Battle-map background images (see upstream.BATTLE_IMAGE_DIR / routes_combat.py's list-backgrounds)
 if os.path.isdir(upstream.BATTLE_IMAGE_DIR):

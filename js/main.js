@@ -14,6 +14,7 @@ import { renderPokemonForm, attachPokemonFormListeners } from './pages/pokemon-f
 import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js';
 import { renderCombat, attachCombatListeners } from './pages/combat.js';
 import { renderCombatWip, attachCombatWipListeners } from './pages/combat-wip.js';
+import { mountPlayerPokedex } from './pokedex/player-pokedex.js';
 import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
 import { getSettings } from './utils/settings.js';
@@ -72,8 +73,11 @@ class Router {
       'pokemon-form': this.renderPokemonForm.bind(this),
       'evolution': this.renderEvolution.bind(this),
       'combat': this.renderCombat.bind(this),
-      'combat-wip': this.renderCombatWip.bind(this)
+      'combat-wip': this.renderCombatWip.bind(this),
+      'pokedex': this.renderPokedex.bind(this)
     };
+    // A page that has to stop something when it's left (the Pokedex's live listeners) puts that here.
+    this.leavePage = null;
 
     this.init();
   }
@@ -140,6 +144,8 @@ class Router {
     if (!ROUTES_WITH_OWN_MUSIC.has(route)) {
       audioManager.stopBg();
     }
+    this.leavePage?.();
+    this.leavePage = null;
     const content = document.getElementById('content');
 
     // Scroll to top on navigation
@@ -300,6 +306,19 @@ class Router {
     const content = document.getElementById('content');
     content.innerHTML = await renderCombatWip();
     attachCombatWipListeners();
+  }
+
+  // The players' Pokedex (the same view as pokedex.html), as a page of its own over the whole screen -- opened from
+  // the trainer info page, its back button returns there. Kept up to date by the app's live connection
+  // (live-updates.js's 'app:pokedex-config' / 'app:live-resync').
+  async renderPokedex() {
+    const content = document.getElementById('content');
+    content.innerHTML = '<div class="pdx-app-page" id="pokedexRoot"></div>';
+    const pokedex = mountPlayerPokedex(document.getElementById('pokedexRoot'), {
+      onBack: () => this.navigate('trainer-info'),
+    });
+    this.leavePage = () => pokedex.destroy();
+    pokedex.ready.catch(err => showError(`Couldn't load the Pokédex: ${err.message}`));
   }
 }
 

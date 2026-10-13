@@ -146,27 +146,25 @@ until that env var is set.** The full connect-and-use guide for Benjakronk is
 nightly mirror still re-fetches from GitHub raw, the push is just the fast
 path.
 
-### Splash image mirror (daily)
+### Benjakronk's pictures (copied onto the Pi)
 
-Splash images are mirrored locally so loading screens don't wait on GitHub.
-One-time setup on the Pi (a sparse clone downloads only the splashes folder):
+Every picture from Benjakronk's repo comes from the Pi -- nothing is fetched
+from GitHub. Copy his `images/` subfolders into `~/pokemon-dnd/images/`:
 
-```bash
-git clone --depth 1 --filter=blob:none --sparse https://github.com/Benjakronk/shima-pokedex ~/shima-splashes
-cd ~/shima-splashes && git sparse-checkout set images/splashes
-```
+| His folder          | Pi folder (env override)                          | Served at               |
+|---------------------|---------------------------------------------------|-------------------------|
+| `images/pokemon`    | `original_pokemon` (`POKEMON_IMAGE_DIR`)          | `/pokemon-images/`      |
+| `images/characters` | `original_characters` (`ORIGINAL_CHARACTER_DIR`)  | `/original-characters/` |
+| `images/badges`     | `badges` (`BADGE_DIR`)                            | `/badges/`              |
+| `images/splashes`   | `splashes` (`SPLASH_DIR`)                         | `/splashes/`            |
 
-Daily sync from `crontab -e` (04:30, after the backups):
-
-```bash
-30 4 * * * cd /home/scorelax/shima-splashes && git pull --quiet >> /home/scorelax/splash-sync.log 2>&1
-```
-
-The server serves the folder at `/splashes/` and lists it via
-`?route=game-data&action=splash-list` (folder path override: env `SPLASH_DIR`).
-The frontend uses the mirror when served by the pi-server and falls back to
-GitHub if the mirror is missing. Restart the service after the first clone so
-the `/splashes` mount appears.
+The server makes the folders at startup if they're missing, and new files
+show up without a restart. What the app shows is worked out on every read
+(`upstream.pokemon_image_url` / `upstream.trainer_image_url`): a Pokémon's
+animated sprite, else its original picture; a trainer's self-made portrait,
+else Benjakronk's original picture of that name. The GitHub addresses still
+stored in older rows are only a hint (`upstream.localize_image_url` maps them
+to the same file on the Pi).
 
 ### Animated sprites (self-uploaded, local only)
 
@@ -174,8 +172,8 @@ Unrelated to Benjakronk's repo. Drop hand-made `.mp4` files into
 `~/pokemon-dnd/pokemon-sprites` (folder path override: env `SPRITE_DIR`),
 named `<sanitized-species-name>.mp4` -- lowercase, non-alphanumeric
 characters collapsed to `-` (e.g. "Mr. Mime" → `mr-mime.mp4`), same rule
-`upstream.get_image_url()` uses for the GitHub-sourced sprites, just without
-the dex-id prefix. `.gif` was supported early on but has since been dropped
+`upstream.local_pokemon_image_url()` uses for the original pictures, just
+without the dex-id prefix. `.gif` was supported early on but has since been dropped
 entirely -- animated GIF decoding runs frame-by-frame in software with no
 hardware acceleration, and paying that continuously (especially with
 several sprites animating on screen at once) was laggier overall than MP4's
@@ -191,9 +189,9 @@ Pokemon's stored image URL in the live DB, so renaming it would 404 all of
 them until each got re-saved; treat it as a legacy path name at this point,
 unrelated to file format). Applies to any owned Pokémon whose species has a
 matching file, including ones already registered before it existed; falls
-back to the existing stored image otherwise. Shiny Pokémon look for
+back to the original picture otherwise. Shiny Pokémon look for
 `<sanitized-species-name>-shiny.mp4` first, then the non-shiny variant, then
-the static image.
+the original picture.
 
 ### Evolution transition videos (self-uploaded, local only)
 

@@ -23,15 +23,12 @@ import { addNpcToSetup } from './creature-setup.js';
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 const ATTITUDES = { friendly: ['Friendly', '#27ae60'], neutral: ['Neutral', '#95a5a6'], wary: ['Wary', '#f39c12'], hostile: ['Hostile', '#e74c3c'], unknown: ['Unknown', '#6c6f8a'] };
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
-// Benjakronk's character pictures (the old DM tool's NPC portraits) live in his Pokedex repo.
-const REPO_PICTURES = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/characters/';
-const REPO_LISTING = 'https://api.github.com/repos/Benjakronk/shima-pokedex/contents/images/characters';
 
 let _root = null;
 let _npcs = [];
 let _selectedId = null;
 let _species = [];
-let _portraits = []; // [{name, url}] -- the Pi's portraits, then the repo's
+let _portraits = []; // [{name, url, own}] -- the self-made portraits on the Pi, then Benjakronk's character pictures
 let _openMon = new Set(); // team members shown expanded
 const _saveTimers = new Map();
 const _recentSaves = new Map(); // id -> time: this tab's own saves, so their live push isn't taken as someone else's change
@@ -84,15 +81,7 @@ export async function renderNpcs(root) {
 
 async function loadPortraits() {
   if (_portraits.length) return;
-  const [pi, repo] = await Promise.all([
-    DmAPI.mapAssets().then(r => r.data?.portraits || []).catch(() => []),
-    fetch(REPO_LISTING).then(r => (r.ok ? r.json() : [])).catch(() => []),
-  ]);
-  _portraits = [
-    ...pi.map(p => ({ name: `${p.name} (Pi)`, url: p.url })),
-    ...(Array.isArray(repo) ? repo : []).filter(f => /\.(png|jpe?g|webp|gif)$/i.test(f.name || ''))
-      .map(f => ({ name: f.name.replace(/\.[^.]+$/, ''), url: `${REPO_PICTURES}${encodeURIComponent(f.name)}` })),
-  ];
+  _portraits = await DmAPI.mapAssets().then(r => r.data?.portraits || []).catch(() => []);
 }
 
 function current() {
@@ -622,27 +611,15 @@ function matchName(value, list) {
   return hit || v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function probeImage(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const done = ok => { clearTimeout(timer); resolve(ok); };
-    const timer = setTimeout(() => done(false), 6000);
-    img.onload = () => done(true);
-    img.onerror = () => done(false);
-    img.src = url;
-  });
-}
-
-async function resolveOldPicture(key) {
+/** The old DM tool's picture for an NPC -- a character picture's name (or its old address in Benjakronk's repo) --
+ * as the same picture on the Pi ('' when the Pi doesn't have it). Any other web address is kept. */
+function resolveOldPicture(key) {
   if (!key) return '';
-  if (/^https?:/.test(key)) return key;
-  const fromRepo = _portraits.find(p => p.url.startsWith(REPO_PICTURES) && p.name.toLowerCase() === String(key).toLowerCase());
-  if (fromRepo) return fromRepo.url;
-  for (const ext of ['jpg', 'png', 'jpeg', 'webp']) {
-    const url = `${REPO_PICTURES}${encodeURIComponent(key)}.${ext}`;
-    if (await probeImage(url)) return url;
-  }
-  return '';
+  const fromRepo = /githubusercontent\.com\/Benjakronk\//.test(key);
+  if (/^https?:/.test(key) && !fromRepo) return key;
+  let stem = String(key).split(/[?#]/)[0].split('/').pop().replace(/\.[^.]+$/, '');
+  try { stem = decodeURIComponent(stem); } catch (e) { /* as it is */ }
+  return _portraits.find(p => !p.own && p.name.toLowerCase() === stem.toLowerCase())?.url || '';
 }
 
 function convertOld(t, image) {

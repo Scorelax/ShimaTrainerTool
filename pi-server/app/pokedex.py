@@ -74,39 +74,30 @@ def _format_row(row, image, with_shiny):
 
 
 def get_complete_pokemon_data(conn):
-    """pokemon/list — resolves image URLs server-side (cached in SQLite).
-    Prefers a self-uploaded animated sprite over the static Benjakronk image
-    when one exists for that species (non-shiny -- this list is a flat
-    per-species reference, not tied to any one trainer's shiny Pokemon), so
-    the evolution-target preview picks up MP4s the same way owned Pokemon do.
-    Falls back to the static image untouched when none is uploaded."""
+    """pokemon/list — resolves image URLs server-side: a self-uploaded
+    animated sprite when one exists for that species (non-shiny -- this list
+    is a flat per-species reference, not tied to any one trainer's shiny
+    Pokemon), so the evolution-target preview picks up MP4s the same way
+    owned Pokemon do, else the original picture on the Pi."""
     registered = upstream.registered_pokemon_names(conn)
     try:
         all_data = upstream.fetch_pokemon_db(conn)
         filtered = [row for row in all_data if row[2] in registered]
-        return [
-            _format_row(row, upstream.local_sprite_url(row[2]) or upstream.get_image_url(conn, row[2], row[1]),
-                        with_shiny=False)
-            for row in filtered
-        ]
+        return [_format_row(row, upstream.pokemon_image_url(row[2], row[1]), with_shiny=False) for row in filtered]
     except Exception:
         return []
 
 
 def get_registered_pokemon_list(conn):
-    """pokemon/registered-list — static images resolved client-side (image =
-    None unless a self-uploaded sprite exists). get_image_url's GitHub probe
-    is deliberately deferred to the client for this bulk endpoint since it's
-    slow -- but local_sprite_url is a plain filesystem check, cheap enough
-    to always do here, so this list (which feeds completePokemonData, and
-    from there the evolution-target preview) knows about self-uploaded
-    sprites immediately instead of falling back to the static-only
-    client-side resolver every time."""
+    """pokemon/registered-list — the same per-species picture as pokemon/list
+    (sprite, else the original picture on the Pi; both plain filesystem
+    checks), so this list (which feeds completePokemonData, and from there
+    the evolution-target preview) never has to look one up itself."""
     try:
         registered = upstream.registered_pokemon_names(conn)
         all_data = upstream.fetch_pokemon_db(conn)
         data = [
-            _format_row(row, upstream.local_sprite_url(row[2]), with_shiny=True)
+            _format_row(row, upstream.pokemon_image_url(row[2], row[1]), with_shiny=True)
             for row in all_data if row[2] in registered
         ]
         data.sort(key=lambda r: js_number(r[2]))

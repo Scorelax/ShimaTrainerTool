@@ -8,9 +8,8 @@ A failed fetch keeps the previous snapshot.
 import json
 import os
 import re
-import time
 from datetime import datetime, timezone
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import httpx
 
@@ -29,10 +28,8 @@ POKEDEX_CONFIG_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex
 # fetch_moves below for the row shape this produces.
 MOVES_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_moves_categorized_draft.json')
 
-IMG_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/'
+# The picture formats of Benjakronk's images, best first (when a picture exists in several, the first one is used).
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
-# The same folder's file listing (GitHub contents API -- lists up to 1000 files), for cache_image_listing.
-IMG_LIST_URL = 'https://api.github.com/repos/Benjakronk/shima-pokedex/contents/images/pokemon'
 
 # User-uploaded animated sprites (mp4 only -- gif support was dropped, see
 # local_sprite_url()), local to the Pi -- unrelated to Benjakronk's
@@ -101,6 +98,21 @@ POKEMON_IMAGE_DIR = os.path.expanduser(
     os.environ.get('POKEMON_IMAGE_DIR', '~/pokemon-dnd/images/original_pokemon'))
 POKEMON_IMAGE_URL_PREFIX = '/pokemon-images/'
 _POKEMON_IMAGE_EXTS = IMG_FORMATS + ['webp']
+
+# Benjakronk's original character pictures (his repo's images/characters, named <sanitized name>.<ext>) -- a trainer's
+# portrait when there's no self-made one (trainer_image_url), and the DM console's NPC portraits.
+ORIGINAL_CHARACTER_DIR = os.path.expanduser(
+    os.environ.get('ORIGINAL_CHARACTER_DIR', '~/pokemon-dnd/images/original_characters'))
+ORIGINAL_CHARACTER_URL_PREFIX = '/original-characters/'
+_ORIGINAL_CHARACTER_EXTS = IMG_FORMATS + ['webp', 'gif']
+
+# The gym badges (his repo's images/badges, <kebab-case name>.png) -- trainer-card.js asks for /badges/<name>.png.
+BADGE_DIR = os.path.expanduser(os.environ.get('BADGE_DIR', '~/pokemon-dnd/images/badges'))
+BADGE_URL_PREFIX = '/badges/'
+
+# The loading-screen splashes (his repo's images/splashes: splash-<n>.png, and session.png when there is one).
+SPLASH_DIR = os.path.expanduser(os.environ.get('SPLASH_DIR', '~/pokemon-dnd/images/splashes'))
+SPLASH_URL_PREFIX = '/splashes/'
 
 # Pictures the DM uploads from the DM console for the table TV (backgrounds -- routes_dm.save_display_image). Each file
 # gets a new random name, so its URL never shows different content (cached hard, see main.py).
@@ -287,84 +299,53 @@ def warm_upstream(conn):
 def _sanitize_species_name(name):
     """Lowercase, non-alphanumeric runs collapsed to a single hyphen, no
     leading/trailing hyphens. The one filename rule shared by every local
-    (get_image_url, local_sprite_url, local_evolution_video_url) or
-    self-uploaded (local_sprite_url, local_evolution_video_url) lookup."""
+    (local_pokemon_image_url, local_sprite_url, local_evolution_video_url,
+    local_original_character_url) lookup."""
     return re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(name).lower()))
 
 
-def get_image_url(conn, pokemon_name, pokemon_id, probe=True):
-    """Port of getImageUrl: probe GitHub for the sprite in each format.
-    Successful lookups are cached in SQLite so this stays fast. probe=False
-    only reads that cache (None when this species was never looked up) --
-    for bulk lists where hundreds of network probes would stall the reply."""
-    padded = str(pokemon_id).zfill(3)
-    sanitized = _sanitize_species_name(pokemon_name)
-    base = f'{padded}-{sanitized}'
-
-    row = conn.execute('SELECT url FROM image_cache WHERE key = ?', (base,)).fetchone()
-    if row:
-        return row[0]
-    if not probe:
-        return None
-
-    for fmt in IMG_FORMATS:
-        url = f'{IMG_BASE_URL}{base}.{fmt}'
-        try:
-            resp = httpx.head(url, timeout=15, follow_redirects=True)
-            if resp.status_code == 405:
-                resp = httpx.get(url, timeout=15, follow_redirects=True)
-            if resp.status_code == 200:
-                conn.execute('INSERT OR REPLACE INTO image_cache (key, url) VALUES (?, ?)', (base, url))
-                conn.commit()
-                return url
-        except Exception:
-            continue
-    return None
+_folder_indexes = {}  # folder -> (folder mtime it was built at, {lowercase file stem: file name})
 
 
-# GitHub allows 60 unauthenticated API calls an hour, so the listing is fetched at most this often.
-_IMG_LIST_RETRY_SECONDS = 600
-_img_list_checked = 0.0
-
-
-def cache_image_listing(conn):
-    """Fills image_cache for every species picture in Benjakronk's repo from ONE request (the folder's file listing)
-    instead of a probe per species -- for bulk lists (the DM console's species list), which otherwise only show the
-    pictures some earlier single lookup happened to cache. Same keys and format preference as get_image_url; rows
-    already cached are kept. Returns how many pictures the listing had (0 when it was skipped or failed -- the cache
-    then stays as it was)."""
-    global _img_list_checked
-    now = time.monotonic()
-    if _img_list_checked and now - _img_list_checked < _IMG_LIST_RETRY_SECONDS:
-        return 0
-    _img_list_checked = now
+def _folder_files(folder, exts):
+    """{lowercase file stem: file name} for the pictures in `folder` (extensions in `exts`, best first -- per stem the
+    best format wins). Rebuilt only when the folder changes (a file added, removed or renamed)."""
     try:
-        resp = httpx.get(IMG_LIST_URL, timeout=15, follow_redirects=True, headers={'Accept': 'application/vnd.github+json'})
-        resp.raise_for_status()
-        files = resp.json()
-    except Exception:
-        return 0
-    best = {}  # cache key -> (format rank, file name)
-    for f in files if isinstance(files, list) else []:
-        name = str(f.get('name', ''))
-        base, _, ext = name.rpartition('.')
-        if not base or ext.lower() not in IMG_FORMATS:
+        mtime = os.path.getmtime(folder)
+    except OSError:
+        return {}
+    cached = _folder_indexes.get(folder)
+    if cached and cached[0] == mtime:
+        return cached[1]
+    best = {}  # stem -> (rank, file name)
+    for filename in os.listdir(folder):
+        stem, ext = os.path.splitext(filename)
+        ext = ext.lower().lstrip('.')
+        if ext not in exts:
             continue
-        rank = IMG_FORMATS.index(ext.lower())
-        key = base.lower()
-        if key not in best or rank < best[key][0]:
-            best[key] = (rank, name)
-    conn.executemany('INSERT OR IGNORE INTO image_cache (key, url) VALUES (?, ?)',
-                     [(key, f'{IMG_BASE_URL}{quote(name)}') for key, (_, name) in best.items()])
-    conn.commit()
-    return len(best)
+        rank = exts.index(ext)
+        stem = stem.lower()
+        if stem not in best or rank < best[stem][0]:
+            best[stem] = (rank, filename)
+    files = {stem: name for stem, (_, name) in best.items()}
+    _folder_indexes[folder] = (mtime, files)
+    return files
+
+
+def _versioned_url(folder, prefix, filename):
+    """prefix + file name + `?t=<mtime>`, or None when the file isn't there -- same mtime-stamped-URL reasoning as
+    local_sprite_url()."""
+    path = os.path.join(folder, filename or '')
+    if not filename or not os.path.isfile(path):
+        return None
+    return f'{prefix}{quote(filename)}?t={int(os.path.getmtime(path))}'
 
 
 def local_sprite_url(pokemon_name, shiny=False):
     """Self-uploaded animated sprite for pokemon_name, if one exists in
-    SPRITE_DIR. Same sanitization as get_image_url() for one consistent
-    filename rule across both, but otherwise unrelated -- no dex-id prefix,
-    no Benjakronk repo, no network probe/cache.
+    SPRITE_DIR. Same sanitization as local_pokemon_image_url() for one
+    consistent filename rule across both, but otherwise unrelated -- no
+    dex-id prefix.
 
     Checked in this order, so shiny-correctness always wins: shiny.mp4, then
     non-shiny.mp4. Shiny uses a -shiny suffix, matching the convention
@@ -419,48 +400,95 @@ def local_character_image_url(trainer_name):
     return None
 
 
-_pokemon_image_index = (None, {})  # (folder mtime it was built at, {lowercase key: file name})
+_pokemon_by_name = (None, {})  # (the _folder_files dict it was built from, {'<name>': file name})
 
 
 def _pokemon_image_files():
-    """{key: file name} for POKEMON_IMAGE_DIR, keyed both by '<dex>-<name>' and by '<name>' alone; per key the format
-    earliest in _POKEMON_IMAGE_EXTS wins. Rebuilt only when the folder changes (a file added, removed or renamed)."""
-    global _pokemon_image_index
-    try:
-        mtime = os.path.getmtime(POKEMON_IMAGE_DIR)
-    except OSError:
-        return {}
-    if _pokemon_image_index[0] == mtime:
-        return _pokemon_image_index[1]
-    best = {}  # key -> (rank, file name)
-    for filename in os.listdir(POKEMON_IMAGE_DIR):
-        stem, ext = os.path.splitext(filename)
-        ext = ext.lower().lstrip('.')
-        if ext not in _POKEMON_IMAGE_EXTS:
-            continue
-        rank = _POKEMON_IMAGE_EXTS.index(ext)
-        stem = stem.lower()
-        for key in {stem, re.sub(r'^\d+-', '', stem)}:
-            if key not in best or rank < best[key][0]:
-                best[key] = (rank, filename)
-    files = {key: name for key, (_, name) in best.items()}
-    _pokemon_image_index = (mtime, files)
-    return files
+    """POKEMON_IMAGE_DIR's pictures keyed '<dex>-<name>' (the file names), and the same keyed by '<name>' alone."""
+    global _pokemon_by_name
+    files = _folder_files(POKEMON_IMAGE_DIR, _POKEMON_IMAGE_EXTS)
+    if _pokemon_by_name[0] is not files:
+        by_name = {}
+        for stem in sorted(files):
+            by_name.setdefault(re.sub(r'^\d+-', '', stem), files[stem])
+        _pokemon_by_name = (files, by_name)
+    return files, _pokemon_by_name[1]
 
 
-def local_pokemon_image_url(pokemon_name, pokemon_id):
-    """The original picture of a species from POKEMON_IMAGE_DIR, or None: '<dex>-<name>' first (Benjakronk's naming,
-    as get_image_url), then the name alone (in case the number differs). Same mtime-stamped-URL reasoning as
-    local_sprite_url()."""
-    files = _pokemon_image_files()
-    sanitized = _sanitize_species_name(pokemon_name)
-    filename = files.get(f'{str(pokemon_id).zfill(3)}-{sanitized}') or files.get(sanitized)
-    if not filename:
+def local_pokemon_image_url(pokemon_name, pokemon_id, shiny=False):
+    """The original picture of a species from POKEMON_IMAGE_DIR, or None: '<dex>-<name>' first (Benjakronk's naming),
+    then the name alone (in case the number differs). A shiny one uses its '-shiny' picture when there is one."""
+    files, by_name = _pokemon_image_files()
+    name = _sanitize_species_name(pokemon_name)
+    base = f'{str(pokemon_id).zfill(3)}-{name}'
+    for suffix in (('-shiny', '') if shiny else ('',)):
+        filename = files.get(base + suffix) or by_name.get(name + suffix)
+        if filename:
+            return _versioned_url(POKEMON_IMAGE_DIR, POKEMON_IMAGE_URL_PREFIX, filename)
+    return None
+
+
+def pokemon_image_url(pokemon_name, pokemon_id, shiny=False, animated=True):
+    """What the app shows for a species: its self-uploaded animated sprite (unless the player turned animated sprites
+    off), else its original picture, else '' (the app shows a Poke Ball)."""
+    return ((animated and local_sprite_url(pokemon_name, shiny=shiny))
+            or local_pokemon_image_url(pokemon_name, pokemon_id, shiny=shiny) or '')
+
+
+def local_original_character_url(name):
+    """Benjakronk's original picture for this trainer / character name (ORIGINAL_CHARACTER_DIR, file named
+    <sanitized name>.<ext>), or None."""
+    filename = _folder_files(ORIGINAL_CHARACTER_DIR, _ORIGINAL_CHARACTER_EXTS).get(_sanitize_species_name(name))
+    return _versioned_url(ORIGINAL_CHARACTER_DIR, ORIGINAL_CHARACTER_URL_PREFIX, filename)
+
+
+def original_character_pictures():
+    """[(file stem, url)] for every picture in ORIGINAL_CHARACTER_DIR, by name -- the DM console's NPC portraits."""
+    files = _folder_files(ORIGINAL_CHARACTER_DIR, _ORIGINAL_CHARACTER_EXTS)
+    out = [(stem, _versioned_url(ORIGINAL_CHARACTER_DIR, ORIGINAL_CHARACTER_URL_PREFIX, name)) for stem, name in sorted(files.items())]
+    return [(stem, url) for stem, url in out if url]
+
+
+def trainer_image_url(trainer_name, stored=''):
+    """What the app shows for a trainer: the self-made portrait (local_character_image_url), else Benjakronk's original
+    picture of that name, else the picture the row stored (made local, see localize_image_url), else the Poke Ball."""
+    return (local_character_image_url(trainer_name) or local_original_character_url(trainer_name)
+            or localize_image_url(stored) or 'assets/Pokeball.png')
+
+
+# A picture in Benjakronk's repo -- the address the app stored before everything moved onto the Pi.
+_REPO_IMAGE = r'https?://raw\.githubusercontent\.com/Benjakronk/shima-pokedex/[^/\s"]+/images/([a-z_]+)/([^?#\s"]+)'
+_REPO_IMAGE_FOLDERS = {
+    'pokemon': (POKEMON_IMAGE_DIR, POKEMON_IMAGE_URL_PREFIX),
+    'characters': (ORIGINAL_CHARACTER_DIR, ORIGINAL_CHARACTER_URL_PREFIX),
+    'badges': (BADGE_DIR, BADGE_URL_PREFIX),
+    'splashes': (SPLASH_DIR, SPLASH_URL_PREFIX),
+}
+
+
+def _local_repo_picture(match):
+    folder = _REPO_IMAGE_FOLDERS.get(match.group(1))
+    return _versioned_url(*folder, os.path.basename(unquote(match.group(2)))) if folder else None
+
+
+def localize_image_url(url):
+    """A stored picture address, made local: one of Benjakronk's repo pictures becomes the same file on the Pi (None
+    when the Pi doesn't have it), any other web address is dropped (None), and the Pi's own paths stay as they are."""
+    url = str(url or '').strip()
+    m = re.fullmatch(_REPO_IMAGE + r'(?:[?#].*)?', url)
+    if m:
+        return _local_repo_picture(m)
+    if not url or re.match(r'^[a-z][a-z0-9+.-]*:', url, re.I):
         return None
-    path = os.path.join(POKEMON_IMAGE_DIR, filename)
-    if not os.path.isfile(path):
-        return None
-    return f'{POKEMON_IMAGE_URL_PREFIX}{quote(filename)}?t={int(os.path.getmtime(path))}'
+    return url
+
+
+def localize_image_urls_in_text(text):
+    """Every repo picture address in a stored JSON text (the DM console's saved scenes, NPCs, encounters) swapped for
+    the Pi's copy of it ('' when the Pi doesn't have it)."""
+    if not text or 'Benjakronk/shima-pokedex' not in text:
+        return text
+    return re.sub(_REPO_IMAGE, lambda m: _local_repo_picture(m) or '', text)
 
 
 def local_battle_animation_url(pokemon_name):

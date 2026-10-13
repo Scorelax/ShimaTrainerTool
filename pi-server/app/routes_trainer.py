@@ -84,46 +84,26 @@ def handle(conn, action, params):
 def get_trainers(conn):
     return [{
         'id': i,
-        'image': upstream.local_character_image_url(row[1]) or row[0],
+        'image': upstream.trainer_image_url(row[1], row[0]),
         'name': row[1],
         'pinCode': row[22],
     } for i, (_, row) in enumerate(db.fetch_rows(conn, 'trainers', T), start=1)]
 
 
 def _with_character_image(row):
-    """Swap in the self-made portrait (upstream.local_character_image_url) for
-    the trainer row's image field, if one exists -- the stored URL stays in
-    the DB untouched as the fallback."""
-    portrait = upstream.local_character_image_url(row[1])
-    if not portrait:
-        return row
+    """The trainer row with the picture the app shows in its image field (upstream.trainer_image_url: the self-made
+    portrait, else Benjakronk's original on the Pi) -- the stored value stays in the DB untouched."""
     row = list(row)
-    row[0] = portrait
+    row[0] = upstream.trainer_image_url(row[1], row[0])
     return row
 
 
-def _keep_stored_image(new_row, stored_row):
-    """The client sends back the whole row it was given, portrait URL
-    included -- never persist that; keep whatever image was stored."""
-    if str(new_row[0] or '').startswith(upstream.CHARACTER_IMAGE_URL_PREFIX):
-        new_row = list(new_row)
-        new_row[0] = stored_row[0] if stored_row is not None else ''
-    return new_row
-
-
-def _with_local_sprite(row, animated=True):
-    """Swap in a self-uploaded animated sprite for this row's image field,
-    if one exists (upstream.local_sprite_url) -- otherwise leave the stored
-    image untouched. Skipped entirely when the caller has animated sprites
-    turned off (Settings > Animated Sprites), so the stored static image
-    always comes through unchanged."""
-    if not animated:
-        return row
-    sprite = upstream.local_sprite_url(row[2], shiny=(row[61] == 'Y'))
-    if not sprite:
-        return row
+def _with_pokemon_image(row, animated=True):
+    """The Pokemon row with the picture the app shows in its image field (upstream.pokemon_image_url: the
+    self-uploaded animated sprite unless Settings > Animated Sprites is off, else the original picture on the Pi) --
+    worked out from the species every time, so the stored value never matters."""
     row = list(row)
-    row[1] = sprite
+    row[1] = upstream.pokemon_image_url(row[2], row[3], shiny=(row[61] == 'Y'), animated=animated)
     return row
 
 
@@ -135,7 +115,7 @@ def store_trainer_and_pokemon_data(conn, trainer_name, animated=True):
         return None
 
     pokemon_entries = [
-        _with_local_sprite(row, animated) for _, row in db.fetch_rows(conn, 'pokemon', P)
+        _with_pokemon_image(row, animated) for _, row in db.fetch_rows(conn, 'pokemon', P)
         if str(row[0]).lower() == trainer_name.lower()
     ]
     return {'trainerData': _with_character_image(trainer_entry), 'pokemonData': pokemon_entries}
@@ -223,7 +203,7 @@ def create_trainer(conn, trainer):
             else:
                 pokeslots = 0
 
-        image_url = trainer.get('image') or 'https://via.placeholder.com/150'
+        image_url = ''  # the picture is worked out from the name whenever the row is sent (_with_character_image)
         inventory = json.loads(trainer.get('inventory') or '[]')
         inventory_str = ', '.join(f"{item['name']} (x{item['quantity']})" for item in inventory)
         skills = ', '.join(trainer['skills']) if isinstance(trainer.get('skills'), list) else ''
@@ -253,7 +233,11 @@ def update_trainer_data(conn, new_trainer_data):
     name = str(new_trainer_data[1]).lower()
     for rowid, row in db.fetch_rows(conn, 'trainers', T):
         if str(row[1]).lower() == name:
-            db.update_row(conn, 'trainers', rowid, T, _keep_stored_image(new_trainer_data, row))
+            # The client sends back the whole row it was given, the picture it was shown included -- the app never
+            # changes a trainer's picture, so keep whatever was stored.
+            new_trainer_data = list(new_trainer_data)
+            new_trainer_data[0] = row[0]
+            db.update_row(conn, 'trainers', rowid, T, new_trainer_data)
             return {'status': 'success'}
     return {'status': 'error', 'message': 'Trainer not found.'}
 

@@ -3,13 +3,12 @@
 
 import { spriteMediaHtml } from './sprite-media.js';
 
-const SPLASH_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/splashes/';
-const SPLASH_API_URL = 'https://api.github.com/repos/Benjakronk/shima-pokedex/contents/images/splashes';
-const FALLBACK_SPLASH_COUNT = 50; // Fallback if API call fails
+// Benjakronk's splashes, copied onto the Pi (pi-server upstream.SPLASH_DIR).
+const SPLASH_BASE_URL = '/splashes/';
 
-// Both the splash-list fetches below and the <img> preload need a hard timeout --
-// without one, a stalled connection (a flaky Tailscale hop to the pi-server, a slow
-// GitHub response) leaves the promise neither resolved nor rejected, forever. That's
+// Both the splash-list fetch below and the <img> preload need a hard timeout --
+// without one, a stalled connection (a flaky Tailscale hop to the pi-server)
+// leaves the promise neither resolved nor rejected, forever. That's
 // silent and easy to miss: continue-journey.js's own preload-while-the-player-picks-a-
 // trainer call (see attachContinueJourneyListeners) just never finishes, so the
 // fullscreen loading background stays on the CSS default (TitleScreen.png) instead of
@@ -26,70 +25,30 @@ function _fetchWithTimeout(url, timeoutMs) {
   return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeoutId));
 }
 
-// Same backend detection as api.js: anything not github.io is the pi-server,
-// which mirrors the splash images locally (much faster than GitHub raw)
-const SPLASH_FROM_PI_SERVER = window.location.protocol.startsWith('http')
-  && !window.location.hostname.endsWith('github.io');
-
-// Fetch the list of available splash images (cached per session).
-// On the pi-server, prefer its local mirror; GitHub is the fallback.
+// Fetch the list of available splash images from the Pi (cached per session once it has any; an empty or failed
+// list is asked again next time).
 async function getSplashList() {
   const cached = sessionStorage.getItem('splashImageList');
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
-      if (parsed.baseUrl) return parsed; // ignore pre-baseUrl cache entries
+      if (parsed.baseUrl === SPLASH_BASE_URL) return parsed; // older entries may point at GitHub
     } catch (e) { /* ignore bad cache */ }
   }
 
-  if (SPLASH_FROM_PI_SERVER) {
-    try {
-      const response = await _fetchWithTimeout(`${window.location.origin}/api?route=game-data&action=splash-list`, SPLASH_LIST_TIMEOUT);
-      const data = await response.json();
-      if (data.status === 'success' && data.splashFiles.length > 0) {
-        const result = {
-          splashFiles: data.splashFiles,
-          hasSession: data.hasSession,
-          baseUrl: '/splashes/'
-        };
-        sessionStorage.setItem('splashImageList', JSON.stringify(result));
-        console.log(`[Splash] Using ${data.splashFiles.length} local splash images from the pi-server`);
-        return result;
-      }
-      console.warn('[Splash] Pi splash mirror not available, falling back to GitHub');
-    } catch (error) {
-      console.warn('[Splash] Pi splash-list failed, falling back to GitHub:', error);
-    }
-  }
-
   try {
-    const response = await _fetchWithTimeout(SPLASH_API_URL, SPLASH_LIST_TIMEOUT);
-    if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
-    const files = await response.json();
-
-    const splashFiles = [];
-    let hasSession = false;
-
-    for (const file of files) {
-      if (file.name === 'session.png') {
-        hasSession = true;
-      } else if (file.name.match(/^splash-\d+\.png$/)) {
-        splashFiles.push(file.name);
-      }
+    const response = await _fetchWithTimeout(`${window.location.origin}/api?route=game-data&action=splash-list`, SPLASH_LIST_TIMEOUT);
+    const data = await response.json();
+    if (data.status === 'success' && (data.splashFiles.length > 0 || data.hasSession)) {
+      const result = { splashFiles: data.splashFiles, hasSession: data.hasSession, baseUrl: SPLASH_BASE_URL };
+      sessionStorage.setItem('splashImageList', JSON.stringify(result));
+      return result;
     }
-
-    const result = { splashFiles, hasSession, baseUrl: SPLASH_BASE_URL };
-    sessionStorage.setItem('splashImageList', JSON.stringify(result));
-    console.log(`[Splash] Found ${splashFiles.length} splash images, session.png: ${hasSession}`);
-    return result;
+    console.warn('[Splash] No splash images on the Pi');
   } catch (error) {
-    console.warn('[Splash] Failed to fetch splash list from GitHub API:', error);
-    const splashFiles = [];
-    for (let i = 1; i <= FALLBACK_SPLASH_COUNT; i++) {
-      splashFiles.push(`splash-${i}.png`);
-    }
-    return { splashFiles, hasSession: false, baseUrl: SPLASH_BASE_URL };
+    console.warn('[Splash] Splash list failed:', error);
   }
+  return { splashFiles: [], hasSession: false, baseUrl: SPLASH_BASE_URL };
 }
 
 /**
@@ -135,6 +94,8 @@ export async function selectAndPreloadSplashImage() {
     console.log('[Splash] Using session splash:', sessionUrl);
     return preloadImage(sessionUrl);
   }
+  // None on the Pi: the loading screen keeps its default background.
+  if (!splashFiles.length) return '';
 
   const randomFile = splashFiles[Math.floor(Math.random() * splashFiles.length)];
   const splashUrl = `${baseUrl}${randomFile}`;

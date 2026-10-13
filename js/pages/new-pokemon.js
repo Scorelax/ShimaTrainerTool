@@ -12,9 +12,6 @@ let allEncounteredPokemon = [];
 // See the matching handler in evolution.js -- window-level listeners survive
 // the router's innerHTML swap, so this must be removed before being re-added.
 let pokedexUpdateHandler = null;
-const imageCache = new Map();
-const IMAGE_BASE_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/';
-const IMAGE_FORMATS = ['png', 'jpg', 'jpeg', 'jfif'];
 
 export function renderNewPokemon() {
   const html = `
@@ -385,9 +382,6 @@ async function loadEncounteredPokemon() {
       allEncounteredPokemon = response.data;
       sessionStorage.setItem('completePokemonData', JSON.stringify(response.data));
       displayPokemonList(allEncounteredPokemon);
-
-      // Resolve images in background
-      resolveImagesProgressively(allEncounteredPokemon);
     } else {
       showError('Failed to load Pokemon list');
       document.getElementById('pokemonList').innerHTML = '<li>Failed to load Pokemon</li>';
@@ -445,8 +439,8 @@ async function selectPokemon(pokemon, listItem) {
   document.querySelectorAll('.pokemon-list li').forEach(li => li.classList.remove('selected'));
   listItem.classList.add('selected');
 
-  // Show details
-  const imageUrl = pokemon[0] || await resolveImageUrl(pokemon[1], pokemon[2]);
+  // Show details (the Pi sends each species' picture with the list; none there -> the Poke Ball)
+  const imageUrl = pokemon[0] || 'assets/Pokeball.png';
 
   // IMPORTANT: Store resolved image URL back into pokemon object
   // so it's available when registering the Pokemon
@@ -483,61 +477,6 @@ async function selectPokemon(pokemon, listItem) {
   document.getElementById('pokemonDetailsContent').style.display = 'flex';
   document.getElementById('pokemonDetails').classList.remove('empty');
   document.getElementById('pokemonDetails').classList.add('visible');
-}
-
-async function resolveImageUrl(pokemonName, pokemonId) {
-  const cacheKey = `${pokemonId}-${pokemonName}`;
-
-  if (imageCache.has(cacheKey)) {
-    return imageCache.get(cacheKey);
-  }
-
-  const paddedId = pokemonId.toString().padStart(3, '0');
-  const sanitizedName = pokemonName.toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  const baseFileName = `${paddedId}-${sanitizedName}`;
-
-  for (const format of IMAGE_FORMATS) {
-    const url = `${IMAGE_BASE_URL}${baseFileName}.${format}`;
-    if (await imageExists(url)) {
-      imageCache.set(cacheKey, url);
-      return url;
-    }
-  }
-
-  const placeholder = 'assets/Pokeball.png';
-  imageCache.set(cacheKey, placeholder);
-  return placeholder;
-}
-
-function imageExists(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = url;
-  });
-}
-
-async function resolveImagesProgressively(pokemonList) {
-  const batchSize = 5;
-
-  for (let i = 0; i < pokemonList.length; i += batchSize) {
-    const batch = pokemonList.slice(i, Math.min(i + batchSize, pokemonList.length));
-
-    await Promise.all(batch.map(async (pokemon) => {
-      if (!pokemon[0]) {
-        const imageUrl = await resolveImageUrl(pokemon[1], pokemon[2]);
-        pokemon[0] = imageUrl;
-      }
-    }));
-
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-
-  // Update session storage
-  sessionStorage.setItem('completePokemonData', JSON.stringify(pokemonList));
 }
 
 function registerPokemon() {

@@ -1778,6 +1778,45 @@ export function renderTrainerInfo() {
           transform: scale(1.08);
         }
 
+        /* Pokedex button -- mirrors the back button, top-right */
+        #pokedexButton {
+          position: fixed;
+          top: clamp(15px, 3vh, 20px);
+          right: clamp(15px, 3vw, 20px);
+          background: var(--surface-glass);
+          width: clamp(45px, 9vw, 55px);
+          height: clamp(45px, 9vw, 55px);
+          border: 2px solid var(--border-accent);
+          border-radius: 50%;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1001;
+          padding: 0;
+          overflow: hidden;
+        }
+
+        #pokedexButton img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 50%;
+        }
+
+        #pokedexButton:hover {
+          transform: scale(1.15);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
+                      0 0 25px rgba(255,222,0,0.6);
+          border-color: #FFC700;
+        }
+
+        #pokedexButton:active {
+          transform: scale(1.08);
+        }
+
         /* Tablet Landscape and below - maintain 2 columns but adjust sizing */
         @media (max-width: 1024px) {
           .trainer-info-page {
@@ -1955,6 +1994,9 @@ export function renderTrainerInfo() {
 
       <!-- Back Button -->
       <button id="backButton">←</button>
+
+      <!-- Pokedex Button -->
+      <button id="pokedexButton" aria-label="Pokédex" title="Pokédex"><img src="assets/PokedexIcon.png" alt=""></button>
 
       <!-- Trainer Name as Title -->
       <h1>${trainerName}</h1>
@@ -2546,7 +2588,8 @@ export function attachTrainerInfoListeners() {
   if (trainerUpdateHandler) window.removeEventListener('app:trainer-updated', trainerUpdateHandler);
   trainerUpdateHandler = () => {
     const content = document.getElementById('content');
-    if (!content) return;
+    // Only while this page is the one showing (the listener outlives it when the player moves on, e.g. to the Pokedex).
+    if (!content || !document.getElementById('trainerImageButton')) return;
     content.innerHTML = renderTrainerInfo();
     attachTrainerInfoListeners();
   };
@@ -2575,6 +2618,12 @@ export function attachTrainerInfoListeners() {
   document.getElementById('backButton')?.addEventListener('click', () => {
     window.dispatchEvent(new CustomEvent('navigate', {
       detail: { route: 'trainer-card' }
+    }));
+  });
+
+  document.getElementById('pokedexButton')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: { route: 'pokedex' }
     }));
   });
 

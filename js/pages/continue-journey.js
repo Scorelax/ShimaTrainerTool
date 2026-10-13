@@ -752,8 +752,6 @@ export function attachContinueJourneyListeners() {
           bundle.pokemonData.forEach((pokemon) => {
             sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
           });
-          sessionStorage.setItem('unlockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokeball.png');
-          sessionStorage.setItem('lockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Grey%20Pokeball.png');
           if (bundle.registeredList) {
             sessionStorage.setItem('completePokemonData', JSON.stringify(bundle.registeredList));
           }
@@ -813,9 +811,6 @@ export function attachContinueJourneyListeners() {
           sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
         });
         _log(`Stored trainerData + ${response.data.pokemonData.length} pokemon_* keys`);
-
-        sessionStorage.setItem('unlockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Pokeball.png');
-        sessionStorage.setItem('lockedPokeSlotImage', 'https://raw.githubusercontent.com/Scorelax/PokemonDnD/main/Grey%20Pokeball.png');
 
         updateLoadingProgress(30, 'Processing trainer information...');
 

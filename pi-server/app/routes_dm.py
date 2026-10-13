@@ -56,9 +56,7 @@ def handle(conn, action, params):
             stats=json.loads(params['stats']) if params.get('stats') else None,
             overrides=json.loads(params['overrides']) if params.get('overrides') else None,
             bonus=json.loads(params['bonus']) if params.get('bonus') else None,
-            extra_skills=[s for s in str(params.get('skills', '')).split(',') if s.strip()],
-            # The battle setup's live preview of the numbers: no picture lookup (a network probe for a species never looked up).
-            probe_image=str(params.get('preview', '')).lower() not in ('1', 'true'))}
+            extra_skills=[s for s in str(params.get('skills', '')).split(',') if s.strip()])}
 
     if action == 'species-detail':
         if not params.get('name'):
@@ -183,7 +181,7 @@ def species_detail(conn, name):
                   for lvl, (i, keep) in zip((1, 2, 6, 10, 14, 18), _MOVE_COLUMNS)},
         'senses': dict(zip(('sight', 'hearing', 'smell', 'tremorsense', 'echolocation', 'telepathy', 'blindsight', 'darkvision', 'truesight'),
                            (_cell(row, i) for i in _SENSE_COLUMNS))),
-        'image': upstream.local_sprite_url(row[2]) or upstream.get_image_url(conn, row[2], _cell(row, 1)) or '',
+        'image': upstream.pokemon_image_url(row[2], _cell(row, 1)),
     }
 
 
@@ -208,7 +206,7 @@ def party_overview(conn):
     plus the XP only the DM sees: `xp` = {trainer, pokemon: [one per Pokemon row, in the same order]}, each the stored
     XP or None when there's none yet (the console counts that as the start of the record's level)."""
     from . import db
-    from .routes_trainer import _with_character_image, _with_local_sprite
+    from .routes_trainer import _with_character_image, _with_pokemon_image
     _absorb_old_xp_ledger(conn)
     xp = {'trainers': dict(conn.execute('SELECT rowid, dm_xp FROM trainers').fetchall()),
           'pokemon': dict(conn.execute('SELECT rowid, dm_xp FROM pokemon').fetchall())}
@@ -218,7 +216,7 @@ def party_overview(conn):
         mine = [(prowid, p) for prowid, p in pokemon if str(p[0]).lower() == str(row[1]).lower()]
         out.append({
             'trainer': _with_character_image(row),
-            'pokemon': [_with_local_sprite(p) for _, p in mine],
+            'pokemon': [_with_pokemon_image(p) for _, p in mine],
             'xp': {'trainer': xp['trainers'].get(trowid), 'pokemon': [xp['pokemon'].get(prowid) for prowid, _ in mine]},
         })
     return out
@@ -373,7 +371,7 @@ def give_money(conn, trainer_name, amount):
 
 def _load_state(conn, key):
     row = conn.execute('SELECT json FROM dm_state WHERE key = ?', (key,)).fetchone()
-    return json.loads(row[0]) if row and row[0] else None
+    return json.loads(upstream.localize_image_urls_in_text(row[0])) if row and row[0] else None
 
 
 def save_clock(conn, clock):
@@ -387,7 +385,7 @@ def save_clock(conn, clock):
 
 def list_npcs(conn):
     """The DM's NPC library (js/dm/npcs.js owns the shape), sorted by name."""
-    npcs = [json.loads(r[0]) for r in conn.execute('SELECT json FROM dm_npcs').fetchall() if r[0]]
+    npcs = [json.loads(upstream.localize_image_urls_in_text(r[0])) for r in conn.execute('SELECT json FROM dm_npcs').fetchall() if r[0]]
     return sorted(npcs, key=lambda n: str(n.get('name', '')).lower())
 
 
@@ -405,7 +403,8 @@ def save_npc(conn, npc):
 
 def list_encounters(conn):
     """The DM's saved encounters (js/dm/encounters.js owns the shape), newest change first."""
-    out = [json.loads(r[0]) for r in conn.execute('SELECT json FROM dm_encounters ORDER BY updated_at DESC').fetchall() if r[0]]
+    out = [json.loads(upstream.localize_image_urls_in_text(r[0]))
+           for r in conn.execute('SELECT json FROM dm_encounters ORDER BY updated_at DESC').fetchall() if r[0]]
     return out
 
 
@@ -523,7 +522,7 @@ def give_pokemon(conn, trainer, cfg):
         held_item=cfg.get('item') or '', shiny=bool(cfg.get('shiny')), stats=cfg.get('stats') or None,
         extra_skills=cfg.get('extraSkills') or ())
     row[0] = tname
-    row[1] = upstream.get_image_url(conn, row[2], row[3]) or ''
+    row[1] = upstream.local_pokemon_image_url(row[2], row[3]) or ''
     db.insert_row(conn, 'pokemon', db.POKEMON_COLUMNS, row)
     live.publish({'type': 'trainer-data', 'trainer': tname})
     return {'status': 'success', 'message': f'{tname} got {cfg.get("nickname") or row[2]}!', 'data': row}
@@ -546,11 +545,13 @@ def save_setup(conn, setup):
 
 
 def _portraits():
-    """The trainer portraits on the Pi (upstream.CHARACTER_IMAGE_DIR), offered for the DM's NPC trainers: [{name, url}]."""
-    if not os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
-        return []
-    names = sorted({os.path.splitext(f)[0] for f in os.listdir(upstream.CHARACTER_IMAGE_DIR)})
-    return [{'name': n, 'url': url} for n in names if (url := upstream.local_character_image_url(n))]
+    """The trainer portraits on the Pi, offered for the DM's NPC trainers: [{name, url, own}] -- the self-made ones
+    (upstream.CHARACTER_IMAGE_DIR, own=True) first, then Benjakronk's original character pictures."""
+    own = []
+    if os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
+        names = sorted({os.path.splitext(f)[0] for f in os.listdir(upstream.CHARACTER_IMAGE_DIR)})
+        own = [{'name': n, 'url': url, 'own': True} for n in names if (url := upstream.local_character_image_url(n))]
+    return own + [{'name': n, 'url': url, 'own': False} for n, url in upstream.original_character_pictures()]
 
 
 def _cell(row, i):
@@ -568,9 +569,8 @@ def _abilities(row):
 
 
 def species_list(conn):
-    """Compact per-species summary for the DM's enemy picker, sorted by dex number. `image` is whatever is known
-    without a network probe (a self-uploaded sprite, or an already-cached static image) -- build-pokemon resolves the
-    real one for whatever the DM actually adds."""
+    """Compact per-species summary for the DM's enemy picker, sorted by dex number. `image`: the self-uploaded sprite,
+    else the original picture (`picture`)."""
     out = []
     for row in upstream.fetch_pokemon_db(conn):
         name = _cell(row, 2)
@@ -592,23 +592,16 @@ def species_list(conn):
                 'speed': _cell(row, 25), 'savingThrows': _cell(row, 33), 'skills': _cell(row, 34),
             },
             'abilities': _abilities(row),
-            # The still picture (Benjakronk's) -- the table TV's Display module offers it beside the animated sprite.
-            'picture': upstream.get_image_url(conn, name, _cell(row, 1), probe=False) or '',
+            # The still picture (Benjakronk's, on the Pi) -- the Display module offers it beside the animated sprite.
+            'picture': upstream.local_pokemon_image_url(name, _cell(row, 1)) or '',
         })
         out[-1]['image'] = upstream.local_sprite_url(name) or out[-1]['picture']
-    # Species never looked up one by one have no cached picture yet: one listing of Benjakronk's picture folder fills
-    # them all in (the self-made mp4 sprite above still comes first).
-    missing = [s for s in out if not s['picture']]
-    if missing and upstream.cache_image_listing(conn):
-        for s in missing:
-            s['picture'] = upstream.get_image_url(conn, s['name'], s['dex'], probe=False) or ''
-            s['image'] = s['image'] or s['picture']
     out.sort(key=lambda s: js_parse_int(s['dex']) or 0)
     return out
 
 
 def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), nickname='', held_item='', shiny=False,
-                  stats=None, overrides=None, extra_skills=(), probe_image=True, bonus=None):
+                  stats=None, overrides=None, extra_skills=(), bonus=None):
     """A full Pokemon row (db.POKEMON_COLUMNS order, the same 62-column shape a player's Pokemon has) for a wild /
     DM-controlled Pokemon, built from its encyclopedia entry the way pokemon-form.js builds one before registering,
     then run through the exact same stat maths -- but never stored. The DM console turns it into a battle
@@ -633,7 +626,7 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
 
     data = [
         '',                                                   # 0: trainer name -- none, the DM controls it
-        upstream.local_sprite_url(name, shiny=shiny) or upstream.get_image_url(conn, name, dex, probe=probe_image) or '',  # 1: image
+        upstream.pokemon_image_url(name, dex, shiny=shiny),  # 1: image
         name,                                                 # 2: name
         dex,                                                  # 3: dex entry
         level,                                                # 4: level

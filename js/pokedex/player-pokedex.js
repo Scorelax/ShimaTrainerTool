@@ -58,7 +58,7 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
       <div class="pdx-view active" data-view-panel="pokedex">
         <div class="pdx-search"><input type="text" id="pdxSearch" placeholder="Search by name, type, or #..." autocomplete="off"></div>
         <div class="pdx-filters">${FILTERS.map(([id, label]) => `<select data-filter="${id}"><option value="">${label}</option></select>`).join('')}</div>
-        <div class="pdx-results" id="pdxResults"></div>
+        <div class="pdx-results" id="pdxResults"><p class="pdx-placeholder">Loading the Pokédex…</p></div>
       </div>
       <div class="pdx-view" data-view-panel="moves">
         <div class="pdx-search">

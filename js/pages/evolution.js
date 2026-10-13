@@ -783,58 +783,11 @@ async function selectEvolution(pokemon, listItem) {
   document.getElementById('pokemonDetails').classList.remove('empty');
   document.getElementById('pokemonDetails').classList.add('visible');
 
-  // Image loads in independently of the above -- pokemon[0] is normally
-  // already resolved server-side, but the rare fallback below probes
-  // Benjakronk's GitHub images one format at a time over the network, which
-  // used to block the whole panel above along with it.
-  const isShiny = currentPokemon ? currentPokemon[61] : '';
-  const imageUrl = pokemon[0] || await resolveImageUrl(pokemon[1], pokemon[2], isShiny);
-
-  // Store resolved image URL back into selectedPokemon for later use
-  if (!pokemon[0]) {
-    selectedPokemon[0] = imageUrl;
-    console.log('[Evolution] Resolved and stored image URL:', imageUrl);
-  }
+  // The Pi sends each species' picture with the list (sprite, else the original picture); none -> the Poke Ball.
+  const imageUrl = pokemon[0] || 'assets/Pokeball.png';
+  if (!pokemon[0]) selectedPokemon[0] = imageUrl;
 
   renderSpriteInto('pokemonImage', imageUrl, pokemon[1]);
-}
-
-async function resolveImageUrl(pokemonName, pokemonId, isShiny) {
-  const paddedId = pokemonId.toString().padStart(3, '0');
-  const sanitizedName = pokemonName.toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  const baseFileName = `${paddedId}-${sanitizedName}`;
-
-  const formats = ['png', 'jpg', 'jpeg', 'jfif'];
-  const baseUrl = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/images/pokemon/';
-
-  if (isShiny === 'Y') {
-    for (const format of formats) {
-      const url = `${baseUrl}${baseFileName}-shiny.${format}`;
-      if (await imageExists(url)) {
-        return url;
-      }
-    }
-  }
-
-  for (const format of formats) {
-    const url = `${baseUrl}${baseFileName}.${format}`;
-    if (await imageExists(url)) {
-      return url;
-    }
-  }
-
-  return 'assets/Pokeball.png';
-}
-
-function imageExists(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = url;
-  });
 }
 
 function evolvePokemon() {

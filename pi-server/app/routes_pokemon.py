@@ -94,7 +94,7 @@ def handle(conn, action, params):
             # here can be a self-uploaded sprite URL (evolution.js shows an
             # MP4 on the target preview when one exists), which must never
             # end up persisted as this Pokemon's canonical stored image.
-            resolved = upstream.get_image_url(conn, calculated['newPokemonData'][2], evolve_data[3])
+            resolved = upstream.local_pokemon_image_url(calculated['newPokemonData'][2], evolve_data[3])
             calculated['newPokemonData'][1] = resolved or ''
             replaced = replace_pokemon(conn, params['currentName'], params['trainer'],
                                        calculated['newPokemonData'])
@@ -120,30 +120,19 @@ def get_pokemon_info(conn, trainer_name, pokemon_name, animated=True):
         if (str(row[0]).lower() == trainer_name.lower()
                 and str(row[2]).lower() == pokemon_name.lower()):
             row = list(row)
-            if animated:
-                sprite = upstream.local_sprite_url(row[2], shiny=(row[61] == 'Y'))
-                if sprite:
-                    row[1] = sprite
+            row[1] = upstream.pokemon_image_url(row[2], row[3], shiny=(row[61] == 'Y'), animated=animated)
             return row
     return None
 
 
 def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
     # Never trust the client's image field for what gets permanently stored
-    # -- always resolve the real static image fresh, server-side, exactly
-    # like the evolve action already does unconditionally. Two ways the
-    # client's own value can be wrong: it may be a self-uploaded sprite URL
-    # (get_registered_pokemon_list() now prefers those for display), which
-    # must never become this Pokemon's canonical image -- the read-time swap
-    # in get_pokemon_info/_with_local_sprite already shows it dynamically on
-    # every fetch regardless of what's stored. Or it may be new-pokemon.js's
-    # own last-resort fallback ('assets/Pokeball.png', from resolveImageUrl()
-    # exhausting every format probe) baked in permanently from a moment when
-    # Benjakronk simply hadn't uploaded that species' artwork yet -- always
-    # re-resolving here means a species that gets its art added later is
-    # picked up by the *next* registration instead of staying stuck on
-    # whatever the first attempt saw.
-    new_pokemon_data[1] = upstream.get_image_url(conn, new_pokemon_data[2], new_pokemon_data[3]) or ''
+    # -- always resolve the static picture fresh, server-side, exactly like
+    # the evolve action already does unconditionally (the client's value may
+    # be a self-uploaded sprite URL or new-pokemon.js's Poke Ball
+    # placeholder). What the app shows is worked out from the species on
+    # every read anyway (get_pokemon_info / routes_trainer._with_pokemon_image).
+    new_pokemon_data[1] = upstream.local_pokemon_image_url(new_pokemon_data[2], new_pokemon_data[3]) or ''
 
     apply_registration_stats(conn, new_pokemon_data)
 

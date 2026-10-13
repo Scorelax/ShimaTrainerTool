@@ -100,7 +100,8 @@ def _data_version():
     finally:
         conn.close()
     files = []
-    for path in (upstream.POKEMON_FILE, upstream.ITEMS_FILE, upstream.MOVES_FILE):
+    # (the Pokemon pictures folder too: a picture added for a species shows on every device without waiting)
+    for path in (upstream.POKEMON_FILE, upstream.ITEMS_FILE, upstream.MOVES_FILE, upstream.POKEMON_IMAGE_DIR):
         try:
             files.append(str(int(os.path.getmtime(path))))
         except OSError:
@@ -303,6 +304,19 @@ def dm_save_display_scene(payload: dict):
     finally:
         conn.close()
     return JSONResponse({'status': 'success'})
+
+
+@app.post('/api/dm/pokemon-image')
+def dm_save_pokemon_image(payload: dict):
+    """A picture for a species without one, uploaded from the DM console's Pokedex (routes_dm.save_pokemon_image)."""
+    conn = db.connect()
+    try:
+        data = routes_dm.save_pokemon_image(conn, payload)
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success', 'data': data})
 
 
 @app.post('/api/dm/npc-image')

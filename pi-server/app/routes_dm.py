@@ -25,7 +25,7 @@ _CLOCK_KEY = 'world-clock'
 # out of the random generators, what the table TV shows outside the battle (js/dm/display-store.js), and where the
 # region map on the board screen is looking (js/dm/pokenav.js).
 _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene', 'region-map-view',
-               'pokedex-caught'}
+               'pokedex-caught', 'saved-maps'}  # saved-maps: the DM's battle maps kept for reuse (js/dm/map-editor.js)
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
@@ -632,6 +632,29 @@ def _portraits():
         names = sorted({os.path.splitext(f)[0] for f in os.listdir(upstream.CHARACTER_IMAGE_DIR)})
         own = [{'name': n, 'file': n, 'url': url, 'own': True} for n in names if (url := upstream.local_character_image_url(n))]
     return npcs + own
+
+
+def save_pokemon_image(conn, payload):
+    """POST /api/dm/pokemon-image: a picture for a species that has none ({species, data: "data:image/...;base64,..."}),
+    saved into the Pokemon pictures folder under Benjakronk's naming (<3-digit dex>-<sanitized name>.<ext>, e.g.
+    005-scorab.png), so every page finds it the same way as his. A species that already has one is refused (nothing is
+    overwritten). Returns {image (what the app shows -- a sprite still wins), picture}."""
+    import base64
+    row = _find_species(conn, payload.get('species') or '')
+    name, dex = row[2], _cell(row, 1)
+    if upstream.local_pokemon_image_url(name, dex):
+        raise ValueError(f'{name} already has a picture')
+    m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
+    if not m or m.group(1) not in _IMAGE_TYPES or m.group(1) == 'image/gif':
+        raise ValueError('That isn\'t a picture (JPG, PNG or WebP)')
+    raw = base64.b64decode(m.group(2))
+    if len(raw) > _MAX_IMAGE_BYTES:
+        raise ValueError('That picture is too big (15 MB at most)')
+    os.makedirs(upstream.POKEMON_IMAGE_DIR, exist_ok=True)
+    filename = f"{str(dex).zfill(3)}-{upstream._sanitize_species_name(name)}{_IMAGE_TYPES[m.group(1)]}"
+    with open(os.path.join(upstream.POKEMON_IMAGE_DIR, filename), 'wb') as f:
+        f.write(raw)
+    return {'image': upstream.pokemon_image_url(name, dex), 'picture': upstream.local_pokemon_image_url(name, dex) or ''}
 
 
 def save_npc_image(payload):

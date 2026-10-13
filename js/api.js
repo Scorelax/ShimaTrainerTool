@@ -1394,6 +1394,12 @@ export class DmAPI {
     return DmAPI._post('display-scene', { scene }, 'Updating the TV');
   }
 
+  /** A picture for a species that has none ({species, data: a data: URL}) into the Pi's Pokemon pictures folder ->
+   * {image, picture}. */
+  static async uploadPokemonImage(image) {
+    return (await DmAPI._post('pokemon-image', image, 'Uploading the picture')).data;
+  }
+
   /** A picture for an NPC ({name, data: a data: URL}) into the Pi's NPC pictures folder -> {name, file, url, own}. */
   static async uploadNpcImage(image) {
     return (await DmAPI._post('npc-image', image, 'Uploading the picture')).data;

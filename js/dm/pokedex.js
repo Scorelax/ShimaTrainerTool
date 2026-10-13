@@ -9,6 +9,7 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, getSpecies } from './dm-common.js';
 import { dexQuery } from '../utils/dex-search.js';
+import { prepareImage } from './display.js';
 
 const DEFAULTS = '__defaults';
 // The page for moves the players can look up on their own (extraSearchableMoves -- the old site's "Move Search" tab).
@@ -111,13 +112,10 @@ export async function renderPokedex(root) {
     <div class="dm-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head"><span class="dm-pdx-lens" aria-hidden="true"></span><span class="dm-pdx-lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>Pokédex</h2><span class="dm-pill ok" id="pdxSave">All saved</span></div>
-        <div class="dm-hint">Tick what the players get to see. Changes save on their own and reach the players straight away.</div>
         <input class="dm-input" id="pdxSearch" placeholder="Search name, type, habitat or #…" autocomplete="off">
         <div class="dm-seg" id="pdxFilter">
           <button data-f="all" class="active">All</button><button data-f="in">In players' Pokédex</button><button data-f="out">Not yet</button>
         </div>
-        <div class="dm-pdx-bulk"><button class="dm-btn small" id="pdxAddListed">Add all listed</button><button class="dm-btn small" id="pdxRemoveListed">Remove all listed</button></div>
-        <button class="dm-pdx-row dm-pdx-defaults" data-name="${DEFAULTS}"><span>⚙</span><span><strong>Default settings</strong><small>For every Pokémon without its own</small></span></button>
         <button class="dm-pdx-row dm-pdx-defaults" data-name="${MOVES}"><span>🔍</span><span><strong>Searchable moves</strong><small>Moves the players can look up</small></span></button>
         <div class="dm-pdx-list" id="pdxList"></div>
       </aside>
@@ -137,8 +135,6 @@ export async function renderPokedex(root) {
     const row = e.target.closest('[data-name]');
     if (row) select(row.dataset.name);
   });
-  document.getElementById('pdxAddListed').addEventListener('click', () => setListedRegistered(true));
-  document.getElementById('pdxRemoveListed').addEventListener('click', () => setListedRegistered(false));
   if (_selected) select(_selected);
 }
 
@@ -191,21 +187,6 @@ function applyFilter() {
     const show = found && (_filter === 'all' || (_filter === 'in' ? reg : !reg));
     row.hidden = !show;
   });
-}
-
-/** Puts every Pokemon the list shows right now (search + filter) into the players' Pokedex, or takes them all out. */
-async function setListedRegistered(on) {
-  const names = [...document.querySelectorAll('#pdxList [data-name]')].filter(r => !r.hidden && r.classList.contains('registered') !== on).map(r => r.dataset.name);
-  if (!names.length) return;
-  const text = on ? `Add ${names.length} Pokémon to the players' Pokédex?` : `Take ${names.length} Pokémon out of the players' Pokédex?`;
-  if (!await showCombatConfirm(text, { title: on ? 'Add all listed' : 'Remove all listed', yesLabel: on ? 'Add' : 'Remove', noLabel: 'Cancel' })) return;
-  const lower = new Set(names.map(n => n.toLowerCase()));
-  _config.registered = _config.registered.filter(n => !lower.has(String(n).toLowerCase()));
-  if (on) _config.registered.push(...names);
-  scheduleSave();
-  refreshListFlags();
-  applyFilter();
-  if (_selected && lower.has(_selected.toLowerCase())) renderDetail();
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +347,9 @@ function renderDetail() {
 
   box.innerHTML = `
     <div class="dm-pdx-head">
-      ${isDefaults ? '<span class="dm-pdx-big">⚙</span>' : '<span class="dm-pdx-big" id="pdxThumb"></span>'}
+      ${isDefaults ? '<span class="dm-pdx-big">⚙</span>'
+        : d.image ? '<span class="dm-pdx-big" id="pdxThumb"></span>'
+        : '<span class="dm-pdx-big dm-pdx-addpic" id="pdxAddPicture" role="button" tabindex="0" title="Upload a picture for it -- saved on the Pi with the other Pokémon pictures"><b>＋</b><small>Add a picture</small></span>'}
       <div class="dm-pdx-title">
         <h3 class="dm-cs-title">${isDefaults ? 'Default settings' : `#${escapeHtml(d.dex)} ${escapeHtml(d.name)}`}</h3>
         <div class="dm-species-meta">${isDefaults ? 'What the players see of a Pokémon that has no settings of its own.'
@@ -387,8 +370,39 @@ function renderDetail() {
     </div>`;
 
   if (!isDefaults && d.image) patchPortraitMedia(document.getElementById('pdxThumb'), d.image, d.name);
+  const addPic = document.getElementById('pdxAddPicture');
+  if (addPic) {
+    const pick = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/webp';
+      input.addEventListener('change', () => { if (input.files?.[0]) uploadPicture(d, input.files[0]); });
+      input.click();
+    };
+    addPic.addEventListener('click', pick);
+    addPic.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+  }
   refreshCaughtBox();
   wireDetail(name, d);
+}
+
+/** A picture from the DM's computer for a species that has none: scaled to 1024 px at most, saved on the Pi as
+ * <dex>-<name> in the Pokemon pictures folder (routes_dm.save_pokemon_image), shown here and in the list at once. */
+async function uploadPicture(d, file) {
+  const box = document.getElementById('pdxAddPicture');
+  if (box) { box.classList.add('busy'); box.querySelector('small').textContent = 'Uploading…'; }
+  try {
+    const res = await DmAPI.uploadPokemonImage({ species: d.name, data: await prepareImage(file, 1024) });
+    d.image = res.image;
+    const s = _species.find(x => x.name.toLowerCase() === d.name.toLowerCase());
+    if (s) { s.image = res.image; s.picture = res.picture; }
+    const thumb = document.querySelector(`#pdxList [data-name="${CSS.escape(d.name)}"] .dm-pdx-thumb`);
+    if (thumb) patchPortraitMedia(thumb, res.image, '');
+    if (_selected === d.name) renderDetail();
+  } catch (err) {
+    showCombatAlert(err.message, { title: "Couldn't upload the picture" });
+    if (box) { box.classList.remove('busy'); box.querySelector('small').textContent = 'Add a picture'; }
+  }
 }
 
 /** The species page's "Caught by the players" tick -- locked on while a player has one (it would only come back). */

@@ -29,7 +29,7 @@ export async function renderPokenav(section, { session } = {}) {
   section.innerHTML = `
     <div class="dm-nav">
       <div class="dm-nav-head">
-        <h2>🧭 PokéNav</h2>
+        <h2><img class="dm-tab-icon" src="assets/pokenav-icon.png" alt="">PokéNav</h2>
         <span class="dm-pill" id="navStatus"></span>
         <span class="dm-pill todo" id="navSlow" hidden></span>
       </div>

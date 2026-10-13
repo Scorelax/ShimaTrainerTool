@@ -91,7 +91,7 @@ function drawOverview() {
   _root.innerHTML = `
     <div class="dm-party">
       <div class="dm-home-head">
-        <div><h2>Party</h2><div class="dm-hint">The players' trainers and their active party. Click a trainer for everything else.</div></div>
+        <div><h2><img class="dm-tab-icon" src="assets/party-icon.png" alt="">Party</h2><div class="dm-hint">The players' trainers and their active party. Click a trainer for everything else.</div></div>
         <button class="dm-btn small" id="partyRefresh">↻ Refresh</button>
       </div>
       <div class="dm-party-grid">

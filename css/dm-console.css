@@ -143,6 +143,19 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-home-card-head { display: flex; justify-content: space-between; align-items: center; }
 .dm-home-card-head h3 { margin: 0; font-size: 1.05rem; }
 .dm-home-preview .dm-map-stage { width: 100%; }
+/* Map editor: saved maps -- a small picture, the name, Load and delete */
+.dm-map-saverow { gap: 0.4rem; }
+.dm-map-saverow .dm-input { flex: 1; min-width: 0; }
+.dm-map-saverow .dm-btn { flex: none; white-space: nowrap; }
+.dm-saved-maps { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.55rem; max-height: 260px; overflow-y: auto; }
+.dm-saved-map { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 0.55rem; align-items: center;
+  padding: 0.35rem; border-radius: 8px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--dm-line); }
+.dm-saved-map-preview { width: 76px; border-radius: 4px; overflow: hidden; pointer-events: none; }
+.dm-saved-map-preview .dm-map-stage { width: 100%; }
+.dm-saved-map-main { display: flex; flex-direction: column; min-width: 0; }
+.dm-saved-map-main strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-saved-map-main small { color: var(--dm-muted); font-size: 0.75rem; }
+.dm-saved-map-btns { display: flex; gap: 0.3rem; margin-top: 0.25rem; }
 .dm-home-creatures { display: flex; flex-direction: column; gap: 0.35rem; max-height: 360px; overflow-y: auto; flex: 1; }
 .dm-home-creature { display: flex; align-items: center; gap: 0.55rem; font-weight: 700; font-size: 0.9rem; }
 .dm-home-creature small { color: var(--dm-muted); font-weight: 500; }
@@ -323,8 +336,6 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-pdx-move { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--dm-line); color: #8d8ea8; cursor: pointer; }
 .dm-pdx-move.on { color: var(--dm-text); background: rgba(39, 174, 96, 0.14); border-color: rgba(39, 174, 96, 0.45); }
 .dm-pdx-move input { margin: 0; accent-color: #27ae60; }
-.dm-pdx-bulk { display: flex; gap: 0.35rem; }
-.dm-pdx-bulk .dm-btn { flex: 1; }
 .dm-pdx-head-plain { grid-template-columns: 96px 1fr; margin-bottom: 0.7rem; }
 .dm-pdx-movegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.35rem; margin-top: 0.7rem; }
 .dm-pdx-movegrid .dm-pdx-move { border-radius: 8px; padding: 0.3rem 0.55rem; }
@@ -950,6 +961,12 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
   background: radial-gradient(circle at 3px 3px, #e0192f 2.4px, transparent 2.9px), radial-gradient(circle at 17px 3px, #e0192f 2.4px, transparent 2.9px);
 }
 #dmModulePokedex .dm-pdx-big img, #dmModulePokedex .dm-pdx-big video { border-radius: 3px; }
+/* no picture yet: the dark screen is a button to upload one */
+#dmModulePokedex .dm-pdx-addpic { flex-direction: column; gap: 2px; cursor: pointer; color: #7fe08a; font-family: var(--pdx-font); }
+#dmModulePokedex .dm-pdx-addpic b { font-size: 1.9rem; line-height: 1; font-weight: 600; }
+#dmModulePokedex .dm-pdx-addpic small { font-size: 0.62rem; letter-spacing: 0.5px; text-transform: uppercase; text-align: center; line-height: 1.1; }
+#dmModulePokedex .dm-pdx-addpic:hover, #dmModulePokedex .dm-pdx-addpic:focus-visible { background: #263036; outline: none; color: #b6f5bd; }
+#dmModulePokedex .dm-pdx-addpic.busy { cursor: progress; opacity: 0.7; }
 #dmModulePokedex .dm-cs-title { font-family: var(--pdx-font); font-size: 1.45rem; font-weight: 700; color: #fff; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
 #dmModulePokedex .dm-species-meta { color: #ffdbe0; }
 #dmModulePokedex .dm-species-meta strong { color: #fff; }

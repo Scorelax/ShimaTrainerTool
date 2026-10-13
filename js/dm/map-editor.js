@@ -10,8 +10,8 @@ import { DmAPI } from '../api.js';
 import { mapObjectHtml, objectScreenRect, objectCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { escapeHtml, newId } from './dm-common.js';
-import { getSetup, updateSetup, flushSetup, onSetupChange, TV_ASPECT } from './setup-store.js';
+import { escapeHtml, newId, toast } from './dm-common.js';
+import { getSetup, updateSetup, flushSetup, onSetupChange, emptySetup, TV_ASPECT } from './setup-store.js';
 import { mapStageHtml } from './map-view.js';
 
 // Starting height (ft) for an object the DM places -- changeable before placing. Anything not listed starts at 5ft.
@@ -138,6 +138,15 @@ export async function renderMapEditor(root, { onDone }) {
         </div>
 
         <div class="dm-card">
+          <div class="dm-card-title">Saved maps</div>
+          <div class="dm-row dm-map-saverow">
+            <input class="dm-input" id="mapSaveName" placeholder="Name this map…" maxlength="60" autocomplete="off">
+            <button class="dm-btn" id="mapSave">💾 Save</button>
+          </div>
+          <div class="dm-saved-maps" id="mapSavedList"><div class="dm-hint">Loading…</div></div>
+        </div>
+
+        <div class="dm-card">
           <div class="dm-tool-tabs" id="mapTools">
             <button data-tool="objects">🌲 Objects</button>
             <button data-tool="terrain">🟫 Terrain</button>
@@ -166,8 +175,102 @@ export async function renderMapEditor(root, { onDone }) {
   wireStatic();
   renderToolPanel();
   renderStage();
+  renderSavedMaps();
   _unsub?.();
   _unsub = onSetupChange(() => { if (document.body.contains(_root)) renderStage(); });
+}
+
+// ---------------------------------------------------------------------------
+// Saved maps: the map alone -- size, background, objects, difficult / blocked squares and its terrain -- kept on the Pi
+// (dm_state 'saved-maps') to use again later. Never the creatures (or the weather, which is the day's, not the map's).
+// Shape: [{ id, name, savedAt, map: {cols, rows, lockRatio, background, objects, marks, terrain} }], newest first.
+// ---------------------------------------------------------------------------
+
+const SAVED_KEYS = ['cols', 'rows', 'lockRatio', 'background', 'objects', 'marks', 'terrain'];
+let _savedMaps = null;
+
+async function loadSavedMaps() {
+  if (!_savedMaps) _savedMaps = (await DmAPI.getState('saved-maps').catch(() => null)) || [];
+  return _savedMaps;
+}
+
+async function renderSavedMaps() {
+  const box = document.getElementById('mapSavedList');
+  if (!box) return;
+  const list = await loadSavedMaps();
+  box.innerHTML = list.length ? list.map(sm => `
+    <div class="dm-saved-map" data-map="${escapeHtml(sm.id)}">
+      <div class="dm-saved-map-preview">${mapStageHtml({ map: sm.map, creatures: [] }, { preview: true })}</div>
+      <div class="dm-saved-map-main">
+        <strong title="${escapeHtml(sm.name)}">${escapeHtml(sm.name)}</strong>
+        <small>${sm.map.rows} × ${sm.map.cols} · ${(sm.map.objects || []).length} object${(sm.map.objects || []).length === 1 ? '' : 's'}</small>
+        <span class="dm-saved-map-btns">
+          <button class="dm-btn small" data-load-map="${escapeHtml(sm.id)}">Load</button>
+          <button class="dm-btn small danger" data-delete-map="${escapeHtml(sm.id)}" title="Delete this saved map">🗑</button>
+        </span>
+      </div>
+    </div>`).join('') : '<div class="dm-hint">No saved maps yet.</div>';
+}
+
+async function saveCurrentMap() {
+  const input = document.getElementById('mapSaveName');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
+  const list = await loadSavedMaps();
+  const same = list.find(sm => sm.name.toLowerCase() === name.toLowerCase());
+  if (same && !await showCombatConfirm(`There's already a saved map called "${same.name}". Replace it with this one?`, { title: 'Save map', yesLabel: 'Replace', noLabel: 'Cancel' })) return;
+  const m = getSetup().map;
+  const entry = {
+    id: same?.id || newId('map'), name, savedAt: new Date().toISOString(),
+    map: JSON.parse(JSON.stringify(Object.fromEntries(SAVED_KEYS.map(k => [k, m[k]])))),
+  };
+  const next = [entry, ...list.filter(sm => sm !== same)];
+  try {
+    await DmAPI.saveState('saved-maps', next);
+    _savedMaps = next;
+    input.value = '';
+    toast(`Saved "${name}"`);
+    renderSavedMaps();
+  } catch (err) {
+    showCombatAlert(err.message, { title: "Couldn't save the map" });
+  }
+}
+
+/** Puts a saved map in place of the current one. Creatures already placed keep their spot when it's still on the map
+ * and not blocked; the others are unplaced (they stay in the battle). */
+async function loadSavedMap(id) {
+  const sm = (await loadSavedMaps()).find(x => x.id === id);
+  if (!sm) return;
+  const s = getSetup();
+  const hasMap = (s.map.objects || []).length || Object.keys(s.map.marks || {}).length;
+  const placed = s.creatures.filter(c => c.position).length;
+  if ((hasMap || placed) && !await showCombatConfirm(`Load "${sm.name}"? It replaces the map you have now${placed ? ' -- creatures placed on it keep their spot only where that square is still there and open' : ''}.`, { title: 'Load map', yesLabel: 'Load', noLabel: 'Cancel' })) return;
+  const loaded = JSON.parse(JSON.stringify(sm.map));
+  updateSetup((st) => {
+    st.map = { ...emptySetup().map, ...loaded, weather: st.map.weather, ready: st.map.ready };
+    st.creatures.forEach((c) => {
+      if (!c.position) return;
+      const { col, row } = c.position;
+      const fits = col >= 0 && col < st.map.cols && row >= 0 && row < st.map.rows && st.map.marks?.[`${col},${row}`] !== 'blocked';
+      if (!fits) c.position = null;
+    });
+  });
+  toast(`Loaded "${sm.name}"`);
+  renderMapEditor(_root, { onDone: _onDone }); // the size and background fields show the loaded map
+}
+
+async function deleteSavedMap(id) {
+  const list = await loadSavedMaps();
+  const sm = list.find(x => x.id === id);
+  if (!sm || !await showCombatConfirm(`Delete the saved map "${sm.name}"? The map you're working on stays.`, { title: 'Delete saved map', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+  const next = list.filter(x => x !== sm);
+  try {
+    await DmAPI.saveState('saved-maps', next);
+    _savedMaps = next;
+    renderSavedMaps();
+  } catch (err) {
+    showCombatAlert(err.message, { title: "Couldn't delete the map" });
+  }
 }
 
 function selectObjectKind(key) {
@@ -196,6 +299,14 @@ function wireStatic() {
     renderStage();
   });
   document.getElementById('mapBack').addEventListener('click', () => leave());
+  document.getElementById('mapSave').addEventListener('click', saveCurrentMap);
+  document.getElementById('mapSaveName').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveCurrentMap(); });
+  document.getElementById('mapSavedList').addEventListener('click', (e) => {
+    const load = e.target.closest('[data-load-map]');
+    if (load) { loadSavedMap(load.dataset.loadMap); return; }
+    const del = e.target.closest('[data-delete-map]');
+    if (del) deleteSavedMap(del.dataset.deleteMap);
+  });
   document.getElementById('mapDone').addEventListener('click', () => {
     updateSetup(s => { s.map.ready = true; });
     leave();

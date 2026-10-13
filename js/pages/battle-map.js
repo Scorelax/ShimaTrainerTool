@@ -46,16 +46,22 @@ async function mountRegion() {
       DmAPI.getState('region-map-view').catch(() => null),
     ]);
     const map = mountRegionMap(document.getElementById('mapRegionMap'), { viewOnly: true, rememberStyle: false });
+    let steered = !!view;
     if (view) map.setView(view);
-    window.addEventListener('app:region-map-view', (e) => map.setView(e.detail?.view, { smooth: true }));
+    window.addEventListener('app:region-map-view', (e) => {
+      if (!e.detail?.view) return;
+      steered = true;
+      map.setView(e.detail.view, { smooth: true });
+    });
     // Back after the connection dropped: wherever the DM left it meanwhile.
     window.addEventListener('app:live-resync', async () => {
       const v = await DmAPI.getState('region-map-view').catch(() => null);
-      if (v) map.setView(v, { smooth: true });
+      if (v) { steered = true; map.setView(v, { smooth: true }); }
     });
     await map.ready;
-    // Never steered yet: the whole island lying along the screen, north to the right (like the painting was)
-    if (!view) map.home({ ms: 0, azimuth: Math.PI / 2 });
+    // Never steered yet (and not while loading either): the whole island lying along the screen, north to the right
+    // (like the painting was)
+    if (!steered) map.home({ ms: 0, azimuth: Math.PI / 2 });
     box.classList.add('ready');
   } catch (err) {
     console.warn('[BattleMap] The region map could not be shown -- the painting stays:', err);

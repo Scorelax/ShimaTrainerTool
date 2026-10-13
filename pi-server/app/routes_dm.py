@@ -440,10 +440,13 @@ def save_display_scene(conn, scene):
     live.publish({'type': 'display-scene', 'scene': scene})
 
 
-def save_region_map_view(conn, view):
+def save_region_map_view(conn, view, store=True):
     """Where the region map on the board screen (battle-map.html, outside a battle) is looking -- POST
-    /api/dm/region-map-view from the DM console's PokeNav, a few times a second while the DM turns it. Stored, then
-    pushed to the board. {x, y, zoom, polar, azimuth, style} (js/region-map/region-map.js's getView)."""
+    /api/dm/region-map-view from the DM console's PokeNav, a few times a second while the DM turns it. Pushed to the
+    board every time; stored (`store`) only about once a second and where it comes to rest -- PokeNav decides -- so a
+    long turn isn't a stream of writes to the Pi's SD card. {x, y, zoom, polar, azimuth, style}
+    (js/region-map/region-map.js's getView)."""
+    import math
     from . import live
     if not isinstance(view, dict):
         raise ValueError('view must be an object')
@@ -451,8 +454,11 @@ def save_region_map_view(conn, view):
         clean = {k: float(view[k]) for k in ('x', 'y', 'zoom', 'polar', 'azimuth')}
     except (KeyError, TypeError, ValueError):
         raise ValueError('view needs x, y, zoom, polar and azimuth')
+    if not all(math.isfinite(v) for v in clean.values()):
+        raise ValueError('view numbers must be real numbers')
     clean['style'] = view.get('style') if view.get('style') in ('topo', 'painted') else 'topo'
-    save_state(conn, 'region-map-view', clean)
+    if store:
+        save_state(conn, 'region-map-view', clean)
     live.publish({'type': 'region-map-view', 'view': clean})
 
 

@@ -1,12 +1,14 @@
 // PokeNav: the region map in 3D (js/region-map/region-map.js) as the table's board screen (battle-map.html) shows it
 // whenever no battle is running. What the DM sees here is what's on that screen -- the frame has its 16:9 shape --
 // and turning, zooming, moving it or flying to a town here moves it there (POST /api/dm/region-map-view, a few times a
-// second while it moves, pushed live). The board itself can't be touched. three.js is only loaded the first time the
-// module is opened.
+// second while it moves, pushed live). It's stored on the Pi at most once a second, and where it comes to rest. The
+// board itself can't be touched. three.js is only loaded the first time the module is opened.
 import { DmAPI } from '../api.js';
 import { escapeHtml, toast } from './dm-common.js';
 
 const SEND_EVERY_MS = 120;
+const SAVE_EVERY_MS = 1000;
+const SETTLED_MS = 600;   // no move for this long: it has come to rest, store where
 
 let _section = null;
 let _map = null;
@@ -15,6 +17,10 @@ let _timer = null;
 let _pending = null;
 let _sending = false;
 let _failing = false;
+let _lastSaved = 0;
+let _unsaved = null;      // the last view sent but not stored
+let _settleTimer = null;
+let _saveNext = false;
 
 export async function renderPokenav(section, { session } = {}) {
   _session = session;
@@ -69,9 +75,14 @@ async function send() {
   const view = _pending;
   _pending = null;
   _sending = true;
+  const save = _saveNext || Date.now() - _lastSaved >= SAVE_EVERY_MS;
+  _saveNext = false;
   try {
-    await DmAPI.saveRegionMapView(view);
+    await DmAPI.saveRegionMapView(view, { save });
     _failing = false;
+    if (save) { _lastSaved = Date.now(); _unsaved = null; } else _unsaved = view;
+    clearTimeout(_settleTimer);
+    _settleTimer = setTimeout(saveSettled, SETTLED_MS);
   } catch (err) {
     if (!_failing) toast(`Couldn't move the map on the table screen: ${err.message}`);
     _failing = true;
@@ -79,4 +90,11 @@ async function send() {
     _sending = false;
     if (_pending && !_timer) _timer = setTimeout(send, SEND_EVERY_MS);
   }
+}
+
+/** The map has come to rest on a view that wasn't stored: store it (moving again meanwhile starts the wait over). */
+function saveSettled() {
+  if (!_unsaved || _pending || _sending) return;
+  _saveNext = true;
+  queue(_unsaved);
 }

@@ -24,6 +24,7 @@ const STYLE_KEY = 'rmapStyle';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** The height map as tables: metres and what's there (0 sea, 1 land, 2 lake, 3 river) per painting pixel. */
 async function loadHeights(seaOffset) {
@@ -224,11 +225,15 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     return new THREE.Vector3().setFromSpherical(s).add(target);
   }
 
+  /** Flies the camera there turning, tilting and zooming round the map (the short way round) -- not in a straight line,
+   * which would cut through over the middle on a big turn. */
   function flyTo(target, distance, polar, azimuth, ms = 900) {
     flight = {
       t0: performance.now(), ms,
       fromTarget: controls.target.clone(), toTarget: target,
-      fromPos: camera.position.clone(), toPos: viewFrom(target, distance, polar, azimuth),
+      fromDist: camera.position.distanceTo(controls.target), toDist: distance,
+      fromPolar: controls.getPolarAngle(), toPolar: polar,
+      fromAz: controls.getAzimuthalAngle(), turn: wrapAngle(azimuth - controls.getAzimuthalAngle()),
     };
     wake();
   }
@@ -243,13 +248,15 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   function stepFlight(now) {
     const k = flight.ms > 0 ? Math.min(1, (now - flight.t0) / flight.ms) : 1;
     const e = ease(k);
-    controls.target.lerpVectors(flight.fromTarget, flight.toTarget, e);
-    camera.position.lerpVectors(flight.fromPos, flight.toPos, e);
+    const f = flight;
+    placeCamera(new THREE.Vector3().lerpVectors(f.fromTarget, f.toTarget, e),
+      f.fromDist * (f.toDist / f.fromDist) ** e,   // zooms evenly, however far it goes
+      f.fromPolar + (f.toPolar - f.fromPolar) * e,
+      f.fromAz + f.turn * e);
     if (k >= 1) flight = null;
     return true;
   }
 
-  const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
   const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
 
   function getView() {
@@ -385,6 +392,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
   controls.addEventListener('change', wake);
   canvas.addEventListener('wheel', wake, { passive: true });
   canvas.addEventListener('pointerdown', wake);
+  // A weak device can take the 3D drawing away (short on graphics memory, say while the battle map plays its videos);
+  // three.js sets it all up again when it's given back, and then it needs drawing again.
+  canvas.addEventListener('webglcontextrestored', () => { dirty = true; wake(); });
 
   async function setStyle(next) {
     style = next;

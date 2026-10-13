@@ -300,10 +300,11 @@ def dm_save_display_scene(payload: dict):
 
 @app.post('/api/dm/region-map-view')
 def dm_save_region_map_view(payload: dict):
-    """Where the region map on the board screen is looking (routes_dm.save_region_map_view), pushed to it at once."""
+    """Where the region map on the board screen is looking (routes_dm.save_region_map_view), pushed to it at once and
+    stored when `save` isn't false."""
     conn = db.connect()
     try:
-        routes_dm.save_region_map_view(conn, payload.get('view'))
+        routes_dm.save_region_map_view(conn, payload.get('view'), store=payload.get('save', True) is not False)
     except ValueError as e:
         return JSONResponse({'status': 'error', 'error': str(e)})
     finally:

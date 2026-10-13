@@ -1382,10 +1382,10 @@ export class DmAPI {
     return DmAPI._post('display-scene', { scene }, 'Updating the TV');
   }
 
-  /** Where the region map on the board screen is looking ({x, y, zoom, polar, azimuth, style}) -- stored and pushed to
-   * the board at once. */
-  static async saveRegionMapView(view) {
-    return DmAPI._post('region-map-view', { view }, 'Moving the map');
+  /** Where the region map on the board screen is looking ({x, y, zoom, polar, azimuth, style}) -- pushed to the board
+   * at once, and stored on the Pi unless `save` is false. */
+  static async saveRegionMapView(view, { save = true } = {}) {
+    return DmAPI._post('region-map-view', { view, save }, 'Moving the map');
   }
 
   /** The pictures uploaded for the TV, newest first: [{id, name, url, createdAt}]. */

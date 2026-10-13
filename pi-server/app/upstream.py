@@ -99,12 +99,13 @@ POKEMON_IMAGE_DIR = os.path.expanduser(
 POKEMON_IMAGE_URL_PREFIX = '/pokemon-images/'
 _POKEMON_IMAGE_EXTS = IMG_FORMATS + ['webp']
 
-# Benjakronk's original character pictures (his repo's images/characters, named <sanitized name>.<ext>) -- a trainer's
-# portrait when there's no self-made one (trainer_image_url), and the DM console's NPC portraits.
-ORIGINAL_CHARACTER_DIR = os.path.expanduser(
-    os.environ.get('ORIGINAL_CHARACTER_DIR', '~/pokemon-dnd/images/original_characters'))
-ORIGINAL_CHARACTER_URL_PREFIX = '/original-characters/'
-_ORIGINAL_CHARACTER_EXTS = IMG_FORMATS + ['webp', 'gif']
+# The NPC pictures (Benjakronk's characters, named <sanitized name>.<ext>, e.g. nurse-joy.png) -- the DM console's NPC
+# portraits, where the DM's own uploads go too (routes_dm.save_npc_image), and a trainer's portrait when there's no
+# self-made one of that name (trainer_image_url). His repo's images/characters addresses map here.
+NPC_IMAGE_DIR = os.path.expanduser(
+    os.environ.get('NPC_IMAGE_DIR') or os.environ.get('ORIGINAL_CHARACTER_DIR') or '~/pokemon-dnd/images/npc')
+NPC_IMAGE_URL_PREFIX = '/npc-images/'
+NPC_IMAGE_EXTS = IMG_FORMATS + ['webp', 'gif']
 
 # The gym badges (his repo's images/badges, <kebab-case name>.png) -- trainer-card.js asks for /badges/<name>.png.
 BADGE_DIR = os.path.expanduser(os.environ.get('BADGE_DIR', '~/pokemon-dnd/images/badges'))
@@ -300,7 +301,7 @@ def _sanitize_species_name(name):
     """Lowercase, non-alphanumeric runs collapsed to a single hyphen, no
     leading/trailing hyphens. The one filename rule shared by every local
     (local_pokemon_image_url, local_sprite_url, local_evolution_video_url,
-    local_original_character_url) lookup."""
+    local_npc_image_url) lookup."""
     return re.sub(r'^-+|-+$', '', re.sub(r'[^a-z0-9]+', '-', str(name).lower()))
 
 
@@ -435,24 +436,23 @@ def pokemon_image_url(pokemon_name, pokemon_id, shiny=False, animated=True):
             or local_pokemon_image_url(pokemon_name, pokemon_id, shiny=shiny) or '')
 
 
-def local_original_character_url(name):
-    """Benjakronk's original picture for this trainer / character name (ORIGINAL_CHARACTER_DIR, file named
-    <sanitized name>.<ext>), or None."""
-    filename = _folder_files(ORIGINAL_CHARACTER_DIR, _ORIGINAL_CHARACTER_EXTS).get(_sanitize_species_name(name))
-    return _versioned_url(ORIGINAL_CHARACTER_DIR, ORIGINAL_CHARACTER_URL_PREFIX, filename)
+def local_npc_image_url(name):
+    """The NPC picture for this trainer / character name (NPC_IMAGE_DIR, file named <sanitized name>.<ext>), or None."""
+    filename = _folder_files(NPC_IMAGE_DIR, NPC_IMAGE_EXTS).get(_sanitize_species_name(name))
+    return _versioned_url(NPC_IMAGE_DIR, NPC_IMAGE_URL_PREFIX, filename)
 
 
-def original_character_pictures():
-    """[(file stem, url)] for every picture in ORIGINAL_CHARACTER_DIR, by name -- the DM console's NPC portraits."""
-    files = _folder_files(ORIGINAL_CHARACTER_DIR, _ORIGINAL_CHARACTER_EXTS)
-    out = [(stem, _versioned_url(ORIGINAL_CHARACTER_DIR, ORIGINAL_CHARACTER_URL_PREFIX, name)) for stem, name in sorted(files.items())]
+def npc_pictures():
+    """[(file stem, url)] for every picture in NPC_IMAGE_DIR, by name -- the DM console's NPC portraits."""
+    files = _folder_files(NPC_IMAGE_DIR, NPC_IMAGE_EXTS)
+    out = [(stem, _versioned_url(NPC_IMAGE_DIR, NPC_IMAGE_URL_PREFIX, name)) for stem, name in sorted(files.items())]
     return [(stem, url) for stem, url in out if url]
 
 
 def trainer_image_url(trainer_name, stored=''):
-    """What the app shows for a trainer: the self-made portrait (local_character_image_url), else Benjakronk's original
-    picture of that name, else the picture the row stored (made local, see localize_image_url), else the Poke Ball."""
-    return (local_character_image_url(trainer_name) or local_original_character_url(trainer_name)
+    """What the app shows for a trainer: the self-made portrait (local_character_image_url), else the NPC picture of
+    that name, else the picture the row stored (made local, see localize_image_url), else the Poke Ball."""
+    return (local_character_image_url(trainer_name) or local_npc_image_url(trainer_name)
             or localize_image_url(stored) or 'assets/Pokeball.png')
 
 
@@ -460,7 +460,7 @@ def trainer_image_url(trainer_name, stored=''):
 _REPO_IMAGE = r'https?://raw\.githubusercontent\.com/Benjakronk/shima-pokedex/[^/\s"]+/images/([a-z_]+)/([^?#\s"]+)'
 _REPO_IMAGE_FOLDERS = {
     'pokemon': (POKEMON_IMAGE_DIR, POKEMON_IMAGE_URL_PREFIX),
-    'characters': (ORIGINAL_CHARACTER_DIR, ORIGINAL_CHARACTER_URL_PREFIX),
+    'characters': (NPC_IMAGE_DIR, NPC_IMAGE_URL_PREFIX),
     'badges': (BADGE_DIR, BADGE_URL_PREFIX),
     'splashes': (SPLASH_DIR, SPLASH_URL_PREFIX),
 }

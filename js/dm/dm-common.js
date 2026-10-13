@@ -10,6 +10,16 @@ export function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+/** The <option>s of a portrait picker (map-assets' portraits): the NPC pictures, then the players' own portraits, each
+ * group labelled (a group with nothing in it is left out). */
+export function portraitOptionsHtml(portraits, selected) {
+  const opts = list => list.map(p => `<option value="${escapeHtml(p.url)}" ${p.url === selected ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
+  const npcs = portraits.filter(p => !p.own);
+  const own = portraits.filter(p => p.own);
+  return (npcs.length ? `<optgroup label="NPCs">${opts(npcs)}</optgroup>` : '')
+    + (own.length ? `<optgroup label="Player trainers">${opts(own)}</optgroup>` : '');
+}
+
 export function typeBadges(t1, t2) {
   return [t1, t2].filter(Boolean).map(t => `<span class="dm-type" style="background:${getMoveTypeColor(t)}">${escapeHtml(t)}</span>`).join('');
 }

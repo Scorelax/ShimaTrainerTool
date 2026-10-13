@@ -15,12 +15,14 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import {
   escapeHtml, typeBadges, getSpecies, newId, toast, natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml,
-  bindMultiSelects, readMultiSelect, abilityMod, trainerHp,
+  bindMultiSelects, readMultiSelect, abilityMod, trainerHp, portraitOptionsHtml,
 } from './dm-common.js';
 import { MONTHS } from './world-clock.js';
 import { addNpcToSetup } from './creature-setup.js';
+import { prepareImage } from './display.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+const NPC_PICTURE_SIDE = 1024; // bigger uploads are scaled down first -- a portrait is never shown bigger
 const ATTITUDES = { friendly: ['Friendly', '#27ae60'], neutral: ['Neutral', '#95a5a6'], wary: ['Wary', '#f39c12'], hostile: ['Hostile', '#e74c3c'], unknown: ['Unknown', '#6c6f8a'] };
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
 
@@ -28,7 +30,7 @@ let _root = null;
 let _npcs = [];
 let _selectedId = null;
 let _species = [];
-let _portraits = []; // [{name, url, own}] -- the self-made portraits on the Pi, then Benjakronk's character pictures
+let _portraits = []; // [{name, file, url, own}] -- the NPC pictures on the Pi, then the players' own portraits
 let _openMon = new Set(); // team members shown expanded
 const _saveTimers = new Map();
 const _recentSaves = new Map(); // id -> time: this tab's own saves, so their live push isn't taken as someone else's change
@@ -182,11 +184,14 @@ function renderSheet() {
         </div>
         <div class="dm-row">
           <div class="dm-field"><label>Picture</label>
-            <select class="dm-select" id="npcPicture">
-              <option value="">None</option>
-              ${_portraits.map(p => `<option value="${escapeHtml(p.url)}" ${p.url === n.image ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
-              <option value="__url" ${n.image && !known ? 'selected' : ''}>Picture from a link…</option>
-            </select>
+            <div class="dm-npc-picrow">
+              <select class="dm-select" id="npcPicture">
+                <option value="">None</option>
+                ${portraitOptionsHtml(_portraits, n.image)}
+                <option value="__url" ${n.image && !known ? 'selected' : ''}>Picture from a link…</option>
+              </select>
+              <button class="dm-btn" id="npcUpload" title="A picture from your computer -- kept on the Pi with the other NPC pictures">⬆ Upload</button>
+            </div>
           </div>
           <div class="dm-field" ${n.image && !known ? '' : 'hidden'} id="npcImageUrlBox"><label>Link</label><input class="dm-input" id="npcImageUrl" value="${escapeHtml(n.image && !known ? n.image : '')}" placeholder="https://…"></div>
         </div>
@@ -426,6 +431,26 @@ function bindSheetFields(box) {
   });
 }
 
+/** A picture from the DM's computer for this NPC: into the Pi's NPC pictures folder, named after the NPC (or the file,
+ * for one still called "New NPC"), added to the picture list and put on the NPC. */
+async function uploadPicture(n, file) {
+  const btn = document.getElementById('npcUpload');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+  try {
+    const name = n.name && n.name !== 'New NPC' ? n.name : file.name.replace(/\.[^.]+$/, '');
+    const pic = await DmAPI.uploadNpcImage({ name, data: await prepareImage(file, NPC_PICTURE_SIDE) });
+    _portraits = [..._portraits.filter(p => !p.own), pic].sort((a, b) => a.name.localeCompare(b.name))
+      .concat(_portraits.filter(p => p.own));
+    n.image = pic.url;
+    scheduleSave(n);
+    renderList();
+    if (current() === n) renderSheet();
+  } catch (err) {
+    showCombatAlert(err.message, { title: "Couldn't upload the picture" });
+    if (btn) { btn.disabled = false; btn.textContent = '⬆ Upload'; }
+  }
+}
+
 /** A team member's header line, redrawn in place as its nickname / level / nature / item / shiny change. */
 function monHeaderHtml(m) {
   const s = _species.find(x => x.name.toLowerCase() === String(m.species).toLowerCase()) || { name: m.species };
@@ -510,6 +535,13 @@ function wireSheet(box, n) {
     }
     btn.disabled = false;
     btn.textContent = '⚔ Add to the next battle';
+  });
+  document.getElementById('npcUpload').addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', () => { if (input.files?.[0]) uploadPicture(n, input.files[0]); });
+    input.click();
   });
   document.getElementById('npcDuplicate').addEventListener('click', async () => {
     const copy = { ...JSON.parse(JSON.stringify(n)), id: newId('npc'), name: `${n.name} (copy)`, createdAt: new Date().toISOString() };
@@ -619,7 +651,8 @@ function resolveOldPicture(key) {
   if (/^https?:/.test(key) && !fromRepo) return key;
   let stem = String(key).split(/[?#]/)[0].split('/').pop().replace(/\.[^.]+$/, '');
   try { stem = decodeURIComponent(stem); } catch (e) { /* as it is */ }
-  return _portraits.find(p => !p.own && p.name.toLowerCase() === stem.toLowerCase())?.url || '';
+  const squashed = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ''); // "Nurse_Joy" finds nurse-joy.png
+  return _portraits.find(p => !p.own && squashed(p.file || p.name) === squashed(stem))?.url || '';
 }
 
 function convertOld(t, image) {

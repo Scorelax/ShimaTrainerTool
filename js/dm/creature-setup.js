@@ -13,7 +13,7 @@ import { footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import {
   escapeHtml, typeBadges, getSpecies, newId, participantFromPokemonRow, participantFromTrainer, trainerHp,
-  natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect,
+  natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect, portraitOptionsHtml,
 } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
 import { mapStageHtml, tokenScreenRect, creatureSpotProblem } from './map-view.js';
@@ -496,7 +496,7 @@ function renderTrainerForm(box) {
           <div class="dm-field"><label for="ctPortrait">Portrait</label>
             <select class="dm-select" id="ctPortrait">
               <option value="">None</option>
-              ${_portraits.map(pt => `<option value="${escapeHtml(pt.url)}" ${pt.url === t.image ? 'selected' : ''}>${escapeHtml(pt.name)}</option>`).join('')}
+              ${portraitOptionsHtml(_portraits, t.image)}
               <option value="__url" ${t.image && !portraitKnown ? 'selected' : ''}>Picture from a link…</option>
             </select>
             <input class="dm-input" id="ctImageUrl" placeholder="https://…" value="${escapeHtml(t.image && !portraitKnown ? t.image : '')}" ${t.image && !portraitKnown ? '' : 'hidden'} style="margin-top:0.35rem">

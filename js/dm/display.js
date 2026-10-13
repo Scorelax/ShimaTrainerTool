@@ -447,8 +447,9 @@ function readAsDataUrl(file) {
   });
 }
 
-/** The file as a data: URL, scaled down first when it's far bigger than the TV (an animated GIF is left as it is). */
-async function prepareImage(file) {
+/** The file as a data: URL, scaled down first when it's bigger than `maxSide` -- by default the TV's size (an animated
+ * GIF is left as it is). Also used for the NPC pictures (npcs.js). */
+export async function prepareImage(file, maxSide = MAX_UPLOAD_SIDE) {
   const dataUrl = await readAsDataUrl(file);
   if (file.type === 'image/gif') return dataUrl;
   const img = await new Promise((resolve, reject) => {
@@ -457,7 +458,7 @@ async function prepareImage(file) {
     el.onerror = () => reject(new Error(`${file.name} isn't a picture the browser can read`));
     el.src = dataUrl;
   });
-  const scale = Math.min(1, MAX_UPLOAD_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
   const type = ['image/png', 'image/webp'].includes(file.type) ? file.type : 'image/jpeg';
   if (scale === 1 && file.size < 4 * 1024 * 1024 && ['image/png', 'image/webp', 'image/jpeg'].includes(file.type)) return dataUrl;
   const canvas = document.createElement('canvas');

@@ -53,7 +53,7 @@ db.init()
 # ever go stale, nothing to manually clear.
 _VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', upstream.CHARACTER_IMAGE_URL_PREFIX,
                              upstream.DISPLAY_IMAGE_URL_PREFIX, upstream.POKEMON_IMAGE_URL_PREFIX,
-                             upstream.ORIGINAL_CHARACTER_URL_PREFIX, sprite_previews.SPRITE_PREVIEW_URL_PREFIX)
+                             upstream.NPC_IMAGE_URL_PREFIX, sprite_previews.SPRITE_PREVIEW_URL_PREFIX)
 
 # The splashes, badges and the bundled PWA assets aren't stamped with a
 # version (their filenames stay constant even when the content behind them
@@ -298,6 +298,16 @@ def dm_save_display_scene(payload: dict):
     return JSONResponse({'status': 'success'})
 
 
+@app.post('/api/dm/npc-image')
+def dm_save_npc_image(payload: dict):
+    """A picture for an NPC uploaded from the DM's computer, into the NPC pictures folder (routes_dm.save_npc_image)."""
+    try:
+        img = routes_dm.save_npc_image(payload)
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    return JSONResponse({'status': 'success', 'data': img})
+
+
 @app.post('/api/dm/region-map-view')
 def dm_save_region_map_view(payload: dict):
     """Where the region map on the board screen is looking (routes_dm.save_region_map_view), pushed to it at once and
@@ -368,13 +378,13 @@ async def live_events(request: Request):
     return StreamingResponse(event_stream(), media_type='text/event-stream')
 
 
-# Benjakronk's pictures, copied onto the Pi (see upstream.py): species, characters, badges and splashes. The folders are
+# Benjakronk's pictures, copied onto the Pi (see upstream.py): species, NPCs, badges and splashes. The folders are
 # made here if they aren't there yet, so files copied in later show up without a restart. Mounted before the PWA
 # catch-all so these paths win. Many species pictures are .jfif, which Python doesn't know as a JPEG -- without this
 # they'd be sent as plain text.
 mimetypes.add_type('image/jpeg', '.jfif')
 for _folder, _prefix, _name in ((upstream.POKEMON_IMAGE_DIR, upstream.POKEMON_IMAGE_URL_PREFIX, 'pokemon-images'),
-                                (upstream.ORIGINAL_CHARACTER_DIR, upstream.ORIGINAL_CHARACTER_URL_PREFIX, 'original-characters'),
+                                (upstream.NPC_IMAGE_DIR, upstream.NPC_IMAGE_URL_PREFIX, 'npc-images'),
                                 (upstream.BADGE_DIR, upstream.BADGE_URL_PREFIX, 'badges'),
                                 (upstream.SPLASH_DIR, upstream.SPLASH_URL_PREFIX, 'splashes')):
     os.makedirs(_folder, exist_ok=True)

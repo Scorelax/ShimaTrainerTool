@@ -5,6 +5,7 @@ Unlike the player-facing pokemon/list, the species list here is EVERY species in
 the shared pokedex has unlocked for players -- the DM sets up encounters with Pokemon the players haven't met yet."""
 import json
 import os
+import re
 from datetime import datetime, timezone
 
 from . import routes_combat, upstream
@@ -567,14 +568,44 @@ def save_setup(conn, setup):
     conn.commit()
 
 
+def _pretty(stem):
+    """A picture's file name as a name to show: 'nurse-joy' -> 'Nurse Joy'."""
+    return ' '.join(w[:1].upper() + w[1:] for w in re.split(r'[-_\s]+', stem) if w) or stem
+
+
 def _portraits():
-    """The trainer portraits on the Pi, offered for the DM's NPC trainers: [{name, url, own}] -- the self-made ones
-    (upstream.CHARACTER_IMAGE_DIR, own=True) first, then Benjakronk's original character pictures."""
+    """The portraits on the Pi, offered for the DM's NPCs and NPC trainers: [{name, file, url, own}] -- the NPC
+    pictures (upstream.NPC_IMAGE_DIR, `file` = the file's name without its extension) first, then the players' own
+    trainer portraits (upstream.CHARACTER_IMAGE_DIR, own=True)."""
+    npcs = sorted(({'name': _pretty(stem), 'file': stem, 'url': url, 'own': False} for stem, url in upstream.npc_pictures()),
+                  key=lambda p: p['name'].lower())
     own = []
     if os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
         names = sorted({os.path.splitext(f)[0] for f in os.listdir(upstream.CHARACTER_IMAGE_DIR)})
-        own = [{'name': n, 'url': url, 'own': True} for n in names if (url := upstream.local_character_image_url(n))]
-    return own + [{'name': n, 'url': url, 'own': False} for n, url in upstream.original_character_pictures()]
+        own = [{'name': n, 'file': n, 'url': url, 'own': True} for n in names if (url := upstream.local_character_image_url(n))]
+    return npcs + own
+
+
+def save_npc_image(payload):
+    """POST /api/dm/npc-image: a picture for an NPC ({name, data: "data:image/...;base64,..."}) saved into the NPC
+    pictures folder as <sanitized name>.<ext> (nurse-joy.png; nurse-joy-2.png when that's taken), next to Benjakronk's
+    own. Returns it as _portraits lists it."""
+    import base64
+    m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
+    if not m or m.group(1) not in _IMAGE_TYPES:
+        raise ValueError('That isn\'t a picture (JPG, PNG, WebP or GIF)')
+    raw = base64.b64decode(m.group(2))
+    if len(raw) > _MAX_IMAGE_BYTES:
+        raise ValueError('That picture is too big (15 MB at most)')
+    base = upstream._sanitize_species_name(payload.get('name') or '')[:60].strip('-') or 'npc'
+    os.makedirs(upstream.NPC_IMAGE_DIR, exist_ok=True)
+    taken = {os.path.splitext(f)[0].lower() for f in os.listdir(upstream.NPC_IMAGE_DIR)}
+    stem, n = base, 2
+    while stem in taken:
+        stem, n = f'{base}-{n}', n + 1
+    with open(os.path.join(upstream.NPC_IMAGE_DIR, stem + _IMAGE_TYPES[m.group(1)]), 'wb') as f:
+        f.write(raw)
+    return {'name': _pretty(stem), 'file': stem, 'url': upstream.local_npc_image_url(stem), 'own': False}
 
 
 def _cell(row, i):

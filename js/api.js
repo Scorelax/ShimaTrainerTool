@@ -1280,7 +1280,8 @@ export class DmAPI {
     return API.request('dm', 'clear-setup', {}, { useCache: false });
   }
 
-  /** {objects: [{key, label, url}], backgrounds: [...], portraits: [{name, url}]} for the map and battle setup. */
+  /** {objects: [{key, label, url}], backgrounds: [...], portraits: [{name, file, url, own}]} for the map and battle setup
+   * (portraits: the NPC pictures, then the players' own, own: true). */
   static async mapAssets() {
     return API.request('dm', 'map-assets', {}, { useCache: false });
   }
@@ -1380,6 +1381,11 @@ export class DmAPI {
   /** What the table TV shows ({background, items, battlePictures}) -- stored and pushed to the TV at once. */
   static async saveDisplayScene(scene) {
     return DmAPI._post('display-scene', { scene }, 'Updating the TV');
+  }
+
+  /** A picture for an NPC ({name, data: a data: URL}) into the Pi's NPC pictures folder -> {name, file, url, own}. */
+  static async uploadNpcImage(image) {
+    return (await DmAPI._post('npc-image', image, 'Uploading the picture')).data;
   }
 
   /** Where the region map on the board screen is looking ({x, y, zoom, polar, azimuth, style}) -- pushed to the board

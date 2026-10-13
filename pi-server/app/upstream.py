@@ -115,10 +115,11 @@ BADGE_URL_PREFIX = '/badges/'
 SPLASH_DIR = os.path.expanduser(os.environ.get('SPLASH_DIR', '~/pokemon-dnd/images/splashes'))
 SPLASH_URL_PREFIX = '/splashes/'
 
-# Pictures the DM uploads from the DM console for the table TV (backgrounds -- routes_dm.save_display_image). Each file
-# gets a new random name, so its URL never shows different content (cached hard, see main.py).
+# Pictures the DM uploads from the DM console's Display module (backgrounds -- routes_dm.save_display_image), with the
+# other pictures under images/. Each file gets a new random name, so its URL never shows different content (cached
+# hard, see main.py). (Until 2026-10-13 they went to ~/pokemon-dnd/display-images.)
 DISPLAY_IMAGE_DIR = os.path.expanduser(
-    os.environ.get('DISPLAY_IMAGE_DIR', '~/pokemon-dnd/display-images'))
+    os.environ.get('DISPLAY_IMAGE_DIR', '~/pokemon-dnd/images/display-images'))
 DISPLAY_IMAGE_URL_PREFIX = '/display-images/'
 
 # Apps Script upstreams can be slow (cold starts)

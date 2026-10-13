@@ -158,7 +158,9 @@ from GitHub. Copy his `images/` subfolders into `~/pokemon-dnd/images/`:
 | `images/badges`     | `badges` (`BADGE_DIR`)                            | `/badges/`              |
 | `images/splashes`   | `splashes` (`SPLASH_DIR`)                         | `/splashes/`            |
 
-The server makes the folders at startup if they're missing, and new files
+Next to them, `images/display-images` (`DISPLAY_IMAGE_DIR`, served at
+`/display-images/`) holds the pictures uploaded in the DM console's Display
+module. The server makes the folders at startup if they're missing, and new files
 show up without a restart. What the app shows is worked out on every read
 (`upstream.pokemon_image_url` / `upstream.trainer_image_url`): a Pokémon's
 animated sprite, else its original picture; a trainer's self-made portrait,

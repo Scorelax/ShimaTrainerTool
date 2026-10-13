@@ -1183,10 +1183,20 @@ setCoverAttackModeResolver((moveName, attackerId, targetId) => {
 // Every picker greys out creatures beyond the move's reach -- the reach comes from the move's range text (move-range.js).
 setMoveRangeResolver(moveName => String((findMoveRow(moveName) || [])[6] || ''));
 
+/** The state hiding `participant` from a move that can still hit `hitsStates`, or null: a semi-invulnerable condition
+ * (Dig, Fly, Dive...), or burrowed on the map (a token below the ground, with a burrowing speed) -- underground, like
+ * Dig, so only Earthquake, Magnitude and Bulldoze reach it. */
+function _hiddenState(participant, hitsStates = []) {
+  const hidden = untargetableState(participant, hitsStates);
+  if (hidden) return hidden;
+  if ((session?.board?.tokens?.[participant?.id]?.z || 0) < 0 && !hitsStates.includes('underground')) return 'underground';
+  return null;
+}
+
 // Semi-invulnerable targets (underground, airborne, ...) are hidden from every picker unless the move
 // lists their state in `hitsStates`.
 setTargetabilityResolver((participant, moveName) => {
-  const hidden = untargetableState(participant, moveFlagsFor(moveName).hitsStates || []);
+  const hidden = _hiddenState(participant, moveFlagsFor(moveName).hitsStates || []);
   if (hidden) return hidden;
   // Earthquake, Bulldoze, Land's Wrath, ...: "each grounded creature" -- a flyer (or anything up in the air) isn't hit.
   if (moveFlagsFor(moveName).affectsGroundedOnly && !_groundedNow(participant.id)) return 'not grounded';
@@ -1466,7 +1476,7 @@ async function _handleSleepPool({ casterId, effect, moveName }) {
   const candidates = Object.values(session.participants)
     .filter(p => p.id !== casterId && p.status === 'participating' && tokens[p.id] && (p.currentHP ?? 0) > 0)
     .filter(p => Math.max(Math.abs(tokens[p.id].col - at.col), Math.abs(tokens[p.id].row - at.row)) <= reach)
-    .filter(p => !untargetableState(p, []) && !(p.statuses || []).some(s => s.kind === 'condition' && s.apply === 'asleep'))
+    .filter(p => !_hiddenState(p, []) && !(p.statuses || []).some(s => s.kind === 'condition' && s.apply === 'asleep'))
     .sort((a, b) => a.currentHP - b.currentHP);
   let left = pool;
   const slept = [];
@@ -5334,6 +5344,8 @@ function _stateDamageMultiplier(moveName, targetId) {
   const states = moveFlagsFor(moveName).doubleDamageVsStates || [];
   const target = session?.participants?.[targetId];
   if ((target?.statuses || []).some((s) => s.kind === 'condition' && states.includes(s.apply))) return 2;
+  // "burrowed": a token below the ground on the map counts as underground.
+  if (states.includes('underground') && (session?.board?.tokens?.[targetId]?.z || 0) < 0) return 2;
   // Cyclone Charge: "creatures in range that are not grounded ... take double damage".
   if (target && moveFlagsFor(moveName).doubleDamageVsAirborne && !_groundedNow(targetId)) return 2;
   return 1;
@@ -5343,7 +5355,9 @@ function _stateDamageMultiplier(moveName, targetId) {
 function _groundedNow(pid) {
   const p = session?.participants?.[pid];
   if (!p) return true;
-  if ((session?.board?.tokens?.[pid]?.z || 0) > 0) return false;
+  const z = session?.board?.tokens?.[pid]?.z || 0;
+  if (z > 0) return false;
+  if (z < 0) return true; // burrowed: in the ground itself (Earthquake reaches it, whatever else it can do)
   return isGroundedIn(p, terrainsAffecting(session, pid));
 }
 

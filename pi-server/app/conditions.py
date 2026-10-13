@@ -479,11 +479,16 @@ def altitude_limits(participant):
 def fields_affecting(state, pid, key):
     """Every `key` ('terrain' or 'weather') effect currently affecting participant `pid`: the whole-map one
     (state[key], also what a DM-typed one is) plus every tile-limited zone (state[key + 'Zones']) that overlaps any
-    cell of their token's footprint. A participant with no token on the map is only affected by the whole-map one."""
+    cell of their token's footprint. A participant with no token on the map is only affected by the whole-map one.
+    Underground (burrowed below the ground on the map, or in Dig's underground state): none at all -- every terrain and
+    weather is on the surface, the whole-map ones too (no Hail or Sandstorm damage, no Gravity pulling it up)."""
+    token = state.get('board', {}).get('tokens', {}).get(pid)
+    statuses = (state.get('participants', {}).get(pid) or {}).get('statuses') or []
+    if (token or {}).get('z', 0) < 0 or any(s.get('kind') == 'condition' and s.get('apply') == 'underground' for s in statuses):
+        return []
     found = []
     if state.get(key):
         found.append(state[key])
-    token = state.get('board', {}).get('tokens', {}).get(pid)
     zones = state.get(key + 'Zones') or []
     if token and zones:
         size = footprint_size(state.get('participants', {}).get(pid, {}).get('size'))

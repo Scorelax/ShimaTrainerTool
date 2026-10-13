@@ -2054,7 +2054,16 @@ def _grid_distance_ft(state, id_a, id_b):
     a, b = tokens.get(id_a), tokens.get(id_b)
     if not a or not b:
         return None
-    return max(abs(a['col'] - b['col']), abs(a['row'] - b['row'])) * _FT_PER_SQUARE
+    # Edge to edge (a Large / Huge creature fills 2x2 / 3x3 squares, its token at the bottom-left one) and in 3D (a flyer
+    # 30ft up is 30ft away from what's under it, a burrower 10ft down 10ft) -- the same as the app's creatureDistanceFt
+    # (move-range.js), so a reaction / aura / ability range means the same thing on both sides.
+    participants = state.get('participants', {})
+    na = footprint_size((participants.get(id_a) or {}).get('size'))
+    nb = footprint_size((participants.get(id_b) or {}).get('size'))
+    dc = max(0, b['col'] - (a['col'] + na - 1), a['col'] - (b['col'] + nb - 1))
+    dr = max(0, (b['row'] - nb + 1) - a['row'], (a['row'] - na + 1) - b['row'])
+    vertical = abs((a.get('z') or 0) - (b.get('z') or 0))
+    return max(max(dc, dr) * _FT_PER_SQUARE, vertical)
 
 
 def _has_block_attack_effect(move_data):
@@ -2111,6 +2120,10 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
         if p.get('reactionUsed'):
             continue  # one reaction per round -- spent until their own turn comes round again, so no popup either
         if only_ids is not None and pid not in only_ids:
+            continue
+        # Hidden away (underground -- Dig or burrowed on the map --, up in Fly, vanished...): can't step in for anyone
+        # else; its own reactions (the anchor itself) are still offered.
+        if pid != anchor_id and (untargetable_state(p) or _altitude_of(state, pid) < 0):
             continue
         anchor = state['participants'].get(anchor_id) or {}
         for move_name in (p.get('moves') or []):
@@ -3277,8 +3290,17 @@ def _apply_damage_to_target(conn, state, pid, target_id, dice_roll, move_type, m
         record = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None)
         if record:
             hidden = untargetable_state(target, record.get('hitsStates') or ())
+            # Burrowed on the map (a token below the ground): underground, like Dig.
+            if not hidden and _altitude_of(state, target_id) < 0 and 'underground' not in (record.get('hitsStates') or ()):
+                hidden = 'underground'
             if hidden:
                 raise ValueError(f"{target['name']} is {hidden.replace('_', ' ')} and can't be targeted by {move_name}")
+            # Earthquake, Bulldoze, Land's Wrath...: "each grounded creature" -- the app leaves the rest out; this is the
+            # server's own check (a burrower counts as grounded, a flyer up in the air doesn't).
+            if record.get('affectsGroundedOnly'):
+                z = _altitude_of(state, target_id)
+                if z > 0 or (z == 0 and not grounded_in(target, terrains_affecting(state, target_id))):
+                    raise ValueError(f"{target['name']} isn't on the ground -- {move_name} only hits grounded creatures")
 
     _consume_ignore_immunities(state, pid, attacker, move_type, move_name)
     multiplier = _type_multiplier(conn, move_type, target.get('type1'), target.get('type2'), target, attacker)

@@ -1392,14 +1392,11 @@ async function handleFormSubmit(pokemonName, originalNature) {
       }
       // Handle Hidden Ability feat
       else if (feat === 'Hidden Ability') {
-        // Add the hidden ability (last one) to existing abilities
-        const abilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]'));
-        if (abilityCheckboxes.length > 0) {
-          const hiddenAbilityCheckbox = abilityCheckboxes[abilityCheckboxes.length - 1];
-          // Check the hidden ability if not already checked
-          if (!hiddenAbilityCheckbox.checked) {
-            hiddenAbilityCheckbox.checked = true;
-          }
+        // Add the hidden ability (slot 2) to existing abilities -- when it's offered at all (shown in the Pokedex).
+        // (It used to tick the last box, which is another ability when the hidden one isn't listed.)
+        const hiddenAbilityCheckbox = document.getElementById('ability2');
+        if (hiddenAbilityCheckbox && !hiddenAbilityCheckbox.checked) {
+          hiddenAbilityCheckbox.checked = true;
         }
       }
     }
@@ -1568,6 +1565,14 @@ function populateAbilities(abilities, pokemonData) {
 
   const pokemonName = pokemonData[2] || 'Unknown'; // Pokemon name at index 2
 
+  // What it has now (pokemonData[7]: "slot:Name;Description" joined by "|", or an older plain name) -- always offered,
+  // so saving never takes an ability away, even one the Pokedex doesn't show.
+  const held = String(pokemonData[7] || '').split('|').map(a => a.trim()).filter(Boolean);
+  const heldSlots = new Set(held.map(a => (/^\d:/.test(a) ? Number(a[0]) : null)).filter(s => s !== null));
+  const heldNames = new Set(held.map(a => a.replace(/^\d:/, '').split(';')[0].trim().toLowerCase()));
+  // The abilities it can take: the ones the DM shows in the Pokedex for this species (primary / secondary / hidden).
+  const SLOT_SWITCH = ['primaryAbility', 'secondaryAbility', 'hiddenAbility'];
+
   abilities.forEach((abilityData, index) => {
     const colonIndex = abilityData.indexOf(':');
     let slotIndex = index;
@@ -1578,13 +1583,12 @@ function populateAbilities(abilities, pokemonData) {
       abilityString = abilityData.substring(colonIndex + 1);
     }
 
-    // Check if this is the hidden ability (slot 2) and if it should be visible
-    if (slotIndex === 2 && !isFieldVisible(pokemonName, 'hiddenAbility')) {
-      return; // Skip hidden ability if not visible
-    }
-
     const parts = abilityString.split(',');
     const abilityName = parts[0].trim();
+    const isHeld = heldSlots.has(slotIndex) || heldNames.has(abilityName.toLowerCase());
+    if (!isHeld && !isFieldVisible(pokemonName, SLOT_SWITCH[slotIndex])) {
+      return; // not in the Pokedex for this species yet
+    }
     const abilityDescription = parts.slice(1).join(',').trim();
 
     const div = document.createElement('div');
@@ -1604,6 +1608,11 @@ function populateAbilities(abilities, pokemonData) {
     div.appendChild(label);
     abilitiesContent.appendChild(div);
   });
+
+  if (!abilitiesContent.children.length) {
+    abilitiesContent.innerHTML = '<div style="padding: clamp(0.8rem, 2vw, 1rem); font-size: clamp(0.95rem, 2vw, 1.1rem); color: #666;">No abilities unlocked in the Pokédex for this Pokémon yet.</div>';
+    return;
+  }
 
   // Check currently selected abilities
   let currentAbilities = [];

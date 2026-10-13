@@ -1200,8 +1200,13 @@ export function weatherKindOf(weather) {
  * DM-typed one is) plus every tile-limited zone (`session[key + 'Zones']`) overlapping any cell of their token's
  * footprint. Mirrors conditions.py's fields_affecting; a participant with no token is only affected by the whole-map one. */
 export function fieldsAffecting(session, pid, key) {
-  const found = session?.[key] ? [session[key]] : [];
   const token = session?.board?.tokens?.[pid];
+  // Underground (burrowed below the ground on the map, or in Dig's underground state): out of every terrain and weather
+  // on the surface, the whole-map ones too -- no Hail, no Sandstorm, no Gravity pulling it up.
+  const underground = (token?.z || 0) < 0
+    || (session?.participants?.[pid]?.statuses || []).some(s => s.kind === 'condition' && s.apply === 'underground');
+  if (underground) return [];
+  const found = session?.[key] ? [session[key]] : [];
   const zones = session?.[key + 'Zones'] || [];
   if (token && zones.length) {
     const s = String(session.participants?.[pid]?.size || '').trim().toLowerCase();

@@ -533,10 +533,13 @@ export function renderIndex() {
 
 // "Updated 2h ago" from an ISO timestamp; falls back gracefully when unset
 // (e.g. Apps Script backend, which never sends X-Data-Version at all).
-function formatLastUpdate(iso) {
-  if (!iso) return 'unknown';
-  const then = new Date(iso);
-  if (isNaN(then)) return 'unknown';
+function formatLastUpdate(version) {
+  if (!version) return 'unknown';
+  // The Pi's data version: "<newest data fetch (ISO)>|<item file's mtime (s)>|<move file's mtime (s)>" -- the newest.
+  const [iso, ...files] = String(version).split('|');
+  const times = [Date.parse(iso), ...files.map(s => Number(s) * 1000)].filter(t => Number.isFinite(t) && t > 0);
+  if (!times.length) return 'unknown';
+  const then = new Date(Math.max(...times));
   const minutes = Math.floor((Date.now() - then.getTime()) / 60000);
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes}m ago`;

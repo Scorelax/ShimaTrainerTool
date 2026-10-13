@@ -90,15 +90,22 @@ async def caching_policy(request: Request, call_next):
 
 
 def _data_version():
-    """Newest upstream fetch time. Changes whenever the snapshots refresh
-    (Reset Cache button or scripts/refresh_upstream.py), which tells clients
-    to drop their locally cached static game data."""
+    """Newest upstream fetch time, plus when the item and move files last changed. Changes whenever the snapshots
+    refresh (Reset Cache button or scripts/refresh_upstream.py), the DM console saves, or an edited item / move file is
+    pulled onto the Pi -- which tells clients to drop their locally cached static game data."""
     conn = db.connect()
     try:
         row = conn.execute('SELECT MAX(fetched_at) FROM upstream_cache').fetchone()
-        return (row and row[0]) or 'none'
+        fetched = (row and row[0]) or 'none'
     finally:
         conn.close()
+    files = []
+    for path in (upstream.ITEMS_FILE, upstream.MOVES_FILE):
+        try:
+            files.append(str(int(os.path.getmtime(path))))
+        except OSError:
+            files.append('-')
+    return f"{fetched}|{'|'.join(files)}"
 
 
 def _dispatch(params):

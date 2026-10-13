@@ -28,6 +28,11 @@ POKEDEX_CONFIG_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex
 # fetch_moves below for the row shape this produces.
 MOVES_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_moves_categorized_draft.json')
 
+# The item list, the same way (2026-10-14, the user's call: all game data on the Pi, nothing fetched from Benjakronk's
+# sheet any more) -- first taken from the Pi's copy of his sheet. {"items": [{name, type, description, effect}]}.
+ITEMS_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_items.json')
+_items_file_cache = (None, None)  # (the file's mtime, fetch_items' result)
+
 # The picture formats of Benjakronk's images, best first (when a picture exists in several, the first one is used).
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
 
@@ -183,7 +188,19 @@ def fetch_moves(conn, force=False):
 
 def fetch_items(conn, force=False):
     """Returns the mapped {'status': 'success', 'items': [...]} shape
-    (the .gs version caches the mapped result, not the raw rows)."""
+    (the .gs version caches the mapped result, not the raw rows). Read from ITEMS_FILE (again only when it changes, so an
+    edit pulled onto the Pi shows at once); `force` doesn't fetch anything any more. Only when the file is missing or
+    broken does it fall back to the snapshot of Benjakronk's sheet in the database (and fetch that if there's none)."""
+    global _items_file_cache
+    try:
+        mtime = os.path.getmtime(ITEMS_FILE)
+        if _items_file_cache[0] != mtime:
+            with open(ITEMS_FILE, encoding='utf-8') as f:
+                items = json.load(f)['items']
+            _items_file_cache = (mtime, {'status': 'success', 'items': items})
+        return _items_file_cache[1]
+    except (OSError, ValueError, KeyError, TypeError):
+        force = False  # no file: the database's snapshot, never a fetch over it
     if not force:
         cached = _cache_get(conn, 'items')
         if cached is not None:
@@ -293,7 +310,7 @@ def warm_upstream(conn):
         finally:
             c.close()
 
-    fns = (fetch_pokemon_db, fetch_items, fetch_pokedex_config)
+    fns = (fetch_pokemon_db, fetch_items, fetch_pokedex_config)  # (items: read from ITEMS_FILE, nothing fetched)
     with ThreadPoolExecutor(max_workers=len(fns)) as pool:
         list(pool.map(refresh, fns))
 

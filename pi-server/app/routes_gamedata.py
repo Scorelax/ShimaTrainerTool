@@ -32,6 +32,10 @@ def handle(conn, action, params):
     if action == 'pokedex-config':
         return {'status': 'success', 'data': upstream.fetch_pokedex_config(conn)}
 
+    if action == 'player-pokedex':
+        from .player_pokedex import player_pokedex
+        return {'status': 'success', 'data': player_pokedex(conn)}
+
     if action == 'clear-cache':
         upstream.warm_upstream(conn)
         return {'status': 'success', 'message': 'Server cache refreshed'}

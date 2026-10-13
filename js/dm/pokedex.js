@@ -10,6 +10,8 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, getSpecies } from './dm-common.js';
 
 const DEFAULTS = '__defaults';
+// The page for moves the players can look up on their own (extraSearchableMoves -- the old site's "Move Search" tab).
+const MOVES = '__moves';
 
 // Every switch the config has, grouped the way the detail page shows them. [key, label, value(detail) -> text]
 const GROUPS = [
@@ -89,7 +91,9 @@ export async function renderPokedex(root) {
         <div class="dm-seg" id="pdxFilter">
           <button data-f="all" class="active">All</button><button data-f="in">In players' Pokédex</button><button data-f="out">Not yet</button>
         </div>
+        <div class="dm-pdx-bulk"><button class="dm-btn small" id="pdxAddListed">Add all listed</button><button class="dm-btn small" id="pdxRemoveListed">Remove all listed</button></div>
         <button class="dm-pdx-row dm-pdx-defaults" data-name="${DEFAULTS}"><span>⚙</span><span><strong>Default settings</strong><small>For every Pokémon without its own</small></span></button>
+        <button class="dm-pdx-row dm-pdx-defaults" data-name="${MOVES}"><span>🔍</span><span><strong>Searchable moves</strong><small>Moves the players can look up</small></span></button>
         <div class="dm-pdx-list" id="pdxList"></div>
       </aside>
       <section class="dm-editor-canvas" id="pdxDetail"><div class="dm-cs-empty">Pick a Pokémon on the left.</div></section>
@@ -108,6 +112,8 @@ export async function renderPokedex(root) {
     const row = e.target.closest('[data-name]');
     if (row) select(row.dataset.name);
   });
+  document.getElementById('pdxAddListed').addEventListener('click', () => setListedRegistered(true));
+  document.getElementById('pdxRemoveListed').addEventListener('click', () => setListedRegistered(false));
   if (_selected) select(_selected);
 }
 
@@ -156,6 +162,21 @@ function applyFilter() {
   });
 }
 
+/** Puts every Pokemon the list shows right now (search + filter) into the players' Pokedex, or takes them all out. */
+async function setListedRegistered(on) {
+  const names = [...document.querySelectorAll('#pdxList [data-name]')].filter(r => !r.hidden && r.classList.contains('registered') !== on).map(r => r.dataset.name);
+  if (!names.length) return;
+  const text = on ? `Add ${names.length} Pokémon to the players' Pokédex?` : `Take ${names.length} Pokémon out of the players' Pokédex?`;
+  if (!await showCombatConfirm(text, { title: on ? 'Add all listed' : 'Remove all listed', yesLabel: on ? 'Add' : 'Remove', noLabel: 'Cancel' })) return;
+  const lower = new Set(names.map(n => n.toLowerCase()));
+  _config.registered = _config.registered.filter(n => !lower.has(String(n).toLowerCase()));
+  if (on) _config.registered.push(...names);
+  scheduleSave();
+  refreshListFlags();
+  applyFilter();
+  if (_selected && lower.has(_selected.toLowerCase())) renderDetail();
+}
+
 // ---------------------------------------------------------------------------
 // The detail page
 // ---------------------------------------------------------------------------
@@ -165,6 +186,7 @@ async function select(name) {
   document.querySelectorAll('.dm-editor-tools [data-name]').forEach(r => r.classList.toggle('selected', r.dataset.name === name));
   const box = document.getElementById('pdxDetail');
   if (name === DEFAULTS) { renderDetail(); return; }
+  if (name === MOVES) { renderMovesPage(); return; }
   if (!_details.has(name)) {
     box.innerHTML = '<div class="dm-loading">Loading…</div>';
     try {
@@ -341,6 +363,60 @@ function wireDetail(name, d) {
     refreshListFlags();
     renderDetail();
   });
+}
+
+// ---------------------------------------------------------------------------
+// Searchable moves
+// ---------------------------------------------------------------------------
+
+/** Every move with a tick for "the players can look it up". The ones a species in their Pokedex already shows are
+ * searchable anyway (ticked and greyed); the others are the DM's own picks (extraSearchableMoves). */
+async function renderMovesPage() {
+  const box = document.getElementById('pdxDetail');
+  box.innerHTML = '<div class="dm-loading">Loading…</div>';
+  let overview;
+  try {
+    if (pokedexHasUnsaved()) await saveNow(); // what the species show comes from the saved settings
+    overview = (await DmAPI.pokedexSearchable()).data;
+  } catch (err) {
+    box.innerHTML = `<div class="dm-loading">Couldn't load the moves: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  if (_selected !== MOVES) return;
+  const via = new Set(overview.viaPokemon.map(n => n.toLowerCase()));
+  const picked = () => new Set((_config.extraSearchableMoves || []).map(n => String(n).toLowerCase()));
+  const count = () => new Set([...via, ...picked()]).size;
+  const extra = picked();
+  box.innerHTML = `
+    <div class="dm-pdx-head dm-pdx-head-plain">
+      <span class="dm-pdx-big">🔍</span>
+      <div class="dm-pdx-title">
+        <h3 class="dm-cs-title">Searchable moves</h3>
+        <div class="dm-species-meta">The players can look these up in their Pokédex. Moves a Pokémon in their Pokédex shows are always included. <strong id="pdxMoveCount">${count()}</strong> searchable.</div>
+      </div>
+    </div>
+    <input class="dm-input" id="pdxMoveFilter" placeholder="Filter by name or type…" autocomplete="off">
+    <div class="dm-pdx-movegrid" id="pdxMoveGrid">
+      ${overview.moves.map((m) => {
+        const lower = m.name.toLowerCase();
+        const fromMon = via.has(lower);
+        const on = fromMon || extra.has(lower);
+        return `<label class="dm-pdx-move${on ? ' on' : ''}${fromMon ? ' via' : ''}" data-search="${escapeHtml(`${m.name} ${m.type}`.toLowerCase())}"${fromMon ? ' title="A Pokémon in their Pokédex shows it"' : ''}>
+          <input type="checkbox" data-searchable="${escapeHtml(m.name)}" ${on ? 'checked' : ''} ${fromMon ? 'disabled' : ''}>${escapeHtml(m.name)}<small>${escapeHtml(m.type)}</small></label>`;
+      }).join('')}
+    </div>`;
+  document.getElementById('pdxMoveFilter').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    box.querySelectorAll('#pdxMoveGrid [data-search]').forEach((el) => { el.hidden = !!q && !el.dataset.search.includes(q); });
+  });
+  box.querySelectorAll('[data-searchable]').forEach(cb => cb.addEventListener('change', () => {
+    const name = cb.dataset.searchable;
+    const rest = (_config.extraSearchableMoves || []).filter(n => String(n).toLowerCase() !== name.toLowerCase());
+    _config.extraSearchableMoves = cb.checked ? [...rest, name] : rest;
+    cb.closest('.dm-pdx-move').classList.toggle('on', cb.checked);
+    document.getElementById('pdxMoveCount').textContent = count();
+    scheduleSave();
+  }));
 }
 
 // ---------------------------------------------------------------------------

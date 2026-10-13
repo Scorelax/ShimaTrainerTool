@@ -10,6 +10,7 @@ Env vars:     POKEDEX_DB (sqlite path), PWA_DIR (static files root)
 import asyncio
 import hmac
 import json
+import mimetypes
 import os
 import queue as queue_mod
 from datetime import datetime, timezone
@@ -51,7 +52,7 @@ db.init()
 # new URL automatically -- nothing for the browser to revalidate, nothing to
 # ever go stale, nothing to manually clear.
 _VERSIONED_MEDIA_PREFIXES = ('/gifs/', '/evolution-videos/', upstream.CHARACTER_IMAGE_URL_PREFIX,
-                             upstream.DISPLAY_IMAGE_URL_PREFIX)
+                             upstream.DISPLAY_IMAGE_URL_PREFIX, upstream.POKEMON_IMAGE_URL_PREFIX)
 
 # Benjakronk's splash mirror and the bundled PWA assets aren't stamped with a
 # version (their filenames stay constant even when the content behind them
@@ -384,6 +385,13 @@ if os.path.isdir(upstream.BATTLE_ANIMATION_DIR):
 if os.path.isdir(upstream.CHARACTER_IMAGE_DIR):
     app.mount(upstream.CHARACTER_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=upstream.CHARACTER_IMAGE_DIR),
               name='character-images')
+
+# Benjakronk's original species pictures (see upstream.POKEMON_IMAGE_DIR / upstream.local_pokemon_image_url). Many are
+# .jfif, which Python doesn't know as a JPEG -- without this they'd be sent as plain text.
+mimetypes.add_type('image/jpeg', '.jfif')
+if os.path.isdir(upstream.POKEMON_IMAGE_DIR):
+    app.mount(upstream.POKEMON_IMAGE_URL_PREFIX.rstrip('/'), StaticFiles(directory=upstream.POKEMON_IMAGE_DIR),
+              name='pokemon-images')
 
 # Battle-map background images (see upstream.BATTLE_IMAGE_DIR / routes_combat.py's list-backgrounds)
 if os.path.isdir(upstream.BATTLE_IMAGE_DIR):

@@ -18,6 +18,23 @@ def sanitize_string(s):
     return re.sub(r'\s+', ' ', s).strip()
 
 
+_MOJIBAKE_MARKS = ('Ã', 'â€', 'Â')
+
+
+def fix_mojibake(s):
+    """'PokÃ©mon' -> 'Pokémon': text that was UTF-8 but got read as Windows-1252 somewhere on its way from the
+    encyclopedia sheet (some of its descriptions arrive like that). Only touches text that shows the tell-tale marks,
+    and leaves it as it was if it doesn't turn back into proper UTF-8."""
+    if not s or not isinstance(s, str) or not any(m in s for m in _MOJIBAKE_MARKS):
+        return s
+    for codec in ('cp1252', 'latin-1'):
+        try:
+            return s.encode(codec).decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+    return s
+
+
 def sanitize_moves(move_string, max_moves):
     if move_string is None:
         move_string = ''

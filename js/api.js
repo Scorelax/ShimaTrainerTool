@@ -710,6 +710,14 @@ export class GameDataAPI {
   }
 
   /**
+   * The players' Pokedex (pokedex.html): the registered species with only what the DM lets them see, and the moves
+   * they may look up -- pi-server's player_pokedex.py does the hiding. Never cached: the DM's changes show at once.
+   */
+  static async getPlayerPokedex() {
+    return API.request('game-data', 'player-pokedex', {}, { useCache: false, timeout: HEAVY_TIMEOUT });
+  }
+
+  /**
    * Refresh the SERVER-side upstream cache in place (pokemon DB, moves,
    * items, pokedex config are re-fetched and overwritten, so the cache
    * stays warm). Used by the Reset Cache button. Can take a while when
@@ -1290,6 +1298,12 @@ export class DmAPI {
   /** The players' pokedex config ({registered, visibility, defaults, ...}) plus `editedHere`. Never cached. */
   static async pokedexConfig() {
     return API.request('dm', 'pokedex-config', {}, { useCache: false });
+  }
+
+  /** Every move ({name, type}) and the names the players can already look up through a species in their Pokedex
+   * (`viaPokemon`) -- the Pokedex module's "Searchable moves" page. */
+  static async pokedexSearchable() {
+    return API.request('dm', 'pokedex-searchable', {}, { useCache: false, timeout: HEAVY_TIMEOUT });
   }
 
   /** Saves what the players may see (POST -- main.py's /api/dm/pokedex-config); it's live-pushed to every device. */

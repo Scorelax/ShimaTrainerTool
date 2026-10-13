@@ -95,6 +95,13 @@ CHARACTER_IMAGE_DIR = os.path.expanduser(
 CHARACTER_IMAGE_URL_PREFIX = '/character-images/'
 _CHARACTER_IMAGE_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.gif')
 
+# Benjakronk's original species pictures, copied onto the Pi (the same files as his repo's images/pokemon, named
+# <3-digit dex>-<sanitized name>.<png|jpg|jpeg|jfif>) -- served at /pokemon-images/ (local_pokemon_image_url).
+POKEMON_IMAGE_DIR = os.path.expanduser(
+    os.environ.get('POKEMON_IMAGE_DIR', '~/pokemon-dnd/images/original_pokemon'))
+POKEMON_IMAGE_URL_PREFIX = '/pokemon-images/'
+_POKEMON_IMAGE_EXTS = IMG_FORMATS + ['webp']
+
 # Pictures the DM uploads from the DM console for the table TV (backgrounds -- routes_dm.save_display_image). Each file
 # gets a new random name, so its URL never shows different content (cached hard, see main.py).
 DISPLAY_IMAGE_DIR = os.path.expanduser(
@@ -410,6 +417,50 @@ def local_character_image_url(trainer_name):
             if os.path.isfile(path):
                 return f'{CHARACTER_IMAGE_URL_PREFIX}{quote(filename)}?t={int(os.path.getmtime(path))}'
     return None
+
+
+_pokemon_image_index = (None, {})  # (folder mtime it was built at, {lowercase key: file name})
+
+
+def _pokemon_image_files():
+    """{key: file name} for POKEMON_IMAGE_DIR, keyed both by '<dex>-<name>' and by '<name>' alone; per key the format
+    earliest in _POKEMON_IMAGE_EXTS wins. Rebuilt only when the folder changes (a file added, removed or renamed)."""
+    global _pokemon_image_index
+    try:
+        mtime = os.path.getmtime(POKEMON_IMAGE_DIR)
+    except OSError:
+        return {}
+    if _pokemon_image_index[0] == mtime:
+        return _pokemon_image_index[1]
+    best = {}  # key -> (rank, file name)
+    for filename in os.listdir(POKEMON_IMAGE_DIR):
+        stem, ext = os.path.splitext(filename)
+        ext = ext.lower().lstrip('.')
+        if ext not in _POKEMON_IMAGE_EXTS:
+            continue
+        rank = _POKEMON_IMAGE_EXTS.index(ext)
+        stem = stem.lower()
+        for key in {stem, re.sub(r'^\d+-', '', stem)}:
+            if key not in best or rank < best[key][0]:
+                best[key] = (rank, filename)
+    files = {key: name for key, (_, name) in best.items()}
+    _pokemon_image_index = (mtime, files)
+    return files
+
+
+def local_pokemon_image_url(pokemon_name, pokemon_id):
+    """The original picture of a species from POKEMON_IMAGE_DIR, or None: '<dex>-<name>' first (Benjakronk's naming,
+    as get_image_url), then the name alone (in case the number differs). Same mtime-stamped-URL reasoning as
+    local_sprite_url()."""
+    files = _pokemon_image_files()
+    sanitized = _sanitize_species_name(pokemon_name)
+    filename = files.get(f'{str(pokemon_id).zfill(3)}-{sanitized}') or files.get(sanitized)
+    if not filename:
+        return None
+    path = os.path.join(POKEMON_IMAGE_DIR, filename)
+    if not os.path.isfile(path):
+        return None
+    return f'{POKEMON_IMAGE_URL_PREFIX}{quote(filename)}?t={int(os.path.getmtime(path))}'
 
 
 def local_battle_animation_url(pokemon_name):

@@ -54,6 +54,8 @@ export function initLiveUpdates() {
       return;
     }
     if (event.dataset === 'pokedex-config') {
+      // The players' Pokedex page (js/pokedex/player-pokedex.js) fetches its own cut of the data at once.
+      window.dispatchEvent(new CustomEvent('app:pokedex-config'));
       refreshPokedexData();
     } else if (event.type === 'trainer-data' && event.trainer) {
       refreshActiveTrainerData(event.trainer);

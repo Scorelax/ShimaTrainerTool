@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#161b22">
+<title>Shima Pokédex</title>
+<link rel="icon" href="assets/PokedexIcon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/pokedex.css">
+<style>
+  html, body { margin: 0; padding: 0; background: #0d1117; }
+</style>
+</head>
+<body>
+  <div class="pdx-loading" id="pdxLoading">
+    <div class="pdx-loader">
+      <div class="pdx-splash" id="pdxSplash"></div>
+      <div class="pdx-loading-info">
+        <p class="pdx-loading-text" id="pdxLoadingText">Initializing Pokédex...</p>
+        <div class="pdx-progress"><div class="pdx-progress-bar" id="pdxProgress"></div></div>
+        <p class="pdx-loading-percent" id="pdxLoadingPercent">0%</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="pokedexRoot"></div>
+
+  <script type="module" src="js/pages/pokedex.js"></script>
+</body>
+</html>

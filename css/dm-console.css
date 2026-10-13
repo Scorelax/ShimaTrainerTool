@@ -322,6 +322,14 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-pdx-move { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--dm-line); color: #8d8ea8; cursor: pointer; }
 .dm-pdx-move.on { color: var(--dm-text); background: rgba(39, 174, 96, 0.14); border-color: rgba(39, 174, 96, 0.45); }
 .dm-pdx-move input { margin: 0; accent-color: #27ae60; }
+.dm-pdx-bulk { display: flex; gap: 0.35rem; }
+.dm-pdx-bulk .dm-btn { flex: 1; }
+.dm-pdx-head-plain { grid-template-columns: 96px 1fr; margin-bottom: 0.7rem; }
+.dm-pdx-movegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.35rem; margin-top: 0.7rem; }
+.dm-pdx-movegrid .dm-pdx-move { border-radius: 8px; padding: 0.3rem 0.55rem; }
+.dm-pdx-movegrid .dm-pdx-move[hidden] { display: none; }
+.dm-pdx-movegrid .dm-pdx-move small { margin-left: auto; font-size: 0.7rem; color: var(--dm-muted); }
+.dm-pdx-move.via { opacity: 0.6; cursor: default; }
 
 /* ---- Party module ---- */
 .dm-party { max-width: 1400px; margin: 0 auto; padding: 1.4rem 1.6rem 2.5rem; }

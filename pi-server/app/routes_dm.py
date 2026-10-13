@@ -69,6 +69,10 @@ def handle(conn, action, params):
         return {'status': 'success', 'data': upstream.fetch_pokedex_config(conn),
                 'editedHere': upstream.pokedex_config_edited_here(conn)}
 
+    if action == 'pokedex-searchable':
+        from .player_pokedex import searchable_move_overview
+        return {'status': 'success', 'data': searchable_move_overview(conn)}
+
     if action == 'party':
         return {'status': 'success', 'data': party_overview(conn)}
 

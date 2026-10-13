@@ -1778,44 +1778,38 @@ export function renderTrainerInfo() {
           transform: scale(1.08);
         }
 
-        /* Pokedex button -- mirrors the back button, top-right */
+        /* Pokedex button, top-right: just the Pokedex itself, no circle */
         #pokedexButton {
           position: fixed;
-          top: clamp(15px, 3vh, 20px);
-          right: clamp(15px, 3vw, 20px);
-          background: var(--surface-glass);
-          width: clamp(45px, 9vw, 55px);
-          height: clamp(45px, 9vw, 55px);
-          border: 2px solid var(--border-accent);
-          border-radius: 50%;
+          top: clamp(12px, 2.5vh, 18px);
+          right: clamp(12px, 3vw, 18px);
+          width: clamp(54px, 11vw, 66px);
+          height: clamp(54px, 11vw, 66px);
+          background: none;
+          border: none;
           cursor: pointer;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), filter 0.3s;
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 1001;
           padding: 0;
-          overflow: hidden;
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
         }
 
-        /* the whole (wider than tall) Pokedex inside the circle */
         #pokedexButton img {
-          width: 80%;
-          height: 80%;
+          width: 100%;
+          height: 100%;
           object-fit: contain;
-          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
         }
 
         #pokedexButton:hover {
-          transform: scale(1.15);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.4),
-                      0 0 25px rgba(255,222,0,0.6);
-          border-color: #FFC700;
+          transform: scale(1.12);
+          filter: drop-shadow(0 6px 12px rgba(0,0,0,0.5)) drop-shadow(0 0 10px rgba(255,222,0,0.6));
         }
 
         #pokedexButton:active {
-          transform: scale(1.08);
+          transform: scale(1.05);
         }
 
         /* Tablet Landscape and below - maintain 2 columns but adjust sizing */

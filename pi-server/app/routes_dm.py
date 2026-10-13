@@ -76,6 +76,12 @@ def handle(conn, action, params):
     if action == 'party':
         return {'status': 'success', 'data': party_overview(conn)}
 
+    if action == 'caught-species':
+        # The species the players have caught (any trainer's Pokemon, by species name, lowercase) -- the Pokedex
+        # module's Poke Ball marks.
+        rows = conn.execute('SELECT DISTINCT lower(trim(name)) FROM pokemon WHERE trim(coalesce(name, \'\')) != \'\'').fetchall()
+        return {'status': 'success', 'data': sorted(r[0] for r in rows)}
+
     if action == 'give-item':
         if not params.get('trainer') or not params.get('item'):
             raise ValueError('Missing trainer or item')

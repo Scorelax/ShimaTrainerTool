@@ -68,14 +68,27 @@ let _filter = 'all';
 let _saveTimer = null;
 let _saveState = 'saved';
 const _details = new Map();
+let _caught = new Set();  // the species the players have caught (lowercase)
+let _caughtTimer = null;
 
 export async function renderPokedex(root) {
   _root = root;
+  if (!_caughtTimer) {
+    // A trainer's Pokemon changed (caught, given, evolved): the Poke Ball marks again, a moment later.
+    _caughtTimer = -1;
+    window.addEventListener('app:trainer-data', () => {
+      clearTimeout(_caughtTimer);
+      _caughtTimer = setTimeout(async () => {
+        try { _caught = new Set(await DmAPI.caughtSpecies()); refreshListFlags(); } catch (e) { /* keep the old marks */ }
+      }, 1000);
+    });
+  }
   root.innerHTML = '<div class="dm-loading">Loading the Pokédex…</div>';
   try {
-    const [cfg, species] = await Promise.all([DmAPI.pokedexConfig(), getSpecies()]);
+    const [cfg, species, caught] = await Promise.all([DmAPI.pokedexConfig(), getSpecies(), DmAPI.caughtSpecies().catch(() => [])]);
     _config = cfg.data || {};
     _species = species;
+    _caught = new Set(caught);
   } catch (err) {
     root.innerHTML = `<div class="dm-loading">Couldn't load the Pokédex: ${escapeHtml(err.message)}</div>`;
     return;
@@ -144,13 +157,17 @@ function renderList() {
   applyFilter();
 }
 
-/** The little markers on each row -- in the players' Pokedex (👁) and has its own settings (✎) -- updated in place. */
+/** The little markers on each row -- in the players' Pokedex (the Pokedex) and caught by the players (a Poke Ball) --
+ * updated in place. */
 function refreshListFlags() {
   document.querySelectorAll('#pdxList [data-name]').forEach(row => {
     const name = row.dataset.name;
     const reg = isRegistered(name);
+    const caught = _caught.has(name.toLowerCase());
     row.classList.toggle('registered', reg);
-    row.querySelector('.dm-pdx-flags').innerHTML = `${reg ? '<span title="In the players\' Pokédex">👁</span>' : ''}${ownSettings(name) ? '<span title="Has its own settings">✎</span>' : ''}`;
+    const html = `${caught ? '<img src="assets/Pokeball.png" alt="Caught" title="The players have caught one">' : ''}${reg ? '<img src="assets/pokedex.png" alt="In the Pokédex" title="In the players\' Pokédex">' : ''}`;
+    const flags = row.querySelector('.dm-pdx-flags');
+    if (flags._html !== html) { flags.innerHTML = html; flags._html = html; }
   });
 }
 

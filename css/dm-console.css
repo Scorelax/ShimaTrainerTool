@@ -294,7 +294,8 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-pdx-thumb img, .dm-pdx-thumb video { width: 100%; height: 100%; object-fit: contain; }
 .dm-pdx-main { min-width: 0; font-size: 0.86rem; }
 .dm-pdx-main strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.dm-pdx-flags { display: flex; gap: 0.25rem; font-size: 0.85rem; }
+.dm-pdx-flags { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; }
+.dm-pdx-flags img { width: 20px; height: 20px; object-fit: contain; display: block; }
 .dm-pdx-head { display: grid; grid-template-columns: 96px 1fr auto; gap: 1rem; align-items: center; }
 .dm-pdx-big { width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; font-size: 3rem; background: rgba(0, 0, 0, 0.25); border-radius: 14px; }
 .dm-pdx-big img, .dm-pdx-big video { width: 100%; height: 100%; object-fit: contain; }

@@ -84,18 +84,26 @@ async function init() {
   });
   window.addEventListener('dm:battle-tab', (e) => { if (e.detail?.tab) showBattleTab(e.detail.tab); });
   window.addEventListener('dm:aftermath-changed', () => { if (!session?.active) renderAftermathBanner(); });
+
+  // Back where the DM was before the reload.
+  let last = null;
+  try { last = localStorage.getItem(MODULE_KEY); } catch (e) { /* not kept */ }
+  if (last && last !== 'battle' && MODULES[last]) showModule(last);
 }
 
 // ---------------------------------------------------------------------------
 // Modules (the rail on the left): Battle, Party, Pokedex, NPCs, Clock, PokeNav, Display. The battle
 // keeps running in its own section while another module is open; Party is fetched fresh every time it's opened, the
-// Clock is redrawn (the time may have moved), the Pokedex, NPCs, PokeNav and Display keep where the DM was.
+// Clock is redrawn (the time may have moved), the Pokedex, NPCs, PokeNav and Display keep where the DM was. The module
+// open last opens again after a reload.
 // ---------------------------------------------------------------------------
 
 const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock', pokenav: 'dmModulePokenav', display: 'dmModuleDisplay' };
 const _moduleOpened = new Set(['battle']);
+const MODULE_KEY = 'dmConsoleModule'; // the module open last, opened again after a reload (this browser only)
 
 function showModule(name) {
+  try { localStorage.setItem(MODULE_KEY, name); } catch (e) { /* not kept */ }
   Object.entries(MODULES).forEach(([key, id]) => {
     const el = document.getElementById(id);
     el.hidden = key !== name;

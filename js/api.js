@@ -1320,6 +1320,11 @@ export class DmAPI {
 
   /** Every player trainer with all their Pokemon: [{trainer: row, pokemon: [rows], xp: {trainer, pokemon: [one per
    * row]}}] (Party module). XP is null where none is stored yet. */
+  /** The species the players have caught: [lowercase species name]. */
+  static async caughtSpecies() {
+    return (await API.request('dm', 'caught-species', {}, { useCache: false })).data || [];
+  }
+
   static async party() {
     return API.request('dm', 'party', {}, { useCache: false, timeout: HEAVY_TIMEOUT });
   }

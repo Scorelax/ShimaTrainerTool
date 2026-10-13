@@ -408,6 +408,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     let moved = flight ? stepFlight(now) : follow ? stepFollow(now) : false;
     lastTick = now;
     if (controls.update()) moved = true;
+    if (controlsMoved) { moved = true; controlsMoved = false; }
     clampTarget();
     if ((moved || dirty) && !root.clientWidth) {
       dirty = true; // put away (the board screen during a battle): drawn when it's back (the resize wakes it)
@@ -464,7 +465,10 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (!frame && !destroyed) frame = requestAnimationFrame(tick);
   }
   controls.addEventListener('start', wake);
-  controls.addEventListener('change', wake);
+  // A zoom (wheel, pinch) is applied by the controls there and then, in their own handler -- by the next frame there's
+  // nothing left for controls.update() to move, so without this it wasn't drawn (or sent on) until something else moved.
+  let controlsMoved = false;
+  controls.addEventListener('change', () => { controlsMoved = true; wake(); });
   canvas.addEventListener('wheel', wake, { passive: true });
   canvas.addEventListener('pointerdown', wake);
   // A weak device can take the 3D drawing away (short on graphics memory, say while the battle map plays its videos);

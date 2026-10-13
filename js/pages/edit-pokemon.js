@@ -6,6 +6,8 @@ import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 import { showLoadingWithSplash, hideLoading } from '../utils/splash.js';
 import { audioManager } from '../utils/audio.js';
 
+const escAttr = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 export function renderEditPokemon(pokemonName) {
   // Load Pokemon data from session storage
   const pokemonDataStr = sessionStorage.getItem(`pokemon_${pokemonName.toLowerCase()}`);
@@ -667,6 +669,11 @@ export function renderEditPokemon(pokemonName) {
       <div class="form-container">
         <form id="editPokemonForm">
           <div class="form-grid">
+            <div class="form-group full-width">
+              <label for="nickname">Nickname</label>
+              <input type="text" id="nickname" name="nickname" value="${escAttr(nickname)}" maxlength="30" placeholder="${escAttr(name)}" autocomplete="off" />
+            </div>
+
             <div class="form-group">
               <label for="level">Level</label>
               <input type="number" id="level" name="level" value="${level}" min="1" max="100" required />
@@ -1415,6 +1422,7 @@ async function handleFormSubmit(pokemonName, originalNature) {
     );
 
     // Update Pokemon data array
+    pokemonData[36] = (document.getElementById('nickname')?.value || '').trim().slice(0, 30); // empty: no nickname
     pokemonData[4] = level;
     pokemonData[7] = abilitiesString;   // Ability (combined with pipes)
     pokemonData[15] = str;

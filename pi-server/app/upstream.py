@@ -33,6 +33,11 @@ MOVES_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_moves_ca
 ITEMS_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_items.json')
 _items_file_cache = (None, None)  # (the file's mtime, fetch_items' result)
 
+# Every species, the same way: {"columns": {index: what}, "pokemon": [[80 cells by position], ...]} -- the rows exactly
+# as Benjakronk's sheet gave them, so every reader of fetch_pokemon_db is unchanged.
+POKEMON_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_pokemon.json')
+_pokemon_file_cache = (None, None)  # (the file's mtime, the rows)
+
 # The picture formats of Benjakronk's images, best first (when a picture exists in several, the first one is used).
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
 
@@ -151,6 +156,21 @@ def _fetch_json(url):
 
 
 def fetch_pokemon_db(conn, force=False):
+    """Every species' row (see POKEMON_FILE) -- read from that file, again only when it changes; `force` fetches nothing
+    any more. Only when the file is missing or broken: the snapshot of Benjakronk's sheet in the database (fetched if
+    there's none)."""
+    global _pokemon_file_cache
+    try:
+        mtime = os.path.getmtime(POKEMON_FILE)
+        if _pokemon_file_cache[0] != mtime:
+            with open(POKEMON_FILE, encoding='utf-8') as f:
+                rows = json.load(f)['pokemon']
+            if not isinstance(rows, list):
+                raise ValueError('pokemon must be a list')
+            _pokemon_file_cache = (mtime, rows)
+        return _pokemon_file_cache[1]
+    except (OSError, ValueError, KeyError, TypeError):
+        force = False  # no file: the database's snapshot, never a fetch over it
     if not force:
         cached = _cache_get(conn, 'pokemonDB')
         if cached is not None:
@@ -310,7 +330,8 @@ def warm_upstream(conn):
         finally:
             c.close()
 
-    fns = (fetch_pokemon_db, fetch_items, fetch_pokedex_config)  # (items: read from ITEMS_FILE, nothing fetched)
+    # (species and items: read from their files, nothing fetched; the pokedex config: never once the DM console owns it)
+    fns = (fetch_pokemon_db, fetch_items, fetch_pokedex_config)
     with ThreadPoolExecutor(max_workers=len(fns)) as pool:
         list(pool.map(refresh, fns))
 

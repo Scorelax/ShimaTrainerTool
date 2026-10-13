@@ -535,7 +535,7 @@ export function renderIndex() {
 // (e.g. Apps Script backend, which never sends X-Data-Version at all).
 function formatLastUpdate(version) {
   if (!version) return 'unknown';
-  // The Pi's data version: "<newest data fetch (ISO)>|<item file's mtime (s)>|<move file's mtime (s)>" -- the newest.
+  // The Pi's data version: "<newest data fetch (ISO)>|<species / item / move files' mtimes (s)>" -- the newest.
   const [iso, ...files] = String(version).split('|');
   const times = [Date.parse(iso), ...files.map(s => Number(s) * 1000)].filter(t => Number.isFinite(t) && t > 0);
   if (!times.length) return 'unknown';

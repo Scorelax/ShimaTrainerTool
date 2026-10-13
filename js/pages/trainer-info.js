@@ -1778,11 +1778,12 @@ export function renderTrainerInfo() {
           transform: scale(1.08);
         }
 
-        /* Pokedex button, top-right: just the Pokedex itself, no circle */
+        /* Pokedex button, the page's top-right corner (scrolls away with the page): just the Pokedex itself, no circle */
         #pokedexButton {
-          position: fixed;
-          top: clamp(12px, 2.5vh, 18px);
-          right: clamp(12px, 3vw, 18px);
+          position: absolute;
+          /* the page's own corner -- the page already sits as far in from the screen's edges as the back button */
+          top: 0;
+          right: 0;
           width: clamp(54px, 11vw, 66px);
           height: clamp(54px, 11vw, 66px);
           background: none;

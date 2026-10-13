@@ -908,10 +908,10 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 /* buttons: the white keys, the one in use lit blue */
 #dmModulePokedex .dm-btn, #dmModulePokedex .dm-seg button {
   font-family: var(--pdx-font); font-weight: 700; color: #2b2b2b; text-shadow: none;
-  background: linear-gradient(#f8f8f8, #d6d6d6); border: 2px solid var(--pdx-ink); border-radius: 6px; box-shadow: 0 2px 0 #8a8a8a;
+  background: linear-gradient(#dedede, #b8b8b8); border: 2px solid var(--pdx-ink); border-radius: 6px; box-shadow: 0 2px 0 #6e6e6e;
 }
-#dmModulePokedex .dm-btn:hover:not(:disabled), #dmModulePokedex .dm-seg button:hover { background: linear-gradient(#ffffff, #e2e2e2); }
-#dmModulePokedex .dm-btn:active:not(:disabled), #dmModulePokedex .dm-seg button:active { transform: translateY(1px); box-shadow: 0 1px 0 #8a8a8a; }
+#dmModulePokedex .dm-btn:hover:not(:disabled), #dmModulePokedex .dm-seg button:hover { background: linear-gradient(#e8e8e8, #c6c6c6); }
+#dmModulePokedex .dm-btn:active:not(:disabled), #dmModulePokedex .dm-seg button:active { transform: translateY(1px); box-shadow: 0 1px 0 #6e6e6e; }
 #dmModulePokedex .dm-seg button.active {
   color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); background: linear-gradient(var(--pdx-blue-top), var(--pdx-blue));
   box-shadow: 0 1px 0 #0f5d93, inset 0 2px 4px rgba(0, 0, 0, 0.25); transform: translateY(1px);
@@ -919,10 +919,10 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 
 /* the species list (and the two pages above it) on the light panel */
 #dmModulePokedex .dm-pdx-defaults {
-  color: #1d2124; background: linear-gradient(#f8f8f8, #dedede); border: 2px solid var(--pdx-ink); border-radius: 8px; box-shadow: 0 2px 0 #8a8a8a;
+  color: #1d2124; background: linear-gradient(#dedede, #bfbfbf); border: 2px solid var(--pdx-ink); border-radius: 8px; box-shadow: 0 2px 0 #6e6e6e;
 }
 #dmModulePokedex .dm-pdx-list {
-  gap: 0; padding: 4px; background: linear-gradient(#f1f1f1, #dddddd); border: 2px solid var(--pdx-ink); border-radius: 10px;
+  gap: 0; padding: 4px; background: linear-gradient(#d4d6d8, #bfc2c5); border: 2px solid var(--pdx-ink); border-radius: 10px;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
 }
 #dmModulePokedex .dm-pdx-row { color: #1d2124; }
@@ -931,14 +931,14 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 #dmModulePokedex .dm-pdx-row.selected {
   background: linear-gradient(var(--pdx-blue-lit), #8fd6ff); border-color: var(--pdx-ink); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.18);
 }
-#dmModulePokedex .dm-pdx-row:not(.registered):not(.dm-pdx-defaults) .dm-pdx-main strong { color: #8a9399; }
-#dmModulePokedex .dm-pdx-defaults small, #dmModulePokedex .dm-pdx-main small { color: #5b646a; }
+#dmModulePokedex .dm-pdx-row:not(.registered):not(.dm-pdx-defaults) .dm-pdx-main strong { color: #6c757b; }
+#dmModulePokedex .dm-pdx-defaults small, #dmModulePokedex .dm-pdx-main small { color: #4a5359; }
 #dmModulePokedex .dm-type { border: 1px solid rgba(0, 0, 0, 0.45); }
 
 /* the detail head: the picture in the grey bezel (its two dots on top), the name on the red */
 #dmModulePokedex .dm-pdx-big {
   position: relative; box-sizing: border-box;
-  background: #1d2124; border: 7px solid #e3e3e3; border-top-width: 14px; border-radius: 6px 6px 6px 20px;
+  background: #1d2124; border: 7px solid #cfcfcf; border-top-width: 14px; border-radius: 6px 6px 6px 20px;
   box-shadow: 0 0 0 2px var(--pdx-ink), inset 0 3px 8px rgba(0, 0, 0, 0.6), 0 4px 0 rgba(0, 0, 0, 0.3);
 }
 #dmModulePokedex .dm-pdx-big::before {
@@ -958,7 +958,7 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 /* the settings groups: light panels with a green header strip */
 #dmModulePokedex .dm-pdx-group {
   color: #1d2124; padding: 0 0.8rem 0.6rem; overflow: hidden;
-  background: linear-gradient(#f1f1f1, #dddddd); border: 2px solid var(--pdx-ink); border-radius: 10px; box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  background: linear-gradient(#d4d6d8, #bfc2c5); border: 2px solid var(--pdx-ink); border-radius: 10px; box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
 }
 #dmModulePokedex .dm-pdx-group-head {
   margin: 0 -0.8rem 0.5rem; padding: 0.35rem 0.8rem;
@@ -967,19 +967,19 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 }
 #dmModulePokedex .dm-pdx-field:hover { background: rgba(0, 0, 0, 0.05); }
 #dmModulePokedex .dm-pdx-field input { accent-color: var(--pdx-blue); }
-#dmModulePokedex .dm-pdx-label { color: #8a9399; }
+#dmModulePokedex .dm-pdx-label { color: #6c757b; }
 #dmModulePokedex .dm-pdx-field.on .dm-pdx-label { color: #1d2124; }
-#dmModulePokedex .dm-pdx-value { color: #8a9399; }
+#dmModulePokedex .dm-pdx-value { color: #6c757b; }
 #dmModulePokedex .dm-pdx-field.on .dm-pdx-value { color: #2d3439; }
-#dmModulePokedex .dm-pdx-sub, #dmModulePokedex .dm-pdx-group .dm-hint, #dmModulePokedex .dm-pdx-lv { color: #5b646a; }
-#dmModulePokedex .dm-pdx-movelevel { border-top-color: #c9cdd0; }
+#dmModulePokedex .dm-pdx-sub, #dmModulePokedex .dm-pdx-group .dm-hint, #dmModulePokedex .dm-pdx-lv { color: #4a5359; }
+#dmModulePokedex .dm-pdx-movelevel { border-top-color: #a9afb3; }
 #dmModulePokedex .dm-pdx-level { padding: 0.15rem 0.4rem; }
 
 /* move chips (a species' moves, and the Searchable moves page on its light panel) */
-#dmModulePokedex .dm-pdx-move { color: #79828a; background: #ffffff; border-color: #c3c8cc; }
-#dmModulePokedex .dm-pdx-move.on { color: var(--pdx-green-ink); background: #dcf2dd; border-color: var(--pdx-green); }
+#dmModulePokedex .dm-pdx-move { color: #5b646a; background: #e8e9ea; border-color: #a9afb3; }
+#dmModulePokedex .dm-pdx-move.on { color: var(--pdx-green-ink); background: #c4e6c6; border-color: var(--pdx-green); }
 #dmModulePokedex .dm-pdx-movegrid {
-  padding: 0.6rem; background: linear-gradient(#f1f1f1, #dddddd); border: 2px solid var(--pdx-ink); border-radius: 10px;
+  padding: 0.6rem; background: linear-gradient(#d4d6d8, #bfc2c5); border: 2px solid var(--pdx-ink); border-radius: 10px;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
 }
-#dmModulePokedex .dm-pdx-movegrid .dm-pdx-move small { color: #79828a; }
+#dmModulePokedex .dm-pdx-movegrid .dm-pdx-move small { color: #5b646a; }

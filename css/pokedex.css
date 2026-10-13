@@ -155,10 +155,10 @@
   text-transform: uppercase;
   padding: 6px;
   color: #2b2b2b;
-  background: linear-gradient(#f8f8f8, #d6d6d6);
+  background: linear-gradient(#dedede, #b8b8b8);
   border: 2px solid var(--pdx-ink);
   border-radius: 6px;
-  box-shadow: 0 3px 0 #8a8a8a;
+  box-shadow: 0 3px 0 #6e6e6e;
   cursor: pointer;
   transition: transform 0.1s, box-shadow 0.1s;
 }
@@ -225,7 +225,7 @@
   padding: 12px 10px 20px;
   background:
     radial-gradient(circle at 16px calc(100% - 10px), #e0192f 0 3.5px, #5a0710 4px, transparent 4.5px),
-    linear-gradient(#eeeeee, #cdcdcd);
+    linear-gradient(#dadada, #b9b9b9);
   border: 2px solid var(--pdx-ink);
   border-radius: 6px 6px 6px 22px;
   box-shadow: inset 0 1px 0 #fff, 0 2px 0 rgba(0,0,0,0.3);
@@ -332,24 +332,24 @@
 /* The panel a key opens: as long as what's in it (the 0fr -> 1fr row opens it smoothly), in the light grey of the
    screen bezel and the white keys -- white cards, dark text, red highlights. */
 .pdx-tab-panels {
-  --pdx-bg-dark: #ffffff;
-  --pdx-bg-surface: #f3f4f5;
-  --pdx-bg-elevated: #ffffff;
-  --pdx-bg-hover: #e6e9eb;
-  --pdx-border: #cdd1d4;
-  --pdx-border-light: #b3b9bd;
+  --pdx-bg-dark: #e8e9ea;
+  --pdx-bg-surface: #dfe1e3;
+  --pdx-bg-elevated: #e8e9ea;
+  --pdx-bg-hover: #d5d8da;
+  --pdx-border: #b4b9bd;
+  --pdx-border-light: #a1a7ac;
   --pdx-text: #1d2124;
-  --pdx-text-2: #485157;
-  --pdx-text-muted: #79828a;
+  --pdx-text-2: #3c444a;
+  --pdx-text-muted: #626b72;
   --pdx-accent: #cf1830;
 
   display: grid;
   grid-template-rows: 0fr;
   color: var(--pdx-text);
-  background: linear-gradient(#f1f1f1, #dddddd);
+  background: linear-gradient(#d4d6d8, #bfc2c5);
   border: 0 solid var(--pdx-ink);
   border-radius: 8px;
-  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0,0,0,0.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 0 rgba(0,0,0,0.08);
   transition: grid-template-rows 0.3s ease, margin 0.3s ease;
 }
 .pdx-tab-panels.open { grid-template-rows: 1fr; margin-top: 10px; border-width: 2px; }
@@ -357,8 +357,8 @@
 .pdx-tab-panel.active { display: block; animation: pdx-fade 0.2s ease; }
 .pdx-tab-inner { padding: 14px 14px 0; }
 .pdx-tab-panels :is(.pdx-char-item, .pdx-score, .pdx-stat-extra, .pdx-ability-card, .pdx-sense-row, .pdx-evo-item, .pdx-move-group) { box-shadow: 0 1px 2px rgba(0,0,0,0.18); }
-.pdx-tab-panels .pdx-move-vp-tag { background: #e4e7e9; }
-.pdx-tab-panels .pdx-combat-stats { border-bottom-color: #c3c8cc; }
+.pdx-tab-panels .pdx-move-vp-tag { background: #cdd1d4; }
+.pdx-tab-panels .pdx-combat-stats { border-bottom-color: #a9afb3; }
 @keyframes pdx-fade { from { opacity: 0; } to { opacity: 1; } }
 
 /* Info */
@@ -473,21 +473,21 @@
 .pdx-move-type-count { margin-left: auto; font-size: 0.72rem; color: #ffe27a; background: rgba(0,0,0,0.3); padding: 1px 9px; border-radius: 10px; text-shadow: none; }
 /* each type's list in the light grey of the card panels: white rows, dark text */
 .pdx-move-list {
-  --pdx-bg-elevated: #eef0f1;
-  --pdx-bg-hover: #e6e9eb;
-  --pdx-border: #d3d7da;
+  --pdx-bg-elevated: #d6d9db;
+  --pdx-bg-hover: #d5d8da;
+  --pdx-border: #c0c5c9;
   --pdx-text: #1d2124;
-  --pdx-text-2: #485157;
-  --pdx-text-muted: #79828a;
+  --pdx-text-2: #3c444a;
+  --pdx-text-muted: #626b72;
   color: var(--pdx-text);
-  background: #ffffff;
+  background: #e2e4e6;
   border: 2px solid var(--pdx-ink);
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 4px 0 rgba(0,0,0,0.25);
 }
-.pdx-move-list .pdx-move-vp-tag { background: #e4e7e9; }
-.pdx-move-list .pdx-move-row.expanded { background: #f4f5f6; }
+.pdx-move-list .pdx-move-vp-tag { background: #cbd0d3; }
+.pdx-move-list .pdx-move-row.expanded { background: #d9dcde; }
 .pdx-move-row { border-bottom: 1px solid var(--pdx-border); border-left: 4px solid var(--type); }
 .pdx-move-row:last-child { border-bottom: none; }
 .pdx-move-row-summary {

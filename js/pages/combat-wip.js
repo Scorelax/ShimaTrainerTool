@@ -69,6 +69,7 @@ const WIP_CSS = `
     margin-top: -20px; margin-bottom: -20px;
     overflow-x: hidden; /* 100vw can run a few px wider than the true scrollbar-adjusted
       viewport -- clip that sliver instead of letting it show as a stray offset/scrollbar */
+    position: relative; /* the log button sits at the page's bottom-left corner */
   }
   .combat-wip-header-bar {
     position: relative; display: flex; align-items: center; justify-content: space-between;
@@ -86,8 +87,10 @@ const WIP_CSS = `
   }
   .combat-wip-title img { height: 1.6em; width: auto; }
   .wip-map-btn, .wip-log-btn { font-size: 0.9rem; letter-spacing: 0.3px; }
-  /* The battle log's button, floating in the bottom-left corner of the screen. */
-  .wip-log-fab { position: fixed; left: 1rem; bottom: 1rem; z-index: 50; }
+  /* The battle log's button: at the bottom-left of the page in the player app (seen after
+     scrolling down), floating in the screen's corner in the DM console. */
+  .wip-log-fab { position: absolute; left: 1rem; bottom: 1rem; z-index: 50; }
+  .wip-log-fab.wip-log-fab--screen { position: fixed; }
   .wip-log-fab:empty { display: none; }
   .wip-log-fab .wip-log-btn { background: rgba(20,20,35,0.92); box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
   .wip-header-btn-group { display: flex; gap: 0.5rem; }
@@ -96,7 +99,7 @@ const WIP_CSS = `
      the portraits. The portraits wrap onto extra rows once there are more
      than fit on one line, which keeps every participant visible. */
   .combat-wip-layout { display: flex; flex-direction: column; align-items: center; padding: 0 1rem; }
-  .combat-wip-body { width: 100%; max-width: 700px; min-width: 0; padding: 1.5rem 0 3rem; }
+  .combat-wip-body { width: 100%; max-width: 700px; min-width: 0; padding: 1.5rem 0 5rem; }
   .combat-wip-turnorder {
     display: flex; flex-flow: row wrap; justify-content: center; gap: 0.6rem 0.5rem;
     width: 100%; max-width: 700px; padding: 0.75rem 0 0;
@@ -748,7 +751,7 @@ function _renderCurrentView() {
         <div class="combat-wip-turnorder" id="wipTurnOrder"></div>
         <div class="combat-wip-body" id="combatWipBody">${renderBody(session)}</div>
       </div>
-      <div class="wip-log-fab" id="wipLogFab"></div>
+      <div class="wip-log-fab${_dmName ? ' wip-log-fab--screen' : ''}" id="wipLogFab"></div>
     </div>`;
 }
 

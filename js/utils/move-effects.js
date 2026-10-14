@@ -157,6 +157,10 @@ export function evaluateEffect(effect, ctx) {
   switch (w.type) {
     case 'always':
       return 'yes';
+    case 'charge':
+      // Applied when a two-stage move is charged up (Swords Dance's +1 AC, Razor Wind's +2) -- by combat-wip.js's
+      // _twoStageFlow itself, never offered again when the move is released.
+      return 'no';
     case 'on_hit':
       return hit ? 'yes' : 'no';
     case 'on_miss':
@@ -227,6 +231,8 @@ export function statusLabel(s) {
     if (s.apply === 'exhaustion') return `Exhaustion (level ${s.value || 1})`;
     if (s.apply === 'stab_doubled') return 'STAB doubled';
     if (s.apply === 'switch_locked') return "Can't be switched out";
+    if (s.apply === 'concentrating') return `Concentrating: ${s.moveName || '?'}`;
+    if (s.apply === 'charging') return `Charging: ${s.moveName || '?'}`;
     return _title(String(s.apply || '').replace(/_/g, ' '));
   }
   if (s.kind === 'temp_hp') {
@@ -384,6 +390,10 @@ const _isDiceAmount = (s) => !!(s.amount && typeof s.amount === 'object' && s.am
 /** True for a status that ends with concentration -- the badge UI groups these
  * together under one "Concentration" umbrella instead of showing each separately. */
 export const isConcentration = (s) => (s?.ends || []).some(e => e.type === 'concentration');
+
+/** A creature's own concentration (or charge-up) on a move -- `concentrating` / `charging`, see routes_combat.py's
+ * CONCENTRATION_STATUSES. */
+export const isConcentrationHolder = (s) => s?.kind === 'condition' && (s.apply === 'concentrating' || s.apply === 'charging');
 
 /** A stat status's numeric amount (stacks applied); 'proficiency' = the holder's bonus.
  * A dice-based amount (see _isDiceAmount) never contributes here -- it's spent by

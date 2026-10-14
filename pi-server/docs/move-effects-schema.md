@@ -2223,3 +2223,30 @@ item bonuses -- `computedData.damageBonus`). The total is stored as `hazard.roll
 the hazard popup shows it instead of asking for a roll, and `_resolve_hazard` uses it (a pass still halves it when
 `onSave` is half). Closing the caster's roll without a value keeps the old per-hit roll. Status `tick`s (Leech Seed, Fire
 Spin, Infestation, Stone Maw, Spike Protein) are single-target and still roll each tick.
+
+## Update 2026-10-14: concentration and two-stage moves (`migrate_effects_v100.py`)
+
+**Concentration is game state now.** A move whose duration says concentration (or a charge move, see below) gives its
+user a `concentrating` condition status (`moveName`, `value` = the "round:turnIndex" it started, `ends` = until the end of
+its next turn for "1 round" / charges, otherwise `rounds` from the duration) once the move is paid for. One at a time:
+applying a new one ends the old one (`routes_combat.py`'s `_apply_status`). Whenever a concentration status goes --
+dropped (the card's Concentration section has a Drop button), replaced, run out, or released --
+`_end_concentration_effects` removes every status that move put on anyone with a `concentration` end, and the holder's
+concentration zones. Dragonfire / Frost Inferno charge up without concentration: `charging` instead (also one at a time,
+separately from concentration). The card's Concentration section (combat.js's renderExpandedSection, compactWip only)
+lists the creature's concentration plus every effect on it that ends on concentration.
+
+**`twoStage`** (top-level, sent as a flag; combat-wip.js's `_twoStageFlow`):
+- `stage: 'charge'` (Swords Dance, Solar Beam, Solar Blade, Sun Disc, Sapphire Torrent, Focus Punch, Sky Attack, Freeze
+  Shock, Ice Burn, Razor Wind, Skull Bash, Dragonfire, Frost Inferno): the first use is paid, applies the effects whose
+  `when` is the new **`charge`** trigger (Swords Dance +1 AC, Razor Wind +2, Sapphire Torrent +5 -- evaluateEffect never
+  offers `charge` effects anywhere else) and starts the concentration. Using it again on a later turn (not the same one)
+  releases it for 0 VP through the ordinary flow; once that went off, the concentration ends. `release: 'bonus'` (Swords
+  Dance) spends the bonus action instead. `skipInWeather` (`['sun']` / `['rain']`): no charging there, the first use goes
+  straight off without concentration.
+- `stage: 'hold'` (Bind, Rock Tomb, Sand Tomb): while a creature still has `holdCondition` from this user's move, using
+  it again hits that creature automatically (no attack roll, no save) for the move's level-scaled dice, plus MOVE when
+  `addMove`, for 0 VP (`release: 'bonus'` for Bind).
+
+Not covered: concentration saves when a concentrating creature takes damage (drop it by hand), Supernova's multi-turn
+charge, Sky Drop / Flavor Savor's "attack roll without damage, then the release next turn".

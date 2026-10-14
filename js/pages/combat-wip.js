@@ -36,13 +36,13 @@ import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficial
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-picker.js';
 import { promptHealRoll, promptDrainRoll, promptValueRoll, promptDamageRoll } from '../utils/heal-popup.js';
-import { abandonMove, pendingMove } from '../utils/move-commit.js';
+import { abandonMove, pendingMove, commitMove, setOnMovePaid } from '../utils/move-commit.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler, moveCover } from '../utils/targetability.js';
 import { coverText } from '../utils/cover.js';
 import { areaPlacementFt, creatureDistanceFt } from '../utils/move-range.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, isConcentrationHolder, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -95,6 +95,13 @@ const WIP_CSS = `
   .wip-log-fab:empty { display: none; }
   .wip-log-fab .wip-log-btn { background: rgba(20,20,35,0.92); box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
   .wip-header-btn-group { display: flex; gap: 0.5rem; }
+  /* The card's Concentration section (combat.js's renderExpandedSection). */
+  #wipBattlePhase .concentration-items { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+  #wipBattlePhase .concentration-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  #wipBattlePhase .concentration-badge { border-color: rgba(155, 140, 255, 0.7); background: rgba(110, 90, 220, 0.22); }
+  #wipBattlePhase .concentration-drop-btn { border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #e8e8f5;
+    border-radius: 999px; padding: 0.25rem 0.8rem; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+  #wipBattlePhase .concentration-drop-btn:hover { background: rgba(231, 76, 60, 0.35); }
   /* The turn order is a strip ABOVE the info box, not a column beside it, so
      on a phone the info box gets the full width instead of what's left after
      the portraits. The portraits wrap onto extra rows once there are more
@@ -881,7 +888,8 @@ function _enterBattleSync() {
   setOnLocalStatusClick(_openLocalStatusDetail);
   setOnBasicAction(_onBasicAction);
   setOnUseTrainerBuff(_useTrainerBuff);
-  setNoTargetHandler(_onTargetCheck); // a move with nobody in reach gets its VP back
+  setNoTargetHandler(_onTargetCheck); // a move with nobody in reach costs nothing
+  setOnMovePaid(_onMovePaid); // a concentration move starts concentrating once it's paid for
   setRemoteSaveHandler(_remoteSaveFor); // a save is made on the screen of whoever controls the saver
 }
 
@@ -902,6 +910,7 @@ function _exitBattleSync() {
   setOnBasicAction(null);
   setOnUseTrainerBuff(null);
   setNoTargetHandler(null);
+  setOnMovePaid(null);
   setRemoteSaveHandler(null);
   _focusedParticipantId = null;
   _focusManuallySet = false;
@@ -1011,15 +1020,200 @@ function _onTargetCheck(casterId, moveName, found) {
 }
 
 /** A move's whole flow (target pick, rolls, effects) as combat.js hands it over. Once it's over, a move that never got
- * as far as a roll or an applied effect is dropped unpaid (move-commit.js). */
+ * as far as a roll or an applied effect is dropped unpaid (move-commit.js). Two-stage moves and concentration are
+ * sorted out first (_twoStageFlow). */
 function _moveFlow(handler) {
   return async (args) => {
     try {
+      if ((await _twoStageFlow(args, handler)) === 'handled') return;
       return await handler(args);
     } finally {
       abandonMove(args?.combatantId);
+      _flowNoConcentration = null;
+      _flowBonusRelease = null;
     }
   };
+}
+
+// ---------------------------------------------------------------------------
+// Concentration and two-stage moves (the user's design, 2026-10-14). A creature concentrating on a move carries a
+// `concentrating` status for it (the card's Concentration section); ending it -- dropped, replaced by another, run out,
+// or released -- ends everything that move's concentration was holding up (routes_combat.py's
+// _end_concentration_effects). One concentration at a time.
+//
+// Charge moves (`twoStage.stage: 'charge'` -- Swords Dance, Solar Beam, Razor Wind...): the first use charges up -- the
+// VP is paid, the `charge` effects applied (Swords Dance's +1 AC) and the creature concentrates on the move (`charging`
+// for Dragonfire / Frost Inferno, which need no concentration). Using it again while that lasts releases it, free: the
+// ordinary attack / save / area flow, after which the concentration ends.
+// Hold moves (`stage: 'hold'` -- Bind, Rock Tomb, Sand Tomb): while the target is still grappled / restrained by this
+// creature's move, using it again hits that target automatically (no attack roll, no save) for the move's dice, free.
+// ---------------------------------------------------------------------------
+
+let _flowNoConcentration = null; // { combatantId, moveName }: this use starts no new concentration (a release, a skipped charge)
+let _flowBonusRelease = null; // { combatantId, moveName }: this use is a bonus action (Swords Dance's release, Bind's follow-up)
+let _flowPaid = null; // the move last paid for, { combatantId, moveName }
+
+/** The creature's own concentration (or charge-up) status, or null. */
+function _concentrationOf(pid, apply = null) {
+  return (session?.participants?.[pid]?.statuses || []).find((s) => isConcentrationHolder(s) && (!apply || s.apply === apply)) || null;
+}
+
+/** Whether using `moveName` means concentrating on it: a charge move that needs concentration, or a move whose duration
+ * says so ("1 minute, concentration"). */
+function _isConcentrationMove(moveName) {
+  const ts = moveFlagsFor(moveName).twoStage;
+  if (ts?.stage === 'charge') return ts.concentration !== false;
+  if (ts?.stage === 'hold') return false;
+  return /concentration/i.test(String((findMoveRow(moveName) || [])[5] || ''));
+}
+
+/** How long the concentration (or charge) lasts at most, as status `ends`: a charge holds until the end of the next
+ * turn, anything else for its own duration ("1 round" = until the end of the next turn, "1 minute" = 10 rounds). */
+function _concentrationEnds(moveName) {
+  const nextTurn = [{ type: 'until_turn', whose: 'holder', point: 'end', count: 1 }];
+  const ts = moveFlagsFor(moveName).twoStage;
+  if (ts?.stage === 'charge' && ts.window !== 'duration') return nextTurn;
+  const m = String((findMoveRow(moveName) || [])[5] || '').toLowerCase().match(/(\d+)\s*(minute|hour|round|turn)/);
+  if (!m) return [];
+  const n = Number(m[1]) * (m[2] === 'minute' ? 10 : m[2] === 'hour' ? 600 : 1);
+  return n === 1 ? nextTurn : [{ type: 'rounds', n }];
+}
+
+/** move-commit.js's "a move was just paid for": a concentration move starts its concentration now (the server ends the
+ * one before), and a bonus-action release spends the round's bonus action. */
+function _onMovePaid({ combatantId, moveName }) {
+  _flowPaid = { combatantId, moveName };
+  const same = (f) => f && f.combatantId === combatantId && f.moveName === moveName;
+  if (same(_flowBonusRelease)) {
+    CombatAPI.useBonusAction(combatantId, moveName).catch((err) => showCombatAlert(err.message, { title: 'Bonus action' }));
+  }
+  if (same(_flowNoConcentration)) return;
+  const ts = moveFlagsFor(moveName).twoStage;
+  const charging = ts?.stage === 'charge' && ts.concentration === false;
+  if (!charging && !_isConcentrationMove(moveName)) return;
+  const holder = session?.participants?.[combatantId];
+  CombatAPI.applyStatus(combatantId, {
+    kind: 'condition', apply: charging ? 'charging' : 'concentrating', moveName,
+    value: `${session?.round}:${session?.turnIndex}`, // the turn it started -- a charge can't be released that same turn
+    sourceId: combatantId, sourceName: holder?.name, ends: _concentrationEnds(moveName),
+  }).catch((err) => showCombatAlert(err.message, { title: 'Concentration' }));
+}
+
+/** "Already concentrating on X -- go ahead and end it?" before a move that needs concentration of its own. */
+async function _confirmConcentrationSwitch(pid, moveName) {
+  if (!_isConcentrationMove(moveName)) return true;
+  const conc = _concentrationOf(pid, 'concentrating');
+  if (!conc || conc.moveName === moveName) return true;
+  const name = session?.participants?.[pid]?.name || 'It';
+  return showCombatConfirm(`${name} is concentrating on ${conc.moveName}. Using ${moveName} ends that concentration, and everything it is holding up.`,
+    { title: 'Concentration', yesLabel: `Use ${moveName}`, noLabel: 'Cancel' });
+}
+
+/** Whoever `holderId`'s `moveName` is still holding (`condition` from it -- Bind's grapple, Rock Tomb's restraint), or null. */
+function _heldTargetOf(holderId, moveName, condition) {
+  return Object.values(session?.participants || {}).find((p) => p.id !== holderId && p.status === 'participating'
+    && (p.statuses || []).some((s) => s.kind === 'condition' && s.apply === condition && s.sourceId === holderId && s.moveName === moveName)) || null;
+}
+
+/** The moves this creature can release / follow up for free right now, with the move popup's note for each (combat.js's
+ * VP cost reads the keys). */
+function _releasableMoves(p) {
+  const out = {};
+  for (const name of p.moves || []) {
+    const ts = moveFlagsFor(name).twoStage;
+    if (ts?.stage === 'charge' && (p.statuses || []).some((s) => isConcentrationHolder(s) && s.moveName === name)) {
+      out[name] = `Charged -- using it now releases it${ts.release === 'bonus' ? ' as a bonus action' : ''} (no VP)`;
+    } else if (ts?.stage === 'hold') {
+      const held = _heldTargetOf(p.id, name, ts.holdCondition);
+      if (held) out[name] = `${visibleToViewer(held, 'name') ? held.name : 'The target'} is still ${ts.holdCondition} -- using it now hits automatically${ts.release === 'bonus' ? ' as a bonus action' : ''} (no VP)`;
+    }
+  }
+  return out;
+}
+
+/** Can `pid` spend a bonus action right now? Says why not, if not. */
+function _bonusActionFree(pid, moveName) {
+  const p = session?.participants?.[pid];
+  if (p?.bonusActionUsed || p?.bonusActionBlockedBy) {
+    showCombatAlert(p.bonusActionBlockedBy ? `Bonus actions are blocked (${p.bonusActionBlockedBy}).` : `${p.name} has already used its bonus action this round.`, { title: moveName });
+    return false;
+  }
+  return true;
+}
+
+/** Charge / release / hold-follow-up / concentration switch for one move use, before its ordinary flow. Returns
+ * 'handled' when it took care of the whole use itself; anything else lets the ordinary handler run. */
+async function _twoStageFlow(args, handler) {
+  const { combatantId, moveName, speciesName } = args;
+  const holder = session?.participants?.[combatantId];
+  if (!holder) return null;
+  const ts = moveFlagsFor(moveName).twoStage;
+  const same = { combatantId, moveName };
+
+  if (ts?.stage === 'charge') {
+    const held = (holder.statuses || []).find((s) => isConcentrationHolder(s) && s.moveName === moveName);
+    if (held) {
+      // Release: the ordinary flow, free; once it went off, the concentration (and the charge buffs) end.
+      if (held.value === `${session.round}:${session.turnIndex}`) {
+        showCombatAlert(`${holder.name} charged ${moveName} this turn -- it can be released ${ts.window === 'duration' ? 'on a later turn' : 'on its next turn'}.`, { title: moveName });
+        return 'handled';
+      }
+      if (ts.release === 'bonus' && !_bonusActionFree(combatantId, moveName)) return 'handled';
+      _flowNoConcentration = same;
+      if (ts.release === 'bonus') _flowBonusRelease = same;
+      _flowPaid = null;
+      await handler(args);
+      if (_flowPaid?.combatantId === combatantId && _flowPaid.moveName === moveName) {
+        await CombatAPI.removeStatus(combatantId, held.id, `${moveName} released`).catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+      }
+      return 'handled';
+    }
+    const kinds = weathersAffecting(session, combatantId).map(weatherKindOf).filter(Boolean);
+    if ((ts.skipInWeather || []).some((w) => kinds.some((k) => k.startsWith(w)))) {
+      _flowNoConcentration = same; // harsh sunlight / heavy rain: no charging -- it goes off at once, without concentration
+      return null;
+    }
+    if (!(await _confirmConcentrationSwitch(combatantId, moveName))) return 'handled';
+    // Charge up: paid now (the concentration starts in _onMovePaid), then the charge buffs.
+    commitMove();
+    for (const e of moveEffectsFor(moveName).filter((x) => x.when?.type === 'charge')) {
+      await CombatAPI.applyStatus(combatantId, buildStatusSpec(e, { sourceId: combatantId, sourceName: holder.name, moveName }))
+        .catch((err) => showCombatAlert(err.message, { title: moveName }));
+    }
+    CombatAPI.logEvent({ type: 'status-apply', actorId: combatantId, actorName: holder.name,
+      text: `${holder.name} charges up ${moveName} -- using it again ${ts.window === 'duration' ? 'on a later turn' : 'on its next turn'} releases it` }).catch(() => {});
+    playBattleAnimationFloating(speciesName);
+    return 'handled';
+  }
+
+  if (ts?.stage === 'hold') {
+    const target = _heldTargetOf(combatantId, moveName, ts.holdCondition);
+    if (!target) return null; // nobody held yet -- the ordinary first use
+    if (ts.release === 'bonus' && !_bonusActionFree(combatantId, moveName)) return 'handled';
+    if (ts.release === 'bonus') _flowBonusRelease = same;
+    const { computedData = {}, move } = args;
+    const row = findMoveRow(moveName) || move || [];
+    // The move's own (level-scaled) dice; without `addMove` the MOVE modifier the move's first hit adds is left out.
+    const moveInBonus = /\+\s*MOVE/i.test(String(row[7] || ''));
+    const bonus = (computedData.damageBonus || 0) - (!ts.addMove && moveInBonus ? (computedData.highestMod || 0) : 0);
+    const targetName = visibleToViewer(target, 'name') ? target.name : 'the target';
+    const rolled = await promptDamageRoll({
+      dice: computedData.damageDice || '1d4', moveModBonus: bonus, moveName, damageType: row[1] || '',
+      bonusSource: ts.addMove ? (String(computedData.damageBreakdown || '').replace(/^\(|\)$/g, '') || 'MOVE') : 'bonuses',
+      description: `${moveName}: ${targetName} is still ${ts.holdCondition} -- automatic damage, no attack roll.`,
+    });
+    if (rolled === null) return 'handled'; // closed: nothing happened, nothing spent
+    try {
+      await _landHit({ attackerId: combatantId, targetId: target.id, damage: Math.max(0, rolled), moveType: row[1] || '', speciesName, moveName, move });
+    } catch (err) {
+      showCombatAlert(err.message, { title: moveName });
+    }
+    playBattleAnimationFloating(speciesName);
+    return 'handled';
+  }
+
+  if (!(await _confirmConcentrationSwitch(combatantId, moveName))) return 'handled';
+  return null;
 }
 
 let _statsSyncInFlight = {}; // participantId -> true while a request is in flight
@@ -1105,7 +1299,9 @@ const LEGACY_BADGE_NAMES = { poisoned: 'Poison', burned: 'Burn', confused: 'Conf
  * own clickable entry underneath (same detail popup, same use-status wiring). */
 function _statusToBadge(st, round) {
   const name = (st.kind === 'condition' && LEGACY_BADGE_NAMES[st.apply]) || statusLabel(st);
-  return { name, description: describeStatusEnds(st, round), duration: -1, serverStatusId: st.id, concentration: isConcentration(st) };
+  const holder = isConcentrationHolder(st); // concentrating on / charging up a move -- the card's Concentration section
+  return { name, description: describeStatusEnds(st, round), duration: -1, serverStatusId: st.id, concentration: isConcentration(st),
+    ...(holder ? { concentrationHolder: true, charging: st.apply === 'charging', moveName: st.moveName || '?' } : {}) };
 }
 
 /** Distinct move TYPES (Fire, Water, ...) actually dealt as damage in the
@@ -1752,6 +1948,8 @@ function _syncLocalCombatState(session) {
     merged.damageRollBonus = damageRollBonusOf(p);
     // Dig/Fly/...'s reappearing second use costs no VP again (see combat.js's vpCostOverride).
     merged.semiHeldMoves = (p.statuses || []).filter((s) => s.kind === 'condition' && UNTARGETABLE_STATES.includes(s.apply) && s.moveName).map((s) => s.moveName);
+    // Charged moves / held targets: using the move again releases it or follows up, free (see _twoStageFlow).
+    merged.releasableMoves = _releasableMoves(p);
     // What it can't use right now (combat.js's move popup refuses those): Disable / Imprison / Throat Chop's disabled
     // moves, Encore's "only this one", and burrowed underground on the map (only a move like Dig, or one on itself).
     merged.disabledMoves = (p.statuses || []).filter((s) => s.kind === 'condition' && s.apply === 'move_disabled' && s.value).map((s) => s.value);
@@ -2641,6 +2839,15 @@ function _attachMainFocusListeners(state) {
   _attachedFocusState = ctx.filteredState;
 
   document.getElementById('battleList')?.addEventListener('click', (e) => {
+    const dropBtn = e.target.closest('.concentration-drop-btn');
+    if (dropBtn) {
+      const { combatantId, serverStatusId, move } = dropBtn.dataset;
+      const name = session?.participants?.[combatantId]?.name || 'It';
+      showCombatConfirm(`${name} stops concentrating on ${move}. Everything it is holding up ends too.`, { title: 'Drop concentration', yesLabel: 'Drop', noLabel: 'Keep' })
+        .then((yes) => yes && CombatAPI.removeStatus(combatantId, serverStatusId, 'dropped'))
+        .catch((err) => showCombatAlert(err.message, { title: 'Error' }));
+      return;
+    }
     const reactBtn = e.target.closest('.wip-react-btn');
     if (reactBtn) {
       if (!reactBtn.disabled) CombatAPI.reactionStart(reactBtn.dataset.combatantId).catch(err => showCombatAlert(err.message, { title: 'Error' }));

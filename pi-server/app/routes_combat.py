@@ -2410,6 +2410,10 @@ def _status_label(s):
             return f"resistance upgraded ({scope})"
         if s.get('apply') == 'granted_immunity':
             return f"immune to {s.get('value') or ''}"
+        if s.get('apply') == 'concentrating':
+            return f"concentrating on {s.get('moveName') or 'a move'}"
+        if s.get('apply') == 'charging':
+            return f"charging {s.get('moveName') or 'a move'}"
         return (s.get('apply') or '').replace('_', ' ')
     if kind == 'stat':
         stat = (s.get('stat') or '').replace('_', ' ')
@@ -2540,6 +2544,11 @@ def _apply_status(state, target_id, spec):
         return _apply_exhaustion(state, target, new, js_parse_int(spec.get('value')) or 1, from_text, source_id, source_name)
 
     statuses = _statuses_of(target)
+    if _is_concentration_status(new):
+        # One concentration at a time (and one charge-up): starting another ends the one before, and everything it held up.
+        for old in [s for s in statuses if _is_concentration_status(s) and s.get('apply') == new.get('apply')
+                    and s.get('moveName') != new.get('moveName')]:
+            _remove_status(state, target_id, old['id'], f"now concentrating on {new.get('moveName')}")
     existing = next((s for s in statuses if _same_status(s, new)), None)
     new['id'] = existing['id'] if existing else uuid.uuid4().hex[:8]
     if spec.get('kind') == 'temp_hp':
@@ -2562,8 +2571,9 @@ def _apply_status(state, target_id, spec):
     if new.get('kind') == 'condition' and new.get('apply') in INCAPACITATING_CONDITIONS:
         # Power-Up Punch: "all stacks are lost if you are incapacitated".
         statuses[:] = [s for s in statuses if s.get('apply') != 'power_up']
-    _log_event(state, 'status-apply', text=f"{target['name']} {verb} {_status_label(new)}{from_text}",
-               actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
+    text = (f"{target['name']} is {_status_label(new)}" if _is_concentration_status(new)
+            else f"{target['name']} {verb} {_status_label(new)}{from_text}")
+    _log_event(state, 'status-apply', text=text, actorId=source_id, actorName=source_name, targetId=target_id, targetName=target['name'])
     _mirror_magic_coat(state, target, target_id, source, source_id, spec, new)
     if not existing and not spec.get('fromSynchronize'):
         _ability_condition_gained(state, target_id, new, source_id)  # Synchronize, Defiant, Shield Dust...
@@ -2633,6 +2643,42 @@ def _remove_status(state, target_id, status_id, reason=''):
     _statuses_of(target).remove(s)
     _log_event(state, 'status-remove', text=f"{target['name']}: {_status_label(s)} ended" + (f' ({reason})' if reason else ''),
                targetId=target_id, targetName=target['name'])
+    if _is_concentration_status(s):
+        _end_concentration_effects(state, target_id, s.get('moveName'))
+
+
+# A creature concentrating on a move (`concentrating`) or charging one up (`charging` -- Dragonfire's turn of drawing in
+# air, which needs no concentration): the card's Concentration section, and what a second use of a two-stage move looks
+# for (combat-wip.js's _twoStageFlow).
+CONCENTRATION_STATUSES = ('concentrating', 'charging')
+
+
+def _is_concentration_status(s):
+    return s.get('kind') == 'condition' and s.get('apply') in CONCENTRATION_STATUSES
+
+
+def _end_concentration_effects(state, holder_id, move_name):
+    """`holder_id`'s concentration on `move_name` ended (dropped, replaced, run out, or released): every effect it was
+    holding up goes with it -- the statuses that move put on anyone that end on concentration (Swords Dance's +1 AC, Fire
+    Spin's burning) and the concentration zones the holder made (Poison Gas, Hail)."""
+    for p in state['participants'].values():
+        for s in list(_statuses_of(p)):
+            if (s.get('sourceId') == holder_id and s.get('moveName') == move_name and not _is_concentration_status(s)
+                    and any(e.get('type') == 'concentration' for e in s.get('ends') or [])):
+                _statuses_of(p).remove(s)
+                _log_event(state, 'status-remove', text=f"{p['name']}: {_status_label(s)} ended (concentration on {move_name} ended)",
+                           targetId=p['id'], targetName=p['name'])
+    for key in ('terrain', 'weather'):
+        zones = state.get(key + 'Zones') or []
+        gone = [z for z in zones if z.get('concentration') and z.get('sourceId') == holder_id]
+        if gone:
+            state[key + 'Zones'] = [z for z in zones if z not in gone]
+        field = state.get(key)
+        if field and field.get('concentration') and field.get('sourceId') == holder_id:
+            gone.append(field)
+            state[key] = None
+        for z in gone:
+            _log_event(state, 'terrain', text=f"The {z.get('name')} fades (concentration ended)")
 
 
 def _consume_ignore_immunities(state, pid, attacker, move_type, move_name):
@@ -2671,6 +2717,8 @@ def _expire_status(state, participant, s, why):
     _statuses_of(participant).remove(s)
     _log_event(state, 'status-expire', text=f"{participant['name']}: {_status_label(s)} wore off ({why})",
                targetId=participant['id'], targetName=participant['name'])
+    if _is_concentration_status(s):
+        _end_concentration_effects(state, participant['id'], s.get('moveName'))
 
 
 def _expire_statuses_on_turn_point(state, pid, point):
@@ -3556,6 +3604,8 @@ def _list_move_categories():
             marks['doubleDamageVsStates'] = m['doubleDamageVsStates']
         if m.get('repeatUse'):
             marks['repeatUse'] = m['repeatUse']  # migrate_effects_v99.py -- the Protect family's d20 after the first use
+        if m.get('twoStage'):
+            marks['twoStage'] = m['twoStage']  # migrate_effects_v100.py -- charge then release / hold then continue
         # Limit Break / Feint Attack / Close Combat ...: the move's OWN attack roll is always made with advantage, and Limit
         # Break's "scores a critical hit on 18-20" widens the crit range for that attack only (base_crit is the 19-20 case).
         if m.get('attackRollMode'):

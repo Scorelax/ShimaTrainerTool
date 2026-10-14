@@ -9200,7 +9200,13 @@
       "moveStat": "STR/DEX",
       "vpCost": "15",
       "scaling": "The damage dice for this move changes to 5d10 at level 5, 6d12 at level 10, and 10d10 at level 17.",
-      "attackRoll": true
+      "attackRoll": true,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn"
+      }
     },
     {
       "name": "Force Palm",
@@ -10685,7 +10691,13 @@
       "moveStat": "STR/DEX",
       "vpCost": "35",
       "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": false,
+        "release": "action",
+        "window": "next_turn"
+      }
     },
     {
       "name": "Ember",
@@ -11971,7 +11983,16 @@
       "moveStat": "STR/INT",
       "vpCost": "25",
       "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn",
+        "skipInWeather": [
+          "sun"
+        ]
+      }
     },
     {
       "name": "Sunny Day",
@@ -13069,7 +13090,13 @@
           ]
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn"
+      }
     },
     {
       "name": "Sky Drop",
@@ -16240,7 +16267,16 @@
           "note": "Harsh sunlight -- double your move modifier for damage"
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn",
+        "skipInWeather": [
+          "sun"
+        ]
+      }
     },
     {
       "name": "Solar Blade",
@@ -16276,7 +16312,16 @@
           "note": "Harsh sunlight -- double your move modifier for damage"
         }
       ],
-      "attackRoll": true
+      "attackRoll": true,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn",
+        "skipInWeather": [
+          "sun"
+        ]
+      }
     },
     {
       "name": "Soothing Breeze",
@@ -17761,7 +17806,13 @@
       "moveStat": "STR",
       "vpCost": "4",
       "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "hold",
+        "holdCondition": "restrained",
+        "release": "action",
+        "addMove": true
+      }
     },
     {
       "name": "Shore Up",
@@ -18255,7 +18306,13 @@
       "moveStat": "DEX",
       "vpCost": "5",
       "scaling": "The damage dice for this move changes to 4d8 at level 5, 5d8 at level 10, and 8d8 at level 17.",
-      "attackRoll": true
+      "attackRoll": true,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn"
+      }
     },
     {
       "name": "Freeze-Dry",
@@ -18347,7 +18404,13 @@
       "moveStat": "STR/DEX",
       "vpCost": "35",
       "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": false,
+        "release": "action",
+        "window": "next_turn"
+      }
     },
     {
       "name": "Frost Shackles",
@@ -18641,7 +18704,13 @@
       "moveStat": "STR/DEX",
       "vpCost": "15",
       "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn"
+      }
     },
     {
       "name": "Ice Fang",
@@ -19575,7 +19644,13 @@
       "moveStat": "STR",
       "vpCost": "1",
       "scaling": "The damage dice for this move changes to 1d6 at level 5, 1d8 at level 10, and 2d6 at level 17.",
-      "attackRoll": true
+      "attackRoll": true,
+      "twoStage": {
+        "stage": "hold",
+        "holdCondition": "grappled",
+        "release": "bonus",
+        "addMove": false
+      }
     },
     {
       "name": "Blinding Flash",
@@ -23234,7 +23309,7 @@
           "stat": "ac",
           "amount": 2,
           "when": {
-            "type": "always"
+            "type": "charge"
           },
           "target": "self",
           "ends": [
@@ -23244,7 +23319,13 @@
           ]
         }
       ],
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn"
+      }
     },
     {
       "name": "Recompose",
@@ -24157,7 +24238,13 @@
       "moveStat": "STR",
       "vpCost": "15",
       "scaling": "The damage dice for this move changes to 5d8 at level 5, 6d10 at level 10, and 10d8 at level 17.",
-      "attackRoll": true
+      "attackRoll": true,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn"
+      }
     },
     {
       "name": "Slack Off",
@@ -24986,7 +25073,7 @@
           "stat": "ac",
           "amount": 1,
           "when": {
-            "type": "always"
+            "type": "charge"
           },
           "target": "self",
           "ends": [
@@ -24996,7 +25083,13 @@
           ]
         }
       ],
-      "attackRoll": true
+      "attackRoll": true,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "bonus",
+        "window": "duration"
+      }
     },
     {
       "name": "Tackle",
@@ -30863,7 +30956,13 @@
       "moveStat": "STR",
       "vpCost": "5",
       "scaling": "The damage dice for this move changes to 2d6 at level 5, 2d8 at level 10, and 4d6 at level 17.",
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "hold",
+        "holdCondition": "restrained",
+        "release": "action",
+        "addMove": true
+      }
     },
     {
       "name": "Rock Wrecker",
@@ -33202,13 +33301,36 @@
           },
           "noteOnly": true,
           "note": "Heavy rain: this move does not need charging -- release it right away"
+        },
+        {
+          "kind": "stat",
+          "stat": "ac",
+          "amount": 5,
+          "when": {
+            "type": "charge"
+          },
+          "target": "self",
+          "ends": [
+            {
+              "type": "concentration"
+            }
+          ]
         }
       ],
       "description": "You begin circling in the air at incredible speeds, creating a vortex of energy fed by atmospheric water for one turn. While charging this attack, your AC is temporarily increased by 5. On your next turn, the accumulated water is released all at once in a sparkling sapphire torrent in a 50 foot line. Any creature caught in the line must make a DEX save against your Move DC, taking 4d12 + MOVE water damage on a failure, or half as much on a success. If a creature fails the save by more than 5, it is paralyzed, and frightened for three turns. During heavy rain, this move does not need charging.",
       "moveStat": "STR/INT",
       "vpCost": "30",
       "scaling": "The damage dice for this move changes to 6d12 at level 5, 8d12 at level 10, and 14d12 at level 17.",
-      "attackRoll": false
+      "attackRoll": false,
+      "twoStage": {
+        "stage": "charge",
+        "concentration": true,
+        "release": "action",
+        "window": "next_turn",
+        "skipInWeather": [
+          "rain"
+        ]
+      }
     },
     {
       "name": "Scald",

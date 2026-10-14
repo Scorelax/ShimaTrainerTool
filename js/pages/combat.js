@@ -1039,16 +1039,21 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
     }
     return `<span class="status-badge ${cls}" data-combatant-id="${c.id}" data-effect="${se.name}"${sid}>${se.name}${dur}</span>`;
   };
-  // Concentration effects (se.concentration -- see combat-wip.js's _statusToBadge)
-  // group under one "Concentration" umbrella instead of showing as separate badges,
-  // each still its own clickable entry underneath.
-  const concEffects = c.statusEffects.filter(se => se.concentration);
-  const otherEffects = c.statusEffects.filter(se => !se.concentration);
-  const statusBadges = otherEffects.map(_badgeHtml).join('')
-    + (concEffects.length ? `<span class="status-concentration-group"><span class="status-concentration-group-label">🧠 Concentration</span>${concEffects.map(_badgeHtml).join('')}</span>` : '');
+  // The shared battle's concentration (see combat-wip.js's _statusToBadge): what this creature is concentrating on or
+  // charging up (se.concentrationHolder), and every effect on it that lasts only while a concentration holds
+  // (se.concentration) -- shown in their own Concentration section instead of among the status badges.
+  const concHolders = c.statusEffects.filter(se => se.concentrationHolder);
+  const concEffects = c.statusEffects.filter(se => se.concentration && !se.concentrationHolder);
+  const otherEffects = c.statusEffects.filter(se => !se.concentration && !se.concentrationHolder);
+  const statusBadges = otherEffects.map(_badgeHtml).join('');
+  const concentrationHtml = concHolders.map(se => `
+      <div class="concentration-row">
+        <span class="status-badge status-custom status-custom-expanded concentration-badge" data-combatant-id="${c.id}" data-effect="${se.name}" data-server-status-id="${se.serverStatusId}"><span class="status-custom-name">${se.charging ? '⚡' : '🧠'} ${se.moveName}</span><span class="status-custom-desc">${se.description}</span></span>
+        ${readOnly ? '' : `<button class="concentration-drop-btn" data-combatant-id="${c.id}" data-server-status-id="${se.serverStatusId}" data-move="${se.moveName}">${se.charging ? 'Stop' : 'Drop'}</button>`}
+      </div>`).join('') + concEffects.map(_badgeHtml).join('');
 
   // The shared battle shows one card at a time, always open -- only the legacy page still collapses cards.
-  const expandedHTML = c.isExpanded || compactWip ? renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive }) : '';
+  const expandedHTML = c.isExpanded || compactWip ? renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive, concentrationHtml }) : '';
 
   return `
     <div class="combat-card ${isActive ? 'combat-card--active' : ''} ${fainted ? 'combat-card--fainted' : ''}" data-combatant-id="${c.id}" id="card_${c.id}">
@@ -1108,7 +1113,7 @@ function renderItemForCombat(itemName) {
   return `<strong>${itemName}</strong>${desc ? `<span class="item-desc">: ${desc}</span>` : ''}`;
 }
 
-function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive } = {}) {
+function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive, concentrationHtml = '' } = {}) {
   // --- Feats section (both) ---
   const featsSection = c.feats ? `
     <div class="expanded-feats-section">
@@ -1290,6 +1295,15 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
       ${statusBadges ? `<div class="status-remove-hint">${compactWip ? 'Tap a badge to see what it does (and remove it)' : 'Tap a badge to remove it'}</div>` : ''}
     </div>`;
 
+  // --- Concentration section (the shared battle only) ---
+  const concentrationSection = compactWip ? `
+    <div class="expanded-status-section expanded-concentration-section">
+      <div class="expanded-section-label">Concentration</div>
+      ${concentrationHtml
+        ? `<div class="concentration-items">${concentrationHtml}</div>`
+        : '<div class="status-remove-hint">Not concentrating on anything</div>'}
+    </div>` : '';
+
   // --- Moves section (pokemon only) ---
   const movesSection = c.type === 'pokemon' && c.moves.length > 0 ? `
     <div class="expanded-moves-section">
@@ -1358,6 +1372,7 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
       ${hpvpSection}
       ${statSection}
       ${statusSection}
+      ${concentrationSection}
       ${trainerActionsSection}
       ${basicActionsSection}
       ${movesSection}
@@ -3465,7 +3480,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     spriteUrl: c.image,
     spriteAlt: c.name,
     speciesName: c.speciesName,
-    noteText: [_stackNote || _damageNote, ...(_abilityMods?.notes || [])].filter(Boolean).join(' · ') || undefined,
+    noteText: [c.releasableMoves?.[moveName], _stackNote || _damageNote, ...(_abilityMods?.notes || [])].filter(Boolean).join(' · ') || undefined,
     disableUse: (_isStackMove && _stacks === 0) || _bonusSpent || !!_weatherBlock || !!_useBlock,
     disableUseMsg: _useBlock || _weatherBlock || (_bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first'),
     diceLabel: _diceLabel,
@@ -3483,6 +3498,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       if (halved.some((a) => abilities.includes(a))) cost = Math.ceil(cost / 2);
       // Dig/Fly/...: the reappearing second use is free (the VP was paid on the vanishing first use).
       if ((c.semiHeldMoves || []).includes(moveName)) return 0;
+      // A charged move's release / a hold move's follow-up (Swords Dance, Solar Beam, Bind...): paid on the first use.
+      if (c.releasableMoves?.[moveName]) return 0;
       // Power-Up Punch: +1 VP per stack on every melee move.
       if ((c.powerUpStacks || 0) > 0 && String(move[6] || '').trim() === 'Melee') cost += c.powerUpStacks;
       return cost !== base ? cost : undefined;

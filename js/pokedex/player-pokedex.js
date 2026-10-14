@@ -209,7 +209,7 @@ export function mountPlayerPokedex(root, { onBack } = {}) {
           <div class="pdx-bezel"><div class="pdx-card-image" style="${screenBg(s)}">${imageHtml(s)}</div></div>
           <div class="pdx-card-info">
             <span class="pdx-card-number">No. ${esc(dex)}</span>
-            <h2 class="pdx-card-name">${esc(s.name)}</h2>
+            <h2 class="pdx-card-name">${esc(s.name)}${s.caught ? '<img class="pdx-caught-ball" src="assets/Pokeball.png" alt="Caught" title="Caught by the players">' : ''}</h2>
             <div class="pdx-card-types">${types}</div>
             ${s.classification ? `<p class="pdx-card-classification">${esc(s.classification)}</p>` : ''}
           </div>

@@ -136,10 +136,12 @@ def register_pokemon_for_trainer(conn, trainer_name, new_pokemon_data):
 
     apply_registration_stats(conn, new_pokemon_data)
 
+    # Remembered as caught for good -- the DM console's Pokedex keeps its Poke Ball after this Pokemon evolves. The
+    # first one of a species the players catch also shows them what they learned of it (routes_dm.reveal_caught_species).
+    from .routes_dm import caught_before, record_caught
+    first_time = not caught_before(conn, new_pokemon_data[2])
     db.insert_row(conn, 'pokemon', P, new_pokemon_data)
-    # Remembered as caught for good -- the DM console's Pokedex keeps its Poke Ball after this Pokemon evolves.
-    from .routes_dm import record_caught
-    record_caught(conn, new_pokemon_data[2])
+    record_caught(conn, new_pokemon_data[2], new_pokemon_data, first_time)
 
     # Same trainer-data event _write_trainer_cell publishes for inventory/gear/
     # money -- register is the other half of Benjakronk's external game-write

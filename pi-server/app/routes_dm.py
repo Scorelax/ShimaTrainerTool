@@ -233,20 +233,85 @@ def caught_species(conn):
     return {'caught': sorted(stored), 'owned': sorted(owned)}
 
 
-def record_caught(conn, species):
-    """A Pokemon of `species` was just caught (registered, or given by the DM): remembered for good."""
+def caught_before(conn, species):
+    """Whether the players had already caught `species` -- asked before a new Pokemon of it is stored, since storing
+    it makes it "owned" (and so caught) on the next read."""
+    name = str(species or '').strip().lower()
+    return name in set(_load_state(conn, _CAUGHT_KEY) or []) or name in _owned_species(conn)
+
+
+def record_caught(conn, species, pokemon_row=None, first_time=False):
+    """A Pokemon of `species` was just caught (registered, or given by the DM): remembered for good. The first time the
+    players catch a species (`first_time`, see caught_before), they learn it: reveal_caught_species."""
     name = str(species or '').strip().lower()
     stored = set(_load_state(conn, _CAUGHT_KEY) or [])
     if name and name not in stored:
         save_state(conn, _CAUGHT_KEY, sorted(stored | {name}))
+    if name and first_time:
+        reveal_caught_species(conn, species, pokemon_row)
 
 
 def set_caught(conn, species, caught):
-    """The DM's own tick: `species` caught by the players or not."""
+    """The DM's own tick: `species` caught by the players or not. Ticking a species the players hadn't caught reveals
+    it, the same as a catch (without a Pokemon of it: no moves or abilities)."""
     name = str(species or '').strip().lower()
     stored = set(_load_state(conn, _CAUGHT_KEY) or [])
+    first_time = caught and name not in stored and name not in _owned_species(conn)
     stored = stored | {name} if caught else stored - {name}
     save_state(conn, _CAUGHT_KEY, sorted(stored))
+    if first_time:
+        reveal_caught_species(conn, species)
+
+
+# What the players learn about a species the first time they catch one (the user's call, 2026-10-14): all its stats,
+# the info lines (size, rarity, behaviour, habitat, activity) and senses -- plus, from the Pokemon they caught, its moves
+# up to that Pokemon's level and the abilities it has.
+_REVEAL_ON_CATCH = ('statAC', 'statHD', 'statVD', 'statSpeed', 'statSTR', 'statDEX', 'statCON', 'statINT', 'statWIS',
+                    'statCHA', 'statSaves', 'statSkills',
+                    'charSize', 'charRarity', 'charBehavior', 'charHabitat', 'charActivity',
+                    'senseSight', 'senseHearing', 'senseSmell', 'senseTremorsense', 'senseEcholocation',
+                    'senseTelepathy', 'senseBlindsight', 'senseDarkvision', 'senseTruesight')
+_ABILITY_VISIBILITY = ('primaryAbility', 'secondaryAbility', 'hiddenAbility')  # the ability slots 0 / 1 / 2
+
+
+def reveal_caught_species(conn, species, pokemon_row=None):
+    """Switches on, in the players' Pokedex (pokedexConfig), what they learn by catching `species` for the first time
+    (_REVEAL_ON_CATCH), and adds the species to it. `pokemon_row`: the caught Pokemon (db.POKEMON_COLUMNS order) -- its
+    level shows the moves up to it, its abilities ("0:Name;text|2:Name;text" -- the slot first) show those abilities.
+    Nothing is ever switched off. Saved like the DM console's own Pokedex edits, and pushed live."""
+    from . import live
+    from .player_pokedex import evolution_targets
+    config = json.loads(json.dumps(upstream.fetch_pokedex_config(conn) or {}))
+    name = str(species or '').strip()
+    key = name.lower()
+    visibility = config.setdefault('visibility', {})
+    vis_key = next((k for k in visibility if str(k).lower() == key), key)
+    own = visibility.get(vis_key)
+    if isinstance(own, dict):
+        vis = dict(own)
+    else:
+        # No settings of its own yet: start from the defaults, as the players saw it -- including the defaults' single
+        # "Evolves into" switch, spelled out per evolution of this species (own settings name each one).
+        vis = json.loads(json.dumps(config.get('defaults') or {}))
+        entry = next((r for r in upstream.fetch_pokemon_db(conn) if len(r) > 2 and str(r[2]).lower() == key), None)
+        targets = evolution_targets(entry[14] if entry and len(entry) > 14 else '')
+        vis['evoToTargets'] = {t: bool(vis.get('evoTo')) for t in targets}
+    for k in _REVEAL_ON_CATCH:
+        vis[k] = True
+    if pokemon_row:
+        level = js_parse_int(pokemon_row[4] if len(pokemon_row) > 4 else None) or 1
+        vis['moves'] = True
+        vis['movesMaxLevel'] = max(js_parse_int(vis.get('movesMaxLevel')) or 1, level)
+        abilities = str(pokemon_row[7] if len(pokemon_row) > 7 else '')
+        for slot in re.findall(r'(?:^|\|)\s*(\d)\s*:', abilities):
+            if int(slot) < len(_ABILITY_VISIBILITY):
+                vis[_ABILITY_VISIBILITY[int(slot)]] = True
+    visibility[vis_key] = vis
+    registered = config.setdefault('registered', [])
+    if key not in {str(r).lower() for r in registered}:
+        registered.append(name)
+    upstream.store_local_pokedex_config(conn, config)
+    live.publish({'dataset': 'pokedex-config', 'version': ''})
 
 
 def party_overview(conn):
@@ -594,8 +659,9 @@ def give_pokemon(conn, trainer, cfg):
         extra_skills=cfg.get('extraSkills') or ())
     row[0] = tname
     row[1] = upstream.local_pokemon_image_url(row[2], row[3]) or ''
+    first_time = not caught_before(conn, row[2])
     db.insert_row(conn, 'pokemon', db.POKEMON_COLUMNS, row)
-    record_caught(conn, row[2])
+    record_caught(conn, row[2], row, first_time)
     live.publish({'type': 'trainer-data', 'trainer': tname})
     return {'status': 'success', 'message': f'{tname} got {cfg.get("nickname") or row[2]}!', 'data': row}
 

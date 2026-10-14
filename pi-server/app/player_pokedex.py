@@ -202,6 +202,11 @@ def player_pokedex(conn):
         own = own_settings.get(str(name).lower())
         species.append(_species_entry(conn, row, _visibility(own if own else defaults), bool(own)))
     species.sort(key=lambda s: js_parse_int(s['dex']) or 0)
+    # The DM console's "caught by the players" record: a Poke Ball next to the name.
+    from .routes_dm import caught_species
+    caught = set(caught_species(conn)['caught'])
+    for s in species:
+        s['caught'] = str(s['name']).lower() in caught
 
     # The moves the players may look up: every move a species shows, plus the ones the DM made searchable on their own.
     details = _move_details(conn)

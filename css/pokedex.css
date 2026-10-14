@@ -282,6 +282,8 @@
   text-shadow: 0 2px 0 rgba(0,0,0,0.3);
   overflow-wrap: anywhere;
 }
+/* The species the players have caught (the DM console's Pokedex record). */
+.pdx-caught-ball { height: 0.8em; width: auto; margin-left: 0.4em; vertical-align: -0.05em; }
 .pdx-card-types { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
 .pdx-type-pill {
   padding: 1px 10px; border-radius: 12px;

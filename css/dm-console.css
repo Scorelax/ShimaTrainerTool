@@ -1017,3 +1017,5 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 
 /* Party module: a card title with a button at its right (Pokémon + Give Pokémon). */
 .dm-title-with-btn { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+/* Map editor: the object's turn, any angle. */
+.dm-obj-turn { width: 100%; margin: 0.2rem 0 0.6rem; accent-color: var(--dm-gold); }

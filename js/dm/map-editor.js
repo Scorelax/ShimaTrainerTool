@@ -23,7 +23,7 @@ const _cropResolved = new Map(); // url -> crop, once worked out
 
 const ed = {
   tool: 'objects',
-  objectKey: '', objW: 1, objH: 1, objRot: 0, objMark: '', objHeight: 5, // objW/objH/objRot as seen on screen
+  objectKey: '', objW: 1, objH: 1, objRot: 0, objMark: '', objHeight: 5, // the picture's own size, and its turn as seen on screen
   terrain: 'difficult',
   hover: null, // {col, row} under the pointer
   painting: false,
@@ -84,7 +84,9 @@ function cropNow(url) {
 function objectAt(m, col, row) {
   const asset = _assets?.objects.find(o => o.key === ed.objectKey);
   if (!asset) return null;
-  const w = ed.objH, h = ed.objW;
+  // Its box as seen: the picture at the nearest quarter turn (any angle beyond that turns it about the box's centre).
+  const [sw, sh] = screenBox();
+  const w = sh, h = sw;
   const o = {
     id: newId('obj'), kind: asset.key, label: asset.label, url: asset.url,
     col, row: row - h + 1, w, h, rot: ((ed.objRot - 90) % 360 + 360) % 360, crop: cropNow(asset.url),
@@ -389,10 +391,11 @@ function renderToolPanel() {
       </div>
       <div class="dm-row">
         <div class="dm-field"><label for="objTall">How tall (ft)</label><input class="dm-input" id="objTall" type="number" min="0" max="500" step="5" value="${ed.objHeight}"></div>
-        <div class="dm-field"><label>Turn</label>
-          <div class="dm-row"><button class="dm-btn" id="objRotL" title="Turn left">⟲</button><button class="dm-btn" id="objRotR" title="Turn right">⟳</button></div>
+        <div class="dm-field"><label>Turn <span id="objRotLabel">${ed.objRot}°</span></label>
+          <div class="dm-row"><button class="dm-btn" id="objRotL" title="Turn left 15°">⟲</button><button class="dm-btn" id="objRotR" title="Turn right 15°">⟳</button></div>
         </div>
       </div>
+      <input type="range" class="dm-obj-turn" id="objRot" min="0" max="359" step="1" value="${ed.objRot}" title="Turn it to any angle">
       <div class="dm-field"><label for="objMark">Its squares are also</label>
         <select class="dm-select" id="objMark">
           <option value="" ${!ed.objMark ? 'selected' : ''}>Just a picture</option>
@@ -405,8 +408,9 @@ function renderToolPanel() {
     document.getElementById('objW')?.addEventListener('input', (e) => { ed.objW = clampInt(e.target.value, 1, 20); renderGhost(); });
     document.getElementById('objH')?.addEventListener('input', (e) => { ed.objH = clampInt(e.target.value, 1, 20); renderGhost(); });
     document.getElementById('objTall')?.addEventListener('input', (e) => { ed.objHeight = clampInt(e.target.value, 0, 500); });
-    document.getElementById('objRotL')?.addEventListener('click', () => turnObject(-90));
-    document.getElementById('objRotR')?.addEventListener('click', () => turnObject(90));
+    document.getElementById('objRotL')?.addEventListener('click', () => turnObject(-15));
+    document.getElementById('objRotR')?.addEventListener('click', () => turnObject(15));
+    document.getElementById('objRot')?.addEventListener('input', (e) => setObjectTurn(Number(e.target.value)));
     document.getElementById('objMark')?.addEventListener('change', (e) => { ed.objMark = e.target.value; });
   } else if (ed.tool === 'terrain') {
     panel.innerHTML = `
@@ -421,10 +425,25 @@ function renderToolPanel() {
 }
 
 function turnObject(delta) {
-  ed.objRot = ((ed.objRot + delta) % 360 + 360) % 360;
-  [ed.objW, ed.objH] = [ed.objH, ed.objW]; // a quarter turn swaps its width and height
-  renderToolPanel();
+  setObjectTurn(ed.objRot + delta);
+}
+
+/** Any angle, like a line move's aim. Only the preview, the ghost and the angle label change -- the panel isn't redrawn,
+ * so dragging the slider keeps going. */
+function setObjectTurn(deg) {
+  ed.objRot = ((Math.round(deg) % 360) + 360) % 360;
+  const img = document.querySelector('.dm-object-preview img');
+  if (img) img.style.transform = `rotate(${ed.objRot}deg)`;
+  const slider = document.getElementById('objRot');
+  if (slider && Number(slider.value) !== ed.objRot) slider.value = ed.objRot;
+  const label = document.getElementById('objRotLabel');
+  if (label) label.textContent = `${ed.objRot}°`;
   renderGhost();
+}
+
+/** The object's box on screen (width, height in squares): its own size at the nearest quarter turn. */
+function screenBox() {
+  return (Math.round(ed.objRot / 90) % 2) ? [ed.objH, ed.objW] : [ed.objW, ed.objH];
 }
 
 function clampInt(v, lo, hi) {
@@ -475,7 +494,8 @@ function renderGhost() {
   } else {
     // Where it would have gone, clipped to the map, in red.
     const sx = m.rows - 1 - row;
-    const w = Math.min(ed.objW, m.rows - sx), h = Math.min(ed.objH, m.cols - col);
+    const [sw, sh] = screenBox();
+    const w = Math.min(sw, m.rows - sx), h = Math.min(sh, m.cols - col);
     ghost.innerHTML = `<div class="dm-ghost-bad" style="left:${(sx / m.rows) * 100}%;top:${(col / m.cols) * 100}%;width:${(w / m.rows) * 100}%;height:${(h / m.cols) * 100}%"></div>`;
   }
 }
@@ -504,7 +524,7 @@ async function onCellClick(col, row) {
       st.map.objects = [...(st.map.objects || []), o];
       if (o.markKind) {
         st.map.marks = st.map.marks || {};
-        objectCells(o).forEach(p => { st.map.marks[`${p.col},${p.row}`] = o.markKind; });
+        objectCells(o, m).forEach(p => { st.map.marks[`${p.col},${p.row}`] = o.markKind; });
       }
     });
   } else if (ed.tool === 'erase') {

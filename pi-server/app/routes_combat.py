@@ -155,7 +155,7 @@ _EMPTY_STATE = {
         # display) renders against.
         'backgroundImage': None,
         # The DM console's map editor (dm-console.html): pictures placed on the map -- [{id, kind, label, url, col, row,
-        # w, h, rot, crop, height, markKind}], (col, row) the TOP-LEFT cell, w x h cells, rot in 90-degree steps, crop
+        # w, h, rot, crop, height, markKind}], (col, row) the TOP-LEFT cell, w x h cells, rot any angle in degrees, crop
         # the picture's visible part as fractions [x0, y0, x1, y1] (see battle-map-grid.js's mapObjectsHtml), height in
         # ft (kept for line of sight / cover later) -- the picture itself doesn't change any rules...
         'objects': [],
@@ -735,7 +735,7 @@ def _clean_map_objects(objects, cols, rows):
         out.append({
             'id': str(o.get('id') or uuid.uuid4().hex[:8]), 'kind': str(o.get('kind') or ''), 'label': str(o.get('label') or ''),
             'url': o['url'], 'col': col, 'row': row, 'w': max(1, min(w, cols)), 'h': max(1, min(h, rows)),
-            'rot': (js_parse_int(o.get('rot')) or 0) % 360 // 90 * 90, 'crop': [max(0.0, min(1.0, float(v))) for v in crop],
+            'rot': (js_parse_int(o.get('rot')) or 0) % 360, 'crop': [max(0.0, min(1.0, float(v))) for v in crop],
             'height': max(0, min(500, js_parse_int(o.get('height')) or 0)),
             **({'markKind': o['markKind']} if o.get('markKind') in MAP_MARK_KINDS else {}),
         })

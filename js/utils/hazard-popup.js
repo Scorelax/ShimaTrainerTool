@@ -48,6 +48,8 @@ export function promptHazard(hazard) {
   return new Promise((resolve) => {
     const flat = hazard.flat ? (hazard.flat > 0 ? ` + ${hazard.flat}` : ` - ${Math.abs(hazard.flat)}`) : '';
     const hasDice = !!hazard.dice;
+    // A zone's damage rolled once by its caster when it was made (Smog, Poison Gas, Spikes...): everyone takes that total.
+    const rolled = Number.isFinite(hazard.rolled) ? hazard.rolled : null;
     const onSave = hazard.onSave || 'half';
     const cond = hazard.condition;
     const condName = cond ? String(cond.apply).replace(/_/g, ' ') : '';
@@ -63,9 +65,10 @@ export function promptHazard(hazard) {
       <div class="hz-card">
         <h3 class="hz-title">${hazard.zoneName}</h3>
         <div class="hz-line"><strong>${hazard.participantName}</strong> ${what}.</div>
-        ${hasDice ? `<div class="hz-line">Roll <strong>${hazard.dice}${flat}</strong> ${hazard.damageType || 'typeless'}${pool} damage.</div>` : ''}
+        ${hasDice && rolled !== null ? `<div class="hz-line">Takes <strong>${rolled}</strong> ${hazard.damageType || 'typeless'}${pool} damage (rolled when it was made).</div>`
+          : hasDice ? `<div class="hz-line">Roll <strong>${hazard.dice}${flat}</strong> ${hazard.damageType || 'typeless'}${pool} damage.</div>` : ''}
         ${hazard.ability ? `<div class="hz-line">${hazard.participantName} makes a <strong>${hazard.ability}</strong> save${hazard.dc ? ` against DC <strong>${hazard.dc}</strong>` : ''}: ${saveText}.</div>` : ''}
-        ${hasDice ? `<div class="hz-roll"><label for="hzRoll">Damage rolled</label><input id="hzRoll" type="number" min="0" inputmode="numeric" placeholder="total"></div>` : ''}
+        ${hasDice && rolled === null ? `<div class="hz-roll"><label for="hzRoll">Damage rolled</label><input id="hzRoll" type="number" min="0" inputmode="numeric" placeholder="total"></div>` : ''}
         <div class="hz-actions">
           ${hazard.ability ? `
             <button type="button" class="hz-fail" data-act="fail">Save failed</button>
@@ -85,7 +88,7 @@ export function promptHazard(hazard) {
       const act = e.target.closest('button')?.dataset.act;
       if (!act) return;
       if (act === 'skip') return finish({ roll: null, saved: true, failedBy: null });
-      let roll = null;
+      let roll = hasDice ? rolled : null;
       if (input) {
         roll = parseInt(input.value, 10);
         // A pass that takes no damage needs no roll.

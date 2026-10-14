@@ -143,3 +143,12 @@ export function promptDrainRoll({ dice, moveModBonus = 0, targetName = '?', move
 export function promptValueRoll({ dice, moveModBonus = 0, moveName = '?', description, pool = '' } = {}) {
   return _promptRoll({ dice, moveModBonus, moveName, pool, title: 'Roll', description: description || `${moveName} -- enter your roll.` });
 }
+
+/**
+ * A damage roll with no target picked yet -- a zone's damage (Smog, Poison Gas, Spikes...) is rolled once by its caster
+ * when the zone is made, and everyone it hits later takes that total. `bonusSource` names what the added bonus is made
+ * of ("STAB +2, CON +3").
+ */
+export function promptDamageRoll({ dice, moveModBonus = 0, moveName = '?', description, bonusSource = 'MOVE', damageType = '' } = {}) {
+  return _promptRoll({ dice, moveModBonus, moveName, pool: `${damageType ? `${damageType} ` : ''}damage`, title: 'Damage Roll', description, bonusSource });
+}

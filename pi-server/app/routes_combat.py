@@ -3821,12 +3821,14 @@ def _queue_hit(state, participant, h, name, trigger, source_id, zone_id=None):
     Storm, Quicksand Trap, ...) or a status's `tick` (Leech Seed, Infestation, Fire Spin, ...). Shape of `h`:
     damageType, dice, flat, ability, dc -- plus `onSave` ('half' by default, 'none' = a pass takes nothing, 'full' = the damage
     lands either way and the save only guards the condition), `condition` ({apply, ends, failBy} applied on a failed save),
-    `pool` ('VP' drains VP instead of HP) and `drain` (that fraction of the damage heals the source -- Leech Seed)."""
+    `pool` ('VP' drains VP instead of HP), `drain` (that fraction of the damage heals the source -- Leech Seed) and
+    `rolled` (a zone's damage, rolled once by its caster when it was made -- everyone it hits takes that same total)."""
     state.setdefault('pendingHazards', []).append({
         'id': uuid.uuid4().hex[:8], 'participantId': participant['id'], 'participantName': participant['name'], 'zoneId': zone_id,
         'zoneName': name, 'trigger': trigger, 'damageType': h.get('damageType', ''), 'ability': h.get('ability', ''),
         'dice': h.get('dice', ''), 'flat': h.get('flat', 0), 'dc': h.get('dc'), 'sourceId': source_id,
         'onSave': h.get('onSave') or 'half', 'condition': h.get('condition'), 'pool': h.get('pool') or 'HP', 'drain': h.get('drain'),
+        'rolled': js_parse_int(h.get('rolled')),
     })
 
 
@@ -3856,6 +3858,8 @@ def _resolve_hazard(conn, state, hazard_id, roll, saved, failed_by=None):
     if not target:
         return
     source_id = entry['sourceId'] if entry.get('sourceId') in state['participants'] else entry['participantId']
+    if roll is not None and entry.get('rolled') is not None:
+        roll = entry['rolled']  # the caster's own roll for the zone, the same for everyone (no roll = "not affected")
     amount = 0
     if roll is not None and roll > 0:
         on_save = entry.get('onSave') or 'half'

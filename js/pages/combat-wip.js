@@ -35,7 +35,7 @@ import { showReactionPromptIfEligible } from '../utils/reaction-prompt-popup.js'
 import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficialReactions } from '../utils/reaction-wait-overlay.js';
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-picker.js';
-import { promptHealRoll, promptDrainRoll, promptValueRoll } from '../utils/heal-popup.js';
+import { promptHealRoll, promptDrainRoll, promptValueRoll, promptDamageRoll } from '../utils/heal-popup.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler, moveCover } from '../utils/targetability.js';
@@ -4228,6 +4228,18 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
             ...(h.onSave ? { onSave: h.onSave } : {}), ...(h.condition ? { condition: h.condition } : {}),
           };
           if (!props.hazard.dice) { delete props.hazard.dice; props.hazard.flat = 0; }
+          else {
+            // The caster rolls the zone's damage once, now, with the same bonus the move's damage step would add (STAB,
+            // MOVE, the trainer's...) -- everyone it hits later takes that same total, before their own resistances.
+            const bonus = Number.isFinite(computedData?.damageBonus) ? computedData.damageBonus : props.hazard.flat;
+            const rolled = await promptDamageRoll({
+              dice: props.hazard.dice, moveModBonus: bonus, moveName, damageType: h.damageType,
+              bonusSource: String(computedData?.damageBreakdown || '').replace(/^\(|\)$/g, '') || 'MOVE',
+              description: `${moveName}: roll the damage now -- every creature it hits takes this total.`,
+            });
+            // Closed without a roll: each hit is rolled when it happens instead, as before.
+            if (rolled !== null) props.hazard.rolled = Math.max(0, rolled);
+          }
         }
         await CombatAPI.setTerrain(effect.name || moveName, effect.description || '', {
           rounds: effect.rounds, healDice: terrainHealDice(effect, caster?.level), sourceId: attackerId, sourceName: caster?.name,

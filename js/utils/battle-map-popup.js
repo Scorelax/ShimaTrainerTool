@@ -33,7 +33,7 @@ import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
-import { lineFtFromRange, lineGeometry, lineHitIds, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
+import { lineFtFromRange, lineGeometry, lineCells, lineCellsHtml, lineHitIds, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 const CONE_FT = 15; // the cone preview is just a visual of where the token faces -- one size is enough
 
@@ -551,10 +551,18 @@ function _renderLine() {
   let strip = layer.querySelector('.bmap-line');
   if (!strip) {
     strip = document.createElement('div');
-    strip.className = 'bmap-line';
+    strip.className = 'bmap-line guide';
     layer.prepend(strip); // under the tokens, so the hit rings (not an orange wash) show who's in it
   }
-  strip.setAttribute('style', lineStyle(_session.board, g, _lineAngle));
+  strip.setAttribute('style', lineGuideStyle(_session.board, g, _lineAngle));
+  // The squares it covers -- the same number at any angle (line-area.js's lineCells).
+  let cellsEl = layer.querySelector('.bmap-line-cells');
+  if (!cellsEl) {
+    cellsEl = document.createElement('div');
+    cellsEl.className = 'bmap-line-cells';
+    layer.prepend(cellsEl);
+  }
+  cellsEl.innerHTML = lineCellsHtml(_session.board, lineCells(sel.pos, sel.size, _lineAngle, ft, 0, null, _session.board.grid));
   const hits = new Set(lineHitIds(_session, sel.id, _lineAngle, ft));
   layer.querySelectorAll('.bmap-token[data-id]').forEach(el => el.classList.toggle('line-hit', hits.has(el.dataset.id)));
 }

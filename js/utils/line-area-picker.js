@@ -7,7 +7,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
 import { coneOrigin, levelCone, inConeReach, coneHitIds, coneShadowCells, coneAimAt } from './cone-area.js';
-import { lineGeometry, lineHitIds, lineReachBox, inLineReach, aimAtCreature, lineStyle, angleToPointer, injectLineStyles } from './line-area.js';
+import { lineGeometry, lineCells, lineCellsHtml, lineHitIds, lineReachBox, inLineReach, aimAtCreature, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 function _injectStyles() {
   if (document.getElementById('line-area-picker-styles')) return;
@@ -114,10 +114,11 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     overlay.innerHTML = `
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
-        <div class="lap-sub">A ${lengthFt}ft line, a 5ft-wide beam from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the beam straight at it (up at a flyer, down from the air). It reaches the edge of the shaded squares (${lengthFt / 5} squares straight, diagonally or up); greyed-out creatures are out of its reach. Everyone the beam touches is selected.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again for the middle.` : ''}</div>
+        <div class="lap-sub">A ${lengthFt}ft line, a 5ft-wide beam from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the beam straight at it (up at a flyer, down from the air). It covers ${lengthFt / 5} squares at any angle (shaded); greyed-out creatures are out of its reach. Everyone the beam touches is selected.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again for the middle.` : ''}</div>
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
-          <div class="bmap-line"></div>
+          <div class="bmap-line-cells"></div>
+          <div class="bmap-line guide"></div>
           <div class="bmap-objects">${mapObjectsHtml(board)}</div>
           <div class="bmap-tokens"></div>
         </div>
@@ -136,6 +137,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     const grid = overlay.querySelector('.bmap-grid');
     const tokenLayer = overlay.querySelector('.bmap-tokens');
     const lineEl = overlay.querySelector('.bmap-line');
+    const lineCellsEl = overlay.querySelector('.bmap-line-cells');
     const aimEl = overlay.querySelector('.lap-aim');
     const hitsEl = overlay.querySelector('.lap-hits');
     if (board.backgroundImage) {
@@ -167,7 +169,8 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     const starts = _startPicker(stage, board, casterPos, casterSize);
     const refresh = () => {
       const g = lineGeometry(casterPos, casterSize, angle, lengthFt, pitch, start);
-      lineEl.setAttribute('style', lineStyle(board, g, angle));
+      lineEl.setAttribute('style', lineGuideStyle(board, g, angle));
+      lineCellsEl.innerHTML = lineCellsHtml(board, lineCells(casterPos, casterSize, angle, lengthFt, pitch, start, board.grid));
       starts.show(start);
       hits = lineHitIds(session, casterId, angle, lengthFt, pitch, start).filter(id => aimable.has(id));
       tokenEls.forEach((el, id) => {

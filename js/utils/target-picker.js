@@ -357,7 +357,7 @@ function _ensureDom() {
           <div class="target-picker-roll-notes" id="targetPickerDamageNote"></div>
           <div class="target-picker-roll-notes" id="targetPickerAbilityNote"></div>
           <div class="target-picker-dice-row" id="targetPickerDamageDiceRow"></div>
-          <label class="target-picker-roll-label" for="targetPickerRollInput">Damage roll<span id="targetPickerModifierNote"></span></label>
+          <label class="target-picker-roll-label" for="targetPickerRollInput">Damage roll<span id="targetPickerDiceText"></span><span id="targetPickerModifierNote"></span></label>
           <input type="number" id="targetPickerRollInput" class="target-picker-roll-input" placeholder="Enter roll…">
           <div id="targetPickerAbilityDice"></div>
           <div class="target-picker-roll-total" id="targetPickerRollTotal"></div>
@@ -738,6 +738,13 @@ function _showStep3() {
     noteParts.push(`<div class="note">Pre-filled with ${_presetRoll} -- not rolled, edit it if it's wrong</div>`);
   }
   noteEl.innerHTML = noteParts.join('');
+  // Which dice to roll, the target's own notes included (Electro Ball's tier swap, Hex's doubled dice...).
+  const rollDice = !_damageDice ? ''
+    : diceOverride ? diceOverride
+    : diceMultiplier > 1 ? multiplyDiceString(_damageDice, diceMultiplier)
+    : extraDiceCount > 0 ? addDiceString(_damageDice, extraDiceCount)
+    : _damageDice;
+  document.getElementById('targetPickerDiceText').innerHTML = rollDice ? `: <strong>${rollDice}</strong>` : '';
 
   _damageDiceExtra = 0;
   _damageBattleDice = 0;

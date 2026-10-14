@@ -5867,7 +5867,7 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
       // speciesName '' -- no clip inside each target's damage popup; it plays once at the end (_handleMultiHitAoe).
       const outcome = await confirmSecondarySave(target, target.name, {
         dc, hasDamage, damageModifier, speciesName: '', ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId],
-        damageOnPass: moveName === 'Self-Destruct', abilityDice: computedData.abilityDice,
+        damageOnPass: moveName === 'Self-Destruct', abilityDice: computedData.abilityDice, damageDice: computedData.damageDice,
       });
       if (!outcome) continue; // closed for this target -- move on to the next one
       const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
@@ -6052,7 +6052,7 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   const dc = computedData.moveDC ?? 0;
   const damageModifier = computedData.damageBonus || 0;
   const hasDamage = !!computedData.damageDice;
-  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName), moveName, abilityDice: computedData.abilityDice });
+  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName), moveName, abilityDice: computedData.abilityDice, damageDice: computedData.damageDice });
   if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
 
   const attackerName = session?.participants?.[combatantId]?.name || '?';

@@ -166,7 +166,7 @@ function _ensureDom() {
           <div class="save-picker-anim-media" id="savePickerAnimMedia"></div>
           <div class="save-picker-dc-target" id="savePickerDamageTarget"></div>
           <div class="save-picker-dice-row" id="savePickerDamageDiceRow"></div>
-          <label class="save-picker-roll-label" for="savePickerRollInput">Damage roll<span id="savePickerModifierNote"></span></label>
+          <label class="save-picker-roll-label" for="savePickerRollInput">Damage roll<span id="savePickerDiceText"></span><span id="savePickerModifierNote"></span></label>
           <input type="number" id="savePickerRollInput" class="save-picker-roll-input" placeholder="Enter roll…">
           <div id="savePickerAbilityDice"></div>
           <div class="save-picker-roll-total" id="savePickerRollTotal"></div>
@@ -481,6 +481,7 @@ function _showStep3() {
     <div class="save-picker-dc-target-name">${_selectedTargetName}</div>`;
   document.getElementById('savePickerModifierNote').textContent =
     _damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '';
+  document.getElementById('savePickerDiceText').innerHTML = _damageDice ? `: <strong>${_damageDice}</strong>` : '';
   const input = document.getElementById('savePickerRollInput');
   input.value = '';
   _damageDiceExtra = 0;
@@ -496,6 +497,7 @@ function _showStep3() {
 // Ace Trainer's Battle Dice (battle-dice.js) added to this damage roll: the total and how many, spent on confirm.
 let _damageDiceExtra = 0;
 let _abilityDice = []; // Blaze / Torrent's own extra dice -- an input of their own on the damage step
+let _damageDice = ''; // the move's damage dice ("3d10"), named on the damage step
 let _damageBattleDice = 0;
 
 function _renderDamageDiceRow() {
@@ -577,8 +579,9 @@ function _cardHtml(p) {
  * save bonuses), folds the numeric ones into the total, uses up "next roll"
  * effects once Success/Fail is chosen, and reports the net rollMode.
  */
-export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false, abilityDice = [] } = {}) {
+export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false, abilityDice = [], damageDice = '' } = {}) {
   _abilityDice = abilityDice || [];
+  _damageDice = damageDice || '';
   _ensureDom();
   _moveUser = moveUser;
   _dc = dc;
@@ -608,8 +611,9 @@ export async function confirmSecondarySave(target, targetName, { dc = 0, hasDama
  * {targetId, passed:true}, {targetId, passed:false} (no damage component),
  * {targetId, passed:false, rawRoll} (has one), or null if closed/no target.
  */
-export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null, moveName = '', abilityDice = [] } = {}) {
+export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null, moveName = '', abilityDice = [], damageDice = '' } = {}) {
   _abilityDice = abilityDice || [];
+  _damageDice = damageDice || '';
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;

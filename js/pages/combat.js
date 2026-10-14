@@ -3331,6 +3331,10 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // move is, instead of drifting from a second copy of the same regex.
   const _isDrainHeal = /the\s+damage\s+dealt\s+is\s+restored\s+to\s+the\s+user/i.test(_fullMoveDesc);
   let _diceLabel, _diceOverride, _diceBreakdownOverride;
+  // The dice and flat bonus the damage roll really takes once the notes below are in (Spit Up's stacks, Rollout's
+  // streak, Power-Up Punch...) -- the shared battle's damage step is handed these (see onUseMove), not the bare move's.
+  let _effDice = computedData.damageDice;
+  let _effFlat = 0;
   if (_isDirectHeal) {
     const _healDice = getHealDiceForLevel(move, c.level || 1);
     const _healMoveMod = (move[2] || '').trim();
@@ -3349,10 +3353,12 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     // already existed, but the actual DAMAGE dice shown here were never
     // multiplied to match it.
     const _adjustedDice = multiplyDiceString(computedData.damageDice, _stacks);
+    _effDice = _adjustedDice;
     _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
     _diceBreakdownOverride = [computedData.damageBreakdown, `×${_stacks} (Stockpile)`].filter(Boolean).join(' · ');
   } else if (_formationSize > 1 && computedData.damageDice) {
     const _adjustedDice = multiplyDiceString(computedData.damageDice, _formationSize);
+    _effDice = _adjustedDice;
     _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
     _diceBreakdownOverride = [computedData.damageBreakdown, `×${_formationSize} (formation size)`].filter(Boolean).join(' · ');
   } else if (moveName === 'Archive Blast' && computedData.damageDice) {
@@ -3366,6 +3372,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     const _diceCount = Math.min(1 + _witnessed, 6);
     if (_diceCount > 1) {
       const _adjustedDice = multiplyDiceString(computedData.damageDice, _diceCount);
+      _effDice = _adjustedDice;
       _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
       _diceBreakdownOverride = [computedData.damageBreakdown, `×${_diceCount} dice (${_witnessed} move type${_witnessed === 1 ? '' : 's'} witnessed: ${c.witnessedMoveTypes.join(', ')})`].filter(Boolean).join(' · ');
     }
@@ -3410,6 +3417,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
         // add the flat extra count, same as how flatBonus stacks on top too.
         let _adjustedDice = diceMultiplier > 1 ? multiplyDiceString(computedData.damageDice, diceMultiplier) : computedData.damageDice;
         if (extraDiceCount > 0) _adjustedDice = addDiceString(_adjustedDice, extraDiceCount);
+        _effDice = _adjustedDice;
+        _effFlat = flatBonus;
         const _totalFlat = computedData.damageBonus + flatBonus;
         _diceOverride = _totalFlat > 0 ? `${_adjustedDice} + ${_totalFlat}` : _adjustedDice;
         const _extraParts = [];
@@ -3431,6 +3440,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   if (_powerUpStacks > 0 && !_isDirectHeal && computedData.damageDice && String(move[6] || '').trim() === 'Melee') {
     const _current = _diceOverride || (computedData.damageBonus > 0 ? `${computedData.damageDice} + ${computedData.damageBonus}` : computedData.damageDice);
     _diceOverride = `${_current} + ${_powerUpStacks}d6`;
+    _effDice = `${_effDice} + ${_powerUpStacks}d6`;
     _diceBreakdownOverride = [_diceBreakdownOverride || computedData.damageBreakdown, `+${_powerUpStacks}d6 (Power-Up)`].filter(Boolean).join(' · ');
   }
 
@@ -3605,6 +3615,11 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       saveCombatState(state);
       rerenderBattle(state);
 
+      // The shared battle's damage step rolls what the popup showed: the adjusted dice and the notes' flat bonus too.
+      const handedData = _isSharedCombat && computedData.damageDice
+        ? { ...computedData, damageDice: _effDice, damageBonus: computedData.damageBonus + _effFlat }
+        : computedData;
+
       // Optional hook (combat-wip.js's shared battle view only -- the
       // legacy page never passes this, so its behavior is unchanged) for
       // "now pick a target and roll damage against them" -- offered only
@@ -3612,17 +3627,17 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       // or pure status/utility moves, matching the same signal
       // move-popup.js's own drain/direct-heal post-use check already uses.
       if (_willDeferToReactiveSave) {
-        onReactiveSave({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+        onReactiveSave({ combatantId, moveName: usedMoveName, move, computedData: handedData, speciesName: target.speciesName });
       } else if (_willDeferToMultiHitAoe) {
-        onMultiHitAoe({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+        onMultiHitAoe({ combatantId, moveName: usedMoveName, move, computedData: handedData, speciesName: target.speciesName });
       } else if (_willDeferToSavePicker) {
-        onSaveTriggered({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+        onSaveTriggered({ combatantId, moveName: usedMoveName, move, computedData: handedData, speciesName: target.speciesName });
       } else if (onDamageResolved && computedData.damageDice && !_isDrainHeal && !_isDirectHeal) {
-        onDamageResolved({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+        onDamageResolved({ combatantId, moveName: usedMoveName, move, computedData: handedData, speciesName: target.speciesName });
       } else if (onEffectsOnly && moveEffectsFor(usedMoveName).length) {
         // Nothing above took it (no damage, not save/AoE-tagged) but the move has
         // structured effects -- Slack Off, Rest, Yawn, Gravity... (combat-wip.js only).
-        onEffectsOnly({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
+        onEffectsOnly({ combatantId, moveName: usedMoveName, move, computedData: handedData, speciesName: target.speciesName });
       } else if (_isSharedCombat) {
         // Nothing else follows (Splash, a pure flavour move) -- the battle animation is the whole rest of the move.
         commitMove();

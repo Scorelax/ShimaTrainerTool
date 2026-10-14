@@ -17,21 +17,32 @@ export function lineFtFromRange(rangeText) {
   return m ? Number(m[1]) : null;
 }
 
-/** The beam's aim in 3D, for drawing its guide and aiming it: origin (the middle of the caster's cube -- or of its chosen
- * `start` square, one of a big caster's own: its front left, say), unit direction `d` (z is up; `pitchDeg` tilts it up
- * (+) or down (-) from level) and `drawLen`, the length of its shadow on the map out to the edge of the line's reach
- * (grid distance: a diagonal square, or a square up, counts 5ft). Which squares it covers is lineCells'. */
+/** Where a big caster fires from: `start` = { col, row } (one of its own squares -- its front left, say; left out = the
+ * middle of it) and `layer` (how many 5ft up its own height: 0, the default, is its lowest point -- a Huge Pokemon on the
+ * ground fires along the ground; the user's rule, 2026-10-14). Either may be missing. */
+function _startOf(start, n) {
+  const square = start && start.col != null && start.row != null ? { col: start.col, row: start.row } : null;
+  const layer = Math.max(0, Math.min(n - 1, Math.floor(start?.layer || 0)));
+  return { square, layer };
+}
+
+/** The beam's aim in 3D, for drawing its guide and aiming it: origin (the middle of the caster's start square, at its
+ * start layer -- see _startOf), unit direction `d` (z is up; `pitchDeg` tilts it up (+) or down (-) from level) and
+ * `drawLen`, the length of its shadow on the map out to the edge of the line's reach (grid distance: a diagonal square,
+ * or a square up, counts 5ft). Which squares it covers is lineCells'. */
 export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0, start = null) {
   const n = casterSize || 1;
+  const { square, layer } = _startOf(start, n);
+  const oz = Math.floor((casterPos.z || 0) / 5) + layer + 0.5;
   const a = (angleDeg * Math.PI) / 180;
   const p = (pitchDeg * Math.PI) / 180;
   const d = { x: Math.sin(a) * Math.cos(p), y: -Math.cos(a) * Math.cos(p), z: Math.sin(p) };
   const stretch = 1 / Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
-  const len = (lengthFt / 5 + (start ? 0.5 : n / 2)) * stretch;
+  const len = (lengthFt / 5 + (square ? 0.5 : n / 2)) * stretch;
   return {
-    o: start
-      ? { x: start.col + 0.5, y: start.row + 0.5, z: (casterPos.z || 0) / 5 + n / 2 }
-      : { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2, z: (casterPos.z || 0) / 5 + n / 2 },
+    o: square
+      ? { x: square.col + 0.5, y: square.row + 0.5, z: oz }
+      : { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2, z: oz },
     d, len,
     drawLen: len * Math.cos(p),
   };
@@ -61,16 +72,17 @@ export function inLineReach(session, casterId, id, lengthFt) {
 
 /** The cubes a line covers, [{x: col, y: row, z: height layer}]: exactly lengthFt / 5 of them beyond the caster (fewer
  * where it runs off the map or into the ground), whatever the angle. From the middle of the caster -- or of its chosen
- * `start` square -- at its middle height layer (a Huge caster's level beam passes over a Medium creature), one cube per
- * step along the beam's main direction; the caster's own cubes don't count. */
+ * start square -- at its lowest layer unless raised (see _startOf), one cube per step along the beam's main direction;
+ * the caster's own cubes don't count. */
 export function lineCells(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0, start = null, grid = null) {
   const n = casterSize || 1;
   const left = casterPos.col, top = casterPos.row - n + 1, z0 = Math.floor((casterPos.z || 0) / 5);
   const a = (angleDeg * Math.PI) / 180;
   const p = (pitchDeg * Math.PI) / 180;
   const d = { x: Math.sin(a) * Math.cos(p), y: -Math.cos(a) * Math.cos(p), z: Math.sin(p) };
-  const o = start ? { x: start.col + 0.5, y: start.row + 0.5 } : { x: left + n / 2, y: top + n / 2 };
-  o.z = z0 + Math.floor((n - 1) / 2) + 0.5;
+  const { square, layer } = _startOf(start, n);
+  const o = square ? { x: square.col + 0.5, y: square.row + 0.5 } : { x: left + n / 2, y: top + n / 2 };
+  o.z = z0 + layer + 0.5;
   const main = Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
   const want = Math.floor(lengthFt / 5);
   const own = (c, r, h) => c >= left && c < left + n && r >= top && r < top + n && h >= z0 && h < z0 + n;

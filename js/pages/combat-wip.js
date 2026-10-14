@@ -1189,6 +1189,12 @@ async function _twoStageFlow(args, handler) {
   if (ts?.stage === 'hold') {
     const target = _heldTargetOf(combatantId, moveName, ts.holdCondition);
     if (!target) return null; // nobody held yet -- the ordinary first use
+    // Once a round, from the turn after the grab -- each time a fresh damage roll (Wrap: "on your subsequent turns").
+    const hold = (target.statuses || []).find((s) => s.kind === 'condition' && s.apply === ts.holdCondition && s.sourceId === combatantId && s.moveName === moveName);
+    if (hold?.appliedRound === session.round) {
+      showCombatAlert(`${holder.name} only just ${ts.holdCondition === 'restrained' ? 'restrained' : 'grabbed'} ${visibleToViewer(target, 'name') ? target.name : 'the target'} -- it can keep it up on its next turn.`, { title: moveName });
+      return 'handled';
+    }
     if (ts.release === 'bonus' && !_bonusActionFree(combatantId, moveName)) return 'handled';
     if (ts.release === 'bonus') _flowBonusRelease = same;
     const { computedData = {}, move } = args;

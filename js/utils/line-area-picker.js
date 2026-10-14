@@ -30,6 +30,7 @@ function _injectStyles() {
     .lap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
     .lap-actions button { border: none; border-radius: 999px; padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.1); color: #e8ecff; }
     .lap-actions button:hover { background: rgba(255,255,255,0.2); }
+    .lap-height { font-size: 0.8rem; color: #9fd8ff; min-width: 4.5em; text-align: center; }
     .lap-actions .lap-confirm { margin-left: auto; background: linear-gradient(135deg, #ff9a50, #e0662a); color: #1a0b02; box-shadow: 0 0 16px rgba(255,120,50,0.45); }
     /* A big caster's own squares (tap one to fire from it) and the one chosen. */
     .lap-own { position: absolute; z-index: 3; pointer-events: none; box-sizing: border-box; border: 2px dashed rgba(130,200,255,0.75); border-radius: 4px; }
@@ -90,6 +91,20 @@ function _startPicker(stage, board, casterPos, n) {
   };
 }
 
+/** The tilt buttons, and -- for a caster taller than one square -- the start-height buttons (from its lowest point up
+ * to its own height). */
+function _heightButtonsHtml(n, tiltStep) {
+  return `<button type="button" data-act="tiltDown" title="Tilt it ${tiltStep}° down">▼ Tilt</button>`
+    + `<button type="button" data-act="tiltUp" title="Tilt it ${tiltStep}° up">▲ Tilt</button>`
+    + (n > 1 ? `<button type="button" data-act="lower" title="Start it 5ft lower">▼ Start</button><span class="lap-height"></span>`
+      + `<button type="button" data-act="raise" title="Start it 5ft higher, up to its own height">▲ Start</button>` : '');
+}
+
+/** "from Onix's lowest point" / "from 10ft up Onix" -- where the move comes out, in the aim line. */
+function _startText(name, layer, flyingNote) {
+  return layer ? `from ${layer * 5}ft up ${name}${flyingNote}` : `from ${name}'s lowest point${flyingNote}`;
+}
+
 /**
  * @param {object} session  the shared combat session (board + participants)
  * @param {string} casterId the line comes out of this creature's token
@@ -108,6 +123,8 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     const casterSize = footprintForSize(caster?.size);
     let angle = casterPos.facing || 0;
     let start = null; // a big caster's own square the beam starts from (null = the middle of it)
+    let layer = 0;    // how many 5ft up its own height it starts (0 = its lowest point)
+    const org = () => ({ ...(start || {}), layer }); // line-area.js's `start`
 
     const overlay = document.createElement('div');
     overlay.className = 'lap-overlay';
@@ -127,6 +144,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
         <div class="lap-actions">
           <button type="button" data-act="left" title="Turn 5° left">⟲ 5°</button>
           <button type="button" data-act="right" title="Turn 5° right">⟳ 5°</button>
+          ${_heightButtonsHtml(casterSize, 5)}
           <button type="button" data-act="cancel">Cancel</button>
           <button type="button" class="lap-confirm" data-act="confirm">${confirmLabel}</button>
         </div>
@@ -168,11 +186,13 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     let hits = [];
     const starts = _startPicker(stage, board, casterPos, casterSize);
     const refresh = () => {
-      const g = lineGeometry(casterPos, casterSize, angle, lengthFt, pitch, start);
+      const g = lineGeometry(casterPos, casterSize, angle, lengthFt, pitch, org());
       lineEl.setAttribute('style', lineGuideStyle(board, g, angle));
-      lineCellsEl.innerHTML = lineCellsHtml(board, lineCells(casterPos, casterSize, angle, lengthFt, pitch, start, board.grid));
+      lineCellsEl.innerHTML = lineCellsHtml(board, lineCells(casterPos, casterSize, angle, lengthFt, pitch, org(), board.grid));
       starts.show(start);
-      hits = lineHitIds(session, casterId, angle, lengthFt, pitch, start).filter(id => aimable.has(id));
+      const heightEl = overlay.querySelector('.lap-height');
+      if (heightEl) heightEl.textContent = `Start ${layer * 5}ft`;
+      hits = lineHitIds(session, casterId, angle, lengthFt, pitch, org()).filter(id => aimable.has(id));
       tokenEls.forEach((el, id) => {
         el.classList.toggle('line-hit', hits.includes(id));
         el.classList.toggle('line-aim', id === aimedAt);
@@ -180,7 +200,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       const tilt = Math.round(Math.abs(pitch));
       aimEl.textContent = aimedAt
         ? `Aimed at ${nameOf(aimedAt)}${heightOf(aimedAt)}${tilt ? `: tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}. Drag to level it again` : ' (level)'}. Tap the same square again for another creature there.`
-        : `Level, at ${caster?.name || 'the caster'}'s height${heightOf(casterId)} -- it passes under flyers. Tap a creature to aim the beam at it.`;
+        : `${tilt ? `Tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}` : 'Level'}, ${_startText(caster?.name || 'the caster', layer, heightOf(casterId))}${tilt ? '' : ' -- it passes under flyers'}. Tilt it, or tap a creature to aim the beam at it.`;
       const names = hits.map(id => `${nameOf(id)}${heightOf(id)}`);
       hitsEl.textContent = names.length ? `In the line: ${names.join(', ')}` : 'Nobody in the line yet.';
     };
@@ -188,7 +208,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
 
     let aiming = false;
     const aim = (e) => {
-      angle = angleToPointer(stage, board, lineGeometry(casterPos, casterSize, 0, lengthFt, 0, start).o, e.clientX, e.clientY);
+      angle = angleToPointer(stage, board, lineGeometry(casterPos, casterSize, 0, lengthFt, 0, org()).o, e.clientX, e.clientY);
       pitch = 0; aimedAt = null; refresh();
     };
     stage.addEventListener('pointerdown', (e) => {
@@ -197,14 +217,14 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       if (own) {
         // One of the caster's own squares: fire from there (the same square again: back to the middle).
         start = start && start.col === own.col && start.row === own.row ? null : own;
-        if (aimedAt) ({ angle, pitch } = aimAtCreature(session, casterId, aimedAt, angle, start));
+        if (aimedAt) ({ angle, pitch } = aimAtCreature(session, casterId, aimedAt, angle, org()));
         refresh();
         return;
       }
       const id = _creatureAt(stage, session, aimable, e, aimedAt);
       if (id) {
         // Tap a creature: the beam tilts to go straight through the middle of it.
-        ({ angle, pitch } = aimAtCreature(session, casterId, id, angle, start));
+        ({ angle, pitch } = aimAtCreature(session, casterId, id, angle, org()));
         aimedAt = id;
         refresh();
         return;
@@ -221,8 +241,14 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       if (!act) return;
       if (act === 'left') { angle = (angle + 355) % 360; aimedAt = null; refresh(); }
       else if (act === 'right') { angle = (angle + 5) % 360; aimedAt = null; refresh(); }
+      else if (act === 'tiltUp' || act === 'tiltDown') { pitch = Math.max(-80, Math.min(80, pitch + (act === 'tiltUp' ? 5 : -5))); aimedAt = null; refresh(); }
+      else if (act === 'raise' || act === 'lower') {
+        layer = Math.max(0, Math.min(casterSize - 1, layer + (act === 'raise' ? 1 : -1)));
+        if (aimedAt) ({ angle, pitch } = aimAtCreature(session, casterId, aimedAt, angle, org()));
+        refresh();
+      }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
-      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch, start }); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch, start: org() }); }
     });
   });
 }
@@ -253,6 +279,9 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     const snap = (deg) => ((Math.round(deg / 45) * 45) % 360 + 360) % 360;
     let angle = snap(casterPos.facing || 0);
     let start = null; // a big caster's own square the cone comes out of (null = the edge it faces)
+    let layer = 0;    // how many 5ft up its own height it starts (0 = its lowest point)
+    let pitch = 0;    // the level cone tilted up / down by hand
+    const org = () => ({ ...(start || {}), layer }); // cone-area.js's `start`
 
     const overlay = document.createElement('div');
     overlay.className = 'lap-overlay';
@@ -270,6 +299,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
         <div class="lap-actions">
           <button type="button" data-act="left" title="Turn 45° left">⟲ 45°</button>
           <button type="button" data-act="right" title="Turn 45° right">⟳ 45°</button>
+          ${_heightButtonsHtml(casterSize, 15)}
           <button type="button" data-act="cancel">Cancel</button>
           <button type="button" class="lap-confirm" data-act="confirm">${confirmLabel}</button>
         </div>
@@ -306,9 +336,14 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     const starts = _startPicker(stage, board, casterPos, casterSize);
     const refresh = () => {
       const level = levelCone(angle);
-      const origin = tilted ? tilted.origin : coneOrigin(casterPos, casterSize, level.dir, start);
+      const origin = tilted ? tilted.origin : coneOrigin(casterPos, casterSize, level.dir, org());
       starts.show(start);
-      const axis = tilted ? tilted.axis : level.axis;
+      const heightEl = overlay.querySelector('.lap-height');
+      if (heightEl) heightEl.textContent = `Start ${layer * 5}ft`;
+      // Tilted by hand: the grid direction, raised (or lowered) by `pitch`.
+      const p = (pitch * Math.PI) / 180;
+      const axis = tilted ? tilted.axis
+        : pitch ? { x: level.axis.x * Math.cos(p), y: level.axis.y * Math.cos(p), z: Math.sin(p) } : level.axis;
       const cells = coneShadowCells(board, origin, axis, lengthCells);
       cellEls.forEach((el, key) => el.classList.toggle('cone', cells.has(key)));
       hits = coneHitIds(session, casterId, origin, axis, lengthCells).filter(id => aimable.has(id));
@@ -316,10 +351,10 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
         el.classList.toggle('line-hit', hits.includes(id));
         el.classList.toggle('line-aim', id === tilted?.id);
       });
-      const tilt = tilted ? Math.round(Math.abs(tilted.pitch)) : 0;
+      const tilt = Math.round(Math.abs(tilted ? tilted.pitch : pitch));
       aimEl.textContent = tilted
         ? `Aimed at ${nameOf(tilted.id)}${heightOf(tilted.id)}${tilt ? `: tilted ${tilt}° ${tilted.pitch > 0 ? 'up' : 'down'}` : ''}. Drag to level it again; tap the same square again for another creature there.`
-        : `Level, at ${caster?.name || 'the caster'}'s height${heightOf(casterId)} -- it spreads upward as it goes (as high as it is wide). Tap a creature to aim the cone at it.`;
+        : `${tilt ? `Tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}` : 'Level'}, ${_startText(caster?.name || 'the caster', layer, heightOf(casterId))} -- it spreads upward as it goes (as high as it is wide). Tilt it, or tap a creature to aim the cone at it.`;
       const names = hits.map(id => `${nameOf(id)}${heightOf(id)}`);
       hitsEl.textContent = names.length ? `In the cone: ${names.join(', ')}` : 'Nobody in the cone yet.';
     };
@@ -327,8 +362,8 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
 
     let aiming = false;
     const aim = (e) => {
-      angle = snap(angleToPointer(stage, board, lineGeometry(casterPos, casterSize, 0, lengthFt, 0, start).o, e.clientX, e.clientY));
-      tilted = null; refresh();
+      angle = snap(angleToPointer(stage, board, lineGeometry(casterPos, casterSize, 0, lengthFt, 0, org()).o, e.clientX, e.clientY));
+      tilted = null; pitch = 0; refresh();
     };
     stage.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -336,14 +371,14 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
       if (own) {
         // One of the caster's own squares: fire from there (the same square again: back to the edge it faces).
         start = start && start.col === own.col && start.row === own.row ? null : own;
-        if (tilted) tilted = { id: tilted.id, ...coneAimAt(session, casterId, tilted.id, start) };
+        if (tilted) tilted = { id: tilted.id, ...coneAimAt(session, casterId, tilted.id, org()) };
         refresh();
         return;
       }
       const id = _creatureAt(stage, session, aimable, e, tilted?.id);
       if (id) {
         // Tap a creature: the cone tilts to point straight at it.
-        tilted = { id, ...coneAimAt(session, casterId, id, start) };
+        tilted = { id, ...coneAimAt(session, casterId, id, org()) };
         refresh();
         return;
       }
@@ -359,8 +394,14 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
       if (!act) return;
       if (act === 'left') { angle = (angle + 315) % 360; tilted = null; refresh(); }
       else if (act === 'right') { angle = (angle + 45) % 360; tilted = null; refresh(); }
+      else if (act === 'tiltUp' || act === 'tiltDown') { pitch = Math.max(-75, Math.min(75, pitch + (act === 'tiltUp' ? 15 : -15))); tilted = null; refresh(); }
+      else if (act === 'raise' || act === 'lower') {
+        layer = Math.max(0, Math.min(casterSize - 1, layer + (act === 'raise' ? 1 : -1)));
+        if (tilted) tilted = { id: tilted.id, ...coneAimAt(session, casterId, tilted.id, org()) };
+        refresh();
+      }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
-      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch: tilted ? tilted.pitch : 0, start }); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch: tilted ? tilted.pitch : pitch, start: org() }); }
     });
   });
 }

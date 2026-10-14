@@ -12,22 +12,24 @@ import { footprintForSize } from './battle-map-grid.js';
 const HALF_ANGLE_COS = Math.cos(Math.PI / 4) + 1e-6; // strictly inside 45 degrees, like the grid template's edges
 
 /** The cube the cone comes out of: the footprint cell on the edge it faces (coneCells' rule -- the corner for a
- * diagonal, the middle of the edge otherwise), at the caster's lowest middle layer. `dir` is 0-7 (up, up-right, ...);
+ * diagonal, the middle of the edge otherwise), at the caster's lowest layer (or the one `start.layer` raises it to). `dir` is 0-7 (up, up-right, ...);
  * a tilted cone (no grid direction) comes out of the footprint's middle. */
 export function coneOrigin(pos, size, dir = null, start = null) {
   const n = size || 1;
   const mid = Math.floor((n - 1) / 2);
   const left = pos.col, top = pos.row - n + 1;
   let x = left + mid, y = top + mid;
-  // A big caster's own square the player chose to fire it from (its front left, say) -- whichever way it points.
-  if (start) return { x: start.col, y: start.row, z: Math.floor((pos.z || 0) / 5) + mid };
+  // From the caster's lowest point unless the player raised it (`start.layer`, up to its own height -- the user's rule,
+  // 2026-10-14), and from the square they chose (`start.col/row`, its front left, say), whichever way it points.
+  const z = Math.floor((pos.z || 0) / 5) + Math.max(0, Math.min(n - 1, Math.floor(start?.layer || 0)));
+  if (start && start.col != null && start.row != null) return { x: start.col, y: start.row, z };
   if (dir != null) {
     const dx = [0, 1, 1, 1, 0, -1, -1, -1][dir];
     const dy = [-1, -1, 0, 1, 1, 1, 0, -1][dir];
     x = dx > 0 ? left + n - 1 : dx < 0 ? left : left + mid;
     y = dy > 0 ? top + n - 1 : dy < 0 ? top : top + mid;
   }
-  return { x, y, z: Math.floor((pos.z || 0) / 5) + mid };
+  return { x, y, z };
 }
 
 /** The level cone's direction for a facing angle, snapped to the 8 grid directions: { dir, axis }. */

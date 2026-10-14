@@ -25953,7 +25953,13 @@
       "moveStat": "STR/DEX",
       "vpCost": "1",
       "scaling": "The damage dice for this move changes to 1d6 at level 5, 1d8 at level 10, and 2d6 at level 17.",
-      "attackRoll": true
+      "attackRoll": true,
+      "twoStage": {
+        "stage": "hold",
+        "holdCondition": "grappled",
+        "release": "bonus",
+        "addMove": false
+      }
     },
     {
       "name": "Wring Out",

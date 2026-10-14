@@ -344,18 +344,26 @@ function _renderMovePanel() {
     _stagedDestination = null; _stagedAlt = null;
     _render();
   });
-  document.getElementById('bmapConfirmMove')?.addEventListener('click', () => {
+  document.getElementById('bmapConfirmMove')?.addEventListener('click', (e) => {
     const movingId = _selectedTokenId;
     const { col, row } = _stagedDestination;
     const altitude = _stagedAlt;
-    _selectedTokenId = null;
-    _stagedDestination = null; _stagedAlt = null;
-    _stagedAlt = null;
+    // The token stays drawn on its new square until the server answers -- then the answer itself redraws the map
+    // (api.js applies it at once), so a slow or dropped live connection can't leave it looking like it snapped back.
+    e.currentTarget.disabled = true;
+    e.currentTarget.textContent = 'Moving…';
+    const done = () => {
+      if (_selectedTokenId === movingId) { _selectedTokenId = null; _stagedDestination = null; _stagedAlt = null; }
+      _render();
+    };
     CombatAPI.moveToken(movingId, col, row, altitude === null ? undefined : altitude)
       // Walking away from a hostile creature can open a reaction window (Pursuit) that nobody else is waiting on -- run its clock.
-      .then(res => { if (res?.data?.pendingReaction) waitForOpenWindow(); })
-      .catch(err => showCombatAlert(err.message, { title: 'Error' }));
-    _render();
+      .then(res => {
+        if (res?.data?.participants && (!_session?.version || (res.data.version || 0) >= _session.version)) _session = res.data;
+        done();
+        if (res?.data?.pendingReaction) waitForOpenWindow();
+      })
+      .catch(err => { done(); showCombatAlert(err.message, { title: 'Error' }); });
   });
 }
 

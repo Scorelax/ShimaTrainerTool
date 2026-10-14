@@ -190,6 +190,13 @@ class API {
           cache.set(cacheKey, data, cacheTtl);
         }
 
+        // A shared-battle action answers with the battle as it now is: shown at once, the same way a live push is,
+        // instead of waiting for that push -- a phone's live connection can lag or silently die. (combat-wip.js keeps
+        // only the newest copy -- see the session `version`.)
+        if (isCombat && action !== 'get-state' && data?.data?.participants && Array.isArray(data.data.turnOrder)) {
+          window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: data.data }));
+        }
+
         return data;
 
       } catch (error) {

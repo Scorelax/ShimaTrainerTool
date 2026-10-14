@@ -777,6 +777,10 @@ def load_state(conn):
 
 
 def _save_and_publish(conn, state):
+    # Every saved state is newer than the one before (milliseconds, never repeating -- also across battles): a device
+    # applies the answer to its own request at once and a live push of the same change later, and keeps only the newest.
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    state['version'] = max(now_ms, int(state.get('version') or 0) + 1)
     conn.execute(
         'INSERT INTO combat_session (id, json, updated_at) VALUES (1, ?, ?) '
         'ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at',

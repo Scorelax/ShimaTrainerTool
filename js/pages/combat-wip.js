@@ -3029,7 +3029,11 @@ export function attachCombatWipListeners() {
   // join flow completes and re-renders.
   if (combatUpdateHandler) window.removeEventListener('app:combat-updated', combatUpdateHandler);
   combatUpdateHandler = (e) => {
-    session = e.detail;
+    // The answer to this device's own request and the live push of the same change both arrive: only a newer copy
+    // than the one on screen is applied (a late push can't roll the screen back).
+    const incoming = e.detail;
+    if (incoming?.version && session?.version && incoming.version <= session.version) return;
+    session = incoming;
     setAbilitySession(session);
     _showNewAbilityReminders(session);
     _answerPromptsForMe(session); // another player's attack asking this player to roll (their Sturdy, Rough Skin...)

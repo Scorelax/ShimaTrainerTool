@@ -118,6 +118,11 @@ let _hasDamage = false;
 // really do deal zero damage on a pass) rather than a blanket "always ask
 // for a damage roll on pass" -- see confirmSecondarySave's own comment.
 let _damageOnPass = false;
+// Which outcome halves the damage, the app halving it (the human enters the full roll): 'pass' for a move's own "half as
+// much on a success", 'fail' for a line's edge target (line-area.js -- nothing on a success, half on a failure); null =
+// neither. A 'pass' one also asks for the damage roll on a pass.
+let _halfOn = null;
+let _saveNote = ''; // a line on the save and damage steps ("On the edge of the line: ...")
 // Which outcome led to the current damage-roll step (_showStep3 is shared
 // by both _confirmFail and, when _damageOnPass, _confirmPass -- see
 // _confirmDamageRoll, which needs to report the right one).
@@ -219,7 +224,7 @@ function _showStep2(p, name) {
   if (p) { _selectedTarget = p; _selectedTargetName = name; }
   // Not a typed-in DC (the reactor's own save against whoever hit them, on their own screen anyway).
   const remote = !_manualDc && _remoteSave
-    ? _remoteSave(_selectedTarget, { dc: _dc, ability: _saveAbility, title: _saveTitle || 'Saving Throw', moveUserId: _moveUser?.id || null })
+    ? _remoteSave(_selectedTarget, { dc: _dc, ability: _saveAbility, title: _saveTitle || 'Saving Throw', moveUserId: _moveUser?.id || null, note: _saveNote })
     : null;
   if (remote) {
     const wasShown = _overlay.style.display;
@@ -255,7 +260,7 @@ function _renderStep2() {
   const modeText = rollModeText(_saveCtx.mode);
   const autoFailNote = _saveAutoFail ? `<div class="mode disadvantage">Automatically fails this save</div>` : '';
   document.getElementById('savePickerRollNotes').innerHTML =
-    `${autoFailNote}${modeText ? `<div class="mode ${_saveCtx.mode}">${modeText}</div>` : ''}${_saveCtx.notes.map(n => `<div class="note">${n}</div>`).join('')}`;
+    `${_saveNote ? `<div class="note">${_saveNote}</div>` : ''}${autoFailNote}${modeText ? `<div class="mode ${_saveCtx.mode}">${modeText}</div>` : ''}${_saveCtx.notes.map(n => `<div class="note">${n}</div>`).join('')}`;
   const abilityText = ability ? ` (${ability}${ability !== _saveAbility ? `, swapped from ${_saveAbility} by Wonder Room` : ''})` : '';
   const modText = _saveModifier === null
     ? (ability ? ' — no ability data, enter the total' : '')
@@ -416,7 +421,7 @@ function _afterSave(passed) {
     // that's ever called this closes right away on a Pass, no damage step at
     // all (see this file's own header comment).
     // Magic Guard (the saver's ability, ability-mods.js): a passed save against a half-damage move means no damage.
-    if (_hasDamage && _damageOnPass && !noDamageOnPassedSave(_selectedTarget)) {
+    if (_hasDamage && (_damageOnPass || _halfOn === 'pass') && !noDamageOnPassedSave(_selectedTarget)) {
       _showStep3();
       _playAnimation();
     } else {
@@ -480,7 +485,8 @@ function _showStep3() {
     <div class="save-picker-portrait">${spriteMediaHtml(_selectedTarget.image, _selectedTargetName, '', '', { small: true })}</div>
     <div class="save-picker-dc-target-name">${_selectedTargetName}</div>`;
   document.getElementById('savePickerModifierNote').textContent =
-    _damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '';
+    (_damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '')
+    + (_halvedNow() ? ` -- enter the full roll, it's halved (${_pendingPassed ? 'a successful save' : 'a failed save on the edge of the line'})` : '');
   document.getElementById('savePickerDiceText').innerHTML = _damageDice ? `: <strong>${_damageDice}</strong>` : '';
   const input = document.getElementById('savePickerRollInput');
   input.value = '';
@@ -526,12 +532,18 @@ function _renderDamageDiceRow() {
   });
 }
 
+/** Whether the damage step's roll is halved (see _halfOn) -- for the outcome that led to it. */
+function _halvedNow() {
+  return _halfOn === (_pendingPassed ? 'pass' : 'fail');
+}
+
 function _updateRollTotal() {
   const raw = parseInt(document.getElementById('savePickerRollInput').value, 10);
   const totalEl = document.getElementById('savePickerRollTotal');
   const ability = abilityDiceSum(document.getElementById('savePickerAbilityDice'));
+  const total = raw + _damageModifier + _damageDiceExtra + (ability || 0);
   totalEl.innerHTML = Number.isNaN(raw) ? ''
-    : `Total: <strong>${raw + _damageModifier + _damageDiceExtra + (ability || 0)}</strong>${Number.isNaN(ability) ? ' (+ the ability roll below)' : ''}`;
+    : `Total: <strong>${total}</strong>${_halvedNow() ? ` → halved: <strong>${Math.floor(total / 2)}</strong>` : ''}${Number.isNaN(ability) ? ' (+ the ability roll below)' : ''}`;
 }
 
 function _confirmDamageRoll() {
@@ -546,7 +558,7 @@ function _confirmDamageRoll() {
   const extra = _damageDiceExtra + abilityRoll;
   _damageDiceExtra = 0;
   _damageBattleDice = 0;
-  _close({ targetId: _selectedTargetId, passed: _pendingPassed, rawRoll: raw + extra, ...(_pendingSave || {}) });
+  _close({ targetId: _selectedTargetId, passed: _pendingPassed, rawRoll: raw + extra, halved: _halvedNow(), ...(_pendingSave || {}) });
 }
 
 function _cardHtml(p) {
@@ -579,7 +591,7 @@ function _cardHtml(p) {
  * save bonuses), folds the numeric ones into the total, uses up "next roll"
  * effects once Success/Fail is chosen, and reports the net rollMode.
  */
-export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false, abilityDice = [], damageDice = '' } = {}) {
+export async function confirmSecondarySave(target, targetName, { dc = 0, hasDamage = false, damageModifier = 0, speciesName = '', ability = null, title = 'Secondary Saving Throw', moveUser = null, damageOnPass = false, abilityDice = [], damageDice = '', halfOn = null, note = '' } = {}) {
   _abilityDice = abilityDice || [];
   _damageDice = damageDice || '';
   _ensureDom();
@@ -591,6 +603,8 @@ export async function confirmSecondarySave(target, targetName, { dc = 0, hasDama
   _speciesName = speciesName;
   _saveAbility = ability;
   _damageOnPass = damageOnPass;
+  _halfOn = halfOn;
+  _saveNote = note || '';
   _pendingSave = null;
   _selectedTargetId = target.id;
   _saveTitle = title;
@@ -630,6 +644,8 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _hasDamage = hasDamage;
   _saveAbility = ability;
   _damageOnPass = false; // single-target save flow -- no caller of this one needs it yet, unlike confirmSecondarySave
+  _halfOn = null;
+  _saveNote = '';
   _pendingSave = null;
   _saveTitle = null;
   document.getElementById('savePickerAnimMedia').innerHTML = '';
@@ -675,6 +691,8 @@ export async function pickManualSaveTarget(casterId, { speciesName = '' } = {}) 
   _hasDamage = false;
   _saveAbility = null;
   _moveUser = null;
+  _halfOn = null;
+  _saveNote = '';
   _pendingSave = null;
   _saveTitle = null;
   _speciesName = speciesName;

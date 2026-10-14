@@ -5815,9 +5815,20 @@ async function _handleMultiHitAoe(args) {
   if ((await _runMultiHitAoe(args)) !== false) playBattleAnimationFloating(args.speciesName);
 }
 
+/** A save move whose text gives "half as much on a success" (Hydro Pump, Earthquake, Self-Destruct...): a passed save
+ * still takes half the rolled damage. */
+const HALF_ON_SAVE_RE = /\bhalf (?:as much|(?:the )?damage)\b[^.]*?\b(?:on ?(?:a |the )?(?:succ|save|pass)|without)|\bsuccess(?:ful+(?:ly)?)?(?: save)?,? (?:they|it|the target|creatures)? ?(?:take|takes) half\b|\bhalf (?:damage )?on (?:a )?success/i;
+function _halvesOnSave(moveName) {
+  return HALF_ON_SAVE_RE.test(String((findMoveRow(moveName) || [])[7] || ''));
+}
+
 async function _runMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
   let targetIds = await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName) });
   if (!targetIds || !targetIds.length) return false; // closed / nobody picked -- move's own cost still applied
+  // A line's targets only on the edge of it (line-area.js, the user's rule 2026-10-14): they save for nothing, or take
+  // half damage -- and the move's effects -- on a failure.
+  const edgeIds = new Set(targetIds.edgeIds || []);
+  const halvesOnSave = _halvesOnSave(moveName);
 
   // Wide Guard's own reaction: this app has no real blast-center/positional-
   // radius concept, so the first target actually picked stands in for "is
@@ -5867,15 +5878,30 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
     if (!target) continue;
 
     if (isSaveTriggered) {
-      // damageOnPass: Self-Destruct's own "half as much on a success" --
-      // every other save-triggered move here deals zero damage on a pass,
-      // same as confirmSecondarySave's own default (see save-picker.js).
+      // halfOn: the save-picker halves the damage roll -- on a pass for a move's own "half as much on a success"
+      // (_halvesOnSave), on a fail for a line's edge target (who takes nothing on a pass).
       // speciesName '' -- no clip inside each target's damage popup; it plays once at the end (_handleMultiHitAoe).
+      const edge = edgeIds.has(targetId);
       const outcome = await confirmSecondarySave(target, target.name, {
         dc, hasDamage, damageModifier, speciesName: '', ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId],
-        damageOnPass: moveName === 'Self-Destruct', abilityDice: computedData.abilityDice, damageDice: computedData.damageDice,
+        abilityDice: computedData.abilityDice, damageDice: computedData.damageDice,
+        halfOn: edge ? 'fail' : (halvesOnSave ? 'pass' : null),
+        note: edge ? `On the edge of ${attackerName}'s ${moveName}: a success means it misses ${target.name} entirely; a failure means ${hasDamage ? 'half damage and ' : ''}its effects.` : '',
       });
       if (!outcome) continue; // closed for this target -- move on to the next one
+      if (edge && outcome.passed) {
+        CombatAPI.logEvent({
+          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
+          text: `${target.name} was on the edge of ${attackerName}'s ${moveName} and dodged it${_saveRollNote(outcome)}`,
+        }).catch(() => {});
+        continue; // nothing happens to it -- no damage, no effects
+      }
+      if (edge) {
+        CombatAPI.logEvent({
+          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
+          text: `${target.name} was on the edge of ${attackerName}'s ${moveName} and failed the saving throw${_saveRollNote(outcome)}${hasDamage ? ' -- half damage' : ''}`,
+        }).catch(() => {});
+      }
       const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
       // rawRoll checked FIRST, not outcome.passed -- a passed save can still
       // carry a damage roll now (damageOnPass above), which used to be
@@ -5887,7 +5913,8 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
           // doubly true in a loop over several AoE targets, one popup per target.
           // damageMultiplier: see this function's own Wide Guard note above.
           const rawTotal = outcome.rawRoll + damageModifier;
-          const targetMultiplier = damageMultiplier * _stateDamageMultiplier(moveName, targetId) * (targetId === vpHalfId ? 0.5 : 1);
+          const targetMultiplier = damageMultiplier * _stateDamageMultiplier(moveName, targetId) * (targetId === vpHalfId ? 0.5 : 1)
+            * (outcome.halved ? 0.5 : 1); // a pass on a "half as much" move / a fail on a line's edge (see halfOn above)
           const finalDamage = targetMultiplier !== 1 ? Math.floor(rawTotal * targetMultiplier) : rawTotal;
           const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, false,
             targetId === vpHalfId ? 'vp' : null);
@@ -5906,7 +5933,7 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
           type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
           text: `${target.name} succeeded the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}`,
         }).catch(() => {});
-      } else {
+      } else if (!edge) {
         CombatAPI.logEvent({
           type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
           text: `${target.name} failed the saving throw against ${attackerName}'s ${moveName}${_saveRollNote(outcome)}${applyHint}`,
@@ -6626,10 +6653,10 @@ function _askRemote(participant, kind, args, label) {
 /** save-picker.js's remote-save hook: a saving throw by a creature another player controls is made on their screen --
  * every move save (single target, area, the secondary save after a hit) and every ability save. The save step only;
  * the damage roll after it stays with the attacker. */
-function _remoteSaveFor(target, { dc, ability, title, moveUserId }) {
+function _remoteSaveFor(target, { dc, ability, title, moveUserId, note }) {
   const mover = session?.participants?.[moveUserId];
   const label = `${target.name}'s ${ability ? `${ability} ` : ''}save${mover ? ` against ${mover.name}` : ''} (DC ${dc})`;
-  const remote = _askRemote(target, 'save', { affectedId: target.id, moveUserId, opts: { dc, ability, title } }, label);
+  const remote = _askRemote(target, 'save', { affectedId: target.id, moveUserId, opts: { dc, ability, title, note } }, label);
   return remote ? remote.then(r => (r?.answered && r.answer ? r.answer : null)) : null;
 }
 

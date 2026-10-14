@@ -42,6 +42,7 @@ function _injectStyles() {
     .mtp-name { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mtp-check { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border-radius: 4px; border: 2px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; }
     .mtp-card.selected .mtp-check { background: #FFD700; border-color: #FFD700; color: #1e1e34; }
+    .mtp-edge-tag { position: absolute; top: 4px; left: 4px; padding: 0 0.3rem; border-radius: 4px; border: 1px dashed #ffd36e; background: rgba(255,211,110,0.15); color: #ffd36e; font-size: 0.65rem; font-weight: 700; }
   `;
   document.head.appendChild(style);
 }
@@ -49,6 +50,7 @@ function _injectStyles() {
 let _overlay = null;
 let _resolve = null;
 let _selected = new Set();
+let _edge = new Set(); // a line's targets only on the edge of it (line-area.js): they save for nothing / half on a fail
 
 function _ensureDom() {
   if (_overlay) return;
@@ -74,12 +76,22 @@ function _ensureDom() {
   document.body.appendChild(_overlay);
   document.getElementById('mtpClose').addEventListener('click', () => _close(null));
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(null); });
-  document.getElementById('mtpConfirm').addEventListener('click', () => _close([..._selected]));
+  // A plain array of ids, carrying `edgeIds` (the ticked ones on a line's edge) for the caller.
+  document.getElementById('mtpConfirm').addEventListener('click', () => {
+    const ids = [..._selected];
+    _close(Object.assign(ids, { edgeIds: ids.filter(id => _edge.has(id)) }));
+  });
 }
 
 function _close(result) {
   if (_overlay) _overlay.style.display = 'none';
   if (_resolve) { _resolve(result); _resolve = null; }
+}
+
+/** The "Edge" tag on a card (a line's target only on the edge of it). */
+function _markEdge(card, on) {
+  card.querySelector('.mtp-edge-tag')?.remove();
+  if (on) card.insertAdjacentHTML('afterbegin', '<div class="mtp-edge-tag" title="On the edge of the line: a save for no damage, half on a fail">Edge</div>');
 }
 
 function _cardHtml(p) {
@@ -100,7 +112,8 @@ function _cardHtml(p) {
  * `area` ({ radiusFt, heightFt, centeredOnCaster }, from the move's own range/description) adds a "Select from the map"
  * button: the caster marks the blast on the battle map and everyone whose token overlaps it -- and, for a cylinder with a
  * height, is at or below that altitude -- is ticked for them, to adjust by hand before confirming.
- * A line move's area is { lineFt } instead: the caster aims a 5ft-wide line on the map (line-area-picker.js).
+ * A line move's area is { lineFt } instead: the caster aims a 5ft-wide line on the map (line-area-picker.js); the ones
+ * only on the edge of it come back tagged, as the result's `edgeIds`.
  */
 export async function pickMultipleTargets(casterId, { moveName = '', area = null } = {}) {
   const result = await CombatAPI.getState();
@@ -112,6 +125,7 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
 
   _ensureDom();
   _selected = new Set();
+  _edge = new Set();
   const grid = document.getElementById('mtpGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
   markOutOfRange(grid, participants); // beyond the move's reach or behind full cover: greyed out, not pickable
@@ -146,9 +160,12 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
     if (area.lineFt) {
       const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt, targetableIds: aimableIds, blockedNotes });
       if (!line) return;
+      _edge = new Set(line.edgeIds || []);
       participants.forEach(p => {
         const card = grid.querySelector(`[data-target-id="${p.id}"]`);
-        if (card) toggle(card, line.ids.includes(p.id));
+        if (!card) return;
+        toggle(card, line.ids.includes(p.id));
+        _markEdge(card, _edge.has(p.id));
       });
       return;
     }

@@ -1,10 +1,12 @@
-// Line areas ("Self (80ft. line)", "50ft. line" -- always 5ft wide): a beam that starts in the middle of the caster, can
-// point in ANY direction (not just the 8 grid directions the cone uses) and tilt up or down at a flyer. It covers exactly
-// one 5ft square (cube) per 5ft of its length beyond the caster, whatever the angle -- one per step along its main
-// direction, a diagonal step counting 5ft like every other distance here (the user's rule, 2026-10-14: a line hits the
-// same number of squares at any angle) -- and a creature is in it when one of its cubes (its footprint, from its flying
-// height up as high as it is wide) is one of those. Used by the map's line tool (battle-map-popup.js, always level) and
-// the "select from the map" line placer (line-area-picker.js).
+// Line areas ("Self (80ft. line)", "50ft. line" -- always 5ft wide): a beam 5ft wide and 5ft tall that starts in the
+// caster, can point in ANY direction (not just the 8 grid directions the cone uses) and tilt up or down at a flyer. It
+// reaches its length beyond the caster in grid distance (a diagonal square, or a square up, counts 5ft like every other
+// distance here). Each 5ft square (cube) counts by how much of it the beam covers (the user's rule, 2026-10-14, so an
+// angled line doesn't catch extra squares just by grazing them): over 2/3 is a full hit, 1/3 to 2/3 an EDGE hit (the
+// creature saves -- nothing on a success, half damage and the move's effects on a failure; combat-wip.js), under 1/3
+// misses. A creature counts its best-covered cube (its footprint, from its flying height up as high as it is wide).
+// Used by the map's line tool (battle-map-popup.js, always level) and the "select from the map" line placer
+// (line-area-picker.js).
 //
 // Coordinates are in cells, y pointing down, with a token's footprint the NxN square whose bottom-left cell is its
 // (col, row) -- the same convention as battle-map-grid.js's cellRect. Angles are degrees clockwise from straight up,
@@ -26,26 +28,55 @@ function _startOf(start, n) {
   return { square, layer };
 }
 
-/** The beam's aim in 3D, for drawing its guide and aiming it: origin (the middle of the caster's start square, at its
- * start layer -- see _startOf), unit direction `d` (z is up; `pitchDeg` tilts it up (+) or down (-) from level) and
- * `drawLen`, the length of its shadow on the map out to the edge of the line's reach (grid distance: a diagonal square,
- * or a square up, counts 5ft). Which squares it covers is lineCells'. */
+/** The square the beam fires from when none was chosen: none (the middle) for an odd-sized caster; for an even-sized one,
+ * whose middle is a grid corner -- a straight beam from there would run down a grid line, half of every square on each
+ * side of it -- its own square furthest along the aim, ties going to the right of it (its front right). */
+function _fireSquare(casterPos, n, square, angleDeg) {
+  if (square || n % 2) return square;
+  const a = (angleDeg * Math.PI) / 180;
+  const fx = Math.sin(a), fy = -Math.cos(a); // forward on the map
+  const left = casterPos.col, top = casterPos.row - n + 1, mx = left + n / 2, my = top + n / 2;
+  let best = null, bestAlong = -Infinity, bestSide = -Infinity;
+  for (let c = left; c < left + n; c++) for (let r = top; r < top + n; r++) {
+    const dx = c + 0.5 - mx, dy = r + 0.5 - my;
+    const along = dx * fx + dy * fy, side = dx * -fy + dy * fx;
+    if (along > bestAlong + 1e-9 || (Math.abs(along - bestAlong) <= 1e-9 && side > bestSide)) {
+      best = { col: c, row: r }; bestAlong = along; bestSide = side;
+    }
+  }
+  return best;
+}
+
+/** Where the beam is aimed from, before an angle is known (dragging to aim it): the middle of the caster, or of its chosen
+ * `start` square, at its start layer. */
+export function lineAimOrigin(casterPos, casterSize, start = null) {
+  const n = casterSize || 1;
+  const { square, layer } = _startOf(start, n);
+  const z = Math.floor((casterPos.z || 0) / 5) + layer + 0.5;
+  return square ? { x: square.col + 0.5, y: square.row + 0.5, z } : { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2, z };
+}
+
+/** The beam in 3D: origin `o` (the middle of the square it fires from -- see _fireSquare -- at its start layer, see
+ * _startOf), unit direction `d` (z is up; `pitchDeg` tilts it up (+) or down (-) from level), `len` from the origin to
+ * its far end -- out of the caster, then the line's length beyond it in grid distance (a diagonal square, or a square up,
+ * counts 5ft) -- and `drawLen`, the length of its shadow on the map. Which squares it covers is lineCells'. */
 export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0, start = null) {
   const n = casterSize || 1;
   const { square, layer } = _startOf(start, n);
-  const oz = Math.floor((casterPos.z || 0) / 5) + layer + 0.5;
+  const fire = _fireSquare(casterPos, n, square, angleDeg);
+  const left = casterPos.col, top = casterPos.row - n + 1, z0 = Math.floor((casterPos.z || 0) / 5);
+  const o = fire ? { x: fire.col + 0.5, y: fire.row + 0.5, z: z0 + layer + 0.5 } : lineAimOrigin(casterPos, n, start);
   const a = (angleDeg * Math.PI) / 180;
   const p = (pitchDeg * Math.PI) / 180;
   const d = { x: Math.sin(a) * Math.cos(p), y: -Math.cos(a) * Math.cos(p), z: Math.sin(p) };
   const stretch = 1 / Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
-  const len = (lengthFt / 5 + (square ? 0.5 : n / 2)) * stretch;
-  return {
-    o: square
-      ? { x: square.col + 0.5, y: square.row + 0.5, z: oz }
-      : { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2, z: oz },
-    d, len,
-    drawLen: len * Math.cos(p),
-  };
+  // Where the middle of the beam leaves the caster's own cubes.
+  let out = Infinity;
+  [['x', left, left + n], ['y', top, top + n], ['z', z0, z0 + n]].forEach(([k, lo, hi]) => {
+    if (Math.abs(d[k]) > 1e-9) out = Math.min(out, ((d[k] > 0 ? hi : lo) - o[k]) / d[k]);
+  });
+  const len = (Number.isFinite(out) ? out : 0) + (lengthFt / 5) * stretch;
+  return { o, d, len, drawLen: len * Math.cos(p) };
 }
 
 /** The squares within `lengthFt` of the caster's footprint (the line's reach box on the map): {c0, c1, r0, r1}, inclusive. */
@@ -70,77 +101,119 @@ export function inLineReach(session, casterId, id, lengthFt) {
     && z < cz + n + reach && z + m > cz - reach;
 }
 
-/** The cubes a line covers, [{x: col, y: row, z: height layer}]: exactly lengthFt / 5 of them beyond the caster (fewer
- * where it runs off the map or into the ground), whatever the angle. From the middle of the caster -- or of its chosen
- * start square -- at its lowest layer unless raised (see _startOf), one cube per step along the beam's main direction;
- * the caster's own cubes don't count. */
+/** Over this share of a square (cube) the beam is a full hit; from LINE_EDGE up to it, an edge hit; under LINE_EDGE,
+ * a miss (the user's rule, 2026-10-14). */
+export const LINE_FULL = 2 / 3;
+export const LINE_EDGE = 1 / 3;
+
+/** The cubes a line covers, [{x: col, y: row, z: height layer, cover, edge}], nearest first: every cube at least
+ * LINE_EDGE of which lies inside the beam (`cover`, 0..1), `edge` when that's LINE_FULL or less. The caster's own cubes,
+ * cubes under the ground and squares off the map (`grid`) don't count. A level beam fills its start layer exactly, so
+ * only the squares across it matter; a tilted one is measured through the whole cube. */
 export function lineCells(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0, start = null, grid = null) {
   const n = casterSize || 1;
   const left = casterPos.col, top = casterPos.row - n + 1, z0 = Math.floor((casterPos.z || 0) / 5);
-  const a = (angleDeg * Math.PI) / 180;
-  const p = (pitchDeg * Math.PI) / 180;
-  const d = { x: Math.sin(a) * Math.cos(p), y: -Math.cos(a) * Math.cos(p), z: Math.sin(p) };
-  const { square, layer } = _startOf(start, n);
-  const o = square ? { x: square.col + 0.5, y: square.row + 0.5 } : { x: left + n / 2, y: top + n / 2 };
-  o.z = z0 + layer + 0.5;
-  const main = Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
-  const want = Math.floor(lengthFt / 5);
+  const { o, d, len } = lineGeometry(casterPos, n, angleDeg, lengthFt, pitchDeg, start);
+  const a = (angleDeg * Math.PI) / 180, p = (pitchDeg * Math.PI) / 180;
+  const w = { x: Math.cos(a), y: Math.sin(a), z: 0 };                                          // across the beam
+  const u = { x: -Math.sin(a) * Math.sin(p), y: Math.cos(a) * Math.sin(p), z: Math.cos(p) };    // up through it
+  const level = Math.abs(pitchDeg) < 1e-9;
+  const inBeam = (x, y, z) => {
+    const sx = x - o.x, sy = y - o.y, sz = z - o.z;
+    const t = sx * d.x + sy * d.y + sz * d.z;
+    return t >= 0 && t <= len && Math.abs(sx * w.x + sy * w.y) <= 0.5 && Math.abs(sx * u.x + sy * u.y + sz * u.z) <= 0.5;
+  };
+  // Measured by points spread evenly through the square (level) or the cube (tilted).
+  const S = level ? 12 : 7;
+  const coverOf = (c, r, h) => {
+    let hit = 0;
+    for (let i = 0; i < S; i++) for (let j = 0; j < S; j++) {
+      const x = c + (i + 0.5) / S, y = r + (j + 0.5) / S;
+      if (level) { if (inBeam(x, y, o.z)) hit++; continue; }
+      for (let k = 0; k < S; k++) if (inBeam(x, y, h + (k + 0.5) / S)) hit++;
+    }
+    return hit / (level ? S * S : S * S * S);
+  };
   const own = (c, r, h) => c >= left && c < left + n && r >= top && r < top + n && h >= z0 && h < z0 + n;
-  const out = [];
-  for (let k = 1; out.length < want && k <= want + 2 * n + 2; k++) {
-    // A hair past each step, so a beam out of a square's corner (a 2x2 caster's middle) picks its squares consistently.
-    const t = k / main + 1e-6;
-    const c = Math.floor(o.x + d.x * t), r = Math.floor(o.y + d.y * t), h = Math.floor(o.z + d.z * t);
-    if (own(c, r, h)) continue;
-    if (h < 0 && z0 >= 0) break; // into the ground
-    if (grid && (c < 0 || r < 0 || c >= grid.cols || r >= grid.rows)) break;
-    out.push({ x: c, y: r, z: h });
+  // The cubes near the middle of the beam, all along it.
+  const seen = new Map();
+  const reach = level ? 0 : 1;
+  for (let t = 0; t <= len + 1e-9; t += 0.25) {
+    const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+    for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) for (let dh = -reach; dh <= reach; dh++) {
+      const c = Math.floor(x) + dc, r = Math.floor(y) + dr, h = Math.floor(z) + dh;
+      const k = `${c},${r},${h}`;
+      if (!seen.has(k)) seen.set(k, { c, r, h, t });
+    }
   }
-  return out;
+  const out = [];
+  for (const { c, r, h, t } of seen.values()) {
+    if (own(c, r, h) || (h < 0 && z0 >= 0)) continue; // its own cubes; under the ground
+    if (grid && (c < 0 || r < 0 || c >= grid.cols || r >= grid.rows)) continue;
+    const cover = coverOf(c, r, h);
+    if (cover >= LINE_EDGE) out.push({ x: c, y: r, z: h, cover, edge: cover <= LINE_FULL, t });
+  }
+  return out.sort((q1, q2) => q1.t - q2.t).map(({ t, ...q }) => q);
 }
 
-/** Ids of every creature (except the caster) with a cube in the line (lineCells). Level by default (pitch 0), so it
- * passes under a flyer and over nothing on the ground; tilted (aimAtCreature) it can climb to one. */
-export function lineHitIds(session, casterId, angleDeg, lengthFt, pitchDeg = 0, start = null) {
+/** Who the line catches: `ids` everyone (except the caster) with a cube in it, `edgeIds` those of them whose
+ * best-covered cube is only an edge hit (see lineCells). Level by default (pitch 0), so it passes under a flyer and over
+ * nothing on the ground; tilted (aimAtCreature) it can climb to one. */
+export function lineHits(session, casterId, angleDeg, lengthFt, pitchDeg = 0, start = null) {
   const board = session.board;
   const casterPos = board.tokens[casterId];
-  if (!casterPos) return [];
+  if (!casterPos) return { ids: [], edgeIds: [] };
   const casterSize = footprintForSize(session.participants[casterId]?.size);
-  const cubes = new Set(lineCells(casterPos, casterSize, angleDeg, lengthFt, pitchDeg, start, board.grid).map(q => `${q.x},${q.y},${q.z}`));
-  return Object.entries(board.tokens)
-    .filter(([id, pos]) => {
-      if (id === casterId || !session.participants[id]) return false;
-      const m = footprintForSize(session.participants[id].size);
-      const z0 = Math.floor((pos.z || 0) / 5);
-      for (let c = pos.col; c < pos.col + m; c++) for (let r = pos.row - m + 1; r <= pos.row; r++) for (let h = z0; h < z0 + m; h++) {
-        if (cubes.has(`${c},${r},${h}`)) return true;
-      }
-      return false;
-    })
-    .map(([id]) => id);
+  const cover = new Map(lineCells(casterPos, casterSize, angleDeg, lengthFt, pitchDeg, start, board.grid).map(q => [`${q.x},${q.y},${q.z}`, q.cover]));
+  const ids = [], edgeIds = [];
+  Object.entries(board.tokens).forEach(([id, pos]) => {
+    if (id === casterId || !session.participants[id]) return;
+    const m = footprintForSize(session.participants[id].size);
+    const z0 = Math.floor((pos.z || 0) / 5);
+    let best = 0;
+    for (let c = pos.col; c < pos.col + m; c++) for (let r = pos.row - m + 1; r <= pos.row; r++) for (let h = z0; h < z0 + m; h++) {
+      best = Math.max(best, cover.get(`${c},${r},${h}`) || 0);
+    }
+    if (!best) return;
+    ids.push(id);
+    if (best <= LINE_FULL) edgeIds.push(id);
+  });
+  return { ids, edgeIds };
 }
 
-/** The line's squares on the map (its cubes' ground squares), drawn as shaded squares. */
+/** Ids of everyone the line catches, full or edge hit (lineHits). */
+export function lineHitIds(session, casterId, angleDeg, lengthFt, pitchDeg = 0, start = null) {
+  return lineHits(session, casterId, angleDeg, lengthFt, pitchDeg, start).ids;
+}
+
+/** The line's squares on the map (its cubes' ground squares, each as its best-covered cube there): shaded squares,
+ * edge-hit ones fainter and dashed. */
 export function lineCellsHtml(board, cells) {
   const { cols, rows } = board.grid;
-  const seen = new Set();
-  return cells.filter((q) => { const k = `${q.x},${q.y}`; if (seen.has(k)) return false; seen.add(k); return true; })
-    .map(q => `<div class="bmap-line-cell" style="left:${(q.x / cols) * 100}%;top:${(q.y / rows) * 100}%;width:${100 / cols}%;height:${100 / rows}%"></div>`)
+  const best = new Map();
+  cells.forEach((q) => { const k = `${q.x},${q.y}`; if (!best.has(k) || best.get(k).cover < q.cover) best.set(k, q); });
+  return [...best.values()]
+    .map(q => `<div class="bmap-line-cell${q.edge ? ' edge' : ''}" style="left:${(q.x / cols) * 100}%;top:${(q.y / rows) * 100}%;width:${100 / cols}%;height:${100 / rows}%"></div>`)
     .join('');
 }
 
-/** The aim {angle, pitch} that points the beam from the middle of the caster's cube (or its chosen `start` square) at
- * the middle of creature `id`'s. */
+/** The aim {angle, pitch} that points the beam from where it fires (the middle of the caster's cube, its chosen `start`
+ * square, or an even-sized caster's square facing that way -- see _fireSquare) at the middle of creature `id`'s. */
 export function aimAtCreature(session, casterId, id, fallbackAngle = 0, start = null) {
   const board = session.board;
   const casterPos = board.tokens[casterId];
   const pos = board.tokens[id];
-  const o = lineGeometry(casterPos, footprintForSize(session.participants[casterId]?.size), 0, 5, 0, start).o;
+  const n = footprintForSize(session.participants[casterId]?.size);
   const m = footprintForSize(session.participants[id]?.size);
-  const dx = pos.col + m / 2 - o.x, dy = pos.row - m + 1 + m / 2 - o.y, dz = (pos.z || 0) / 5 + m / 2 - o.z;
-  const flat = Math.hypot(dx, dy);
-  const angle = flat < 1e-6 ? fallbackAngle : (((Math.atan2(dx, -dy) * 180) / Math.PI) + 360) % 360;
-  return { angle, pitch: (Math.atan2(dz, flat) * 180) / Math.PI };
+  const aimFrom = (o, fallback) => {
+    const dx = pos.col + m / 2 - o.x, dy = pos.row - m + 1 + m / 2 - o.y, dz = (pos.z || 0) / 5 + m / 2 - o.z;
+    const flat = Math.hypot(dx, dy);
+    const angle = flat < 1e-6 ? fallback : (((Math.atan2(dx, -dy) * 180) / Math.PI) + 360) % 360;
+    return { angle, pitch: (Math.atan2(dz, flat) * 180) / Math.PI };
+  };
+  // Roughly from the middle first, then from the square it really fires from at that angle.
+  const rough = aimFrom(lineAimOrigin(casterPos, n, start), fallbackAngle);
+  return aimFrom(lineGeometry(casterPos, n, rough.angle, 5, 0, start).o, rough.angle);
 }
 
 /** A thin aiming guide along the beam (the squares themselves are lineCellsHtml's). */
@@ -170,6 +243,8 @@ export function injectLineStyles() {
     .bmap-line.guide { background: rgba(255,190,120,0.85); border: none; border-radius: 2px; box-shadow: 0 0 6px rgba(255,120,50,0.7); }
     .bmap-line-cells { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
     .bmap-line-cell { position: absolute; box-sizing: border-box; background: rgba(255,140,60,0.42); box-shadow: inset 0 0 0 2px rgba(255,170,90,0.9); }
+    .bmap-line-cell.edge { background: rgba(255,200,110,0.16); box-shadow: none; border: 2px dashed rgba(255,205,120,0.85); }
+    .bmap-token.line-hit.line-edge .bmap-token-portrait { box-shadow: 0 0 0 3px #ffd36e, 0 0 12px 2px rgba(255,210,110,0.7); }
   `;
   document.head.appendChild(style);
 }

@@ -1,13 +1,14 @@
 // "Aim the line" -- the "select from the map" step for a line move (Hyper Beam's "80 foot line, 5ft wide"). Shows the
 // battle map with a 5ft-wide strip coming out of the caster; drag (or tap) anywhere on the map to swing it round to any
-// angle, or nudge it 5° at a time. Creatures the strip touches are ringed live, and the confirm hands their ids back to the
-// multi-target picker to tick (still adjustable there). See line-area.js for the geometry.
+// angle, or nudge it 5° at a time. Creatures the strip catches are ringed live (a yellow ring on the edge of it), and the
+// confirm hands their ids back to the multi-target picker to tick (still adjustable there). See line-area.js for the
+// geometry and the edge rule.
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
 import { coneOrigin, levelCone, inConeReach, coneHitIds, coneShadowCells, coneAimAt } from './cone-area.js';
-import { lineGeometry, lineCells, lineCellsHtml, lineHitIds, lineReachBox, inLineReach, aimAtCreature, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
+import { lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineReachBox, inLineReach, aimAtCreature, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 function _injectStyles() {
   if (document.getElementById('line-area-picker-styles')) return;
@@ -110,7 +111,8 @@ function _startText(name, layer, flyingNote) {
  * @param {string} casterId the line comes out of this creature's token
  * @param {string} title    e.g. "Hyper Beam"
  * @param {number} lengthFt the line's length (lineFtFromRange of the move's range)
- * @returns {Promise<{ids: string[], angle: number, pitch: number} | null>}  null when cancelled
+ * @returns {Promise<{ids: string[], edgeIds: string[], angle: number, pitch: number} | null>}  null when cancelled; edgeIds
+ *   are the ones only on the edge of it (line-area.js's lineHits)
  */
 export function pickLineArea({ session, casterId, title, lengthFt, targetableIds = null, blockedNotes = null, confirmLabel = 'Select targets in the line' }) {
   _injectStyles();
@@ -131,7 +133,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     overlay.innerHTML = `
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
-        <div class="lap-sub">A ${lengthFt}ft line, a 5ft-wide beam from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the beam straight at it (up at a flyer, down from the air). It covers ${lengthFt / 5} squares at any angle (shaded); greyed-out creatures are out of its reach. Everyone the beam touches is selected.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again for the middle.` : ''}</div>
+        <div class="lap-sub">A ${lengthFt}ft line, a 5ft-wide beam from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the beam straight at it (up at a flyer, down from the air). It reaches ${lengthFt / 5} squares out at any angle; a square more than 2/3 inside the beam is hit (shaded), one 1/3 to 2/3 inside is the edge of it (dashed: a save for nothing, or half damage on a fail), and less misses. Greyed-out creatures are out of its reach.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again to go back to ${casterSize % 2 ? 'the middle' : 'the square facing the aim'}.` : ''}</div>
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
           <div class="bmap-line-cells"></div>
@@ -184,6 +186,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     let pitch = 0;       // level unless aimed at a creature
     let aimedAt = null;  // the creature it was aimed at
     let hits = [];
+    let edges = [];      // the ones only on the edge of it
     const starts = _startPicker(stage, board, casterPos, casterSize);
     const refresh = () => {
       const g = lineGeometry(casterPos, casterSize, angle, lengthFt, pitch, org());
@@ -192,23 +195,29 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       starts.show(start);
       const heightEl = overlay.querySelector('.lap-height');
       if (heightEl) heightEl.textContent = `Start ${layer * 5}ft`;
-      hits = lineHitIds(session, casterId, angle, lengthFt, pitch, org()).filter(id => aimable.has(id));
+      const caught = lineHits(session, casterId, angle, lengthFt, pitch, org());
+      hits = caught.ids.filter(id => aimable.has(id));
+      edges = caught.edgeIds.filter(id => aimable.has(id));
       tokenEls.forEach((el, id) => {
         el.classList.toggle('line-hit', hits.includes(id));
+        el.classList.toggle('line-edge', edges.includes(id));
         el.classList.toggle('line-aim', id === aimedAt);
       });
       const tilt = Math.round(Math.abs(pitch));
       aimEl.textContent = aimedAt
         ? `Aimed at ${nameOf(aimedAt)}${heightOf(aimedAt)}${tilt ? `: tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}. Drag to level it again` : ' (level)'}. Tap the same square again for another creature there.`
         : `${tilt ? `Tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}` : 'Level'}, ${_startText(caster?.name || 'the caster', layer, heightOf(casterId))}${tilt ? '' : ' -- it passes under flyers'}. Tilt it, or tap a creature to aim the beam at it.`;
-      const names = hits.map(id => `${nameOf(id)}${heightOf(id)}`);
-      hitsEl.textContent = names.length ? `In the line: ${names.join(', ')}` : 'Nobody in the line yet.';
+      const names = ids => ids.map(id => `${nameOf(id)}${heightOf(id)}`).join(', ');
+      const full = hits.filter(id => !edges.includes(id));
+      hitsEl.textContent = hits.length
+        ? [full.length ? `In the line: ${names(full)}` : '', edges.length ? `On the edge: ${names(edges)}` : ''].filter(Boolean).join(' · ')
+        : 'Nobody in the line yet.';
     };
     refresh();
 
     let aiming = false;
     const aim = (e) => {
-      angle = angleToPointer(stage, board, lineGeometry(casterPos, casterSize, 0, lengthFt, 0, org()).o, e.clientX, e.clientY);
+      angle = angleToPointer(stage, board, lineAimOrigin(casterPos, casterSize, org()), e.clientX, e.clientY);
       pitch = 0; aimedAt = null; refresh();
     };
     stage.addEventListener('pointerdown', (e) => {
@@ -248,7 +257,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
         refresh();
       }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
-      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch, start: org() }); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, edgeIds: edges, angle, pitch, start: org() }); }
     });
   });
 }
@@ -362,7 +371,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
 
     let aiming = false;
     const aim = (e) => {
-      angle = snap(angleToPointer(stage, board, lineGeometry(casterPos, casterSize, 0, lengthFt, 0, org()).o, e.clientX, e.clientY));
+      angle = snap(angleToPointer(stage, board, lineAimOrigin(casterPos, casterSize, org()), e.clientX, e.clientY));
       tilted = null; pitch = 0; refresh();
     };
     stage.addEventListener('pointerdown', (e) => {

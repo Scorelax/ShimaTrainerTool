@@ -638,8 +638,9 @@ def delete_display_image(conn, img_id):
 
 
 def give_pokemon(conn, trainer, cfg):
-    """The aftermath's "give to trainer": a Pokemon the players caught goes straight into that trainer's team -- built
-    the way the DM set it up (species, level, nature, abilities, held item, shiny, any ability scores the DM gave it),
+    """The aftermath's "give to trainer", and the Party module's Give Pokemon: a Pokemon goes straight into that trainer's
+    team -- built the way the DM set it up (species, level, nature, abilities, held item, shiny, any ability scores and
+    AC / max HP / max VP the DM gave it),
     with the same maths a player's own registration runs, stored with its static picture like register does."""
     from . import db, live
     tname = next((r[1] for _, r in db.fetch_rows(conn, 'trainers', db.TRAINER_COLUMNS) if str(r[1]).lower() == str(trainer).lower()), None)
@@ -656,7 +657,7 @@ def give_pokemon(conn, trainer, cfg):
         conn, species, js_parse_int(cfg.get('level')), nature=cfg.get('nature') or '',
         ability_slots=[str(s) for s in (cfg.get('abilities') or [0])], nickname=cfg.get('nickname') or '',
         held_item=cfg.get('item') or '', shiny=bool(cfg.get('shiny')), stats=cfg.get('stats') or None,
-        extra_skills=cfg.get('extraSkills') or ())
+        overrides=cfg.get('overrides') or None, extra_skills=cfg.get('extraSkills') or ())
     row[0] = tname
     row[1] = upstream.local_pokemon_image_url(row[2], row[3]) or ''
     first_time = not caught_before(conn, row[2])

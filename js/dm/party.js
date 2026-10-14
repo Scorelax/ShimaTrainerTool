@@ -1,13 +1,14 @@
 // DM console -- the Party module: every player trainer with their current party at a glance, and a trainer's full
 // page on a click -- their stats, all their Pokemon (each one's full stat block on a click), their money and their
 // inventory, where the DM hands out items and money (routes_dm.py's give-item / give-money, which add to what's there
-// on the server, so nothing the player just changed is overwritten). Kept live: any change to a trainer (the player's
+// on the server, so nothing the player just changed is overwritten) and gives Pokemon (give-pokemon.js). Kept live: any change to a trainer (the player's
 // own, or the DM's) is pushed by the server and redrawn here.
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, typeBadges, toast } from './dm-common.js';
 import { xpOrStart, xpPanelHtml, xpButtonHtml, giveXpPopup } from './xp.js';
+import { givePokemonPopup } from './give-pokemon.js';
 
 // Positions in a trainer row (db.TRAINER_COLUMNS) and a Pokemon row (db.POKEMON_COLUMNS).
 const T = { image: 0, name: 1, level: 2, hd: 3, vd: 4, str: 5, hp: 11, vp: 12, ac: 13, speed: 14, saves: 15, init: 16, prof: 17, skills: 18,
@@ -152,7 +153,7 @@ function drawTrainer(entry) {
       <div class="dm-trainer-cols">
         <div class="dm-trainer-col">${trainerStatsHtml(t)}${xpPanelHtml(xpOrStart(entry.xp?.trainer, t[T.level]), t[T.level], 'id="trainerXp"')}</div>
         <div class="dm-trainer-col">
-          <div class="dm-card-title">Pokémon (${all.length})</div>
+          <div class="dm-card-title dm-title-with-btn">Pokémon (${all.length})<button class="dm-btn small primary" id="givePokemonBtn">+ Give Pokémon</button></div>
           ${all.map(p => pokemonRowHtml(name, p, xpFor(p))).join('') || '<div class="dm-hint">No Pokémon.</div>'}
         </div>
         <div class="dm-trainer-col">${moneyAndItemsHtml(t, items)}</div>
@@ -161,6 +162,12 @@ function drawTrainer(entry) {
   patchImages(_root);
   _root.querySelectorAll('.dm-trainer-col').forEach((c, i) => { if (scrollers[i]) c.scrollTop = scrollers[i]; });
   wireTrainer(name, items);
+  document.getElementById('givePokemonBtn').addEventListener('click', async () => {
+    if (await givePokemonPopup(name, { ownedSpecies: entry.pokemon.map(p => p[P.name]) })) {
+      toast(`Gave ${name} a Pokémon`);
+      reload();
+    }
+  });
   document.getElementById('trainerXp').addEventListener('click', async () => {
     if (await giveXpPopup({ label: name, trainer: name, xp: xpOrStart(entry.xp?.trainer, t[T.level]), level: t[T.level] }) !== null) reload();
   });

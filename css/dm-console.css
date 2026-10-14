@@ -1014,3 +1014,6 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
   width: min(100cqw, calc(100cqh * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px;
   border: 2px solid rgba(255, 215, 0, 0.35); background: #081423; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
+
+/* Party module: a card title with a button at its right (Pokémon + Give Pokémon). */
+.dm-title-with-btn { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }

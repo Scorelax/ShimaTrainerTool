@@ -20,8 +20,10 @@ export function lineFtFromRange(rangeText) {
 /** The beam, in 3D: origin (the middle of the caster's cube), unit direction `d` (z is up), its length and half-size
  * (5ft wide AND 5ft tall), all in cells. `pitchDeg` tilts it up (+) or down (-) from level -- 0, the default, fires it
  * straight out at the caster's own height. `u` / `drawLen` are its shadow on the map, for drawing the strip. The length
- * runs `lengthFt` past the caster's own half-size, so the line reaches its full distance beyond the caster's edge. */
-export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0) {
+ * runs `lengthFt` past the caster's own half-size, so the line reaches its full distance beyond the caster's edge.
+ * `start` ({col, row}, one of a big caster's own squares -- its front left, say): the beam starts from the middle of that
+ * square instead, and runs `lengthFt` past that square's edge. */
+export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0, start = null) {
   const n = casterSize || 1;
   const a = (angleDeg * Math.PI) / 180;
   const p = (pitchDeg * Math.PI) / 180;
@@ -31,9 +33,11 @@ export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg
   // caster, not a sphere: the beam runs to that box's edge, e.g. a 30ft line reaches 6 squares straight ahead, 6
   // diagonally, or 30ft straight up.
   const stretch = 1 / Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
-  const len = (lengthFt / 5 + n / 2) * stretch;
+  const len = (lengthFt / 5 + (start ? 0.5 : n / 2)) * stretch;
   return {
-    o: { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2, z: (casterPos.z || 0) / 5 + n / 2 },
+    o: start
+      ? { x: start.col + 0.5, y: start.row + 0.5, z: (casterPos.z || 0) / 5 + n / 2 }
+      : { x: casterPos.col + n / 2, y: casterPos.row - n + 1 + n / 2, z: (casterPos.z || 0) / 5 + n / 2 },
     u, d, len,
     drawLen: len * Math.cos(p),
     half: LINE_WIDTH_FT / 10,
@@ -93,12 +97,12 @@ export function lineTouchesCube(g, pos, n, eps = 0.05) {
 
 /** Ids of every creature (except the caster) in the line's reach that the beam touches. Level by default (pitch 0), so
  * it passes under a flyer and over nothing on the ground; tilted (aimAtCreature) it can climb to one. */
-export function lineHitIds(session, casterId, angleDeg, lengthFt, pitchDeg = 0) {
+export function lineHitIds(session, casterId, angleDeg, lengthFt, pitchDeg = 0, start = null) {
   const board = session.board;
   const casterPos = board.tokens[casterId];
   if (!casterPos) return [];
   const casterSize = footprintForSize(session.participants[casterId]?.size);
-  const g = lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg);
+  const g = lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg, start);
   // The beam's square end pokes a little past the reach box's corner on a diagonal; whoever stands out there isn't hit.
   return Object.entries(board.tokens)
     .filter(([id, pos]) => id !== casterId && inLineReach(session, casterId, id, lengthFt)
@@ -106,12 +110,13 @@ export function lineHitIds(session, casterId, angleDeg, lengthFt, pitchDeg = 0) 
     .map(([id]) => id);
 }
 
-/** The aim {angle, pitch} that points the beam from the middle of the caster's cube at the middle of creature `id`'s. */
-export function aimAtCreature(session, casterId, id, fallbackAngle = 0) {
+/** The aim {angle, pitch} that points the beam from the middle of the caster's cube (or its chosen `start` square) at
+ * the middle of creature `id`'s. */
+export function aimAtCreature(session, casterId, id, fallbackAngle = 0, start = null) {
   const board = session.board;
   const casterPos = board.tokens[casterId];
   const pos = board.tokens[id];
-  const o = lineGeometry(casterPos, footprintForSize(session.participants[casterId]?.size), 0, 5).o;
+  const o = lineGeometry(casterPos, footprintForSize(session.participants[casterId]?.size), 0, 5, 0, start).o;
   const m = footprintForSize(session.participants[id]?.size);
   const dx = pos.col + m / 2 - o.x, dy = pos.row - m + 1 + m / 2 - o.y, dz = (pos.z || 0) / 5 + m / 2 - o.z;
   const flat = Math.hypot(dx, dy);

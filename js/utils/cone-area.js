@@ -14,11 +14,13 @@ const HALF_ANGLE_COS = Math.cos(Math.PI / 4) + 1e-6; // strictly inside 45 degre
 /** The cube the cone comes out of: the footprint cell on the edge it faces (coneCells' rule -- the corner for a
  * diagonal, the middle of the edge otherwise), at the caster's lowest middle layer. `dir` is 0-7 (up, up-right, ...);
  * a tilted cone (no grid direction) comes out of the footprint's middle. */
-export function coneOrigin(pos, size, dir = null) {
+export function coneOrigin(pos, size, dir = null, start = null) {
   const n = size || 1;
   const mid = Math.floor((n - 1) / 2);
   const left = pos.col, top = pos.row - n + 1;
   let x = left + mid, y = top + mid;
+  // A big caster's own square the player chose to fire it from (its front left, say) -- whichever way it points.
+  if (start) return { x: start.col, y: start.row, z: Math.floor((pos.z || 0) / 5) + mid };
   if (dir != null) {
     const dx = [0, 1, 1, 1, 0, -1, -1, -1][dir];
     const dy = [-1, -1, 0, 1, 1, 1, 0, -1][dir];
@@ -86,9 +88,9 @@ export function coneShadowCells(board, origin, axis, lengthCells) {
 }
 
 /** The cone tilted straight at creature `id`: { origin, axis, pitch } (pitch in degrees, + up). */
-export function coneAimAt(session, casterId, id) {
+export function coneAimAt(session, casterId, id, start = null) {
   const board = session.board;
-  const origin = coneOrigin(board.tokens[casterId], footprintForSize(session.participants[casterId]?.size));
+  const origin = coneOrigin(board.tokens[casterId], footprintForSize(session.participants[casterId]?.size), null, start);
   const pos = board.tokens[id];
   const m = footprintForSize(session.participants[id]?.size);
   const v = {

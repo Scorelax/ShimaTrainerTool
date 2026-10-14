@@ -31,6 +31,10 @@ function _injectStyles() {
     .lap-actions button { border: none; border-radius: 999px; padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.1); color: #e8ecff; }
     .lap-actions button:hover { background: rgba(255,255,255,0.2); }
     .lap-actions .lap-confirm { margin-left: auto; background: linear-gradient(135deg, #ff9a50, #e0662a); color: #1a0b02; box-shadow: 0 0 16px rgba(255,120,50,0.45); }
+    /* A big caster's own squares (tap one to fire from it) and the one chosen. */
+    .lap-own { position: absolute; z-index: 3; pointer-events: none; box-sizing: border-box; border: 2px dashed rgba(130,200,255,0.75); border-radius: 4px; }
+    .lap-start-mark { position: absolute; z-index: 3; pointer-events: none; box-sizing: border-box; border: 3px solid #7fd0ff; border-radius: 4px;
+      background: rgba(127,208,255,0.28); box-shadow: 0 0 12px rgba(127,208,255,0.8); }
   `;
   document.head.appendChild(style);
 }
@@ -57,6 +61,35 @@ function _buildTokens(session, board, casterId, tokenLayer, targetable, blockedN
   return tokenEls;
 }
 
+/** A caster bigger than one square chooses which of its own squares the line / cone starts from (its front left, its
+ * front right...): their outline, the chosen square's mark, and which own square (if any) a pointer event is on. */
+function _startPicker(stage, board, casterPos, n) {
+  const own = document.createElement('div');
+  own.className = 'lap-own';
+  const mark = document.createElement('div');
+  mark.className = 'lap-start-mark';
+  mark.hidden = true;
+  if (n > 1) {
+    Object.assign(own.style, cellRect(board, casterPos.col, casterPos.row, n));
+    stage.append(own, mark);
+  }
+  return {
+    show(start) {
+      mark.hidden = !start;
+      if (start) Object.assign(mark.style, cellRect(board, start.col, start.row, 1));
+    },
+    /** The caster's own square under the pointer, or null (always null for a one-square caster). */
+    squareAt(e) {
+      if (n <= 1) return null;
+      const r = stage.getBoundingClientRect();
+      const col = Math.floor(((e.clientX - r.left) / r.width) * board.grid.cols);
+      const row = Math.floor(((e.clientY - r.top) / r.height) * board.grid.rows);
+      const inside = col >= casterPos.col && col <= casterPos.col + n - 1 && row >= casterPos.row - n + 1 && row <= casterPos.row;
+      return inside ? { col, row } : null;
+    },
+  };
+}
+
 /**
  * @param {object} session  the shared combat session (board + participants)
  * @param {string} casterId the line comes out of this creature's token
@@ -74,13 +107,14 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     if (!casterPos) { resolve(null); return; }
     const casterSize = footprintForSize(caster?.size);
     let angle = casterPos.facing || 0;
+    let start = null; // a big caster's own square the beam starts from (null = the middle of it)
 
     const overlay = document.createElement('div');
     overlay.className = 'lap-overlay';
     overlay.innerHTML = `
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
-        <div class="lap-sub">A ${lengthFt}ft line, a 5ft-wide beam from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the beam straight at it (up at a flyer, down from the air). It reaches the edge of the shaded squares (${lengthFt / 5} squares straight, diagonally or up); greyed-out creatures are out of its reach. Everyone the beam touches is selected.</div>
+        <div class="lap-sub">A ${lengthFt}ft line, a 5ft-wide beam from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the beam straight at it (up at a flyer, down from the air). It reaches the edge of the shaded squares (${lengthFt / 5} squares straight, diagonally or up); greyed-out creatures are out of its reach. Everyone the beam touches is selected.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again for the middle.` : ''}</div>
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
           <div class="bmap-line"></div>
@@ -130,10 +164,12 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     let pitch = 0;       // level unless aimed at a creature
     let aimedAt = null;  // the creature it was aimed at
     let hits = [];
+    const starts = _startPicker(stage, board, casterPos, casterSize);
     const refresh = () => {
-      const g = lineGeometry(casterPos, casterSize, angle, lengthFt, pitch);
+      const g = lineGeometry(casterPos, casterSize, angle, lengthFt, pitch, start);
       lineEl.setAttribute('style', lineStyle(board, g, angle));
-      hits = lineHitIds(session, casterId, angle, lengthFt, pitch).filter(id => aimable.has(id));
+      starts.show(start);
+      hits = lineHitIds(session, casterId, angle, lengthFt, pitch, start).filter(id => aimable.has(id));
       tokenEls.forEach((el, id) => {
         el.classList.toggle('line-hit', hits.includes(id));
         el.classList.toggle('line-aim', id === aimedAt);
@@ -147,15 +183,25 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     };
     refresh();
 
-    const origin = lineGeometry(casterPos, casterSize, 0, lengthFt).o;
     let aiming = false;
-    const aim = (e) => { angle = angleToPointer(stage, board, origin, e.clientX, e.clientY); pitch = 0; aimedAt = null; refresh(); };
+    const aim = (e) => {
+      angle = angleToPointer(stage, board, lineGeometry(casterPos, casterSize, 0, lengthFt, 0, start).o, e.clientX, e.clientY);
+      pitch = 0; aimedAt = null; refresh();
+    };
     stage.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      const own = starts.squareAt(e);
+      if (own) {
+        // One of the caster's own squares: fire from there (the same square again: back to the middle).
+        start = start && start.col === own.col && start.row === own.row ? null : own;
+        if (aimedAt) ({ angle, pitch } = aimAtCreature(session, casterId, aimedAt, angle, start));
+        refresh();
+        return;
+      }
       const id = _creatureAt(stage, session, aimable, e, aimedAt);
       if (id) {
         // Tap a creature: the beam tilts to go straight through the middle of it.
-        ({ angle, pitch } = aimAtCreature(session, casterId, id, angle));
+        ({ angle, pitch } = aimAtCreature(session, casterId, id, angle, start));
         aimedAt = id;
         refresh();
         return;
@@ -173,7 +219,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       if (act === 'left') { angle = (angle + 355) % 360; aimedAt = null; refresh(); }
       else if (act === 'right') { angle = (angle + 5) % 360; aimedAt = null; refresh(); }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
-      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch }); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch, start }); }
     });
   });
 }
@@ -203,13 +249,14 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     const casterSize = footprintForSize(caster?.size);
     const snap = (deg) => ((Math.round(deg / 45) * 45) % 360 + 360) % 360;
     let angle = snap(casterPos.facing || 0);
+    let start = null; // a big caster's own square the cone comes out of (null = the edge it faces)
 
     const overlay = document.createElement('div');
     overlay.className = 'lap-overlay';
     overlay.innerHTML = `
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
-        <div class="lap-sub">A ${lengthFt}ft cone from ${caster?.name || 'the caster'}. Drag on the map toward where it should point (level, in 8 directions), or use the buttons — or tap a creature to tilt the cone straight at it (up at a flyer, down from the air). The shaded squares are where it covers the ground; ringed creatures are caught (in the air too); greyed-out ones are out of its reach.</div>
+        <div class="lap-sub">A ${lengthFt}ft cone from ${caster?.name || 'the caster'}. Drag on the map toward where it should point (level, in 8 directions), or use the buttons — or tap a creature to tilt the cone straight at it (up at a flyer, down from the air). The shaded squares are where it covers the ground; ringed creatures are caught (in the air too); greyed-out ones are out of its reach.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again to go back to the edge it faces.` : ''}</div>
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
           <div class="bmap-objects">${mapObjectsHtml(board)}</div>
@@ -253,9 +300,11 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
 
     let tilted = null; // { id, origin, axis, pitch } once aimed at a creature; null = level, along the grid
     let hits = [];
+    const starts = _startPicker(stage, board, casterPos, casterSize);
     const refresh = () => {
       const level = levelCone(angle);
-      const origin = tilted ? tilted.origin : coneOrigin(casterPos, casterSize, level.dir);
+      const origin = tilted ? tilted.origin : coneOrigin(casterPos, casterSize, level.dir, start);
+      starts.show(start);
       const axis = tilted ? tilted.axis : level.axis;
       const cells = coneShadowCells(board, origin, axis, lengthCells);
       cellEls.forEach((el, key) => el.classList.toggle('cone', cells.has(key)));
@@ -273,15 +322,25 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     };
     refresh();
 
-    const origin = lineGeometry(casterPos, casterSize, 0, lengthFt).o;
     let aiming = false;
-    const aim = (e) => { angle = snap(angleToPointer(stage, board, origin, e.clientX, e.clientY)); tilted = null; refresh(); };
+    const aim = (e) => {
+      angle = snap(angleToPointer(stage, board, lineGeometry(casterPos, casterSize, 0, lengthFt, 0, start).o, e.clientX, e.clientY));
+      tilted = null; refresh();
+    };
     stage.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      const own = starts.squareAt(e);
+      if (own) {
+        // One of the caster's own squares: fire from there (the same square again: back to the edge it faces).
+        start = start && start.col === own.col && start.row === own.row ? null : own;
+        if (tilted) tilted = { id: tilted.id, ...coneAimAt(session, casterId, tilted.id, start) };
+        refresh();
+        return;
+      }
       const id = _creatureAt(stage, session, aimable, e, tilted?.id);
       if (id) {
         // Tap a creature: the cone tilts to point straight at it.
-        tilted = { id, ...coneAimAt(session, casterId, id) };
+        tilted = { id, ...coneAimAt(session, casterId, id, start) };
         refresh();
         return;
       }
@@ -298,7 +357,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
       if (act === 'left') { angle = (angle + 315) % 360; tilted = null; refresh(); }
       else if (act === 'right') { angle = (angle + 45) % 360; tilted = null; refresh(); }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
-      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch: tilted ? tilted.pitch : 0 }); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch: tilted ? tilted.pitch : 0, start }); }
     });
   });
 }

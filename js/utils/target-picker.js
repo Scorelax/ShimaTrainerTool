@@ -21,6 +21,7 @@ import { showCombatConfirm, showCombatAlert } from './combat-alert.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
 import { renderAbilityDiceInputs, abilityDiceSum } from './ability-dice-inputs.js';
+import { commitMove } from './move-commit.js';
 
 function _injectStyles() {
   if (document.getElementById('target-picker-styles')) return;
@@ -570,6 +571,7 @@ function _updateAttackTotal() {
  * two-button choice (see its own comment) -- the human declares a miss themselves,
  * same as the app would have on a failed AC comparison. */
 function _confirmMiss() {
+  commitMove(); // the attack was rolled -- the move is paid for now, hit or miss (move-commit.js)
   const attackRoll = _currentAttackRoll();
   const rollMode = _atkCtx?.mode || 'normal';
   _consume(_atkCtx);
@@ -587,6 +589,7 @@ function _confirmMiss() {
 function _confirmAttack() {
   const attackRoll = _currentAttackRoll();
   if (attackRoll === null) return;
+  commitMove(); // the attack was rolled -- the move is paid for now, hit or miss (move-commit.js)
   _attackRoll = attackRoll;
   const targetAc = _effectiveTargetAc();
   // A guaranteed hit can't miss -- the roll only decides a crit (_resolveOneHit).
@@ -816,6 +819,7 @@ async function _confirmDamageRoll() {
   const btn = document.getElementById('targetPickerConfirmRoll');
   if (btn.disabled) return;
   btn.disabled = true;
+  commitMove(); // a guaranteed hit has no attack roll -- the damage roll is what pays for it
   const result = {
     // _targetFlatBonus (Crush Grip's own "+proficiency if target above 50%
     // HP", see _showStep3) folded straight into rawRoll -- the caller

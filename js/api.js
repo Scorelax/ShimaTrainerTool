@@ -2,6 +2,7 @@
 // Handles all communication with Google Apps Script backend
 
 import { getSettings } from './utils/settings.js';
+import { commitMove } from './utils/move-commit.js';
 
 // ============================================================================
 // CONFIGURATION
@@ -869,6 +870,7 @@ export class CombatAPI {
    * blocker, currently holding the floor via reaction-start for a real
    * pending window -- see routes_combat.py's own _block_pending_attack. */
   static async blockPendingAttack(id, moveName = '') {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'block-pending-attack', { id, moveName }, { useCache: false });
   }
 
@@ -886,6 +888,7 @@ export class CombatAPI {
    * negateReactionBlock's attacker-identity one. See routes_combat.py's own
    * _apply_reaction_damage_multiplier. */
   static async applyReactionDamageMultiplier(id, multiplier, pool = null) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'apply-reaction-damage-multiplier', { id, multiplier, ...(pool ? { pool } : {}) }, { useCache: false });
   }
 
@@ -950,16 +953,19 @@ export class CombatAPI {
    * rolled to an `n`. Re-applying the same effect from the same move refreshes or
    * stacks it; the server expires it from its `ends`. See routes_combat.py. */
   static async applyStatus(targetId, status) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'apply-status', { targetId, status: JSON.stringify(status) }, { useCache: false });
   }
 
   /** Removes one live effect by its id (a passed save, a manual cure...). */
   static async removeStatus(targetId, statusId, reason = '') {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'remove-status', { targetId, statusId, reason }, { useCache: false });
   }
 
   /** Consumes one use of an effect that lasts "the next attack"/"next roll". */
   static async useStatus(targetId, statusId) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'use-status', { targetId, statusId }, { useCache: false });
   }
 
@@ -978,6 +984,7 @@ export class CombatAPI {
    * combat-wip.js's _applyPrimaryDamage. Returns {multiplier,
    * damageApplied} alongside the usual {status, data}. */
   static async applyDamage(id, targetId, diceRoll, moveType, species, moveName, crit = false, pool = 'hp', soften = null) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     const extra = soften ? { softenHolderId: soften.holderId, softenAbility: soften.ability, softenIndex: soften.index } : {};
     return API.request('combat', 'apply-damage', { id, targetId, diceRoll, moveType, species, moveName, crit, pool, ...extra }, { useCache: false });
   }
@@ -992,6 +999,7 @@ export class CombatAPI {
    * just hit them in melee; the server checks the holder really has the status and applies the
    * rolled damage off-turn (routes_combat.py's _apply_retaliation). */
   static async applyRetaliation(id, targetId, diceRoll) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'apply-retaliation', { id, targetId, diceRoll }, { useCache: false });
   }
 
@@ -1028,10 +1036,12 @@ export class CombatAPI {
   /** DM/setup placement -- NOT turn-gated, moves any token any time. */
   /** Forced altitude change (Smack Down to the ground, Skyward Soar 60ft up) -- not the creature's own movement. */
   static async setTokenAltitude(id, z) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'set-token-altitude', { id, z }, { useCache: false });
   }
 
   static async setTokenPosition(id, col, row) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'set-token-position', { id, col, row }, { useCache: false });
   }
 
@@ -1086,6 +1096,7 @@ export class CombatAPI {
    * charging for one more turn instead of resolving -- ignored/harmless on
    * the activate call, only meaningful while already charging. */
   static async bideUse(id, hold = false) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'bide-use', { id, hold }, { useCache: false });
   }
 
@@ -1148,11 +1159,13 @@ export class CombatAPI {
    * (see routes_combat.py's _set_weather) -- `cells` limits it to those tiles, otherwise it covers the whole map. */
   /** Chill / Superheat / Stormwind: the whole map's environment ('cold' | 'hot' | 'windy'); an empty name clears it. */
   static async setEnvironment(name, kind = '', extra = {}) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'set-environment', { name, kind, ...extra }, { useCache: false });
   }
 
   /** Dragon Tail: the target's trainer must switch it out (their client opens the switch picker). */
   static async requestForcedSwitch(id, moveName, sourceId) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'request-forced-switch', { id, moveName, sourceId }, { useCache: false });
   }
 
@@ -1161,6 +1174,7 @@ export class CombatAPI {
   }
 
   static async setWeather(name, effect, extra = {}) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     const { cells, ...rest } = extra;
     return API.request('combat', 'set-weather', { name, effect, ...rest, ...(cells?.length ? { cells: JSON.stringify(cells) } : {}) }, { useCache: false });
   }
@@ -1174,6 +1188,7 @@ export class CombatAPI {
    * routes_combat.py's _set_terrain). `cells` (["col,row", ...]) limits it to those tiles; without it the
    * terrain covers the whole map. */
   static async setTerrain(name, effect, extra = {}) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     const { cells, props, ...rest } = extra;
     return API.request('combat', 'set-terrain', {
       name, effect, ...rest,
@@ -1202,16 +1217,19 @@ export class CombatAPI {
 
   /** Quash: moves the target to the bottom of this round's initiative order (restored when the next round begins). */
   static async quash(id) {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'quash', { id }, { useCache: false });
   }
 
   /** Tragic Hero: the ally gets the floor for an extra turn the moment `id` (the caster) ends their reaction. */
   static async grantExtraTurn(id, targetId, moveName = '') {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'grant-extra-turn', { id, targetId, moveName }, { useCache: false });
   }
 
   /** Trick Room: reverses (or, used again, un-reverses) the initiative order from the start of the next round. */
   static async trickRoom() {
+    commitMove(); // a move waiting to be paid for is paid now (move-commit.js)
     return API.request('combat', 'trick-room', {}, { useCache: false });
   }
 

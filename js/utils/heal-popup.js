@@ -1,3 +1,5 @@
+import { commitMove } from './move-commit.js';
+
 // A "type in what you rolled" popup for a dice-based amount this app has no
 // digital dice to compute itself -- shared by the `heal` effect kind's own
 // {dice} amount shape (promptHealRoll, "regain 2d6 + MOVE hit points", see
@@ -87,6 +89,7 @@ function _updateTotal() {
 function _confirm() {
   const raw = _currentRoll();
   if (raw === null) return;
+  commitMove(); // a heal / damage / value roll was entered -- a move waiting to be paid for is paid now (move-commit.js)
   _close(raw);
 }
 

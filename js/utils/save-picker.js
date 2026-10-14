@@ -23,6 +23,7 @@ import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, sa
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
 import { renderAbilityDiceInputs, abilityDiceSum } from './ability-dice-inputs.js';
 import { noDamageOnPassedSave } from './ability-mods.js';
+import { commitMove } from './move-commit.js';
 
 function _injectStyles() {
   if (document.getElementById('save-picker-styles')) return;
@@ -408,6 +409,7 @@ function _confirmPass() {
 
 /** What follows a declared save (here, or on the saver's own screen -- see _showStep2): the damage step, or done. */
 function _afterSave(passed) {
+  commitMove(); // the save was made -- the move is paid for now (move-commit.js)
   _pendingPassed = passed;
   if (passed) {
     // Self-Destruct's own "half as much on a success" -- everything else

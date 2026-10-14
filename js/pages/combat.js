@@ -10,6 +10,7 @@ import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, 
 import { setAbilityData, moveAbilityMods, activatedAbilityEffects, abilityExtraDice } from '../utils/ability-mods.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
+import { beginMove, commitMove } from '../utils/move-commit.js';
 
 // Holds a reference to the live battle state so inventory/heal functions stay in sync
 let _battleState = null;
@@ -2763,6 +2764,7 @@ function showDrainHealPopup(combatant, moveName, state) {
   });
 
   document.getElementById('drainHealConfirm').addEventListener('click', function () {
+    commitMove(); // the heal was applied -- the shared battle's pending move is paid for now (no-op elsewhere)
     const dmg = parseInt(document.getElementById('drainDamageInput').value);
     if (isNaN(dmg) || dmg < 0) return;
     const heal = Math.floor(dmg / 2);
@@ -2842,6 +2844,7 @@ function showDirectHealPopup(combatant, moveName, healDice, moveMod, stacks, sta
   });
 
   document.getElementById('directHealConfirm').addEventListener('click', function () {
+    commitMove(); // the heal was applied -- the shared battle's pending move is paid for now (no-op elsewhere)
     const diceVal = parseInt(document.getElementById('directHealDiceInput').value);
     if (!diceVal || diceVal < 1) return;
     const total = (diceVal * stacks) + modBonus;
@@ -3494,31 +3497,57 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       const target = state.combatants.find(x => x.id === combatantId);
       if (!target) return;
 
-      const spend = { vpCost, hpBefore: target.currentHp, vpBefore: target.currentVp }; // the shared battle's refund (combat-wip.js)
-      let newVp = target.currentVp - vpCost;
-      let newHp = target.currentHp;
-      if (newVp < 0) { newHp = newHp + newVp; newVp = 0; } // no floor -- see handleHpVpDelta
-      // self_faint moves (Lunar Dance, Memento, Final Gambit, Self-Destruct,
-      // Healing Wish) -- "fainting immediately after the attack", modeled as
-      // a plain 0 HP, nothing more (no forced death-save chain, no "can't
-      // heal from potions" -- the user's own call: leave that part out,
-      // handle it by hand same as every other narrative consequence this
-      // app doesn't automate). Overrides the VP-overflow HP drain above,
-      // not combined with it.
-      if (moveCategoriesFor(usedMoveName).includes('self_faint')) newHp = 0;
-      target.currentHp = newHp;
-      target.currentVp = newVp;
-      spend.hpTaken = spend.hpBefore - newHp; spend.vpTaken = spend.vpBefore - newVp;
-      logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, move: usedMoveName, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)`, spend });
-      // Spend the session's one bonus action for the round (the server rejects a second one).
-      if (_isSharedCombat && _isBonusActionMove(usedMoveName)) {
-        target.bonusActionUsed = true;
-        CombatAPI.useBonusAction(target.id, usedMoveName).catch(err => showCombatAlert(err.message, { title: 'Bonus action' }));
-      }
+      // What using the move costs: VP (overflowing into HP), the "used X" log line, the round's bonus action, a
+      // recharge charge. The legacy page pays at once; the shared battle only once something actually happens -- an
+      // attack roll, a save, an applied effect (move-commit.js) -- so closing the popups before that costs nothing.
+      const pay = (target) => {
+        const spend = { vpCost, hpBefore: target.currentHp, vpBefore: target.currentVp }; // the shared battle's refund (combat-wip.js)
+        let newVp = target.currentVp - vpCost;
+        let newHp = target.currentHp;
+        if (newVp < 0) { newHp = newHp + newVp; newVp = 0; } // no floor -- see handleHpVpDelta
+        // self_faint moves (Lunar Dance, Memento, Final Gambit, Self-Destruct,
+        // Healing Wish) -- "fainting immediately after the attack", modeled as
+        // a plain 0 HP, nothing more (no forced death-save chain, no "can't
+        // heal from potions" -- the user's own call: leave that part out,
+        // handle it by hand same as every other narrative consequence this
+        // app doesn't automate). Overrides the VP-overflow HP drain above,
+        // not combined with it.
+        if (moveCategoriesFor(usedMoveName).includes('self_faint')) newHp = 0;
+        target.currentHp = newHp;
+        target.currentVp = newVp;
+        spend.hpTaken = spend.hpBefore - newHp; spend.vpTaken = spend.vpBefore - newVp;
+        logBattleEvent({ type: 'move-used', actorId: target.id, actorName: target.name, move: usedMoveName, text: `${target.name} used ${usedMoveName} (-${vpCost} VP)`, spend });
+        // Spend the session's one bonus action for the round (the server rejects a second one).
+        if (_isSharedCombat && _isBonusActionMove(usedMoveName)) {
+          target.bonusActionUsed = true;
+          CombatAPI.useBonusAction(target.id, usedMoveName).catch(err => showCombatAlert(err.message, { title: 'Bonus action' }));
+        }
 
-      if (target.rechargeStates && target.rechargeStates[usedMoveName]) {
-        target.rechargeStates[usedMoveName].chargesLeft =
-          Math.max(0, target.rechargeStates[usedMoveName].chargesLeft - 1);
+        if (target.rechargeStates && target.rechargeStates[usedMoveName]) {
+          target.rechargeStates[usedMoveName].chargesLeft =
+            Math.max(0, target.rechargeStates[usedMoveName].chargesLeft - 1);
+        }
+      };
+      if (_isSharedCombat) {
+        // Paid later, by which time live updates have redrawn the battle from a fresh copy -- pay that one.
+        beginMove(combatantId, usedMoveName, () => {
+          let live = _battleState || state;
+          let now = live.combatants.find(x => x.id === combatantId);
+          if (!now) {
+            // Another card is on screen by now -- pay from the saved copy of the whole battle instead.
+            live = JSON.parse(sessionStorage.getItem(_combatStateKey) || 'null');
+            now = live?.combatants?.find(x => x.id === combatantId);
+            if (!now) return;
+            pay(now);
+            saveCombatState(live);
+            return;
+          }
+          pay(now);
+          saveCombatState(live);
+          rerenderBattle(live);
+        });
+      } else {
+        pay(target);
       }
 
       if (usedMoveName && usedMoveName.toLowerCase() === 'ingrain') {
@@ -3579,6 +3608,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
         onEffectsOnly({ combatantId, moveName: usedMoveName, move, computedData, speciesName: target.speciesName });
       } else if (_isSharedCombat) {
         // Nothing else follows (Splash, a pure flavour move) -- the battle animation is the whole rest of the move.
+        commitMove();
         playBattleAnimationFloating(target.speciesName);
       }
     },

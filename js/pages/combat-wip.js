@@ -36,6 +36,7 @@ import { waitForDamagedReactions, waitForTargetedAoeReactions, waitForBeneficial
 import { promptRerollDamage } from '../utils/reroll-damage-popup.js';
 import { pickOneStatus, pickOneMoveName, pickOneAbility } from '../utils/status-picker.js';
 import { promptHealRoll, promptDrainRoll, promptValueRoll, promptDamageRoll } from '../utils/heal-popup.js';
+import { abandonMove, pendingMove } from '../utils/move-commit.js';
 import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler, moveCover } from '../utils/targetability.js';
@@ -870,11 +871,7 @@ function _enterBattleSync() {
   _battleSyncActive = true;
   setCombatStateKey(WIP_COMBAT_STATE_KEY);
   setOnCombatStateSave(_onLocalCombatStateSave);
-  setOnLogEvent(({ spend, ...event }) => {
-    // What the move cost and the HP/VP before it -- refunded if it turns out to have nobody to aim at (_onTargetCheck).
-    if (event.type === 'move-used' && spend) {
-      _lastMoveSpend[event.actorId] = { move: event.move, ...spend, turn: `${session?.round}:${session?.turnIndex}` };
-    }
+  setOnLogEvent(({ spend, ...event }) => { // `spend` (what a move cost) is local bookkeeping -- not sent to the server
     const sent = CombatAPI.logEvent(event).catch(() => {});
     _lastLogSent = sent; // _repeatUseCheck counts move-used entries -- it waits for this one to land first
     if (event.type === 'move-used' && event.move) sent.then(() => _abilityMoveUsed(event.actorId, event.move)); // Protean, Dancer...
@@ -1001,29 +998,28 @@ function _persistStatsToDb(combatant, hp, vp) {
 // device's local state actually holds by the time the in-flight request
 // clears -- never a stale intermediate one.
 /** A move that turned out to have nobody it could be aimed at (targetability.js -- everyone out of reach or hidden):
- * its VP comes back, and any HP the VP overflow took. Only for the move just used, and only before it found anyone --
- * once a picker had a target (`found`) or its damage landed (_landHit), the spend is forgotten, so a multi-hit's next
- * pick or Harmony Breath's ally pick coming up empty never refunds a move that already went off. */
-const _lastMoveSpend = {}; // participantId -> { move, vpCost, hpTaken, vpTaken, turn }
+ * nothing is spent. A move is only paid for once something happens (move-commit.js), so this only has to drop the
+ * pending payment of the move just used -- a multi-hit's next pick or Harmony Breath's ally pick coming up empty comes
+ * after the move was already paid and changes nothing. */
 function _onTargetCheck(casterId, moveName, found) {
-  const spend = _lastMoveSpend[casterId];
-  if (!spend || spend.move !== moveName) return;
-  delete _lastMoveSpend[casterId];
-  // Only the use just made, this same turn (a move that never opened a picker leaves its record behind).
-  if (found || !(spend.vpCost > 0) || spend.turn !== `${session?.round}:${session?.turnIndex}`) return;
-  // What the use took is added back onto this device's own copy (already past the spend -- the server's may lag).
-  const state = JSON.parse(sessionStorage.getItem(WIP_COMBAT_STATE_KEY) || 'null');
-  const c = state?.combatants?.find(x => x.id === casterId);
-  if (!c) return;
-  c.currentVp = Math.min(c.maxVp ?? Infinity, (c.currentVp || 0) + (spend.vpTaken || 0));
-  c.currentHp = Math.min(c.maxHp ?? Infinity, (c.currentHp || 0) + (spend.hpTaken || 0));
-  sessionStorage.setItem(WIP_COMBAT_STATE_KEY, JSON.stringify(state));
-  _lastSyncedStats[casterId] = { hp: c.currentHp, vp: c.currentVp };
-  _pushStatsSync(casterId, c.currentHp, c.currentVp); // queued behind the spend itself, so it lands last
-  _persistStatsToDb(c, c.currentHp, c.currentVp);
+  const waiting = pendingMove();
+  if (found || !waiting || waiting.combatantId !== casterId || waiting.moveName !== moveName) return;
+  abandonMove(casterId);
   const name = session?.participants?.[casterId]?.name || '?';
   CombatAPI.logEvent({ type: 'refund', actorId: casterId, actorName: name,
-    text: `${name}'s ${moveName} had nobody it could reach -- ${spend.vpCost} VP refunded` }).catch(() => {});
+    text: `${name}'s ${moveName} had nobody it could reach -- no VP spent` }).catch(() => {});
+}
+
+/** A move's whole flow (target pick, rolls, effects) as combat.js hands it over. Once it's over, a move that never got
+ * as far as a roll or an applied effect is dropped unpaid (move-commit.js). */
+function _moveFlow(handler) {
+  return async (args) => {
+    try {
+      return await handler(args);
+    } finally {
+      abandonMove(args?.combatantId);
+    }
+  };
 }
 
 let _statsSyncInFlight = {}; // participantId -> true while a request is in flight
@@ -2640,7 +2636,7 @@ function _attachMainFocusListeners(state) {
   const ctx = _computeFocusContext(state);
   if (!ctx || !ctx.isMine) return;
 
-  attachBattleListeners(ctx.filteredState, { onDamageResolved: _handleDamageResolved, onSaveTriggered: _handleSaveTriggered, onReactiveSave: _handleReactiveSave, onMultiHitAoe: _handleMultiHitAoe, onEffectsOnly: _handleEffectsOnly, onBideResolve: _handleBideResolve, ...ctx.cardOptions });
+  attachBattleListeners(ctx.filteredState, { onDamageResolved: _moveFlow(_handleDamageResolved), onSaveTriggered: _moveFlow(_handleSaveTriggered), onReactiveSave: _moveFlow(_handleReactiveSave), onMultiHitAoe: _moveFlow(_handleMultiHitAoe), onEffectsOnly: _moveFlow(_handleEffectsOnly), onBideResolve: _handleBideResolve, ...ctx.cardOptions });
   _attachedFocusId = ctx.p.id;
   _attachedFocusState = ctx.filteredState;
 
@@ -2675,6 +2671,7 @@ function _attachMainFocusListeners(state) {
     // happened"), and a second tap while the first is still on its way can't advance the turn twice.
     if (_endingTurn) return;
     _endingTurn = true;
+    abandonMove(); // a move left unfinished this turn is never paid for later
     endBtn.disabled = true;
     endBtn.textContent = 'Ending turn…';
 
@@ -3787,7 +3784,10 @@ async function _repeatUseCheck(userId, moveName, rule) {
     const fresh = await CombatAPI.getState();
     if (fresh?.status === 'success') log = fresh.data.log || log;
   } catch { /* use what we have */ }
-  const uses = log.filter(e => e.type === 'move-used' && e.actorId === userId && e.move === moveName).length;
+  // This use counts too -- it isn't in the log yet while it waits to be paid for (move-commit.js).
+  const waiting = pendingMove();
+  const thisUse = waiting && waiting.combatantId === userId && waiting.moveName === moveName ? 1 : 0;
+  const uses = log.filter(e => e.type === 'move-used' && e.actorId === userId && e.move === moveName).length + thisUse;
   if (uses <= 1) return 'ok';
   const user = session?.participants?.[userId];
   const rolled = await promptValueRoll({
@@ -5570,7 +5570,6 @@ async function _landHit({ attackerId, targetId, damage, moveType, speciesName, m
     });
   }
   const dmgResult = await CombatAPI.applyDamage(attackerId, targetId, damage, moveType, speciesName, moveName, !!crit, pool, soften);
-  delete _lastMoveSpend[attackerId]; // the move landed -- no "nobody in reach" refund for it any more (_onTargetCheck)
   // 'damaged'-family reactions fire right here -- after the damage lands, before anything else about this hit.
   await waitForDamagedReactions(targetId, attackerId, moveName);
   await _maybeMeleeRetaliate(attackerId, targetId, moveName);

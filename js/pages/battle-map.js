@@ -12,6 +12,7 @@
 import { CombatAPI, DmAPI } from '../api.js';
 import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia, keepVideosPlaying } from '../utils/sprite-media.js';
+import { keepScreenAwake } from '../utils/screen-awake.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
 import { footprintForSize, mapObjectsHtml, MAP_OBJECT_CSS, MAP_MARK_CSS } from '../utils/battle-map-grid.js';
 import { zoneKindsByCell, legendHtml, activeTerrainSummary, spriteTransform, unwrapAngle } from '../utils/battle-map-view.js';
@@ -25,6 +26,7 @@ async function init() {
   document.head.appendChild(style);
   initLiveUpdates();
   keepVideosPlaying(); // nobody touches this screen: a sprite the WebView pauses starts again
+  keepScreenAwake(); // ...and it mustn't dim or sleep on the table monitor
 
   const result = await CombatAPI.getState();
   if (result.status === 'success') session = result.data;

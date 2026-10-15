@@ -1461,6 +1461,14 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=Non
     _close_stale_reaction_window(state)  # a switch held on a window nobody ran the clock for finishes (or drops) first
     if state.get('pendingSwitch'):
         raise ValueError('A switch is already in progress -- wait for its reaction window to close')
+    if not state.get('started'):
+        # A switch on the trainer's (or the creature's own) turn is acting: the battle is under way, so the turn order
+        # holds and the newcomer takes the outgoing Pokemon's slot -- before this, a faster newcomer was re-sorted to the
+        # top and took the turn from the trainer still using it.
+        trainer = next((p for p in state['participants'].values()
+                        if p.get('combatantType') == 'trainer' and (p.get('owner') or '') == (out.get('owner') or '')), None)
+        if _active_participant_id(state) in ({out_id} | ({trainer['id']} if trainer else set())):
+            state['started'] = True
     _check_switch_turn(state, out, move_name)
     trapped = next((s for s in _statuses_of(out) if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
     if trapped:

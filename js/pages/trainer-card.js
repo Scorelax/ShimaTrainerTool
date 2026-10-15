@@ -1258,7 +1258,15 @@ export function attachTrainerCardListeners() {
         const badge = badgeList[idx];
         if (!badge) return;
         document.getElementById('badgeDetailTitle').textContent = badge.name;
-        document.getElementById('badgeDetailBody').textContent = badge.description || 'No description available.';
+        // The badge itself, big, above its effect -- the same picture as the tapped slot.
+        const body = document.getElementById('badgeDetailBody');
+        const src = slot.querySelector('img')?.getAttribute('src');
+        body.innerHTML = src
+          ? '<img class="badge-detail-img" alt="" style="display:block;width:min(160px,45vw);height:auto;margin:0 auto 0.9rem;image-rendering:auto;">' : '';
+        if (src) body.querySelector('img').src = src;
+        const text = document.createElement('div');
+        text.textContent = badge.description || 'No description available.';
+        body.appendChild(text);
         document.getElementById('badgeDetailPopup').classList.add('active');
       });
     });

@@ -6,6 +6,7 @@
 
 import { CONDITION_RULES } from './condition-rules.js';
 import { abilityStatuses } from './ability-mods.js';
+import { footprintForSize } from './battle-map-grid.js';
 
 /** A participant's live statuses plus its ability's always-on bonuses as virtual statuses (ability-mods.js), for the
  * rules that should count both the same way (stat deltas, attack and save roll modes). `target` adds the abilities
@@ -1256,8 +1257,7 @@ export function fieldsAffecting(session, pid, key) {
   const found = session?.[key] ? [session[key]] : [];
   const zones = session?.[key + 'Zones'] || [];
   if (token && zones.length) {
-    const s = String(session.participants?.[pid]?.size || '').trim().toLowerCase();
-    const size = s === 'large' ? 2 : s === 'huge' ? 3 : 1;
+    const size = footprintForSize(session.participants?.[pid]?.size); // the one size table (Gigantic 4x4 too)
     const covered = new Set();
     for (let dc = 0; dc < size; dc++) for (let dr = 0; dr < size; dr++) covered.add(`${token.col + dc},${token.row - dr}`);
     // A zone with a `height` (ft above the ground) only reaches creatures at or below it; none = every altitude.

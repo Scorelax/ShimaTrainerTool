@@ -20,8 +20,16 @@ export function normaliseScene(s) {
     background: s?.background?.url ? { url: String(s.background.url), name: String(s.background.name || '') } : null,
     items: Array.isArray(s?.items) ? s.items.filter(i => i && i.id && i.src) : [],
     battlePictures: BATTLE_PICTURES[s?.battlePictures] ? s.battlePictures : 'away',
+    // The battle the DM has taken off the display (its log file -- one battle's id): the regular scene shows meanwhile.
+    // Tied to that one battle, so the next one shows again even if the box was left unticked.
+    hideBattle: typeof s?.hideBattle === 'string' ? s.hideBattle : '',
   };
   return out;
+}
+
+/** Whether the display shows `session`'s battle -- running, and not taken off it by the DM (battle-live.js's checkbox). */
+export function battleOnDisplay(scene, session) {
+  return !!session?.active && !(scene?.hideBattle && scene.hideBattle === session.logFile);
 }
 
 /** The scene as the TV draws it right now -- during a battle without the placed pictures, unless they're kept on. */

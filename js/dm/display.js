@@ -12,7 +12,7 @@
 // shown with one click. A Pokemon goes on as its animated sprite whenever it has one.
 import { DmAPI } from '../api.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { renderScene, BATTLE_PICTURES, SCREEN_RATIO } from '../utils/display-scene.js';
+import { renderScene, BATTLE_PICTURES, SCREEN_RATIO, battleOnDisplay } from '../utils/display-scene.js';
 import { escapeHtml, getSpecies, newId, toast, openDmModal } from './dm-common.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
 import { spriteSrc } from '../utils/sprite-media.js';
@@ -211,7 +211,7 @@ function drawLayers() {
     hideAll.disabled = !scene.items.length;
   }
   const items = [...scene.items].reverse(); // the top one first
-  const putAway = !!_session?.active && scene.battlePictures !== 'keep' && items.length;
+  const putAway = battleOnDisplay(scene, _session) && scene.battlePictures !== 'keep' && items.length;
   box.innerHTML = `
     ${putAway ? '<div class="dm-disp-away">⚔️ Put away during the battle</div>' : ''}
     ${items.map(it => `

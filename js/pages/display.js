@@ -22,7 +22,7 @@ import { getSettings } from '../utils/settings.js';
 import { spriteMediaHtml, patchPortraitMedia, useSpritePreviews, keepVideosPlaying } from '../utils/sprite-media.js';
 import { preloadBattleAnimation, getBattleAnimationUrl } from '../utils/battle-animation.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
-import { normaliseScene, renderScene, sceneHasContent, sceneOnScreen } from '../utils/display-scene.js';
+import { normaliseScene, renderScene, sceneHasContent, sceneOnScreen, battleOnDisplay } from '../utils/display-scene.js';
 
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 
@@ -80,6 +80,7 @@ async function init() {
 
   window.addEventListener('app:display-scene', (e) => {
     scene = normaliseScene(e.detail?.scene);
+    render(); // the DM may have taken the battle off the screen, or put it back
     drawScene();
     render();
   });
@@ -94,7 +95,7 @@ async function init() {
 }
 
 function drawScene() {
-  renderScene(document.getElementById('sceneStage'), sceneOnScreen(scene, !!session.active));
+  renderScene(document.getElementById('sceneStage'), sceneOnScreen(scene, battleOnDisplay(scene, session)));
 }
 
 function preloadAllAnimations() {
@@ -115,7 +116,7 @@ function preloadAllAnimations() {
 function render() {
   const layer = document.getElementById('battleLayer');
   if (!layer) return;
-  const inBattle = !!session.active;
+  const inBattle = battleOnDisplay(scene, session); // the DM can put the regular screen back during a battle
   document.getElementById('idleLogo').hidden = inBattle || sceneHasContent(scene);
   layer.hidden = !inBattle;
   if (!inBattle) return;
@@ -173,7 +174,7 @@ function updateSpotlight(activeId) {
   const name = visibleToViewer(p, 'name') ? p.name : '???';
   patchPortraitMedia(document.getElementById('spotlightPortrait'), p.image, name);
   document.getElementById('spotlightTurn').textContent = session.reactingParticipantId === activeId ? '⚡ Reacting' : 'Turn';
-  document.getElementById('spotlightName').textContent = p.level ? `${name} · Lv ${p.level}` : name;
+  document.getElementById('spotlightName').textContent = p.level && visibleToViewer(p, 'level') ? `${name} · Lv ${p.level}` : name;
   document.getElementById('spotlightBars').innerHTML = barsHtml(p).trim();
 }
 
@@ -181,7 +182,10 @@ function updateStrip(activeId) {
   const stripEl = document.getElementById('displayStrip');
   if (!stripEl) return;
 
-  const liveIds = new Set(Object.keys(session.participants));
+  // The DM's creatures held back (not in the fight yet) stay a surprise: not in the strip at all. A player's benched
+  // Pokemon still show, greyed.
+  const heldBack = (p) => p.status === 'spectating' && (!p.owner || p.owner === 'DM');
+  const liveIds = new Set(Object.keys(session.participants).filter(id => !heldBack(session.participants[id])));
   [...stripEl.children].forEach(card => {
     if (!liveIds.has(card.dataset.id)) card.remove();
   });
@@ -195,7 +199,7 @@ function updateStrip(activeId) {
 
   orderedIds.forEach((id, index) => {
     const p = session.participants[id];
-    if (!p) return;
+    if (!p || heldBack(p)) return;
 
     let card = stripEl.querySelector(`[data-id="${id}"]`);
     if (!card) {
@@ -217,7 +221,7 @@ function updateStrip(activeId) {
       id === activeId ? 'active' : '',
       p.status === 'spectating' ? 'spectating' : ''].filter(Boolean).join(' ');
     card.querySelector('.display-strip-name').textContent = name;
-    card.querySelector('.display-strip-level').textContent = p.level ? `Lv ${p.level}` : '';
+    card.querySelector('.display-strip-level').textContent = p.level && visibleToViewer(p, 'level') ? `Lv ${p.level}` : '';
     card.querySelector('.display-strip-bars').innerHTML = barsHtml(p);
     patchPortraitMedia(card.querySelector('.display-strip-portrait'), p.image, name);
 

@@ -9,6 +9,7 @@ import { escapeHtml, toast } from './dm-common.js';
 const SEND_EVERY_MS = 120;
 const SAVE_EVERY_MS = 1000;
 const SETTLED_MS = 600;   // no move for this long: it has come to rest, store where
+const HOME_AZIMUTH = Math.PI / 2; // the default view: north to the right, the way the battle maps lie
 
 let _section = null;
 let _map = null;
@@ -41,7 +42,8 @@ export async function renderPokenav(section, { session } = {}) {
       import('../region-map/region-map.js'),
       DmAPI.getState('region-map-view').catch(() => null),
     ]);
-    _map = mountRegionMap(document.getElementById('navMap'), { title: false, rememberStyle: false, onView: queue });
+    // Turned a quarter like the battle maps (north to the right); the compass in the corner goes back to that view.
+    _map = mountRegionMap(document.getElementById('navMap'), { title: false, rememberStyle: false, onView: queue, homeAzimuth: HOME_AZIMUTH });
     // Drawn without the graphics card (hardware acceleration off in the browser): it moves slowly, and that's why.
     if (_map.graphics.software) {
       const slow = document.getElementById('navSlow');
@@ -52,7 +54,7 @@ export async function renderPokenav(section, { session } = {}) {
     if (saved) _map.setView(saved);
     await _map.ready;
     // Never steered yet: the whole island lying along the screen, north to the right
-    if (!saved) _map.home({ ms: 0, azimuth: Math.PI / 2 });
+    if (!saved) _map.home({ ms: 0, azimuth: HOME_AZIMUTH });
   } catch (err) {
     document.getElementById('navMap').innerHTML = `<div class="dm-loading">Couldn't load the map: ${escapeHtml(err.message)}</div>`;
   }

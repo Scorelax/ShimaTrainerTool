@@ -15,6 +15,7 @@ import { TERRAIN, WEATHER_ROLL_MOD, STATUS_CAPTURE_BONUS, captureDc, accuracyDc 
 import { getSetup } from './setup-store.js';
 import { renderMapEditor } from './map-editor.js';
 import { setLiveSession } from './live-map-store.js';
+import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
@@ -274,6 +275,8 @@ function renderTools(el) {
         <a class="dm-btn" href="battle-map.html" target="_blank" rel="noopener" title="Opens the table's battle map screen in a new tab">▦ Battle map ↗</a>
         <button class="dm-btn" id="dmEditMap" title="Change the map, move any creature -- any time, whoever's turn it is">✏️ Edit map</button>
       </div>
+      <label class="dm-check" style="margin-top:0.5rem"><input type="checkbox" id="dmShowBattle" checked>
+        <span>Show the battle on the display screen <small>Untick for the display's regular screen (the Display module's scene) meanwhile -- tick to bring the battle back.</small></span></label>
     </div>
 
     <div class="dm-card" id="dmEncCard" hidden></div>
@@ -326,6 +329,14 @@ function renderTools(el) {
   });
   document.getElementById('dmCreatures').addEventListener('click', onCreatureAction);
   document.getElementById('dmEditMap').addEventListener('click', openLiveMapEditor);
+  // The display screen: this battle on it, or the regular scene (display-scene.js's hideBattle -- just this battle).
+  const showBox = document.getElementById('dmShowBattle');
+  const syncShowBox = () => { if (showBox.isConnected) showBox.checked = !(getScene().hideBattle && getScene().hideBattle === session?.logFile); };
+  loadScene().then(syncShowBox).catch(() => {});
+  onSceneChange(syncShowBox);
+  showBox.addEventListener('change', () => {
+    updateScene((s) => { s.hideBattle = showBox.checked ? '' : (session?.logFile || ''); });
+  });
 }
 
 /** The running battle's map in the Map setup editor (live mode, map-editor.js + live-map-store.js), over the battle

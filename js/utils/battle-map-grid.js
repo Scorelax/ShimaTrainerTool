@@ -58,12 +58,13 @@ export function cellRect(board, col, row, size = 1) {
  * a freeform sheet column, not a fixed enum, so this only special-cases
  * the two values the game currently distinguishes for map purposes and
  * falls back to 1 for everything else: Tiny/Small/Medium/blank/unknown, and
- * every trainer (who have no `size` at all). More tiers (e.g. Gargantuan)
- * are additive later, not a breaking change. */
+ * every trainer (who have no `size` at all). Gigantic (the game's largest, D&D's Gargantuan) is 4x4 -- it fell back to
+ * a single square before, so a Gigantic Pokemon took up one square on the map. */
 export function footprintForSize(size) {
   const s = (size || '').trim().toLowerCase();
   if (s === 'large') return 2;
   if (s === 'huge') return 3;
+  if (s === 'gigantic' || s === 'gargantuan') return 4;
   return 1;
 }
 

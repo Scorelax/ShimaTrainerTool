@@ -74,7 +74,7 @@ function graphicsInfo() {
   }
 }
 
-export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView } = {}) {
+export function mountRegionMap(root, { onBack, viewOnly = false, title = true, rememberStyle = true, onView, homeAzimuth = null } = {}) {
   root.classList.add('rmap');
   root.classList.toggle('view-only', viewOnly); // nothing to press or drag: it follows setView
   let style = 'topo';
@@ -97,7 +97,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       <button class="rmap-btn" data-act="home">Whole region</button>
     </div>`}
     ${viewOnly ? '<div class="rmap-compass"><span class="rmap-needle"></span></div>'
-      : '<button class="rmap-compass" data-act="north" aria-label="North up"><span class="rmap-needle"></span><b>N</b></button>'}
+      : `<button class="rmap-compass" data-act="north" aria-label="${homeAzimuth == null ? 'North up' : 'Back to the default view'}" title="${homeAzimuth == null ? 'North up' : 'Back to the default view'}"><span class="rmap-needle"></span><b>N</b></button>`}
     <div class="rmap-loading">Loading the map…</div>`;
   const $ = sel => root.querySelector(sel);
   const canvas = $('.rmap-canvas');
@@ -420,7 +420,7 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
       placeLabels();
       const az = controls.getAzimuthalAngle();
       $('.rmap-needle').style.transform = `rotate(${(az * 180 / Math.PI).toFixed(1)}deg)`;
-      $('.rmap-compass').classList.toggle('off-north', Math.abs(az) > 0.02);
+      $('.rmap-compass').classList.toggle('off-north', Math.abs(wrapAngle(az - (homeAzimuth ?? 0))) > 0.02);
       if (moved && onView) onView(getView());
       dirty = false;
       quiet = 0;
@@ -495,6 +495,9 @@ export function mountRegionMap(root, { onBack, viewOnly = false, title = true, r
     if (t.closest('[data-act="back"]')) { onBack?.(); return; }
     if (t.closest('[data-act="home"]')) { home(); return; }
     if (t.closest('[data-act="north"]')) {
+      // With a home direction (the DM's PokeNav: turned like the battle maps), the compass is the way back to the
+      // default view -- the whole island, turned that way.
+      if (homeAzimuth != null) { home({ azimuth: homeAzimuth }); return; }
       const dist = camera.position.distanceTo(controls.target);
       flyTo(controls.target.clone(), dist, controls.getPolarAngle(), 0, 600);
       return;

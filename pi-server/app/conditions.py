@@ -452,9 +452,9 @@ def footprint_cells(col, row, size):
 
 
 def footprint_size(size_text):
-    """Large = 2x2, Huge = 3x3, everything else 1x1 (same table as battle-map-grid.js's footprintForSize)."""
+    """Large = 2x2, Huge = 3x3, Gigantic = 4x4, everything else 1x1 (same table as battle-map-grid.js's footprintForSize)."""
     s = str(size_text or '').strip().lower()
-    return 2 if s == 'large' else 3 if s == 'huge' else 1
+    return 2 if s == 'large' else 3 if s == 'huge' else 4 if s in ('gigantic', 'gargantuan') else 1
 
 
 def altitude_limits(participant):

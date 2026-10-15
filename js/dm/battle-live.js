@@ -228,7 +228,7 @@ async function openCapture(p) {
 // ---------------------------------------------------------------------------
 
 const VISIBILITY_FIELDS = [
-  ['hp', 'HP'], ['vp', 'VP'], ['ac', 'AC'], ['stats', 'Other stats', 'STR, DEX, CON, INT, WIS, CHA'],
+  ['hp', 'HP numbers', 'The HP bar always shows'], ['vp', 'VP numbers', 'The VP bar always shows'], ['ac', 'AC'], ['stats', 'Other stats', 'STR, DEX, CON, INT, WIS, CHA'],
   ['name', 'Name'], ['type', 'Type'], ['level', 'Level'], ['abilities', 'Abilities'], ['size', 'Size'],
 ];
 
@@ -251,7 +251,7 @@ function renderVisibilityColumn(focusId, currentSession) {
           <input type="checkbox" data-vis="${field}" ${vis[field] ? 'checked' : ''}>
           <span>${label}${sub ? `<small>${sub}</small>` : ''}</span>
         </label>`).join('')}
-      <div class="dm-vis-note">Moves it uses are shown to the players as it uses them.</div>
+      <div class="dm-vis-note">Its picture and HP / VP bars always show. Moves it uses are shown to the players as it uses them.</div>
     </div>`;
   el.querySelectorAll('[data-vis]').forEach(cb => cb.addEventListener('change', async () => {
     try {

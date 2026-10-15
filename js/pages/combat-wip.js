@@ -2732,8 +2732,9 @@ function _maskForeignView(v, p) {
   if (!see('name')) v.name = hide;
   if (!see('type')) v.types = [];
   if (!see('level')) v.level = '?';
-  if (!see('hp')) { v.currentHp = hide; v.maxHp = ''; v.tempHp = 0; }
-  if (!see('vp')) { v.currentVp = hide; v.maxVp = ''; }
+  // HP / VP: the bars always show how full they are; unticked, the numbers are ??? (renderCombatCard's hpHidden / vpHidden).
+  if (!see('hp')) { v.hpHidden = true; v.tempHp = 0; }
+  if (!see('vp')) v.vpHidden = true;
   if (!see('size')) v.size = '';
   v.appliedStatMods = { ...(v.appliedStatMods || {}) }; // the little +1 / -1 beside a value would give a hidden one away
   if (!see('ac')) { v.ac = '?'; v.baseAc = '?'; delete v.appliedStatMods.ac; }

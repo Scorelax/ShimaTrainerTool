@@ -1077,8 +1077,8 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
           <div class="combat-card-stats-group">
             ${c.hasStatBlock === false || compactWip ? '' : `<div class="combat-card-ac-line">AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}</div>`}
             <div class="combat-card-stats-row">
-              ${_barHtml(c, 'hp', `HP: <strong>${c.maxHp === '' ? c.currentHp : `${c.currentHp}/${c.maxHp}`}</strong>${c.tempHp ? `<sup class="temp-hp-tag" title="Temporary HP -- absorbs damage before real HP">+${c.tempHp}</sup>` : ''}`, hpPct, compactWip && !readOnly)}
-              ${_barHtml(c, 'vp', `VP: <strong>${c.maxVp === '' ? c.currentVp : `${c.currentVp}/${c.maxVp}`}</strong>`, vpPct, compactWip && !readOnly)}
+              ${_barHtml(c, 'hp', `HP: <strong>${c.hpHidden ? '???' : `${c.currentHp}/${c.maxHp}`}</strong>${c.tempHp ? `<sup class="temp-hp-tag" title="Temporary HP -- absorbs damage before real HP">+${c.tempHp}</sup>` : ''}`, hpPct, compactWip && !readOnly)}
+              ${_barHtml(c, 'vp', `VP: <strong>${c.vpHidden ? '???' : `${c.currentVp}/${c.maxVp}`}</strong>`, vpPct, compactWip && !readOnly)}
             </div>
           </div>
           ${c.hasStatBlock === false ? '' : _abilityScoresHtml(c, modTag, { compactWip, readOnly })}

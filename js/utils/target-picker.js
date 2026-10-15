@@ -852,8 +852,8 @@ function _cardHtml(p) {
     <button type="button" class="target-picker-card" data-target-id="${p.id}">
       <div class="target-picker-portrait">${spriteMediaHtml(p.image, name, '', '', { small: true })}</div>
       <div class="target-picker-name">${name}</div>
-      ${visibleToViewer(p, 'hp') ? `<div class="target-picker-bar hp"><div class="target-picker-bar-fill" style="width:${hpPct}%"></div></div>` : ''}
-      ${visibleToViewer(p, 'vp') ? `<div class="target-picker-bar vp"><div class="target-picker-bar-fill" style="width:${vpPct}%"></div></div>` : ''}
+      <div class="target-picker-bar hp"><div class="target-picker-bar-fill" style="width:${hpPct}%"></div></div>
+      <div class="target-picker-bar vp"><div class="target-picker-bar-fill" style="width:${vpPct}%"></div></div>
     </button>`;
 }
 

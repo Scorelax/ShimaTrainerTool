@@ -168,11 +168,11 @@ _EMPTY_STATE = {
 MAP_MARK_KINDS = ('difficult', 'blocked')
 
 # What the players can see of an enemy, per field -- the DM ticks these per creature in the DM console. `stats` covers all
-# six ability scores together. Starts with what players have always seen (name, type, level, HP/VP bars) plus its size
-# (it shows on the map anyway); AC, ability scores and abilities start hidden. The moves an enemy has used are always
-# shown (read from the battle log). Mirrored by combat-visibility.js's VISIBILITY_DEFAULTS.
+# six ability scores together. Everything starts hidden (the user's call, 2026-10-15): the picture always shows, and so
+# do the HP / VP bars -- `hp` / `vp` only decide whether their numbers do. The moves an enemy has used are always shown
+# (read from the battle log). Mirrored by combat-visibility.js's VISIBILITY_DEFAULTS.
 VISIBILITY_DEFAULTS = {
-    'name': True, 'type': True, 'level': True, 'hp': True, 'vp': True, 'size': True,
+    'name': False, 'type': False, 'level': False, 'hp': False, 'vp': False, 'size': False,
     'ac': False, 'stats': False, 'abilities': False,
 }
 

@@ -159,8 +159,8 @@ function barsHtml(p) {
   const hpPct = p.maxHP > 0 ? Math.max(0, Math.min(100, (p.currentHP / p.maxHP) * 100)) : 0;
   const vpPct = p.maxVP > 0 ? Math.max(0, Math.min(100, (p.currentVP / p.maxVP) * 100)) : 0;
   return `
-    ${visibleToViewer(p, 'hp') ? `<div class="display-bar hp"><div class="display-bar-fill" style="width:${hpPct}%"></div></div>` : ''}
-    ${visibleToViewer(p, 'vp') ? `<div class="display-bar vp"><div class="display-bar-fill" style="width:${vpPct}%"></div></div>` : ''}
+    <div class="display-bar hp"><div class="display-bar-fill" style="width:${hpPct}%"></div></div>
+    <div class="display-bar vp"><div class="display-bar-fill" style="width:${vpPct}%"></div></div>
   `;
 }
 

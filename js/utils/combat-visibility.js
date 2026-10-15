@@ -5,9 +5,11 @@
 // can't drift between them.
 
 // Where each field starts for an enemy, and the fallback for a participant whose record predates a field -- mirrors
-// routes_combat.py's VISIBILITY_DEFAULTS. `stats` covers all six ability scores together.
+// routes_combat.py's VISIBILITY_DEFAULTS. `stats` covers all six ability scores together. Everything starts hidden (the
+// user's call, 2026-10-15) -- the picture always shows, and so do the HP / VP bars: `hp` / `vp` only decide whether their
+// numbers are shown.
 export const VISIBILITY_DEFAULTS = {
-  name: true, type: true, level: true, hp: true, vp: true, size: true,
+  name: false, type: false, level: false, hp: false, vp: false, size: false,
   ac: false, stats: false, abilities: false,
 };
 

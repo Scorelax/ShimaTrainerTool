@@ -1700,6 +1700,7 @@ def _rebuild_turn_order(state):
     fresh (index 0 of the current sort), since there's no real turn in
     progress yet to protect."""
     current_id = None
+    old_order = list(state['turnOrder'])
     if state.get('started') and state['turnOrder'] and state['turnIndex'] < len(state['turnOrder']):
         current_id = state['turnOrder'][state['turnIndex']]
 
@@ -1742,6 +1743,18 @@ def _rebuild_turn_order(state):
             else:
                 _maybe_close_reaction_window(state)
 
+    # The creature whose turn it was left the fight mid-turn (its trainer ended the battle, it was caught, benched or
+    # removed): the turn passes to the next one still in it, with that one's usual start of turn -- instead of jumping
+    # back to the top of the order, which skipped everyone after it and gave everyone before it a second turn.
+    if current_id and current_id not in state['turnOrder'] and state['turnOrder']:
+        pos = old_order.index(current_id)
+        nxt = next((pid for pid in old_order[pos + 1:] if pid in state['turnOrder']), None)
+        idx, new_round = (state['turnOrder'].index(nxt), False) if nxt else (0, True)
+        if state.get('reactingParticipantId'):
+            state['turnIndex'] = idx  # mid-reaction: the floor comes back to that one when the reaction ends
+        else:
+            _advance_turn(state, after_departure=(idx, new_round))
+
 
 def _apply_condition_turn_damage(state, pid, point):
     """Burning/Poisoned's automatic proficiency-bonus damage tick at turn
@@ -1761,16 +1774,23 @@ def _apply_condition_turn_damage(state, pid, point):
                    actorId=pid, actorName=participant['name'])
 
 
-def _advance_turn(state):
+def _advance_turn(state, after_departure=None):
+    """End Turn: the next one in the order starts its turn (a new round after the last). `after_departure` = (index,
+    new_round): the one whose turn it was has just left the fight (_rebuild_turn_order) -- its turn ends with nothing to
+    run for it, and the turn goes to that index."""
     if state['reactingParticipantId']:
         raise ValueError('Cannot advance turn while a reaction is in progress')
     if not state['turnOrder']:
         return
     _close_stale_reaction_window(state)
     state['started'] = True
-    ending_id = state['turnOrder'][state['turnIndex']] if state['turnIndex'] < len(state['turnOrder']) else None
-    state['turnIndex'] = (state['turnIndex'] + 1) % len(state['turnOrder'])
-    new_round = state['turnIndex'] == 0
+    if after_departure:
+        ending_id = None
+        state['turnIndex'], new_round = after_departure
+    else:
+        ending_id = state['turnOrder'][state['turnIndex']] if state['turnIndex'] < len(state['turnOrder']) else None
+        state['turnIndex'] = (state['turnIndex'] + 1) % len(state['turnOrder'])
+        new_round = state['turnIndex'] == 0
     if new_round:
         state['round'] += 1
     if new_round and state.get('resortAtRound'):

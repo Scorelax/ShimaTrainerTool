@@ -179,11 +179,15 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
     });
     if (!res) return;
     const inArea = new Set(res.cells || []);
+    // How high it reaches: a cylinder's own height ("40ft high"), otherwise its radius up and down from where it sits --
+    // the caster's height for one around them, the ground for one placed at a point (a flyer far above a blast isn't in it).
+    const centerZ = area.centeredOnCaster ? (session.board.tokens[casterId]?.z || 0) : 0;
     participants.forEach(p => {
       const token = session.board.tokens[p.id];
       if (!token) return;
       const inside = res.all || footprintCells(token.col, token.row, footprintForSize(p.size)).some(c => inArea.has(`${c.col},${c.row}`));
-      const reachesHeight = area.heightFt == null || (token.z || 0) <= area.heightFt;
+      const reachesHeight = area.heightFt != null ? (token.z || 0) <= area.heightFt
+        : !area.radiusFt || res.all || Math.abs((token.z || 0) - centerZ) <= area.radiusFt;
       const card = grid.querySelector(`[data-target-id="${p.id}"]`);
       if (card) toggle(card, inside && reachesHeight);
     });

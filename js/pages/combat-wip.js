@@ -159,8 +159,7 @@ const WIP_CSS = `
   /* The single focused card's Reaction button -- sits in the name row, to
      the right of the type badges (see renderCombatCard's compactWip
      option), which is also where Init used to be (moved into the mods row
-     instead) and where End Turn used to be (moved below the moves section,
-     see the same option's endTurnAtBottom). */
+     instead). End Turn sits right after it on the creature's own turn (the option's endTurnAtTop). */
   .wip-react-btn {
     background: linear-gradient(135deg, #f1c40f, #e67e22); color: #1a1a1a;
     border: none; border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.82rem; font-weight: 700; cursor: pointer;
@@ -314,8 +313,15 @@ const WIP_CSS = `
     background: rgba(140,170,255,0.14); border: 1px solid rgba(140,170,255,0.3);
   }
   #wipBattlePhase .combat-card-name-row .type-badge { border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.68rem; letter-spacing: 0.05em; }
+  #wipBattlePhase .wip-card-turn-btns { margin-left: auto; display: inline-flex; align-items: center; gap: 0.45rem; }
+  #wipBattlePhase .wip-card-turn-btns > button { white-space: nowrap; }
+  /* A phone: the pair takes the whole row, half each, instead of running past the card's edge. */
+  @media (max-width: 520px) {
+    #wipBattlePhase .wip-card-turn-btns { margin-left: 0; width: 100%; }
+    #wipBattlePhase .wip-card-turn-btns > button { flex: 1 1 0; padding-left: 0.5rem; padding-right: 0.5rem; }
+  }
   #wipBattlePhase .wip-react-btn {
-    margin-left: auto; border-radius: 999px; padding: 0.35rem 0.9rem; font-weight: 700;
+    border-radius: 999px; padding: 0.35rem 0.9rem; font-weight: 700;
     background: linear-gradient(135deg, #f1c40f, #d68910); color: #1a1300; border: none; box-shadow: 0 0 14px rgba(241,196,15,0.35);
   }
   #wipBattlePhase .wip-react-btn:disabled { background: rgba(255,255,255,0.08); color: #8a8fb0; box-shadow: none; }
@@ -423,6 +429,8 @@ const WIP_CSS = `
     background: linear-gradient(135deg, #f39c12, #d35400); box-shadow: 0 0 18px rgba(230,126,34,0.45);
   }
   #wipBattlePhase .combat-end-turn-bottom { margin: 0.4rem auto 1rem; }
+  /* End Turn in the name row, right after Reaction -- the same orange pill, sized to sit beside it. */
+  #wipBattlePhase .wip-end-turn-top { padding: 0.35rem 1rem; font-size: 0.85rem; white-space: nowrap; }
 
 
   /* ---- ability tiles you click to edit (replaces the separate Modify Stats section) ---- */
@@ -2704,7 +2712,7 @@ function _computeFocusContext(state) {
   const filteredState = { ...merged, combatants: [focused], activeTurnIndex: focused.id === activeId ? 0 : -1 };
   const canReact = p.status === 'participating' && !p.reactionUsed &&
     !state.reactingParticipantId && p.id !== state.turnOrder[state.turnIndex];
-  const cardOptions = { compactWip: true, canReact, endTurnAtBottom: true };
+  const cardOptions = { compactWip: true, canReact, endTurnAtTop: true };
   return { p, isMine: true, filteredState, cardOptions };
 }
 

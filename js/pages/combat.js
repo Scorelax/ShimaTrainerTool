@@ -1012,7 +1012,7 @@ function _calcButtonHtml(c, compactWip) {
     : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}" style="background:rgba(76,175,80,0.12);border-color:rgba(76,175,80,0.5);color:#4CAF50;">HP/VP${compactWip ? ' Calculator' : '<br>Calculator'}</button>`;
 }
 
-export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom, readOnly } = {}) {
+export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom, endTurnAtTop, readOnly } = {}) {
   const fainted = c.currentHp <= 0;
   const hpPct = c.maxHp > 0 ? Math.round((c.currentHp / c.maxHp) * 100) : 0;
   const vpPct = c.maxVp > 0 ? Math.round((c.currentVp / c.maxVp) * 100) : 0;
@@ -1072,7 +1072,11 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
             <span class="combat-card-level">Lv ${c.level}</span>
             ${typeBadges}
             ${readOnly ? '' : compactWip
-              ? `<button class="wip-react-btn" data-combatant-id="${c.id}" ${canReact ? '' : 'disabled'}>⚡ Reaction</button>`
+              // End Turn up top, next to Reaction (the user's call after the first playtest, 2026-10-16: at the bottom it
+              // was easy to forget) -- the two kept together, so on a phone they wrap to the next line as a pair.
+              ? `<span class="wip-card-turn-btns"><button class="wip-react-btn" data-combatant-id="${c.id}" ${canReact ? '' : 'disabled'}>⚡ Reaction</button>`
+                + (isActive && endTurnAtTop ? `<button class="end-turn-btn wip-end-turn-top" data-combatant-id="${c.id}">End Turn</button>` : '')
+                + '</span>'
               : `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>`}
           </div>
           <div class="combat-card-stats-group">
@@ -1088,7 +1092,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
       </div>
       <div class="combat-card-footer">
         <div class="combat-status-badges">${statusBadges}</div>
-        ${isActive && !readOnly && !endTurnAtBottom ? `<button class="end-turn-btn" data-combatant-id="${c.id}">End Turn</button>` : '<div></div>'}
+        ${isActive && !readOnly && !endTurnAtBottom && !endTurnAtTop ? `<button class="end-turn-btn" data-combatant-id="${c.id}">End Turn</button>` : '<div></div>'}
       </div>
       ${expandedHTML}
       ${isActive && !readOnly && endTurnAtBottom ? `<button class="end-turn-btn combat-end-turn-bottom" data-combatant-id="${c.id}">End Turn</button>` : ''}

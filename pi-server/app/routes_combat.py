@@ -1401,12 +1401,14 @@ def _switch_placement(state, out, inn, col=None, row=None):
             continue  # its tile is about to be free
         occupied.update(footprint_cells(t['col'], t['row'], footprint_size((state['participants'].get(pid) or {}).get('size'))))
     trainer_token = tokens[trainer['id']] if trainer else None
+    # The DM's blocked squares (a wall, deep water...) can't be landed on -- unless it floats over them.
+    blocked = set() if is_levitating(inn) else {cell for cell, kind in _map_marks(state).items() if kind == 'blocked'}
 
     def legal(c, r):
         cells = footprint_cells(c, r, size)
         if any(not (0 <= cc < cols and 0 <= rr < rows) for cc, rr in cells):
             return False
-        if any(cell in occupied for cell in cells):
+        if any(cell in occupied or f'{cell[0]},{cell[1]}' in blocked for cell in cells):
             return False
         if trainer_token and min(max(abs(cc - trainer_token['col']), abs(rr - trainer_token['row'])) for cc, rr in cells) > SWITCH_RANGE_CELLS:
             return False
@@ -1414,7 +1416,7 @@ def _switch_placement(state, out, inn, col=None, row=None):
 
     if col is not None and row is not None:
         if not legal(col, row):
-            raise ValueError('That tile is more than 20ft from the trainer, occupied, or off the map')
+            raise ValueError('That tile is more than 20ft from the trainer, occupied, blocked, or off the map')
         return {'col': col, 'row': row}
     anchor = out_token or trainer_token
     best = None

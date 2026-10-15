@@ -21,6 +21,7 @@ import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprint
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { showCombatAlert } from './combat-alert.js';
+import { isLevitating } from './move-effects.js';
 
 function _injectStyles() {
   if (document.getElementById('reposition-picker-styles')) return;
@@ -99,19 +100,33 @@ function _distanceFt(fromCol, fromRow, toCol, toRow) {
 
 let _state = null;
 
-function _occupiedCells(session, excludeTokenId) {
-  const occupied = new Set();
-  for (const [id, pos] of Object.entries(session.board.tokens || {})) {
-    if (id === excludeTokenId) continue;
-    const p = session.participants[id];
-    const size = footprintForSize(p?.size);
-    for (const c of footprintCells(pos.col, pos.row, size)) occupied.add(`${c.col},${c.row}`);
-  }
-  return occupied;
+/** "col,row" -> whether the moving creature can land with its bottom-left there: its whole footprint on the map, sharing no
+ * space with another creature at its height (a flyer above or below is fine), and -- on the ground, unless it floats --
+ * on none of the DM's blocked squares. */
+function _landingCheck(session, tokenId) {
+  const { cols, rows } = session.board.grid;
+  const mover = session.participants[tokenId];
+  const n = footprintForSize(mover?.size);
+  const z = session.board.tokens?.[tokenId]?.z || 0;
+  const others = Object.entries(session.board.tokens || {})
+    .filter(([id]) => id !== tokenId && session.participants[id] && session.participants[id].status === 'participating')
+    .map(([id, pos]) => {
+      const m = footprintForSize(session.participants[id].size);
+      return { cells: new Set(footprintCells(pos.col, pos.row, m).map(c => `${c.col},${c.row}`)), lo: pos.z || 0, hi: (pos.z || 0) + 5 * m };
+    });
+  const blocked = z === 0 && !isLevitating(mover)
+    ? new Set(Object.entries(session.board.marks || {}).filter(([, kind]) => kind === 'blocked').map(([cell]) => cell)) : new Set();
+  return (col, row) => {
+    const cells = footprintCells(col, row, n);
+    if (cells.some(c => c.col < 0 || c.row < 0 || c.col >= cols || c.row >= rows)) return false;
+    const keys = cells.map(c => `${c.col},${c.row}`);
+    if (keys.some(k => blocked.has(k))) return false;
+    return !others.some(o => o.lo < z + 5 * n && z < o.hi && keys.some(k => o.cells.has(k)));
+  };
 }
 
 function _render() {
-  const { session, tokenId, anchorCol, anchorRow, maxFt, hint, staged, occupied } = _state;
+  const { session, tokenId, anchorCol, anchorRow, maxFt, hint, staged, canLand } = _state;
   document.getElementById('rpickHint').textContent = staged
     ? 'Confirm the move below, or click a different cell.'
     : hint;
@@ -149,7 +164,7 @@ function _render() {
     const dist = _distanceFt(anchorCol, anchorRow, col, row);
     // `allow` narrows the reachable cells further -- a push only lands on cells straight away from the pusher.
     const inRange = dist <= maxFt && (!_state.allow || _state.allow(col, row));
-    const isOccupied = occupied.has(`${col},${row}`);
+    const isOccupied = !canLand(col, row); // taken, off the map for its size, or a blocked square
     if (col === anchorCol && row === anchorRow) cell.classList.add('anchor');
     if (!inRange) cell.classList.add('out-of-range');
     else if (isOccupied) cell.classList.add('occupied');
@@ -191,7 +206,7 @@ export function pickRepositionCell(session, tokenId, anchorCol, anchorRow, maxFt
   if (!session?.board?.grid) return Promise.resolve(null);
   _ensureDom();
   document.getElementById('rpickTitle').textContent = title;
-  _state = { session, tokenId, anchorCol, anchorRow, maxFt, hint, allow, staged: null, occupied: _occupiedCells(session, tokenId) };
+  _state = { session, tokenId, anchorCol, anchorRow, maxFt, hint, allow, staged: null, canLand: _landingCheck(session, tokenId) };
   _render();
   _overlay.style.display = 'flex';
   return new Promise((resolve) => { _resolve = resolve; });

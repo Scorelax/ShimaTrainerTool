@@ -1835,7 +1835,7 @@ async function _switchPokemonShared(bench, options = {}) {
     let tile = null;
     const trainer = Object.values(session.participants).find(p => p.owner === myName && p.combatantType === 'trainer' && session.board?.tokens?.[p.id]);
     if (trainer && session.board?.tokens?.[out.id]) {
-      tile = await pickSwitchTile({ session, trainerId: trainer.id, outId: out.id, incoming: { name: bench.name, image: bench.image, size: bench.size } });
+      tile = await pickSwitchTile({ session, trainerId: trainer.id, outId: out.id, incoming: { name: bench.name, image: bench.image, size: bench.size, speeds: bench.speeds, abilities: bench.abilities } });
       if (!tile) return; // cancelled -- nothing has changed yet
     }
     let inId = bench.id && session.participants[bench.id] ? bench.id : null;
@@ -1918,6 +1918,7 @@ function _syncLocalCombatState(session) {
     const psychic = merged.activeTerrains.find(t => terrainKindOf(t) === 'psychic');
     merged.bonusActionBlockedBy = psychic && isGroundedIn(p, merged.activeTerrains) ? psychic.name : '';
     merged.bonusActionUsed = !!p.bonusActionUsed; // one bonus action per round -- see combat.js's _isBonusActionMove
+    merged.hasFloor = p.id === activeId; // its turn, its reaction or its extra action -- combat.js's move popup only allows a move then
     merged.actionUsed = !!p.actionUsed; // Disengage / a trainer's Attack spent it -- locks the card's Actions row
     merged.bideHeld = !!p.bideHeld;
     // Archive Blast's own "every type of move you have witnessed so far

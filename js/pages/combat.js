@@ -3197,7 +3197,10 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // The shared battle's "can't use this one now" (bridged onto `c` by combat-wip.js; never set on the legacy engine):
   // Disable / Imprison / Throat Chop, Encore's lock, and burrowed underground -- from down there only a move like Dig
   // or one on itself alone (range "Self") works; anything else has to wait until it's back up on the surface.
-  const _useBlock = (c.disabledMoves || []).includes(moveName) ? `${moveName} is disabled right now`
+  // Not holding the floor (the shared battle's `hasFloor`: its own turn, a reaction it started, or an extra action): the
+  // server would refuse the hit after the VP was already spent.
+  const _useBlock = c.hasFloor === false ? `It isn't ${c.name}'s turn -- moves are used on its own turn (press React first for a reaction)`
+    : (c.disabledMoves || []).includes(moveName) ? `${moveName} is disabled right now`
     : c.lockedMove && c.lockedMove !== moveName ? `Only ${c.lockedMove} can be used right now (Encore)`
     : c.burrowed && moveFlagsFor(moveName).semiInvulnerable !== 'underground' && String(move[6] || '').trim().toLowerCase() !== 'self'
       ? 'Burrowed underground -- come up to the surface first (only a move like Dig, or one on itself, works from down there)'

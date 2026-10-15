@@ -8,6 +8,7 @@
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from './battle-map-grid.js';
+import { isLevitating } from './move-effects.js';
 import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
 
 export const SWITCH_RANGE_CELLS = 4; // 20ft -- keep in step with routes_combat.py's SWITCH_RANGE_CELLS
@@ -36,8 +37,9 @@ function _injectStyles() {
 }
 
 /** The anchor tiles where a Pokemon of `size` (cells per side) may be sent out: footprint on the board, clear of every token other
- * than the outgoing one's, and within SWITCH_RANGE_CELLS of the trainer (a trainer with no token leaves only the other two rules). */
-export function legalSwitchTiles(session, { trainerId, outId, size }) {
+ * than the outgoing one's, off the DM's blocked squares (unless it floats -- `floats`), and within SWITCH_RANGE_CELLS of the
+ * trainer (a trainer with no token leaves only the other rules). */
+export function legalSwitchTiles(session, { trainerId, outId, size, floats = false }) {
   const { cols, rows } = session.board.grid;
   const tokens = session.board.tokens;
   const occupied = new Set();
@@ -45,13 +47,14 @@ export function legalSwitchTiles(session, { trainerId, outId, size }) {
     if (id === outId) continue; // its tile is about to be free
     footprintCells(t.col, t.row, footprintForSize(session.participants[id]?.size)).forEach(c => occupied.add(`${c.col},${c.row}`));
   }
+  const blocked = floats ? new Set() : new Set(Object.entries(session.board.marks || {}).filter(([, k]) => k === 'blocked').map(([c]) => c));
   const trainer = trainerId && tokens[trainerId];
   const legal = new Set();
   for (let col = 0; col < cols; col++) {
     for (let row = 0; row < rows; row++) {
       const cells = footprintCells(col, row, size);
       if (cells.some(c => c.col < 0 || c.col >= cols || c.row < 0 || c.row >= rows)) continue;
-      if (cells.some(c => occupied.has(`${c.col},${c.row}`))) continue;
+      if (cells.some(c => occupied.has(`${c.col},${c.row}`) || blocked.has(`${c.col},${c.row}`))) continue;
       if (trainer && Math.min(...cells.map(c => Math.max(Math.abs(c.col - trainer.col), Math.abs(c.row - trainer.row)))) > SWITCH_RANGE_CELLS) continue;
       legal.add(`${col},${row}`);
     }
@@ -63,7 +66,7 @@ export function legalSwitchTiles(session, { trainerId, outId, size }) {
  * @param {object} session   the shared combat session
  * @param {string} trainerId the trainer participant whose Pokemon is being sent out (its token is the 20ft anchor)
  * @param {string} outId     the Pokemon leaving (its tile is freed)
- * @param {object} incoming  the Pokemon coming in -- { name, image, size }
+ * @param {object} incoming  the Pokemon coming in -- { name, image, size, speeds, abilities } (the last two: whether it floats)
  */
 export function pickSwitchTile({ session, trainerId, outId, incoming }) {
   _injectStyles();
@@ -71,7 +74,7 @@ export function pickSwitchTile({ session, trainerId, outId, incoming }) {
     const board = session.board;
     const { cols, rows } = board.grid;
     const size = footprintForSize(incoming.size);
-    const legal = legalSwitchTiles(session, { trainerId, outId, size });
+    const legal = legalSwitchTiles(session, { trainerId, outId, size, floats: isLevitating(incoming) });
 
     const overlay = document.createElement('div');
     overlay.className = 'tpp-overlay';

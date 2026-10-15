@@ -6,7 +6,7 @@ import { getMoveTypeColor, getTextColorForBackground, parseDamageDice, computeMo
 import { showMovePopup, playBattleAnimationFloating } from '../utils/move-popup.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
 import { preloadBattleAnimation } from '../utils/battle-animation.js';
-import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, selfRequirementUnmet, zoneRuleActive, isMeleeMoveRow } from '../utils/move-effects.js';
+import { multiplyDiceString, addDiceString, terrainDamageNote, weatherMoveType, weatherRequirementUnmet, roundRequirementUnmet, selfRequirementUnmet, zoneRuleActive, isMeleeMoveRow, tierAt } from '../utils/move-effects.js';
 import { setAbilityData, moveAbilityMods, activatedAbilityEffects, abilityExtraDice } from '../utils/ability-mods.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { showCombatConfirm, showCombatAlert, showCombatPrompt } from '../utils/combat-alert.js';
@@ -3296,6 +3296,13 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // noCastDamage moves: the dice in their text aren't a damage roll made when the move is cast -- they belong to what it does LATER
   // (Spikes/Uproar's zone hazard, Mirror Coat's reduction and return hit, Etheric Discharge's VP multiplier) -- so casting must not open
   // the single-target damage flow, which would otherwise be triggered just by NdM appearing in the description.
+  // The shared battle still SHOWS a zone's damage (Smog, Poison Gas, Spikes...): rolled once when it's placed, with this
+  // same bonus (combat-wip.js's set_terrain), and taken by every creature it hits after that.
+  let _zoneDamageDice = null;
+  if (_isSharedCombat && moveFlagsFor(moveName).noCastDamage) {
+    const _hz = moveEffectsFor(moveName).find(e => e.kind === 'set_terrain' && (e.hazard?.dice || e.hazard?.diceTiers))?.hazard;
+    if (_hz) _zoneDamageDice = tierAt(_hz.diceTiers, c.level) || _hz.dice || null;
+  }
   if (moveFlagsFor(moveName).noCastDamage) { computedData.damageDice = null; computedData.nextTierDice = null; }
 
   const heldItemsHTML = _itemsSuppressed && (c.item || '').trim()
@@ -3376,6 +3383,12 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       _diceOverride = computedData.damageBonus > 0 ? `${_adjustedDice} + ${computedData.damageBonus}` : _adjustedDice;
       _diceBreakdownOverride = [computedData.damageBreakdown, `×${_diceCount} dice (${_witnessed} move type${_witnessed === 1 ? '' : 's'} witnessed: ${c.witnessedMoveTypes.join(', ')})`].filter(Boolean).join(' · ');
     }
+  }
+
+  if (_zoneDamageDice && _diceOverride === undefined) {
+    _diceLabel = 'Zone Damage:';
+    _diceOverride = computedData.damageBonus > 0 ? `${_zoneDamageDice} + ${computedData.damageBonus}` : _zoneDamageDice;
+    _diceBreakdownOverride = [computedData.damageBreakdown, 'rolled once when the zone is placed -- every creature it hits takes that total'].filter(Boolean).join(' · ');
   }
 
   // `damage_note` effects (see move-effects-schema.md's own section) --

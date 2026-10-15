@@ -28,7 +28,7 @@
 import { CombatAPI } from '../api.js';
 import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
+import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells, mapObjectsHtml } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating, movementBudget } from './move-effects.js';
@@ -318,8 +318,10 @@ function _renderMovePanel() {
 
     // A depth change is easy to stage by accident (one tap on ▼/▲), so it gets its own highlighted line and the
     // button says what it will do.
-    const altLine = z1 !== z0
-      ? `<span class="bmap-stage-alt">${z1 < 0 ? '⛏' : z1 > 0 ? '🪽' : '⬇'} Ends ${_altText(z1)} (now ${_altText(z0)})</span>` : '';
+    const altLine = (z1 !== z0
+      ? `<span class="bmap-stage-alt">${z1 < 0 ? '⛏' : z1 > 0 ? '🪽' : '⬇'} Ends ${_altText(z1)} (now ${_altText(z0)})</span>` : '')
+      + (_sharesSpaceAt(activeId, _stagedDestination.col, _stagedDestination.row, z1)
+        ? '<span class="bmap-stage-alt">↔ Someone is already there -- fine to pass through, but ending the turn here pushes it to a free square beside them</span>' : '');
     const confirmLabel = z1 < 0 && z1 !== z0 ? 'Confirm Burrow' : z1 > 0 && z1 !== z0 ? 'Confirm Climb' : 'Confirm Move';
     stageRow = canMove ? `
         <div class="bmap-stage-row">
@@ -360,6 +362,20 @@ function _renderMovePanel() {
         if (res?.data?.pendingReaction) waitForOpenWindow();
       })
       .catch(err => { done(); showCombatAlert(err.message, { title: 'Error' }); });
+  });
+}
+
+/** Whether `pid` standing at (col, row), z ft up, would share space with another creature -- the same square at the same
+ * height (routes_combat.py's _push_out_of_shared_space moves it aside if it ends its turn like that). */
+function _sharesSpaceAt(pid, col, row, z) {
+  const n = footprintForSize(_session.participants[pid]?.size);
+  const mine = new Set(footprintCells(col, row, n).map(c => `${c.col},${c.row}`));
+  return Object.entries(_session.board.tokens).some(([id, t]) => {
+    const p = _session.participants[id];
+    if (id === pid || !p || p.status !== 'participating') return false;
+    const m = footprintForSize(p.size);
+    const tz = t.z || 0;
+    return tz < z + 5 * n && z < tz + 5 * m && footprintCells(t.col, t.row, m).some(c => mine.has(`${c.col},${c.row}`));
   });
 }
 

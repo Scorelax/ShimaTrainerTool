@@ -2,9 +2,9 @@
 // caster, can point in ANY direction (not just the 8 grid directions -- a cone too, cone-area.js) and tilt up or down at a
 // flyer. It reaches its length beyond the caster in grid distance (a diagonal square, or a square up, counts 5ft like
 // every other distance here). Each 5ft square (cube) counts by how much of it the beam covers (the user's rule, 2026-10-14, so an
-// angled line doesn't catch extra squares just by grazing them): over 2/3 is a full hit, 1/3 to 2/3 an EDGE hit (the
-// creature saves -- nothing on a success, half damage and the move's effects on a failure; combat-wip.js), under 1/3
-// misses. A creature counts its best-covered cube (its footprint, from its flying height up as high as it is wide).
+// angled line doesn't catch extra squares just by grazing them; 25% / 50% since 2026-10-15): over half is a full hit,
+// over a quarter up to half an EDGE hit (the creature saves -- nothing on a success, half damage and the move's effects on
+// a failure; combat-wip.js), a quarter or less misses -- so a diagonal line's side squares (exactly a quarter) miss. A creature counts its best-covered cube (its footprint, from its flying height up as high as it is wide).
 // Used by the map's line tool (battle-map-popup.js, always level) and the "select from the map" line placer
 // (line-area-picker.js).
 //
@@ -102,12 +102,42 @@ export function inLineReach(session, casterId, id, lengthFt) {
     && z < cz + n + reach && z + m > cz - reach;
 }
 
-/** Over this share of a square (cube) the beam is a full hit; from LINE_EDGE up to it, an edge hit; under LINE_EDGE,
- * a miss (the user's rule, 2026-10-14). */
-export const LINE_FULL = 2 / 3;
-export const LINE_EDGE = 1 / 3;
+/** Over this share of a square (cube) the beam is a full hit; over LINE_EDGE up to it, an edge hit; LINE_EDGE or
+ * less, a miss (the user's rule, 2026-10-14; a half and a quarter since 2026-10-15 -- exactly a quarter misses). */
+export const LINE_FULL = 1 / 2;
+export const LINE_EDGE = 1 / 4;
+const _EPS = 1e-6;
 
-/** The cubes a line covers, [{x: col, y: row, z: height layer, cover, edge}], nearest first: every cube at least
+/** 'full' | 'edge' | null (a miss) for a covered share (see LINE_FULL / LINE_EDGE). */
+export function coverClass(cover) {
+  if (cover > LINE_FULL + _EPS) return 'full';
+  if (cover > LINE_EDGE + _EPS) return 'edge';
+  return null;
+}
+
+/** The exact share (0..1) of map square (c, r) inside every half-plane [ax, ay, b] (ax*x + ay*y <= b) -- the square
+ * cut down to the shape they make, then measured. Used for squares at a level beam's / cone's own height, where an
+ * exact share matters: a diagonal line's side squares are exactly a quarter inside. */
+export function squareShareInside(c, r, planes) {
+  let poly = [[c, r], [c + 1, r], [c + 1, r + 1], [c, r + 1]];
+  for (const [ax, ay, b] of planes) {
+    const f = ([x, y]) => ax * x + ay * y - b;
+    const next = [];
+    poly.forEach((P, i) => {
+      const Q = poly[(i + 1) % poly.length];
+      const fp = f(P), fq = f(Q);
+      if (fp <= 0) next.push(P);
+      if ((fp <= 0) !== (fq <= 0)) { const t = fp / (fp - fq); next.push([P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t]); }
+    });
+    poly = next;
+    if (poly.length < 3) return 0;
+  }
+  let area = 0;
+  poly.forEach(([x0, y0], i) => { const [x1, y1] = poly[(i + 1) % poly.length]; area += x0 * y1 - x1 * y0; });
+  return Math.abs(area) / 2;
+}
+
+/** The cubes a line covers, [{x: col, y: row, z: height layer, cover, edge}], nearest first: every cube more than
  * LINE_EDGE of which lies inside the beam (`cover`, 0..1), `edge` when that's LINE_FULL or less. The caster's own cubes,
  * cubes under the ground and squares off the map (`grid`) don't count. A level beam fills its start layer exactly, so
  * only the squares across it matter; a tilted one is measured through the whole cube. */
@@ -124,16 +154,20 @@ export function lineCells(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 
     const t = sx * d.x + sy * d.y + sz * d.z;
     return t >= 0 && t <= len && Math.abs(sx * w.x + sy * w.y) <= 0.5 && Math.abs(sx * u.x + sy * u.y + sz * u.z) <= 0.5;
   };
-  // Measured by points spread evenly through the square (level) or the cube (tilted).
-  const S = level ? 12 : 7;
+  // Level: the square cut exactly to the strip. Tilted: points spread evenly through the cube.
+  const strip = [
+    [-d.x, -d.y, -(d.x * o.x + d.y * o.y)], [d.x, d.y, len + d.x * o.x + d.y * o.y],
+    [w.x, w.y, 0.5 + w.x * o.x + w.y * o.y], [-w.x, -w.y, 0.5 - w.x * o.x - w.y * o.y],
+  ];
+  const S = 7;
   const coverOf = (c, r, h) => {
+    if (level) return squareShareInside(c, r, strip);
     let hit = 0;
     for (let i = 0; i < S; i++) for (let j = 0; j < S; j++) {
       const x = c + (i + 0.5) / S, y = r + (j + 0.5) / S;
-      if (level) { if (inBeam(x, y, o.z)) hit++; continue; }
       for (let k = 0; k < S; k++) if (inBeam(x, y, h + (k + 0.5) / S)) hit++;
     }
-    return hit / (level ? S * S : S * S * S);
+    return hit / (S * S * S);
   };
   const own = (c, r, h) => c >= left && c < left + n && r >= top && r < top + n && h >= z0 && h < z0 + n;
   // The cubes near the middle of the beam, all along it.
@@ -152,7 +186,8 @@ export function lineCells(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 
     if (own(c, r, h) || (h < 0 && z0 >= 0)) continue; // its own cubes; under the ground
     if (grid && (c < 0 || r < 0 || c >= grid.cols || r >= grid.rows)) continue;
     const cover = coverOf(c, r, h);
-    if (cover >= LINE_EDGE) out.push({ x: c, y: r, z: h, cover, edge: cover <= LINE_FULL, t });
+    const cls = coverClass(cover);
+    if (cls) out.push({ x: c, y: r, z: h, cover, edge: cls === 'edge', t });
   }
   return out.sort((q1, q2) => q1.t - q2.t).map(({ t, ...q }) => q);
 }
@@ -175,9 +210,10 @@ export function lineHits(session, casterId, angleDeg, lengthFt, pitchDeg = 0, st
     for (let c = pos.col; c < pos.col + m; c++) for (let r = pos.row - m + 1; r <= pos.row; r++) for (let h = z0; h < z0 + m; h++) {
       best = Math.max(best, cover.get(`${c},${r},${h}`) || 0);
     }
-    if (!best) return;
+    const cls = coverClass(best);
+    if (!cls) return;
     ids.push(id);
-    if (best <= LINE_FULL) edgeIds.push(id);
+    if (cls === 'edge') edgeIds.push(id);
   });
   return { ids, edgeIds };
 }

@@ -5,14 +5,14 @@
 // It comes out of the caster's edge: where the aim leaves the square it fires from (the line's rule -- the middle of an
 // odd-sized caster, the square facing the aim of an even-sized one, or the square the player chose), at its start layer;
 // and it reaches its length beyond that square in grid distance (a diagonal square, or a square up, counts 5ft).
-// Each square (cube) counts by how much of it the cone covers, the same as a line (the user's rule, 2026-10-15): over 2/3
-// is a hit, 1/3 to 2/3 the edge (a save for nothing, half damage and effects on a fail), less misses. Straight or
+// Each square (cube) counts by how much of it the cone covers, the same as a line (the user's rule, 2026-10-15): over half
+// is a hit, over a quarter up to half the edge (a save for nothing, half damage and effects on a fail), less misses. Straight or
 // diagonal that's the table's grid cone exactly (rows 1, 3, 5... wide; the square block off the corner), and at any
 // angle in between it covers about as many squares.
 //
 // Coordinates are in cells: x = column, y = row (down), z = height in cubes (up).
 import { footprintForSize } from './battle-map-grid.js';
-import { lineGeometry, LINE_FULL, LINE_EDGE } from './line-area.js';
+import { lineGeometry, coverClass, squareShareInside } from './line-area.js';
 
 const dot = (a, p) => a.x * p.x + a.y * p.y + a.z * p.z;
 
@@ -55,7 +55,9 @@ export function coneGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg
  * the whole cube. */
 function _cover(g, c, r, h) {
   const flat = g.level && h === g.layer;
-  const zs = flat ? [g.z] : [h, h + 1];
+  // Its own height, level: the square cut exactly to the wedge's slice there.
+  if (flat) return squareShareInside(c, r, g.planes.filter(([a]) => Math.abs(a.x) + Math.abs(a.y) > 1e-12).map(([a, b]) => [a.x, a.y, b - a.z * g.z]));
+  const zs = [h, h + 1];
   const corners = [];
   for (const x of [c, c + 1]) for (const y of [r, r + 1]) for (const z of zs) corners.push({ x, y, z });
   let allIn = true;
@@ -81,8 +83,8 @@ function _ownCube(casterPos, n, c, r, h) {
 }
 
 /** The squares to show on the map, [{x: col, y: row, z, cover, edge}]: where the cone covers its own start height or the
- * ground (a cone fired down from the air shows where it lands), at least LINE_EDGE of a square, `edge` when that's
- * LINE_FULL or less. Tilted up, only its start near the caster -- the creatures it catches higher up are ringed instead. */
+ * ground (a cone fired down from the air shows where it lands), more than a quarter of a square (line-area.js's
+ * coverClass), `edge` when it's half or less. Tilted up, only its start near the caster -- the creatures it catches higher up are ringed instead. */
 export function coneSquares(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0, start = null, grid = null) {
   const n = casterSize || 1;
   const g = coneGeometry(casterPos, n, angleDeg, lengthFt, pitchDeg, start);
@@ -94,15 +96,16 @@ export function coneSquares(casterPos, casterSize, angleDeg, lengthFt, pitchDeg 
       for (const h of layers) {
         if (_ownCube(casterPos, n, c, r, h)) continue;
         const cover = _cover(g, c, r, h);
-        if (cover >= LINE_EDGE) out.push({ x: c, y: r, z: h, cover, edge: cover <= LINE_FULL });
+        const cls = coverClass(cover);
+        if (cls) out.push({ x: c, y: r, z: h, cover, edge: cls === 'edge' });
       }
     }
   }
   return out;
 }
 
-/** Who the cone catches: `ids` everyone (but the caster) with a cube at least LINE_EDGE inside it, `edgeIds` those of
- * them whose best-covered cube is only an edge hit (LINE_FULL or less). */
+/** Who the cone catches: `ids` everyone (but the caster) with a cube more than a quarter inside it, `edgeIds` those of
+ * them whose best-covered cube is only an edge hit (half or less -- line-area.js's coverClass). */
 export function coneHits(session, casterId, angleDeg, lengthFt, pitchDeg = 0, start = null) {
   const board = session.board;
   const casterPos = board.tokens[casterId];
@@ -119,9 +122,10 @@ export function coneHits(session, casterId, angleDeg, lengthFt, pitchDeg = 0, st
       if ((h < 0 && (casterPos.z || 0) >= 0) || _ownCube(casterPos, n, c, r, h)) continue; // under the ground; the caster's
       best = Math.max(best, _cover(g, c, r, h));
     }
-    if (best < LINE_EDGE) return;
+    const cls = coverClass(best);
+    if (!cls) return;
     ids.push(id);
-    if (best <= LINE_FULL) edgeIds.push(id);
+    if (cls === 'edge') edgeIds.push(id);
   });
   return { ids, edgeIds };
 }

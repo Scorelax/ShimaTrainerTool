@@ -633,7 +633,8 @@ def _handle(conn, action, params):
         if not params.get('id') or col is None or row is None:
             raise ValueError('Missing participant id, col, or row')
         facing = js_parse_int(params.get('facing'))  # optional: which way the token faces as it's placed
-        return _mutate(conn, lambda s: _confirm_placement(s, params['id'], col, row, facing))
+        z = js_parse_int(params.get('z'))  # optional: released in the air (ft); left out = where it already is
+        return _mutate(conn, lambda s: _confirm_placement(s, params['id'], col, row, facing, z))
 
     if action == 'hover-token':
         if not params.get('id'):
@@ -1789,6 +1790,8 @@ def _advance_turn(state, after_departure=None):
         state['turnIndex'], new_round = after_departure
     else:
         ending_id = state['turnOrder'][state['turnIndex']] if state['turnIndex'] < len(state['turnOrder']) else None
+        if ending_id:
+            _push_out_of_shared_space(state, ending_id)
         state['turnIndex'] = (state['turnIndex'] + 1) % len(state['turnOrder'])
         new_round = state['turnIndex'] == 0
     if new_round:
@@ -1851,6 +1854,64 @@ def _advance_turn(state, after_departure=None):
     _apply_weather_damage(state, starting_id)
     _queue_hazards(state, starting_id, 'start')
     _expire_statuses_on_turn_point(state, starting_id, 'start')
+
+
+def _space_of(state, pid, col=None, row=None):
+    """The cubes a creature fills: ({(col, row), ...} of its footprint, (z0, z1) its height span in ft) -- optionally as
+    if it stood at (col, row)."""
+    tok = state['board']['tokens'][pid]
+    size = footprint_size((state['participants'].get(pid) or {}).get('size'))
+    cells = set(footprint_cells(tok['col'] if col is None else col, tok['row'] if row is None else row, size))
+    z = tok.get('z') or 0
+    return cells, (z, z + 5 * size)
+
+
+def _shares_space(a, b):
+    (cells_a, (lo_a, hi_a)), (cells_b, (lo_b, hi_b)) = a, b
+    return bool(cells_a & cells_b) and lo_a < hi_b and lo_b < hi_a
+
+
+def _push_out_of_shared_space(state, pid):
+    """A creature can pass through another's square, but not end its turn there (the user's rule, 2026-10-15): one that
+    ends its turn in another creature's space -- the same square at the same height -- is pushed to a random free spot
+    beside it (further out only when nothing next to it is free). A flyer above, or a burrower below, isn't sharing."""
+    tokens = state['board']['tokens']
+    participant = state['participants'].get(pid)
+    if pid not in tokens or not participant:
+        return
+    others = [q for q, p in state['participants'].items()
+              if q != pid and q in tokens and p.get('status') == 'participating']
+    spaces = {q: _space_of(state, q) for q in others}
+    mine = _space_of(state, pid)
+    under = [q for q in others if _shares_space(mine, spaces[q])]
+    if not under:
+        return
+    tok = tokens[pid]
+    cols, rows = state['board']['grid']['cols'], state['board']['grid']['rows']
+    size = footprint_size(participant.get('size'))
+    z = tok.get('z') or 0
+    blocked = {cell for cell, kind in _map_marks(state).items() if kind == 'blocked'}
+
+    def free(c, r):
+        cells = footprint_cells(c, r, size)
+        if any(not (0 <= cc < cols and 0 <= rr < rows) for cc, rr in cells):
+            return False
+        if z == 0 and not is_levitating(participant) and any(f'{cc},{rr}' in blocked for cc, rr in cells):
+            return False
+        here = _space_of(state, pid, c, r)
+        return not any(_shares_space(here, spaces[q]) for q in others)
+
+    for ring in range(1, max(cols, rows) + 1):
+        spots = [(tok['col'] + dc, tok['row'] + dr) for dc in range(-ring, ring + 1) for dr in range(-ring, ring + 1)
+                 if max(abs(dc), abs(dr)) == ring and free(tok['col'] + dc, tok['row'] + dr)]
+        if spots:
+            col, row = random.choice(spots)
+            tok['col'], tok['row'] = col, row
+            names = ', '.join(state['participants'][q]['name'] for q in under)
+            _log_event(state, 'move', text=f"{participant['name']} can't end its turn in {names}'s space -- pushed to ({col}, {row})",
+                       actorId=pid, actorName=participant['name'], col=col, row=row)
+            _queue_hazards(state, pid, 'enter')
+            return
 
 
 def _use_bonus_action(state, pid, move_name=''):
@@ -4259,7 +4320,7 @@ def _clear_token_position(state, pid):
     state['board']['tokens'].pop(pid, None)
 
 
-def _confirm_placement(state, pid, col, row, facing=None):
+def _confirm_placement(state, pid, col, row, facing=None, z=None):
     """The per-player placement step (see combat-wip.js's placement screen):
     like set-token-position (unrestricted, not turn-gated -- this happens
     before battle even starts), but also marks the participant placed so
@@ -4274,11 +4335,23 @@ def _confirm_placement(state, pid, col, row, facing=None):
     for other_id, pos in state['board']['tokens'].items():
         if other_id != pid and pos['col'] == col and pos['row'] == row:
             raise ValueError('That square is already taken')
-    if not is_levitating(participant) and any(_map_marks(state).get(f'{c},{r}') == 'blocked'
-                                              for c, r in footprint_cells(col, row, footprint_size(participant.get('size')))):
+    if z is None:
+        z = _altitude_of(state, pid)
+    elif z != _altitude_of(state, pid):
+        # Released in the air (the user's call, 2026-10-15): only as high as it can go -- a flyer anywhere, a hoverer
+        # 5ft -- never below the ground, never inside a Gravity field.
+        _, high = altitude_limits(participant)
+        if z < 0 or z % 5:
+            raise ValueError('It can be released on the ground or in the air, in 5ft steps')
+        if high is not None and z > high:
+            raise ValueError(f"{participant['name']} can't be up there" + (' (no flying speed)' if high == 0 else f' -- it can only hover {high}ft up'))
+        if z and _in_gravity_at(state, participant, col, row):
+            raise ValueError("Nothing can fly inside the Gravity field -- release it on the ground")
+    if not z and not is_levitating(participant) and any(_map_marks(state).get(f'{c},{r}') == 'blocked'
+                                                        for c, r in footprint_cells(col, row, footprint_size(participant.get('size')))):
         raise ValueError("That square is blocked -- pick another one")
     facing = _facing_of(state, pid) if facing is None else (round(facing / 45) * 45) % 360
-    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing, 'z': _altitude_of(state, pid)}
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing, 'z': z}
     participant['placed'] = True
-    _log_event(state, 'placement', text=f"{participant['name']} placed at ({col}, {row})",
+    _log_event(state, 'placement', text=f"{participant['name']} placed at ({col}, {row})" + (f", {z}ft up" if z > 0 else ''),
                actorId=pid, actorName=participant['name'], col=col, row=row)

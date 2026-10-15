@@ -42,7 +42,7 @@ import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler, moveCover } from '../utils/targetability.js';
 import { coverText } from '../utils/cover.js';
 import { areaPlacementFt, creatureDistanceFt } from '../utils/move-range.js';
-import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, isConcentrationHolder, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating } from '../utils/move-effects.js';
+import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, isConcentrationHolder, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating, altitudeLimits } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
   renderSetupPhase, attachSetupListeners,
@@ -562,6 +562,10 @@ const PLACEMENT_CSS = `
     background: rgba(255,255,255,0.1); color: #e8ecff;
   }
   .placement-rotate-btn:hover { background: rgba(255,215,0,0.28); }
+  .placement-rotate-btn:disabled { opacity: 0.35; cursor: default; }
+  .placement-alt-label { min-width: 3.6rem; text-align: center; font-size: 0.85rem; font-weight: 700; color: #9fd8ff; align-self: center; }
+  .placement-alt-badge { position: absolute; right: -4px; bottom: -6px; z-index: 3; padding: 0 5px; border-radius: 8px; font-size: 0.7rem; font-weight: 800;
+    background: #1a2a40; color: #9fd8ff; border: 1px solid #9fd8ff; pointer-events: none; }
   .placement-token.ghost { opacity: 0.5; }
   .placement-token.ghost .placement-token-portrait { outline-color: rgba(255,215,0,0.55); }
   .placement-token.staged { opacity: 0.85; }
@@ -2150,17 +2154,36 @@ let _gridDraftBase = null;
 // Which way the token being placed faces (degrees clockwise from up, 45-degree steps) -- turned with the buttons next to
 // Confirm (or Q / E) and sent with confirm-placement.
 let _stagedFacing = 0;
+// How high it's released (ft, 0 = on the ground): a creature that can fly or hover can be sent out in the air (the
+// user's call, 2026-10-15) -- ▲ / ▼ next to Confirm, within what it can reach (move-effects.js's altitudeLimits).
+let _stagedZ = 0;
 
 function _renderPlacementActions(currentId) {
   const el = document.getElementById('placementActions');
   if (!el) return;
+  const high = altitudeLimits(session?.participants?.[currentId])[1];
+  const altHtml = high === 0 ? '' : `
+       <div class="placement-rotate">
+         <button type="button" class="placement-rotate-btn" data-alt="-5" title="Release it 5ft lower"${_stagedZ <= 0 ? ' disabled' : ''}>▼</button>
+         <span class="placement-alt-label">${_stagedZ ? `↑${_stagedZ}ft` : 'Ground'}</span>
+         <button type="button" class="placement-rotate-btn" data-alt="5" title="Release it 5ft higher"${high !== null && _stagedZ >= high ? ' disabled' : ''}>▲</button>
+       </div>`;
   el.innerHTML = _stagedPosition
     ? `<div class="placement-rotate">
          <button type="button" class="placement-rotate-btn" data-turn="-45" title="Turn left 45° (Q)">⟲</button>
          <button type="button" class="placement-rotate-btn" data-turn="45" title="Turn right 45° (E)">⟳</button>
-       </div>
-       <button class="placement-confirm-btn" id="placementConfirmBtn">✅ Confirm Placement</button>`
+       </div>${altHtml}
+       <button class="placement-confirm-btn" id="placementConfirmBtn">✅ Confirm Placement${_stagedZ ? ` (${_stagedZ}ft up)` : ''}</button>`
     : '';
+}
+
+/** ▲ / ▼ on the placement screen: the height the creature is released at, never below the ground or above its reach. */
+function _stepStagedAltitude(delta, currentId) {
+  const high = altitudeLimits(session?.participants?.[currentId])[1];
+  _stagedZ = Math.max(0, _stagedZ + delta);
+  if (high !== null) _stagedZ = Math.min(high, _stagedZ);
+  _renderPlacementActions(currentId);
+  _renderPlacementTokens(session, currentId);
 }
 
 function _turnStagedPlacement(delta, currentId) {
@@ -2216,6 +2239,7 @@ function _renderPlacementTokens(state, currentId) {
       html.push(`
         <div class="placement-token staged ${current.side}" title="${name}" style="left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height};">
           <div class="placement-token-portrait"><div class="bmap-sprite" data-portrait-id="${currentId}" style="transform:${spriteTransform(_stagedFacing)}"></div></div>
+          ${_stagedZ ? `<span class="placement-alt-badge">↑${_stagedZ}ft</span>` : ''}
         </div>`);
     }
   }
@@ -2231,6 +2255,7 @@ function _renderPlacementTokens(state, currentId) {
 function attachPlacementListeners(state, currentId) {
   _stagedPosition = null;
   _stagedFacing = 0;
+  _stagedZ = 0;
   _renderPlacementActions(currentId);
   _renderPlacementTokens(state, currentId);
   _refreshCellTakenStates(state, currentId);
@@ -2310,12 +2335,14 @@ function attachPlacementListeners(state, currentId) {
   });
 
   document.getElementById('placementActions')?.addEventListener('click', async (e) => {
+    const alt = e.target.closest('[data-alt]');
+    if (alt) { _stepStagedAltitude(Number(alt.dataset.alt), currentId); return; }
     const turn = e.target.closest('.placement-rotate-btn');
     if (turn) { _turnStagedPlacement(Number(turn.dataset.turn), currentId); return; }
     if (!e.target.closest('#placementConfirmBtn') || !_stagedPosition) return;
     const { col, row } = _stagedPosition;
     try {
-      await CombatAPI.confirmPlacement(currentId, col, row, _stagedFacing);
+      await CombatAPI.confirmPlacement(currentId, col, row, _stagedFacing, _stagedZ);
     } catch (err) {
       showCombatAlert(err.message, { title: 'Error' });
       // Someone else likely just took it -- drop the stale preview and let
@@ -2330,6 +2357,7 @@ function attachPlacementListeners(state, currentId) {
     CombatAPI.hoverToken(currentId).catch(() => {}); // clear our own hover reservation for others
     _stagedPosition = null;
     _stagedFacing = 0;
+    _stagedZ = 0;
     _placementQueue.shift();
     if (!_placementQueue.length) _joinStage = null;
     _rerenderFull();

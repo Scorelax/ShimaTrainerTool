@@ -32,7 +32,8 @@ import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObject
 import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating } from './move-effects.js';
-import { injectBattleMapStyles, zoneKindsByCell, legendHtml, coneCells, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
+import { injectBattleMapStyles, zoneKindsByCell, legendHtml, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
+import { coneSquares } from './cone-area.js';
 import { lineFtFromRange, lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 const CONE_FT = 15; // the cone preview is just a visual of where the token faces -- one size is enough
@@ -401,11 +402,15 @@ function _renderGrid() {
 
   // Reach: cells the selected mover can still afford (Chebyshev distance x 5ft, same as the server's budget check).
   const bestRemaining = sel && (sel.p.speeds || []).length ? Math.max(...sel.p.speeds.map(s => _remainingFt(sel.p, s.type))) : null;
-  let cone = null;
+  let cone = null; // "col,row" -> whether that square is only on the edge of it
   if (sel && _coneOn) {
-    // From where the token will be once the staged move is confirmed.
-    const from = _stagedDestination ? { col: _stagedDestination.col, row: _stagedDestination.row } : sel.pos;
-    cone = coneCells(_session.board, from, sel.size, sel.pos.facing || 0, CONE_FT / 5);
+    // From where the token will be once the staged move is confirmed; level, the way it faces (cone-area.js).
+    const from = _stagedDestination ? { ...sel.pos, col: _stagedDestination.col, row: _stagedDestination.row, z: _stagedAlt ?? sel.pos.z } : sel.pos;
+    cone = new Map();
+    coneSquares(from, sel.size, sel.pos.facing || 0, CONE_FT, 0, null, _session.board.grid).forEach((q) => {
+      const k = `${q.x},${q.y}`;
+      cone.set(k, cone.has(k) ? cone.get(k) && q.edge : q.edge);
+    });
   }
 
   gridEl.setAttribute('style', gridTemplateStyle(_session.board));
@@ -417,7 +422,7 @@ function _renderGrid() {
     const z0 = sel?.pos.z || 0;
     if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row, sel.p, z0, _stagedAlt ?? z0) <= bestRemaining
         && !_blockedOnTheWay(sel, col, row)) classes.push('reach');
-    if (cone?.has(key)) classes.push('cone');
+    if (cone?.has(key)) classes.push(cone.get(key) ? 'cone cone-edge' : 'cone');
     if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) classes.push('staged');
     return classes.join(' ');
   });

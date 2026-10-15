@@ -50,7 +50,7 @@ function _injectStyles() {
 let _overlay = null;
 let _resolve = null;
 let _selected = new Set();
-let _edge = new Set(); // a line's targets only on the edge of it (line-area.js): they save for nothing / half on a fail
+let _edge = new Set(); // a line's or cone's targets only on the edge of it (line-area.js): they save for nothing / half on a fail
 
 function _ensureDom() {
   if (_overlay) return;
@@ -91,7 +91,7 @@ function _close(result) {
 /** The "Edge" tag on a card (a line's target only on the edge of it). */
 function _markEdge(card, on) {
   card.querySelector('.mtp-edge-tag')?.remove();
-  if (on) card.insertAdjacentHTML('afterbegin', '<div class="mtp-edge-tag" title="On the edge of the line: a save for no damage, half on a fail">Edge</div>');
+  if (on) card.insertAdjacentHTML('afterbegin', '<div class="mtp-edge-tag" title="On the edge of the area: a save for no damage, half on a fail">Edge</div>');
 }
 
 function _cardHtml(p) {
@@ -112,8 +112,8 @@ function _cardHtml(p) {
  * `area` ({ radiusFt, heightFt, centeredOnCaster }, from the move's own range/description) adds a "Select from the map"
  * button: the caster marks the blast on the battle map and everyone whose token overlaps it -- and, for a cylinder with a
  * height, is at or below that altitude -- is ticked for them, to adjust by hand before confirming.
- * A line move's area is { lineFt } instead: the caster aims a 5ft-wide line on the map (line-area-picker.js); the ones
- * only on the edge of it come back tagged, as the result's `edgeIds`.
+ * A line move's area is { lineFt } instead: the caster aims a 5ft-wide line on the map (line-area-picker.js); a cone
+ * move's { coneFt }, a cone the same way. The ones only on the edge of either come back tagged, as the result's `edgeIds`.
  */
 export async function pickMultipleTargets(casterId, { moveName = '', area = null } = {}) {
   const result = await CombatAPI.getState();
@@ -151,9 +151,12 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
     if (area.coneFt) {
       const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt, targetableIds: aimableIds, blockedNotes });
       if (!cone) return;
+      _edge = new Set(cone.edgeIds || []);
       participants.forEach(p => {
         const card = grid.querySelector(`[data-target-id="${p.id}"]`);
-        if (card) toggle(card, cone.ids.includes(p.id));
+        if (!card) return;
+        toggle(card, cone.ids.includes(p.id));
+        _markEdge(card, _edge.has(p.id));
       });
       return;
     }

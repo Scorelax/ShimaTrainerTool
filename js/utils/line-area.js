@@ -1,7 +1,7 @@
 // Line areas ("Self (80ft. line)", "50ft. line" -- always 5ft wide): a beam 5ft wide and 5ft tall that starts in the
-// caster, can point in ANY direction (not just the 8 grid directions the cone uses) and tilt up or down at a flyer. It
-// reaches its length beyond the caster in grid distance (a diagonal square, or a square up, counts 5ft like every other
-// distance here). Each 5ft square (cube) counts by how much of it the beam covers (the user's rule, 2026-10-14, so an
+// caster, can point in ANY direction (not just the 8 grid directions -- a cone too, cone-area.js) and tilt up or down at a
+// flyer. It reaches its length beyond the caster in grid distance (a diagonal square, or a square up, counts 5ft like
+// every other distance here). Each 5ft square (cube) counts by how much of it the beam covers (the user's rule, 2026-10-14, so an
 // angled line doesn't catch extra squares just by grazing them): over 2/3 is a full hit, 1/3 to 2/3 an EDGE hit (the
 // creature saves -- nothing on a success, half damage and the move's effects on a failure; combat-wip.js), under 1/3
 // misses. A creature counts its best-covered cube (its footprint, from its flying height up as high as it is wide).
@@ -59,7 +59,8 @@ export function lineAimOrigin(casterPos, casterSize, start = null) {
 /** The beam in 3D: origin `o` (the middle of the square it fires from -- see _fireSquare -- at its start layer, see
  * _startOf), unit direction `d` (z is up; `pitchDeg` tilts it up (+) or down (-) from level), `len` from the origin to
  * its far end -- out of the caster, then the line's length beyond it in grid distance (a diagonal square, or a square up,
- * counts 5ft) -- and `drawLen`, the length of its shadow on the map. Which squares it covers is lineCells'. */
+ * counts 5ft) -- `drawLen`, the length of its shadow on the map, and `fire`, the square it fires from (null: the middle of
+ * an odd-sized caster). Which squares it covers is lineCells'. */
 export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 0, start = null) {
   const n = casterSize || 1;
   const { square, layer } = _startOf(start, n);
@@ -76,7 +77,7 @@ export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg
     if (Math.abs(d[k]) > 1e-9) out = Math.min(out, ((d[k] > 0 ? hi : lo) - o[k]) / d[k]);
   });
   const len = (Number.isFinite(out) ? out : 0) + (lengthFt / 5) * stretch;
-  return { o, d, len, drawLen: len * Math.cos(p) };
+  return { o, d, len, drawLen: len * Math.cos(p), fire };
 }
 
 /** The squares within `lengthFt` of the caster's footprint (the line's reach box on the map): {c0, c1, r0, r1}, inclusive. */

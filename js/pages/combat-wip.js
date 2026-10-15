@@ -5825,8 +5825,8 @@ function _halvesOnSave(moveName) {
 async function _runMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
   let targetIds = await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName) });
   if (!targetIds || !targetIds.length) return false; // closed / nobody picked -- move's own cost still applied
-  // A line's targets only on the edge of it (line-area.js, the user's rule 2026-10-14): they save for nothing, or take
-  // half damage -- and the move's effects -- on a failure.
+  // A line's or cone's targets only on the edge of it (line-area.js / cone-area.js, the user's rule 2026-10-14): they
+  // save for nothing, or take half damage -- and the move's effects -- on a failure.
   const edgeIds = new Set(targetIds.edgeIds || []);
   const halvesOnSave = _halvesOnSave(moveName);
 
@@ -5879,7 +5879,7 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
 
     if (isSaveTriggered) {
       // halfOn: the save-picker halves the damage roll -- on a pass for a move's own "half as much on a success"
-      // (_halvesOnSave), on a fail for a line's edge target (who takes nothing on a pass).
+      // (_halvesOnSave), on a fail for a line's or cone's edge target (who takes nothing on a pass).
       // speciesName '' -- no clip inside each target's damage popup; it plays once at the end (_handleMultiHitAoe).
       const edge = edgeIds.has(targetId);
       const outcome = await confirmSecondarySave(target, target.name, {
@@ -5914,7 +5914,7 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
           // damageMultiplier: see this function's own Wide Guard note above.
           const rawTotal = outcome.rawRoll + damageModifier;
           const targetMultiplier = damageMultiplier * _stateDamageMultiplier(moveName, targetId) * (targetId === vpHalfId ? 0.5 : 1)
-            * (outcome.halved ? 0.5 : 1); // a pass on a "half as much" move / a fail on a line's edge (see halfOn above)
+            * (outcome.halved ? 0.5 : 1); // a pass on a "half as much" move / a fail on the edge (see halfOn above)
           const finalDamage = targetMultiplier !== 1 ? Math.floor(rawTotal * targetMultiplier) : rawTotal;
           const dmgResult = await _applyPrimaryDamage(combatantId, targetId, finalDamage, moveType, speciesName, moveName, false,
             targetId === vpHalfId ? 'vp' : null);
@@ -5948,9 +5948,27 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
       });
     } else {
       // Shock Wave-style area moves: guaranteed to hit everything in the area,
-      // so each selected target goes straight to its damage roll.
+      // so each selected target goes straight to its damage roll -- but one only
+      // on the edge of the cone makes a Dexterity save first (the move has no
+      // save of its own): nothing on a success, half damage on a failure.
+      let edgeMultiplier = 1;
+      if (edgeIds.has(targetId)) {
+        const outcome = await confirmSecondarySave(target, target.name, {
+          dc, hasDamage: false, ability: 'DEX', title: 'Saving Throw', moveUser: session?.participants?.[combatantId],
+          note: `On the edge of ${attackerName}'s ${moveName}: a success means it misses ${target.name} entirely; a failure means half damage.`,
+        });
+        if (!outcome) continue;
+        CombatAPI.logEvent({
+          type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
+          text: outcome.passed
+            ? `${target.name} was on the edge of ${attackerName}'s ${moveName} and dodged it${_saveRollNote(outcome)}`
+            : `${target.name} was on the edge of ${attackerName}'s ${moveName} and failed the saving throw${_saveRollNote(outcome)} -- half damage`,
+        }).catch(() => {});
+        if (outcome.passed) continue;
+        edgeMultiplier = 0.5;
+      }
       const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice });
-      await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier });
+      await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier: damageMultiplier * edgeMultiplier });
     }
   }
 

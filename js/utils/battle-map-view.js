@@ -92,42 +92,6 @@ export function squareCells(board, col, row, size, radiusCells) {
   return out;
 }
 
-/** The cells a cone of `lengthCells` covers from a token at `pos` (its footprint's bottom-left cell) of `size` cells, facing
- * `facing` degrees clockwise from up. Grid cones, the table's rule: facing straight, row k in front is 2k-1 cells wide
- * (a 15ft cone: 1, 3, 5 = 9 squares); facing a diagonal, it's the lengthCells x lengthCells block off that corner (3x3 = 9
- * squares). A bigger creature casts the same cone, from the footprint cell it faces out of: the corner cell for a diagonal,
- * the middle of the facing edge otherwise (left/top of the two middle cells on an even-sized edge). Cells off the board are
- * dropped. */
-export function coneCells(board, pos, size, facing, lengthCells) {
-  const { cols, rows } = board.grid;
-  const out = new Set();
-  const add = (c, r) => { if (c >= 0 && r >= 0 && c < cols && r < rows) out.add(`${c},${r}`); };
-  const n = size || 1;
-  const dir = ((Math.round((facing || 0) / 45) % 8) + 8) % 8; // 0 up, 1 up-right, 2 right, ... 7 up-left
-  const dx = [0, 1, 1, 1, 0, -1, -1, -1][dir];
-  const dy = [-1, -1, 0, 1, 1, 1, 0, -1][dir];
-  // The one footprint cell the cone comes out of.
-  const mid = Math.floor((n - 1) / 2);
-  const left = pos.col, top = pos.row - n + 1;
-  const ox = dx > 0 ? left + n - 1 : dx < 0 ? left : left + mid;
-  const oy = dy > 0 ? top + n - 1 : dy < 0 ? top : top + mid;
-  const x0 = ox, x1 = ox, y0 = oy, y1 = oy;
-  for (let k = 1; k <= lengthCells; k++) {
-    if (dx === 0) {
-      const r = dy < 0 ? y0 - k : y1 + k;
-      for (let c = x0 - (k - 1); c <= x1 + (k - 1); c++) add(c, r);
-    } else if (dy === 0) {
-      const c = dx > 0 ? x1 + k : x0 - k;
-      for (let r = y0 - (k - 1); r <= y1 + (k - 1); r++) add(c, r);
-    } else {
-      // Diagonal: column k of the block off the corner the token faces.
-      const c = dx > 0 ? x1 + k : x0 - k;
-      for (let j = 1; j <= lengthCells; j++) add(c, dy < 0 ? y0 - j : y1 + j);
-    }
-  }
-  return out;
-}
-
 /** CSS transform that turns a token's sprite to face `deg` (clockwise from up; the sprite as drawn is "facing up").
  * A square turned off the 90-degree grid sticks out of its tile, so it's scaled down to still fit -- 1 at 0/90/180/270,
  * about 0.71 at the 45-degree diagonals. `deg` may be any real angle (see unwrapAngle). */
@@ -179,6 +143,7 @@ export function injectBattleMapStyles() {
     .bmap-cell.reach:hover { background: rgba(255,215,0,0.2); }
     /* the cone/line preview from the selected token's facing */
     .bmap-cell.cone { background: rgba(255,140,60,0.28); box-shadow: inset 0 0 0 1px rgba(255,160,80,0.65); }
+    .bmap-cell.cone.cone-edge { background: rgba(255,200,110,0.12); box-shadow: inset 0 0 0 1px rgba(255,205,120,0.85); outline: 1px dashed rgba(255,205,120,0.85); outline-offset: -3px; }
 
     /* ---- terrain zones: tinted, hatched, glowing edge ---- */
     .bmap-cell[class*="zone-"] {

@@ -119,10 +119,10 @@ let _hasDamage = false;
 // for a damage roll on pass" -- see confirmSecondarySave's own comment.
 let _damageOnPass = false;
 // Which outcome halves the damage, the app halving it (the human enters the full roll): 'pass' for a move's own "half as
-// much on a success", 'fail' for a line's edge target (line-area.js -- nothing on a success, half on a failure); null =
+// much on a success", 'fail' for a line's or cone's edge target (line-area.js -- nothing on a success, half on a failure); null =
 // neither. A 'pass' one also asks for the damage roll on a pass.
 let _halfOn = null;
-let _saveNote = ''; // a line on the save and damage steps ("On the edge of the line: ...")
+let _saveNote = ''; // a line on the save and damage steps ("On the edge of Bubble's Hydro Pump: ...")
 // Which outcome led to the current damage-roll step (_showStep3 is shared
 // by both _confirmFail and, when _damageOnPass, _confirmPass -- see
 // _confirmDamageRoll, which needs to report the right one).
@@ -486,7 +486,7 @@ function _showStep3() {
     <div class="save-picker-dc-target-name">${_selectedTargetName}</div>`;
   document.getElementById('savePickerModifierNote').textContent =
     (_damageModifier ? ` (${_damageModifier >= 0 ? '+' : ''}${_damageModifier} modifier added automatically)` : '')
-    + (_halvedNow() ? ` -- enter the full roll, it's halved (${_pendingPassed ? 'a successful save' : 'a failed save on the edge of the line'})` : '');
+    + (_halvedNow() ? ` -- enter the full roll, it's halved (${_pendingPassed ? 'a successful save' : 'a failed save on the edge of the area'})` : '');
   document.getElementById('savePickerDiceText').innerHTML = _damageDice ? `: <strong>${_damageDice}</strong>` : '';
   const input = document.getElementById('savePickerRollInput');
   input.value = '';

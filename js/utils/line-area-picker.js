@@ -7,7 +7,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
-import { coneOrigin, levelCone, inConeReach, coneHitIds, coneShadowCells, coneAimAt } from './cone-area.js';
+import { coneSquares, coneHits, coneOutlineSvg, injectConeStyles } from './cone-area.js';
 import { lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineReachBox, inLineReach, aimAtCreature, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
 
 function _injectStyles() {
@@ -23,6 +23,7 @@ function _injectStyles() {
     .lap-sub { font-size: 0.82rem; color: #a0a8d0; margin-bottom: 0.7rem; }
     .lap-stage { touch-action: none; user-select: none; cursor: crosshair; }
     .lap-stage .bmap-tokens { z-index: 2; pointer-events: none; }
+    .lap-cone-shape { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
     .lap-stage .bmap-token.untargetable { opacity: 0.35; filter: grayscale(1); }
     .lap-stage .bmap-cell.line-reach { background: rgba(255,140,60,0.1); box-shadow: inset 0 0 0 1px rgba(255,160,80,0.25); }
     .lap-stage .bmap-token.line-aim .bmap-token-portrait { outline: 2px dashed #fff3; outline-offset: 3px; }
@@ -269,15 +270,17 @@ export function coneFtFromRange(rangeText) {
 }
 
 /**
- * "Aim the cone" -- the cone counterpart of pickLineArea. The cone comes out of the caster and points in one of the 8 grid
- * directions (the table's grid cones: straight ahead each row is 2 squares wider, a diagonal is a square block off the
- * corner -- battle-map-view.js's coneCells). Drag toward where it should point, or turn it 45° at a time; it's a real cone in
- * 3D (cone-area.js), so it spreads upward as it goes and catches a flyer only where it has grown tall enough. Tap a creature
- * in reach to tilt the cone straight at it. The squares under it are shaded and everyone it covers is listed.
- * @returns {Promise<{ids: string[], angle: number, pitch: number} | null>}  null when cancelled
+ * "Aim the cone" -- the cone counterpart of pickLineArea. The cone is a 90-degree wedge out of the caster's edge that
+ * turns to any angle like the line (cone-area.js): drag toward where it should point, or nudge it 5° at a time. It's a
+ * pyramid in 3D, so it spreads upward as it goes and catches a flyer only where it has grown tall enough; tap a creature
+ * in reach to tilt it straight at it. Its outline and the squares under it are drawn -- hit squares shaded, edge ones
+ * dashed -- and everyone it covers is listed.
+ * @returns {Promise<{ids: string[], edgeIds: string[], angle: number, pitch: number} | null>}  null when cancelled; edgeIds
+ *   are the ones only on the edge of it (cone-area.js's coneHits)
  */
 export function pickConeArea({ session, casterId, title, lengthFt, targetableIds = null, blockedNotes = null, confirmLabel = 'Select targets in the cone' }) {
   _injectStyles();
+  injectConeStyles();
   return new Promise((resolve) => {
     const board = session.board;
     const { cols, rows } = board.grid;
@@ -285,11 +288,11 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     const caster = session.participants[casterId];
     if (!casterPos) { resolve(null); return; }
     const casterSize = footprintForSize(caster?.size);
-    const snap = (deg) => ((Math.round(deg / 45) * 45) % 360 + 360) % 360;
-    let angle = snap(casterPos.facing || 0);
-    let start = null; // a big caster's own square the cone comes out of (null = the edge it faces)
+    let angle = casterPos.facing || 0;
+    let start = null; // a big caster's own square the cone comes out of (null = the middle, or the square facing the aim)
     let layer = 0;    // how many 5ft up its own height it starts (0 = its lowest point)
-    let pitch = 0;    // the level cone tilted up / down by hand
+    let pitch = 0;    // level unless tilted or aimed at a creature
+    let aimedAt = null;
     const org = () => ({ ...(start || {}), layer }); // cone-area.js's `start`
 
     const overlay = document.createElement('div');
@@ -297,17 +300,19 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     overlay.innerHTML = `
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
-        <div class="lap-sub">A ${lengthFt}ft cone from ${caster?.name || 'the caster'}. Drag on the map toward where it should point (level, in 8 directions), or use the buttons — or tap a creature to tilt the cone straight at it (up at a flyer, down from the air). The shaded squares are where it covers the ground; ringed creatures are caught (in the air too); greyed-out ones are out of its reach.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again to go back to the edge it faces.` : ''}</div>
+        <div class="lap-sub">A ${lengthFt}ft cone from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the cone straight at it (up at a flyer, down from the air). It reaches ${lengthFt / 5} squares out; a square more than 2/3 inside it is hit (shaded), one 1/3 to 2/3 inside is the edge of it (dashed: a save for nothing, or half damage on a fail), and less misses. Greyed-out creatures are out of its reach.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again to go back to ${casterSize % 2 ? 'the middle' : 'the square facing the aim'}.` : ''}</div>
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
+          <div class="bmap-line-cells"></div>
+          <div class="lap-cone-shape"></div>
           <div class="bmap-objects">${mapObjectsHtml(board)}</div>
           <div class="bmap-tokens"></div>
         </div>
         <div class="lap-aim"></div>
         <div class="lap-hits"></div>
         <div class="lap-actions">
-          <button type="button" data-act="left" title="Turn 45° left">⟲ 45°</button>
-          <button type="button" data-act="right" title="Turn 45° right">⟳ 45°</button>
+          <button type="button" data-act="left" title="Turn 5° left">⟲ 5°</button>
+          <button type="button" data-act="right" title="Turn 5° right">⟳ 5°</button>
           ${_heightButtonsHtml(casterSize, 15)}
           <button type="button" data-act="cancel">Cancel</button>
           <button type="button" class="lap-confirm" data-act="confirm">${confirmLabel}</button>
@@ -318,6 +323,8 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     const stage = overlay.querySelector('.lap-stage');
     const grid = overlay.querySelector('.bmap-grid');
     const tokenLayer = overlay.querySelector('.bmap-tokens');
+    const cellsEl = overlay.querySelector('.bmap-line-cells');
+    const shapeEl = overlay.querySelector('.lap-cone-shape');
     const aimEl = overlay.querySelector('.lap-aim');
     const hitsEl = overlay.querySelector('.lap-hits');
     if (board.backgroundImage) {
@@ -326,68 +333,66 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     }
     grid.setAttribute('style', gridTemplateStyle(board));
     grid.innerHTML = gridCellsHtml(board, 'bmap-cell');
-    const cellEls = new Map([...grid.querySelectorAll('[data-cell]')].map(el => [el.dataset.cell, el]));
 
     const targetable = targetableIds ? new Set(targetableIds) : null;
     const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable, blockedNotes);
-    const lengthCells = Math.floor(lengthFt / 5);
-    // Who the cone could reach at all (on the map and in height) -- everyone else is greyed out, and only these can be
-    // tapped to aim at. Reach is measured from the middle of the caster (a level cone's own origin is on its edge).
-    const middle = coneOrigin(casterPos, casterSize);
+    // Who the cone could reach at all (on the map and in height, its length from the caster) -- everyone else is greyed
+    // out, and only these can be tapped to aim at.
     const aimable = new Set(Object.keys(board.tokens).filter(id => id !== casterId && (!targetable || targetable.has(id))
-      && inConeReach(session, id, middle, lengthCells + Math.floor(casterSize / 2))));
+      && inLineReach(session, casterId, id, lengthFt)));
     tokenEls.forEach((el, id) => { if (id !== casterId && !aimable.has(id)) el.classList.add('untargetable'); });
     const nameOf = id => (visibleToViewer(session.participants[id], 'name') ? session.participants[id].name : '???');
     const heightOf = id => { const z = board.tokens[id]?.z || 0; return z > 0 ? ` (${z}ft up)` : ''; };
 
-    let tilted = null; // { id, origin, axis, pitch } once aimed at a creature; null = level, along the grid
     let hits = [];
+    let edges = [];   // the ones only on the edge of it
     const starts = _startPicker(stage, board, casterPos, casterSize);
     const refresh = () => {
-      const level = levelCone(angle);
-      const origin = tilted ? tilted.origin : coneOrigin(casterPos, casterSize, level.dir, org());
+      cellsEl.innerHTML = lineCellsHtml(board, coneSquares(casterPos, casterSize, angle, lengthFt, pitch, org(), board.grid));
+      shapeEl.innerHTML = coneOutlineSvg(board, casterPos, casterSize, angle, lengthFt, pitch, org());
       starts.show(start);
       const heightEl = overlay.querySelector('.lap-height');
       if (heightEl) heightEl.textContent = `Start ${layer * 5}ft`;
-      // Tilted by hand: the grid direction, raised (or lowered) by `pitch`.
-      const p = (pitch * Math.PI) / 180;
-      const axis = tilted ? tilted.axis
-        : pitch ? { x: level.axis.x * Math.cos(p), y: level.axis.y * Math.cos(p), z: Math.sin(p) } : level.axis;
-      const cells = coneShadowCells(board, origin, axis, lengthCells);
-      cellEls.forEach((el, key) => el.classList.toggle('cone', cells.has(key)));
-      hits = coneHitIds(session, casterId, origin, axis, lengthCells).filter(id => aimable.has(id));
+      const caught = coneHits(session, casterId, angle, lengthFt, pitch, org());
+      hits = caught.ids.filter(id => aimable.has(id));
+      edges = caught.edgeIds.filter(id => aimable.has(id));
       tokenEls.forEach((el, id) => {
         el.classList.toggle('line-hit', hits.includes(id));
-        el.classList.toggle('line-aim', id === tilted?.id);
+        el.classList.toggle('line-edge', edges.includes(id));
+        el.classList.toggle('line-aim', id === aimedAt);
       });
-      const tilt = Math.round(Math.abs(tilted ? tilted.pitch : pitch));
-      aimEl.textContent = tilted
-        ? `Aimed at ${nameOf(tilted.id)}${heightOf(tilted.id)}${tilt ? `: tilted ${tilt}° ${tilted.pitch > 0 ? 'up' : 'down'}` : ''}. Drag to level it again; tap the same square again for another creature there.`
+      const tilt = Math.round(Math.abs(pitch));
+      aimEl.textContent = aimedAt
+        ? `Aimed at ${nameOf(aimedAt)}${heightOf(aimedAt)}${tilt ? `: tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}` : ''}. Drag to level it again; tap the same square again for another creature there.`
         : `${tilt ? `Tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}` : 'Level'}, ${_startText(caster?.name || 'the caster', layer, heightOf(casterId))} -- it spreads upward as it goes (as high as it is wide). Tilt it, or tap a creature to aim the cone at it.`;
-      const names = hits.map(id => `${nameOf(id)}${heightOf(id)}`);
-      hitsEl.textContent = names.length ? `In the cone: ${names.join(', ')}` : 'Nobody in the cone yet.';
+      const names = ids => ids.map(id => `${nameOf(id)}${heightOf(id)}`).join(', ');
+      const full = hits.filter(id => !edges.includes(id));
+      hitsEl.textContent = hits.length
+        ? [full.length ? `In the cone: ${names(full)}` : '', edges.length ? `On the edge: ${names(edges)}` : ''].filter(Boolean).join(' · ')
+        : 'Nobody in the cone yet.';
     };
     refresh();
 
     let aiming = false;
     const aim = (e) => {
-      angle = snap(angleToPointer(stage, board, lineAimOrigin(casterPos, casterSize, org()), e.clientX, e.clientY));
-      tilted = null; pitch = 0; refresh();
+      angle = angleToPointer(stage, board, lineAimOrigin(casterPos, casterSize, org()), e.clientX, e.clientY);
+      pitch = 0; aimedAt = null; refresh();
     };
     stage.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       const own = starts.squareAt(e);
       if (own) {
-        // One of the caster's own squares: fire from there (the same square again: back to the edge it faces).
+        // One of the caster's own squares: fire from there (the same square again: back to the default).
         start = start && start.col === own.col && start.row === own.row ? null : own;
-        if (tilted) tilted = { id: tilted.id, ...coneAimAt(session, casterId, tilted.id, org()) };
+        if (aimedAt) ({ angle, pitch } = aimAtCreature(session, casterId, aimedAt, angle, org()));
         refresh();
         return;
       }
-      const id = _creatureAt(stage, session, aimable, e, tilted?.id);
+      const id = _creatureAt(stage, session, aimable, e, aimedAt);
       if (id) {
-        // Tap a creature: the cone tilts to point straight at it.
-        tilted = { id, ...coneAimAt(session, casterId, id, org()) };
+        // Tap a creature: the cone tilts to point straight at the middle of it.
+        ({ angle, pitch } = aimAtCreature(session, casterId, id, angle, org()));
+        aimedAt = id;
         refresh();
         return;
       }
@@ -401,16 +406,16 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
     overlay.addEventListener('click', (e) => {
       const act = e.target.closest('button')?.dataset.act;
       if (!act) return;
-      if (act === 'left') { angle = (angle + 315) % 360; tilted = null; refresh(); }
-      else if (act === 'right') { angle = (angle + 45) % 360; tilted = null; refresh(); }
-      else if (act === 'tiltUp' || act === 'tiltDown') { pitch = Math.max(-75, Math.min(75, pitch + (act === 'tiltUp' ? 15 : -15))); tilted = null; refresh(); }
+      if (act === 'left') { angle = (angle + 355) % 360; aimedAt = null; refresh(); }
+      else if (act === 'right') { angle = (angle + 5) % 360; aimedAt = null; refresh(); }
+      else if (act === 'tiltUp' || act === 'tiltDown') { pitch = Math.max(-75, Math.min(75, pitch + (act === 'tiltUp' ? 15 : -15))); aimedAt = null; refresh(); }
       else if (act === 'raise' || act === 'lower') {
         layer = Math.max(0, Math.min(casterSize - 1, layer + (act === 'raise' ? 1 : -1)));
-        if (tilted) tilted = { id: tilted.id, ...coneAimAt(session, casterId, tilted.id, org()) };
+        if (aimedAt) ({ angle, pitch } = aimAtCreature(session, casterId, aimedAt, angle, org()));
         refresh();
       }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
-      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, angle, pitch: tilted ? tilted.pitch : pitch, start: org() }); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, edgeIds: edges, angle, pitch, start: org() }); }
     });
   });
 }

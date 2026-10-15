@@ -945,7 +945,9 @@ function _onLocalCombatStateSave(state) {
     const last = _lastSyncedStats[c.id];
     if (last && last.hp === c.currentHp && last.vp === c.currentVp) return;
     _lastSyncedStats[c.id] = { hp: c.currentHp, vp: c.currentVp };
-    _pushStatsSync(c.id, c.currentHp, c.currentVp);
+    // Only what changed here: re-sending this screen's copy of the other could undo a change the server made a moment
+    // ago (a hit from another player landing just as this screen spends VP would come straight back off).
+    _pushStatsSync(c.id, !last || last.hp !== c.currentHp ? c.currentHp : undefined, !last || last.vp !== c.currentVp ? c.currentVp : undefined);
     _persistStatsToDb(c, c.currentHp, c.currentVp);
   });
   _persistRechargeStates(state);
@@ -1222,7 +1224,8 @@ let _statsSyncPending = {}; // participantId -> {hp, vp} latest value waiting be
 
 function _pushStatsSync(id, hp, vp) {
   if (_statsSyncInFlight[id]) {
-    _statsSyncPending[id] = { hp, vp };
+    const queued = _statsSyncPending[id] || {};
+    _statsSyncPending[id] = { hp: hp !== undefined ? hp : queued.hp, vp: vp !== undefined ? vp : queued.vp };
     return;
   }
   _statsSyncInFlight[id] = true;
@@ -6790,7 +6793,12 @@ function _answerConcentrationChecks(s) {
   const check = Object.values(s?.concentrationChecks || {}).find(c => c.owner === me);
   if (!check) return;
   const holder = s.participants?.[check.participantId];
-  if (!holder) { CombatAPI.concentrationSave(check.id, 'skip').catch(() => {}); return; }
+  // Gone, or nothing left to keep (an earlier failed save, a Drop): no popup.
+  if (!holder || !(holder.statuses || []).some(st => st.kind === 'condition' && st.apply === 'concentrating')) {
+    _concentrationCheckOpen = check.id;
+    CombatAPI.concentrationSave(check.id, 'skip').catch(() => {}).finally(() => { _concentrationCheckOpen = null; });
+    return;
+  }
   _concentrationCheckOpen = check.id;
   const moves = check.moves.join(', ');
   confirmSecondarySave(holder, holder.name, {

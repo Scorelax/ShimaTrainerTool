@@ -2871,6 +2871,9 @@ def _concentration_save(state, check_id, outcome, roll_note=''):
         _log_event(state, 'save', text=f"{p['name']} lost its concentration (DC {check['dc']} after {check['damage']} damage){note}",
                    targetId=p['id'], targetName=p['name'])
         _end_all_concentration(state, p['id'], 'concentration lost')
+        # Other hits still waiting on a save for it have nothing left to keep.
+        for cid in [k for k, c in state['concentrationChecks'].items() if c['participantId'] == p['id']]:
+            state['concentrationChecks'].pop(cid, None)
 
 
 def _end_concentration_effects(state, holder_id, move_name):

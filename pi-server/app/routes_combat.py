@@ -1148,7 +1148,16 @@ def _add_participant(state, data):
     status = data.get('status', 'participating')
     if status not in ('participating', 'spectating'):
         raise ValueError('status must be participating or spectating')
-
+    owner = data.get('owner') or ''
+    if owner and owner != DM_OWNER and not data.get('id'):
+        # A player's join sent again -- retried after a lost answer, or tapped again after one that broke halfway: the
+        # trainer (and a Pokemon of the same name) they already have in the battle isn't added a second time. (The DM may
+        # have several of a kind, so its creatures are always added.)
+        same = next((p for p in state['participants'].values() if (p.get('owner') or '') == owner
+                     and p.get('combatantType') == data.get('combatantType')
+                     and (data.get('combatantType') == 'trainer' or p.get('name') == data.get('name'))), None)
+        if same:
+            return
     pid = data.get('id') or uuid.uuid4().hex[:8]
     state['participants'][pid] = {
         'id': pid,
@@ -3733,7 +3742,7 @@ def _set_cell_terrain(state, col, row, terrain):
         state['board']['cells'].pop(key, None)
 
 
-_BACKGROUND_FILENAME_RE = re.compile(r'^battle-(.+)\.png$', re.IGNORECASE)
+_BACKGROUND_FILENAME_RE = re.compile(r'^battle-(.+)\.(?:png|jpe?g|webp)$', re.IGNORECASE)
 
 
 def _list_backgrounds():

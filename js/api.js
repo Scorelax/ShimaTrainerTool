@@ -1437,6 +1437,11 @@ export class DmAPI {
     return (await DmAPI._post('npc-image', image, 'Uploading the picture')).data;
   }
 
+  /** A battle-map background from the DM's computer ({name, data: data URL}) -> {key, label, url} (routes_dm.py). */
+  static async uploadBattleBackground(image) {
+    return (await DmAPI._post('battle-background', image, 'Uploading the background')).data;
+  }
+
   /** Where the region map on the board screen is looking ({x, y, zoom, polar, azimuth, style}) -- pushed to the board
    * at once, and stored on the Pi unless `save` is false. */
   static async saveRegionMapView(view, { save = true } = {}) {

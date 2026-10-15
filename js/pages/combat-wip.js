@@ -651,7 +651,9 @@ function _needsToJoin(state) {
   if (_dmName) return false; // the DM adds creatures from the console, never through the players' join flow
   const name = _currentTrainerName();
   if (!name) return false;
-  return !Object.values(state.participants).some(p => p.owner === name);
+  // No Pokemon of theirs in it -- not even benched: never joined, or a join that broke after the trainer went in (the
+  // join is then offered again, and adds only what's missing).
+  return !Object.values(state.participants).some(p => p.owner === name && p.combatantType !== 'trainer');
 }
 
 let _prefetchedAllBackgrounds = false; // fire the list+warm pass at most once per page load
@@ -3212,12 +3214,31 @@ export function attachCombatWipListeners() {
       },
       onComplete: async (combatants) => {
         if (combatants[1]?.id) _myPokemonKeys.set(combatants[1].name, combatants[1].id);
-        try {
-          for (const c of combatants) {
-            await CombatAPI.addParticipant(_combatantToParticipant(c));
+        // Each one is tried twice (a phone's connection can drop one request); a trainer already in the battle from a
+        // join that broke halfway isn't sent again (the server ignores a repeat anyway). What still fails is said
+        // plainly -- and written to the battle log, so the reason can be looked up afterwards.
+        const me = _currentTrainerName();
+        const haveTrainer = Object.values(session?.participants || {}).some(p => p.owner === me && p.combatantType === 'trainer');
+        const failed = [];
+        for (const c of combatants) {
+          if (c.type === 'trainer' && haveTrainer) continue;
+          let lastErr = null;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              await CombatAPI.addParticipant(_combatantToParticipant(c));
+              lastErr = null;
+              break;
+            } catch (err) {
+              lastErr = err;
+              if (attempt === 0) await new Promise(r => setTimeout(r, 1200));
+            }
           }
-        } catch (err) {
-          showCombatAlert(err.message, { title: 'Error' });
+          if (lastErr) failed.push({ name: c?.name || '?', reason: lastErr?.message || String(lastErr) });
+        }
+        if (failed.length) {
+          const what = failed.map(f => `${f.name} (${f.reason})`).join(', ');
+          showCombatAlert(`Couldn't add ${what} to the battle. Tap Join again -- it only adds what's missing.`, { title: 'Joining the battle' });
+          CombatAPI.logEvent({ type: 'join-error', actorName: me, text: `${me} couldn't join with ${what}` }).catch(() => {});
         }
         // Pick up whatever the server now has (including this device's own
         // just-added participants) before deciding what's next.

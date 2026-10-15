@@ -245,6 +245,8 @@ export async function renderMapEditor(root, { onDone }) {
             <option value="">No background</option>
             ${_assets.backgrounds.map(b => `<option value="${escapeHtml(b.url)}" ${b.url === m.background ? 'selected' : ''}>${escapeHtml(b.label)}</option>`).join('')}
           </select>
+          <button class="dm-btn small wide" id="mapBgUpload" style="margin-top:0.5rem" title="A picture from this computer (JPG, PNG or WebP)">⬆ Upload a background</button>
+          <input type="file" id="mapBgFile" accept="image/jpeg,image/png,image/webp" hidden>
         </div>
 
         <div class="dm-card">
@@ -400,6 +402,12 @@ function wireStatic() {
   lock.addEventListener('change', () => updateSetup(s => { s.map.lockRatio = lock.checked; }));
   document.getElementById('mapApplySize').addEventListener('click', () => applySize(Number(across.value), Number(down.value)));
   document.getElementById('mapBackground').addEventListener('change', (e) => updateSetup(s => { s.map.background = e.target.value; }));
+  document.getElementById('mapBgUpload').addEventListener('click', () => document.getElementById('mapBgFile').click());
+  document.getElementById('mapBgFile').addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) uploadBackground(file);
+  });
   document.getElementById('mapTools').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tool]');
     if (!b) return;
@@ -438,6 +446,28 @@ function wireStatic() {
     document.addEventListener('pointercancel', () => { ed.painting = false; });
     wireStatic.mouseUpBound = true;
   }
+}
+
+/** A background picture from the DM's computer: saved on the Pi with the others (named after the file), then used for
+ * this map at once -- and listed for the players' placement screen too. */
+function uploadBackground(file) {
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const btn = document.getElementById('mapBgUpload');
+    if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+    try {
+      const bg = await DmAPI.uploadBattleBackground({ name: file.name.replace(/\.[^.]+$/, ''), data: reader.result });
+      _assets = null;
+      await loadAssets();
+      updateSetup(s => { s.map.background = bg.url; });
+      toast(`Background "${bg.label}" uploaded and used for this map.`);
+      renderMapEditor(_root, { onDone: _onDone });
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Upload a background' });
+      if (btn) { btn.disabled = false; btn.textContent = '⬆ Upload a background'; }
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 async function leave() {

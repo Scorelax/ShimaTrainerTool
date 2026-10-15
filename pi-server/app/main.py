@@ -329,6 +329,16 @@ def dm_save_npc_image(payload: dict):
     return JSONResponse({'status': 'success', 'data': img})
 
 
+@app.post('/api/dm/battle-background')
+def dm_save_battle_background(payload: dict):
+    """A battle-map background uploaded from the DM console's Map setup (routes_dm.save_battle_background)."""
+    try:
+        bg = routes_dm.save_battle_background(payload)
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    return JSONResponse({'status': 'success', 'data': bg})
+
+
 @app.post('/api/dm/region-map-view')
 def dm_save_region_map_view(payload: dict):
     """Where the region map on the board screen is looking (routes_dm.save_region_map_view), pushed to it at once and

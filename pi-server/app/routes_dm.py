@@ -746,6 +746,33 @@ def save_npc_image(payload):
     return {'name': _pretty(stem), 'file': stem, 'url': upstream.local_npc_image_url(stem), 'own': False}
 
 
+_BACKGROUND_TYPES = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp'}
+
+
+def save_battle_background(payload):
+    """POST /api/dm/battle-background: a battle-map background uploaded from the DM console ({name, data: "data:image/
+    ...;base64,..."}), saved in the battle pictures folder as battle-<sanitized name>.<ext> -- where Map setup and the
+    players' placement screen list their backgrounds (routes_combat._list_backgrounds). A name already there gets -2, -3...
+    Returns it as that list does: {key, label, url}."""
+    import base64
+    m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
+    if not m or m.group(1) not in _BACKGROUND_TYPES:
+        raise ValueError("That isn't a picture the map can use (JPG, PNG or WebP)")
+    raw = base64.b64decode(m.group(2))
+    if len(raw) > _MAX_IMAGE_BYTES:
+        raise ValueError('That picture is too big (15 MB at most)')
+    base = upstream._sanitize_species_name(payload.get('name') or '')[:50].strip('-') or 'background'
+    os.makedirs(upstream.BATTLE_IMAGE_DIR, exist_ok=True)
+    taken = {os.path.splitext(f)[0].lower() for f in os.listdir(upstream.BATTLE_IMAGE_DIR)}
+    key, n = base, 2
+    while f'battle-{key}' in taken:
+        key, n = f'{base}-{n}', n + 1
+    filename = f'battle-{key}{_BACKGROUND_TYPES[m.group(1)]}'
+    with open(os.path.join(upstream.BATTLE_IMAGE_DIR, filename), 'wb') as f:
+        f.write(raw)
+    return {'key': key, 'label': key.replace('_', ' ').replace('-', ' ').title(), 'url': f'/battle-images/{filename}'}
+
+
 def _cell(row, i):
     return row[i] if i < len(row) and row[i] is not None else ''
 

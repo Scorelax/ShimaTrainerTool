@@ -12,7 +12,7 @@
 //
 // Coordinates are in cells: x = column, y = row (down), z = height in cubes (up).
 import { footprintForSize } from './battle-map-grid.js';
-import { lineGeometry, coverClass, squareShareInside } from './line-area.js';
+import { lineGeometry, coverClass, squareShareInside, cubeShareInside } from './line-area.js';
 
 const dot = (a, p) => a.x * p.x + a.y * p.y + a.z * p.z;
 
@@ -67,14 +67,7 @@ function _cover(g, c, r, h) {
     if (inside < corners.length) allIn = false;
   }
   if (allIn) return 1;                  // wholly inside (it's convex)
-  // Cut by a side: measured by points spread evenly through the square (or the cube).
-  const S = flat ? 12 : 7;
-  let hit = 0;
-  for (let i = 0; i < S; i++) for (let j = 0; j < S; j++) for (let k = 0; k < (flat ? 1 : S); k++) {
-    const q = { x: c + (i + 0.5) / S, y: r + (j + 0.5) / S, z: flat ? g.z : h + (k + 0.5) / S };
-    if (g.planes.every(([a, b]) => dot(a, q) <= b + 1e-9)) hit++;
-  }
-  return hit / (flat ? S * S : S * S * S);
+  return cubeShareInside(c, r, h, g.planes); // cut by a side: the cube cut exactly, slice by slice
 }
 
 function _ownCube(casterPos, n, c, r, h) {

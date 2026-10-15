@@ -76,8 +76,9 @@ export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg
   [['x', left, left + n], ['y', top, top + n], ['z', z0, z0 + n]].forEach(([k, lo, hi]) => {
     if (Math.abs(d[k]) > 1e-9) out = Math.min(out, ((d[k] > 0 ? hi : lo) - o[k]) / d[k]);
   });
-  const len = (Number.isFinite(out) ? out : 0) + (lengthFt / 5) * stretch;
-  return { o, d, len, drawLen: len * Math.cos(p), fire };
+  const outLen = Number.isFinite(out) ? out : 0;
+  const len = outLen + (lengthFt / 5) * stretch;
+  return { o, d, len, out: outLen, drawLen: len * Math.cos(p), fire };
 }
 
 /** The squares within `lengthFt` of the caster's footprint (the line's reach box on the map): {c0, c1, r0, r1}, inclusive. */
@@ -137,6 +138,17 @@ export function squareShareInside(c, r, planes) {
   return Math.abs(area) / 2;
 }
 
+/** The exact share (0..1) of cube (c, r, h) inside every half-space [{x, y, z}, b] (a.x*x + a.y*y + a.z*z <= b): the
+ * cube cut into thin level slices, each square slice measured exactly (squareShareInside). For a tilted beam / cone. */
+export function cubeShareInside(c, r, h, planes, slices = 16) {
+  let total = 0;
+  for (let k = 0; k < slices; k++) {
+    const z = h + (k + 0.5) / slices;
+    total += squareShareInside(c, r, planes.map(([a, b]) => [a.x, a.y, b - a.z * z]));
+  }
+  return total / slices;
+}
+
 /** The cubes a line covers, [{x: col, y: row, z: height layer, cover, edge}], nearest first: every cube more than
  * LINE_EDGE of which lies inside the beam (`cover`, 0..1), `edge` when that's LINE_FULL or less. The caster's own cubes,
  * cubes under the ground and squares off the map (`grid`) don't count. A level beam fills its start layer exactly, so
@@ -149,26 +161,16 @@ export function lineCells(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 
   const w = { x: Math.cos(a), y: Math.sin(a), z: 0 };                                          // across the beam
   const u = { x: -Math.sin(a) * Math.sin(p), y: Math.cos(a) * Math.sin(p), z: Math.cos(p) };    // up through it
   const level = Math.abs(pitchDeg) < 1e-9;
-  const inBeam = (x, y, z) => {
-    const sx = x - o.x, sy = y - o.y, sz = z - o.z;
-    const t = sx * d.x + sy * d.y + sz * d.z;
-    return t >= 0 && t <= len && Math.abs(sx * w.x + sy * w.y) <= 0.5 && Math.abs(sx * u.x + sy * u.y + sz * u.z) <= 0.5;
-  };
-  // Level: the square cut exactly to the strip. Tilted: points spread evenly through the cube.
-  const strip = [
-    [-d.x, -d.y, -(d.x * o.x + d.y * o.y)], [d.x, d.y, len + d.x * o.x + d.y * o.y],
-    [w.x, w.y, 0.5 + w.x * o.x + w.y * o.y], [-w.x, -w.y, 0.5 - w.x * o.x - w.y * o.y],
+  // Level: the square cut exactly to the strip. Tilted: the cube cut exactly to the beam, slice by slice.
+  const dot = (v, q) => v.x * q.x + v.y * q.y + v.z * q.z;
+  const neg = (v) => ({ x: -v.x, y: -v.y, z: -v.z });
+  const beam = [
+    [neg(d), -dot(d, o)], [d, len + dot(d, o)],
+    [w, 0.5 + dot(w, o)], [neg(w), 0.5 - dot(w, o)],
+    [u, 0.5 + dot(u, o)], [neg(u), 0.5 - dot(u, o)],
   ];
-  const S = 7;
-  const coverOf = (c, r, h) => {
-    if (level) return squareShareInside(c, r, strip);
-    let hit = 0;
-    for (let i = 0; i < S; i++) for (let j = 0; j < S; j++) {
-      const x = c + (i + 0.5) / S, y = r + (j + 0.5) / S;
-      for (let k = 0; k < S; k++) if (inBeam(x, y, h + (k + 0.5) / S)) hit++;
-    }
-    return hit / (S * S * S);
-  };
+  const strip = beam.slice(0, 4).map(([v, b]) => [v.x, v.y, b - v.z * o.z]);
+  const coverOf = (c, r, h) => (level ? squareShareInside(c, r, strip) : cubeShareInside(c, r, h, beam));
   const own = (c, r, h) => c >= left && c < left + n && r >= top && r < top + n && h >= z0 && h < z0 + n;
   // The cubes near the middle of the beam, all along it.
   const seen = new Map();
@@ -253,6 +255,19 @@ export function aimAtCreature(session, casterId, id, fallbackAngle = 0, start = 
   return aimFrom(lineGeometry(casterPos, n, rough.angle, 5, 0, start).o, rough.angle);
 }
 
+/** The beam's own outline on the map -- 5ft wide, from where it leaves the caster to its end (its shadow, when tilted) --
+ * as an SVG over the stage, so it's plain how much of each square it covers. */
+export function lineOutlineSvg(board, g, angleDeg) {
+  const { cols, rows } = board.grid;
+  const a = (angleDeg * Math.PI) / 180;
+  const hx = Math.sin(a), hy = -Math.cos(a), wx = Math.cos(a), wy = Math.sin(a);
+  const scale = g.len ? g.drawLen / g.len : 1; // a tilted beam's shadow is shorter
+  const t0 = (g.out || 0) * scale, t1 = g.drawLen;
+  const pts = [[t0, -0.5], [t1, -0.5], [t1, 0.5], [t0, 0.5]].map(([t, s]) => [g.o.x + hx * t + wx * s, g.o.y + hy * t + wy * s]);
+  return `<svg class="bmap-line-outline" viewBox="0 0 ${cols} ${rows}" preserveAspectRatio="none">`
+    + `<polygon points="${pts.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).join(' ')}"/></svg>`;
+}
+
 /** A thin aiming guide along the beam (the squares themselves are lineCellsHtml's). */
 export function lineGuideStyle(board, g, angleDeg) {
   const { cols, rows } = board.grid;
@@ -280,6 +295,8 @@ export function injectLineStyles() {
     .bmap-line.guide { background: rgba(255,190,120,0.85); border: none; border-radius: 2px; box-shadow: 0 0 6px rgba(255,120,50,0.7); }
     .bmap-line-cells { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
     .bmap-line-cell { position: absolute; box-sizing: border-box; background: rgba(255,140,60,0.42); box-shadow: inset 0 0 0 2px rgba(255,170,90,0.9); }
+    .bmap-line-outline { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: hidden; }
+    .bmap-line-outline polygon { fill: rgba(255,150,70,0.10); stroke: rgba(255,225,160,0.95); stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
     .bmap-line-cell.edge { background: rgba(255,200,110,0.16); box-shadow: none; border: 2px dashed rgba(255,205,120,0.85); }
     .bmap-token.line-hit.line-edge .bmap-token-portrait { box-shadow: 0 0 0 3px #ffd36e, 0 0 12px 2px rgba(255,210,110,0.7); }
   `;

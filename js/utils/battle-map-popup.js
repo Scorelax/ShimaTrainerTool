@@ -34,7 +34,7 @@ import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating, movementBudget } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 import { coneSquares } from './cone-area.js';
-import { lineFtFromRange, lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
+import { lineFtFromRange, lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineGuideStyle, lineOutlineSvg, angleToPointer, injectLineStyles } from './line-area.js';
 
 const CONE_FT = 15; // the cone preview is just a visual of where the token faces -- one size is enough
 
@@ -571,6 +571,15 @@ function _renderLine() {
     layer.prepend(strip); // under the tokens, so the hit rings (not an orange wash) show who's in it
   }
   strip.setAttribute('style', lineGuideStyle(_session.board, g, _lineAngle));
+  // The 5ft beam's own outline, so it's plain how much of each square it covers.
+  let shape = layer.querySelector('.bmap-line-shape');
+  if (!shape) {
+    shape = document.createElement('div');
+    shape.className = 'bmap-line-shape';
+    shape.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
+    layer.prepend(shape);
+  }
+  shape.innerHTML = lineOutlineSvg(_session.board, g, _lineAngle);
   // The squares it covers -- hit (shaded) or only its edge (dashed), line-area.js's lineCells.
   let cellsEl = layer.querySelector('.bmap-line-cells');
   if (!cellsEl) {

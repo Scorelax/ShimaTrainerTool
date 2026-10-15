@@ -8,7 +8,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
 import { coneSquares, coneHits, coneOutlineSvg, injectConeStyles } from './cone-area.js';
-import { lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineReachBox, inLineReach, aimAtCreature, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
+import { lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineReachBox, inLineReach, aimAtCreature, lineGuideStyle, lineOutlineSvg, angleToPointer, injectLineStyles } from './line-area.js';
 
 function _injectStyles() {
   if (document.getElementById('line-area-picker-styles')) return;
@@ -23,7 +23,7 @@ function _injectStyles() {
     .lap-sub { font-size: 0.82rem; color: #a0a8d0; margin-bottom: 0.7rem; }
     .lap-stage { touch-action: none; user-select: none; cursor: crosshair; }
     .lap-stage .bmap-tokens { z-index: 2; pointer-events: none; }
-    .lap-cone-shape { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+    .lap-cone-shape, .lap-line-shape { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
     .lap-stage .bmap-token.untargetable { opacity: 0.35; filter: grayscale(1); }
     .lap-stage .bmap-cell.line-reach { background: rgba(255,140,60,0.1); box-shadow: inset 0 0 0 1px rgba(255,160,80,0.25); }
     .lap-stage .bmap-token.line-aim .bmap-token-portrait { outline: 2px dashed #fff3; outline-offset: 3px; }
@@ -138,6 +138,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
         <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
           <div class="bmap-grid"></div>
           <div class="bmap-line-cells"></div>
+          <div class="lap-line-shape"></div>
           <div class="bmap-line guide"></div>
           <div class="bmap-objects">${mapObjectsHtml(board)}</div>
           <div class="bmap-tokens"></div>
@@ -159,6 +160,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     const tokenLayer = overlay.querySelector('.bmap-tokens');
     const lineEl = overlay.querySelector('.bmap-line');
     const lineCellsEl = overlay.querySelector('.bmap-line-cells');
+    const lineShapeEl = overlay.querySelector('.lap-line-shape');
     const aimEl = overlay.querySelector('.lap-aim');
     const hitsEl = overlay.querySelector('.lap-hits');
     if (board.backgroundImage) {
@@ -192,6 +194,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
     const refresh = () => {
       const g = lineGeometry(casterPos, casterSize, angle, lengthFt, pitch, org());
       lineEl.setAttribute('style', lineGuideStyle(board, g, angle));
+      lineShapeEl.innerHTML = lineOutlineSvg(board, g, angle); // the 5ft beam itself, not just its middle
       lineCellsEl.innerHTML = lineCellsHtml(board, lineCells(casterPos, casterSize, angle, lengthFt, pitch, org(), board.grid));
       starts.show(start);
       const heightEl = overlay.querySelector('.lap-height');

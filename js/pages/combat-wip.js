@@ -1051,7 +1051,7 @@ function _moveFlow(handler) {
 // Concentration and two-stage moves (the user's design, 2026-10-14). A creature concentrating on a move carries a
 // `concentrating` status for it (the card's Concentration section); ending it -- dropped, replaced by another, run out,
 // or released -- ends everything that move's concentration was holding up (routes_combat.py's
-// _end_concentration_effects). One concentration at a time.
+// _end_concentration_effects). Several can run at once (the user's call, 2026-10-15) -- each ends on its own.
 //
 // Charge moves (`twoStage.stage: 'charge'` -- Swords Dance, Solar Beam, Razor Wind...): the first use charges up -- the
 // VP is paid, the `charge` effects applied (Swords Dance's +1 AC) and the creature concentrates on the move (`charging`
@@ -1064,11 +1064,6 @@ function _moveFlow(handler) {
 let _flowNoConcentration = null; // { combatantId, moveName }: this use starts no new concentration (a release, a skipped charge)
 let _flowBonusRelease = null; // { combatantId, moveName }: this use is a bonus action (Swords Dance's release, Bind's follow-up)
 let _flowPaid = null; // the move last paid for, { combatantId, moveName }
-
-/** The creature's own concentration (or charge-up) status, or null. */
-function _concentrationOf(pid, apply = null) {
-  return (session?.participants?.[pid]?.statuses || []).find((s) => isConcentrationHolder(s) && (!apply || s.apply === apply)) || null;
-}
 
 /** Whether using `moveName` means concentrating on it: a charge move that needs concentration, or a move whose duration
  * says so ("1 minute, concentration"). */
@@ -1109,16 +1104,6 @@ function _onMovePaid({ combatantId, moveName }) {
     value: `${session?.round}:${session?.turnIndex}`, // the turn it started -- a charge can't be released that same turn
     sourceId: combatantId, sourceName: holder?.name, ends: _concentrationEnds(moveName),
   }).catch((err) => showCombatAlert(err.message, { title: 'Concentration' }));
-}
-
-/** "Already concentrating on X -- go ahead and end it?" before a move that needs concentration of its own. */
-async function _confirmConcentrationSwitch(pid, moveName) {
-  if (!_isConcentrationMove(moveName)) return true;
-  const conc = _concentrationOf(pid, 'concentrating');
-  if (!conc || conc.moveName === moveName) return true;
-  const name = session?.participants?.[pid]?.name || 'It';
-  return showCombatConfirm(`${name} is concentrating on ${conc.moveName}. Using ${moveName} ends that concentration, and everything it is holding up.`,
-    { title: 'Concentration', yesLabel: `Use ${moveName}`, noLabel: 'Cancel' });
 }
 
 /** Whoever `holderId`'s `moveName` is still holding (`condition` from it -- Bind's grapple, Rock Tomb's restraint), or null. */
@@ -1185,7 +1170,6 @@ async function _twoStageFlow(args, handler) {
       _flowNoConcentration = same; // harsh sunlight / heavy rain: no charging -- it goes off at once, without concentration
       return null;
     }
-    if (!(await _confirmConcentrationSwitch(combatantId, moveName))) return 'handled';
     // Charge up: paid now (the concentration starts in _onMovePaid), then the charge buffs.
     commitMove();
     for (const e of moveEffectsFor(moveName).filter((x) => x.when?.type === 'charge')) {
@@ -1230,7 +1214,6 @@ async function _twoStageFlow(args, handler) {
     return 'handled';
   }
 
-  if (!(await _confirmConcentrationSwitch(combatantId, moveName))) return 'handled';
   return null;
 }
 
@@ -4416,7 +4399,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         if (!area) continue;
         await CombatAPI.setWeather(effect.name || moveName, effect.description || '', {
           rounds: effect.rounds, sourceId: attackerId, sourceName: caster?.name, casterLevel: caster?.level,
-          concentration: effect.concentration ? '1' : '', cells: area.cells,
+          concentration: effect.concentration ? '1' : '', cells: area.cells, moveName, // whose concentration holds it up
         });
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });
@@ -4503,7 +4486,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         }
         await CombatAPI.setTerrain(effect.name || moveName, effect.description || '', {
           rounds: effect.rounds, healDice: terrainHealDice(effect, caster?.level), sourceId: attackerId, sourceName: caster?.name,
-          cells: area.cells, props: Object.keys(props).length ? props : undefined,
+          cells: area.cells, props: Object.keys(props).length ? props : undefined, moveName, // whose concentration holds it up
         });
       } catch (err) {
         showCombatAlert(err.message, { title: 'Error' });

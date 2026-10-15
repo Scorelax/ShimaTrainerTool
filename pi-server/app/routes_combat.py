@@ -525,7 +525,8 @@ def _handle(conn, action, params):
         return _mutate(conn, lambda s: _set_weather(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
                                                     params.get('sourceId'), params.get('sourceName'),
                                                     json.loads(params['cells']) if params.get('cells') else None,
-                                                    js_parse_int(params.get('casterLevel')), str(params.get('concentration', '')) in ('1', 'true')))
+                                                    js_parse_int(params.get('casterLevel')), str(params.get('concentration', '')) in ('1', 'true'),
+                                                    params.get('moveName') or None))
 
     if action == 'remove-field-zone':
         return _mutate(conn, lambda s: _remove_field_zone(s, params.get('kind', ''), params.get('id', '')))
@@ -534,7 +535,8 @@ def _handle(conn, action, params):
         return _mutate(conn, lambda s: _set_terrain(s, params.get('name', ''), params.get('effect', ''), params.get('rounds'),
                                                     params.get('healDice'), params.get('sourceId'), params.get('sourceName'),
                                                     json.loads(params['cells']) if params.get('cells') else None,
-                                                    json.loads(params['props']) if params.get('props') else None))
+                                                    json.loads(params['props']) if params.get('props') else None,
+                                                    params.get('moveName') or None))
 
     if action == 'trick-room':
         return _mutate(conn, _trick_room)
@@ -2649,11 +2651,8 @@ def _apply_status(state, target_id, spec):
         return _apply_exhaustion(state, target, new, js_parse_int(spec.get('value')) or 1, from_text, source_id, source_name)
 
     statuses = _statuses_of(target)
-    if _is_concentration_status(new):
-        # One concentration at a time (and one charge-up): starting another ends the one before, and everything it held up.
-        for old in [s for s in statuses if _is_concentration_status(s) and s.get('apply') == new.get('apply')
-                    and s.get('moveName') != new.get('moveName')]:
-            _remove_status(state, target_id, old['id'], f"now concentrating on {new.get('moveName')}")
+    # A creature may concentrate on several moves at once (the user's call, 2026-10-15) -- a new one no longer ends the one
+    # before; using the same move again just refreshes its own (_same_status below).
     existing = next((s for s in statuses if _same_status(s, new)), None)
     new['id'] = existing['id'] if existing else uuid.uuid4().hex[:8]
     if spec.get('kind') == 'temp_hp':
@@ -2773,13 +2772,16 @@ def _end_concentration_effects(state, holder_id, move_name):
                 _statuses_of(p).remove(s)
                 _log_event(state, 'status-remove', text=f"{p['name']}: {_status_label(s)} ended (concentration on {move_name} ended)",
                            targetId=p['id'], targetName=p['name'])
+    # Only that move's zones: with several concentrations going, dropping one must leave the others' (a zone saved before
+    # zones carried their move counts as this one's).
+    mine = lambda z: z.get('concentration') and z.get('sourceId') == holder_id and (z.get('moveName') or move_name) == move_name
     for key in ('terrain', 'weather'):
         zones = state.get(key + 'Zones') or []
-        gone = [z for z in zones if z.get('concentration') and z.get('sourceId') == holder_id]
+        gone = [z for z in zones if mine(z)]
         if gone:
             state[key + 'Zones'] = [z for z in zones if z not in gone]
         field = state.get(key)
-        if field and field.get('concentration') and field.get('sourceId') == holder_id:
+        if field and mine(field):
             gone.append(field)
             state[key] = None
         for z in gone:
@@ -3748,7 +3750,7 @@ _ZONE_PROPS = ('rule', 'hazard', 'difficult', 'critReduction', 'concentration') 
 
 
 def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None,
-               caster_level=None, concentration=False, props=None):
+               caster_level=None, concentration=False, props=None, move_name=None):
     """Shared by terrain and weather ('terrain' / 'weather'). `rounds`/`healDice`/source only come from a MOVE (see
     move-effects-schema.md's set_terrain / set_weather): `rounds` schedules the expiry (_expire_fields, run from
     _advance_turn), `healDice` is Grassy Terrain's already-level-scaled end-of-turn heal, `casterLevel` is what
@@ -3771,6 +3773,8 @@ def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=
     if source_id:
         field['sourceId'] = source_id
         field['sourceName'] = source_name
+    if move_name:
+        field['moveName'] = move_name  # whose concentration holds it up (_end_concentration_effects)
     props = props or {}
     for k in _ZONE_PROPS:
         if props.get(k) not in (None, False, ''):
@@ -3799,13 +3803,14 @@ def _set_field(state, key, name, effect, rounds=None, heal_dice=None, source_id=
                     tok['z'] = 0
 
 
-def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None, props=None):
-    _set_field(state, 'terrain', name, effect, rounds, heal_dice, source_id, source_name, cells, props=props)
+def _set_terrain(state, name, effect, rounds=None, heal_dice=None, source_id=None, source_name=None, cells=None, props=None,
+                 move_name=None):
+    _set_field(state, 'terrain', name, effect, rounds, heal_dice, source_id, source_name, cells, props=props, move_name=move_name)
 
 
 def _set_weather(state, name, effect, rounds=None, source_id=None, source_name=None, cells=None, caster_level=None,
-                 concentration=False):
-    _set_field(state, 'weather', name, effect, rounds, None, source_id, source_name, cells, caster_level, concentration)
+                 concentration=False, move_name=None):
+    _set_field(state, 'weather', name, effect, rounds, None, source_id, source_name, cells, caster_level, concentration, move_name=move_name)
 
 
 _ENVIRONMENT_KINDS = ('cold', 'hot', 'windy')

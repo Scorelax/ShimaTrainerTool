@@ -57,3 +57,12 @@ export async function getBattleAnimationUrl(speciesName) {
   await entry.ready;
   return entry.blobUrl;
 }
+
+// The player's app tells the display screen (display.html) to play a move's animation at the very moment it starts its
+// own -- combat-wip.js registers how (CombatAPI.playAnimation, the server's live 'combat-animation' cue).
+let _announcer = null;
+export function setAnimationAnnouncer(fn) { _announcer = typeof fn === 'function' ? fn : null; }
+export function announceAnimation(speciesName) {
+  if (!speciesName) return;
+  try { _announcer?.(speciesName); } catch { /* the display missing it never stops the move */ }
+}

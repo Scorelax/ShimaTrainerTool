@@ -9,7 +9,8 @@
 // other should update within the SSE stream's normal latency, with no
 // manual refresh.
 import { CombatAPI, PokemonAPI, TrainerAPI } from '../api.js';
-import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver, setCoverAttackModeResolver } from '../utils/target-picker.js';
+import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolver, setMoveRowResolver, setWeatherAttackModeResolver, setCoverAttackModeResolver, setCritResolver } from '../utils/target-picker.js';
+import { setAnimationAnnouncer } from '../utils/battle-animation.js';
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
 import { waitForOpenWindow } from '../utils/reaction-window.js';
@@ -1363,6 +1364,30 @@ function _lastHitMoveStreak(session, pid) {
 
 setMoveFlagResolver((moveName) => moveFlagsFor(moveName));
 setMoveRowResolver((moveName) => findMoveRow(moveName)); // abilities' target-dependent damage (ability-mods.js)
+
+/** Whether a natural `attackRoll` is a critical hit for `attackerId`'s `moveName`: its crit range (19-20 for a base_crit
+ * move like Hyper Fang), the attacker's crit modifier (Focus Energy), a Fortune Ring zone, Limit Break's critBonus. */
+function _isCritRoll(attackerId, moveName, attackRoll) {
+  if (attackRoll === null || attackRoll === undefined) return false;
+  const attacker = session?.participants?.[attackerId];
+  return attackRoll >= critThreshold(effectiveStats(attacker).critMod + critReductionFrom(terrainsAffecting(session, attackerId))
+    + (Number(moveFlagsFor(moveName).critBonus) || 0), moveCategoriesFor(moveName).includes('base_crit'));
+}
+// The damage step adds a critical hit's maxed dice (target-picker.js) -- Laser Focus makes it one whatever the roll;
+// a target whose ability cancels a crit's extra damage (Battle Armor, Shell Armor) gets none.
+setCritResolver((moveName, attackerId, attackRoll, targetId) => {
+  const attacker = session?.participants?.[attackerId];
+  const crit = !!guaranteedCritStatusId(attacker) || _isCritRoll(attackerId, moveName, attackRoll);
+  if (!crit) return { crit: false };
+  const target = session?.participants?.[targetId];
+  const block = target ? abilityEffectsOf(target).find(({ effect: e }) => e.kind === 'immunity' && e.critDamage) : null;
+  return { crit: true, blockedBy: block ? `${target.name}'s ${block.ability || 'ability'}` : null };
+});
+// The display screen plays a move's animation the moment the app starts its own (battle-animation.js).
+setAnimationAnnouncer((species) => {
+  const id = session?.reactingParticipantId || session?.turnOrder?.[session?.turnIndex] || Object.keys(session?.participants || {})[0];
+  if (session?.active && id) CombatAPI.playAnimation(id, species).catch(() => {});
+});
 // Wonder Room: WIS saves become CON saves and CON saves become WIS saves for creatures standing in it.
 setSaveAbilityResolver((ability, saver) => {
   if (!saver?.id || !zoneRuleActive(terrainsAffecting(session, saver.id), 'wonder_room')) return ability;
@@ -3457,7 +3482,13 @@ function _saveRollNote(outcome) {
 /** The ability of the first save-based effect on `moveName` ("WIS", ...), so the
  * save popup can add the target's modifier for it. null when the move has none. */
 function _saveAbilityFor(moveName) {
-  return moveEffectsFor(moveName).find(e => e.when?.type === 'save_fail')?.when.ability || null;
+  const fromData = moveEffectsFor(moveName).find(e => e.when?.type === 'save_fail')?.when.ability;
+  if (fromData) return fromData;
+  // 65 save moves have no effects recorded (Fiery Dance, Surf...): their text names the save -- "must make a DEX save",
+  // "a Dexterity saving throw". Without it the save popup knew no ability, so no modifier was added (Voltey's 10 stayed 10).
+  const m = /\b(STR|DEX|CON|INT|WIS|CHA|Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+sav/i
+    .exec(String((findMoveRow(moveName) || [])[7] || ''));
+  return m ? m[1].slice(0, 3).toUpperCase() : null;
 }
 
 /** `moveName`'s TARGET-conditional `damage_note` effects (see move-effects-
@@ -5776,7 +5807,7 @@ async function _resolveOneHit(combatantId, moveName, move, computedData, species
     // actually change whether this roll counts, not just show up as a number on the card.
     // Fortune Ring: a move used from inside one lowers the crit DC by its level-scaled amount.
     // Limit Break's own "scores a critical hit on 18-20" (critBonus) widens it for this attack only.
-    crit = attackRoll === null ? undefined : attackRoll >= critThreshold(effectiveStats(attacker).critMod + critReductionFrom(terrainsAffecting(session, combatantId)) + (Number(moveFlagsFor(moveName).critBonus) || 0), categories.includes('base_crit'));
+    crit = attackRoll === null ? undefined : _isCritRoll(combatantId, moveName, attackRoll);
   }
   // Laser Focus overrides whatever the roll says (there may be no roll at all, see
   // guaranteedHit above) -- computed here too (consumed further down, only once the

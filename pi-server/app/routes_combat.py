@@ -1134,13 +1134,8 @@ def _use_move(conn, pid, move_name, target_id, dice_roll, species):
     result = _mutate(conn, lambda s: outcome.update(
         _apply_move(conn, s, pid, move_name, vp_cost, target_id, dice_roll, move_type)))
     result.update(outcome)
-
-    attacker = result['data']['participants'].get(pid, {})
-    live.publish({
-        'type': 'combat-animation',
-        'participantId': pid,
-        'species': species or attacker.get('name', ''),
-    })
+    # The display screen's animation is cued by the player's app as its own starts (play-animation) -- cued here it came
+    # only after the app's animation had finished, and once per target of an area move.
     return result
 
 
@@ -3149,13 +3144,8 @@ def _apply_damage(conn, pid, target_id, dice_roll, move_type, species, move_name
     result = _mutate(conn, lambda s: outcome.update(
         _apply_damage_to_target(conn, s, pid, target_id, dice_roll, move_type, move_name, crit, pool, soften=soften)))
     result.update(outcome)
-
-    attacker = result['data']['participants'].get(pid, {})
-    live.publish({
-        'type': 'combat-animation',
-        'participantId': pid,
-        'species': species or attacker.get('name', ''),
-    })
+    # The display screen's animation is cued by the player's app as its own starts (play-animation) -- cued here it came
+    # only after the app's animation had finished, and once per target of an area move.
     return result
 
 

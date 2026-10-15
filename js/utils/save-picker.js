@@ -17,7 +17,7 @@
 import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { getBattleAnimationUrl } from './battle-animation.js';
+import { getBattleAnimationUrl, announceAnimation } from './battle-animation.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { saveModifierFor, saveRollContext, rollModeText, diceBonusOptionsFor, saveAutoFails } from './move-effects.js';
 import { battleDieButtonHtml, spendBattleDie } from './battle-dice.js';
@@ -471,6 +471,7 @@ async function _playAnimation() {
     video.addEventListener('error', resolve, { once: true });
     setTimeout(resolve, 3000);
   });
+  announceAnimation(_speciesName); // the display screen plays it now too
   try { await video.play(); } catch { return; }
   await new Promise((resolve) => {
     video.addEventListener('ended', resolve, { once: true });

@@ -77,7 +77,7 @@
   .display-bar.vp .display-bar-fill { background: #3498db; }
 
   .display-anim-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    position: fixed; inset: 0; background: none; /* the background stays -- the animation plays over it */
     display: flex; align-items: center; justify-content: center; z-index: 10;
   }
   /* Only while a move animation plays -- display:flex above would otherwise beat the hidden attribute and leave this

@@ -13,7 +13,7 @@
 import { CombatAPI } from '../api.js';
 import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
-import { getBattleAnimationUrl } from './battle-animation.js';
+import { getBattleAnimationUrl, announceAnimation } from './battle-animation.js';
 import { attackRollContext, rollModeText, diceBonusOptionsFor, targetDamageNoteResult, multiplyDiceString, addDiceString, mergeRollMode, isMeleeMoveRow, guaranteedCritStatusId } from './move-effects.js';
 import { targetAbilityDamage, moveAbilityMods, attackRollReminders } from './ability-mods.js';
 import { waitForReactionWindow } from './reaction-window.js';
@@ -146,6 +146,18 @@ export function setMoveFlagResolver(fn) { _moveFlagResolver = typeof fn === 'fun
 // Same injection for the move's data row ([name, type, stat, action, vp, duration, range, description, scaling]) --
 // the abilities' target-dependent damage (ability-mods.js's targetAbilityDamage) needs its type and range.
 let _moveRowResolver = () => null;
+// combat-wip.js: whether this attack roll is a critical hit for this move and attacker (crit range, Focus Energy, Laser
+// Focus...), and whether the target's ability cancels the extra damage (Battle Armor) -> {crit, blockedBy}.
+let _critResolver = () => ({ crit: false });
+export function setCritResolver(fn) { _critResolver = typeof fn === 'function' ? fn : () => ({ crit: false }); }
+let _critBonus = 0; // the damage step's critical-hit bonus: the move's dice at their maximum
+
+/** The most `dice` can roll: "2d6" -> 12, "2d6+1d4" -> 16 (flat parts aren't dice). */
+function _maxOfDice(dice) {
+  let total = 0;
+  String(dice || '').replace(/(\d*)\s*d\s*(\d+)/gi, (_, n, s) => { total += (Number(n) || 1) * Number(s); return ''; });
+  return total;
+}
 export function setMoveRowResolver(fn) { _moveRowResolver = typeof fn === 'function' ? fn : () => null; }
 export function setMoveAbilityResolver(fn) { _moveAbilityResolver = typeof fn === 'function' ? fn : () => []; }
 // The name of a move the ATTACKER knows that carries `negatesProtectBlock`
@@ -648,6 +660,7 @@ async function _playAnimation() {
     video.addEventListener('error', resolve, { once: true });
     setTimeout(resolve, 3000);
   });
+  announceAnimation(_speciesName); // the display screen plays it now too
   try { await video.play(); } catch { return; }
   await new Promise((resolve) => {
     video.addEventListener('ended', resolve, { once: true });
@@ -745,6 +758,16 @@ function _showStep3() {
     : extraDiceCount > 0 ? addDiceString(_damageDice, extraDiceCount)
     : _damageDice;
   document.getElementById('targetPickerDiceText').innerHTML = rollDice ? `: <strong>${rollDice}</strong>` : '';
+  // A critical hit (the user's rule, 2026-10-15): the move's dice count at their maximum, on top of the roll and the
+  // modifier -- Hyper Fang's 2d6 rolled 5 with +6 does 5 + 6 + 12. The target's Battle Armor & co. cancel the extra.
+  const critInfo = _critResolver(_moveName, _attacker?.id, _attackRoll, _selectedTargetId) || {};
+  _critBonus = critInfo.crit && !critInfo.blockedBy && rollDice ? _maxOfDice(rollDice) : 0;
+  if (critInfo.crit) {
+    noteEl.insertAdjacentHTML('afterbegin', critInfo.blockedBy
+      ? `<div class="note">Critical hit -- but ${critInfo.blockedBy}: no extra damage, roll the normal dice</div>`
+      : `<div class="mode advantage">💥 Critical hit! The dice count at full (${rollDice} = ${_critBonus}) on top of your roll${_critBonus ? ` -- +${_critBonus} added automatically` : ''}</div>`);
+  }
+  _baseTargetFlat += _critBonus;
 
   _damageDiceExtra = 0;
   _damageBattleDice = 0;

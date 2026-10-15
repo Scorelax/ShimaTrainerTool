@@ -786,6 +786,7 @@ export function renderBattlePhase(state, cardOptions = {}) {
               <div class="inventory-search-wrapper">
                 <input type="text" id="combatInventorySearch" class="inventory-search-input" placeholder="Search items..." autocomplete="off">
               </div>
+              <button type="button" class="combat-inv-add-btn" id="combatInvAddBtn">➕ Add item</button>
               <ul id="combatInventorySearchResults" class="inventory-search-results"></ul>
               <ul id="combatInventoryCategories" class="inventory-categories"></ul>
             </div>
@@ -1507,6 +1508,21 @@ function getCombatCSS() {
     .combat-mods-row small { color: #888; margin-left: 1px; }
     .stat-bar-wrap { display: flex; align-items: center; gap: 0.3rem; }
     .mini-bar { width: 48px; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+    .combat-inv-add-btn { width: 100%; margin: 0.4rem 0 0.6rem; padding: 0.5rem; border-radius: 10px; border: 1px dashed rgba(255,215,0,0.55); background: rgba(255,215,0,0.08); color: #ffd700; font-weight: 700; cursor: pointer; }
+    .combat-inv-add { display: flex; flex-direction: column; gap: 0.5rem; }
+    .combat-inv-add-tabs { display: flex; gap: 0.4rem; }
+    .combat-inv-add-tabs button { flex: 1; padding: 0.4rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.05); color: inherit; cursor: pointer; font-weight: 600; }
+    .combat-inv-add-tabs button.active { background: rgba(255,215,0,0.15); border-color: rgba(255,215,0,0.6); color: #ffd700; }
+    .combat-inv-add-input { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: inherit; font: inherit; }
+    .combat-inv-add-suggest { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; margin-top: 0.3rem; }
+    .combat-inv-add-suggest button { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.35rem 0.5rem; border: none; border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; text-align: left; cursor: pointer; font: inherit; font-size: 0.85rem; }
+    .combat-inv-add-suggest button:hover { background: rgba(255,215,0,0.12); }
+    .combat-inv-add-suggest small { opacity: 0.6; }
+    .combat-inv-add-none { font-size: 0.8rem; opacity: 0.7; }
+    .combat-inv-add-row { display: flex; align-items: flex-end; gap: 0.6rem; }
+    .combat-inv-add-row label { display: flex; flex-direction: column; font-size: 0.8rem; gap: 0.2rem; }
+    .combat-inv-add-qty { width: 80px; }
+    .combat-inv-add-confirm { flex: 1; }
     .mini-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
     .hp-bar { background: #4CAF50; }
     .vp-bar { background: #2196F3; }
@@ -2213,6 +2229,7 @@ export function attachBattleListeners(state, { onDamageResolved, onSaveTriggered
   }
 
   // Inventory popup close
+  document.getElementById('combatInvAddBtn')?.addEventListener('click', _showCombatAddItem);
   document.getElementById('closeCombatInventoryPopup')?.addEventListener('click', () => {
     document.getElementById('combatInventoryPopup').style.display = 'none';
   });
@@ -4033,6 +4050,122 @@ function showTypeCalcPopup(combatantId, state) {
   };
 
   popup.style.display = 'flex';
+}
+
+// ---------------------------------------------------------------------------
+// Adding an item in battle (the user's ask, 2026-10-15): the same two ways as the trainer page's Add -- an item from the
+// game's list, or a custom one -- written to the same inventory string (regular items, then ##CUSTOM## + JSON).
+// ---------------------------------------------------------------------------
+
+function _invParts(full) {
+  const str = full || '';
+  const i = str.indexOf('##CUSTOM##');
+  let custom = [];
+  if (i >= 0) { try { custom = JSON.parse(str.slice(i + 10)) || []; } catch { custom = []; } }
+  return { regular: i >= 0 ? str.slice(0, i) : str, custom };
+}
+
+function _invString(regular, custom) {
+  return custom && custom.length ? `${regular || ''}##CUSTOM##${JSON.stringify(custom)}` : (regular || '');
+}
+
+function _escInv(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function _showCombatAddItem() {
+  const area = document.getElementById('combatItemActionArea');
+  const nameEl = document.getElementById('combatSelectedItemName');
+  const descEl = document.getElementById('combatDescriptionText');
+  const effEl = document.getElementById('combatEffectText');
+  if (!area) return;
+  if (nameEl) nameEl.textContent = 'Add an item';
+  if (descEl) descEl.textContent = 'Pick one from the item list, or make your own.';
+  if (effEl) effEl.textContent = '';
+  area.innerHTML = `
+    <div class="combat-inv-add">
+      <div class="combat-inv-add-tabs">
+        <button type="button" class="active" data-add-tab="list">From the list</button>
+        <button type="button" data-add-tab="custom">Custom item</button>
+      </div>
+      <div data-add-pane="list">
+        <input type="text" class="combat-inv-add-input" id="combatAddItemName" placeholder="Type to search..." autocomplete="off">
+        <div class="combat-inv-add-suggest" id="combatAddItemSuggest"></div>
+      </div>
+      <div data-add-pane="custom" hidden>
+        <input type="text" class="combat-inv-add-input" id="combatAddCustomName" placeholder="Name" autocomplete="off">
+        <textarea class="combat-inv-add-input" id="combatAddCustomDesc" rows="2" placeholder="What it is / does"></textarea>
+      </div>
+      <div class="combat-inv-add-row">
+        <label>Quantity <input type="number" class="combat-inv-add-input combat-inv-add-qty" id="combatAddItemQty" min="1" value="1"></label>
+        <button type="button" class="combat-use-move-btn combat-inv-add-confirm" id="combatAddItemConfirm">Add</button>
+      </div>
+    </div>`;
+  const items = JSON.parse(sessionStorage.getItem('items') || '[]');
+  const nameOf = it => (Array.isArray(it) ? it[0] : it?.name) || '';
+  const typeOf = it => (Array.isArray(it) ? it[1] : it?.type) || '';
+  let tab = 'list';
+  area.querySelectorAll('[data-add-tab]').forEach(b => b.addEventListener('click', () => {
+    tab = b.dataset.addTab;
+    area.querySelectorAll('[data-add-tab]').forEach(x => x.classList.toggle('active', x === b));
+    area.querySelectorAll('[data-add-pane]').forEach(p => { p.hidden = p.dataset.addPane !== tab; });
+  }));
+  const input = document.getElementById('combatAddItemName');
+  const suggest = document.getElementById('combatAddItemSuggest');
+  const render = () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { suggest.innerHTML = ''; return; }
+    const hits = items.filter(it => nameOf(it).toLowerCase().includes(q))
+      .sort((a, b) => nameOf(a).toLowerCase().startsWith(q) === nameOf(b).toLowerCase().startsWith(q) ? 0 : nameOf(a).toLowerCase().startsWith(q) ? -1 : 1)
+      .slice(0, 20);
+    if (hits.length === 1 && nameOf(hits[0]).toLowerCase() === q) { suggest.innerHTML = ''; return; }
+    suggest.innerHTML = hits.map(it => `<button type="button" data-pick="${_escInv(nameOf(it))}"><span>${_escInv(nameOf(it))}</span><small>${_escInv(typeOf(it))}</small></button>`).join('')
+      || '<div class="combat-inv-add-none">Not in the item list -- add it as a custom item instead.</div>';
+  };
+  input.addEventListener('input', render);
+  suggest.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pick]');
+    if (!b) return;
+    input.value = b.dataset.pick;
+    suggest.innerHTML = '';
+  });
+  document.getElementById('combatAddItemConfirm').addEventListener('click', () => {
+    const qty = Math.max(1, parseInt(document.getElementById('combatAddItemQty').value, 10) || 1);
+    const td = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+    const { regular, custom } = _invParts(td[20]);
+    let added;
+    if (tab === 'custom') {
+      const name = document.getElementById('combatAddCustomName').value.trim();
+      const description = document.getElementById('combatAddCustomDesc').value.trim();
+      if (!name) { showCombatAlert('Give the item a name.', { title: 'Add item' }); return; }
+      const hit = custom.find(ci => String(ci.name).toLowerCase() === name.toLowerCase());
+      if (hit) { hit.quantity = (Number(hit.quantity) || 0) + qty; if (description) hit.description = description; }
+      else custom.push({ name, description, quantity: qty });
+      td[20] = _invString(regular, custom);
+      added = name;
+    } else {
+      const typed = input.value.trim();
+      const known = items.find(it => nameOf(it).toLowerCase() === typed.toLowerCase());
+      if (!known) { showCombatAlert(typed ? `"${typed}" isn't in the item list -- pick one from the suggestions, or add it as a custom item.` : 'Pick an item first.', { title: 'Add item' }); return; }
+      const name = nameOf(known);
+      let found = false;
+      const list = (regular && regular !== 'None' ? regular.split(',').map(s => s.trim()).filter(Boolean) : []).map((s) => {
+        const m = s.match(/^(.+?)\s*\(x(\d+)\)$/);
+        const n = m ? m[1].trim() : s;
+        if (n.toLowerCase() !== name.toLowerCase()) return s;
+        found = true;
+        return `${n} (x${(m ? parseInt(m[2], 10) : 1) + qty})`;
+      });
+      if (!found) list.push(`${name} (x${qty})`);
+      td[20] = _invString(list.join(', '), custom);
+      added = name;
+    }
+    sessionStorage.setItem('trainerData', JSON.stringify(td));
+    TrainerAPI.update(td).catch(e => console.error('Inventory sync:', e));
+    showToast(`Added ${qty} × ${added}`);
+    showCombatInventoryPopup();
+  });
+  setTimeout(() => input.focus(), 50);
 }
 
 function showCombatInventoryPopup() {

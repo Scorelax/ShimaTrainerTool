@@ -540,6 +540,8 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-suggest-thumb { width: 30px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center; }
 .dm-suggest-thumb img, .dm-suggest-thumb video { width: 100%; height: 100%; object-fit: contain; }
 .dm-give-item-row { align-items: flex-start; }
+.dm-give-tabs { margin-bottom: 0.5rem; }
+.dm-custom-item[hidden] { display: none; }
 .dm-cs-head[hidden] { display: none; }
 /* The DM's live map editor (battle-live.js's Edit map) over the battle view. */
 .dm-live-map-overlay { position: fixed; inset: 0; z-index: 950; background: var(--dm-bg, #0d0e1c); overflow: auto; }

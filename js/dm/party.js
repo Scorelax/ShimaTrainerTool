@@ -306,20 +306,25 @@ function moneyAndItemsHtml(t, items) {
     </div>
 
     <div class="dm-card-title" style="margin-top:1rem">Give an item</div>
-    <div class="dm-row dm-give-item-row">
-      <div class="dm-give-item-name"><input class="dm-input" id="giveItemName" placeholder="Item from the list…"></div>
-      <input class="dm-input" id="giveItemQty" type="number" min="1" value="1" style="max-width:70px">
-      <button class="dm-btn primary" id="giveItemBtn">Give</button>
+    <div class="dm-tool-tabs dm-give-tabs">
+      <button type="button" class="active" data-give-tab="list">From the list</button>
+      <button type="button" data-give-tab="custom">Custom item</button>
     </div>
-    <details class="dm-custom-item">
-      <summary>Or an item of your own…</summary>
+    <div data-give-pane="list">
+      <div class="dm-row dm-give-item-row">
+        <div class="dm-give-item-name"><input class="dm-input" id="giveItemName" placeholder="Item from the list…"></div>
+        <input class="dm-input" id="giveItemQty" type="number" min="1" value="1" style="max-width:70px">
+        <button class="dm-btn primary" id="giveItemBtn">Give</button>
+      </div>
+    </div>
+    <div class="dm-custom-item" data-give-pane="custom" hidden>
       <input class="dm-input" id="customName" placeholder="Name">
       <textarea class="dm-input" id="customDesc" rows="2" placeholder="What it is / does"></textarea>
       <div class="dm-row">
         <input class="dm-input" id="customQty" type="number" min="1" value="1" style="max-width:70px">
         <button class="dm-btn primary" id="giveCustomBtn">Give custom item</button>
       </div>
-    </details>
+    </div>
 
     <div class="dm-card-title" style="margin-top:1rem">Inventory</div>
     <div class="dm-inv">
@@ -362,6 +367,11 @@ function wireTrainer(name, items) {
   _root.querySelectorAll('[data-delta]').forEach(b => b.addEventListener('click', () => {
     run(() => DmAPI.giveItem(name, b.dataset.item, Number(b.dataset.delta), { custom: !!b.dataset.custom }));
   }));
+  // Give an item: from the game's list, or an item of the DM's own (shown as a tab of its own, not tucked away).
+  document.querySelectorAll('[data-give-tab]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-give-tab]').forEach(x => x.classList.toggle('active', x === b));
+    document.querySelectorAll('[data-give-pane]').forEach(pane => { pane.hidden = pane.dataset.givePane !== b.dataset.giveTab; });
+  }));
   attachSuggest(document.getElementById('giveItemName'), () => items.map(i => ({ value: i.name, label: i.name, sub: i.type || '' })),
     { after: document.querySelector('.dm-give-item-row') });
   document.getElementById('giveItemBtn').addEventListener('click', () => {
@@ -370,7 +380,7 @@ function wireTrainer(name, items) {
     if (!typed) return;
     const known = items.find(i => i.name.toLowerCase() === typed.toLowerCase());
     if (!known) {
-      showCombatAlert(`"${typed}" isn't in the item list -- pick one from the suggestions, or give it as an item of your own below.`, { title: 'Give an item' });
+      showCombatAlert(`"${typed}" isn't in the item list -- pick one from the suggestions, or give it under Custom item.`, { title: 'Give an item' });
       return;
     }
     run(() => DmAPI.giveItem(name, known.name, qty), `Gave ${name} ${qty} × ${known.name}`);

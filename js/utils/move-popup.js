@@ -5,7 +5,7 @@ import { getMoveTypeColor, getTextColorForBackground } from './pokemon-types.js'
 import { PokemonAPI, TrainerAPI } from '../api.js';
 import { showToast } from './notifications.js';
 import { spriteMediaHtml } from './sprite-media.js';
-import { getBattleAnimationUrl } from './battle-animation.js';
+import { getBattleAnimationUrl, announceAnimation } from './battle-animation.js';
 
 // ── CSS injection ─────────────────────────────────────────────────────────────
 
@@ -307,6 +307,7 @@ export async function playBattleAnimationFloating(speciesName) {
   video.addEventListener('ended', remove, { once: true });
   video.addEventListener('error', remove, { once: true });
   setTimeout(remove, 8000); // safety cap
+  announceAnimation(speciesName); // the display screen plays it now too
   try { await video.play(); } catch { remove(); }
 }
 

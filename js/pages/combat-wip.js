@@ -1672,11 +1672,10 @@ async function _handleSleepPool({ casterId, effect, moveName }) {
   const pool = await promptValueRoll({ dice: mod ? `${dice}${mod > 0 ? '+' : ''}${mod}` : dice, moveName,
     description: `${moveName}: roll ${dice} + MOVE -- the total is how many hit points of creatures fall asleep` });
   if (pool === null || pool <= 0) return;
-  const at = tokens[casterId];
-  const reach = (effect.radiusFt || 30) / 5;
+  const reach = effect.radiusFt || 30;
   const candidates = Object.values(session.participants)
     .filter(p => p.id !== casterId && p.status === 'participating' && tokens[p.id] && (p.currentHP ?? 0) > 0)
-    .filter(p => Math.max(Math.abs(tokens[p.id].col - at.col), Math.abs(tokens[p.id].row - at.row)) <= reach)
+    .filter(p => (creatureDistanceFt(session.board, caster, p) ?? Infinity) <= reach) // edge to edge, flyers' height too
     .filter(p => !_hiddenState(p, []) && !(p.statuses || []).some(s => s.kind === 'condition' && s.apply === 'asleep'))
     .sort((a, b) => a.currentHP - b.currentHP);
   let left = pool;
@@ -1695,20 +1694,20 @@ async function _handleSleepPool({ casterId, effect, moveName }) {
     text: slept.length ? `${caster.name}'s ${moveName} (${pool}) puts ${slept.join(', ')} to sleep` : `${caster.name}'s ${moveName} (${pool}) puts nobody to sleep` }).catch(() => {});
 }
 
-/** Feet to the nearest hostile creature on the map (Chebyshev, 5ft squares -- the same distance the server's reaction ranges
- * use), or null when this participant or nobody hostile has a token. Hostile = another side, or another owner in PvP. */
+/** Feet to the nearest hostile creature on the map (edge to edge, a flyer's height too -- the same distance the server's
+ * reaction ranges use), or null when this participant or nobody hostile has a token. Hostile = another side, or another
+ * owner in PvP. */
 function _nearestHostileFt(state, pid) {
   const tokens = state?.board?.tokens || {};
   const me = state?.participants?.[pid];
-  const at = tokens[pid];
-  if (!me || !at) return null;
+  if (!me || !tokens[pid]) return null;
   let best = null;
   for (const [id, p] of Object.entries(state.participants || {})) {
     if (id === pid || p.status !== 'participating' || !tokens[id]) continue;
     const hostile = p.side !== me.side || (state.battleType === 'pvp' && (p.owner || '') !== (me.owner || ''));
     if (!hostile) continue;
-    const ft = Math.max(Math.abs(tokens[id].col - at.col), Math.abs(tokens[id].row - at.row)) * 5;
-    if (best === null || ft < best) best = ft;
+    const ft = creatureDistanceFt(state.board, me, p);
+    if (ft !== null && (best === null || ft < best)) best = ft;
   }
   return best;
 }
@@ -3478,6 +3477,9 @@ async function _handleStatTransfer({ mode, attackerId, targetId, moveName, field
     try { await CombatAPI.applyStatus(destId, spec); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
   };
   const remove = async (holderId, status, reason) => {
+    // Ending a concentration also ends what it held up (routes_combat.py's _end_concentration_effects) -- those are gone
+    // from the live session by the time the loop reaches them.
+    if (!(session?.participants?.[holderId]?.statuses || []).some((s) => s.id === status.id)) return;
     try { await CombatAPI.removeStatus(holderId, status.id, reason); } catch (err) { showCombatAlert(err.message, { title: 'Error' }); }
   };
 
@@ -6103,7 +6105,9 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
   const dc = computedData.moveDC ?? 0;
   const damageModifier = computedData.damageBonus || 0;
   const hasDamage = !!computedData.damageDice;
-  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName), moveName, abilityDice: computedData.abilityDice, damageDice: computedData.damageDice });
+  // A move's own "half as much on a success" (Psybeam, Rock Slide...): a passed save still asks for the damage roll, halved.
+  const halvesOnSave = hasDamage && _halvesOnSave(moveName);
+  const picked = await pickSaveTarget(combatantId, { dc, damageModifier, speciesName, hasDamage, ability: _saveAbilityFor(moveName), moveName, abilityDice: computedData.abilityDice, damageDice: computedData.damageDice, halfOn: halvesOnSave ? 'pass' : null });
   if (!picked) return; // "no target" / closed -- move's own cost still applied, nothing more to do
 
   const attackerName = session?.participants?.[combatantId]?.name || '?';
@@ -6117,12 +6121,23 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
     ctx: { hit: true, guaranteedHit: true, attackRoll: null, crit: false, save: { passed: picked.passed, failBy: picked.failBy ?? null }, ...extra },
   });
 
+  const moveType = (move && move[1]) || '';
   if (picked.passed) {
     CombatAPI.logEvent({
       type: 'save', actorId: combatantId, actorName: attackerName, targetId: picked.targetId, targetName,
-      text: `${targetName} succeeded the saving throw against ${attackerName}'s ${moveName}${rollNote}`,
+      text: `${targetName} succeeded the saving throw against ${attackerName}'s ${moveName}${rollNote}${picked.rawRoll !== undefined ? ', but still takes half damage' : ''}`,
     }).catch(() => {});
-    await offerEffects();
+    let damageDealt;
+    if (picked.rawRoll !== undefined) {
+      try {
+        const total = picked.rawRoll + damageModifier;
+        const dmgResult = await _applyPrimaryDamage(combatantId, picked.targetId, picked.halved ? Math.floor(total / 2) : total, moveType, speciesName, moveName);
+        damageDealt = dmgResult?.damageApplied;
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Error' });
+      }
+    }
+    await offerEffects({ damageDealt });
     return;
   }
 
@@ -6139,7 +6154,6 @@ async function _handleSaveTriggered({ combatantId, moveName, move, computedData,
     return;
   }
 
-  const moveType = (move && move[1]) || '';
   let damageDealt;
   try {
     // No "N damage applied" popup -- see _resolveOneHit's own note on why.

@@ -915,6 +915,43 @@ export function maxSpeed(p) {
   return Math.max(...speeds.map(s => s.ft || 0));
 }
 
+/** The movement a participant has this turn, with everything its statuses do to it -- mirrors routes_combat.py's
+ * _movement_budget (the number move-token enforces): Speed Swap's override replaces its speeds, Ascension adds a
+ * flight speed, Agility-style flat bonuses then Tailwind-style multipliers apply per type (`appliesTo`, or all), and
+ * the worst slowing condition (Grappled 0, Paralyzed / Confused / Slowed half, Exhaustion 2+ half, 5+ none) scales the
+ * lot. { speeds: [{type, ft, remaining}], fastest, remaining } (ft already effective); null with no speeds at all. */
+export function movementBudget(p) {
+  const statuses = p?.statuses || [];
+  const override = statuses.find(s => s.kind === 'condition' && s.apply === 'speed_override' && Number.isFinite(s.value));
+  const base = override ? [{ type: 'overridden', ft: override.value }]
+    : [...(p?.speeds || []), ...statuses.filter(s => s.kind === 'condition' && s.apply === 'granted_flight_speed' && Number.isFinite(s.value) && s.value)
+      .map(s => ({ type: 'flying', ft: s.value }))];
+  if (!base.length) return null;
+  let slow = 1;
+  const bonus = {}, factor = {};
+  for (const s of statuses) {
+    if (s.kind === 'condition') {
+      if (s.apply === 'exhaustion') {
+        const level = s.value || 1;
+        if (level >= 5) slow = Math.min(slow, 0);
+        else if (level >= 2) slow = Math.min(slow, 0.5);
+      } else if (CONDITION_RULES[s.apply]?.speedMultiplier !== undefined) {
+        slow = Math.min(slow, CONDITION_RULES[s.apply].speedMultiplier);
+      }
+    } else if (s.kind === 'stat' && s.stat === 'speed') {
+      const scope = s.appliesTo || 'all';
+      if (typeof s.amount === 'number') bonus[scope] = (bonus[scope] || 0) + s.amount * (s.stacks || 1);
+      else if (typeof s.amount?.multiplier === 'number') factor[scope] = (factor[scope] ?? 1) * s.amount.multiplier;
+    }
+  }
+  const used = p?.movementUsed || 0;
+  const speeds = base.map(({ type, ft }) => {
+    const eff = Math.max(0, (ft || 0) + (bonus.all || 0) + (bonus[type] || 0)) * (factor.all ?? 1) * (factor[type] ?? 1) * slow;
+    return { type, ft: eff, remaining: Math.max(0, eff - used) };
+  });
+  return { speeds, fastest: Math.max(...speeds.map(s => s.ft)), remaining: Math.max(...speeds.map(s => s.remaining)) };
+}
+
 // Heavy Slam's own size ordering -- the move's own text names it exactly
 // this way ("Sizes, in order, are: Tiny, Small, Medium, Large, Huge,
 // Gigantic"), the one canonical size scale this app has (participants'

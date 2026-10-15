@@ -31,7 +31,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
-import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating } from './move-effects.js';
+import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating, movementBudget } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 import { coneSquares } from './cone-area.js';
 import { lineFtFromRange, lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineGuideStyle, angleToPointer, injectLineStyles } from './line-area.js';
@@ -200,15 +200,11 @@ function _activeParticipantId(session) {
   return null;
 }
 
-/** Feet of `type` movement `p` has left this turn -- speeds' own max minus
- * the single shared movementUsed counter (see routes_combat.py's
- * _move_token comment: switching between multiple speeds still draws from
- * one pool, same as 5e's own rule for a creature with more than one
- * speed), floored at 0. */
-function _remainingFt(p, type) {
-  const s = (p.speeds || []).find(x => x.type === type);
-  if (!s) return 0;
-  return Math.max(0, s.ft - (p.movementUsed || 0));
+/** Feet `p` can still move this turn under its best movement type -- its speeds with every buff, debuff and swap
+ * applied (move-effects.js's movementBudget, the same number the server enforces), minus the single shared
+ * movementUsed counter (switching between speeds still draws from one pool, 5e's own rule). null with no speeds. */
+function _bestRemainingFt(p) {
+  return movementBudget(p)?.remaining ?? null;
 }
 
 /** Grid distance between two cells in feet -- Chebyshev (diagonal costs the
@@ -304,13 +300,13 @@ function _renderMovePanel() {
   const activeId = _activeParticipantId(_session);
   const p = activeId && _session.participants[activeId]?.owner === _ownerName
     ? _session.participants[activeId] : null;
-  if (!p || !(p.speeds || []).length) { panel.hidden = true; return; }
+  const budget = p ? movementBudget(p) : null;
+  if (!budget) { panel.hidden = true; return; }
   panel.hidden = false;
 
-  const chips = p.speeds.map(s => {
-    const remaining = _remainingFt(p, s.type);
-    return `<span class="bmap-move-chip${remaining <= 0 ? ' depleted' : ''}">${s.type}: ${remaining}/${s.ft}ft</span>`;
-  }).join('');
+  const ftText = (n) => (Number.isInteger(n) ? n : Math.round(n * 10) / 10);
+  const chips = budget.speeds.map(s =>
+    `<span class="bmap-move-chip${s.remaining <= 0 ? ' depleted' : ''}">${s.type}: ${ftText(s.remaining)}/${ftText(s.ft)}ft</span>`).join('');
 
   let stageRow = '';
   if (_stagedDestination && _selectedTokenId === activeId) {
@@ -318,8 +314,7 @@ function _renderMovePanel() {
     const z0 = current?.z || 0;
     const z1 = _stagedAlt ?? z0;
     const distance = current ? _distanceFt(current.col, current.row, _stagedDestination.col, _stagedDestination.row, p, z0, z1) : 0;
-    const bestRemaining = Math.max(...p.speeds.map(s => _remainingFt(p, s.type)));
-    const canMove = distance <= bestRemaining;
+    const canMove = distance <= budget.remaining;
 
     // A depth change is easy to stage by accident (one tap on ▼/▲), so it gets its own highlighted line and the
     // button says what it will do.
@@ -401,7 +396,7 @@ function _renderGrid() {
   const zones = zoneKindsByCell(_session);
 
   // Reach: cells the selected mover can still afford (Chebyshev distance x 5ft, same as the server's budget check).
-  const bestRemaining = sel && (sel.p.speeds || []).length ? Math.max(...sel.p.speeds.map(s => _remainingFt(sel.p, s.type))) : null;
+  const bestRemaining = sel ? _bestRemainingFt(sel.p) : null;
   let cone = null; // "col,row" -> whether that square is only on the edge of it
   if (sel && _coneOn) {
     // From where the token will be once the staged move is confirmed; level, the way it faces (cone-area.js).

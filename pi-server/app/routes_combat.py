@@ -1766,6 +1766,7 @@ def _advance_turn(state):
         raise ValueError('Cannot advance turn while a reaction is in progress')
     if not state['turnOrder']:
         return
+    _close_stale_reaction_window(state)
     state['started'] = True
     ending_id = state['turnOrder'][state['turnIndex']] if state['turnIndex'] < len(state['turnOrder']) else None
     state['turnIndex'] = (state['turnIndex'] + 1) % len(state['turnOrder'])
@@ -2158,7 +2159,23 @@ def _eligible_reactors(state, moves_data, trigger, anchor_id, exclude_id, attack
     return result
 
 
+def _close_stale_reaction_window(state):
+    """A window whose time ran out a while ago with nobody holding the floor: closed as if its clock had been run. The
+    client that opened it runs that clock (_close_reaction_window) -- a phone that went to sleep meanwhile never does,
+    and the stale window would otherwise refuse every later one for the rest of the battle."""
+    pr = state.get('pendingReaction')
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    if pr and not state.get('reactingParticipantId') and now_ms > (pr.get('expiresAt') or 0) + _STALE_WINDOW_GRACE_MS:
+        state['pendingReaction'] = None
+        _log_event(state, 'reaction-window-close', text='Reaction window closed (time expired)')
+        _finish_pending_switch(state)
+
+
+_STALE_WINDOW_GRACE_MS = 5000  # past its expiry, so the opener's own countdown (and its retry) always gets there first
+
+
 def _open_reaction_window(state, trigger, anchor_id, attacker_id, move_name, only_ids=None):
+    _close_stale_reaction_window(state)
     if state['pendingReaction']:
         raise ValueError('A reaction window is already open')
     if anchor_id not in state['participants']:
@@ -2718,6 +2735,8 @@ def _use_status(state, target_id, status_id):
 
 
 def _expire_status(state, participant, s, why):
+    if not any(x is s for x in _statuses_of(participant)):
+        return  # already gone -- ended along with a concentration that wore off in the same sweep
     _statuses_of(participant).remove(s)
     _log_event(state, 'status-expire', text=f"{participant['name']}: {_status_label(s)} wore off ({why})",
                targetId=participant['id'], targetName=participant['name'])
@@ -2729,6 +2748,8 @@ def _expire_statuses_on_turn_point(state, pid, point):
     """A turn just ended/started for `pid`: fire every until_turn end waiting on it."""
     for p in state['participants'].values():
         for s in list(_statuses_of(p)):
+            if not any(x is s for x in _statuses_of(p)):
+                continue  # ended along with a concentration earlier in this sweep
             for e in s.get('ends', []):
                 if e.get('type') != 'until_turn' or e.get('point') != point:
                     continue
@@ -2774,6 +2795,8 @@ def _absorb_temp_hp(state, target, amount):
 def _expire_statuses_by_round(state):
     for p in state['participants'].values():
         for s in list(_statuses_of(p)):
+            if not any(x is s for x in _statuses_of(p)):
+                continue  # ended along with a concentration earlier in this sweep
             if any(e.get('type') == 'rounds' and e.get('expiresRound') is not None
                    and state['round'] >= e['expiresRound'] for e in s.get('ends', [])):
                 _expire_status(state, p, s, 'duration over')

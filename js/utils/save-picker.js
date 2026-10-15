@@ -623,9 +623,10 @@ export async function confirmSecondarySave(target, targetName, { dc = 0, hasDama
  * attacker's battle animation plays and -- only for moves with an actual
  * damage component -- a damage roll follows. Resolves to
  * {targetId, passed:true}, {targetId, passed:false} (no damage component),
- * {targetId, passed:false, rawRoll} (has one), or null if closed/no target.
+ * {targetId, passed:false, rawRoll} (has one), or null if closed/no target. `halfOn: 'pass'` (a move's own "half as
+ * much on a success") asks for the damage roll on a pass too: {targetId, passed:true, rawRoll, halved:true}.
  */
-export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null, moveName = '', abilityDice = [], damageDice = '' } = {}) {
+export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, speciesName = '', hasDamage = false, ability = null, moveName = '', abilityDice = [], damageDice = '', halfOn = null } = {}) {
   _abilityDice = abilityDice || [];
   _damageDice = damageDice || '';
   const result = await CombatAPI.getState();
@@ -643,8 +644,8 @@ export async function pickSaveTarget(casterId, { dc = 0, damageModifier = 0, spe
   _speciesName = speciesName;
   _hasDamage = hasDamage;
   _saveAbility = ability;
-  _damageOnPass = false; // single-target save flow -- no caller of this one needs it yet, unlike confirmSecondarySave
-  _halfOn = null;
+  _damageOnPass = false; // single-target save flow -- a move's own "half as much on a success" comes as halfOn 'pass'
+  _halfOn = halfOn;
   _saveNote = '';
   _pendingSave = null;
   _saveTitle = null;

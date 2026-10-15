@@ -3,9 +3,13 @@
 // exactly what the table sees.
 //
 // Tools: Objects (place a picture -- tree, rock, log... any object-*.png in the battle-images folder -- sized in squares,
-// turned in 90-degree steps, with a height in feet for line of sight later, and optionally marking its squares
-// difficult or blocked), Terrain (paint difficult / blocked squares, which the battle enforces for creatures on the
-// ground -- routes_combat.py's _move_cost_ft / _move_token) and Eraser.
+// turned to any angle, with a height in feet for line of sight, and optionally marking its squares difficult or
+// blocked), Terrain (paint difficult / blocked squares, which the battle enforces for creatures on the ground --
+// routes_combat.py's _move_cost_ft / _move_token) and Eraser.
+//
+// Objects (the user's ask, 2026-10-15): press a square to place one there and, still holding, move the pointer around
+// it to turn it -- it's placed on release. Click a placed object to edit it (the panel shows its settings, changes apply
+// at once, arrows move it); press and hold a placed object to turn it the same way.
 import { DmAPI } from '../api.js';
 import { mapObjectHtml, objectScreenRect, objectCells } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
@@ -27,6 +31,9 @@ const ed = {
   terrain: 'difficult',
   hover: null, // {col, row} under the pointer
   painting: false,
+  selectedId: null, // the placed object being edited
+  editCx: 0, editCy: 0, // its centre on screen, in squares -- kept while editing, so turning it back and forth doesn't creep
+  gesture: null, // press-and-turn under way: {cx, cy, startRot, ref, editing, turned, pointerId}
 };
 
 let _root = null;
@@ -81,18 +88,118 @@ function cropNow(url) {
 /** The object the Objects tool would place with its top-left corner (as seen) on board cell (col, row), or null if
  * it doesn't fit. Screen width = board rows, screen height = board cols; the TV adds a quarter turn, so the stored
  * turn is a quarter less than what the DM sees. */
-function objectAt(m, col, row) {
-  const asset = _assets?.objects.find(o => o.key === ed.objectKey);
+function objectAt(m, col, row, id = null) {
+  const asset = currentAsset();
   if (!asset) return null;
   // Its box as seen: the picture at the nearest quarter turn (any angle beyond that turns it about the box's centre).
   const [sw, sh] = screenBox();
   const w = sh, h = sw;
   const o = {
-    id: newId('obj'), kind: asset.key, label: asset.label, url: asset.url,
+    id: id || newId('obj'), kind: asset.key, label: asset.label, url: asset.url,
     col, row: row - h + 1, w, h, rot: ((ed.objRot - 90) % 360 + 360) % 360, crop: cropNow(asset.url),
     height: ed.objHeight, ...(ed.objMark ? { markKind: ed.objMark } : {}),
   };
   return o.row >= 0 && o.col + o.w <= m.cols && o.row + o.h <= m.rows ? o : null;
+}
+
+/** The picture the Objects tool uses: the chosen kind, or -- editing an object whose picture is no longer on the Pi --
+ * that object's own. */
+function currentAsset() {
+  return _assets?.objects.find(o => o.key === ed.objectKey) || (ed.selectedId ? ed.editAsset : null) || null;
+}
+
+/** A placed object's box on screen, in squares: top-left (sx, sy) and size (sw, sh). */
+function screenBoxOf(m, o) {
+  return { sx: m.rows - o.row - (o.h || 1), sy: o.col, sw: o.h || 1, sh: o.w || 1 };
+}
+
+/** The object the tool's settings make, its box centred on screen point (cx, cy) (squares) -- null if it doesn't fit. */
+function objectCentredAt(m, cx, cy, id = null) {
+  const [sw, sh] = screenBox();
+  const sx = Math.round(cx - sw / 2), sy = Math.round(cy - sh / 2);
+  return objectAt(m, sy, m.rows - 1 - sx, id);
+}
+
+/** Puts `next` on the map -- in `old`'s place (same spot in the stacking order) when editing -- and moves the squares it
+ * marks (difficult / blocked) along with it. */
+function commitObject(next, old = null) {
+  updateSetup(st => {
+    const objs = st.map.objects || [];
+    const at = old ? objs.findIndex(o => o.id === old.id) : -1;
+    st.map.objects = at >= 0 ? objs.map((o, i) => (i === at ? next : o)) : [...objs, next];
+    if (old) unmarkObject(st, old, next.id);
+    if (next.markKind) {
+      st.map.marks = st.map.marks || {};
+      objectCells(next, st.map).forEach(p => { st.map.marks[`${p.col},${p.row}`] = next.markKind; });
+    }
+  });
+}
+
+/** Squares `gone` marked go back to normal unless another object (other than `exceptId`'s new self) still marks them. */
+function unmarkObject(st, gone, exceptId = null) {
+  if (!gone.markKind) return;
+  const kept = new Set((st.map.objects || []).filter(o => o.markKind === gone.markKind && o.id !== exceptId)
+    .flatMap(o => objectCells(o).map(p => `${p.col},${p.row}`)));
+  objectCells(gone).forEach(p => {
+    const k = `${p.col},${p.row}`;
+    if (st.map.marks?.[k] === gone.markKind && !kept.has(k)) delete st.map.marks[k];
+  });
+}
+
+function removeObject(hit) {
+  updateSetup(st => {
+    st.map.objects = (st.map.objects || []).filter(o => o.id !== hit.id);
+    unmarkObject(st, hit);
+  });
+}
+
+function topObjectAt(m, col, row) {
+  return [...(m.objects || [])].reverse().find(o => objectCells(o).some(p => p.col === col && p.row === row)) || null;
+}
+
+/** Edit a placed object: the tool's settings become its own. */
+function selectObject(o) {
+  const m = getSetup().map;
+  ed.selectedId = o.id;
+  ed.editAsset = { key: o.kind, label: o.label, url: o.url };
+  const known = _assets.objects.find(a => a.url === o.url) || _assets.objects.find(a => a.key === o.kind);
+  ed.objectKey = known ? known.key : '';
+  ed.objRot = (((o.rot || 0) + 90) % 360 + 360) % 360; // stored a quarter turn less than seen (objectAt)
+  const sideways = Math.round(ed.objRot / 90) % 2;
+  ed.objW = sideways ? (o.w || 1) : (o.h || 1);
+  ed.objH = sideways ? (o.h || 1) : (o.w || 1);
+  ed.objHeight = o.height ?? 0;
+  ed.objMark = o.markKind || '';
+  const b = screenBoxOf(m, o);
+  ed.editCx = b.sx + b.sw / 2; ed.editCy = b.sy + b.sh / 2;
+  renderToolPanel();
+  renderGhost();
+}
+
+function deselectObject() {
+  if (!ed.selectedId) return;
+  ed.selectedId = null;
+  ed.editAsset = null;
+  if (!ed.objectKey && _assets.objects.length) selectObjectKind(_assets.objects[0].key);
+  renderToolPanel();
+  renderGhost();
+}
+
+/** The object being edited, rebuilt from the tool's settings around its centre. False (and nothing changed) when it
+ * wouldn't fit there -- the settings go back to the object's own. */
+function applyEdit() {
+  const m = getSetup().map;
+  const old = (m.objects || []).find(o => o.id === ed.selectedId);
+  if (!old) { deselectObject(); return false; }
+  const next = objectCentredAt(m, ed.editCx, ed.editCy, old.id);
+  if (!next) {
+    toast("It doesn't fit there -- move it further in first.");
+    selectObject(old);
+    return false;
+  }
+  if (next.url === old.url) next.crop = old.crop;
+  commitObject(next, old);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +384,7 @@ async function deleteSavedMap(id) {
 
 function selectObjectKind(key) {
   ed.objectKey = key;
-  ed.objHeight = DEFAULT_HEIGHTS[key] ?? 5;
+  if (!ed.selectedId) ed.objHeight = DEFAULT_HEIGHTS[key] ?? 5; // an edited object keeps its own height
 }
 
 function wireStatic() {
@@ -297,6 +404,7 @@ function wireStatic() {
     const b = e.target.closest('[data-tool]');
     if (!b) return;
     ed.tool = b.dataset.tool;
+    if (ed.tool !== 'objects') { ed.selectedId = null; ed.editAsset = null; }
     renderToolPanel();
     renderStage();
   });
@@ -326,7 +434,8 @@ function wireStatic() {
     }
   });
   if (!wireStatic.mouseUpBound) {
-    document.addEventListener('mouseup', () => { ed.painting = false; });
+    document.addEventListener('pointerup', () => { ed.painting = false; });
+    document.addEventListener('pointercancel', () => { ed.painting = false; });
     wireStatic.mouseUpBound = true;
   }
 }
@@ -379,10 +488,13 @@ function renderToolPanel() {
   const panel = document.getElementById('mapToolPanel');
   const hint = document.getElementById('mapHint');
   if (ed.tool === 'objects') {
-    const asset = _assets.objects.find(o => o.key === ed.objectKey);
-    panel.innerHTML = _assets.objects.length ? `
+    const asset = currentAsset();
+    const editing = !!ed.selectedId;
+    const missing = editing && !ed.objectKey; // its picture is no longer on the Pi
+    panel.innerHTML = _assets.objects.length || editing ? `
+      ${editing ? `<div class="dm-edit-head"><b>Editing: ${escapeHtml(asset?.label || 'object')}</b><small>Changes apply at once.</small></div>` : ''}
       <div class="dm-field"><label for="objKind">Object</label>
-        <select class="dm-select" id="objKind">${_assets.objects.map(o => `<option value="${escapeHtml(o.key)}" ${o.key === ed.objectKey ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>
+        <select class="dm-select" id="objKind">${missing ? `<option value="" selected>${escapeHtml(asset?.label || '?')}</option>` : ''}${_assets.objects.map(o => `<option value="${escapeHtml(o.key)}" ${o.key === ed.objectKey ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>
       </div>
       <div class="dm-object-preview">${asset ? `<img src="${escapeHtml(asset.url)}" alt="" style="transform:rotate(${ed.objRot}deg)">` : ''}</div>
       <div class="dm-row">
@@ -402,16 +514,53 @@ function renderToolPanel() {
           <option value="difficult" ${ed.objMark === 'difficult' ? 'selected' : ''}>Difficult terrain</option>
           <option value="blocked" ${ed.objMark === 'blocked' ? 'selected' : ''}>Blocked</option>
         </select>
-      </div>` : '<div class="dm-hint">No object pictures found -- add object-&lt;name&gt;.png files to the battle-images folder on the Pi.</div>';
-    hint.textContent = 'Click a square to place the object there (its top-left corner). The outline shows where it will go.';
-    document.getElementById('objKind')?.addEventListener('change', (e) => { selectObjectKind(e.target.value); renderToolPanel(); });
-    document.getElementById('objW')?.addEventListener('input', (e) => { ed.objW = clampInt(e.target.value, 1, 20); renderGhost(); });
-    document.getElementById('objH')?.addEventListener('input', (e) => { ed.objH = clampInt(e.target.value, 1, 20); renderGhost(); });
-    document.getElementById('objTall')?.addEventListener('input', (e) => { ed.objHeight = clampInt(e.target.value, 0, 500); });
+      </div>
+      ${editing ? `
+      <div class="dm-field"><label>Move it</label>
+        <div class="dm-row dm-obj-move">
+          <button class="dm-btn" data-move-obj="-1,0" title="One square left">←</button><button class="dm-btn" data-move-obj="0,-1" title="One square up">↑</button>
+          <button class="dm-btn" data-move-obj="0,1" title="One square down">↓</button><button class="dm-btn" data-move-obj="1,0" title="One square right">→</button>
+        </div>
+      </div>
+      <div class="dm-row">
+        <button class="dm-btn" id="objRemove">🗑 Remove</button>
+        <button class="dm-btn primary" id="objDoneEdit">✓ Done</button>
+      </div>` : ''}` : '<div class="dm-hint">No object pictures found -- add object-&lt;name&gt;.png files to the battle-images folder on the Pi.</div>';
+    hint.textContent = editing
+      ? 'Editing the outlined object -- hold it and move the pointer around it to turn it. Click an empty square (or Done) to finish.'
+      : 'Click a square to place the object there (its top-left corner) -- or hold and move the pointer around to turn it, then let go. Click a placed object to edit it.';
+    // Editing: every change goes straight onto the object (applyEdit). Placing: it only changes what the next one looks like.
+    const changed = () => { if (ed.selectedId) applyEdit(); else renderGhost(); };
+    document.getElementById('objKind')?.addEventListener('change', (e) => {
+      if (!e.target.value) return;
+      selectObjectKind(e.target.value);
+      if (ed.selectedId) applyEdit();
+      renderToolPanel();
+    });
+    document.getElementById('objW')?.addEventListener('change', (e) => { ed.objW = clampInt(e.target.value, 1, 20); changed(); });
+    document.getElementById('objH')?.addEventListener('change', (e) => { ed.objH = clampInt(e.target.value, 1, 20); changed(); });
+    if (!editing) {
+      document.getElementById('objW')?.addEventListener('input', (e) => { ed.objW = clampInt(e.target.value, 1, 20); renderGhost(); });
+      document.getElementById('objH')?.addEventListener('input', (e) => { ed.objH = clampInt(e.target.value, 1, 20); renderGhost(); });
+    }
+    document.getElementById('objTall')?.addEventListener('change', (e) => { ed.objHeight = clampInt(e.target.value, 0, 500); if (ed.selectedId) applyEdit(); });
     document.getElementById('objRotL')?.addEventListener('click', () => turnObject(-15));
     document.getElementById('objRotR')?.addEventListener('click', () => turnObject(15));
     document.getElementById('objRot')?.addEventListener('input', (e) => setObjectTurn(Number(e.target.value)));
-    document.getElementById('objMark')?.addEventListener('change', (e) => { ed.objMark = e.target.value; });
+    document.getElementById('objMark')?.addEventListener('change', (e) => { ed.objMark = e.target.value; if (ed.selectedId) applyEdit(); });
+    panel.querySelectorAll('[data-move-obj]').forEach(b => b.addEventListener('click', () => {
+      const [dx, dy] = b.dataset.moveObj.split(',').map(Number);
+      ed.editCx += dx; ed.editCy += dy;
+      if (!applyEdit()) { ed.editCx -= dx; ed.editCy -= dy; }
+    }));
+    document.getElementById('objRemove')?.addEventListener('click', () => {
+      const o = (getSetup().map.objects || []).find(x => x.id === ed.selectedId);
+      ed.selectedId = null; ed.editAsset = null;
+      if (o) removeObject(o);
+      if (!ed.objectKey && _assets.objects.length) selectObjectKind(_assets.objects[0].key);
+      renderToolPanel();
+    });
+    document.getElementById('objDoneEdit')?.addEventListener('click', deselectObject);
   } else if (ed.tool === 'terrain') {
     panel.innerHTML = `
       ${[['difficult', 'Difficult terrain', 'Double movement for creatures on the ground.'], ['blocked', 'Blocked', "Can't be walked through or stood on."], ['clear', 'Clear', 'Back to normal ground.']]
@@ -430,7 +579,7 @@ function turnObject(delta) {
 
 /** Any angle, like a line move's aim. Only the preview, the ghost and the angle label change -- the panel isn't redrawn,
  * so dragging the slider keeps going. */
-function setObjectTurn(deg) {
+function setObjectTurn(deg, { apply = true } = {}) {
   ed.objRot = ((Math.round(deg) % 360) + 360) % 360;
   const img = document.querySelector('.dm-object-preview img');
   if (img) img.style.transform = `rotate(${ed.objRot}deg)`;
@@ -438,7 +587,8 @@ function setObjectTurn(deg) {
   if (slider && Number(slider.value) !== ed.objRot) slider.value = ed.objRot;
   const label = document.getElementById('objRotLabel');
   if (label) label.textContent = `${ed.objRot}°`;
-  renderGhost();
+  if (apply && ed.selectedId && !ed.gesture) applyEdit(); // the edited object turns with it (mid-press: on release)
+  else renderGhost();
 }
 
 /** The object's box on screen (width, height in squares): its own size at the nearest quarter turn. */
@@ -461,24 +611,109 @@ function renderStage() {
   stage.style.width = `min(100%, calc((100vh - 190px) * ${m.rows / m.cols}))`;
   stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
 
-  const grid = stage.querySelector('.dm-map-grid');
-  grid.addEventListener('mousedown', (e) => {
-    const cell = e.target.closest('[data-cell]');
+  stage.style.touchAction = 'none'; // a held finger turns / paints instead of scrolling the page
+  stage.addEventListener('pointerdown', (e) => {
+    const cell = cellAtPointer(e);
     if (!cell) return;
     e.preventDefault();
-    const [col, row] = cell.dataset.cell.split(',').map(Number);
-    if (ed.tool === 'terrain') { ed.painting = true; paint(col, row); } else onCellClick(col, row);
+    const { col, row } = cell;
+    if (ed.tool === 'terrain') { ed.painting = true; paint(col, row); }
+    else if (ed.tool === 'objects') startObjectPress(e, col, row);
+    else onCellClick(col, row);
   });
-  grid.addEventListener('mouseover', (e) => {
-    const cell = e.target.closest('[data-cell]');
+  stage.addEventListener('pointermove', (e) => {
+    if (ed.gesture) return; // the press-and-turn follows the pointer itself
+    const cell = cellAtPointer(e);
     if (!cell) return;
-    const [col, row] = cell.dataset.cell.split(',').map(Number);
-    ed.hover = { col, row };
-    if (ed.painting && ed.tool === 'terrain') paint(col, row);
+    if (ed.hover?.col === cell.col && ed.hover?.row === cell.row) return;
+    ed.hover = cell;
+    if (ed.painting && ed.tool === 'terrain') paint(cell.col, cell.row);
     renderGhost();
   });
-  grid.addEventListener('mouseleave', () => { ed.hover = null; renderGhost(); });
+  stage.addEventListener('pointerleave', () => { if (!ed.gesture) { ed.hover = null; renderGhost(); } });
   renderGhost();
+}
+
+/** The board square under the pointer, worked out from where it is on the map (the objects sit above the grid). */
+function cellAtPointer(e) {
+  const grid = document.querySelector('#mapWrap .dm-map-grid');
+  if (!grid) return null;
+  const m = getSetup().map;
+  const r = grid.getBoundingClientRect();
+  const sx = Math.floor((e.clientX - r.left) / r.width * m.rows), sy = Math.floor((e.clientY - r.top) / r.height * m.cols);
+  if (sx < 0 || sy < 0 || sx >= m.rows || sy >= m.cols) return null;
+  return { col: sy, row: m.rows - 1 - sx };
+}
+
+/** Objects tool, pointer pressed on board square (col, row): on a placed object, edit it (and turn it while held); on an
+ * empty square, finish editing -- or start placing a new object there, turned while held, placed on release. */
+function startObjectPress(e, col, row) {
+  const m = getSetup().map;
+  const hit = topObjectAt(m, col, row);
+  if (!hit && ed.selectedId) { deselectObject(); return; }
+  if (hit && hit.id !== ed.selectedId) selectObject(hit);
+  if (!hit && !currentAsset()) return;
+  let cx, cy;
+  if (hit) { cx = ed.editCx; cy = ed.editCy; }
+  else {
+    const [sw, sh] = screenBox();
+    cx = (m.rows - 1 - row) + sw / 2; cy = col + sh / 2;
+  }
+  ed.gesture = { cx, cy, startRot: ed.objRot, ref: null, editing: hit?.id || null, turned: false, pointerId: e.pointerId };
+  ed.hover = { col, row };
+  const move = (ev) => { if (ev.pointerId === ed.gesture?.pointerId) turnByPointer(ev); };
+  const end = (ev) => {
+    if (ev.pointerId !== ed.gesture?.pointerId) return;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
+    finishObjectPress(ev.type === 'pointercancel');
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
+  renderGhost();
+}
+
+/** While held: the angle the pointer has gone round the object's centre since it first left it turns the object by as
+ * much (5-degree steps) -- a twist, so it never jumps when the turn starts. */
+function turnByPointer(e) {
+  const g = ed.gesture;
+  const grid = document.querySelector('#mapWrap .dm-map-grid');
+  if (!grid) return;
+  const m = getSetup().map;
+  const r = grid.getBoundingClientRect();
+  const square = r.width / m.rows;
+  const px = r.left + g.cx * square, py = r.top + g.cy * (r.height / m.cols);
+  const dx = e.clientX - px, dy = e.clientY - py;
+  if (Math.hypot(dx, dy) < square * 0.6) return; // too close to the middle to tell a direction
+  const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  if (g.ref === null) { g.ref = ang; return; }
+  const turn = Math.round((g.startRot + ang - g.ref) / 5) * 5;
+  if (turn === ed.objRot) return;
+  g.turned = true;
+  setObjectTurn(turn, { apply: false });
+}
+
+async function finishObjectPress(cancelled) {
+  const g = ed.gesture;
+  ed.gesture = null;
+  const m = getSetup().map;
+  if (g.editing) {
+    if (cancelled) { setObjectTurn(g.startRot, { apply: false }); renderGhost(); return; }
+    if (g.turned) applyEdit();
+    else renderGhost();
+    return;
+  }
+  if (cancelled) { renderGhost(); return; }
+  const o = objectCentredAt(m, g.cx, g.cy);
+  if (!o) {
+    renderGhost();
+    showCombatAlert("The object doesn't fit there -- make it smaller or move it further in.", { title: 'Place object' });
+    return;
+  }
+  o.crop = await cropFor(o.url);
+  commitObject(o);
 }
 
 /** The outline of the object a click would place here (red when it doesn't fit). */
@@ -486,7 +721,30 @@ function renderGhost() {
   const ghost = document.querySelector('#mapWrap .dm-map-ghost');
   if (!ghost) return;
   const m = getSetup().map;
-  if (!ed.hover || ed.tool !== 'objects') { ghost.innerHTML = ''; return; }
+  document.querySelectorAll('#mapWrap .bmap-object.dm-editing-hidden').forEach(el => el.classList.remove('dm-editing-hidden'));
+  if (ed.tool !== 'objects') { ghost.innerHTML = ''; return; }
+  const board = { grid: { cols: m.cols, rows: m.rows } };
+  const g = ed.gesture;
+  if (g?.editing && g.turned) {
+    // The object turning under the pointer: its new look, in place of the old one.
+    document.querySelector(`#mapWrap .bmap-object[data-object-id="${g.editing}"]`)?.classList.add('dm-editing-hidden');
+    const o = objectCentredAt(m, g.cx, g.cy, g.editing);
+    ghost.innerHTML = o ? mapObjectHtml(o, objectScreenRect(board, o), 90).replace('class="bmap-object"', 'class="bmap-object dm-ghost-ok"')
+      : '<div class="dm-ghost-bad" style="inset:0;opacity:0.4"></div>';
+    return;
+  }
+  if (ed.selectedId) {
+    const o = (m.objects || []).find(x => x.id === ed.selectedId);
+    if (!o) { ghost.innerHTML = ''; return; }
+    const r = objectScreenRect(board, o);
+    ghost.innerHTML = `<div class="dm-ghost-good dm-edit-outline" style="left:${r.left};top:${r.top};width:${r.width};height:${r.height}"></div>`;
+    return;
+  }
+  if (g) {
+    const o = objectCentredAt(m, g.cx, g.cy);
+    if (o) { ghost.innerHTML = mapObjectHtml(o, objectScreenRect(board, o), 90).replace('class="bmap-object"', 'class="bmap-object dm-ghost-ok"'); return; }
+  }
+  if (!ed.hover) { ghost.innerHTML = ''; return; }
   const { col, row } = ed.hover;
   const o = objectAt(m, col, row);
   if (o) {
@@ -513,36 +771,9 @@ function paint(col, row) {
 
 async function onCellClick(col, row) {
   const m = getSetup().map;
-  if (ed.tool === 'objects') {
-    const o = objectAt(m, col, row);
-    if (!o) {
-      showCombatAlert("The object doesn't fit there -- make it smaller or move it further in.", { title: 'Place object' });
-      return;
-    }
-    o.crop = await cropFor(o.url);
-    updateSetup(st => {
-      st.map.objects = [...(st.map.objects || []), o];
-      if (o.markKind) {
-        st.map.marks = st.map.marks || {};
-        objectCells(o, m).forEach(p => { st.map.marks[`${p.col},${p.row}`] = o.markKind; });
-      }
-    });
-  } else if (ed.tool === 'erase') {
-    const hit = [...(m.objects || [])].reverse().find(o => objectCells(o).some(p => p.col === col && p.row === row));
-    if (hit) {
-      updateSetup(st => {
-        st.map.objects = st.map.objects.filter(o => o.id !== hit.id);
-        // Squares it marked go back to normal unless another object still marks them the same way.
-        if (hit.markKind) {
-          const kept = new Set(st.map.objects.filter(o => o.markKind === hit.markKind).flatMap(o => objectCells(o).map(p => `${p.col},${p.row}`)));
-          objectCells(hit).forEach(p => {
-            const k = `${p.col},${p.row}`;
-            if (st.map.marks?.[k] === hit.markKind && !kept.has(k)) delete st.map.marks[k];
-          });
-        }
-      });
-      return;
-    }
+  if (ed.tool === 'erase') {
+    const hit = topObjectAt(m, col, row);
+    if (hit) { removeObject(hit); return; } // squares it marked go back to normal unless another object marks them too
     if (m.marks?.[`${col},${row}`]) updateSetup(st => { delete st.map.marks[`${col},${row}`]; });
   }
 }

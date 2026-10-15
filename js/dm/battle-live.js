@@ -13,6 +13,8 @@ import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFrom
 import { getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD, STATUS_CAPTURE_BONUS, captureDc, accuracyDc } from './encounter-rules.js';
 import { getSetup } from './setup-store.js';
+import { renderMapEditor } from './map-editor.js';
+import { setLiveSession } from './live-map-store.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
@@ -36,6 +38,7 @@ export async function mountLive(stageEl, toolsEl, currentSession) {
 
 export function updateLive(currentSession) {
   session = currentSession;
+  setLiveSession(currentSession); // the live map editor, if it's open, follows the battle
   renderCreatures();
   const round = session.started ? Number(session.round) || 1 : null;
   if (round !== null && lastRound !== null && round > lastRound) newRound(round);
@@ -269,6 +272,7 @@ function renderTools(el) {
       <div class="dm-card-title">Table screens</div>
       <div class="dm-row">
         <a class="dm-btn" href="battle-map.html" target="_blank" rel="noopener" title="Opens the table's battle map screen in a new tab">▦ Battle map ↗</a>
+        <button class="dm-btn" id="dmEditMap" title="Change the map, move any creature -- any time, whoever's turn it is">✏️ Edit map</button>
       </div>
     </div>
 
@@ -321,6 +325,23 @@ function renderTools(el) {
     if (!startDmPlacement()) showCombatAlert('Everything of yours that is fighting is already on the map.', { title: 'Place on map' });
   });
   document.getElementById('dmCreatures').addEventListener('click', onCreatureAction);
+  document.getElementById('dmEditMap').addEventListener('click', openLiveMapEditor);
+}
+
+/** The running battle's map in the Map setup editor (live mode, map-editor.js + live-map-store.js), over the battle
+ * view until Done / Back. */
+function openLiveMapEditor() {
+  if (!session?.board) { showCombatAlert('No battle map yet.', { title: 'Edit map' }); return; }
+  document.getElementById('dmLiveMapEditor')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'dmLiveMapEditor';
+  overlay.className = 'dm-live-map-overlay';
+  const root = document.createElement('div');
+  root.className = 'dm-live-map-root';
+  overlay.appendChild(root);
+  document.body.appendChild(overlay);
+  setLiveSession(session);
+  renderMapEditor(root, { live: true, onDone: () => overlay.remove() });
 }
 
 function renderSpeciesResults() {

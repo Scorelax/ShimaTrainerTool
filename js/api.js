@@ -1156,6 +1156,11 @@ export class CombatAPI {
   }
 
   /** Sets the shared board's background image (empty string clears it). */
+  /** The DM moves / turns / lifts any creature, any time, without using its movement ({col, row, facing, z}). */
+  static async dmPlaceToken(id, { col, row, facing, z }) {
+    return API.request('combat', 'dm-place-token', { id, col, row, facing, z }, { useCache: false });
+  }
+
   static async setBoardBackground(url) {
     return API.request('combat', 'set-board-background', { url }, { useCache: false });
   }
@@ -1435,6 +1440,11 @@ export class DmAPI {
   /** A picture for an NPC ({name, data: a data: URL}) into the Pi's NPC pictures folder -> {name, file, url, own}. */
   static async uploadNpcImage(image) {
     return (await DmAPI._post('npc-image', image, 'Uploading the picture')).data;
+  }
+
+  /** The running battle's map objects and difficult / blocked squares, as the DM's live map editor has them. */
+  static async setBoardMap(objects, marks) {
+    return (await DmAPI._post('board-map', { objects, marks }, 'Changing the map')).data;
   }
 
   /** A battle-map background from the DM's computer ({name, data: data URL}) -> {key, label, url} (routes_dm.py). */

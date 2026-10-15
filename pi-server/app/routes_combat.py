@@ -630,6 +630,12 @@ def _handle(conn, action, params):
         hold = str(params.get('hold', '')).lower() in ('1', 'true')
         return _mutate(conn, lambda s: _bide_use(s, params['id'], hold))
 
+    if action == 'dm-place-token':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _dm_place_token(s, params['id'], js_parse_int(params.get('col')), js_parse_int(params.get('row')),
+                                                       js_parse_int(params.get('facing')), js_parse_int(params.get('z'))))
+
     if action == 'confirm-placement':
         col = js_parse_int(params.get('col'))
         row = js_parse_int(params.get('row'))
@@ -4236,6 +4242,48 @@ def _set_token_position(state, pid, col, row):
     _wake_electric_sleepers(state)
     if state.get('started'):
         _queue_hazards(state, pid, 'enter')  # forced movement (a swap, a push) into a hazard counts too
+
+
+def _dm_place_token(state, pid, col, row, facing=None, z=None):
+    """The DM moves, turns or lifts any creature on the map (the DM console's live map editor) -- any time, whoever's turn
+    it is, and without using its movement: a push, a fall, a correction. It has to fit on the map; its height stays
+    within what it can reach (a burrower may go below the ground)."""
+    p = state['participants'].get(pid)
+    if not p:
+        raise ValueError('Unknown participant: ' + pid)
+    grid = state['board'].get('grid') or {}
+    n = footprint_size(p.get('size'))
+    if col is None or row is None or not all(0 <= c < (grid.get('cols') or 0) and 0 <= r < (grid.get('rows') or 0)
+                                             for c, r in footprint_cells(col, row, n)):
+        raise ValueError(f"{p['name']} doesn't fit there")
+    old = state['board']['tokens'].get(pid)
+    moved = not old or (old.get('col'), old.get('row')) != (col, row)
+    _set_token_position(state, pid, col, row)
+    tok = state['board']['tokens'][pid]
+    if facing is not None:
+        tok['facing'] = facing % 360
+    if z is not None:
+        low, high = altitude_limits(p)
+        tok['z'] = max(z, low) if low is not None else z
+        if high is not None:
+            tok['z'] = min(tok['z'], high)
+    p['placed'] = True
+    if moved:
+        _log_event(state, 'placement', text=f"The DM moved {p['name']} to ({col}, {row})", targetId=pid, targetName=p['name'])
+
+
+def dm_set_board_map(conn, objects, marks):
+    """POST /api/dm/board-map: the DM's live map edits -- the battle map's objects and difficult / blocked squares replaced
+    as the DM console's map editor now has them (cleaned the same way Start battle cleans the setup's)."""
+    with _SESSION_LOCK:
+        def apply(state):
+            board = state['board']
+            grid = board.get('grid') or {}
+            cols, rows = grid.get('cols') or 0, grid.get('rows') or 0
+            board['objects'] = _clean_map_objects(objects if isinstance(objects, list) else [], cols, rows)
+            board['marks'] = {cell: kind for cell, kind in (marks if isinstance(marks, dict) else {}).items()
+                              if kind in MAP_MARK_KINDS and _in_grid(cell, cols, rows)}
+        return _mutate(conn, apply)
 
 
 def _facing_of(state, pid):

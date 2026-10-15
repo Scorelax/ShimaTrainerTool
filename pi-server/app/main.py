@@ -329,6 +329,19 @@ def dm_save_npc_image(payload: dict):
     return JSONResponse({'status': 'success', 'data': img})
 
 
+@app.post('/api/dm/board-map')
+def dm_set_board_map(payload: dict):
+    """The DM's mid-battle map edits -- objects and difficult / blocked squares (routes_combat.dm_set_board_map)."""
+    conn = db.connect()
+    try:
+        result = routes_combat.dm_set_board_map(conn, payload.get('objects'), payload.get('marks'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    finally:
+        conn.close()
+    return JSONResponse({'status': 'success', 'data': result.get('data') if isinstance(result, dict) else None})
+
+
 @app.post('/api/dm/battle-background')
 def dm_save_battle_background(payload: dict):
     """A battle-map background uploaded from the DM console's Map setup (routes_dm.save_battle_background)."""

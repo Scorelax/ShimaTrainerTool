@@ -7,15 +7,29 @@
 // blocked), Terrain (paint difficult / blocked squares, which the battle enforces for creatures on the ground --
 // routes_combat.py's _move_cost_ft / _move_token) and Eraser.
 //
+// Mid-battle (live mode, the user's ask 2026-10-15) the DM edits the running battle's map the same way, whoever's turn
+// it is, and the Creatures tool moves, turns and lifts any creature without using its movement.
+//
 // Objects (the user's ask, 2026-10-15): press a square to place one there and, still holding, move the pointer around
 // it to turn it -- it's placed on release. Click a placed object to edit it (the panel shows its settings, changes apply
 // at once, arrows move it); press and hold a placed object to turn it the same way.
 import { DmAPI } from '../api.js';
-import { mapObjectHtml, objectScreenRect, objectCells } from '../utils/battle-map-grid.js';
+import { mapObjectHtml, objectScreenRect, objectCells, footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { escapeHtml, newId, toast } from './dm-common.js';
-import { getSetup, updateSetup, flushSetup, onSetupChange, emptySetup, TV_ASPECT } from './setup-store.js';
+import * as setupStore from './setup-store.js';
+import * as liveStore from './live-map-store.js';
+
+const { emptySetup, TV_ASPECT } = setupStore;
+// Map setup edits the setup (setup-store.js); `live` mode edits the running battle's map (live-map-store.js) -- the
+// same editor, plus a Creatures tool, from the DM console's battle panel (battle-live.js's Edit map).
+let _store = setupStore;
+let _live = false;
+const getSetup = () => _store.getSetup();
+const updateSetup = (fn) => _store.updateSetup(fn);
+const flushSetup = () => _store.flushSetup();
+const onSetupChange = (fn) => _store.onSetupChange(fn);
 import { mapStageHtml } from './map-view.js';
 
 // Starting height (ft) for an object the DM places -- changeable before placing. Anything not listed starts at 5ft.
@@ -34,6 +48,7 @@ const ed = {
   selectedId: null, // the placed object being edited
   editCx: 0, editCy: 0, // its centre on screen, in squares -- kept while editing, so turning it back and forth doesn't creep
   gesture: null, // press-and-turn under way: {cx, cy, startRot, ref, editing, turned, pointerId}
+  creatureId: null, // live mode's Creatures tool: the creature picked to move / turn / lift
 };
 
 let _root = null;
@@ -206,9 +221,12 @@ function applyEdit() {
 // Render
 // ---------------------------------------------------------------------------
 
-export async function renderMapEditor(root, { onDone }) {
+export async function renderMapEditor(root, { onDone, live = false }) {
   _root = root;
   _onDone = onDone;
+  _live = live;
+  _store = live ? liveStore : setupStore;
+  if (!live && ed.tool === 'creatures') ed.tool = 'objects';
   root.innerHTML = '<div class="dm-loading">Loading the map tools…</div>';
   try {
     await loadAssets();
@@ -223,12 +241,13 @@ export async function renderMapEditor(root, { onDone }) {
     <div class="dm-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head">
-          <button class="dm-btn small" id="mapBack">← Map setup</button>
-          <h2>Map</h2>
+          <button class="dm-btn small" id="mapBack">${_live ? '← Battle' : '← Map setup'}</button>
+          <h2>${_live ? 'Battle map' : 'Map'}</h2>
           <button class="dm-btn primary small" id="mapDone">✓ Done</button>
         </div>
+        ${_live ? '<div class="dm-hint dm-live-note">The running battle\'s map -- every change shows on the players\' screens and the table at once.</div>' : ''}
 
-        <div class="dm-card">
+        ${_live ? '' : `<div class="dm-card">
           <div class="dm-card-title">Size</div>
           <div class="dm-row">
             <div class="dm-field"><label for="mapAcross">Squares across</label><input class="dm-input" id="mapAcross" type="number" min="1" max="60" value="${m.rows}"></div>
@@ -237,7 +256,7 @@ export async function renderMapEditor(root, { onDone }) {
           <label class="dm-check"><input type="checkbox" id="mapLock" ${m.lockRatio ? 'checked' : ''}>
             <span>Keep the table TV's shape <small>Squares stay square on the TV. Untick to make any shape.</small></span></label>
           <button class="dm-btn wide" id="mapApplySize">Apply size</button>
-        </div>
+        </div>`}
 
         <div class="dm-card">
           <div class="dm-card-title">Background</div>
@@ -249,17 +268,18 @@ export async function renderMapEditor(root, { onDone }) {
           <input type="file" id="mapBgFile" accept="image/jpeg,image/png,image/webp" hidden>
         </div>
 
-        <div class="dm-card">
+        ${_live ? '' : `<div class="dm-card">
           <div class="dm-card-title">Saved maps</div>
           <div class="dm-row dm-map-saverow">
             <input class="dm-input" id="mapSaveName" placeholder="Name this map…" maxlength="60" autocomplete="off">
             <button class="dm-btn" id="mapSave">💾 Save</button>
           </div>
           <div class="dm-saved-maps" id="mapSavedList"><div class="dm-hint">Loading…</div></div>
-        </div>
+        </div>`}
 
         <div class="dm-card">
           <div class="dm-tool-tabs" id="mapTools">
+            ${_live ? '<button data-tool="creatures">🧍 Creatures</button>' : ''}
             <button data-tool="objects">🌲 Objects</button>
             <button data-tool="terrain">🟫 Terrain</button>
             <button data-tool="erase">🧽 Eraser</button>
@@ -286,9 +306,13 @@ export async function renderMapEditor(root, { onDone }) {
   wireStatic();
   renderToolPanel();
   renderStage();
-  renderSavedMaps();
+  if (!_live) renderSavedMaps();
   _unsub?.();
-  _unsub = onSetupChange(() => { if (document.body.contains(_root)) renderStage(); });
+  _unsub = onSetupChange(() => {
+    if (!document.body.contains(_root)) return;
+    renderStage();
+    if (_live && ed.tool === 'creatures') renderToolPanel();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -390,17 +414,19 @@ function selectObjectKind(key) {
 }
 
 function wireStatic() {
-  const across = document.getElementById('mapAcross');
-  const down = document.getElementById('mapDown');
-  const lock = document.getElementById('mapLock');
-  across.addEventListener('input', () => {
-    if (lock.checked && Number(across.value) > 0) down.value = Math.max(1, Math.round(Number(across.value) / TV_ASPECT));
-  });
-  down.addEventListener('input', () => {
-    if (lock.checked && Number(down.value) > 0) across.value = Math.max(1, Math.round(Number(down.value) * TV_ASPECT));
-  });
-  lock.addEventListener('change', () => updateSetup(s => { s.map.lockRatio = lock.checked; }));
-  document.getElementById('mapApplySize').addEventListener('click', () => applySize(Number(across.value), Number(down.value)));
+  if (!_live) {
+    const across = document.getElementById('mapAcross');
+    const down = document.getElementById('mapDown');
+    const lock = document.getElementById('mapLock');
+    across.addEventListener('input', () => {
+      if (lock.checked && Number(across.value) > 0) down.value = Math.max(1, Math.round(Number(across.value) / TV_ASPECT));
+    });
+    down.addEventListener('input', () => {
+      if (lock.checked && Number(down.value) > 0) across.value = Math.max(1, Math.round(Number(down.value) * TV_ASPECT));
+    });
+    lock.addEventListener('change', () => updateSetup(s => { s.map.lockRatio = lock.checked; }));
+    document.getElementById('mapApplySize').addEventListener('click', () => applySize(Number(across.value), Number(down.value)));
+  }
   document.getElementById('mapBackground').addEventListener('change', (e) => updateSetup(s => { s.map.background = e.target.value; }));
   document.getElementById('mapBgUpload').addEventListener('click', () => document.getElementById('mapBgFile').click());
   document.getElementById('mapBgFile').addEventListener('change', (e) => {
@@ -413,20 +439,21 @@ function wireStatic() {
     if (!b) return;
     ed.tool = b.dataset.tool;
     if (ed.tool !== 'objects') { ed.selectedId = null; ed.editAsset = null; }
+    if (ed.tool !== 'creatures') ed.creatureId = null;
     renderToolPanel();
     renderStage();
   });
   document.getElementById('mapBack').addEventListener('click', () => leave());
-  document.getElementById('mapSave').addEventListener('click', saveCurrentMap);
-  document.getElementById('mapSaveName').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveCurrentMap(); });
-  document.getElementById('mapSavedList').addEventListener('click', (e) => {
+  document.getElementById('mapSave')?.addEventListener('click', saveCurrentMap);
+  document.getElementById('mapSaveName')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveCurrentMap(); });
+  document.getElementById('mapSavedList')?.addEventListener('click', (e) => {
     const load = e.target.closest('[data-load-map]');
     if (load) { loadSavedMap(load.dataset.loadMap); return; }
     const del = e.target.closest('[data-delete-map]');
     if (del) deleteSavedMap(del.dataset.deleteMap);
   });
   document.getElementById('mapDone').addEventListener('click', () => {
-    updateSetup(s => { s.map.ready = true; });
+    if (!_live) updateSetup(s => { s.map.ready = true; });
     leave();
   });
   document.getElementById('mapClearObjects').addEventListener('click', async () => {
@@ -591,6 +618,24 @@ function renderToolPanel() {
       renderToolPanel();
     });
     document.getElementById('objDoneEdit')?.addEventListener('click', deselectObject);
+  } else if (ed.tool === 'creatures') {
+    const c = getSetup().creatures.find(x => x.id === ed.creatureId);
+    panel.innerHTML = c ? `
+      <div class="dm-edit-head"><b>${escapeHtml(c.name)}</b><small>Facing ${c.position.facing}° · ${c.z ? `${c.z}ft up` : 'on the ground'}</small></div>
+      <div class="dm-field"><label>Turn</label><div class="dm-row">
+        <button class="dm-btn" data-cre="turn" data-v="-45" title="Turn left 45°">⟲ 45°</button><button class="dm-btn" data-cre="turn" data-v="45" title="Turn right 45°">⟳ 45°</button></div></div>
+      <div class="dm-field"><label>Height</label><div class="dm-row">
+        <button class="dm-btn" data-cre="z" data-v="-5" title="5ft lower">▼ 5ft</button><button class="dm-btn" data-cre="z" data-v="5" title="5ft higher">▲ 5ft</button></div></div>
+      <button class="dm-btn wide" data-cre="done">✓ Done with ${escapeHtml(c.name)}</button>`
+      : '<div class="dm-hint">Tap a creature on the map -- anyone\'s -- then tap a square to move it there. It doesn\'t use its movement, and it doesn\'t have to be its turn.</div>';
+    hint.textContent = c ? `Tap a square to move ${c.name} there · turn it or change its height on the left.` : 'Creatures: tap one to pick it.';
+    panel.querySelectorAll('[data-cre]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.cre === 'done') { ed.creatureId = null; renderToolPanel(); renderStage(); return; }
+      const now = getSetup().creatures.find(x => x.id === ed.creatureId);
+      if (!now) return;
+      const v = Number(b.dataset.v);
+      liveStore.placeToken(now.id, b.dataset.cre === 'turn' ? { facing: (((now.position.facing + v) % 360) + 360) % 360 } : { z: Math.max(-500, now.z + v) });
+    }));
   } else if (ed.tool === 'terrain') {
     panel.innerHTML = `
       ${[['difficult', 'Difficult terrain', 'Double movement for creatures on the ground.'], ['blocked', 'Blocked', "Can't be walked through or stood on."], ['clear', 'Clear', 'Back to normal ground.']]
@@ -636,7 +681,7 @@ function renderStage() {
   if (!wrap) return;
   const s = getSetup();
   const m = s.map;
-  wrap.innerHTML = mapStageHtml(s, { interactive: true });
+  wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: ed.tool === 'creatures' ? ed.creatureId : null });
   const stage = wrap.querySelector('.dm-map-stage');
   stage.style.width = `min(100%, calc((100vh - 190px) * ${m.rows / m.cols}))`;
   stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
@@ -649,6 +694,7 @@ function renderStage() {
     const { col, row } = cell;
     if (ed.tool === 'terrain') { startPainting(e); paint(col, row); }
     else if (ed.tool === 'objects') startObjectPress(e, col, row);
+    else if (ed.tool === 'creatures') onCreaturePress(col, row);
     else onCellClick(col, row);
   });
   stage.addEventListener('pointermove', (e) => {
@@ -686,6 +732,18 @@ function startPainting(e) {
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
+}
+
+/** Live mode's Creatures tool: a press on a creature picks it (again: lets go of it); with one picked, a press on a
+ * square moves it there (live-map-store.js's placeToken -- the server checks it fits). */
+function onCreaturePress(col, row) {
+  const s = getSetup();
+  const hit = s.creatures.find(c => footprintCells(c.position.col, c.position.row, footprintForSize(c.participant?.size))
+    .some(p => p.col === col && p.row === row));
+  if (hit && hit.id !== ed.creatureId) { ed.creatureId = hit.id; renderToolPanel(); renderStage(); return; }
+  if (hit) { ed.creatureId = null; renderToolPanel(); renderStage(); return; }
+  if (!ed.creatureId) return;
+  liveStore.placeToken(ed.creatureId, { col, row });
 }
 
 /** The board square under the pointer, worked out from where it is on the map (the objects sit above the grid). */

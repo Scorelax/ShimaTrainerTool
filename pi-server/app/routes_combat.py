@@ -1472,9 +1472,8 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=Non
         # A switch on the trainer's (or the creature's own) turn is acting: the battle is under way, so the turn order
         # holds and the newcomer takes the outgoing Pokemon's slot -- before this, a faster newcomer was re-sorted to the
         # top and took the turn from the trainer still using it.
-        trainer = next((p for p in state['participants'].values()
-                        if p.get('combatantType') == 'trainer' and (p.get('owner') or '') == (out.get('owner') or '')), None)
-        if _active_participant_id(state) in ({out_id} | ({trainer['id']} if trainer else set())):
+        active = _active_participant_id(state)
+        if active == out_id or _switch_turn_owner(state, out, active):
             state['started'] = True
     _check_switch_turn(state, out, move_name)
     trapped = next((s for s in _statuses_of(out) if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
@@ -1501,6 +1500,13 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=Non
 _SWITCHING_EFFECT_KINDS = ('switch_out', 'faint_pass_heal')  # Baton Pass, U-turn, Volt Switch / Lunar Dance, Healing Wish
 
 
+def _switch_turn_owner(state, out, active):
+    """Whether it's the turn of a trainer who sends out `out` -- its player's trainer, or any of the DM's trainers for a
+    DM creature (the server doesn't know which NPC trainer a DM Pokemon belongs to)."""
+    ap = state['participants'].get(active) or {}
+    return ap.get('combatantType') == 'trainer' and (ap.get('owner') or '') == (out.get('owner') or '')
+
+
 def _check_switch_turn(state, out, move_name=None):
     """Switching is the trainer's action, on the trainer's own turn (the user's rule, 2026-10-15) -- except a move that
     switches (`move_name` with a switch_out / faint_pass_heal effect, used on the Pokemon's own turn: Baton Pass, U-turn,
@@ -1511,16 +1517,19 @@ def _check_switch_turn(state, out, move_name=None):
     if (state.get('pendingForcedSwitch') or {}).get('pokemonId') == out['id']:
         return
     active = _active_participant_id(state)
-    trainer = next((p for p in state['participants'].values()
-                    if p.get('combatantType') == 'trainer' and (p.get('owner') or '') == (out.get('owner') or '')), None)
-    if trainer and active == trainer['id']:
+    if _switch_turn_owner(state, out, active):
         return
+    # The DM's creatures have no one trainer the server knows of (wild ones, and several NPC trainers' all owned by
+    # 'DM'), so on their own turn they switch freely; a player's Pokemon needs a switching move on its own turn.
+    dm_side = (out.get('owner') or '') in ('', DM_OWNER)
     if active == out['id']:
-        if not trainer:
+        if dm_side:
             return
         record = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None) if move_name else None
         if record and any(e.get('kind') in _SWITCHING_EFFECT_KINDS for e in record.get('effects') or []):
             return
+    trainer = None if dm_side else next((p for p in state['participants'].values()
+                                         if p.get('combatantType') == 'trainer' and (p.get('owner') or '') == (out.get('owner') or '')), None)
     who = trainer['name'] if trainer else out['name']
     raise ValueError(f"Switching is {who}'s action -- only on {who}'s turn (or with a move that switches, like U-turn or Baton Pass)")
 

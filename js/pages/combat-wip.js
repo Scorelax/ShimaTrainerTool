@@ -6494,7 +6494,10 @@ function _aoeAreaFor(moveName) {
   if (coneFt) return { coneFt };
   // No shape in the range ("30ft.", "Melee"): the description may give one -- Smokescreen's wall from a point, Blizzard's
   // 20 foot radius centered on a point, Dark Void's "all creatures within 30 feet of you" (areaFromDescription).
-  if (!/radius|circle|cylinder/i.test(range)) return areaFromDescription(range, String(row[7] || ''));
+  // Only for a move tagged as an area move -- "choose one creature within 60 feet" (Temporal Shift) isn't a 60ft circle.
+  if (!/radius|circle|cylinder/i.test(range)) {
+    return moveCategoriesFor(moveName).includes('multi_hit_aoe') ? areaFromDescription(range, String(row[7] || '')) : null;
+  }
   const radiusFt = radiusFtFromRange(range);
   if (!radiusFt) return null;
   const high = /(\d+)\s*(?:ft|feet|foot)\.?\s*high/i.exec(String(row[7] || ''));

@@ -617,7 +617,7 @@ function renderStage() {
     if (!cell) return;
     e.preventDefault();
     const { col, row } = cell;
-    if (ed.tool === 'terrain') { ed.painting = true; paint(col, row); }
+    if (ed.tool === 'terrain') { startPainting(e); paint(col, row); }
     else if (ed.tool === 'objects') startObjectPress(e, col, row);
     else onCellClick(col, row);
   });
@@ -627,11 +627,35 @@ function renderStage() {
     if (!cell) return;
     if (ed.hover?.col === cell.col && ed.hover?.row === cell.row) return;
     ed.hover = cell;
-    if (ed.painting && ed.tool === 'terrain') paint(cell.col, cell.row);
     renderGhost();
   });
   stage.addEventListener('pointerleave', () => { if (!ed.gesture) { ed.hover = null; renderGhost(); } });
   renderGhost();
+}
+
+/** Terrain: keeps painting under the pointer until it's let go -- followed on the window, since every painted square
+ * redraws the map (and a finger's touch stays tied to the element it started on, which that replaces). */
+function startPainting(e) {
+  ed.painting = true;
+  const id = e.pointerId;
+  let last = null;
+  const move = (ev) => {
+    if (ev.pointerId !== id || !ed.painting) return;
+    const cell = cellAtPointer(ev);
+    if (!cell || (last && last.col === cell.col && last.row === cell.row)) return;
+    last = cell;
+    paint(cell.col, cell.row);
+  };
+  const end = (ev) => {
+    if (ev.pointerId !== id) return;
+    ed.painting = false;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
 }
 
 /** The board square under the pointer, worked out from where it is on the map (the objects sit above the grid). */

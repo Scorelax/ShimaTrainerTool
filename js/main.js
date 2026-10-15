@@ -13,7 +13,7 @@ import { renderNewPokemon, attachNewPokemonListeners } from './pages/new-pokemon
 import { renderPokemonForm, attachPokemonFormListeners } from './pages/pokemon-form.js';
 import { renderEvolution, attachEvolutionListeners } from './pages/evolution.js';
 import { renderCombat, attachCombatListeners } from './pages/combat.js';
-import { renderCombatWip, attachCombatWipListeners } from './pages/combat-wip.js';
+import { renderCombatWip, attachCombatWipListeners, leaveCombatWip } from './pages/combat-wip.js';
 import { mountPlayerPokedex } from './pokedex/player-pokedex.js';
 import { showToast, showError } from './utils/notifications.js';
 import { audioManager } from './utils/audio.js';
@@ -306,6 +306,7 @@ class Router {
     const content = document.getElementById('content');
     content.innerHTML = await renderCombatWip();
     attachCombatWipListeners();
+    this.leavePage = leaveCombatWip; // leaving it (a Back swipe too) disconnects it from the old combat page's engine
   }
 
   // The players' Pokedex (the same view as pokedex.html), as a page of its own over the whole screen -- opened from

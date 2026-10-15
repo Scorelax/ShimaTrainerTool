@@ -878,7 +878,9 @@ function _hasFullStatBlock(p) {
 }
 
 function _enterBattleSync() {
-  if (_battleSyncActive) return;
+  // Installed again on every entry, never skipped as "already on": the old combat page, which the trainer card's Battle
+  // button passes through on the way here, resets the state key and the save hook -- a page entered a second time used to
+  // run without them (its VP changes never reached the server, and its local copy landed where the old page reads).
   _battleSyncActive = true;
   setCombatStateKey(WIP_COMBAT_STATE_KEY);
   setOnCombatStateSave(_onLocalCombatStateSave);
@@ -895,6 +897,12 @@ function _enterBattleSync() {
   setNoTargetHandler(_onTargetCheck); // a move with nobody in reach costs nothing
   setOnMovePaid(_onMovePaid); // a concentration move starts concentrating once it's paid for
   setRemoteSaveHandler(_remoteSaveFor); // a save is made on the screen of whoever controls the saver
+}
+
+/** main.js's leavePage for this route: leaving the battle page by any way at all (a Back swipe too) disconnects it from
+ * the old combat page's engine, which would otherwise keep the shared battle's hooks and state key. */
+export function leaveCombatWip() {
+  _exitBattleSync();
 }
 
 function _exitBattleSync() {
@@ -4403,7 +4411,9 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
           radiusFt: radiusFtFromRange(rangeText),
           // "Self, 50ft" is around the caster; "centered on a point in range" is placed by the caster instead.
           centeredOnCaster: /\bself\b/i.test(rangeText),
+          allowCancel: true, // changed their mind: nothing has happened yet, so nothing is spent
         });
+        if (!area) continue;
         await CombatAPI.setWeather(effect.name || moveName, effect.description || '', {
           rounds: effect.rounds, sourceId: attackerId, sourceName: caster?.name, casterLevel: caster?.level,
           concentration: effect.concentration ? '1' : '', cells: area.cells,
@@ -4456,7 +4466,9 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
           // `center: 'point'` moves are placed by the caster, the rest are centered on them.
           radiusFt: effect.radiusFt ?? radiusFtFromRange(moveRow[6]),
           centeredOnCaster: effect.center !== 'point',
+          allowCancel: true, // changed their mind: nothing has happened yet, so nothing is spent
         });
+        if (!area) continue;
         // What the zone does for whoever stands on it (routes_combat.py's _ZONE_PROPS), resolved at the caster's level now.
         const props = {};
         if (effect.rule) props.rule = effect.rule;
@@ -4483,10 +4495,10 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
             const rolled = await promptDamageRoll({
               dice: props.hazard.dice, moveModBonus: bonus, moveName, damageType: h.damageType,
               bonusSource: String(computedData?.damageBreakdown || '').replace(/^\(|\)$/g, '') || 'MOVE',
-              description: `${moveName}: roll the damage now -- every creature it hits takes this total.`,
+              description: `${moveName}: roll the damage now -- every creature it hits takes this total. (Closing this cancels the move.)`,
             });
-            // Closed without a roll: each hit is rolled when it happens instead, as before.
-            if (rolled !== null) props.hazard.rolled = Math.max(0, rolled);
+            if (rolled === null) continue; // closed: the move is called off -- no zone, nothing spent
+            props.hazard.rolled = Math.max(0, rolled);
           }
         }
         await CombatAPI.setTerrain(effect.name || moveName, effect.description || '', {
@@ -5563,7 +5575,10 @@ async function _handleApplyHeal({ targetId, effect, moveName, casterId, casterNa
  * before assuming it just works. */
 /** The battle animation always comes last: after the effects popup, any area placement and every target. */
 async function _handleEffectsOnly(args) {
-  if ((await _runEffectsOnly(args)) !== false) playBattleAnimationFloating(args.speciesName);
+  const ran = await _runEffectsOnly(args);
+  // Nothing happened (every popup closed or cancelled): the move was never paid for, and isn't played either.
+  const unpaid = pendingMove()?.combatantId === args.combatantId && pendingMove()?.moveName === args.moveName;
+  if (ran !== false && !unpaid) playBattleAnimationFloating(args.speciesName);
 }
 
 async function _runEffectsOnly({ combatantId, moveName, computedData }) {

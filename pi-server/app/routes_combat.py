@@ -1455,6 +1455,7 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=Non
         raise ValueError(f"{out['name']} isn't in the battle")
     if inn.get('status') == 'participating':
         raise ValueError(f"{inn['name']} is already in the battle")
+    _close_stale_reaction_window(state)  # a switch held on a window nobody ran the clock for finishes (or drops) first
     if state.get('pendingSwitch'):
         raise ValueError('A switch is already in progress -- wait for its reaction window to close')
     trapped = next((s for s in _statuses_of(out) if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)

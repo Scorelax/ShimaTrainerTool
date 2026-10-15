@@ -4,7 +4,6 @@ import { showError } from '../utils/notifications.js';
 import { scaledMaxCharges } from '../utils/move-charges.js';
 import { audioManager } from '../utils/audio.js';
 import { spriteMediaHtml } from '../utils/sprite-media.js';
-import { showCombatConfirm } from '../utils/combat-alert.js';
 
 // Helper function to get max charges for a buff based on trainer level
 function getMaxCharges(buffName, trainerLevel) {
@@ -1214,22 +1213,10 @@ export function attachTrainerCardListeners() {
     }));
   });
 
-  // Combat button
-  document.getElementById('combatBtn')?.addEventListener('click', async () => {
-    const existing = sessionStorage.getItem('combatState');
-    if (existing) {
-      const existingState = JSON.parse(existing);
-      if (existingState.phase === 'battle' || existingState.phase === 'initiative') {
-        // Ask: resume or new?
-        const resume = await showCombatConfirm('An active combat session exists.', { yesLabel: 'Resume', noLabel: 'Start New' });
-        if (!resume) {
-          sessionStorage.removeItem('combatState');
-        }
-      } else {
-        sessionStorage.removeItem('combatState');
-      }
-    }
-    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat' } }));
+  // Combat button: straight into the shared battle (combat-wip.js) -- the main battle system since 2026-10-15. The old
+  // single-device combat page (combat.js's own flow) is no longer linked from here.
+  document.getElementById('combatBtn')?.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { route: 'combat-wip' } }));
   });
 
   // Badge tap interaction

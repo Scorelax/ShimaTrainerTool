@@ -3156,7 +3156,7 @@ export function attachCombatWipListeners() {
 
   if (_joinStage === 'setup') {
     attachSetupListeners({
-      backRoute: 'combat',
+      backRoute: 'trainer-card', // the old combat page isn't a way back any more -- the trainer card opens this one
       onStart: ({ trainerCombatant, activePokemon }) => {
         _joinState = { combatants: [trainerCombatant, activePokemon] };
         _joinStage = 'initiative';

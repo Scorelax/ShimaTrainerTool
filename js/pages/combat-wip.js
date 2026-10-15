@@ -13,7 +13,7 @@ import { pickTarget, pickTargetAgain, setMoveAbilityResolver, setMoveFlagResolve
 import { setSaveAbilityResolver } from '../utils/save-picker.js';
 import { pickSwitchTile } from '../utils/token-placement-picker.js';
 import { waitForOpenWindow } from '../utils/reaction-window.js';
-import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler } from '../utils/save-picker.js';
+import { pickSaveTarget, confirmSecondarySave, pickManualSaveTarget, setRemoteSaveHandler, isSavePickerBusy } from '../utils/save-picker.js';
 import { pickMultipleTargets } from '../utils/multi-target-picker.js';
 import { computeMoveDC, bestMoveStatModifier } from '../utils/pokemon-types.js';
 import { showBattleMap, updateBattleMap } from '../utils/battle-map-popup.js';
@@ -3062,6 +3062,7 @@ export function attachCombatWipListeners() {
     setAbilitySession(session);
     _showNewAbilityReminders(session);
     _answerPromptsForMe(session); // another player's attack asking this player to roll (their Sturdy, Rough Skin...)
+    _answerConcentrationChecks(session); // one of this player's creatures took damage while concentrating
     if (_joinStage === 'placement') {
       if (_placementQueue.length) {
         _renderPlacementTokens(session, _placementQueue[0]);
@@ -6778,6 +6779,28 @@ function _answerPromptsForMe(s) {
   }
 }
 const _promptsOpen = new Map(); // prompt id -> kind, while its popup is up on this screen
+
+/** The server's concentration checks for this player's creatures (routes_combat.py _check_concentration_after_damage):
+ * a Constitution save, DC half the damage (at least 10); a failure ends every move it concentrates on. One at a time,
+ * and only when the save popup is free (a save or attack under way here goes first -- the next push picks it up). */
+let _concentrationCheckOpen = null;
+function _answerConcentrationChecks(s) {
+  const me = _currentTrainerName();
+  if (!me || _spectating || _concentrationCheckOpen || isSavePickerBusy()) return;
+  const check = Object.values(s?.concentrationChecks || {}).find(c => c.owner === me);
+  if (!check) return;
+  const holder = s.participants?.[check.participantId];
+  if (!holder) { CombatAPI.concentrationSave(check.id, 'skip').catch(() => {}); return; }
+  _concentrationCheckOpen = check.id;
+  const moves = check.moves.join(', ');
+  confirmSecondarySave(holder, holder.name, {
+    dc: check.dc, ability: 'CON', title: 'Concentration Save', hasDamage: false,
+    note: `${holder.name} took ${check.damage} damage while concentrating on ${moves}: DC ${check.dc} (half the damage, at least 10). A failure ends ${check.moves.length > 1 ? 'all of them' : 'it'}.`,
+  }).then((outcome) => CombatAPI.concentrationSave(check.id, !outcome ? 'skip' : outcome.passed ? 'pass' : 'fail',
+    outcome?.saveTotal != null ? `rolled ${outcome.saveTotal}` : ''))
+    .catch(() => {})
+    .finally(() => { _concentrationCheckOpen = null; if (session) _answerConcentrationChecks(session); });
+}
 // The button that closes each kind's popup without an answer.
 const _PROMPT_CLOSE_BUTTON = { roll: 'healPopupClose', confirm: 'combatConfirmNo2', save: 'savePickerClose' };
 

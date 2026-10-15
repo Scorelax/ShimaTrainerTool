@@ -1213,6 +1213,12 @@ export class CombatAPI {
     return API.request('combat', 'switch-pokemon', { id, inId, pass: pass ? '1' : '', ...(tile ? { col: tile.col, row: tile.row } : {}), ...(move ? { move } : {}) }, { useCache: false });
   }
 
+  /** The answer to a concentration check (session.concentrationChecks): 'pass', 'fail' (ends all its concentration) or
+   * 'skip' (closed -- handled by hand). `note` is the roll, for the log. */
+  static async concentrationSave(checkId, outcome, note = '') {
+    return API.request('combat', 'concentration-save', { checkId, outcome, note }, { useCache: false });
+  }
+
   /** Block: stops the switch-out that is waiting on the open `switch_out` reaction window. */
   static async cancelPendingSwitch(id) {
     return API.request('combat', 'cancel-pending-switch', { id }, { useCache: false });

@@ -661,6 +661,11 @@ def _handle(conn, action, params):
             raise ValueError('Missing prompt id')
         return _mutate(conn, lambda s: _answer_prompt(s, params['promptId'], params.get('answer')))
 
+    if action == 'concentration-save':
+        if not params.get('checkId') or params.get('outcome') not in ('pass', 'fail', 'skip'):
+            raise ValueError('Missing check id or outcome (pass, fail or skip)')
+        return _mutate(conn, lambda s: _concentration_save(s, params['checkId'], params['outcome'], str(params.get('note') or '')[:120]))
+
     if action == 'prompt-clear':
         if not params.get('promptId'):
             raise ValueError('Missing prompt id')
@@ -801,7 +806,9 @@ def _mutate(conn, fn):
     state = load_state(conn)
     if not state.get('active'):
         raise ValueError('No active combat session')
+    before = _concentrators_health(state)
     fn(state)
+    _check_concentration_after_damage(state, before)
     return _save_and_publish(conn, state)
 
 
@@ -2796,6 +2803,74 @@ CONCENTRATION_STATUSES = ('concentrating', 'charging')
 
 def _is_concentration_status(s):
     return s.get('kind') == 'condition' and s.get('apply') in CONCENTRATION_STATUSES
+
+
+def _concentrating_moves(p):
+    """The moves `p` is concentrating on (not `charging` -- drawing in air for a two-stage move needs no concentration)."""
+    return [st for st in _statuses_of(p) if st.get('kind') == 'condition' and st.get('apply') == 'concentrating']
+
+
+def _health_with_temp(p):
+    return (p.get('currentHP') or 0) + sum(max(0, st.get('remaining') or 0) for st in _statuses_of(p) if st.get('kind') == 'temp_hp')
+
+
+def _concentrators_health(state):
+    """id -> HP + temporary HP of every creature concentrating on something, before an action runs (_mutate)."""
+    return {pid: _health_with_temp(p) for pid, p in state['participants'].items() if _concentrating_moves(p)}
+
+
+def concentration_save_dc(damage):
+    """Half the damage taken, rounded up, at least 10 (the DM's rule, 2026-10-15): 22 -> DC 11, 23 -> DC 12, under 21 -> 10."""
+    return max(10, -(-int(damage) // 2))
+
+
+def _end_all_concentration(state, pid, reason):
+    p = state['participants'].get(pid)
+    for st in list(_concentrating_moves(p) if p else []):
+        if st in _statuses_of(p):
+            _remove_status(state, pid, st['id'], reason)
+
+
+def _check_concentration_after_damage(state, before):
+    """Damage to a concentrating creature (an attack, a zone, burn, recoil -- anything that lowered its HP or temporary HP in
+    this action) calls for a Constitution save to keep it: DC half the damage, at least 10. One save per hit; a failure ends
+    every move it concentrates on (the user's call, 2026-10-15). Its owner's screen (a player's, or the DM console for the
+    DM's creatures) shows the save (combat-wip.js _answerConcentrationChecks) and sends concentration-save. Fainting ends
+    all its concentration at once, no save."""
+    for pid, was in before.items():
+        p = state['participants'].get(pid)
+        if not p or not _concentrating_moves(p):
+            continue
+        damage = was - _health_with_temp(p)
+        if damage <= 0:
+            continue
+        if (p.get('currentHP') or 0) <= 0:
+            _end_all_concentration(state, pid, 'fainted')
+            continue
+        check_id = uuid.uuid4().hex[:10]
+        state.setdefault('concentrationChecks', {})[check_id] = {
+            'id': check_id, 'participantId': pid, 'owner': p.get('owner') or '', 'damage': damage,
+            'dc': concentration_save_dc(damage), 'moves': [st.get('moveName') or '?' for st in _concentrating_moves(p)],
+        }
+
+
+def _concentration_save(state, check_id, outcome, roll_note=''):
+    """The owner's answer to a concentration check: 'pass' keeps it, 'fail' ends every concentration the creature holds,
+    'skip' (the popup was closed) leaves it to be handled by hand."""
+    check = state.setdefault('concentrationChecks', {}).pop(check_id, None)
+    if not check:
+        return
+    p = state['participants'].get(check['participantId'])
+    if not p or not _concentrating_moves(p):
+        return
+    note = f' ({roll_note})' if roll_note else ''
+    if outcome == 'pass':
+        _log_event(state, 'save', text=f"{p['name']} kept its concentration (DC {check['dc']} after {check['damage']} damage){note}",
+                   targetId=p['id'], targetName=p['name'])
+    elif outcome == 'fail':
+        _log_event(state, 'save', text=f"{p['name']} lost its concentration (DC {check['dc']} after {check['damage']} damage){note}",
+                   targetId=p['id'], targetName=p['name'])
+        _end_all_concentration(state, p['id'], 'concentration lost')
 
 
 def _end_concentration_effects(state, holder_id, move_name):

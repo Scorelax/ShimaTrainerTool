@@ -2248,5 +2248,5 @@ lists the creature's concentration plus every effect on it that ends on concentr
   it again hits that creature automatically (no attack roll, no save) for the move's level-scaled dice, plus MOVE when
   `addMove`, for 0 VP (`release: 'bonus'` for Bind).
 
-Not covered: concentration saves when a concentrating creature takes damage (drop it by hand), Supernova's multi-turn
+Concentration saves: damage to a concentrating creature (HP or temporary HP, any source) asks its owner for a CON save, DC half the damage rounded up, at least 10; a failure ends every concentration it holds, fainting ends them with no save (routes_combat.py _check_concentration_after_damage). Not covered: Supernova's multi-turn
 charge, Sky Drop / Flavor Savor's "attack roll without damage, then the release next turn".

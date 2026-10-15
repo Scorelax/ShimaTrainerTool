@@ -218,6 +218,8 @@ function _showStep1() {
 // -- then it's done here after all). The damage roll that may follow stays on this screen: it's the attacker's roll.
 let _remoteSave = null;
 export function setRemoteSaveHandler(fn) { _remoteSave = typeof fn === 'function' ? fn : null; }
+/** True while a save is being asked here (shown, or waiting on another screen) -- the popup is single-use. */
+export function isSavePickerBusy() { return !!_resolve; }
 let _saveTitle = null; // confirmSecondarySave's own title for the save step
 
 function _showStep2(p, name) {

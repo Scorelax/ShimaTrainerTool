@@ -339,7 +339,8 @@ def _handle(conn, action, params):
             raise ValueError('Missing participant id or inId')
         passing = str(params.get('pass', '')) in ('1', 'true')
         return _mutate(conn, lambda s: _switch_pokemon(s, params['id'], params['inId'], passing,
-                                                       js_parse_int(params.get('col')), js_parse_int(params.get('row'))))
+                                                       js_parse_int(params.get('col')), js_parse_int(params.get('row')),
+                                                       params.get('move') or None))
 
     if action == 'cancel-pending-switch':
         if not params.get('id'):
@@ -1433,7 +1434,7 @@ def _switch_placement(state, out, inn, col=None, row=None):
     return {'col': best[1], 'row': best[2]}
 
 
-def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=None):
+def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=None, move_name=None):
     """Swaps one of a trainer's Pokemon out for another: the outgoing one goes to the bench (status 'spectating', keeping its HP,
     VP and statuses), the incoming one is sent out onto a free tile within 20ft of the trainer (chosen by the player, `col`/`row`)
     and takes the outgoing one's slot in the turn order. `pass_statuses` is Baton Pass: every status on the outgoing Pokemon goes
@@ -1460,6 +1461,7 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=Non
     _close_stale_reaction_window(state)  # a switch held on a window nobody ran the clock for finishes (or drops) first
     if state.get('pendingSwitch'):
         raise ValueError('A switch is already in progress -- wait for its reaction window to close')
+    _check_switch_turn(state, out, move_name)
     trapped = next((s for s in _statuses_of(out) if s.get('kind') == 'condition' and s.get('apply') in _MOVEMENT_BLOCKING_CONDITIONS), None)
     if trapped:
         raise ValueError(f"{out['name']} is {trapped['apply']} and can't be switched out")
@@ -1479,6 +1481,33 @@ def _switch_pokemon(state, out_id, in_id, pass_statuses=False, col=None, row=Non
                            actorId=out_id, actorName=out['name'])
                 return
     _perform_switch(state, pending)
+
+
+_SWITCHING_EFFECT_KINDS = ('switch_out', 'faint_pass_heal')  # Baton Pass, U-turn, Volt Switch / Lunar Dance, Healing Wish
+
+
+def _check_switch_turn(state, out, move_name=None):
+    """Switching is the trainer's action, on the trainer's own turn (the user's rule, 2026-10-15) -- except a move that
+    switches (`move_name` with a switch_out / faint_pass_heal effect, used on the Pokemon's own turn: Baton Pass, U-turn,
+    Lunar Dance...) and a forced switch (Dragon Tail's pendingForcedSwitch). A creature with no trainer in the battle (the
+    DM's) switches on its own turn. Before the battle starts there are no turns to keep to."""
+    if not state.get('started'):
+        return
+    if (state.get('pendingForcedSwitch') or {}).get('pokemonId') == out['id']:
+        return
+    active = _active_participant_id(state)
+    trainer = next((p for p in state['participants'].values()
+                    if p.get('combatantType') == 'trainer' and (p.get('owner') or '') == (out.get('owner') or '')), None)
+    if trainer and active == trainer['id']:
+        return
+    if active == out['id']:
+        if not trainer:
+            return
+        record = next((m for m in _load_move_data_file().get('moves', []) if m['name'] == move_name), None) if move_name else None
+        if record and any(e.get('kind') in _SWITCHING_EFFECT_KINDS for e in record.get('effects') or []):
+            return
+    who = trainer['name'] if trainer else out['name']
+    raise ValueError(f"Switching is {who}'s action -- only on {who}'s turn (or with a move that switches, like U-turn or Baton Pass)")
 
 
 def _finish_pending_switch(state):

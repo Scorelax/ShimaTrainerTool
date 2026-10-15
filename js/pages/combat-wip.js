@@ -1834,7 +1834,7 @@ async function _switchPokemonShared(bench, options = {}) {
       inId = `p${Math.random().toString(36).slice(2, 10)}`;
       await CombatAPI.addParticipant({ ..._combatantToParticipant(bench), id: inId, status: 'spectating' });
     }
-    const result = await CombatAPI.switchPokemon(out.id, inId, !!options.pass, tile);
+    const result = await CombatAPI.switchPokemon(out.id, inId, !!options.pass, tile, options.move || null);
     // A hostile creature may get a chance to react (Pursuit, Block) -- the switch waits on that window; run its clock.
     if (result?.data?.pendingReaction) waitForOpenWindow();
   } catch (err) {
@@ -4132,7 +4132,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
     }
     if (effect.kind === 'switch_out') {
       // Baton Pass, and U-turn / Volt Switch's "your trainer switches you out": the bench picker, then the server swap.
-      openSwitchPopup({ pass: !!effect.pass });
+      openSwitchPopup({ pass: !!effect.pass, move: moveName }); // the move is what allows a switch on the Pokemon's own turn
       continue;
     }
     if (effect.kind === 'faint_pass_heal') {
@@ -4143,7 +4143,7 @@ async function _offerMoveEffects({ attackerId, targetId = null, moveName, comput
         showCombatAlert(err.message, { title: 'Error' });
         continue;
       }
-      openSwitchPopup({ pass: false });
+      openSwitchPopup({ pass: false, move: moveName });
       continue;
     }
     if (effect.kind === 'recoil') {

@@ -470,7 +470,7 @@ export function setOnBasicAction(fn) { _onBasicAction = fn || null; }
 /** Opens the bench picker for a move-driven switch (Baton Pass, U-turn / Volt Switch's trainer switch, Lunar Dance, Healing
  * Wish). The normal "⇄ Switch Pokémon" button opens the same picker with no options. */
 export function openSwitchPopup(options = {}) {
-  _switchOptions = { pass: !!options.pass };
+  _switchOptions = { pass: !!options.pass, move: options.move || null }; // move: the switching move (U-turn...), if any
   if (_battleState) showSwitchPopup(_battleState);
 }
 
@@ -1130,7 +1130,10 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
     x.statusEffects.some(se => se.name === 'Ingrain' && se.duration > 0)
   );
   const switchBtn = !hasBenchPokemon ? '' :
-    ingrainLocked
+    // The shared battle: switching is the trainer's action, on the trainer's own turn (`hasFloor`, bridged by combat-wip.js).
+    c.hasFloor === false
+      ? `<button class="combat-trainer-action-btn combat-switch-open-btn" disabled title="Switching is ${c.name}'s action -- only on ${c.name}'s turn" style="opacity:0.4;cursor:not-allowed;">⇄ Switch Pokémon</button>`
+    : ingrainLocked
       ? `<button class="combat-trainer-action-btn combat-switch-open-btn" disabled title="Cannot switch: a Pokémon is rooted by Ingrain" style="opacity:0.4;cursor:not-allowed;">⇄ Switch Pokémon</button>`
       : `<button class="combat-trainer-action-btn combat-switch-open-btn">⇄ Switch Pokémon</button>`;
   // Own-actions only (open your own bag/buffs, switch YOUR bench) -- meaningless

@@ -1207,9 +1207,10 @@ export class CombatAPI {
 
   /** Switch Pokemon (shared battle): `id` goes to the bench, `inId` takes its place on the map and in the turn order. `pass`
    * is Baton Pass -- the outgoing Pokemon's statuses go with it. */
-  static async switchPokemon(id, inId, pass = false, tile = null) {
+  static async switchPokemon(id, inId, pass = false, tile = null, move = null) {
     // `tile` ({col, row}) is where the newcomer is sent out (within 20ft of its trainer); the server picks the nearest free tile without one.
-    return API.request('combat', 'switch-pokemon', { id, inId, pass: pass ? '1' : '', ...(tile ? { col: tile.col, row: tile.row } : {}) }, { useCache: false });
+    // `move`: the move whose effect does the switching (U-turn, Baton Pass...) -- the one way to switch on the Pokemon's own turn.
+    return API.request('combat', 'switch-pokemon', { id, inId, pass: pass ? '1' : '', ...(tile ? { col: tile.col, row: tile.row } : {}), ...(move ? { move } : {}) }, { useCache: false });
   }
 
   /** Block: stops the switch-out that is waiting on the open `switch_out` reaction window. */

@@ -141,9 +141,6 @@ export function injectBattleMapStyles() {
     /* where the selected token can reach with the movement it has left */
     .bmap-cell.reach { background: rgba(93,173,226,0.14); box-shadow: inset 0 0 0 0.5px rgba(93,173,226,0.5); }
     .bmap-cell.reach:hover { background: rgba(255,215,0,0.2); }
-    /* the cone/line preview from the selected token's facing */
-    .bmap-cell.cone { background: rgba(255,140,60,0.28); box-shadow: inset 0 0 0 1px rgba(255,160,80,0.65); }
-    .bmap-cell.cone.cone-edge { background: rgba(255,200,110,0.12); box-shadow: inset 0 0 0 1px rgba(255,205,120,0.85); outline: 1px dashed rgba(255,205,120,0.85); outline-offset: -3px; }
 
     /* ---- terrain zones: tinted, hatched, glowing edge ---- */
     .bmap-cell[class*="zone-"] {

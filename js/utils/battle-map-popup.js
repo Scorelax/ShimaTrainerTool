@@ -1,7 +1,7 @@
 // Interactive in-app battle map popup -- lets a player VIEW the same board the table kiosk screen
 // (battle-map.html) shows, and MOVE / TURN their own token. Click your token (it's the only clickable one, and
 // only on your turn) and a toolbar appears in the strip above the map (never over it): rotate left/right in 45-degree steps (or Q / E),
-// and a cone/line preview so you can see what a facing would hit. Click a cell to STAGE a move (a distance preview,
+// and a cone / line tool you aim at any angle by dragging on the map (the token's own cone and line moves, at their length). Click a cell to STAGE a move (a distance preview,
 // no server call yet), then Confirm to actually commit it -- a deliberate extra step so a misclick can't burn real
 // movement (the user's own call: hard-enforce the movement budget below, but only after an explicit confirm).
 // Cells the token can still reach with the movement it has left are tinted while it's selected.
@@ -33,15 +33,15 @@ import { showCombatAlert } from './combat-alert.js';
 import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating, movementBudget } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
-import { coneSquares } from './cone-area.js';
+import { coneSquares, coneHits, coneOutlineSvg, injectConeStyles } from './cone-area.js';
 import { lineFtFromRange, lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineGuideStyle, lineOutlineSvg, angleToPointer, injectLineStyles } from './line-area.js';
 
-const CONE_FT = 15; // the cone preview is just a visual of where the token faces -- one size is enough
 
 function _injectStyles() {
   if (document.getElementById('battle-map-popup-styles')) return;
   injectBattleMapStyles();
   injectLineStyles();
+  injectConeStyles();
   const style = document.createElement('style');
   style.id = 'battle-map-popup-styles';
   style.textContent = `
@@ -90,14 +90,16 @@ let _ownerName = null;
 let _selectedTokenId = null;
 // A clicked-but-not-yet-confirmed destination for _selectedTokenId.
 let _stagedDestination = null;
-// Whether the cone preview is on for the selected token. Kept across selections.
+// The cone tool (cone-area.js): a cone from the selected token, aimed at any angle by dragging on the map, like the line.
+// Its length is one of the token's own cone moves (cycled by tapping the length), or 15ft when it knows none.
 let _coneOn = false;
-// The line preview (line-area.js): a 5ft-wide strip from the selected token, aimed at any angle by dragging on the map.
+let _coneChoice = 0;
+// The line tool (line-area.js): a 5ft-wide strip from the selected token, aimed at any angle by dragging on the map.
 // Its length is one of the token's own line moves (cycled by tapping the length), or 30ft when it knows none.
 let _lineOn = false;
-let _lineAngle = 0;
 let _lineChoice = 0;
-let _lineAiming = false;
+let _aimAngle = 0;   // where the line / cone points (degrees clockwise from up)
+let _aiming = false; // a drag on the map is turning it
 // The altitude (ft) the selected token is being sent to, or null to stay where it is -- changed by the toolbar's ▲ ▼,
 // confirmed together with the staged cell (a pure climb stages the token's own cell).
 let _stagedAlt = null;
@@ -139,17 +141,17 @@ function _ensureDom() {
     if (x) CombatAPI.removeFieldZone(x.dataset.key, x.dataset.id).catch(err => showCombatAlert(err.message, { title: 'Error' }));
   });
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(); });
-  // Line tool: press and drag anywhere on the map to sweep the line round (a tap aims it straight at that spot).
+  // Line / cone tool: press and drag anywhere on the map to sweep it round (a tap aims it straight at that spot).
   const stage = document.getElementById('bmapStage');
   stage.addEventListener('pointerdown', (e) => {
-    if (!_lineOn || !_selected()) return;
+    if (!(_lineOn || _coneOn) || !_selected()) return;
     e.preventDefault();
-    _lineAiming = true;
+    _aiming = true;
     stage.setPointerCapture?.(e.pointerId);
-    _aimLine(e);
+    _aimTool(e);
   });
-  stage.addEventListener('pointermove', (e) => { if (_lineAiming) _aimLine(e); });
-  const stopAiming = () => { _lineAiming = false; };
+  stage.addEventListener('pointermove', (e) => { if (_aiming) _aimTool(e); });
+  const stopAiming = () => { _aiming = false; };
   stage.addEventListener('pointerup', stopAiming);
   stage.addEventListener('pointercancel', stopAiming);
   document.addEventListener('keydown', (e) => {
@@ -260,10 +262,11 @@ function _render() {
   if (hint) {
     if (_stagedDestination) {
       hint.textContent = 'Confirm the move below, or click a different cell.';
-    } else if (_selectedTokenId && _lineOn) {
-      hint.textContent = 'Drag on the map to aim the line (any angle) · tap the length to switch line move · turn Line off to move again.';
+    } else if (_selectedTokenId && (_lineOn || _coneOn)) {
+      const tool = _lineOn ? 'line' : 'cone';
+      hint.textContent = `Drag on the map to aim the ${tool} (any angle) · tap the length to switch ${tool} move · turn ${_lineOn ? 'Line' : 'Cone'} off to move again.`;
     } else if (_selectedTokenId) {
-      hint.textContent = 'Click a cell to move there · ⟲ ⟳ (or Q / E) to turn · the cone shows what a facing would hit.';
+      hint.textContent = 'Click a cell to move there · ⟲ ⟳ (or Q / E) to turn · Cone / Line to aim one and see who it would catch.';
     } else {
       const activeId = _activeParticipantId(_session);
       const activeIsMine = !!activeId && _session.participants[activeId]?.owner === _ownerName;
@@ -274,8 +277,8 @@ function _render() {
   }
   _renderMovePanel();
   _renderStage();
-  // While aiming a line, a drag on the map turns it instead of scrolling the page (phones).
-  document.getElementById('bmapStage')?.classList.toggle('line-aiming', _lineOn && !!_selected());
+  // While aiming a line or cone, a drag on the map turns it instead of scrolling the page (phones).
+  document.getElementById('bmapStage')?.classList.toggle('line-aiming', (_lineOn || _coneOn) && !!_selected());
   _renderGrid();
   _renderObjects();
   _renderTokens();
@@ -413,16 +416,6 @@ function _renderGrid() {
 
   // Reach: cells the selected mover can still afford (Chebyshev distance x 5ft, same as the server's budget check).
   const bestRemaining = sel ? _bestRemainingFt(sel.p) : null;
-  let cone = null; // "col,row" -> whether that square is only on the edge of it
-  if (sel && _coneOn) {
-    // From where the token will be once the staged move is confirmed; level, the way it faces (cone-area.js).
-    const from = _stagedDestination ? { ...sel.pos, col: _stagedDestination.col, row: _stagedDestination.row, z: _stagedAlt ?? sel.pos.z } : sel.pos;
-    cone = new Map();
-    coneSquares(from, sel.size, sel.pos.facing || 0, CONE_FT, 0, null, _session.board.grid).forEach((q) => {
-      const k = `${q.x},${q.y}`;
-      cone.set(k, cone.has(k) ? cone.get(k) && q.edge : q.edge);
-    });
-  }
 
   gridEl.setAttribute('style', gridTemplateStyle(_session.board));
   gridEl.innerHTML = gridCellsHtml(_session.board, 'bmap-cell', (col, row) => {
@@ -433,7 +426,6 @@ function _renderGrid() {
     const z0 = sel?.pos.z || 0;
     if (sel && bestRemaining !== null && _distanceFt(sel.pos.col, sel.pos.row, col, row, sel.p, z0, _stagedAlt ?? z0) <= bestRemaining
         && !_blockedOnTheWay(sel, col, row)) classes.push('reach');
-    if (cone?.has(key)) classes.push(cone.get(key) ? 'cone cone-edge' : 'cone');
     if (_stagedDestination && col === _stagedDestination.col && row === _stagedDestination.row) classes.push('staged');
     return classes.join(' ');
   });
@@ -442,7 +434,7 @@ function _renderGrid() {
     const [col, row] = cell.dataset.cell.split(',').map(Number);
     cell.addEventListener('click', () => {
       if (!_selectedTokenId) return; // nothing selected -- clicking empty ground does nothing
-      if (_lineOn) return; // the line tool owns the map's clicks (aiming) until it's turned off
+      if (_lineOn || _coneOn) return; // the line / cone tool owns the map's clicks (aiming) until it's turned off
       const own = _selected();
       // Standing still isn't a move (movement comes in 5ft steps) -- unless an altitude change is staged with it.
       if (own && own.pos.col === col && own.pos.row === row && (_stagedAlt === null || _stagedAlt === (own.pos.z || 0))) return;
@@ -529,7 +521,7 @@ function _renderTokens() {
     // While a move is staged the token sits on the cell it's going to -- let clicks fall through to the cells beneath it.
     if (isMyTurn && !staged) {
       el.addEventListener('click', () => {
-        if (_lineOn && _selectedTokenId) return; // aiming the line -- a tap on the token is part of the drag
+        if ((_lineOn || _coneOn) && _selectedTokenId) return; // aiming -- a tap on the token is part of the drag
         _selectedTokenId = _selectedTokenId === id ? null : id;
         _stagedDestination = null; _stagedAlt = null;
         _render();
@@ -539,6 +531,7 @@ function _renderTokens() {
     layer.appendChild(el);
   });
   _renderLine();
+  _renderCone();
 }
 
 /** The selected token's line moves as { label, ft } (from the logged-in device's move list), or a plain 30ft line. */
@@ -557,20 +550,66 @@ function _lineOption(p) {
   return opts[_lineChoice % opts.length];
 }
 
+/** The selected token's cone moves as { label, ft } ("Self (15ft. cone)", "40ft. cone"), or a plain 15ft cone. */
+function _coneOptions(p) {
+  let rows = [];
+  try { rows = JSON.parse(sessionStorage.getItem('moves') || '[]'); } catch { /* no move list -- generic cone */ }
+  const opts = (p?.moves || []).map(name => {
+    const m = /(\d+)\s*ft\.?\s*cone/i.exec(String(rows.find(r => r[0] === name)?.[6] || ''));
+    return m ? { label: name, ft: Number(m[1]) } : null;
+  }).filter(Boolean);
+  return opts.length ? opts : [{ label: '', ft: 15 }];
+}
+
+function _coneOption(p) {
+  const opts = _coneOptions(p);
+  return opts[_coneChoice % opts.length];
+}
+
+/** Draws the cone from the selected token -- its outline, the squares it hits (shaded) or only edges (dashed) -- and
+ * rings everyone it catches (cone-area.js), the same way the line tool does. */
+function _renderCone() {
+  const layer = document.getElementById('bmapTokens');
+  const sel = _selected();
+  if (!layer || !_coneOn || !sel) return;
+  const { ft } = _coneOption(sel.p);
+  let cellsEl = layer.querySelector('.bmap-line-cells');
+  if (!cellsEl) {
+    cellsEl = document.createElement('div');
+    cellsEl.className = 'bmap-line-cells';
+    layer.prepend(cellsEl);
+  }
+  cellsEl.innerHTML = lineCellsHtml(_session.board, coneSquares(sel.pos, sel.size, _aimAngle, ft, 0, null, _session.board.grid));
+  let shape = layer.querySelector('.bmap-cone-shape');
+  if (!shape) {
+    shape = document.createElement('div');
+    shape.className = 'bmap-cone-shape';
+    shape.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
+    layer.prepend(shape);
+  }
+  shape.innerHTML = coneOutlineSvg(_session.board, sel.pos, sel.size, _aimAngle, ft);
+  const caught = coneHits(_session, sel.id, _aimAngle, ft);
+  const hits = new Set(caught.ids), edges = new Set(caught.edgeIds);
+  layer.querySelectorAll('.bmap-token[data-id]').forEach((el) => {
+    el.classList.toggle('line-hit', hits.has(el.dataset.id));
+    el.classList.toggle('line-edge', edges.has(el.dataset.id));
+  });
+}
+
 /** Draws the line strip from the selected token and rings everyone it touches (see line-area.js). */
 function _renderLine() {
   const layer = document.getElementById('bmapTokens');
   const sel = _selected();
   if (!layer || !_lineOn || !sel) return;
   const { ft } = _lineOption(sel.p);
-  const g = lineGeometry(sel.pos, sel.size, _lineAngle, ft);
+  const g = lineGeometry(sel.pos, sel.size, _aimAngle, ft);
   let strip = layer.querySelector('.bmap-line');
   if (!strip) {
     strip = document.createElement('div');
     strip.className = 'bmap-line guide';
     layer.prepend(strip); // under the tokens, so the hit rings (not an orange wash) show who's in it
   }
-  strip.setAttribute('style', lineGuideStyle(_session.board, g, _lineAngle));
+  strip.setAttribute('style', lineGuideStyle(_session.board, g, _aimAngle));
   // The 5ft beam's own outline, so it's plain how much of each square it covers.
   let shape = layer.querySelector('.bmap-line-shape');
   if (!shape) {
@@ -579,7 +618,7 @@ function _renderLine() {
     shape.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
     layer.prepend(shape);
   }
-  shape.innerHTML = lineOutlineSvg(_session.board, g, _lineAngle);
+  shape.innerHTML = lineOutlineSvg(_session.board, g, _aimAngle);
   // The squares it covers -- hit (shaded) or only its edge (dashed), line-area.js's lineCells.
   let cellsEl = layer.querySelector('.bmap-line-cells');
   if (!cellsEl) {
@@ -587,8 +626,8 @@ function _renderLine() {
     cellsEl.className = 'bmap-line-cells';
     layer.prepend(cellsEl);
   }
-  cellsEl.innerHTML = lineCellsHtml(_session.board, lineCells(sel.pos, sel.size, _lineAngle, ft, 0, null, _session.board.grid));
-  const caught = lineHits(_session, sel.id, _lineAngle, ft);
+  cellsEl.innerHTML = lineCellsHtml(_session.board, lineCells(sel.pos, sel.size, _aimAngle, ft, 0, null, _session.board.grid));
+  const caught = lineHits(_session, sel.id, _aimAngle, ft);
   const hits = new Set(caught.ids), edges = new Set(caught.edgeIds);
   layer.querySelectorAll('.bmap-token[data-id]').forEach((el) => {
     el.classList.toggle('line-hit', hits.has(el.dataset.id));
@@ -596,14 +635,15 @@ function _renderLine() {
   });
 }
 
-/** Pointer on the map while the line tool is on: aim the line at the pointer (drag to sweep it round). */
-function _aimLine(e) {
+/** Pointer on the map while the line or cone tool is on: aim it at the pointer (drag to sweep it round). */
+function _aimTool(e) {
   const sel = _selected();
   const stage = document.getElementById('bmapStage');
   if (!sel || !stage) return;
   const origin = lineAimOrigin(sel.pos, sel.size);
-  _lineAngle = angleToPointer(stage, _session.board, origin, e.clientX, e.clientY);
+  _aimAngle = angleToPointer(stage, _session.board, origin, e.clientX, e.clientY);
   _renderLine();
+  _renderCone();
 }
 
 /** "20ft up" / "15ft underground" / "the ground". */
@@ -644,9 +684,10 @@ function _renderToolbar() {
     <button type="button" data-act="right" title="Turn right 45° (E)">⟳</button>
     <span class="tb-sep"></span>
     ${_altitudeControlsHtml(sel)}
-    <button type="button" data-act="cone" class="${_coneOn ? 'on' : ''}" title="Show a ${CONE_FT}ft cone from this facing">◔ Cone</button>
+    <button type="button" data-act="cone" class="${_coneOn ? 'on' : ''}" title="Show a cone you can aim at any angle">◔ Cone</button>
     <button type="button" data-act="line" class="${_lineOn ? 'on' : ''}" title="Show a 5ft-wide line you can aim at any angle">━ Line</button>
     ${_lineOn ? (() => { const o = _lineOption(sel.p); return `<button type="button" data-act="line-len" title="Switch line move">${o.ft}ft${o.label ? ` · ${o.label}` : ''}</button>`; })() : ''}
+    ${_coneOn ? (() => { const o = _coneOption(sel.p); return `<button type="button" data-act="cone-len" title="Switch cone move">${o.ft}ft${o.label ? ` · ${o.label}` : ''}</button>`; })() : ''}
     <button type="button" data-act="close" title="Deselect (Esc)">✕</button>`;
   bar.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -655,13 +696,16 @@ function _renderToolbar() {
     else if (act === 'right') _rotate(45);
     else if (act === 'up') _stepAltitude(5);
     else if (act === 'down') _stepAltitude(-5);
-    else if (act === 'cone') { _coneOn = !_coneOn; _render(); }
-    else if (act === 'line') {
-      _lineOn = !_lineOn;
-      if (_lineOn) { _lineAngle = sel.pos.facing || 0; _stagedDestination = null; _stagedAlt = null; }
+    else if (act === 'cone' || act === 'line') {
+      // One aiming tool at a time; it starts out pointing the way the token faces.
+      const turnOn = act === 'cone' ? !_coneOn : !_lineOn;
+      _coneOn = act === 'cone' && turnOn;
+      _lineOn = act === 'line' && turnOn;
+      if (turnOn) { _aimAngle = sel.pos.facing || 0; _stagedDestination = null; _stagedAlt = null; }
       _render();
     }
     else if (act === 'line-len') { _lineChoice++; _render(); }
+    else if (act === 'cone-len') { _coneChoice++; _render(); }
     else if (act === 'close') { _selectedTokenId = null; _stagedDestination = null; _stagedAlt = null; _render(); }
   });
   slot.appendChild(bar);

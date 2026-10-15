@@ -5852,11 +5852,20 @@ function _halvesOnSave(moveName) {
 }
 
 async function _runMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
-  let targetIds = await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName) });
+  // Partial cover: one step down for a save move or a sure hit; one that rolls to hit keeps disadvantage on the roll
+  // (the attack popup's cover resolver), so the picker leaves its hits as they are.
+  const rollsToHit = !moveCategoriesFor(moveName).includes('trigger_saving_throw') && !moveCategoriesFor(moveName).includes('guaranteed_hit');
+  let targetIds = await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName), partialCoverAs: rollsToHit ? 'disadvantage' : 'edge' });
   if (!targetIds || !targetIds.length) return false; // closed / nobody picked -- move's own cost still applied
   // A line's or cone's targets only on the edge of it (line-area.js / cone-area.js, the user's rule 2026-10-14): they
   // save for nothing, or take half damage -- and the move's effects -- on a failure.
   const edgeIds = new Set(targetIds.edgeIds || []);
+  // Why a target is on the edge: the area's own edge, or partial cover pushing a hit down a step (the user's rule 2026-10-15).
+  const coverEdge = targetIds.coverEdge || {};
+  const edgeWhere = (id) => coverEdge[id]
+    ? `partly behind cover from ${attackerName}'s ${moveName} (${coverEdge[id]})` : `on the edge of ${attackerName}'s ${moveName}`;
+  const edgeNote = (id) => coverEdge[id]
+    ? `${coverEdge[id]} from ${attackerName}'s ${moveName}` : `On the edge of ${attackerName}'s ${moveName}`;
   const halvesOnSave = _halvesOnSave(moveName);
 
   // Wide Guard's own reaction: this app has no real blast-center/positional-
@@ -5915,20 +5924,20 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
         dc, hasDamage, damageModifier, speciesName: '', ability: _saveAbilityFor(moveName), moveUser: session?.participants?.[combatantId],
         abilityDice: computedData.abilityDice, damageDice: computedData.damageDice,
         halfOn: edge ? 'fail' : (halvesOnSave ? 'pass' : null),
-        note: edge ? `On the edge of ${attackerName}'s ${moveName}: a success means it misses ${target.name} entirely; a failure means ${hasDamage ? 'half damage and ' : ''}its effects.` : '',
+        note: edge ? `${edgeNote(targetId)}: a success means it misses ${target.name} entirely; a failure means ${hasDamage ? 'half damage and ' : ''}its effects.` : '',
       });
       if (!outcome) continue; // closed for this target -- move on to the next one
       if (edge && outcome.passed) {
         CombatAPI.logEvent({
           type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} was on the edge of ${attackerName}'s ${moveName} and dodged it${_saveRollNote(outcome)}`,
+          text: `${target.name} was ${edgeWhere(targetId)} and dodged it${_saveRollNote(outcome)}`,
         }).catch(() => {});
         continue; // nothing happens to it -- no damage, no effects
       }
       if (edge) {
         CombatAPI.logEvent({
           type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
-          text: `${target.name} was on the edge of ${attackerName}'s ${moveName} and failed the saving throw${_saveRollNote(outcome)}${hasDamage ? ' -- half damage' : ''}`,
+          text: `${target.name} was ${edgeWhere(targetId)} and failed the saving throw${_saveRollNote(outcome)}${hasDamage ? ' -- half damage' : ''}`,
         }).catch(() => {});
       }
       const applyHint = moveEffectsFor(moveName).length ? '' : ' -- apply its effect';
@@ -5984,19 +5993,19 @@ async function _runMultiHitAoe({ combatantId, moveName, move, computedData, spec
       if (edgeIds.has(targetId)) {
         const outcome = await confirmSecondarySave(target, target.name, {
           dc, hasDamage: false, ability: 'DEX', title: 'Saving Throw', moveUser: session?.participants?.[combatantId],
-          note: `On the edge of ${attackerName}'s ${moveName}: a success means it misses ${target.name} entirely; a failure means half damage.`,
+          note: `${edgeNote(targetId)}: a success means it misses ${target.name} entirely; a failure means half damage.`,
         });
         if (!outcome) continue;
         CombatAPI.logEvent({
           type: 'save', actorId: combatantId, actorName: attackerName, targetId, targetName: target.name,
           text: outcome.passed
-            ? `${target.name} was on the edge of ${attackerName}'s ${moveName} and dodged it${_saveRollNote(outcome)}`
-            : `${target.name} was on the edge of ${attackerName}'s ${moveName} and failed the saving throw${_saveRollNote(outcome)} -- half damage`,
+            ? `${target.name} was ${edgeWhere(targetId)} and dodged it${_saveRollNote(outcome)}`
+            : `${target.name} was ${edgeWhere(targetId)} and failed the saving throw${_saveRollNote(outcome)} -- half damage`,
         }).catch(() => {});
         if (outcome.passed) continue;
         edgeMultiplier = 0.5;
       }
-      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice });
+      const picked = await pickTargetAgain(target, target.name, { attackModifier, damageModifier, speciesName: '', guaranteedHit, attacker: session?.participants?.[combatantId], moveName, damageDice: computedData.damageDice, damageNotes, moveModValue: computedData.highestMod, nextTierDice: computedData.nextTierDice, abilityDice: computedData.abilityDice, });
       await _resolveOneHit(combatantId, moveName, move, computedData, speciesName, picked, { damageMultiplier: damageMultiplier * edgeMultiplier });
     }
   }

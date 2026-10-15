@@ -59,7 +59,7 @@ function _injectStyles() {
  * @param {boolean} allowCancel  adds a Cancel button (resolves null). Off for a move whose VP is already spent; on for
  *                               "select targets from the map", where backing out costs nothing
  * @param {string} confirmLabel  the confirm button's text
- * @returns {Promise<{cells: string[]} | {all: true} | null>}
+ * @returns {Promise<{cells: string[], center: {col, row} | null} | {all: true} | null>}  center: where the stamp was dropped
  */
 export function pickTerrainArea({ session, casterId, title, kind, radiusFt, centeredOnCaster = true, heightFt = null, allowCancel = false, confirmLabel = 'Confirm area', maxCenterFt = null }) {
   _injectStyles();
@@ -73,6 +73,7 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
     // The marked area is the stamped one plus whatever was painted by hand. A new stamp REPLACES the last stamp (it moves
     // the move's area); hand-painted tiles stay until erased or cleared.
     let stamped = new Set();
+    let stampCenter = null; // the square the last stamp was dropped on (null: around the caster, or none)
     const manual = new Set();
     const painted = new Set();
     const rebuild = () => { painted.clear(); stamped.forEach(c => painted.add(c)); manual.forEach(c => painted.add(c)); };
@@ -169,6 +170,7 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
           return;
         }
         stamped = squareCells(board, col, row, 1, radiusFt / 5); // replaces the previous stamp
+        stampCenter = { col, row };
         rebuild();
         refresh();
         return;
@@ -184,11 +186,11 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
       const act = e.target.closest('button')?.dataset.act;
       if (!act) return;
       if (act === 'stamp') { stamp = !stamp; e.target.closest('button').classList.toggle('on', stamp); }
-      else if (act === 'circle') { stamped = aroundCaster(); rebuild(); refresh(); }
-      else if (act === 'clear') { stamped = new Set(); manual.clear(); rebuild(); refresh(); }
+      else if (act === 'circle') { stamped = aroundCaster(); stampCenter = null; rebuild(); refresh(); }
+      else if (act === 'clear') { stamped = new Set(); stampCenter = null; manual.clear(); rebuild(); refresh(); }
       else if (act === 'all') done({ all: true });
       else if (act === 'cancel') done(null);
-      else if (act === 'confirm' && painted.size) done({ cells: [...painted] });
+      else if (act === 'confirm' && painted.size) done({ cells: [...painted], center: stamped.size ? stampCenter : null });
     });
   });
 }

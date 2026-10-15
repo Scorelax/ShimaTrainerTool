@@ -69,11 +69,21 @@ function _blocker(a, b, heights) {
  * 'none' when either isn't on the map or there's nothing in the way.
  */
 export function coverBetween(session, attackerId, targetId) {
+  const board = session?.board;
+  return _coverFrom(session, board?.tokens?.[attackerId], footprintForSize(session?.participants?.[attackerId]?.size), targetId);
+}
+
+/** The same, from the square (col, row) a blast was dropped on, `z` ft up -- the blast is a 5ft cube there (Explosion,
+ * Earthquake placed at a point): what of `targetId` it can reach past the objects. */
+export function coverFromCell(session, col, row, z, targetId) {
+  return _coverFrom(session, { col, row, z: z || 0 }, 1, targetId);
+}
+
+function _coverFrom(session, ta, na, targetId) {
   const none = { level: 'none', by: [], hidden: 0 };
   const board = session?.board;
-  const ta = board?.tokens?.[attackerId], tb = board?.tokens?.[targetId];
+  const tb = board?.tokens?.[targetId];
   if (!ta || !tb || !(board.objects || []).length) return none;
-  const na = footprintForSize(session.participants?.[attackerId]?.size);
   const nb = footprintForSize(session.participants?.[targetId]?.size);
   const skip = new Set([...footprintCells(ta.col, ta.row, na), ...footprintCells(tb.col, tb.row, nb)].map(c => `${c.col},${c.row}`));
   const heights = _heights(board, skip);

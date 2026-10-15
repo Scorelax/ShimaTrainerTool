@@ -14,6 +14,7 @@ import { filterTargetable, markOutOfRange } from './targetability.js';
 import { pickTerrainArea } from './terrain-area-picker.js';
 import { pickLineArea, pickConeArea } from './line-area-picker.js';
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
+import { coverBetween, coverFromCell, coverText } from './cover.js';
 
 function _injectStyles() {
   if (document.getElementById('multi-target-picker-styles')) return;
@@ -51,6 +52,7 @@ let _overlay = null;
 let _resolve = null;
 let _selected = new Set();
 let _edge = new Set(); // a line's or cone's targets only on the edge of it (line-area.js): they save for nothing / half on a fail
+let _coverEdge = new Map(); // the edge targets that are there because of partial cover: id -> "Partial cover (Rock)"
 
 function _ensureDom() {
   if (_overlay) return;
@@ -79,7 +81,8 @@ function _ensureDom() {
   // A plain array of ids, carrying `edgeIds` (the ticked ones on a line's edge) for the caller.
   document.getElementById('mtpConfirm').addEventListener('click', () => {
     const ids = [..._selected];
-    _close(Object.assign(ids, { edgeIds: ids.filter(id => _edge.has(id)) }));
+    _close(Object.assign(ids, { edgeIds: ids.filter(id => _edge.has(id)),
+      coverEdge: Object.fromEntries(ids.filter(id => _edge.has(id) && _coverEdge.has(id)).map(id => [id, _coverEdge.get(id)])) }));
   });
 }
 
@@ -115,7 +118,7 @@ function _cardHtml(p) {
  * A line move's area is { lineFt } instead: the caster aims a 5ft-wide line on the map (line-area-picker.js); a cone
  * move's { coneFt }, a cone the same way. The ones only on the edge of either come back tagged, as the result's `edgeIds`.
  */
-export async function pickMultipleTargets(casterId, { moveName = '', area = null } = {}) {
+export async function pickMultipleTargets(casterId, { moveName = '', area = null, partialCoverAs = 'edge' } = {}) {
   const result = await CombatAPI.getState();
   const session = result.status === 'success' ? result.data : null;
   if (!session || !session.active) return null;
@@ -126,6 +129,7 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   _ensureDom();
   _selected = new Set();
   _edge = new Set();
+  _coverEdge = new Map();
   const grid = document.getElementById('mtpGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
   markOutOfRange(grid, participants); // beyond the move's reach or behind full cover: greyed out, not pickable
@@ -147,11 +151,15 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   // Lines and cones start at the caster: whoever is behind full cover from there isn't caught (targetability.js).
   const aimableIds = participants.filter(p => !participants.noSight?.has(p.id)).map(p => p.id);
   const blockedNotes = participants.noSight || null;
+  // Partial cover (the user's rule, 2026-10-15): for a save or a sure hit, one step down -- a hit becomes the edge, the
+  // edge a miss; a move that rolls to hit ('disadvantage') keeps its hits -- the attack roll gets disadvantage instead.
+  const partialCover = participants.partialCover || null;
   mapBtn.onclick = async () => {
     if (area.coneFt) {
-      const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt, targetableIds: aimableIds, blockedNotes });
+      const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt, targetableIds: aimableIds, blockedNotes, partialCover, partialAs: partialCoverAs });
       if (!cone) return;
       _edge = new Set(cone.edgeIds || []);
+      _coverEdge = new Map([..._edge].filter(id => partialCover?.has(id)).map(id => [id, partialCover.get(id)]));
       participants.forEach(p => {
         const card = grid.querySelector(`[data-target-id="${p.id}"]`);
         if (!card) return;
@@ -161,9 +169,10 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
       return;
     }
     if (area.lineFt) {
-      const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt, targetableIds: aimableIds, blockedNotes });
+      const line = await pickLineArea({ session, casterId, title: moveName || 'Line', lengthFt: area.lineFt, targetableIds: aimableIds, blockedNotes, partialCover, partialAs: partialCoverAs });
       if (!line) return;
       _edge = new Set(line.edgeIds || []);
+      _coverEdge = new Map([..._edge].filter(id => partialCover?.has(id)).map(id => [id, partialCover.get(id)]));
       participants.forEach(p => {
         const card = grid.querySelector(`[data-target-id="${p.id}"]`);
         if (!card) return;
@@ -182,6 +191,13 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
     // How high it reaches: a cylinder's own height ("40ft high"), otherwise its radius up and down from where it sits --
     // the caster's height for one around them, the ground for one placed at a point (a flyer far above a blast isn't in it).
     const centerZ = area.centeredOnCaster ? (session.board.tokens[casterId]?.z || 0) : 0;
+    // Cover from where the blast is (the user's rule, 2026-10-15): around the caster, from the caster; dropped on a
+    // square, from that square. Full cover: not caught. Partial cover: one step down -- the edge (a move that rolls to
+    // hit gets disadvantage on that creature's roll instead). A hand-painted area has no centre to measure from.
+    const coverOf = (id) => (res.all ? null : area.centeredOnCaster ? coverBetween(session, casterId, id)
+      : res.center ? coverFromCell(session, res.center.col, res.center.row, 0, id) : null);
+    _edge = new Set();
+    _coverEdge = new Map();
     participants.forEach(p => {
       const token = session.board.tokens[p.id];
       if (!token) return;
@@ -189,7 +205,14 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
       const reachesHeight = area.heightFt != null ? (token.z || 0) <= area.heightFt
         : !area.radiusFt || res.all || Math.abs((token.z || 0) - centerZ) <= area.radiusFt;
       const card = grid.querySelector(`[data-target-id="${p.id}"]`);
-      if (card) toggle(card, inside && reachesHeight);
+      if (!card) return;
+      const cover = inside && reachesHeight ? coverOf(p.id) : null;
+      const caught = inside && reachesHeight && cover?.level !== 'full';
+      if (cover?.level === 'partial' && caught && partialCoverAs !== 'disadvantage') { _edge.add(p.id); _coverEdge.set(p.id, coverText(cover)); }
+      toggle(card, caught);
+      _markEdge(card, _edge.has(p.id));
+      card.querySelector('.mtp-cover-note')?.remove();
+      if (cover && cover.level !== 'none') card.insertAdjacentHTML('beforeend', `<div class="mtp-cover-note" style="font-size:0.7rem;font-weight:700;color:${cover.level === 'full' ? '#e74c3c' : '#f0b232'};">${coverText(cover)}</div>`);
     });
   };
 

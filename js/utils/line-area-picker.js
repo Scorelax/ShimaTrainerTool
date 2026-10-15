@@ -102,6 +102,21 @@ function _heightButtonsHtml(n, tiltStep) {
       + `<button type="button" data-act="raise" title="Start it 5ft higher, up to its own height">▲ Start</button>` : '');
 }
 
+/** Partial cover from where the line / cone starts (the user's rule, 2026-10-15): a hit becomes an edge hit, an edge
+ * hit a miss (`partialCover`: id -> "Partial cover (Rock)"; `partialAs` 'edge'). For a move that rolls to hit
+ * ('disadvantage') nothing moves -- that creature's attack roll gets disadvantage instead (combat-wip.js). */
+function _coverStep(hits, edges, partialCover, partialAs) {
+  if (!partialCover?.size || partialAs !== 'edge') return { hits, edges };
+  const out = { hits: [], edges: [] };
+  hits.forEach((id) => {
+    const edge = edges.includes(id);
+    if (!partialCover.has(id)) { out.hits.push(id); if (edge) out.edges.push(id); return; }
+    if (edge) return; // edge + partial cover: a miss
+    out.hits.push(id); out.edges.push(id); // hit + partial cover: the edge
+  });
+  return out;
+}
+
 /** "from Onix's lowest point" / "from 10ft up Onix" -- where the move comes out, in the aim line. */
 function _startText(name, layer, flyingNote) {
   return layer ? `from ${layer * 5}ft up ${name}${flyingNote}` : `from ${name}'s lowest point${flyingNote}`;
@@ -115,7 +130,7 @@ function _startText(name, layer, flyingNote) {
  * @returns {Promise<{ids: string[], edgeIds: string[], angle: number, pitch: number} | null>}  null when cancelled; edgeIds
  *   are the ones only on the edge of it (line-area.js's lineHits)
  */
-export function pickLineArea({ session, casterId, title, lengthFt, targetableIds = null, blockedNotes = null, confirmLabel = 'Select targets in the line' }) {
+export function pickLineArea({ session, casterId, title, lengthFt, targetableIds = null, blockedNotes = null, partialCover = null, partialAs = 'edge', confirmLabel = 'Select targets in the line' }) {
   _injectStyles();
   return new Promise((resolve) => {
     const board = session.board;
@@ -200,8 +215,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       const heightEl = overlay.querySelector('.lap-height');
       if (heightEl) heightEl.textContent = `Start ${layer * 5}ft`;
       const caught = lineHits(session, casterId, angle, lengthFt, pitch, org());
-      hits = caught.ids.filter(id => aimable.has(id));
-      edges = caught.edgeIds.filter(id => aimable.has(id));
+      ({ hits, edges } = _coverStep(caught.ids.filter(id => aimable.has(id)), caught.edgeIds.filter(id => aimable.has(id)), partialCover, partialAs));
       tokenEls.forEach((el, id) => {
         el.classList.toggle('line-hit', hits.includes(id));
         el.classList.toggle('line-edge', edges.includes(id));
@@ -211,7 +225,7 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       aimEl.textContent = aimedAt
         ? `Aimed at ${nameOf(aimedAt)}${heightOf(aimedAt)}${tilt ? `: tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}. Drag to level it again` : ' (level)'}. Tap the same square again for another creature there.`
         : `${tilt ? `Tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}` : 'Level'}, ${_startText(caster?.name || 'the caster', layer, heightOf(casterId))}${tilt ? '' : ' -- it passes under flyers'}. Tilt it, or tap a creature to aim the beam at it.`;
-      const names = ids => ids.map(id => `${nameOf(id)}${heightOf(id)}`).join(', ');
+      const names = ids => ids.map(id => `${nameOf(id)}${heightOf(id)}${partialCover?.has(id) ? ' (partial cover)' : ''}`).join(', ');
       const full = hits.filter(id => !edges.includes(id));
       hitsEl.textContent = hits.length
         ? [full.length ? `In the line: ${names(full)}` : '', edges.length ? `On the edge: ${names(edges)}` : ''].filter(Boolean).join(' · ')
@@ -281,7 +295,7 @@ export function coneFtFromRange(rangeText) {
  * @returns {Promise<{ids: string[], edgeIds: string[], angle: number, pitch: number} | null>}  null when cancelled; edgeIds
  *   are the ones only on the edge of it (cone-area.js's coneHits)
  */
-export function pickConeArea({ session, casterId, title, lengthFt, targetableIds = null, blockedNotes = null, confirmLabel = 'Select targets in the cone' }) {
+export function pickConeArea({ session, casterId, title, lengthFt, targetableIds = null, blockedNotes = null, partialCover = null, partialAs = 'edge', confirmLabel = 'Select targets in the cone' }) {
   _injectStyles();
   injectConeStyles();
   return new Promise((resolve) => {
@@ -357,8 +371,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
       const heightEl = overlay.querySelector('.lap-height');
       if (heightEl) heightEl.textContent = `Start ${layer * 5}ft`;
       const caught = coneHits(session, casterId, angle, lengthFt, pitch, org());
-      hits = caught.ids.filter(id => aimable.has(id));
-      edges = caught.edgeIds.filter(id => aimable.has(id));
+      ({ hits, edges } = _coverStep(caught.ids.filter(id => aimable.has(id)), caught.edgeIds.filter(id => aimable.has(id)), partialCover, partialAs));
       tokenEls.forEach((el, id) => {
         el.classList.toggle('line-hit', hits.includes(id));
         el.classList.toggle('line-edge', edges.includes(id));
@@ -368,7 +381,7 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
       aimEl.textContent = aimedAt
         ? `Aimed at ${nameOf(aimedAt)}${heightOf(aimedAt)}${tilt ? `: tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}` : ''}. Drag to level it again; tap the same square again for another creature there.`
         : `${tilt ? `Tilted ${tilt}° ${pitch > 0 ? 'up' : 'down'}` : 'Level'}, ${_startText(caster?.name || 'the caster', layer, heightOf(casterId))} -- it spreads upward as it goes (as high as it is wide). Tilt it, or tap a creature to aim the cone at it.`;
-      const names = ids => ids.map(id => `${nameOf(id)}${heightOf(id)}`).join(', ');
+      const names = ids => ids.map(id => `${nameOf(id)}${heightOf(id)}${partialCover?.has(id) ? ' (partial cover)' : ''}`).join(', ');
       const full = hits.filter(id => !edges.includes(id));
       hitsEl.textContent = hits.length
         ? [full.length ? `In the cone: ${names(full)}` : '', edges.length ? `On the edge: ${names(edges)}` : ''].filter(Boolean).join(' · ')

@@ -41,7 +41,7 @@ import { showStatusDetail } from '../utils/status-popup.js';
 import { createBaseStatSync } from '../utils/stat-sync.js';
 import { setTargetabilityResolver, setMoveRangeResolver, setNoTargetHandler, moveCover } from '../utils/targetability.js';
 import { coverText } from '../utils/cover.js';
-import { areaPlacementFt, creatureDistanceFt } from '../utils/move-range.js';
+import { areaPlacementFt, areaFromDescription, creatureDistanceFt } from '../utils/move-range.js';
 import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, isConcentrationHolder, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating, altitudeLimits } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
 import {
@@ -2698,9 +2698,9 @@ function _computeFocusContext(state) {
  * where there's no DM fog-of-war to preserve (see routes_combat.py's `status`
  * module docstring's "PvP-only in practice" and the user's own call that PvP
  * has no DM intervention). */
-function _foreignCombatantView(p) {
+function _foreignCombatantView(p, { masked = false } = {}) {
   const eff = effectiveStats(p);
-  return {
+  const view = {
     id: p.id, type: p.combatantType, name: p.name, image: p.image, level: p.level,
     types: [p.type1, p.type2].filter(Boolean),
     currentHp: p.currentHP, maxHp: p.maxHP, currentVp: p.currentVP, maxVp: p.maxVP,
@@ -2718,6 +2718,37 @@ function _foreignCombatantView(p) {
     hasStatBlock: p.combatantType != null && p.proficiency != null,
     isExpanded: true, // one card at a time, always open
   };
+  return masked ? _maskForeignView(view, p) : view;
+}
+
+/** A DM's creature in PvE, as a player sees it: the same card as their own Pokemon's, with what the DM hasn't let the
+ * players see (the DM console's checkboxes -- visibleToViewer) shown as ??? in its usual place, and only the moves it has
+ * been seen using. Its held item, skills and saving throws have no checkbox, so they stay hidden. */
+function _maskForeignView(v, p) {
+  const see = (field) => visibleToViewer(p, field);
+  const hide = '???';
+  if (!see('name')) v.name = hide;
+  if (!see('type')) v.types = [];
+  if (!see('level')) v.level = '?';
+  if (!see('hp')) { v.currentHp = hide; v.maxHp = ''; v.tempHp = 0; }
+  if (!see('vp')) { v.currentVp = hide; v.maxVp = ''; }
+  if (!see('size')) v.size = '';
+  v.appliedStatMods = { ...(v.appliedStatMods || {}) }; // the little +1 / -1 beside a value would give a hidden one away
+  if (!see('ac')) { v.ac = '?'; v.baseAc = '?'; delete v.appliedStatMods.ac; }
+  if (!see('stats')) {
+    ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach((k) => { v[k] = '?'; v[`${k}Mod`] = '?'; delete v.appliedStatMods[k]; });
+    v.critMod = '?';
+  }
+  if (!see('abilities')) v.abilities = '';
+  v.item = '';
+  v.skills = '';
+  v.savingThrows = '';
+  v.proficiency = null; // no Proficiency / Skills / Saving Throws rows (hasStatBlock was worked out above)
+  v.feats = '';
+  v.movement = '';
+  const seen = new Set(_movesSeen(session, p.id));
+  v.moves = (v.moves || []).filter(name => seen.has(name));
+  return v;
 }
 
 /** data-focus-id marks which participant this card is currently
@@ -2729,13 +2760,19 @@ function _renderForeignFocusFull(p) {
   // The card styles normally ride along inside the viewer's own battle markup (combat.js's renderBattlePhase), which this
   // replaces -- without them in <head> another player's card rendered as unstyled text.
   _ensureCombatCardStyles();
-  return `<div class="wip-foreign-focus-full" data-focus-id="${p.id}">${renderCombatCard(_foreignCombatantView(p), false, { compactWip: true, readOnly: true })}</div>`;
+  const view = _foreignCombatantView(p, { masked: _isDmEnemy(session, p) });
+  return `<div class="wip-foreign-focus-full" data-focus-id="${p.id}">${renderCombatCard(view, false, { compactWip: true, readOnly: true })}</div>`;
 }
 
-/** Another trainer's own participants (themselves and their Pokemon) show their full card, read-only, in every battle type;
- * only a DM's enemy in PvE (no owner, or the DM console's 'DM') keeps the short fog-of-war panel. */
-function _showsFullForeignCard(state, p) {
-  return state.battleType === 'pvp' || (!!p.owner && p.owner !== DM_OWNER);
+/** A DM's creature in PvE (no owner, or the DM console's 'DM'): its card hides what the DM hasn't shown the players. */
+function _isDmEnemy(state, p) {
+  return state?.battleType !== 'pvp' && (!p.owner || p.owner === DM_OWNER);
+}
+
+/** Every other participant shows the full card, read-only -- the same design as the viewer's own (the user's call,
+ * 2026-10-15); a DM's enemy in PvE has its hidden values masked (_maskForeignView) instead of a separate short panel. */
+function _showsFullForeignCard() {
+  return true;
 }
 
 function _ensureCombatCardStyles() {
@@ -5855,12 +5892,32 @@ function _halvesOnSave(moveName) {
   return HALF_ON_SAVE_RE.test(String((findMoveRow(moveName) || [])[7] || ''));
 }
 
+/** The wall pickWallArea placed, as a zone on the map (routes_combat.py's set-terrain with cells): it lasts the move's
+ * duration ("1 minute" -> 10 rounds) and, for a concentration move, ends with that concentration. */
+async function _placeWallZone(casterId, moveName, wall) {
+  if (!wall?.cells?.length) return;
+  const row = findMoveRow(moveName) || [];
+  const dur = String(row[5] || '').toLowerCase().match(/(\d+)\s*(minute|hour|round|turn)/);
+  const rounds = dur ? Number(dur[1]) * (dur[2] === 'minute' ? 10 : dur[2] === 'hour' ? 600 : 1) : null;
+  const caster = session?.participants?.[casterId];
+  try {
+    await CombatAPI.setTerrain(moveName, String(row[7] || ''), {
+      ...(rounds ? { rounds } : {}), sourceId: casterId, sourceName: caster?.name, cells: wall.cells, moveName,
+      props: _isConcentrationMove(moveName) ? { concentration: true } : undefined,
+    });
+  } catch (err) {
+    showCombatAlert(err.message, { title: moveName });
+  }
+}
+
 async function _runMultiHitAoe({ combatantId, moveName, move, computedData, speciesName }) {
   // Partial cover: one step down for a save move or a sure hit; one that rolls to hit keeps disadvantage on the roll
   // (the attack popup's cover resolver), so the picker leaves its hits as they are.
   const rollsToHit = !moveCategoriesFor(moveName).includes('trigger_saving_throw') && !moveCategoriesFor(moveName).includes('guaranteed_hit');
   let targetIds = await pickMultipleTargets(combatantId, { moveName, area: _aoeAreaFor(moveName), partialCoverAs: rollsToHit ? 'disadvantage' : 'edge' });
-  if (!targetIds || !targetIds.length) return false; // closed / nobody picked -- move's own cost still applied
+  // A wall (Smokescreen) stays on the map as a zone for the move's duration -- held up by its concentration if it has one.
+  if (targetIds?.wall) await _placeWallZone(combatantId, moveName, targetIds.wall);
+  if (!targetIds || !targetIds.length) return !!targetIds?.wall; // closed / nobody picked -- move's own cost still applied
   // A line's or cone's targets only on the edge of it (line-area.js / cone-area.js, the user's rule 2026-10-14): they
   // save for nothing, or take half damage -- and the move's effects -- on a failure.
   const edgeIds = new Set(targetIds.edgeIds || []);
@@ -6435,7 +6492,9 @@ function _aoeAreaFor(moveName) {
   // A cone move ("Self (15ft. cone)", "40ft. cone") is aimed from the caster in one of the 8 grid directions.
   const coneFt = coneFtFromRange(range);
   if (coneFt) return { coneFt };
-  if (!/radius|circle|cylinder/i.test(range)) return null;
+  // No shape in the range ("30ft.", "Melee"): the description may give one -- Smokescreen's wall from a point, Blizzard's
+  // 20 foot radius centered on a point, Dark Void's "all creatures within 30 feet of you" (areaFromDescription).
+  if (!/radius|circle|cylinder/i.test(range)) return areaFromDescription(range, String(row[7] || ''));
   const radiusFt = radiusFtFromRange(range);
   if (!radiusFt) return null;
   const high = /(\d+)\s*(?:ft|feet|foot)\.?\s*high/i.exec(String(row[7] || ''));

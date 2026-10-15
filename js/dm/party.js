@@ -6,7 +6,7 @@
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
-import { escapeHtml, typeBadges, toast } from './dm-common.js';
+import { escapeHtml, typeBadges, toast, attachSuggest } from './dm-common.js';
 import { xpOrStart, xpPanelHtml, xpButtonHtml, giveXpPopup } from './xp.js';
 import { givePokemonPopup } from './give-pokemon.js';
 
@@ -305,6 +305,22 @@ function moneyAndItemsHtml(t, items) {
       <button class="dm-btn danger" id="moneyTake">− Take</button>
     </div>
 
+    <div class="dm-card-title" style="margin-top:1rem">Give an item</div>
+    <div class="dm-row dm-give-item-row">
+      <div class="dm-give-item-name"><input class="dm-input" id="giveItemName" placeholder="Item from the list…"></div>
+      <input class="dm-input" id="giveItemQty" type="number" min="1" value="1" style="max-width:70px">
+      <button class="dm-btn primary" id="giveItemBtn">Give</button>
+    </div>
+    <details class="dm-custom-item">
+      <summary>Or an item of your own…</summary>
+      <input class="dm-input" id="customName" placeholder="Name">
+      <textarea class="dm-input" id="customDesc" rows="2" placeholder="What it is / does"></textarea>
+      <div class="dm-row">
+        <input class="dm-input" id="customQty" type="number" min="1" value="1" style="max-width:70px">
+        <button class="dm-btn primary" id="giveCustomBtn">Give custom item</button>
+      </div>
+    </details>
+
     <div class="dm-card-title" style="margin-top:1rem">Inventory</div>
     <div class="dm-inv">
       ${Object.keys(groups).sort().map(type => `
@@ -317,23 +333,7 @@ function moneyAndItemsHtml(t, items) {
             <button class="dm-icon-btn" data-item="${escapeHtml(it.name)}" data-custom="${it.custom ? 1 : ''}" data-delta="1" title="Give one more">+</button>
           </div>`).join('')}`).join('') || '<div class="dm-hint">Nothing in the inventory.</div>'}
     </div>
-
-    <div class="dm-card-title" style="margin-top:1rem">Give an item</div>
-    <datalist id="itemNames">${items.map(i => `<option value="${escapeHtml(i.name)}">${escapeHtml(i.type || '')}</option>`).join('')}</datalist>
-    <div class="dm-row">
-      <input class="dm-input" id="giveItemName" list="itemNames" placeholder="Item from the list…">
-      <input class="dm-input" id="giveItemQty" type="number" min="1" value="1" style="max-width:70px">
-      <button class="dm-btn primary" id="giveItemBtn">Give</button>
-    </div>
-    <details class="dm-custom-item">
-      <summary>Or an item of your own…</summary>
-      <input class="dm-input" id="customName" placeholder="Name">
-      <textarea class="dm-input" id="customDesc" rows="2" placeholder="What it is / does"></textarea>
-      <div class="dm-row">
-        <input class="dm-input" id="customQty" type="number" min="1" value="1" style="max-width:70px">
-        <button class="dm-btn primary" id="giveCustomBtn">Give custom item</button>
-      </div>
-    </details>`;
+`;
 }
 
 function wireTrainer(name, items) {
@@ -362,6 +362,8 @@ function wireTrainer(name, items) {
   _root.querySelectorAll('[data-delta]').forEach(b => b.addEventListener('click', () => {
     run(() => DmAPI.giveItem(name, b.dataset.item, Number(b.dataset.delta), { custom: !!b.dataset.custom }));
   }));
+  attachSuggest(document.getElementById('giveItemName'), () => items.map(i => ({ value: i.name, label: i.name, sub: i.type || '' })),
+    { after: document.querySelector('.dm-give-item-row') });
   document.getElementById('giveItemBtn').addEventListener('click', () => {
     const typed = document.getElementById('giveItemName').value.trim();
     const qty = Math.max(1, parseInt(document.getElementById('giveItemQty').value, 10) || 1);

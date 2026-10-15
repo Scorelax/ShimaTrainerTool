@@ -163,8 +163,8 @@ function _ensureDom() {
           <div class="save-picker-roll-total" id="savePickerSaveTotal"></div>
           <div class="save-picker-outcome-actions">
             <button class="combat-use-move-btn save-picker-back" id="savePickerBack">← Back</button>
-            <button class="combat-use-move-btn save-picker-pass-btn" id="savePickerPass">Save Success</button>
             <button class="combat-use-move-btn save-picker-fail-btn" id="savePickerFail">Save Fail</button>
+            <button class="combat-use-move-btn save-picker-pass-btn" id="savePickerPass">Save Success</button>
           </div>
         </div>
         <div id="savePickerStep3" hidden>

@@ -124,6 +124,7 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
   position: fixed; right: 400px; bottom: 16px; z-index: 10050; max-width: 440px; background: rgba(23, 24, 43, 0.97);
   color: var(--dm-text); border: 1px solid rgba(255, 215, 0, 0.5); border-radius: 10px; padding: 0.6rem 0.9rem;
   font-size: 0.86rem; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45); transition: opacity 0.3s;
+  pointer-events: none; /* just a notice -- faded out it stays in place, and used to swallow clicks on what's under it */
 }
 .dm-collapsible > summary { cursor: pointer; list-style: none; margin-bottom: 0; }
 .dm-collapsible[open] > summary { margin-bottom: 0.6rem; }
@@ -524,6 +525,23 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-multi-opt { display: flex; align-items: center; gap: 0.45rem; padding: 0.3rem 0.4rem; border-radius: 5px; font-size: 0.86rem; cursor: pointer; }
 .dm-multi-opt:hover { background: rgba(255, 255, 255, 0.06); }
 .dm-multi-opt.locked { opacity: 0.7; cursor: default; }
+/* attachSuggest's list: opens in place under its input, like the multi-select's. */
+.dm-suggest-pop {
+  margin-top: 4px; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px;
+  background: #1b1c33; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 8px; padding: 0.3rem;
+}
+.dm-suggest-pop[hidden] { display: none; }
+.dm-suggest-opt {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.3rem 0.45rem; border: none; border-radius: 5px;
+  background: none; color: var(--dm-text); font: inherit; font-size: 0.86rem; text-align: left; cursor: pointer;
+}
+.dm-suggest-opt:hover, .dm-suggest-opt.active { background: rgba(255, 215, 0, 0.12); }
+.dm-suggest-opt small { margin-left: auto; color: var(--dm-muted); font-size: 0.74rem; }
+.dm-suggest-thumb { width: 30px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center; }
+.dm-suggest-thumb img, .dm-suggest-thumb video { width: 100%; height: 100%; object-fit: contain; }
+.dm-give-item-row { align-items: flex-start; }
+.dm-cs-head[hidden] { display: none; }
+.dm-give-item-name { flex: 1; min-width: 0; }
 .dm-multi-opt small { color: var(--dm-muted); }
 .dm-move-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .dm-move-chips span { font-size: 0.78rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--dm-line); }

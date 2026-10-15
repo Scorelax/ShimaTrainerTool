@@ -77,6 +77,13 @@ export function lineGeometry(casterPos, casterSize, angleDeg, lengthFt, pitchDeg
     if (Math.abs(d[k]) > 1e-9) out = Math.min(out, ((d[k] > 0 ? hi : lo) - o[k]) / d[k]);
   });
   const outLen = Number.isFinite(out) ? out : 0;
+  if (start?.point) {
+    // A wall conjured at a point (Smokescreen -- line-area-picker.js's pickWallArea): it runs from the back edge of that
+    // square, the square itself included, `lengthFt` in all.
+    const from = { x: o.x - d.x * outLen, y: o.y - d.y * outLen, z: o.z - d.z * outLen };
+    const wallLen = (lengthFt / 5) * stretch;
+    return { o: from, d, len: wallLen, out: 0, drawLen: wallLen * Math.cos(p), fire };
+  }
   const len = outLen + (lengthFt / 5) * stretch;
   return { o, d, len, out: outLen, drawLen: len * Math.cos(p), fire };
 }
@@ -171,7 +178,8 @@ export function lineCells(casterPos, casterSize, angleDeg, lengthFt, pitchDeg = 
   ];
   const strip = beam.slice(0, 4).map(([v, b]) => [v.x, v.y, b - v.z * o.z]);
   const coverOf = (c, r, h) => (level ? squareShareInside(c, r, strip) : cubeShareInside(c, r, h, beam));
-  const own = (c, r, h) => c >= left && c < left + n && r >= top && r < top + n && h >= z0 && h < z0 + n;
+  const own = start?.point ? () => false // a wall's own starting square is part of it
+    : (c, r, h) => c >= left && c < left + n && r >= top && r < top + n && h >= z0 && h < z0 + n;
   // The cubes near the middle of the beam, all along it.
   const seen = new Map();
   const reach = level ? 0 : 1;

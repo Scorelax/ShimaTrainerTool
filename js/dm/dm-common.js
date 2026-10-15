@@ -1,5 +1,6 @@
 // Small helpers shared by the DM console's modules (see dm-console.js).
 import { DmAPI } from '../api.js';
+import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { getMoveTypeColor } from '../utils/pokemon-types.js';
 import { buildPokemonCombatant } from '../pages/combat.js';
 import { dmEnemyParticipant } from '../pages/combat-wip.js';
@@ -50,6 +51,66 @@ export function splitList(text, known = []) {
 
 /** A dropdown with a checkbox per option, for picking several (saving throws, skills). `locked` options show ticked
  * and can't be changed (a Pokemon's own species skills). Wire with bindMultiSelects, read with readMultiSelect. */
+/**
+ * A search-as-you-type list under a text input -- the DM console's own instead of the browser's <datalist>, which Chrome
+ * draws beside the field. It opens in place under the input (like the multi-select's list), filtered by what's typed;
+ * `options()` gives [{value, label, sub, image}] (image: a species picture, shown small). Picking one fills the input and
+ * fires its input/change events, so the form's own listeners run as if it had been typed. `after`: the element the list
+ * opens under, when the input shares a row with other fields.
+ */
+export function attachSuggest(input, options, { max = 40, imageFallback = '', after = null } = {}) {
+  const pop = document.createElement('div');
+  pop.className = 'dm-suggest-pop';
+  pop.hidden = true;
+  (after || input).insertAdjacentElement('afterend', pop); // `after`: a whole row the list opens under (input + buttons)
+  input.setAttribute('autocomplete', 'off');
+  let shown = [];
+  let active = -1;
+  const close = () => { pop.hidden = true; active = -1; };
+  const highlight = () => pop.querySelectorAll('.dm-suggest-opt').forEach((el, i) => el.classList.toggle('active', i === active));
+  const render = () => {
+    const q = input.value.trim().toLowerCase();
+    const all = options();
+    // Starts-with first, then contains -- typing "pi" puts Pidgey before Spinarak.
+    const starts = all.filter(o => o.label.toLowerCase().startsWith(q));
+    const rest = q ? all.filter(o => !o.label.toLowerCase().startsWith(q) && `${o.label} ${o.sub || ''}`.toLowerCase().includes(q)) : [];
+    shown = [...starts, ...rest].slice(0, max);
+    if (!shown.length || (shown.length === 1 && shown[0].value.toLowerCase() === q)) { close(); return; }
+    pop.innerHTML = shown.map((o, i) => `
+      <button type="button" class="dm-suggest-opt" data-i="${i}" tabindex="-1">
+        ${o.image !== undefined ? `<span class="dm-suggest-thumb" data-img="${escapeHtml(o.image || '')}"></span>` : ''}
+        <span class="dm-suggest-label">${escapeHtml(o.label)}</span>${o.sub ? `<small>${escapeHtml(o.sub)}</small>` : ''}
+      </button>`).join('');
+    pop.querySelectorAll('[data-img]').forEach((el) => {
+      if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, '', { small: true });
+      else if (imageFallback) el.innerHTML = `<img src="${imageFallback}" alt="" style="opacity:0.35">`;
+    });
+    active = -1;
+    pop.hidden = false;
+  };
+  const pick = (i) => {
+    const o = shown[i];
+    if (!o) return;
+    input.value = o.value;
+    close();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  input.addEventListener('input', (e) => { if (e.isTrusted) render(); });
+  input.addEventListener('focus', render);
+  input.addEventListener('blur', () => setTimeout(close, 150));
+  input.addEventListener('keydown', (e) => {
+    if (pop.hidden) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(shown.length - 1, active + 1); highlight(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active - 1); highlight(); }
+    else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); pick(active); }
+    else if (e.key === 'Escape') { e.stopPropagation(); close(); }
+  });
+  pop.addEventListener('mousedown', (e) => e.preventDefault()); // keep the focus in the input while picking
+  pop.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) pick(Number(b.dataset.i)); });
+  return { close };
+}
+
 export function multiSelectHtml(id, options, selected = [], { locked = [], placeholder = 'None' } = {}) {
   const sel = new Set(selected.map(s => s.toLowerCase()));
   const lock = new Set(locked.map(s => s.toLowerCase()));

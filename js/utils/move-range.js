@@ -27,6 +27,38 @@ export function areaPlacementFt(rangeText) {
   return m ? Number(m[1]) : null;
 }
 
+/**
+ * The area of a move whose range text has no shape ("30ft.", "Melee") but whose description does -- null when it has
+ * none (it picks its targets: Fire Blast's "up to two creatures"). Returns one of
+ *   {wallFt, maxStartFt}                      a wall of smoke from a point within range (Smokescreen)
+ *   {radiusFt, centeredOnCaster: false, maxCenterFt, heightFt}   a blast dropped within range (Blizzard, Toxic...)
+ *   {radiusFt, centeredOnCaster: true}        everyone within N ft of the user (Dark Void, Echoing Screech...)
+ */
+export function areaFromDescription(rangeText, description) {
+  const range = String(rangeText || '');
+  const d = String(description || '');
+  const rangeM = /(\d+)\s*(?:ft|feet|foot)\b/i.exec(range);
+  const rangeFt = rangeM ? Number(rangeM[1]) : null;
+  const high = /(\d+)\s*(?:ft|feet|foot)\.?\s*high/i.exec(d);
+  const heightFt = high ? Number(high[1]) : null;
+  const wall = /\bline\b[^.]*?(\d+)\s*(?:feet|foot|ft)\.?\s*long[^.]*?\bfrom a point\b/i.exec(d);
+  if (wall) return { wallFt: Number(wall[1]), maxStartFt: rangeFt };
+  const radius = /(\d+)\s*[- ]?(?:foot|feet|ft)\.?[\s-]*radius/i.exec(d);
+  if (radius && /\bpoint\b|\bcentered\b|within range/i.test(d)) {
+    return { radiusFt: Number(radius[1]), centeredOnCaster: false, maxCenterFt: rangeFt, heightFt };
+  }
+  const nearPoint = /within (\d+)\s*(?:feet|foot|ft)\.? of (?:that|the|a) point/i.exec(d);
+  if (nearPoint) return { radiusFt: Number(nearPoint[1]), centeredOnCaster: false, maxCenterFt: rangeFt, heightFt: null };
+  if (/(?:creatures?|enemies|targets?)\b[^.]*\bwithin melee range/i.test(d)) return { radiusFt: 5, centeredOnCaster: true, heightFt: null };
+  // "Each creature within 30 feet", "All creatures within 30 feet of you" -- not "within 10ft of the target" / "you pass within".
+  const nearYou = /(?:creatures?|enemies)\b[^.]*?\bwithin (\d+)\s*(?:feet|foot|ft)\.?(?:\s+of you)?(?!\s+of\b)/i.exec(d);
+  if (nearYou && !/\bpass within\b/i.test(d)) return { radiusFt: Number(nearYou[1]), centeredOnCaster: true, heightFt: null };
+  if (rangeFt && /(?:all|each)\s+(?:creatures?|enemies)\s+(?:in|within)\s+(?:range|must)\b/i.test(d)) {
+    return { radiusFt: rangeFt, centeredOnCaster: true, heightFt: null };
+  }
+  return null;
+}
+
 function _span(token, size) {
   const n = footprintForSize(size);
   return { c0: token.col, c1: token.col + n - 1, r0: token.row - n + 1, r1: token.row };

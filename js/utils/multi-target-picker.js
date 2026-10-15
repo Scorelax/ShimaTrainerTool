@@ -12,7 +12,7 @@ import { spriteMediaHtml } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { filterTargetable, markOutOfRange } from './targetability.js';
 import { pickTerrainArea } from './terrain-area-picker.js';
-import { pickLineArea, pickConeArea } from './line-area-picker.js';
+import { pickLineArea, pickConeArea, pickWallArea } from './line-area-picker.js';
 import { footprintCells, footprintForSize } from './battle-map-grid.js';
 import { coverBetween, coverFromCell, coverText } from './cover.js';
 
@@ -53,6 +53,7 @@ let _resolve = null;
 let _selected = new Set();
 let _edge = new Set(); // a line's or cone's targets only on the edge of it (line-area.js): they save for nothing / half on a fail
 let _coverEdge = new Map(); // the edge targets that are there because of partial cover: id -> "Partial cover (Rock)"
+let _wall = null; // a wall placed on the map (pickWallArea): {cells, origin, angle} -- it goes on the map as a zone
 
 function _ensureDom() {
   if (_overlay) return;
@@ -81,7 +82,7 @@ function _ensureDom() {
   // A plain array of ids, carrying `edgeIds` (the ticked ones on a line's edge) for the caller.
   document.getElementById('mtpConfirm').addEventListener('click', () => {
     const ids = [..._selected];
-    _close(Object.assign(ids, { edgeIds: ids.filter(id => _edge.has(id)),
+    _close(Object.assign(ids, { edgeIds: ids.filter(id => _edge.has(id)), wall: _wall,
       coverEdge: Object.fromEntries(ids.filter(id => _edge.has(id) && _coverEdge.has(id)).map(id => [id, _coverEdge.get(id)])) }));
   });
 }
@@ -130,6 +131,7 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   _selected = new Set();
   _edge = new Set();
   _coverEdge = new Map();
+  _wall = null;
   const grid = document.getElementById('mtpGrid');
   grid.innerHTML = participants.map(p => _cardHtml(p)).join('');
   markOutOfRange(grid, participants); // beyond the move's reach or behind full cover: greyed out, not pickable
@@ -155,6 +157,23 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
   // edge a miss; a move that rolls to hit ('disadvantage') keeps its hits -- the attack roll gets disadvantage instead.
   const partialCover = participants.partialCover || null;
   mapBtn.onclick = async () => {
+    if (area.wallFt) {
+      // A wall from a point (Smokescreen): placed on the map, then whoever it covers is ticked. Nobody in it -- it still
+      // goes on the map, so the move is done right away.
+      const wall = await pickWallArea({ session, casterId, title: moveName || 'Wall', lengthFt: area.wallFt, rangeFt: area.maxStartFt ?? null, targetableIds: aimableIds });
+      if (!wall) return;
+      _wall = { cells: wall.cells, origin: wall.origin, angle: wall.angle };
+      _edge = new Set(wall.edgeIds || []);
+      _coverEdge = new Map();
+      if (!wall.ids.length) { _close(Object.assign([], { edgeIds: [], coverEdge: {}, wall: _wall })); return; }
+      participants.forEach(p => {
+        const card = grid.querySelector(`[data-target-id="${p.id}"]`);
+        if (!card) return;
+        toggle(card, wall.ids.includes(p.id));
+        _markEdge(card, _edge.has(p.id));
+      });
+      return;
+    }
     if (area.coneFt) {
       const cone = await pickConeArea({ session, casterId, title: moveName || 'Cone', lengthFt: area.coneFt, targetableIds: aimableIds, blockedNotes, partialCover, partialAs: partialCoverAs });
       if (!cone) return;
@@ -218,7 +237,8 @@ export async function pickMultipleTargets(casterId, { moveName = '', area = null
 
   _overlay.style.display = 'flex';
   const promise = new Promise((resolve) => { _resolve = resolve; });
-  // A cone or a line is aimed, not picked: open the aimer straight away (its hits come back ticked here, still adjustable).
-  if ((area?.coneFt || area?.lineFt) && !mapBtn.hidden) mapBtn.onclick();
+  // An area move is placed on the map, not picked (the user's call, 2026-10-15): open the map straight away -- its hits
+  // come back ticked here, still adjustable, and closing the map leaves the list to pick from by hand.
+  if (area && !mapBtn.hidden) mapBtn.onclick();
   return promise;
 }

@@ -17,6 +17,7 @@ function _injectStyles() {
   const style = document.createElement('style');
   style.id = 'line-area-picker-styles';
   style.textContent = `
+    .lap-wall-start { position: absolute; z-index: 3; pointer-events: none; box-sizing: border-box; border: 3px solid #ffd700; border-radius: 4px; box-shadow: 0 0 8px rgba(255,215,0,0.7); }
     .lap-overlay { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; background: rgba(2,3,10,0.85); backdrop-filter: blur(4px); }
     .lap-card { width: 94%; max-width: 640px; max-height: 94vh; overflow-y: auto; background: linear-gradient(180deg, #1a1d36, #11132a); border: 1px solid rgba(255,150,80,0.45); border-radius: 18px; padding: 1rem 1.1rem 1.1rem; color: #e0e0e0; box-shadow: 0 14px 50px rgba(0,0,0,0.7); }
     .lap-title { margin: 0 0 0.2rem; font-size: 1.15rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #ffb27a; }
@@ -276,6 +277,151 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       }
       else if (act === 'cancel') { overlay.remove(); resolve(null); }
       else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, edgeIds: edges, angle, pitch, start: org() }); }
+    });
+  });
+}
+
+/**
+ * "Place the wall" -- a line that starts at a point instead of at the caster (Smokescreen: "a line of smoke 60 feet long
+ * and 5 feet thick, that extends in any direction from a point within range"). Tap a square within `rangeFt` of the
+ * caster (shaded) to start it there, and drag -- or ⟲ / ⟳ -- to turn it any way; it stays level on the ground. Its
+ * squares follow the line's rules (more than half inside: in it; a quarter to half: the edge of it).
+ * @returns {Promise<{ids, edgeIds, cells: string[], origin: {col, row}, angle} | null>}  cells: "col,row" of the squares
+ *   in it (not the edge ones) -- where the zone goes on the map
+ */
+export function pickWallArea({ session, casterId, title, lengthFt, rangeFt = null, targetableIds = null, confirmLabel = 'Place it' }) {
+  _injectStyles();
+  return new Promise((resolve) => {
+    const board = session.board;
+    const { cols, rows } = board.grid;
+    const casterPos = board.tokens[casterId];
+    const caster = session.participants[casterId];
+    if (!casterPos) { resolve(null); return; }
+    const n = footprintForSize(caster?.size);
+    const VID = '__wall_start__';
+    const START = { point: true };
+    const box = { c0: casterPos.col, c1: casterPos.col + n - 1, r0: casterPos.row - n + 1, r1: casterPos.row };
+    const reach = rangeFt == null ? Infinity : Math.floor(rangeFt / 5);
+    const inRange = (c, r) => c >= 0 && r >= 0 && c < cols && r < rows
+      && Math.max(Math.max(0, box.c0 - c, c - box.c1), Math.max(0, box.r0 - r, r - box.r1)) <= reach;
+    let angle = casterPos.facing || 0;
+    // To begin with: the square just in front of the caster.
+    const a0 = (angle * Math.PI) / 180;
+    let origin = {
+      col: Math.round(box.c0 + (n - 1) / 2 + Math.sin(a0) * (n / 2 + 0.5)),
+      row: Math.round(box.r0 + (n - 1) / 2 - Math.cos(a0) * (n / 2 + 0.5)),
+    };
+    if (!inRange(origin.col, origin.row)) origin = { col: casterPos.col, row: casterPos.row };
+    const pos = () => ({ col: origin.col, row: origin.row, z: 0, facing: angle });
+    const vSession = () => ({
+      ...session,
+      participants: { ...session.participants, [VID]: { id: VID, name: 'Start', size: 'Medium' } },
+      board: { ...board, tokens: { ...board.tokens, [VID]: pos() } },
+    });
+
+    const overlay = document.createElement('div');
+    overlay.className = 'lap-overlay';
+    overlay.innerHTML = `
+      <div class="lap-card">
+        <h3 class="lap-title">${title}</h3>
+        <div class="lap-sub">A ${lengthFt}ft wall, 5ft thick. Tap a square${rangeFt != null ? ` within ${rangeFt}ft of ${caster?.name || 'the caster'} (shaded)` : ''} to start it there, then drag to turn it any way -- or use ⟲ / ⟳. A square more than half inside it is in it (shaded); one more than a quarter up to half inside is the edge of it (dashed).</div>
+        <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
+          <div class="bmap-grid"></div>
+          <div class="bmap-line-cells"></div>
+          <div class="lap-line-shape"></div>
+          <div class="lap-wall-start"></div>
+          <div class="bmap-objects">${mapObjectsHtml(board)}</div>
+          <div class="bmap-tokens"></div>
+        </div>
+        <div class="lap-aim"></div>
+        <div class="lap-hits"></div>
+        <div class="lap-actions">
+          <button type="button" data-act="left" title="Turn 5° left">⟲ 5°</button>
+          <button type="button" data-act="right" title="Turn 5° right">⟳ 5°</button>
+          <button type="button" data-act="cancel">Cancel</button>
+          <button type="button" class="lap-confirm" data-act="confirm">${confirmLabel}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const stage = overlay.querySelector('.lap-stage');
+    const grid = overlay.querySelector('.bmap-grid');
+    const tokenLayer = overlay.querySelector('.bmap-tokens');
+    const lineCellsEl = overlay.querySelector('.bmap-line-cells');
+    const lineShapeEl = overlay.querySelector('.lap-line-shape');
+    const startEl = overlay.querySelector('.lap-wall-start');
+    const aimEl = overlay.querySelector('.lap-aim');
+    const hitsEl = overlay.querySelector('.lap-hits');
+    if (board.backgroundImage) {
+      stage.classList.add('has-bg');
+      stage.style.backgroundImage = `url(${board.backgroundImage})`;
+    }
+    grid.setAttribute('style', gridTemplateStyle(board));
+    grid.innerHTML = gridCellsHtml(board, 'bmap-cell');
+    grid.querySelectorAll('[data-cell]').forEach((el) => {
+      const [c, r] = el.dataset.cell.split(',').map(Number);
+      if (inRange(c, r)) el.classList.add('line-reach');
+    });
+    const targetable = targetableIds ? new Set(targetableIds) : null;
+    const tokenEls = _buildTokens(session, board, casterId, tokenLayer, targetable, null);
+    const nameOf = id => (visibleToViewer(session.participants[id], 'name') ? session.participants[id].name : '???');
+
+    let hits = [], edges = [], cells = [];
+    const refresh = () => {
+      const g = lineGeometry(pos(), 1, angle, lengthFt, 0, START);
+      lineShapeEl.innerHTML = lineOutlineSvg(board, g, angle);
+      const sq = lineCells(pos(), 1, angle, lengthFt, 0, START, board.grid).filter(q => q.z === 0);
+      lineCellsEl.innerHTML = lineCellsHtml(board, sq);
+      cells = [...new Set(sq.filter(q => !q.edge).map(q => `${q.x},${q.y}`))];
+      startEl.setAttribute('style', `left:${(origin.col / cols) * 100}%;top:${(origin.row / rows) * 100}%;width:${100 / cols}%;height:${100 / rows}%`);
+      const caught = lineHits(vSession(), VID, angle, lengthFt, 0, START);
+      hits = caught.ids.filter(id => !targetable || targetable.has(id));
+      edges = caught.edgeIds.filter(id => hits.includes(id));
+      tokenEls.forEach((el, id) => {
+        el.classList.toggle('line-hit', hits.includes(id));
+        el.classList.toggle('line-edge', edges.includes(id));
+      });
+      aimEl.textContent = `Starts at the outlined square, turned ${Math.round(angle) % 360}°. Tap another shaded square to move the start; drag to turn it.`;
+      const full = hits.filter(id => !edges.includes(id));
+      hitsEl.textContent = hits.length
+        ? [full.length ? `In it: ${full.map(nameOf).join(', ')}` : '', edges.length ? `On the edge: ${edges.map(nameOf).join(', ')}` : ''].filter(Boolean).join(' · ')
+        : 'Nobody in it -- it still goes on the map.';
+    };
+    refresh();
+
+    const squareAt = (e) => {
+      const r = stage.getBoundingClientRect();
+      const c = Math.floor(((e.clientX - r.left) / r.width) * cols), rr = Math.floor(((e.clientY - r.top) / r.height) * rows);
+      return { col: c, row: rr };
+    };
+    let aiming = false;
+    const aim = (e) => {
+      const centre = { x: origin.col + 0.5, y: origin.row + 0.5 };
+      const r = stage.getBoundingClientRect();
+      const x = ((e.clientX - r.left) / r.width) * cols, y = ((e.clientY - r.top) / r.height) * rows;
+      if (Math.hypot(x - centre.x, y - centre.y) < 0.6) return; // on the start square itself: no direction yet
+      angle = angleToPointer(stage, board, centre, e.clientX, e.clientY);
+      refresh();
+    };
+    stage.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const sq = squareAt(e);
+      // A shaded square other than the start: the wall starts there now. Then (or anywhere else) dragging turns it.
+      if (inRange(sq.col, sq.row) && (sq.col !== origin.col || sq.row !== origin.row)) { origin = sq; refresh(); }
+      aiming = true; stage.setPointerCapture?.(e.pointerId);
+    });
+    stage.addEventListener('pointermove', (e) => { if (aiming) aim(e); });
+    const stop = () => { aiming = false; };
+    stage.addEventListener('pointerup', stop);
+    stage.addEventListener('pointercancel', stop);
+
+    overlay.addEventListener('click', (e) => {
+      const act = e.target.closest('button')?.dataset.act;
+      if (!act) return;
+      if (act === 'left') { angle = (angle + 355) % 360; refresh(); }
+      else if (act === 'right') { angle = (angle + 5) % 360; refresh(); }
+      else if (act === 'cancel') { overlay.remove(); resolve(null); }
+      else if (act === 'confirm') { overlay.remove(); resolve({ ids: hits, edgeIds: edges, cells, origin: { ...origin }, angle }); }
     });
   });
 }

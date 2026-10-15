@@ -225,6 +225,7 @@ export async function renderMapEditor(root, { onDone }) {
         <div class="dm-editor-head">
           <button class="dm-btn small" id="mapBack">← Map setup</button>
           <h2>Map</h2>
+          <button class="dm-btn primary small" id="mapDone">✓ Done</button>
         </div>
 
         <div class="dm-card">
@@ -267,7 +268,6 @@ export async function renderMapEditor(root, { onDone }) {
         <div class="dm-editor-foot">
           <button class="dm-btn small" id="mapClearObjects">Clear objects</button>
           <button class="dm-btn small" id="mapClearMarks">Clear terrain</button>
-          <button class="dm-btn primary wide" id="mapDone">✓ Done</button>
         </div>
       </aside>
       <section class="dm-editor-canvas">

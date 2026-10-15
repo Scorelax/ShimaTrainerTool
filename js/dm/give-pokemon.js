@@ -7,7 +7,7 @@ import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
 import {
   escapeHtml, typeBadges, natureOptions, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect,
-  openDmModal, getSpecies, participantFromPokemonRow,
+  openDmModal, getSpecies, participantFromPokemonRow, attachSuggest,
 } from './dm-common.js';
 
 const STATS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -30,13 +30,11 @@ export async function givePokemonPopup(trainer, { ownedSpecies = [] } = {}) {
   let previewSeq = 0;
 
   const html = `
-    <datalist id="gpSpeciesNames">${species.map(s => `<option value="${escapeHtml(s.name)}">No. ${escapeHtml(s.dex)}</option>`).join('')}</datalist>
-    <datalist id="gpItemNames">${items.map(i => `<option value="${escapeHtml(i.name)}">${escapeHtml(i.type || '')}</option>`).join('')}</datalist>
     <form id="gpForm" class="dm-cs-form" autocomplete="off">
       <div class="dm-cs-cols">
         <div>
           <div class="dm-field"><label for="gpSpecies">Species</label>
-            <input class="dm-input" id="gpSpecies" list="gpSpeciesNames" placeholder="Type to search…"></div>
+            <input class="dm-input" id="gpSpecies" placeholder="Type to search…"></div>
           <div class="dm-cs-head" id="gpHead" hidden>
             <span class="dm-cs-head-thumb" id="gpThumb"></span>
             <div><h3 class="dm-cs-title" id="gpTitle"></h3><div class="dm-species-meta" id="gpMeta"></div></div>
@@ -51,7 +49,7 @@ export async function givePokemonPopup(trainer, { ownedSpecies = [] } = {}) {
             <div class="dm-field"><label for="gpNature">Nature</label>
               <select class="dm-select" id="gpNature"><option value="">None</option>${natureOptions('')}</select></div>
             <div class="dm-field"><label for="gpItem">Held item</label>
-              <input class="dm-input" id="gpItem" list="gpItemNames" placeholder="None"></div>
+              <input class="dm-input" id="gpItem" placeholder="None"></div>
           </div>
           <div class="dm-field"><label>Abilities</label><div id="gpAbilities"><div class="dm-hint">Pick a species first.</div></div></div>
           <div class="dm-field"><label>Skills <small class="dm-label-note">its species' own are always on -- tick extra ones</small></label>
@@ -158,6 +156,10 @@ export async function givePokemonPopup(trainer, { ownedSpecies = [] } = {}) {
     ],
     onOpen: (body) => {
       const speciesInput = body.querySelector('#gpSpecies');
+      // Lists that open under the field (attachSuggest), the species with their pictures.
+      attachSuggest(speciesInput, () => species.map(s => ({ value: s.name, label: s.name, sub: `No. ${s.dex}`, image: s.image || '' })),
+        { imageFallback: 'assets/Pokeball.png' });
+      attachSuggest(body.querySelector('#gpItem'), () => items.map(i => ({ value: i.name, label: i.name, sub: i.type || '' })));
       speciesInput.addEventListener('change', () => pickSpecies(body));
       speciesInput.addEventListener('input', () => pickSpecies(body));
       const form = body.querySelector('#gpForm');

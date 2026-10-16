@@ -14,6 +14,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize } from './battle-map-grid.js';
 import { injectBattleMapStyles, squareCells, ZONE_RGB, spriteTransform } from './battle-map-view.js';
 import { cellDistanceFt } from './move-range.js';
+import { attachMapZoom, zoomControlsHtml, clampText } from './map-zoom.js';
 
 /** A move's area radius from its range text: the distance next to "radius"/"circle" if there is one ("Self (30ft. radius)"
  * -> 30, "100ft., 50ft. radius" -> 50), otherwise the first distance ("Self, 50ft." -> 50). null if none. */
@@ -36,7 +37,7 @@ function _injectStyles() {
     .tap-stage { touch-action: none; user-select: none; }
     .tap-stage .bmap-cell { cursor: crosshair; }
     .tap-stage .bmap-tokens { z-index: 2; }
-    .tap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
+    .tap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; }
     .tap-actions button { border: none; border-radius: 999px; padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.1); color: #e8ecff; }
     .tap-actions button:hover { background: rgba(255,255,255,0.2); }
     .tap-actions .tap-confirm { margin-left: auto; background: linear-gradient(135deg, rgb(var(--zc)), rgba(var(--zc), 0.6)); color: #0b0d1a; box-shadow: 0 0 16px rgba(var(--zc), 0.45); }
@@ -89,11 +90,8 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
       <div class="tap-card" style="--zc:${rgb}">
         <h3 class="tap-title">${title}</h3>
         <div class="tap-sub">Mark where it takes effect${heightFt ? ` (${heightFt}ft high)` : ''}${radiusFt && centeredOnCaster ? ` — pre-filled with the ${radiusFt}ft area around ${caster?.name || 'the caster'}` : ''}. ${radiusFt ? `With the stamp on, a click drops the ${radiusFt}ft area centred on that tile (a new click moves it); turn the stamp off to ` : ''}${radiusFt ? 'click' : 'Click'} or drag to paint tiles by hand; start a drag on a marked tile to erase. Only creatures standing on these tiles are affected.</div>
-        <div class="bmap-stage tap-stage" style="aspect-ratio:${cols} / ${rows}; --zc:${rgb}">
-          <div class="bmap-grid"></div>
-          <div class="bmap-tokens"></div>
-        </div>
         <div class="tap-actions">
+          ${zoomControlsHtml()}
           ${radiusFt ? `<button type="button" data-act="stamp" class="${stamp ? 'on' : ''}">Stamp ${radiusFt}ft</button>` : ''}
           ${radiusFt && casterPos ? `<button type="button" data-act="circle">Around ${caster?.name || 'caster'}</button>` : ''}
           <button type="button" data-act="all">🗺️ All map</button>
@@ -102,8 +100,18 @@ export function pickTerrainArea({ session, casterId, title, kind, radiusFt, cent
           <span class="tap-count"></span>
           <button type="button" class="tap-confirm" data-act="confirm">${confirmLabel}</button>
         </div>
+        <div class="tap-viewport">
+          <div class="bmap-stage tap-stage" style="aspect-ratio:${cols} / ${rows}; --zc:${rgb}">
+            <div class="bmap-grid"></div>
+            <div class="bmap-tokens"></div>
+          </div>
+        </div>
       </div>`;
     document.body.appendChild(overlay);
+    // The whole screen, buttons above the map, the map fitted and zoomable (map-zoom.js).
+    overlay.querySelector('.tap-card').classList.add('mz-fullcard');
+    clampText(overlay.querySelector('.tap-sub'));
+    attachMapZoom({ viewport: overlay.querySelector('.tap-viewport'), stage: overlay.querySelector('.tap-stage'), getGrid: () => board.grid, controls: overlay.querySelector('.tap-actions') }).refit();
 
     const stage = overlay.querySelector('.tap-stage');
     const grid = overlay.querySelector('.bmap-grid');

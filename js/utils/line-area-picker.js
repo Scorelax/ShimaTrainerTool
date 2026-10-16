@@ -8,6 +8,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, mapObjectsHtml } from './battle-map-grid.js';
 import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
 import { coneSquares, coneHits, coneOutlineSvg, injectConeStyles } from './cone-area.js';
+import { attachMapZoom, zoomControlsHtml, clampText } from './map-zoom.js';
 import { lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineReachBox, inLineReach, aimAtCreature, lineGuideStyle, lineOutlineSvg, angleToPointer, injectLineStyles } from './line-area.js';
 
 function _injectStyles() {
@@ -28,9 +29,9 @@ function _injectStyles() {
     .lap-stage .bmap-token.untargetable { opacity: 0.35; filter: grayscale(1); }
     .lap-stage .bmap-cell.line-reach { background: rgba(255,140,60,0.1); box-shadow: inset 0 0 0 1px rgba(255,160,80,0.25); }
     .lap-stage .bmap-token.line-aim .bmap-token-portrait { outline: 2px dashed #fff3; outline-offset: 3px; }
-    .lap-aim { font-size: 0.82rem; margin-top: 0.6rem; color: #c8cff5; }
-    .lap-hits { font-size: 0.85rem; margin-top: 0.3rem; min-height: 1.2em; color: #ffcf9e; }
-    .lap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
+    .lap-aim { font-size: 0.82rem; color: #c8cff5; }
+    .lap-hits { font-size: 0.85rem; margin-top: 0.2rem; min-height: 1.2em; color: #ffcf9e; }
+    .lap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.6rem; }
     .lap-actions button { border: none; border-radius: 999px; padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.1); color: #e8ecff; }
     .lap-actions button:hover { background: rgba(255,255,255,0.2); }
     .lap-height { font-size: 0.8rem; color: #9fd8ff; min-width: 4.5em; text-align: center; }
@@ -67,6 +68,13 @@ function _buildTokens(session, board, casterId, tokenLayer, targetable, blockedN
 
 /** A caster bigger than one square chooses which of its own squares the line / cone starts from (its front left, its
  * front right...): their outline, the chosen square's mark, and which own square (if any) a pointer event is on. */
+/** The whole screen, buttons above the map, the map fitted and zoomable (map-zoom.js). */
+function _fitPicker(overlay, board) {
+  overlay.querySelector('.lap-card').classList.add('mz-fullcard');
+  clampText(overlay.querySelector('.lap-sub'));
+  attachMapZoom({ viewport: overlay.querySelector('.lap-viewport'), stage: overlay.querySelector('.lap-stage'), getGrid: () => board.grid, controls: overlay.querySelector('.lap-actions') }).refit();
+}
+
 function _startPicker(stage, board, casterPos, n) {
   const own = document.createElement('div');
   own.className = 'lap-own';
@@ -151,25 +159,29 @@ export function pickLineArea({ session, casterId, title, lengthFt, targetableIds
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
         <div class="lap-sub">A ${lengthFt}ft line, a 5ft-wide beam from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the beam straight at it (up at a flyer, down from the air). It reaches ${lengthFt / 5} squares out at any angle; a square more than half inside the beam is hit (shaded), one more than a quarter up to half inside is the edge of it (dashed: a save for nothing, or half damage on a fail), and less misses. Greyed-out creatures are out of its reach.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again to go back to ${casterSize % 2 ? 'the middle' : 'the square facing the aim'}.` : ''}</div>
-        <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
-          <div class="bmap-grid"></div>
-          <div class="bmap-line-cells"></div>
-          <div class="lap-line-shape"></div>
-          <div class="bmap-line guide"></div>
-          <div class="bmap-objects">${mapObjectsHtml(board)}</div>
-          <div class="bmap-tokens"></div>
-        </div>
         <div class="lap-aim"></div>
         <div class="lap-hits"></div>
         <div class="lap-actions">
+          ${zoomControlsHtml()}
           <button type="button" data-act="left" title="Turn 5° left">⟲ 5°</button>
           <button type="button" data-act="right" title="Turn 5° right">⟳ 5°</button>
           ${_heightButtonsHtml(casterSize, 5)}
           <button type="button" data-act="cancel">Cancel</button>
           <button type="button" class="lap-confirm" data-act="confirm">${confirmLabel}</button>
         </div>
+        <div class="lap-viewport">
+          <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
+            <div class="bmap-grid"></div>
+            <div class="bmap-line-cells"></div>
+            <div class="lap-line-shape"></div>
+            <div class="bmap-line guide"></div>
+            <div class="bmap-objects">${mapObjectsHtml(board)}</div>
+            <div class="bmap-tokens"></div>
+          </div>
+        </div>
       </div>`;
     document.body.appendChild(overlay);
+    _fitPicker(overlay, board);
 
     const stage = overlay.querySelector('.lap-stage');
     const grid = overlay.querySelector('.bmap-grid');
@@ -325,24 +337,28 @@ export function pickWallArea({ session, casterId, title, lengthFt, rangeFt = nul
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
         <div class="lap-sub">A ${lengthFt}ft wall, 5ft thick. Tap a square${rangeFt != null ? ` within ${rangeFt}ft of ${caster?.name || 'the caster'} (shaded)` : ''} to start it there, then drag to turn it any way -- or use ⟲ / ⟳. A square more than half inside it is in it (shaded); one more than a quarter up to half inside is the edge of it (dashed).</div>
-        <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
-          <div class="bmap-grid"></div>
-          <div class="bmap-line-cells"></div>
-          <div class="lap-line-shape"></div>
-          <div class="lap-wall-start"></div>
-          <div class="bmap-objects">${mapObjectsHtml(board)}</div>
-          <div class="bmap-tokens"></div>
-        </div>
         <div class="lap-aim"></div>
         <div class="lap-hits"></div>
         <div class="lap-actions">
+          ${zoomControlsHtml()}
           <button type="button" data-act="left" title="Turn 5° left">⟲ 5°</button>
           <button type="button" data-act="right" title="Turn 5° right">⟳ 5°</button>
           <button type="button" data-act="cancel">Cancel</button>
           <button type="button" class="lap-confirm" data-act="confirm">${confirmLabel}</button>
         </div>
+        <div class="lap-viewport">
+          <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
+            <div class="bmap-grid"></div>
+            <div class="bmap-line-cells"></div>
+            <div class="lap-line-shape"></div>
+            <div class="lap-wall-start"></div>
+            <div class="bmap-objects">${mapObjectsHtml(board)}</div>
+            <div class="bmap-tokens"></div>
+          </div>
+        </div>
       </div>`;
     document.body.appendChild(overlay);
+    _fitPicker(overlay, board);
 
     const stage = overlay.querySelector('.lap-stage');
     const grid = overlay.querySelector('.bmap-grid');
@@ -464,24 +480,28 @@ export function pickConeArea({ session, casterId, title, lengthFt, targetableIds
       <div class="lap-card">
         <h3 class="lap-title">${title}</h3>
         <div class="lap-sub">A ${lengthFt}ft cone from ${caster?.name || 'the caster'}. Drag on the map to aim it level — any angle, not just along the grid — or tap a creature to tilt the cone straight at it (up at a flyer, down from the air). It reaches ${lengthFt / 5} squares out; a square more than half inside it is hit (shaded), one more than a quarter up to half inside is the edge of it (dashed: a save for nothing, or half damage on a fail), and less misses. Greyed-out creatures are out of its reach.${casterSize > 1 ? ` ${caster?.name || 'The caster'} fills several squares: tap one of them (outlined) to fire from there -- its front left, its front right... -- and tap it again to go back to ${casterSize % 2 ? 'the middle' : 'the square facing the aim'}.` : ''}</div>
-        <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
-          <div class="bmap-grid"></div>
-          <div class="bmap-line-cells"></div>
-          <div class="lap-cone-shape"></div>
-          <div class="bmap-objects">${mapObjectsHtml(board)}</div>
-          <div class="bmap-tokens"></div>
-        </div>
         <div class="lap-aim"></div>
         <div class="lap-hits"></div>
         <div class="lap-actions">
+          ${zoomControlsHtml()}
           <button type="button" data-act="left" title="Turn 5° left">⟲ 5°</button>
           <button type="button" data-act="right" title="Turn 5° right">⟳ 5°</button>
           ${_heightButtonsHtml(casterSize, 15)}
           <button type="button" data-act="cancel">Cancel</button>
           <button type="button" class="lap-confirm" data-act="confirm">${confirmLabel}</button>
         </div>
+        <div class="lap-viewport">
+          <div class="bmap-stage lap-stage" style="aspect-ratio:${cols} / ${rows}">
+            <div class="bmap-grid"></div>
+            <div class="bmap-line-cells"></div>
+            <div class="lap-cone-shape"></div>
+            <div class="bmap-objects">${mapObjectsHtml(board)}</div>
+            <div class="bmap-tokens"></div>
+          </div>
+        </div>
       </div>`;
     document.body.appendChild(overlay);
+    _fitPicker(overlay, board);
 
     const stage = overlay.querySelector('.lap-stage');
     const grid = overlay.querySelector('.bmap-grid');

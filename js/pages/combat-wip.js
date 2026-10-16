@@ -45,13 +45,14 @@ import { coverText } from '../utils/cover.js';
 import { areaPlacementFt, areaFromDescription, creatureDistanceFt } from '../utils/move-range.js';
 import { evaluateEffect, buildStatusSpec, untargetableState, UNTARGETABLE_STATES, parseAbilityList, effectiveAbilities, critThreshold, statusLabel, describeStatusEnds, pendingTurnSaves, pendingTurnHeals, statDeltas, statSetOverrides, reapplyStatDeltas, effectiveStats, isConcentration, guaranteedCritStatusId, guaranteedHitStatusId, isConcentrationHolder, tempHpRemaining, activeBuffCount, activeBuffCountsByStat, echoedVoiceMultiplier, maxSpeed, damageRollBonusOf, terrainKindOf, terrainHealDice, terrainsAffecting, weathersAffecting, weatherKindOf, applyWeatherVariants, weatherAttackMode, isGrounded, tierAt, critReductionFrom, zoneRuleActive, isMeleeMoveRow, isGroundedIn, isLevitating, altitudeLimits } from '../utils/move-effects.js';
 import { CONDITION_RULES } from '../utils/condition-rules.js';
+import { showTypeCalculator } from '../utils/type-calculator.js';
 import {
   renderSetupPhase, attachSetupListeners,
   renderInitiativePhase, attachInitiativeListeners,
   buildTrainerCombatant, buildPokemonCombatant,
   renderBattlePhase, attachBattleListeners, rerenderBattle, setBattleCardOptions, renderCombatCard,
   setCombatStateKey, setOnCombatStateSave, setOnLogEvent, setOnSwitchPokemon, setOnAddStatus, setOnLocalStatusClick, setOnBasicAction, setOnUseTrainerBuff, openSwitchPopup, moveCategoriesFor, moveEffectsFor, moveFlagsFor, findMoveRow,
-  buildKnownMovesString, COMBAT_CSS,
+  buildKnownMovesString, COMBAT_CSS, showMoveDetailsReadOnly,
 } from './combat.js';
 
 const WIP_CSS = `
@@ -145,6 +146,9 @@ const WIP_CSS = `
   }
   .wip-turn-reaction-dot.bonus { background: #f39c12; }
   .wip-turn-reaction-dot.used { background: #6b6b6b; }
+  /* Holding an action (Hold Action) -- a blue dot, only while held. */
+  .wip-turn-reaction-dot.held { background: #5dade2; display: none; }
+  .wip-turn-reaction-dot.held.on { display: block; }
   /* How many live effects (conditions, stat changes, advantage...) this participant has,
      on the portrait's bottom-right corner -- hidden at zero. */
   .wip-turn-status-count {
@@ -325,6 +329,12 @@ const WIP_CSS = `
     background: linear-gradient(135deg, #f1c40f, #d68910); color: #1a1300; border: none; box-shadow: 0 0 14px rgba(241,196,15,0.35);
   }
   #wipBattlePhase .wip-react-btn:disabled { background: rgba(255,255,255,0.08); color: #8a8fb0; box-shadow: none; }
+  #wipBattlePhase .wip-hold-btn, #wipBattlePhase .wip-held-btn {
+    border-radius: 999px; padding: 0.35rem 0.9rem; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    background: linear-gradient(135deg, #5dade2, #2e86c1); color: #06121c; border: none; box-shadow: 0 0 14px rgba(93,173,226,0.35);
+  }
+  #wipBattlePhase .wip-hold-btn { background: rgba(93,173,226,0.16); color: #cfe6f7; border: 1px solid rgba(93,173,226,0.6); box-shadow: none; }
+  #wipBattlePhase .wip-hold-btn:disabled, #wipBattlePhase .wip-held-btn:disabled { background: rgba(255,255,255,0.08); color: #8a8fb0; border-color: transparent; box-shadow: none; cursor: not-allowed; }
 
   /* AC chip + HP / VP bars */
   #wipBattlePhase .combat-card-stats-group { background: none; padding: 0; margin-bottom: 0.65rem; display: flex; flex-direction: column; gap: 0.45rem; }
@@ -495,6 +505,10 @@ const WIP_CSS = `
   #wipBattlePhase .calc-tile--hpvp {
     color: #c8f7d4; background: linear-gradient(135deg, rgba(46,204,113,0.26), rgba(30,132,73,0.2));
     border: 1px solid rgba(46,204,113,0.6); box-shadow: 0 0 12px rgba(46,204,113,0.16);
+  }
+  #wipBattlePhase .calc-tile--types {
+    color: #d6e4ff; background: linear-gradient(135deg, rgba(93,173,226,0.26), rgba(91,44,111,0.22));
+    border: 1px solid rgba(93,173,226,0.6); box-shadow: 0 0 12px rgba(93,173,226,0.16);
   }
   #wipBattlePhase .calc-tile:hover { filter: brightness(1.18); transform: translateY(-1px); }
   #wipBattlePhase .calc-tile:active { transform: scale(0.96); }
@@ -2558,7 +2572,7 @@ function _syncTurnOrderSidebar(state) {
         <div class="wip-turn-item" data-id="${id}">
           <div class="wip-turn-portrait">
             <div class="wip-turn-portrait-media" data-portrait-id="${id}"></div>
-            <div class="wip-turn-reaction"><div class="wip-turn-reaction-dot" data-kind="reaction" title="Reaction"></div><div class="wip-turn-reaction-dot bonus" data-kind="bonus" title="Bonus action"></div></div>
+            <div class="wip-turn-reaction"><div class="wip-turn-reaction-dot" data-kind="reaction" title="Reaction"></div><div class="wip-turn-reaction-dot bonus" data-kind="bonus" title="Bonus action"></div><div class="wip-turn-reaction-dot held" data-kind="held" title="Holding an action"></div></div>
             <div class="wip-turn-status-count" style="display:none"></div>
           </div>
           <div class="wip-turn-name"></div>
@@ -2580,6 +2594,7 @@ function _syncTurnOrderSidebar(state) {
     reactionEl.style.display = p.status === 'participating' ? 'flex' : 'none';
     reactionEl.querySelector('[data-kind="reaction"]').classList.toggle('used', !!p.reactionUsed);
     reactionEl.querySelector('[data-kind="bonus"]').classList.toggle('used', !!p.bonusActionUsed);
+    reactionEl.querySelector('[data-kind="held"]')?.classList.toggle('on', !!p.heldAction);
 
     const statuses = p.statuses || [];
     const countEl = node.querySelector('.wip-turn-status-count');
@@ -2712,7 +2727,12 @@ function _computeFocusContext(state) {
   const filteredState = { ...merged, combatants: [focused], activeTurnIndex: focused.id === activeId ? 0 : -1 };
   const canReact = p.status === 'participating' && !p.reactionUsed &&
     !state.reactingParticipantId && p.id !== state.turnOrder[state.turnIndex];
-  const cardOptions = { compactWip: true, canReact, endTurnAtTop: true };
+  // Hold Action: offered on its own normal turn (not a reaction or extra action); a held one shows Held Action until it's
+  // taken or its next turn starts, usable whenever nobody else holds the floor out of turn.
+  const showHold = !state.reactingParticipantId && p.id === state.turnOrder[state.turnIndex];
+  const showUseHeld = !!p.heldAction;
+  const canUseHeld = showUseHeld && p.status === 'participating' && !state.reactingParticipantId;
+  const cardOptions = { compactWip: true, canReact, endTurnAtTop: true, showHold, showUseHeld, canUseHeld };
   return { p, isMine: true, filteredState, cardOptions };
 }
 
@@ -2744,7 +2764,7 @@ function _foreignCombatantView(p, { masked = false } = {}) {
     str: eff.str, dex: eff.dex, con: eff.con, int: eff.int, wis: eff.wis, cha: eff.cha,
     strMod: eff.strMod, dexMod: eff.dexMod, conMod: eff.conMod,
     intMod: eff.intMod, wisMod: eff.wisMod, chaMod: eff.chaMod,
-    proficiency: p.proficiency, abilities: effectiveAbilities(p), item: p.item,
+    proficiency: p.proficiency, abilities: effectiveAbilities(p), item: p.item, stabBonusValue: p.stabBonusValue,
     savingThrows: p.savingThrows, skills: p.skills, size: p.size,
     moves: p.moves || [], rechargeStates: {}, // this device doesn't track another player's recharge state
     initiativeTotal: p.initiative,
@@ -2785,6 +2805,20 @@ function _maskForeignView(v, p) {
   const seen = new Set(_movesSeen(session, p.id));
   v.moves = (v.moves || []).filter(name => seen.has(name));
   return v;
+}
+
+/** Another participant's creature as the read-only move popup works it out (showMoveDetailsReadOnly): its real stats,
+ * so the numbers are right -- but for a DM's creature, nothing the players aren't allowed to know: no item, abilities only
+ * if shown, and hideNumbers / hideLevel so the popup puts ??? where a hidden stat, type or level would show through. */
+function _moveViewFor(p) {
+  // The weather and zones it stands in change its moves (Weather Ball, Solar Beam...) -- same as its owner's card.
+  const v = { ..._foreignCombatantView(p), activeTerrains: terrainsAffecting(session, p.id), activeWeathers: weathersAffecting(session, p.id) };
+  if (!_isDmEnemy(session, p)) return v;
+  const see = (field) => visibleToViewer(p, field);
+  return {
+    ...v, item: '', abilities: see('abilities') ? v.abilities : '', name: see('name') ? v.name : '???',
+    hideNumbers: !see('stats') || !see('type'), hideLevel: !see('level'),
+  };
 }
 
 /** data-focus-id marks which participant this card is currently
@@ -2954,6 +2988,28 @@ function _attachMainFocusListeners(state) {
       if (!reactBtn.disabled) CombatAPI.reactionStart(reactBtn.dataset.combatantId).catch(err => showCombatAlert(err.message, { title: 'Error' }));
       return;
     }
+    const heldBtn = e.target.closest('.wip-held-btn');
+    if (heldBtn) {
+      if (!heldBtn.disabled) CombatAPI.useHeldAction(heldBtn.dataset.combatantId).catch(err => showCombatAlert(err.message, { title: "Couldn't take the held action" }));
+      return;
+    }
+    const holdBtn = e.target.closest('.wip-hold-btn');
+    if (holdBtn) {
+      if (holdBtn.disabled || _endingTurn) return;
+      const name = session?.participants?.[holdBtn.dataset.combatantId]?.name || 'It';
+      showCombatConfirm(`${name} holds their action and ends their turn. When the trigger happens -- before ${name}'s next turn -- tap ✋ Held Action to take it.`,
+        { title: 'Hold Action', yesLabel: 'Hold', noLabel: 'Cancel' })
+        .then((yes) => {
+          if (!yes) return;
+          // Holding ends the turn like End Turn does -- combat.js's own End Turn handling included -- so it presses
+          // End Turn, marked to hold the action on the way out.
+          const endTurnBtn = document.querySelector(`#battleList .end-turn-btn[data-combatant-id="${holdBtn.dataset.combatantId}"]`);
+          if (!endTurnBtn) return;
+          _holdOnEndTurn = holdBtn.dataset.combatantId;
+          endTurnBtn.click();
+        });
+      return;
+    }
     // The one extra thing this shared context needs on top of combat.js's
     // own End Turn handling: actually move the SERVER's turn pointer so
     // every other client agrees who's up, not just a local-only index.
@@ -2964,6 +3020,8 @@ function _attachMainFocusListeners(state) {
     // the floor" either way: reactionEnd while reacting, advanceTurn otherwise.
     const endBtn = e.target.closest('.end-turn-btn');
     if (!endBtn) return;
+    const holding = _holdOnEndTurn === endBtn.dataset.combatantId;
+    _holdOnEndTurn = null;
     if (session.reactingParticipantId) {
       // A reaction or an extra action (Rapid Orders) is over: the floor goes back to whoever's turn it is -- show them
       // if they're this player's own (the trainer who gave Rapid Orders).
@@ -2975,40 +3033,50 @@ function _attachMainFocusListeners(state) {
         .catch(err => showCombatAlert(err.message, { title: "Couldn't end the reaction" }));
       return;
     }
-    // One End Turn at a time: the button shows it's working (a slow connection is visible instead of "nothing
-    // happened"), and a second tap while the first is still on its way can't advance the turn twice.
-    if (_endingTurn) return;
-    _endingTurn = true;
-    abandonMove(); // a move left unfinished this turn is never paid for later
-    endBtn.disabled = true;
-    endBtn.textContent = 'Ending turn…';
-
-    // Ending a real turn also moves the info box on to this viewer's own next
-    // combatant (trainer or Pokémon, wrapping round the turn order), so the
-    // next thing they see is whoever they'll be playing next. Only once the
-    // server accepted the advance, so a rejected End Turn doesn't move focus.
-    // Skipped for a combatant with Ingrain: combat.js finishes that End Turn
-    // later, behind its heal popup, by redrawing THIS combatant's card --
-    // which would land on top of the new focus.
-    const endingId = endBtn.dataset.combatantId;
-    const nextId = _nextOwnedAfter(session, endingId);
-    const endingHasIngrain = ctx.filteredState.combatants[0]?.statusEffects
-      ?.some(se => se.name === 'Ingrain' && se.duration > 0);
-    // Effects that end on a repeat save, or a `heal` status due to re-trigger
-    // (Aqua Ring/Ingrain), at the end of this turn get prompted first.
-    _promptTurnSaves(endingId, 'end_of_turn')
-      .then(() => _promptTurnHeals(endingId, 'end_of_turn'))
-      .then(() => _promptSleepCheck(endingId))
-      .then(() => _promptAbilityTurn(endingId, 'end_of_turn')) // Shed Skin
-      .then(() => CombatAPI.advanceTurn())
-      .then(() => { if (nextId && nextId !== endingId && !endingHasIngrain) _setFocus(nextId); })
-      .catch((err) => {
-        showCombatAlert(err.message, { title: "Couldn't end the turn" });
-        // The card is normally redrawn by the next push; after a failure there may be none, so restore the button here.
-        if (endBtn.isConnected) { endBtn.disabled = false; endBtn.textContent = 'End Turn'; }
-      })
-      .finally(() => { _endingTurn = false; });
+    _endTurn(endBtn, ctx, holding ? () => CombatAPI.holdAction(endBtn.dataset.combatantId) : () => CombatAPI.advanceTurn());
   });
+}
+
+// Hold Action's End Turn press (see the Hold handler above): the id whose turn ends holding its action.
+let _holdOnEndTurn = null;
+
+/** End Turn, or Hold Action (`advance` is what moves the server's turn on: advance-turn, or hold-action -- which ends
+ * the turn the same way). The end-of-turn prompts run first either way. */
+function _endTurn(endBtn, ctx, advance) {
+  // One End Turn at a time: the button shows it's working (a slow connection is visible instead of "nothing
+  // happened"), and a second tap while the first is still on its way can't advance the turn twice.
+  if (_endingTurn) return;
+  _endingTurn = true;
+  abandonMove(); // a move left unfinished this turn is never paid for later
+  const label = endBtn.textContent;
+  endBtn.disabled = true;
+  endBtn.textContent = 'Ending turn…';
+
+  // Ending a real turn also moves the info box on to this viewer's own next
+  // combatant (trainer or Pokémon, wrapping round the turn order), so the
+  // next thing they see is whoever they'll be playing next. Only once the
+  // server accepted the advance, so a rejected End Turn doesn't move focus.
+  // Skipped for a combatant with Ingrain: combat.js finishes that End Turn
+  // later, behind its heal popup, by redrawing THIS combatant's card --
+  // which would land on top of the new focus.
+  const endingId = endBtn.dataset.combatantId;
+  const nextId = _nextOwnedAfter(session, endingId);
+  const endingHasIngrain = ctx.filteredState.combatants[0]?.statusEffects
+    ?.some(se => se.name === 'Ingrain' && se.duration > 0);
+  // Effects that end on a repeat save, or a `heal` status due to re-trigger
+  // (Aqua Ring/Ingrain), at the end of this turn get prompted first.
+  _promptTurnSaves(endingId, 'end_of_turn')
+    .then(() => _promptTurnHeals(endingId, 'end_of_turn'))
+    .then(() => _promptSleepCheck(endingId))
+    .then(() => _promptAbilityTurn(endingId, 'end_of_turn')) // Shed Skin
+    .then(advance)
+    .then(() => { if (nextId && nextId !== endingId && !endingHasIngrain) _setFocus(nextId); })
+    .catch((err) => {
+      showCombatAlert(err.message, { title: "Couldn't end the turn" });
+      // The card is normally redrawn by the next push; after a failure there may be none, so restore the button here.
+      if (endBtn.isConnected) { endBtn.disabled = false; endBtn.textContent = label; }
+    })
+    .finally(() => { _endingTurn = false; });
 }
 
 // True while an End Turn is on its way to the server (see the handler above).
@@ -7182,6 +7250,12 @@ function _bindStatusBadgeClicks() {
   _statusClickHandler = (e) => {
     const badge = e.target.closest?.('.status-badge[data-server-status-id]');
     if (badge) _openStatusDetail(badge.dataset.combatantId, badge.dataset.serverStatusId);
+    // A move on another participant's card (a player's for the DM, anyone else's for a player): its popup, to read.
+    const viewMove = e.target.closest?.('.combat-move-view');
+    const p = viewMove && session?.participants?.[viewMove.dataset.combatantId];
+    if (p) showMoveDetailsReadOnly(viewMove.dataset.move, _moveViewFor(p), { round: session.round });
+    const typeCalc = e.target.closest?.('.wip-type-calc-btn');
+    if (typeCalc) showTypeCalculator((typeCalc.dataset.types || '').split(',').filter(Boolean));
   };
   document.addEventListener('click', _statusClickHandler);
 }

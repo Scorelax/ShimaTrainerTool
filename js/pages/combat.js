@@ -1005,6 +1005,12 @@ function _calcTileHtml(c) {
     : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn calc-tile calc-tile--hpvp" data-combatant-id="${c.id}" title="HP/VP Calculator"><span class="calc-tile-icon">❤️</span><span class="calc-tile-label">HP / VP<br>Calculator</span></button>`;
 }
 
+/** The Type Calculator (utils/type-calculator.js), under the other calculator -- on every shared battle card, read-only ones
+ * too, starting from this creature's types (opened by combat-wip.js's document-wide click handler). */
+function _typeCalcTileHtml(c) {
+  return `<button type="button" class="wip-type-calc-btn calc-tile calc-tile--types" data-types="${(c.types || []).join(',')}" title="Type Calculator"><span class="calc-tile-icon">⚖️</span><span class="calc-tile-label">Type<br>Calculator</span></button>`;
+}
+
 /** The Damage Calculator (a Pokemon) or HP/VP Calculator (a trainer) button -- same classes/handlers wherever it sits. */
 function _calcButtonHtml(c, compactWip) {
   return c.type === 'pokemon'
@@ -1012,7 +1018,7 @@ function _calcButtonHtml(c, compactWip) {
     : `<button class="combat-type-calc-btn combat-trainer-hpvp-btn" data-combatant-id="${c.id}" style="background:rgba(76,175,80,0.12);border-color:rgba(76,175,80,0.5);color:#4CAF50;">HP/VP${compactWip ? ' Calculator' : '<br>Calculator'}</button>`;
 }
 
-export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom, endTurnAtTop, readOnly } = {}) {
+export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtBottom, endTurnAtTop, readOnly, showHold, showUseHeld, canUseHeld } = {}) {
   const fainted = c.currentHp <= 0;
   const hpPct = c.maxHp > 0 ? Math.round((c.currentHp / c.maxHp) * 100) : 0;
   const vpPct = c.maxVp > 0 ? Math.round((c.currentVp / c.maxVp) * 100) : 0;
@@ -1065,6 +1071,7 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
           ${compactWip && c.hasStatBlock !== false ? _chipHtml(c, 'ac', `AC <strong>${c.ac} / ${c.baseAc}</strong>${modTag('ac')}`, readOnly) : ''}
           ${compactWip && c.hasStatBlock !== false && c.type === 'pokemon' ? _chipHtml(c, 'crit', `Crit <strong>${formatMod(c.critMod || 0)}</strong>`, readOnly) : ''}
           ${compactWip && !readOnly ? _calcTileHtml(c) : ''}
+          ${compactWip ? _typeCalcTileHtml(c) : ''}
         </div>
         <div class="combat-card-body">
           <div class="combat-card-name-row">
@@ -1075,6 +1082,9 @@ export function renderCombatCard(c, isActive, { compactWip, canReact, endTurnAtB
               // End Turn up top, next to Reaction (the user's call after the first playtest, 2026-10-16: at the bottom it
               // was easy to forget) -- the two kept together, so on a phone they wrap to the next line as a pair.
               ? `<span class="wip-card-turn-btns"><button class="wip-react-btn" data-combatant-id="${c.id}" ${canReact ? '' : 'disabled'}>⚡ Reaction</button>`
+                // Hold Action (the shared battle -- combat-wip.js): held on its own turn, taken later with Held Action.
+                + (showUseHeld ? `<button class="wip-held-btn" data-combatant-id="${c.id}" ${canUseHeld ? '' : 'disabled'} title="Take the action held from your turn, now that its trigger happened">✋ Held Action</button>` : '')
+                + (showHold ? `<button class="wip-hold-btn" data-combatant-id="${c.id}" ${c.actionUsed ? 'disabled title="The action is already used this turn"' : 'title="Keep your action for a trigger and end your turn"'}>✋ Hold</button>` : '')
                 + (isActive && endTurnAtTop ? `<button class="end-turn-btn wip-end-turn-top" data-combatant-id="${c.id}">End Turn</button>` : '')
                 + '</span>'
               : `<span class="combat-initiative-badge">Init: ${c.initiativeTotal}</span>`}
@@ -1331,15 +1341,14 @@ function renderExpandedSection(c, statusBadges, { compactWip, readOnly, isActive
           // per round is spent, so every bonus-action move waits until this combatant's next turn.
           const bonusSpent = (!!c.bonusActionUsed || !!c.bonusActionBlockedBy) && _isBonusActionMove(moveName);
           const label = `${moveName}${chargeText}${bonusSpent ? (c.bonusActionBlockedBy ? ' (no bonus actions)' : ' (bonus action used)') : ''}`;
-          // No move-use flow wired for a foreign card (see readOnly, above) --
-          // a plain row instead of a clickable button, so it doesn't look like
-          // it's supposed to do something on click.
+          // A foreign card (see readOnly, above): no move-use flow, but tapping a move opens its popup to read, with
+          // Use Move off (combat-wip.js -> showMoveDetailsReadOnly). The owner's move handler only listens inside #battleList, which a foreign card is never in.
           if (readOnly) {
             // Coloured by type like the owner's own buttons (applyMoveColors only runs on the viewer's own card).
             const mv = _moveMap?.get(moveName);
             const bg = mv ? getMoveTypeColor(mv[1]) : '';
             const style = bg ? ` style="background-color:${bg};color:${getTextColorForBackground(bg)}"` : '';
-            return `<div class="combat-move-row"><div class="combat-move-item combat-move-item--display" data-move="${moveName}"${style}>${label}</div></div>`;
+            return `<div class="combat-move-row"><button type="button" class="combat-move-item combat-move-view" data-move="${moveName}" data-combatant-id="${c.id}"${style} title="See ${moveName}">${label}</button></div>`;
           }
           return `<div class="combat-move-row">
             <button class="combat-move-item ${isLocked || bonusSpent ? 'move-locked' : ''} ${isDiceLocked ? 'move-dice-locked' : ''}"
@@ -1607,8 +1616,7 @@ function getCombatCSS() {
     .combat-move-item.move-locked { opacity: 0.4; cursor: not-allowed; background: #555 !important; color: #999 !important; }
     .combat-move-item.move-dice-locked { opacity: 0.7; cursor: pointer; background: rgba(255,165,0,0.15) !important; color: #FFA500 !important; border: 1px solid rgba(255,165,0,0.5) !important; }
     .combat-move-item.move-dice-locked:active { transform: scale(0.95); }
-    .combat-move-item--display { cursor: default; }
-    .combat-move-item--display:active { transform: none; }
+
 
     /* MOVE POPUP */
     .combat-popup-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
@@ -3175,12 +3183,21 @@ async function _handleBideClick(c, move, state, onBideResolve) {
   }
 }
 
-async function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve } = {}) {
+/** The shared battle: another combatant's move (another player's creature, or a player's for the DM), in the same popup
+ * the owner gets -- its effect and damage worked out from that creature's own stats -- with Use Move switched off.
+ * `c` is a combatant in renderCombatCard's shape (combat-wip.js's _moveViewFor). */
+export function showMoveDetailsReadOnly(moveName, c, { round } = {}) {
+  loadCombatMoves();
+  return showCombatMoveDetails(moveName, c.id, { combatants: [c], round }, { viewOnly: true });
+}
+
+async function showCombatMoveDetails(moveName, combatantId, state, { onDamageResolved, onSaveTriggered, onReactiveSave, onMultiHitAoe, onEffectsOnly, onBideResolve, viewOnly } = {}) {
   // Only combat-wip.js's shared-combat flow ever passes any of these (see
   // _attachMainFocusListeners) -- the legacy page's own attachCombatListeners()
   // calls attachBattleListeners(state) with none of them, so this stays false
-  // there and that page's own confirm-popup step is unaffected.
-  const _isSharedCombat = !!(onDamageResolved || onSaveTriggered || onReactiveSave || onMultiHitAoe || onEffectsOnly);
+  // there and that page's own confirm-popup step is unaffected. viewOnly (showMoveDetailsReadOnly) is the shared
+  // battle too: the same ability and battle rules apply to the numbers shown.
+  const _isSharedCombat = !!(onDamageResolved || onSaveTriggered || onReactiveSave || onMultiHitAoe || onEffectsOnly || viewOnly);
   if (!_moves) { showToast('Move data not loaded.', 'warning'); return; }
   let move = _moveMap.get(moveName);
   if (!move) { showToast(`Move "${moveName}" not found.`, 'warning'); return; }
@@ -3236,7 +3253,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // live session's log, which the legacy standalone engine has no
   // equivalent of. Short-circuits the rest of this function entirely;
   // there's no normal move-details view for a move with nothing to roll.
-  if (_isSharedCombat && moveName === 'Bide') {
+  if (_isSharedCombat && moveName === 'Bide' && !viewOnly) {
     _handleBideClick(c, move, state, onBideResolve);
     return;
   }
@@ -3247,7 +3264,7 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   // as state -- cancelling/leaving it blank cancels the move entirely,
   // there's no sane damage to show without a number.
   let _formationSize = null;
-  if (moveName === 'Formation Strike') {
+  if (moveName === 'Formation Strike' && !viewOnly) {
     _formationSize = await showCombatPrompt(
       'How many creatures are in your formation? This decides how many damage dice you roll.',
       { title: 'Formation Strike', defaultValue: 1, min: 1 },
@@ -3255,7 +3272,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     if (!_formationSize || _formationSize < 1) return;
   }
 
-  const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
+  // Trainer path bonuses are the viewer's own trainer's -- another player's trainer isn't known here, so none for viewOnly.
+  const trainerData = viewOnly ? [] : JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const trainerPath = trainerData[25] || '';
   const trainerLevel = parseInt(trainerData[2]) || 1;
   const specializationsStr = trainerData[24] || '';
@@ -3531,8 +3549,8 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
     spriteAlt: c.name,
     speciesName: c.speciesName,
     noteText: [c.releasableMoves?.[moveName], _stackNote || _damageNote, ...(_abilityMods?.notes || [])].filter(Boolean).join(' · ') || undefined,
-    disableUse: (_isStackMove && _stacks === 0) || _bonusSpent || !!_weatherBlock || !!_useBlock,
-    disableUseMsg: _useBlock || _weatherBlock || (_bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first'),
+    disableUse: !!viewOnly || (_isStackMove && _stacks === 0) || _bonusSpent || !!_weatherBlock || !!_useBlock,
+    disableUseMsg: (viewOnly ? `${c.name}'s move -- view only` : '') || _useBlock || _weatherBlock || (_bonusSpent ? (c.bonusActionBlockedBy ? `Bonus actions are blocked (${c.bonusActionBlockedBy})` : 'Bonus action already used this round') : 'No Stockpile stacks — use Stockpile first'),
     diceLabel: _diceLabel,
     diceOverride: _diceOverride,
     diceBreakdownOverride: _diceBreakdownOverride,
@@ -3704,6 +3722,22 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
       showDirectHealPopup(target, moveName, healDice, moveMod, stacks, state);
     },
   });
+
+  // A DM's creature whose stats (or type) the players can't see: its modifiers would give them away, so they read ???
+  // -- and its dice too while its level is hidden (they scale with level). The move's own text still shows.
+  if (viewOnly && (c.hideNumbers || c.hideLevel)) {
+    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    if (c.hideNumbers) {
+      set('cAttackBonus', '???'); set('cAttackBreakdown', '');
+      set('cMoveDC', '???'); set('cMoveCritMod', '???');
+      const dmg = document.getElementById('cDamageBonus');
+      if (dmg && dmg.textContent !== '—') dmg.textContent = c.hideLevel ? '???' : `${_effDice || computedData.damageDice || '?'} + ???`;
+      set('cDamageBreakdown', '');
+    } else if (c.hideLevel) {
+      const dmg = document.getElementById('cDamageBonus');
+      if (dmg && dmg.textContent !== '—') { dmg.textContent = '???'; set('cDamageBreakdown', ''); }
+    }
+  }
 }
 
 // ============================================================================

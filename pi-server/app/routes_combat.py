@@ -619,6 +619,16 @@ def _handle(conn, action, params):
             raise ValueError('Missing participant id')
         return _mutate(conn, lambda s: _disengage(s, params['id']))
 
+    if action == 'hold-action':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _hold_action(s, params['id']))
+
+    if action == 'use-held-action':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _use_held_action(s, params['id']))
+
     if action == 'clear-token-position':
         if not params.get('id'):
             raise ValueError('Missing participant id')
@@ -1259,6 +1269,8 @@ def _add_participant(state, data):
         'placed': False,
         'status': status,
         'reactionUsed': False,
+        # Hold Action (_hold_action): an action kept from its own turn, usable until its next turn starts.
+        'heldAction': False,
         # One bonus action per round, same cycle as the reaction: spent by use-bonus-action, refreshed when
         # this participant's own turn comes round again (see _advance_turn).
         'bonusActionUsed': False,
@@ -1892,6 +1904,11 @@ def _advance_turn(state, after_departure=None):
     ending = state['participants'].get(ending_id) if ending_id else None
     if ending:
         ending['lastTurnRound'] = state['round'] - (1 if new_round else 0)
+    if next_participant and next_participant.get('heldAction'):
+        # A held action lasts until the holder's next turn starts.
+        next_participant['heldAction'] = False
+        _log_event(state, 'held-action-lapsed', text=f"{next_participant['name']}'s held action went unused",
+                   actorId=next_participant['id'], actorName=next_participant['name'])
     if next_participant:
         next_participant['lastTurnRound'] = state['round']
         next_participant['reactionUsed'] = False
@@ -2019,6 +2036,48 @@ def _disengage(state, pid):
     participant['disengaged'] = True
     state['started'] = True
     _log_event(state, 'disengage', text=f"{participant['name']} disengaged", actorId=pid, actorName=participant['name'])
+
+
+def _hold_action(state, pid):
+    """Hold Action: on its own turn a creature (trainer or Pokemon) keeps its action for a trigger the table agrees on, and
+    its turn ends. Until its next turn starts (_advance_turn drops an unused one) it can take that action outside its turn
+    (_use_held_action) -- like a reaction, except it had to be set up on its own turn. Movement already used stays used."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if state.get('reactingParticipantId'):
+        raise ValueError('Wait until the current reaction or extra action is over')
+    if pid != _active_participant_id(state):
+        raise ValueError("An action can only be held on this participant's own turn")
+    if participant.get('actionUsed'):
+        raise ValueError(f"{participant['name']} has already used their action this turn")
+    participant['heldAction'] = True
+    _log_event(state, 'hold-action', text=f"{participant['name']} holds their action", actorId=pid, actorName=participant['name'])
+    _advance_turn(state)
+
+
+def _use_held_action(state, pid):
+    """The held action's trigger happened: the creature takes the floor for that one action, the same way Rapid Orders' extra
+    action does (reactingParticipantId, so use-move, move-token and End Turn all act for it, and its End Turn --
+    reaction-end -- hands the floor back to whoever's turn it is). Doesn't spend its reaction."""
+    participant = state['participants'].get(pid)
+    if not participant:
+        raise ValueError('Unknown participant: ' + pid)
+    if not participant.get('heldAction'):
+        raise ValueError(f"{participant['name']} isn't holding an action")
+    if state.get('reactingParticipantId'):
+        raise ValueError('Wait until the current reaction or extra action is over')
+    if participant.get('status') != 'participating':
+        raise ValueError(f"{participant['name']} isn't in the battle right now")
+    incap = _incapacitating_status(participant)
+    if incap:
+        raise ValueError(f"{participant['name']} is {incap['apply']} and can't act")
+    participant['heldAction'] = False
+    participant['actionUsed'] = False
+    participant['extraActionFrom'] = 'held action'
+    state['reactingParticipantId'] = pid
+    state['started'] = True
+    _log_event(state, 'held-action', text=f"{participant['name']} takes their held action", actorId=pid, actorName=participant['name'])
 
 
 def _rapid_orders(state, trainer_id, pokemon_id):

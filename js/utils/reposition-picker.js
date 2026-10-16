@@ -22,6 +22,7 @@ import { patchPortraitMedia } from './sprite-media.js';
 import { visibleToViewer } from './combat-visibility.js';
 import { showCombatAlert } from './combat-alert.js';
 import { isLevitating } from './move-effects.js';
+import { attachMapZoom, zoomControlsHtml } from './map-zoom.js';
 
 function _injectStyles() {
   if (document.getElementById('reposition-picker-styles')) return;
@@ -40,6 +41,7 @@ function _injectStyles() {
     .rpick-confirm-btn { background: linear-gradient(135deg, #27ae60, #1e8449); color: #fff; }
     .rpick-confirm-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
     .rpick-cancel-btn { background: rgba(255,255,255,0.12); color: #e0e0e0; }
+    .rpick-zoom { margin-left: auto; margin-right: 2.6rem; }
     .rpick-stage { position: relative; width: 100%; background: #0a0a12; border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; }
     .rpick-grid { position: absolute; inset: 0; display: grid; gap: 2px; background: #1a1a24; }
     .rpick-stage.has-bg .rpick-grid { background: rgba(26,26,36,0.35); }
@@ -61,6 +63,7 @@ function _injectStyles() {
 
 let _overlay = null;
 let _resolve = null;
+let _zoom = null;
 
 function _ensureDom() {
   if (_overlay) return;
@@ -70,21 +73,29 @@ function _ensureDom() {
   _overlay.id = 'repositionPickerPopup';
   _overlay.style.display = 'none';
   _overlay.innerHTML = `
-    <div class="combat-popup-content">
+    <div class="combat-popup-content mz-fullcard">
       <div class="combat-move-popup-header">
         <button id="rpickClose" class="combat-popup-close">×</button>
         <h2 id="rpickTitle">Choose a cell</h2>
+        <span id="rpickZoomControls" class="rpick-zoom">${zoomControlsHtml()}</span>
       </div>
-      <div class="combat-move-popup-body">
+      <div class="combat-move-popup-body mz-fill">
         <div class="rpick-hint" id="rpickHint"></div>
         <div class="rpick-row" id="rpickConfirmRow"></div>
-        <div class="rpick-stage" id="rpickStage">
-          <div class="rpick-grid" id="rpickGrid"></div>
-          <div class="rpick-tokens" id="rpickTokens"></div>
+        <div id="rpickViewport">
+          <div class="rpick-stage" id="rpickStage">
+            <div class="rpick-grid" id="rpickGrid"></div>
+            <div class="rpick-tokens" id="rpickTokens"></div>
+          </div>
         </div>
       </div>
     </div>`;
   document.body.appendChild(_overlay);
+  // The whole screen, buttons above the map, the map fitted and zoomable (map-zoom.js).
+  _zoom = attachMapZoom({
+    viewport: document.getElementById('rpickViewport'), stage: document.getElementById('rpickStage'),
+    getGrid: () => _state?.session?.board?.grid, controls: document.getElementById('rpickZoomControls'),
+  });
   document.getElementById('rpickClose').addEventListener('click', () => _close(null));
   _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(null); });
 }
@@ -128,7 +139,7 @@ function _landingCheck(session, tokenId) {
 function _render() {
   const { session, tokenId, anchorCol, anchorRow, maxFt, hint, staged, canLand } = _state;
   document.getElementById('rpickHint').textContent = staged
-    ? 'Confirm the move below, or click a different cell.'
+    ? 'Confirm the move, or click a different cell.'
     : hint;
 
   const confirmRow = document.getElementById('rpickConfirmRow');
@@ -207,7 +218,8 @@ export function pickRepositionCell(session, tokenId, anchorCol, anchorRow, maxFt
   _ensureDom();
   document.getElementById('rpickTitle').textContent = title;
   _state = { session, tokenId, anchorCol, anchorRow, maxFt, hint, allow, staged: null, canLand: _landingCheck(session, tokenId) };
-  _render();
   _overlay.style.display = 'flex';
+  _render();
+  _zoom.reset();
   return new Promise((resolve) => { _resolve = resolve; });
 }

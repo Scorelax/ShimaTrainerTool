@@ -1092,6 +1092,16 @@ export class CombatAPI {
     return API.request('combat', 'rapid-orders', { id: trainerId, targetId: pokemonId }, { useCache: false });
   }
 
+  /** Hold Action: keeps the action for a trigger and ends the turn (routes_combat.py's _hold_action). */
+  static async holdAction(id) {
+    return API.request('combat', 'hold-action', { id }, { useCache: false });
+  }
+
+  /** Takes a held action outside the holder's turn -- the floor until its End Turn (routes_combat.py's _use_held_action). */
+  static async useHeldAction(id) {
+    return API.request('combat', 'use-held-action', { id }, { useCache: false });
+  }
+
   /** Disengage: spends the action; moving away this turn provokes no reactions (routes_combat.py's _disengage). */
   static async disengage(id) {
     return API.request('combat', 'disengage', { id }, { useCache: false });

@@ -10,6 +10,7 @@ import { visibleToViewer } from './combat-visibility.js';
 import { gridCellsHtml, gridTemplateStyle, cellRect, footprintForSize, footprintCells } from './battle-map-grid.js';
 import { isLevitating } from './move-effects.js';
 import { injectBattleMapStyles, spriteTransform } from './battle-map-view.js';
+import { attachMapZoom, zoomControlsHtml } from './map-zoom.js';
 
 export const SWITCH_RANGE_CELLS = 4; // 20ft -- keep in step with routes_combat.py's SWITCH_RANGE_CELLS
 
@@ -27,7 +28,7 @@ function _injectStyles() {
     .tpp-stage .bmap-cell.legal:hover { background: rgba(255,215,0,0.28); }
     .tpp-stage .bmap-cell:not(.legal) { cursor: not-allowed; }
     .tpp-stage .bmap-cell.chosen { background: rgba(255,215,0,0.38); box-shadow: inset 0 0 0 2px #FFD700, 0 0 12px rgba(255,215,0,0.6); }
-    .tpp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.8rem; }
+    .tpp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 0.6rem; }
     .tpp-actions button { border: none; border-radius: 999px; padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.1); color: #e8ecff; }
     .tpp-actions button:hover { background: rgba(255,255,255,0.2); }
     .tpp-actions .tpp-confirm { margin-left: auto; background: linear-gradient(135deg, #5dade2, #2e86c1); color: #07121c; }
@@ -82,16 +83,22 @@ export function pickSwitchTile({ session, trainerId, outId, incoming }) {
       <div class="tpp-card">
         <h3 class="tpp-title">Send out ${incoming.name}</h3>
         <div class="tpp-sub">Pick where it appears -- any free tile within 20ft of your trainer (blue).${legal.size ? '' : ' There is no free tile in range!'}</div>
-        <div class="bmap-stage tpp-stage" style="aspect-ratio:${cols} / ${rows}">
-          <div class="bmap-grid"></div>
-          <div class="bmap-tokens"></div>
-        </div>
         <div class="tpp-actions">
+          ${zoomControlsHtml()}
           <button type="button" data-act="cancel">Cancel</button>
           <button type="button" class="tpp-confirm" data-act="confirm" disabled>Send out here</button>
         </div>
+        <div class="tpp-viewport">
+          <div class="bmap-stage tpp-stage" style="aspect-ratio:${cols} / ${rows}">
+            <div class="bmap-grid"></div>
+            <div class="bmap-tokens"></div>
+          </div>
+        </div>
       </div>`;
     document.body.appendChild(overlay);
+    // The whole screen, buttons above the map, the map fitted and zoomable (map-zoom.js).
+    overlay.querySelector('.tpp-card').classList.add('mz-fullcard');
+    attachMapZoom({ viewport: overlay.querySelector('.tpp-viewport'), stage: overlay.querySelector('.tpp-stage'), getGrid: () => board.grid, controls: overlay.querySelector('.tpp-actions') }).refit();
     const stage = overlay.querySelector('.tpp-stage');
     const grid = overlay.querySelector('.bmap-grid');
     const tokenLayer = overlay.querySelector('.bmap-tokens');

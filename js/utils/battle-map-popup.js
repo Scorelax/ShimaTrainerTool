@@ -34,6 +34,7 @@ import { waitForOpenWindow } from './reaction-window.js';
 import { moveCostFt, altitudeLimits, blockedCellOnPath, isLevitating, movementBudget } from './move-effects.js';
 import { injectBattleMapStyles, zoneKindsByCell, legendHtml, spriteTransform, unwrapAngle, activeTerrainSummary } from './battle-map-view.js';
 import { coneSquares, coneHits, coneOutlineSvg, injectConeStyles } from './cone-area.js';
+import { attachMapZoom, zoomControlsHtml, injectMapZoomStyles } from './map-zoom.js';
 import { lineFtFromRange, lineGeometry, lineAimOrigin, lineCells, lineCellsHtml, lineHits, lineGuideStyle, lineOutlineSvg, angleToPointer, injectLineStyles } from './line-area.js';
 
 
@@ -42,6 +43,7 @@ function _injectStyles() {
   injectBattleMapStyles();
   injectLineStyles();
   injectConeStyles();
+  injectMapZoomStyles();
   const style = document.createElement('style');
   style.id = 'battle-map-popup-styles';
   style.textContent = `
@@ -80,11 +82,24 @@ function _injectStyles() {
     .bmap-toolbar-slot { display: flex; justify-content: center; min-height: 2.8rem; margin-bottom: 0.5rem; }
     .bmap-toolbar-slot .bmap-toolbar { position: static; transform: none; }
     .bmap-toolbar .tb-name { font-size: 0.8rem; font-weight: 700; padding: 0 0.5rem 0 0.4rem; color: #ffd76a; }
+    /* the whole screen (map-zoom.js): header with the zoom buttons, then everything you press, then the map */
+    .bmap-content .combat-move-popup-header { padding: 0.55rem 0.9rem; }
+    .bmap-content .combat-move-popup-header h2 { font-size: 1.05rem; }
+    .bmap-content .mz-controls { margin-left: auto; }
+    .bmap-content .bmap-round { margin-left: 0.4rem; }
+    .bmap-content .combat-move-popup-body { padding: 0.5rem 0.8rem 0.8rem; }
+    .bmap-content .bmap-hint { margin-bottom: 0.4rem; }
+    .bmap-content .bmap-move-panel { margin-bottom: 0.45rem; padding: 0.4rem 0.6rem; }
+    .bmap-content .bmap-toolbar-slot { margin-bottom: 0.4rem; min-height: 2.6rem; }
+    .bmap-content .bmap-legend:empty { display: none; }
+    .bmap-content .bmap-legend { margin: 0 0 0.45rem; }
+    @media (max-width: 520px) { .bmap-content .combat-move-popup-header h2 { font-size: 0.9rem; } }
   `;
   document.head.appendChild(style);
 }
 
 let _overlay = null;
+let _zoom = null; // map-zoom.js: the map fitted to the screen, zoomed on its own
 let _session = null;
 let _ownerName = null;
 let _selectedTokenId = null;
@@ -114,26 +129,35 @@ function _ensureDom() {
   _overlay.id = 'battleMapPopup';
   _overlay.style.display = 'none';
   _overlay.innerHTML = `
-    <div class="combat-popup-content">
+    <div class="combat-popup-content bmap-content mz-fullcard">
       <div class="combat-move-popup-header">
         <button id="battleMapClose" class="combat-popup-close">×</button>
         <h2>🗺️ Battle Map</h2>
+        <span id="bmapZoomControls">${zoomControlsHtml()}</span>
         <span class="bmap-round" id="bmapRound"></span>
       </div>
-      <div class="combat-move-popup-body">
+      <div class="combat-move-popup-body mz-fill">
         <div class="bmap-hint" id="bmapHint"></div>
         <div class="bmap-move-panel" id="bmapMovePanel" hidden></div>
         <div class="bmap-toolbar-slot" id="bmapToolbarSlot"></div>
-        <div class="bmap-stage" id="bmapStage">
-          <div class="bmap-grid" id="bmapGrid"></div>
-          <div class="bmap-objects" id="bmapObjects"></div>
-          <div class="bmap-tokens" id="bmapTokens"></div>
-        </div>
         <div class="bmap-legend" id="bmapLegend"></div>
+        <div id="bmapViewport">
+          <div class="bmap-stage" id="bmapStage">
+            <div class="bmap-grid" id="bmapGrid"></div>
+            <div class="bmap-objects" id="bmapObjects"></div>
+            <div class="bmap-tokens" id="bmapTokens"></div>
+          </div>
+        </div>
       </div>
     </div>
   `;
   document.body.appendChild(_overlay);
+  _zoom = attachMapZoom({
+    viewport: document.getElementById('bmapViewport'),
+    stage: document.getElementById('bmapStage'),
+    getGrid: () => _session?.board?.grid,
+    controls: document.getElementById('bmapZoomControls'),
+  });
 
   document.getElementById('battleMapClose').addEventListener('click', _close);
   document.getElementById('bmapLegend').addEventListener('click', (e) => {
@@ -181,8 +205,9 @@ export function showBattleMap(session, trainerName, { selectId = null } = {}) {
     && selectId === _activeParticipantId(session) ? selectId : null;
   _stagedDestination = null; _stagedAlt = null;
   _ensureDom();
-  _render();
   _overlay.style.display = 'flex';
+  _render();
+  _zoom.reset(); // opens on the whole map, fitted to the screen
 }
 
 /** Call on every live session push so the popup stays current while open;
@@ -261,7 +286,7 @@ function _render() {
   const hint = document.getElementById('bmapHint');
   if (hint) {
     if (_stagedDestination) {
-      hint.textContent = 'Confirm the move below, or click a different cell.';
+      hint.textContent = 'Confirm the move, or click a different cell.';
     } else if (_selectedTokenId && (_lineOn || _coneOn)) {
       const tool = _lineOn ? 'line' : 'cone';
       hint.textContent = `Drag on the map to aim the ${tool} (any angle) · tap the length to switch ${tool} move · turn ${_lineOn ? 'Line' : 'Cone'} off to move again.`;
@@ -277,6 +302,7 @@ function _render() {
   }
   _renderMovePanel();
   _renderStage();
+  _zoom?.refit(); // the grid may have changed size (the DM's map editor)
   // While aiming a line or cone, a drag on the map turns it instead of scrolling the page (phones).
   document.getElementById('bmapStage')?.classList.toggle('line-aiming', (_lineOn || _coneOn) && !!_selected());
   _renderGrid();

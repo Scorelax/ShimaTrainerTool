@@ -8,7 +8,7 @@ import { showCombatAlert } from '../utils/combat-alert.js';
 
 let _session = null;
 const _subs = new Set();
-let _local = null;      // {objects, marks}: the DM's latest edit, shown until the server's push has caught up with it
+let _local = null;      // {objects, marks, traps}: the DM's latest edit, shown until the server's push has caught up with it
 let _localUntil = 0;
 let _sendTimer = null;
 let _sending = null;
@@ -27,6 +27,7 @@ function _board() {
     background: b.backgroundImage || '',
     objects: keep ? _local.objects : (b.objects || []),
     marks: keep ? _local.marks : (b.marks || {}),
+    traps: keep ? _local.traps : (b.traps || []),
     tokens: b.tokens || {},
   };
 }
@@ -37,10 +38,10 @@ export function getSetup() {
   const b = _board();
   const participants = _session?.participants || {};
   return {
-    map: { cols: b.grid.cols, rows: b.grid.rows, background: b.background, objects: b.objects, marks: b.marks, ready: true, live: true },
+    map: { cols: b.grid.cols, rows: b.grid.rows, background: b.background, objects: b.objects, marks: b.marks, traps: b.traps, ready: true, live: true },
     creatures: Object.entries(b.tokens).filter(([id]) => participants[id]).map(([id, t]) => ({
       id, name: participants[id].name, position: { col: t.col, row: t.row, facing: t.facing || 0 }, z: t.z || 0,
-      participant: { size: participants[id].size, image: participants[id].image },
+      participant: { size: participants[id].size, image: participants[id].image, speciesName: participants[id].speciesName },
     })),
   };
 }
@@ -49,8 +50,8 @@ export function updateSetup(fn) {
   const before = getSetup();
   const next = JSON.parse(JSON.stringify(before));
   fn(next);
-  if (JSON.stringify(next.map.objects) !== JSON.stringify(before.map.objects) || JSON.stringify(next.map.marks) !== JSON.stringify(before.map.marks)) {
-    _local = { objects: next.map.objects || [], marks: next.map.marks || {} };
+  if (['objects', 'marks', 'traps'].some(k => JSON.stringify(next.map[k]) !== JSON.stringify(before.map[k]))) {
+    _local = { objects: next.map.objects || [], marks: next.map.marks || {}, traps: next.map.traps || [] };
     _localUntil = Date.now() + 4000;
     clearTimeout(_sendTimer);
     _sendTimer = setTimeout(_send, 250); // a painted stroke goes up as one change, not one per square
@@ -64,9 +65,9 @@ export function updateSetup(fn) {
 async function _send() {
   _sendTimer = null;
   if (!_local) return;
-  const { objects, marks } = _local;
+  const { objects, marks, traps } = _local;
   _localUntil = Date.now() + 4000;
-  _sending = DmAPI.setBoardMap(objects, marks)
+  _sending = DmAPI.setBoardMap(objects, marks, traps)
     .catch(err => showCombatAlert(err.message, { title: "Couldn't change the map" }))
     .finally(() => { _sending = null; });
   await _sending;
@@ -80,6 +81,15 @@ export async function flushSetup() {
 export function onSetupChange(fn) {
   _subs.add(fn);
   return () => _subs.delete(fn);
+}
+
+/** The DM's size override for a creature on the map (its footprint follows). */
+export async function setTokenSize(id, size) {
+  try {
+    await CombatAPI.dmSetSize(id, size);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Size' });
+  }
 }
 
 /** The DM moves / turns / lifts a creature, any time and without using its movement. `change`: {col, row} | {facing} | {z}. */

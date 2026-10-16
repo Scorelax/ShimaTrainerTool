@@ -50,11 +50,18 @@
         </div>
         <div class="dm-view" id="dmView"><div class="dm-loading">Loading…</div></div>
         <div class="dm-tabview" id="dmEncView" hidden></div>
-        <!-- A battle running: combat-wip.js renders the shared battle here, as the DM (must be #content). -->
+        <!-- A battle running: two tabs (battle-live.js) -- the battle itself, and its map. -->
+        <div class="dm-enc-tabs" id="dmLiveTabs" hidden>
+          <button data-ltab="battle" class="active"><img class="dm-tab-icon" src="assets/VS.png" alt="">Battle</button>
+          <button data-ltab="map">🗺️ Map</button>
+        </div>
+        <!-- The Battle tab: combat-wip.js renders the shared battle here, as the DM (must be #content). -->
         <div class="dm-battle" id="dmLive" hidden>
           <div class="dm-battle-stage" id="content"></div>
           <aside class="dm-tools" id="dmTools"></aside>
         </div>
+        <!-- The Map tab: the battle map (moves, cones, lines, like the players') or the live map editor. -->
+        <div class="dm-live-map" id="dmLiveMap" hidden></div>
       </section>
     </main>
   </div>

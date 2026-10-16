@@ -13,7 +13,7 @@ import { footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import {
   escapeHtml, typeBadges, getSpecies, newId, participantFromPokemonRow, participantFromTrainer, trainerHp,
-  natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect, portraitOptionsHtml,
+  natureOptions, SAVING_THROWS, SKILLS, splitList, multiSelectHtml, bindMultiSelects, readMultiSelect, portraitOptionsHtml, toast,
 } from './dm-common.js';
 import { getSetup, updateSetup, flushSetup, onSetupChange } from './setup-store.js';
 import { mapStageHtml, tokenScreenRect, creatureSpotProblem } from './map-view.js';
@@ -104,7 +104,7 @@ function renderList() {
   const wild = all.filter(c => c.kind === 'pokemon' && !trainers.some(t => t.id === c.trainerId));
   const row = (c, nested = false) => {
     const p = c.participant || {};
-    const where = c.heldBack ? 'held back' : c.position ? '📍 placed' : '⚠ not placed';
+    const where = c.heldBack ? '🙈 hidden' : c.position ? '📍 placed' : '⚠ not placed';
     return `
       <button class="dm-cs-row${nested ? ' nested' : ''}${_editing?.id === c.id ? ' selected' : ''}" data-creature="${c.id}">
         <span class="dm-cs-thumb" data-img="${escapeHtml(p.image || '')}"></span>
@@ -144,7 +144,7 @@ function renderMap() {
   if (hint) {
     hint.textContent = !sel
       ? 'Pick someone on the left (or click a token) to place them on the map.'
-      : sel.heldBack ? `${sel.name} is held back -- it joins later and doesn't start on the map.`
+      : sel.heldBack ? `${sel.name} is hidden -- it joins later (only you see it until then) and doesn't start on the map.`
         : `Click a square to place ${sel.name}${sel.position ? ' somewhere else' : ''}.`;
   }
 
@@ -190,16 +190,42 @@ function onMapClick(col, row) {
   renderPlacementLine();
 }
 
-/** The form's own line about where the selected creature starts. */
+const SIZES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
+const SQUARES = { Large: '2×2', Huge: '3×3', Gigantic: '4×4' };
+
+/** The form's own line about where the selected creature starts -- and, for a Pokemon, its size on the map: its
+ * species' own by default (Large 2x2, Huge 3x3, Gigantic 4x4), or the DM's override (config.size, kept on rebuilds). */
 function renderPlacementLine() {
   const el = document.getElementById('csPlacement');
   const c = selectedCreature();
   if (!el || !c) return;
-  el.innerHTML = c.heldBack ? '<span class="dm-hint">Held back -- not on the map at the start.</span>'
+  const own = c.naturalSize ?? c.participant?.size ?? '';
+  const sizeRow = c.kind === 'pokemon' ? `
+    <div class="dm-field" style="margin-top:0.4rem"><label for="csSize">Size on the map</label>
+      <select class="dm-select" id="csSize">
+        <option value="" ${!c.config?.size ? 'selected' : ''}>Its own${own ? ` -- ${escapeHtml(own)}${SQUARES[own] ? ` (${SQUARES[own]})` : ''}` : ''}</option>
+        ${SIZES.map(z => `<option value="${z}" ${c.config?.size === z ? 'selected' : ''}>${z} (${SQUARES[z] || '1 square'})</option>`).join('')}
+      </select></div>` : '';
+  el.innerHTML = (c.heldBack ? '<span class="dm-hint">Hidden -- not on the map at the start.</span>'
     : c.position ? `<span>📍 On the map.</span> <button type="button" class="dm-btn small" id="csUnplace">Take off the map</button>`
-      : '<span class="dm-warn-text">⚠ Not on the map yet -- click a square on the map above.</span>';
+      : '<span class="dm-warn-text">⚠ Not on the map yet -- click a square on the map above.</span>') + sizeRow;
   document.getElementById('csUnplace')?.addEventListener('click', () => {
     updateSetup(s => { s.creatures.find(x => x.id === c.id).position = null; });
+    renderPlacementLine();
+  });
+  document.getElementById('csSize')?.addEventListener('change', (e) => {
+    const size = e.target.value;
+    let lifted = false;
+    updateSetup(s => {
+      const x = s.creatures.find(y => y.id === c.id);
+      x.naturalSize = x.naturalSize ?? x.participant.size ?? '';
+      x.config = { ...x.config, size };
+      x.participant = { ...x.participant, size: size || x.naturalSize };
+      // Bigger now and no longer fits where it stood: off the map until it's placed again.
+      if (x.position && creatureSpotProblem(s, x, x.position.col, x.position.row)) { x.position = null; lifted = true; }
+    });
+    if (lifted) toast(`${c.name} doesn't fit where it stood at that size -- place it again.`);
+    renderMap();
     renderPlacementLine();
   });
 }
@@ -293,7 +319,7 @@ function renderPokemonForm(box) {
             <div class="dm-field"><label for="csInit">Initiative</label><input class="dm-input" id="csInit" type="number" value="${cfg.initiative ?? ''}" placeholder="Rolled at the start"></div>
             <div class="dm-field dm-field-checks">
               <label class="dm-check"><input type="checkbox" id="csShiny" ${cfg.shiny ? 'checked' : ''}>Shiny</label>
-              <label class="dm-check"><input type="checkbox" id="csHeld" ${c?.heldBack ? 'checked' : ''}>Held back (joins later)</label>
+              <label class="dm-check"><input type="checkbox" id="csHeld" ${c?.heldBack ? 'checked' : ''}>Hidden (joins later -- only you see it)</label>
             </div>
           </div>
           <div class="dm-cs-placement" id="csPlacement"></div>
@@ -385,6 +411,7 @@ function readPokemonForm() {
       stats: statsIn, overrides,
       extraSkills: readMultiSelect('csSkills'),
       bonus: selectedCreature()?.config.bonus || {}, // Encounter setup's stat bonuses stay
+      size: selectedCreature()?.config.size || '', // and the DM's size override (renderPlacementLine)
     },
     trainerId: document.getElementById('csTrainer').value || null,
     heldBack: document.getElementById('csHeld').checked,
@@ -397,9 +424,11 @@ export async function buildPokemonCreature(id, species, name, config, extra) {
   const res = await DmAPI.buildPokemon({ species, nickname: name === species ? '' : name, ...config });
   const { combatant, participant } = participantFromPokemonRow(res.data);
   participant.initiative = config.initiative ?? null;
+  const naturalSize = participant.size || '';
+  if (config.size) participant.size = config.size; // the DM's size override on the map
   return {
     id, kind: 'pokemon', name: participant.name, config: { ...config, species },
-    participant, initiativeBonus: combatant.initiativeTotal || 0, ...extra,
+    participant, naturalSize, initiativeBonus: combatant.initiativeTotal || 0, ...extra,
   };
 }
 
@@ -508,7 +537,7 @@ function renderTrainerForm(box) {
           </div>
           <div class="dm-field"><label>Saving throws</label>${multiSelectHtml('ctSaves', SAVING_THROWS, splitList(t.savingThrows, SAVING_THROWS))}</div>
           <div class="dm-field"><label>Skills</label>${multiSelectHtml('ctSkills', SKILLS, splitList(t.skills, SKILLS))}</div>
-          <label class="dm-check"><input type="checkbox" id="ctHeld" ${c?.heldBack ? 'checked' : ''}>Held back (joins later)</label>
+          <label class="dm-check"><input type="checkbox" id="ctHeld" ${c?.heldBack ? 'checked' : ''}>Hidden (joins later -- only you see it)</label>
           <div class="dm-cs-placement" id="csPlacement"></div>
         </div>
         <div>

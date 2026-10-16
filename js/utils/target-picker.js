@@ -871,12 +871,15 @@ function _cardHtml(p) {
   const name = visibleToViewer(p, 'name') ? p.name : '???';
   const hpPct = p.maxHP > 0 ? Math.max(0, Math.min(100, (p.currentHP / p.maxHP) * 100)) : 0;
   const vpPct = p.maxVP > 0 ? Math.max(0, Math.min(100, (p.currentVP / p.maxVP) * 100)) : 0;
+  // The DM's creature: its bars only when the DM shows them (hpBar / vpBar).
+  const bar = (key, pct) => (visibleToViewer(p, `${key}Bar`)
+    ? `<div class="target-picker-bar ${key}"><div class="target-picker-bar-fill" style="width:${pct}%"></div></div>` : '');
   return `
     <button type="button" class="target-picker-card" data-target-id="${p.id}">
       <div class="target-picker-portrait">${spriteMediaHtml(p.image, name, '', '', { small: true })}</div>
       <div class="target-picker-name">${name}</div>
-      <div class="target-picker-bar hp"><div class="target-picker-bar-fill" style="width:${hpPct}%"></div></div>
-      <div class="target-picker-bar vp"><div class="target-picker-bar-fill" style="width:${vpPct}%"></div></div>
+      ${bar('hp', hpPct)}
+      ${bar('vp', vpPct)}
     </button>`;
 }
 

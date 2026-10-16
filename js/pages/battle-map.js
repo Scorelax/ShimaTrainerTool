@@ -14,7 +14,7 @@ import { initLiveUpdates } from '../utils/live-updates.js';
 import { patchPortraitMedia, keepVideosPlaying } from '../utils/sprite-media.js';
 import { keepScreenAwake } from '../utils/screen-awake.js';
 import { visibleToViewer } from '../utils/combat-visibility.js';
-import { footprintForSize, mapObjectsHtml, MAP_OBJECT_CSS, MAP_MARK_CSS } from '../utils/battle-map-grid.js';
+import { footprintForSize, mapObjectsHtml, MAP_OBJECT_CSS, MAP_MARK_CSS, trapCellsOf, trapCellClass } from '../utils/battle-map-grid.js';
 import { zoneKindsByCell, legendHtml, activeTerrainSummary, spriteTransform, unwrapAngle } from '../utils/battle-map-view.js';
 
 let session = { active: false, participants: {}, board: null };
@@ -179,12 +179,14 @@ function updateGrid() {
   // row (descending), same mapping screenCellRect() uses.
   const cells = [];
   const zones = zoneKindsByCell(session);
+  const traps = trapCellsOf(session.board); // revealed ones only -- the table never sees a hidden trap
   for (let col = 0; col < cols; col++) {
     for (let row = rows - 1; row >= 0; row--) {
       const terrain = session.board.cells[`${col},${row}`]?.terrain || '';
       const zone = zones.get(`${col},${row}`);
       const mark = session.board.marks?.[`${col},${row}`]; // the DM's difficult / blocked squares
-      const classes = ['map-cell', terrain ? 'marked' : '', zone ? `zone-${zone[0]}` : '', mark ? `mark-${mark}` : ''].filter(Boolean).join(' ');
+      const trap = trapCellClass(traps, `${col},${row}`);
+      const classes = ['map-cell', terrain ? 'marked' : '', zone ? `zone-${zone[0]}` : '', mark ? `mark-${mark}` : '', trap?.cls].filter(Boolean).join(' ');
       cells.push(`<div class="${classes}"${terrain ? ` title="${terrain}"` : ''}>${terrain}</div>`);
     }
   }

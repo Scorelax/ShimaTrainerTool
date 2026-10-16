@@ -19,6 +19,7 @@ function _injectStyles() {
     .blog-round-header { font-size: 0.75rem; font-weight: 700; color: #FFD700; text-transform: uppercase; letter-spacing: 0.5px; margin: 1rem 0 0.4rem; opacity: 0.85; }
     .blog-round-header:first-child { margin-top: 0.4rem; }
     .blog-entry { display: flex; gap: 0.6rem; align-items: baseline; padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.88rem; line-height: 1.4; }
+    .blog-entry.blog-hidden { opacity: 0.6; font-style: italic; }
     .blog-entry:last-child { border-bottom: none; }
     .blog-icon { flex-shrink: 0; width: 1.3em; text-align: center; }
     .blog-text { flex: 1; }
@@ -106,7 +107,8 @@ function _render() {
       lastRound = entry.round;
     }
     const icon = _ICONS[entry.type] || '•';
-    html += `<div class="blog-entry type-${entry.type}"><span class="blog-icon">${icon}</span><span class="blog-text">${entry.text}</span></div>`;
+    // hidden: only the DM console ever gets these (combat-visibility.js) -- marked as kept from the players.
+    html += `<div class="blog-entry type-${entry.type}${entry.hidden ? ' blog-hidden' : ''}"${entry.hidden ? ' title="Hidden from the players"' : ''}><span class="blog-icon">${entry.hidden ? '🙈' : icon}</span><span class="blog-text">${entry.text}</span></div>`;
   }
   body.innerHTML = html;
 }

@@ -334,7 +334,7 @@ def dm_set_board_map(payload: dict):
     """The DM's mid-battle map edits -- objects and difficult / blocked squares (routes_combat.dm_set_board_map)."""
     conn = db.connect()
     try:
-        result = routes_combat.dm_set_board_map(conn, payload.get('objects'), payload.get('marks'))
+        result = routes_combat.dm_set_board_map(conn, payload.get('objects'), payload.get('marks'), payload.get('traps'))
     except ValueError as e:
         return JSONResponse({'status': 'error', 'error': str(e)})
     finally:
@@ -350,6 +350,27 @@ def dm_save_battle_background(payload: dict):
     except ValueError as e:
         return JSONResponse({'status': 'error', 'error': str(e)})
     return JSONResponse({'status': 'success', 'data': bg})
+
+
+@app.post('/api/dm/battle-image')
+def dm_save_battle_image(payload: dict):
+    """A battle-map picture uploaded from the DM console -- an object (object-<name>.png) or a background
+    (battle-<name>.<ext>) -- routes_dm.save_battle_image."""
+    try:
+        img = routes_dm.save_battle_image(payload)
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    return JSONResponse({'status': 'success', 'data': img})
+
+
+@app.post('/api/dm/battle-image-delete')
+def dm_delete_battle_image(payload: dict):
+    """Deletes an uploaded battle-map object or background picture (routes_dm.delete_battle_image)."""
+    try:
+        routes_dm.delete_battle_image(payload.get('url'))
+    except ValueError as e:
+        return JSONResponse({'status': 'error', 'error': str(e)})
+    return JSONResponse({'status': 'success'})
 
 
 @app.post('/api/dm/region-map-view')

@@ -20,7 +20,7 @@ import { DM, escapeHtml } from './dm-common.js';
 import { loadSetup, getSetup, updateSetup, flushSetup, resetSetup, resetMap, resetBattle, mapReady, battleReady, DEFAULT_BACKGROUND } from './setup-store.js';
 import { renderMapEditor, mapPreviewHtml } from './map-editor.js';
 import { renderCreatureSetup } from './creature-setup.js';
-import { mountLive, updateLive } from './battle-live.js';
+import { mountLive, updateLive, showLiveTab, leaveLive } from './battle-live.js';
 import { renderPokedex, pokedexHasUnsaved } from './pokedex.js';
 import { renderParty } from './party.js';
 import { renderNpcs, npcsHaveUnsaved } from './npcs.js';
@@ -177,13 +177,15 @@ function route() {
   renderStatus();
   const view = document.getElementById('dmView');
   const live = document.getElementById('dmLive');
+  const liveTabs = document.getElementById('dmLiveTabs');
   const tabs = document.getElementById('dmBattleTabs');
   const enc = document.getElementById('dmEncView');
   if (session?.active) {
     view.hidden = true;
     enc.hidden = true;
     tabs.hidden = true;
-    live.hidden = false;
+    liveTabs.hidden = false;
+    showLiveTab(); // the Battle or the Map tab, whichever was open
     if (!liveMounted) {
       liveMounted = true;
       mountLive(document.getElementById('content'), document.getElementById('dmTools'), session);
@@ -200,8 +202,11 @@ function route() {
     setupView = 'home';
     battleTab = 'setup';
   }
-  const wasLive = !live.hidden;
+  const wasLive = !liveTabs.hidden;
+  leaveLive();
   live.hidden = true;
+  liveTabs.hidden = true;
+  document.getElementById('dmLiveMap').hidden = true;
   tabs.hidden = false;
   if (battleTab !== 'setup') {
     if (wasLive) showBattleTab(battleTab);
@@ -238,7 +243,7 @@ function renderStatus() {
   const count = Object.keys(session.participants || {}).length;
   const turn = !session.started
     ? 'Not started yet'
-    : active ? `<span class="dm-status-turn">▶ ${escapeHtml(active.name)}${session.reactingParticipantId ? ' (reacting)' : ''}</span>` : '';
+    : active ? `<span class="dm-status-turn">▶ ${escapeHtml(active.name)}${session.reactingParticipantId ? (active.extraActionFrom ? ` (${escapeHtml(active.extraActionFrom)})` : ' (reacting)') : ''}</span>` : '';
   el.innerHTML = `<strong>${session.battleType === 'pvp' ? 'PvP' : 'PvE'} battle</strong> · Round ${session.round} · ${turn} · ${count} in the battle`;
 }
 
@@ -267,7 +272,7 @@ function renderHome(view) {
   const line = (c) => `
     <div class="dm-home-creature">
       <span class="dm-home-thumb" data-img="${escapeHtml(c.participant?.image || '')}"></span>
-      <span>${escapeHtml(c.name)} <small>Lv ${c.participant?.level ?? '?'}${c.heldBack ? ' · held back' : ''}${c.kind === 'pokemon' && c.trainerId ? ` · ${escapeHtml(trainers.find(t => t.id === c.trainerId)?.name || '')}'s` : ''}</small></span>
+      <span>${escapeHtml(c.name)} <small>Lv ${c.participant?.level ?? '?'}${c.heldBack ? ' · 🙈 hidden' : ''}${c.kind === 'pokemon' && c.trainerId ? ` · ${escapeHtml(trainers.find(t => t.id === c.trainerId)?.name || '')}'s` : ''}</small></span>
     </div>`;
 
   view.innerHTML = `

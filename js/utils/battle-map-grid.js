@@ -4,6 +4,24 @@
 // drift between them. The read-only kiosk page (battle-map.html/js/pages/
 // battle-map.js) builds its own cells directly since it never needs click
 // handling and lives in a fully separate static page.
+import { viewerSeesEverything } from './combat-visibility.js';
+
+/** The DM's traps by square: "col,row" -> the trap. Only revealed ones, except for the DM (viewerSeesEverything), who
+ * sees the hidden ones too -- the players' screens and the table never draw a trap before it's revealed. */
+export function trapCellsOf(board, all = viewerSeesEverything()) {
+  const out = new Map();
+  (board?.traps || []).forEach(t => {
+    if (t.revealed || all) (t.cells || []).forEach(c => out.set(c, t));
+  });
+  return out;
+}
+
+/** A cell's trap classes ('trap', plus 'trap-hidden' while the players can't see it) and its tooltip. */
+export function trapCellClass(traps, key) {
+  const t = traps.get(key);
+  if (!t) return null;
+  return { cls: `trap${t.revealed ? '' : ' trap-hidden'}`, title: `${t.revealed ? '⚠ ' : '🙈 '}${t.name || 'Trap'}${t.revealed ? '' : ' (hidden)'}` };
+}
 
 /**
  * HTML for every cell in board.grid, in row-major order, each carrying a
@@ -12,15 +30,18 @@
  */
 export function gridCellsHtml(board, cellClass = 'bmap-cell', classFor = null) {
   const { cols, rows } = board.grid;
+  const traps = trapCellsOf(board);
   const cells = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const terrain = board.cells[`${col},${row}`]?.terrain || '';
+      const terrain = board.cells?.[`${col},${row}`]?.terrain || '';
       // classFor(col, row) -> extra classes for this cell (terrain zones, reach/cone overlays, ...), or ''.
       const extra = classFor ? classFor(col, row) : '';
       const mark = board.marks?.[`${col},${row}`]; // the DM's difficult / blocked squares
-      const classes = [cellClass, terrain ? 'marked' : '', mark ? `mark-${mark}` : '', extra].filter(Boolean).join(' ');
-      cells.push(`<div class="${classes}" data-cell="${col},${row}"${terrain ? ` title="${terrain}"` : ''}>${terrain}</div>`);
+      const trap = trapCellClass(traps, `${col},${row}`);
+      const classes = [cellClass, terrain ? 'marked' : '', mark ? `mark-${mark}` : '', trap?.cls, extra].filter(Boolean).join(' ');
+      const title = terrain || trap?.title || '';
+      cells.push(`<div class="${classes}" data-cell="${col},${row}"${title ? ` title="${title}"` : ''}>${terrain}</div>`);
     }
   }
   return cells.join('');
@@ -139,14 +160,16 @@ export function mapObjectHtml(o, rect, turn = 0) {
   const img = `width:${(100 / cw).toFixed(3)}%;height:${(100 / ch).toFixed(3)}%;left:${(-x0 / cw * 100).toFixed(3)}%;top:${(-y0 / ch * 100).toFixed(3)}%`;
   const style = `left:${rect.left};top:${rect.top};width:${rect.width};height:${rect.height}`;
   const title = `${o.label || o.kind || ''}${o.height ? ` · ${o.height}ft tall` : ''}`;
-  return `<div class="bmap-object" data-object-id="${o.id}" style="${style}" title="${title}">`
+  const hiddenNote = o.hidden ? ' (hidden from the players)' : '';
+  return `<div class="bmap-object${o.hidden ? ' bmap-object--hidden' : ''}" data-object-id="${o.id}" style="${style}" title="${title}${hiddenNote}">`
     + `<div class="bmap-object-art${sideways ? ' swap' : ''}" style="transform:translate(-50%,-50%) rotate(${rot}deg)">`
     + `<img src="${o.url}" alt="" draggable="false" style="${img}"></div></div>`;
 }
 
-/** Every object on the board. `tv` draws them for the sideways table-TV board instead. */
-export function mapObjectsHtml(board, { tv = false } = {}) {
-  return (board?.objects || []).map(o => mapObjectHtml(o, tv ? objectScreenRect(board, o) : objectRect(board, o), tv ? 90 : 0)).join('');
+/** Every object on the board. `tv` draws them for the sideways table-TV board instead. A hidden object (the DM's, until
+ * revealed) is left out -- except on the DM console, which draws it see-through. */
+export function mapObjectsHtml(board, { tv = false, all = viewerSeesEverything() } = {}) {
+  return (board?.objects || []).filter(o => all || !o.hidden).map(o => mapObjectHtml(o, tv ? objectScreenRect(board, o) : objectRect(board, o), tv ? 90 : 0)).join('');
 }
 
 /** Styles for the objects layer -- shared with the kiosk page (battle-map.html carries its own copy). */
@@ -156,6 +179,7 @@ export const MAP_OBJECT_CSS = `
   .bmap-object-art { position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; }
   .bmap-object-art.swap { width: 100cqh; height: 100cqw; }
   .bmap-object-art img { position: absolute; max-width: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.55)); }
+  .bmap-object--hidden { opacity: 0.45; outline: 2px dashed rgba(190,140,255,0.9); outline-offset: -2px; }
 `;
 
 /** Styles for the DM's difficult / blocked squares (gridCellsHtml's mark-* classes) -- shared the same way. */
@@ -169,6 +193,15 @@ export const MAP_MARK_CSS = `
       repeating-linear-gradient(45deg, rgba(215,55,55,0.38) 0 3px, transparent 3px 8px),
       repeating-linear-gradient(-45deg, rgba(215,55,55,0.38) 0 3px, rgba(60,10,10,0.25) 3px 8px) !important;
     box-shadow: inset 0 0 0 1px rgba(231,76,60,0.75) !important;
+  }
+  /* the DM's traps: a revealed one for everyone, a hidden one only on the DM console (dashed) */
+  .trap {
+    background: repeating-linear-gradient(45deg, rgba(255,120,40,0.42) 0 5px, rgba(120,30,0,0.2) 5px 10px) !important;
+    box-shadow: inset 0 0 0 1px rgba(255,140,60,0.85) !important;
+  }
+  .trap.trap-hidden {
+    background: rgba(170,110,255,0.16) !important;
+    box-shadow: inset 0 0 0 1px rgba(190,140,255,0.55) !important; outline: 1px dashed rgba(200,160,255,0.9); outline-offset: -3px;
   }
 `;
 

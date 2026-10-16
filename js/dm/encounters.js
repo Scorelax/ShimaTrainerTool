@@ -308,7 +308,7 @@ function monRowHtml(p) {
           <select class="dm-select" data-k="nature">${natureOptions(p.nature)}</select>
           <input class="dm-input" data-k="item" value="${escapeHtml(p.item || '')}" placeholder="Held item" list="encItems">
           <label title="Shiny"><input type="checkbox" data-k="shiny" ${p.shiny ? 'checked' : ''}>✨</label>
-          <label title="Starts held back (not fighting yet)"><input type="checkbox" data-k="heldBack" ${p.heldBack ? 'checked' : ''}>Held back</label>
+          <label title="Starts hidden -- not fighting yet, and only you see it"><input type="checkbox" data-k="heldBack" ${p.heldBack ? 'checked' : ''}>Hidden</label>
         </div>
         <div class="dm-enc-mon-sum"><span data-sum="abil">✦ ${escapeHtml(abilityNames(p, sp))}</span>${bonuses.length ? `<span class="dm-enc-bonus-sum">${escapeHtml(bonuses.join(' · '))}</span>` : ''}</div>
       </div>

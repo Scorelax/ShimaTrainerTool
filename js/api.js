@@ -3,6 +3,7 @@
 
 import { getSettings } from './utils/settings.js';
 import { commitMove } from './utils/move-commit.js';
+import { redactForViewer } from './utils/combat-visibility.js';
 
 // ============================================================================
 // CONFIGURATION
@@ -105,6 +106,18 @@ const HEAVY_TIMEOUT = 90000;
 // API CLIENT
 // ============================================================================
 
+// The DM console's "Hide from the battle log": while on, every shared-battle request carries hideLog=1, and the server
+// marks what it logs as hidden from the players (routes_combat.py's handle).
+let _hideBattleLog = false;
+
+export function setHideBattleLog(on) {
+  _hideBattleLog = !!on;
+}
+
+export function hideBattleLogOn() {
+  return _hideBattleLog;
+}
+
 class API {
   static async request(route, action, params = {}, options = {}) {
     // Shared-battle actions (route 'combat') change live state, so a timed-out one is never retried -- the first try may
@@ -134,6 +147,7 @@ class API {
         url.searchParams.append(key, value);
       }
     });
+    if (isCombat && _hideBattleLog) url.searchParams.append('hideLog', '1');
 
     let lastError;
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -189,6 +203,10 @@ class API {
         if (useCache && cacheKey) {
           cache.set(cacheKey, data, cacheTtl);
         }
+
+        // The battle as this screen may see it: a player's device or a table screen never gets the DM's hidden creatures
+        // or hidden log entries (combat-visibility.js -- a no-op on the DM console).
+        if (isCombat && data?.data?.participants) redactForViewer(data.data);
 
         // A shared-battle action answers with the battle as it now is: shown at once, the same way a live push is,
         // instead of waiting for that push -- a phone's live connection can lag or silently die. (combat-wip.js keeps
@@ -837,6 +855,16 @@ export class CombatAPI {
     return API.request('combat', 'set-visibility', { id, field, visible: visible ? 1 : 0 }, { useCache: false });
   }
 
+  /** Several of the players' visibility fields at once ({field: true/false}) -- the DM console's Pokedex button. */
+  static async setVisibilityMany(id, fields) {
+    return API.request('combat', 'set-visibility-many', { id, fields: JSON.stringify(fields) }, { useCache: false });
+  }
+
+  /** The DM changes one of its creatures mid-battle (any stat-block field -- routes_combat.py's _dm_update_participant). */
+  static async dmUpdateParticipant(id, data) {
+    return API.request('combat', 'dm-update-participant', { id, data: JSON.stringify(data) }, { useCache: false });
+  }
+
   static async advanceTurn() {
     return API.request('combat', 'advance-turn', {}, { useCache: false });
   }
@@ -1167,6 +1195,16 @@ export class CombatAPI {
 
   /** Sets the shared board's background image (empty string clears it). */
   /** The DM moves / turns / lifts any creature, any time, without using its movement ({col, row, facing, z}). */
+  /** The DM gives any creature a turn out of order -- the turn order resumes after it (routes_combat.py's _dm_give_turn). */
+  static async dmGiveTurn(id) {
+    return API.request('combat', 'dm-give-turn', { id }, { useCache: false });
+  }
+
+  /** The DM's size override for a creature: Tiny / Small / Medium / Large / Huge / Gigantic (_dm_set_size). */
+  static async dmSetSize(id, size) {
+    return API.request('combat', 'dm-set-size', { id, size }, { useCache: false });
+  }
+
   static async dmPlaceToken(id, { col, row, facing, z }) {
     return API.request('combat', 'dm-place-token', { id, col, row, facing, z }, { useCache: false });
   }
@@ -1453,8 +1491,19 @@ export class DmAPI {
   }
 
   /** The running battle's map objects and difficult / blocked squares, as the DM's live map editor has them. */
-  static async setBoardMap(objects, marks) {
-    return (await DmAPI._post('board-map', { objects, marks }, 'Changing the map')).data;
+  static async setBoardMap(objects, marks, traps) {
+    return (await DmAPI._post('board-map', { objects, marks, traps }, 'Changing the map')).data;
+  }
+
+  /** A battle-map picture from the DM's computer ({kind: 'object' | 'background', name, data: data URL}) -> {key, label,
+   * url}, saved as object-<name>.png / battle-<name>.<ext> (routes_dm.py's save_battle_image). */
+  static async uploadBattleImage(image) {
+    return (await DmAPI._post('battle-image', image, 'Uploading the picture')).data;
+  }
+
+  /** Deletes one of the battle-map pictures (an object-* or battle-* file) by its url. */
+  static async deleteBattleImage(url) {
+    return DmAPI._post('battle-image-delete', { url }, 'Deleting the picture');
   }
 
   /** A battle-map background from the DM's computer ({name, data: data URL}) -> {key, label, url} (routes_dm.py). */

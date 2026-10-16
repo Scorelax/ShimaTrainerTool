@@ -155,12 +155,13 @@ function ensureSkeleton(layer) {
   `;
 }
 
+/** A creature's HP / VP bars -- for the DM's creatures, only the ones the DM shows the players (hpBar / vpBar). */
 function barsHtml(p) {
   const hpPct = p.maxHP > 0 ? Math.max(0, Math.min(100, (p.currentHP / p.maxHP) * 100)) : 0;
   const vpPct = p.maxVP > 0 ? Math.max(0, Math.min(100, (p.currentVP / p.maxVP) * 100)) : 0;
   return `
-    <div class="display-bar hp"><div class="display-bar-fill" style="width:${hpPct}%"></div></div>
-    <div class="display-bar vp"><div class="display-bar-fill" style="width:${vpPct}%"></div></div>
+    ${visibleToViewer(p, 'hpBar') ? `<div class="display-bar hp"><div class="display-bar-fill" style="width:${hpPct}%"></div></div>` : ''}
+    ${visibleToViewer(p, 'vpBar') ? `<div class="display-bar vp"><div class="display-bar-fill" style="width:${vpPct}%"></div></div>` : ''}
   `;
 }
 

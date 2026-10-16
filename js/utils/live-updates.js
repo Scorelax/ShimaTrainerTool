@@ -21,6 +21,7 @@
 
 import { EVENTS_URL, GameDataAPI, PokemonAPI, TrainerAPI } from '../api.js';
 import { setPokedexConfig } from './visibility.js';
+import { redactForViewer } from './combat-visibility.js';
 
 let source = null;
 
@@ -62,7 +63,8 @@ export function initLiveUpdates() {
       // Pages watching every trainer (the DM console's Party module) hear about it too.
       window.dispatchEvent(new CustomEvent('app:trainer-data', { detail: { trainer: event.trainer } }));
     } else if (event.type === 'combat') {
-      window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: event.session }));
+      // What this screen may see of it (combat-visibility.js) -- the DM's hidden creatures and log lines left out.
+      window.dispatchEvent(new CustomEvent('app:combat-updated', { detail: redactForViewer(event.session) }));
     } else if (event.type === 'combat-animation') {
       window.dispatchEvent(new CustomEvent('app:combat-animation', { detail: event }));
     } else if (event.type === 'combat-hover') {

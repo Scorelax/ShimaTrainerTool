@@ -162,17 +162,19 @@ _EMPTY_STATE = {
         # ...and the squares the DM marked: "col,row" -> one of MAP_MARK_KINDS. These ARE rules: difficult doubles the
         # movement cost like a Fissure zone, blocked can't be walked through or stood on (see _move_cost_ft/_move_token).
         'marks': {},
+        # The DM's traps (_clean_traps): [{id, name, note, cells, revealed}] -- left off the players' screens until revealed.
+        'traps': [],
     },
 }
 
 MAP_MARK_KINDS = ('difficult', 'blocked')
 
 # What the players can see of an enemy, per field -- the DM ticks these per creature in the DM console. `stats` covers all
-# six ability scores together. Everything starts hidden (the user's call, 2026-10-15): the picture always shows, and so
-# do the HP / VP bars -- `hp` / `vp` only decide whether their numbers do. The moves an enemy has used are always shown
-# (read from the battle log). Mirrored by combat-visibility.js's VISIBILITY_DEFAULTS.
+# six ability scores together. Everything starts hidden except the picture (the user's call, 2026-10-15; the HP / VP bars
+# too since 2026-10-16): `hpBar` / `vpBar` show how full the bars are, `hp` / `vp` the numbers. The moves an enemy has used
+# are always shown (read from the battle log). Mirrored by combat-visibility.js's VISIBILITY_DEFAULTS.
 VISIBILITY_DEFAULTS = {
-    'name': False, 'type': False, 'level': False, 'hp': False, 'vp': False, 'size': False,
+    'name': False, 'type': False, 'level': False, 'hpBar': False, 'hp': False, 'vpBar': False, 'vp': False, 'size': False,
     'ac': False, 'stats': False, 'abilities': False,
 }
 
@@ -196,9 +198,19 @@ _PVP_DEFAULT_BACKGROUND = 'battle-forest.png'
 _SESSION_LOCK = threading.Lock()
 
 
+# The DM console's "Hide from the battle log" (the user's ask, 2026-10-16): while it's ticked, every request the DM sends
+# carries hideLog=1, and everything that request logs is kept -- in the session and the log file -- but marked hidden, so
+# the players' screens leave it out (combat-visibility.js's redactForViewer). Set per request, under the session lock.
+_REQUEST = threading.local()
+
+
 def handle(conn, action, params):
     with _SESSION_LOCK:
-        return _handle(conn, action, params)
+        _REQUEST.hide_log = str(params.get('hideLog') or '') == '1'
+        try:
+            return _handle(conn, action, params)
+        finally:
+            _REQUEST.hide_log = False
 
 
 def _handle(conn, action, params):
@@ -280,7 +292,9 @@ def _handle(conn, action, params):
     if action == 'add-participant':
         if not params.get('data'):
             raise ValueError('Missing participant data')
-        return _mutate(conn, lambda s: _add_participant(s, json.loads(params['data'])))
+        data = json.loads(params['data'])
+        _fill_species_size(conn, data)
+        return _mutate(conn, lambda s: _add_participant(s, data))
 
     if action == 'remove-participant':
         if not params.get('id'):
@@ -297,6 +311,24 @@ def _handle(conn, action, params):
             raise ValueError('Missing participant id, or field must be one of ' + '/'.join(VISIBILITY_DEFAULTS))
         visible = params.get('visible', '1') != '0'
         return _mutate(conn, lambda s: _set_visibility(s, params['id'], params['field'], visible))
+
+    if action == 'set-visibility-many':
+        # The DM console's Pokedex button: several fields at once ({field: true/false}).
+        if not params.get('id') or not params.get('fields'):
+            raise ValueError('Missing participant id or fields')
+        fields = json.loads(params['fields'])
+        if not isinstance(fields, dict) or any(f not in VISIBILITY_DEFAULTS for f in fields):
+            raise ValueError('Fields must be some of ' + '/'.join(VISIBILITY_DEFAULTS))
+
+        def _many(st):
+            for f, v in fields.items():
+                _set_visibility(st, params['id'], f, bool(v))
+        return _mutate(conn, _many)
+
+    if action == 'dm-update-participant':
+        if not params.get('id') or not params.get('data'):
+            raise ValueError('Missing participant id or data')
+        return _mutate(conn, lambda s: _dm_update_participant(s, params['id'], json.loads(params['data'])))
 
     if action == 'advance-turn':
         return _mutate(conn, _advance_turn)
@@ -390,6 +422,8 @@ def _handle(conn, action, params):
     if action == 'play-animation':
         if not params.get('id'):
             raise ValueError('Missing participant id')
+        if _REQUEST.hide_log:
+            return {'status': 'success'}  # hidden from the players: no animation on the display screen either
         return _play_animation(conn, params['id'], params.get('species'))
 
     if action == 'use-move':
@@ -640,6 +674,16 @@ def _handle(conn, action, params):
         hold = str(params.get('hold', '')).lower() in ('1', 'true')
         return _mutate(conn, lambda s: _bide_use(s, params['id'], hold))
 
+    if action == 'dm-give-turn':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _dm_give_turn(s, params['id']))
+
+    if action == 'dm-set-size':
+        if not params.get('id'):
+            raise ValueError('Missing participant id')
+        return _mutate(conn, lambda s: _dm_set_size(s, params['id'], params.get('size', '')))
+
     if action == 'dm-place-token':
         if not params.get('id'):
             raise ValueError('Missing participant id')
@@ -717,6 +761,7 @@ def start_prepared_session(conn, setup):
         board['objects'] = _clean_map_objects(m.get('objects'), cols, rows)
         board['marks'] = {cell: kind for cell, kind in (m.get('marks') or {}).items()
                           if kind in MAP_MARK_KINDS and _in_grid(cell, cols, rows)}
+        board['traps'] = _clean_traps(m.get('traps'), cols, rows)
         _log_event(state, 'session-start', text='Battle started (PVE)')
 
         for creature in setup.get('creatures') or []:
@@ -727,6 +772,7 @@ def start_prepared_session(conn, setup):
                          'status': 'spectating' if creature.get('heldBack') else 'participating'})
             if js_parse_int(data.get('initiative')) is None:
                 data['initiative'] = random.randint(1, 20) + (js_parse_int(creature.get('initiativeBonus')) or 0)
+            _fill_species_size(conn, data)
             _add_participant(state, data)
             pid = data['id'] or next(reversed(state['participants']))  # _add_participant made one up if it had none
             pos = creature.get('position') or {}
@@ -763,7 +809,26 @@ def _clean_map_objects(objects, cols, rows):
             'rot': (js_parse_int(o.get('rot')) or 0) % 360, 'crop': [max(0.0, min(1.0, float(v))) for v in crop],
             'height': max(0, min(500, js_parse_int(o.get('height')) or 0)),
             **({'markKind': o['markKind']} if o.get('markKind') in MAP_MARK_KINDS else {}),
+            # Hidden from the players until the DM reveals it (a trap, a hidden passage) -- their screens and the table's
+            # leave it out (battle-map-grid.js's mapObjectsHtml); the DM's editor doesn't mark its squares meanwhile.
+            **({'hidden': True} if o.get('hidden') else {}),
         })
+    return out
+
+
+def _clean_traps(traps, cols, rows):
+    """The DM's traps (the map editor's Traps tool): marked squares, invisible to the players until revealed --
+    [{id, name, note, cells: ["col,row", ...], revealed}]. Like a hidden object, a hidden trap is only left out of what the
+    players' screens draw; nothing about it is enforced -- the DM is told when a creature walks onto one (battle-live.js)."""
+    out = []
+    for t in traps if isinstance(traps, list) else []:
+        if not isinstance(t, dict):
+            continue
+        cells = sorted({str(c) for c in (t.get('cells') or []) if _in_grid(str(c), cols, rows)})
+        if not cells:
+            continue
+        out.append({'id': str(t.get('id') or uuid.uuid4().hex[:8])[:40], 'name': str(t.get('name') or 'Trap')[:60],
+                    'note': str(t.get('note') or '')[:300], 'cells': cells, 'revealed': bool(t.get('revealed'))})
     return out
 
 
@@ -886,6 +951,8 @@ def _log_event(state, event_type, text, actorId=None, actorName=None, targetId=N
         'targetId': targetId, 'targetName': targetName,
         **extra,
     }
+    if getattr(_REQUEST, 'hide_log', False):
+        entry['hidden'] = True  # the DM's "Hide from the battle log" -- see handle()
     state.setdefault('log', []).append(entry)
     _append_log_file(state, entry)
     return entry
@@ -1288,7 +1355,10 @@ def _add_participant(state, data):
         _apply_switch_heal(state, state['participants'][pid])
         _entered_battle(state, state['participants'][pid])
     _rebuild_turn_order(state)
-    _log_event(state, 'join', text=f"{state['participants'][pid]['name']} joined the battle", actorId=pid, actorName=state['participants'][pid]['name'])
+    joined = state['participants'][pid]
+    # A DM creature that joins hidden is a surprise -- its join is logged hidden (the players' screens leave it out).
+    secret = {'hidden': True} if status != 'participating' and (joined.get('owner') or DM_OWNER) == DM_OWNER and state.get('battleType') != 'pvp' else {}
+    _log_event(state, 'join', text=f"{joined['name']} joined the battle", actorId=pid, actorName=joined['name'], **secret)
 
 
 def _drop_pending_switch_involving(state, ids):
@@ -1393,6 +1463,13 @@ def _set_status(state, pid, status):
         raise ValueError('Unknown participant: ' + pid)
     was = participant.get('status')
     participant['status'] = status
+    # The DM hides / reveals one of its creatures (the DM console's 🙈 / 👁): a hidden one is left off every screen but
+    # the DM's (combat-visibility.js's redactForViewer); revealing it is what the table notices.
+    if was != status and (participant.get('owner') or DM_OWNER) == DM_OWNER and state.get('battleType') != 'pvp':
+        if status == 'participating':
+            _log_event(state, 'appears', text=f"{participant['name']} appears!", actorId=pid, actorName=participant['name'])
+        else:
+            _log_event(state, 'hidden', text=f"The DM hid {participant['name']}", actorId=pid, actorName=participant['name'], hidden=True)
     if status == 'participating':
         _apply_switch_heal(state, participant)
         if was != 'participating':
@@ -2216,8 +2293,10 @@ def _reaction_end(state):
     # to exactly where the normal order left off.
     state['reactingParticipantId'] = None
     if reactor and reactor.get('extraActionFrom'):
-        # Rapid Orders (_rapid_orders): the extra action is over, the floor goes back to the trainer.
-        _log_event(state, 'extra-action-end', text=f"{reactor['name']}'s extra action ({reactor['extraActionFrom']}) ended",
+        # Rapid Orders (_rapid_orders), a held action (_use_held_action) or the DM's turn (_dm_give_turn) is over: the floor
+        # goes back to whoever's turn it is.
+        what = 'turn from the DM' if reactor['extraActionFrom'] == 'turn from the DM' else f"extra action ({reactor['extraActionFrom']})"
+        _log_event(state, 'extra-action-end', text=f"{reactor['name']}'s {what} ended",
                    actorId=reactor['id'], actorName=reactor['name'])
         reactor['extraActionFrom'] = None
     elif reactor:
@@ -4321,9 +4400,10 @@ def _dm_place_token(state, pid, col, row, facing=None, z=None):
         _log_event(state, 'placement', text=f"The DM moved {p['name']} to ({col}, {row})", targetId=pid, targetName=p['name'])
 
 
-def dm_set_board_map(conn, objects, marks):
-    """POST /api/dm/board-map: the DM's live map edits -- the battle map's objects and difficult / blocked squares replaced
-    as the DM console's map editor now has them (cleaned the same way Start battle cleans the setup's)."""
+def dm_set_board_map(conn, objects, marks, traps=None):
+    """POST /api/dm/board-map: the DM's live map edits -- the battle map's objects, difficult / blocked squares and traps
+    replaced as the DM console's map editor now has them (cleaned the same way Start battle cleans the setup's). `traps`
+    left out keeps the ones there."""
     with _SESSION_LOCK:
         def apply(state):
             board = state['board']
@@ -4332,7 +4412,111 @@ def dm_set_board_map(conn, objects, marks):
             board['objects'] = _clean_map_objects(objects if isinstance(objects, list) else [], cols, rows)
             board['marks'] = {cell: kind for cell, kind in (marks if isinstance(marks, dict) else {}).items()
                               if kind in MAP_MARK_KINDS and _in_grid(cell, cols, rows)}
+            if traps is not None:
+                board['traps'] = _clean_traps(traps, cols, rows)
         return _mutate(conn, apply)
+
+
+# The DM console's Edit (the user's ask, 2026-10-16): anything about one of the DM's creatures, changed mid-battle. The
+# fields a participant record carries for its stat block, and what each is.
+_EDITABLE_TEXT = ('name', 'type1', 'type2', 'size', 'abilities', 'item', 'savingThrows', 'skills')
+_EDITABLE_INT = ('level', 'maxHP', 'currentHP', 'maxVP', 'currentVP', 'ac', 'baseAc', 'critMod', 'proficiency', 'stabBonusValue',
+                 'str', 'dex', 'con', 'int', 'wis', 'cha', 'strMod', 'dexMod', 'conMod', 'intMod', 'wisMod', 'chaMod', 'initiative')
+
+
+def _dm_update_participant(state, pid, data):
+    """The DM changes a creature mid-battle -- level, HP / VP, AC, ability scores, abilities, item, moves, saves, skills,
+    types, size, speeds, name. Only the fields sent change; its statuses, position and turn stay. Logged hidden (it's the
+    DM's bookkeeping, not something that happened at the table)."""
+    p = state['participants'].get(pid)
+    if not p:
+        raise ValueError('Unknown participant: ' + pid)
+    if not isinstance(data, dict):
+        raise ValueError('Nothing to change')
+    for key in _EDITABLE_TEXT:
+        if key in data:
+            p[key] = str(data[key] or '').strip()
+    for key in _EDITABLE_INT:
+        if key in data:
+            value = js_parse_int(data[key])
+            if value is None:
+                raise ValueError(f'{key} must be a number')
+            p[key] = value
+    if 'moves' in data:
+        p['moves'] = list(dict.fromkeys(str(m).strip() for m in (data['moves'] or []) if str(m).strip()))  # each once, in order
+    if 'speeds' in data:
+        p['speeds'] = [{'type': str(sp.get('type') or 'Walking'), 'ft': max(0, js_parse_int(sp.get('ft')) or 0)}
+                       for sp in (data['speeds'] or []) if isinstance(sp, dict)]
+    if not p.get('name'):
+        raise ValueError('It needs a name')
+    p['maxHP'], p['maxVP'] = max(1, p.get('maxHP') or 1), max(0, p.get('maxVP') or 0)
+    p['currentHP'] = min(p.get('currentHP', 0), p['maxHP'])
+    p['currentVP'] = max(0, min(p.get('currentVP', 0), p['maxVP']))
+    if 'initiative' in data:
+        _rebuild_turn_order(state)
+    _log_event(state, 'dm-edit', text=f"The DM changed {p['name']}", targetId=pid, targetName=p['name'], hidden=True)
+
+
+SIZES = ('Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic')
+
+
+def _fill_species_size(conn, data):
+    """A Pokemon that arrives without a size (an older saved creature, a row missing it) gets its species' size, so its
+    token covers the right squares (Large 2x2, Huge 3x3, Gigantic 4x4) instead of falling back to one."""
+    if str(data.get('size') or '').strip() or data.get('combatantType') != 'pokemon':
+        return
+    species = str(data.get('speciesName') or '').strip().lower()
+    if not species:
+        return
+    try:
+        row = next((r for r in upstream.fetch_pokemon_db(conn) if len(r) > 9 and str(r[2]).strip().lower() == species), None)
+    except Exception:
+        row = None
+    if row and str(row[9] or '').strip():
+        data['size'] = str(row[9]).strip()
+
+
+def _dm_set_size(state, pid, size):
+    """The DM's size override for a creature (its footprint on every map follows: Large 2x2, Huge 3x3, Gigantic 4x4). A
+    token that no longer fits where it stands is moved in from the edge."""
+    p = state['participants'].get(pid)
+    if not p:
+        raise ValueError('Unknown participant: ' + pid)
+    match = next((x for x in SIZES if x.lower() == str(size or '').strip().lower()), None)
+    if not match:
+        raise ValueError('Size must be one of ' + ', '.join(SIZES))
+    p['size'] = match
+    tok = state['board']['tokens'].get(pid)
+    if tok:
+        grid = state['board'].get('grid') or {}
+        n = footprint_size(match)
+        # (col, row) is the footprint's anchor; footprint_cells spreads it to higher cols and lower rows.
+        tok['col'] = max(0, min(tok['col'], (grid.get('cols') or 1) - n))
+        tok['row'] = max(n - 1, min(tok['row'], (grid.get('rows') or 1) - 1))
+    _log_event(state, 'dm-size', text=f"The DM made {p['name']} {match}", targetId=pid, targetName=p['name'], hidden=True)
+
+
+def _dm_give_turn(state, pid):
+    """The DM hands any creature a turn out of order: it takes the floor the way a reaction does (reactingParticipantId --
+    so use-move, move-token and End Turn all act for it) without spending its reaction, with a fresh action, bonus action
+    and movement. Its End Turn (reaction-end) puts the turn order back exactly where it was."""
+    p = state['participants'].get(pid)
+    if not p:
+        raise ValueError('Unknown participant: ' + pid)
+    if state.get('reactingParticipantId'):
+        raise ValueError('Wait until the current reaction or extra action is over')
+    if p.get('status') != 'participating':
+        raise ValueError(f"{p['name']} isn't in the fight right now")
+    if state['turnOrder'] and state['turnOrder'][state['turnIndex']] == pid:
+        raise ValueError(f"It's already {p['name']}'s turn")
+    p['movementUsed'] = 0
+    p['actionUsed'] = False
+    p['bonusActionUsed'] = False
+    p['disengaged'] = False
+    p['extraActionFrom'] = 'turn from the DM'
+    state['reactingParticipantId'] = pid
+    state['started'] = True
+    _log_event(state, 'dm-turn', text=f"The DM gives {p['name']} a turn", targetId=pid, targetName=p['name'])
 
 
 def _facing_of(state, pid):

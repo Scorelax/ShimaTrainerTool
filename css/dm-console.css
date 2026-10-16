@@ -1049,3 +1049,54 @@ a.dm-btn { display: inline-flex; align-items: center; justify-content: center; t
 .dm-title-with-btn { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 /* Map editor: the object's turn, any angle. */
 .dm-obj-turn { width: 100%; margin: 0.2rem 0 0.6rem; accent-color: var(--dm-gold); }
+
+/* Map editor: the Pictures card's list, and the Traps tool's traps / hidden objects */
+.dm-pic-manage { margin-top: 0.5rem; }
+.dm-pic-manage summary { cursor: pointer; font-size: 0.85rem; color: var(--dm-muted); }
+.dm-pic-group { margin: 0.5rem 0 0.25rem; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dm-muted); }
+.dm-pic-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }
+.dm-pic-row img { width: 34px; height: 34px; object-fit: contain; border-radius: 6px; background: rgba(255,255,255,0.05); flex-shrink: 0; }
+.dm-pic-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85rem; }
+.dm-trap-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.dm-trap-row { display: flex; align-items: center; gap: 0.35rem; }
+.dm-trap-pick { flex: 1; min-width: 0; text-align: left; background: rgba(255,255,255,0.04); border: 1px solid var(--dm-line); border-radius: 8px;
+  color: inherit; padding: 0.35rem 0.55rem; font: inherit; font-size: 0.85rem; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+span.dm-trap-pick { cursor: default; }
+.dm-trap-pick small { opacity: 0.65; }
+.dm-trap-row.active .dm-trap-pick { border-color: var(--dm-gold); background: rgba(255, 215, 0, 0.1); }
+
+/* The running battle's Map tab (battle-live.js): Battle map / Edit map, filling the module under the tabs */
+.dm-battle-module > .dm-live-map:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #14141f; }
+.dm-live-map-head { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--dm-line); }
+.dm-live-map-head .dm-hint { flex: 1; min-width: 12rem; }
+.dm-seg { display: inline-flex; border: 1px solid var(--dm-line); border-radius: 999px; overflow: hidden; flex-shrink: 0; }
+.dm-seg button { border: none; background: none; color: var(--dm-muted); font: inherit; font-weight: 700; font-size: 0.88rem; padding: 0.4rem 0.95rem; cursor: pointer; }
+.dm-seg button.active { background: rgba(255, 215, 0, 0.16); color: var(--dm-gold); }
+.dm-live-map-body { flex: 1; min-height: 0; overflow: auto; position: relative; }
+
+/* Give a turn: the creatures to pick from */
+.dm-turn-pick-list { display: flex; flex-direction: column; gap: 0.35rem; max-height: 60vh; overflow-y: auto; }
+.dm-turn-pick { display: flex; align-items: center; gap: 0.6rem; text-align: left; padding: 0.4rem 0.6rem; border-radius: 10px; cursor: pointer;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--dm-line); color: inherit; font: inherit; }
+.dm-turn-pick:hover { border-color: var(--dm-gold); background: rgba(255, 215, 0, 0.08); }
+.dm-turn-pick > span:last-child { display: flex; flex-direction: column; }
+.dm-turn-pick small { color: var(--dm-muted); }
+.dm-turn-pick-img { width: 40px; height: 40px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.05); }
+.dm-turn-pick-img img, .dm-turn-pick-img video { width: 100%; height: 100%; object-fit: contain; }
+
+/* The Players-see column's buttons (📖 Pokedex, Only picture, ✏️ Edit) */
+.dm-vis-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.45rem; }
+.dm-vis-actions .dm-btn { flex: 1 1 auto; padding: 0.25rem 0.45rem; font-size: 0.74rem; }
+
+/* "Hide from the battle log", at the right end of the running battle's tab bar -- red while it's on */
+#dmLiveTabs { align-items: center; }
+.dm-hidelog { margin-left: auto; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.75rem; margin-bottom: 0.3rem;
+  border-radius: 999px; border: 1px solid var(--dm-line); font-size: 0.82rem; font-weight: 700; color: var(--dm-muted); cursor: pointer; user-select: none; }
+.dm-hidelog input { accent-color: #e74c3c; }
+.dm-hidelog.on { color: #fff; background: rgba(231, 76, 60, 0.3); border-color: #e74c3c; box-shadow: 0 0 12px rgba(231, 76, 60, 0.45); }
+
+/* ✏️ Edit a creature mid-battle */
+.dm-edit-form .dm-row { flex-wrap: wrap; }
+.dm-edit-form .dm-row > .dm-field { min-width: 110px; }
+.dm-edit-scores > .dm-field { min-width: 70px !important; }
+.dm-edit-form textarea.dm-input { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; }

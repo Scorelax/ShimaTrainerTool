@@ -10,6 +10,11 @@
 // Mid-battle (live mode, the user's ask 2026-10-15) the DM edits the running battle's map the same way, whoever's turn
 // it is, and the Creatures tool moves, turns and lifts any creature without using its movement.
 //
+// After the first playtest (2026-10-16): an object can be hidden from the players until the DM reveals it, the Traps tool
+// marks squares as a trap (hidden until revealed -- the DM is told when a creature walks onto one, battle-live.js), the
+// Pictures card uploads an object or a background (saved as object-<name>.png / battle-<name>.<ext>) and deletes them,
+// and the Creatures tool changes a creature's size on the map.
+//
 // Objects (the user's ask, 2026-10-15): press a square to place one there and, still holding, move the pointer around
 // it to turn it -- it's placed on release. Click a placed object to edit it (the panel shows its settings, changes apply
 // at once, arrows move it); press and hold a placed object to turn it the same way.
@@ -49,7 +54,13 @@ const ed = {
   editCx: 0, editCy: 0, // its centre on screen, in squares -- kept while editing, so turning it back and forth doesn't creep
   gesture: null, // press-and-turn under way: {cx, cy, startRot, ref, editing, turned, pointerId}
   creatureId: null, // live mode's Creatures tool: the creature picked to move / turn / lift
+  objHidden: false, // the next object placed (or the one being edited) is hidden from the players
+  trapId: null, // the Traps tool's trap being drawn
+  draftTrap: null, // a new trap with no squares yet -- it joins the map with its first square
+  picKind: 'object', // the Pictures card's upload kind
 };
+
+const SIZES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
 
 let _root = null;
 let _onDone = null;
@@ -112,7 +123,7 @@ function objectAt(m, col, row, id = null) {
   const o = {
     id: id || newId('obj'), kind: asset.key, label: asset.label, url: asset.url,
     col, row: row - h + 1, w, h, rot: ((ed.objRot - 90) % 360 + 360) % 360, crop: cropNow(asset.url),
-    height: ed.objHeight, ...(ed.objMark ? { markKind: ed.objMark } : {}),
+    height: ed.objHeight, ...(ed.objMark ? { markKind: ed.objMark } : {}), ...(ed.objHidden ? { hidden: true } : {}),
   };
   return o.row >= 0 && o.col + o.w <= m.cols && o.row + o.h <= m.rows ? o : null;
 }
@@ -143,7 +154,7 @@ function commitObject(next, old = null) {
     const at = old ? objs.findIndex(o => o.id === old.id) : -1;
     st.map.objects = at >= 0 ? objs.map((o, i) => (i === at ? next : o)) : [...objs, next];
     if (old) unmarkObject(st, old, next.id);
-    if (next.markKind) {
+    if (next.markKind && !next.hidden) { // a hidden object's squares stay ordinary until it's revealed
       st.map.marks = st.map.marks || {};
       objectCells(next, st.map).forEach(p => { st.map.marks[`${p.col},${p.row}`] = next.markKind; });
     }
@@ -152,8 +163,8 @@ function commitObject(next, old = null) {
 
 /** Squares `gone` marked go back to normal unless another object (other than `exceptId`'s new self) still marks them. */
 function unmarkObject(st, gone, exceptId = null) {
-  if (!gone.markKind) return;
-  const kept = new Set((st.map.objects || []).filter(o => o.markKind === gone.markKind && o.id !== exceptId)
+  if (!gone.markKind || gone.hidden) return;
+  const kept = new Set((st.map.objects || []).filter(o => o.markKind === gone.markKind && o.id !== exceptId && !o.hidden)
     .flatMap(o => objectCells(o).map(p => `${p.col},${p.row}`)));
   objectCells(gone).forEach(p => {
     const k = `${p.col},${p.row}`;
@@ -185,6 +196,7 @@ function selectObject(o) {
   ed.objH = sideways ? (o.h || 1) : (o.w || 1);
   ed.objHeight = o.height ?? 0;
   ed.objMark = o.markKind || '';
+  ed.objHidden = !!o.hidden;
   const b = screenBoxOf(m, o);
   ed.editCx = b.sx + b.sw / 2; ed.editCy = b.sy + b.sh / 2;
   renderToolPanel();
@@ -264,9 +276,9 @@ export async function renderMapEditor(root, { onDone, live = false }) {
             <option value="">No background</option>
             ${_assets.backgrounds.map(b => `<option value="${escapeHtml(b.url)}" ${b.url === m.background ? 'selected' : ''}>${escapeHtml(b.label)}</option>`).join('')}
           </select>
-          <button class="dm-btn small wide" id="mapBgUpload" style="margin-top:0.5rem" title="A picture from this computer (JPG, PNG or WebP)">⬆ Upload a background</button>
-          <input type="file" id="mapBgFile" accept="image/jpeg,image/png,image/webp" hidden>
         </div>
+
+
 
         ${_live ? '' : `<div class="dm-card">
           <div class="dm-card-title">Saved maps</div>
@@ -282,9 +294,31 @@ export async function renderMapEditor(root, { onDone, live = false }) {
             ${_live ? '<button data-tool="creatures">🧍 Creatures</button>' : ''}
             <button data-tool="objects">🌲 Objects</button>
             <button data-tool="terrain">🟫 Terrain</button>
+            <button data-tool="traps">🪤 Traps</button>
             <button data-tool="erase">🧽 Eraser</button>
           </div>
           <div id="mapToolPanel"></div>
+        </div>
+
+        <div class="dm-card">
+          <div class="dm-card-title">Pictures</div>
+          <div class="dm-row">
+            <select class="dm-select" id="picKind" title="What the picture is for">
+              <option value="object" ${ed.picKind === 'object' ? 'selected' : ''}>Object</option>
+              <option value="background" ${ed.picKind === 'background' ? 'selected' : ''}>Background</option>
+            </select>
+            <input class="dm-input" id="picName" placeholder="Name (else the file's)" maxlength="50" autocomplete="off">
+          </div>
+          <button class="dm-btn small wide" id="picUpload" style="margin-top:0.5rem" title="A picture from this computer">⬆ Upload ${ed.picKind === 'object' ? 'an object' : 'a background'}</button>
+          <input type="file" id="picFile" hidden>
+          <div class="dm-hint" style="margin-top:0.35rem">Saved on the Pi as <b>object-&lt;name&gt;.png</b> (a PNG with a see-through background) or <b>battle-&lt;name&gt;</b> (JPG, PNG or WebP).</div>
+          <details class="dm-pic-manage">
+            <summary>Manage pictures (${_assets.objects.length + _assets.backgrounds.length})</summary>
+            ${[['Objects', _assets.objects], ['Backgrounds', _assets.backgrounds]].map(([label, list]) => `
+              <div class="dm-pic-group">${label}</div>
+              ${list.map(a => `<div class="dm-pic-row"><img src="${escapeHtml(a.url)}" alt="" loading="lazy"><span>${escapeHtml(a.label)}</span>
+                <button class="dm-icon-btn danger" data-del-pic="${escapeHtml(a.url)}" data-label="${escapeHtml(a.label)}" title="Delete it from the Pi">🗑</button></div>`).join('') || '<div class="dm-hint">None</div>'}`).join('')}
+          </details>
         </div>
 
         <div class="dm-editor-foot">
@@ -311,7 +345,9 @@ export async function renderMapEditor(root, { onDone, live = false }) {
   _unsub = onSetupChange(() => {
     if (!document.body.contains(_root)) return;
     renderStage();
-    if (_live && ed.tool === 'creatures') renderToolPanel();
+    // The square counts on the Traps panel follow too -- unless the DM is typing in it (a redraw would lose the text).
+    const typing = document.activeElement?.closest?.('#mapToolPanel');
+    if ((_live && ed.tool === 'creatures') || (ed.tool === 'traps' && !typing)) renderToolPanel();
   });
 }
 
@@ -428,11 +464,23 @@ function wireStatic() {
     document.getElementById('mapApplySize').addEventListener('click', () => applySize(Number(across.value), Number(down.value)));
   }
   document.getElementById('mapBackground').addEventListener('change', (e) => updateSetup(s => { s.map.background = e.target.value; }));
-  document.getElementById('mapBgUpload').addEventListener('click', () => document.getElementById('mapBgFile').click());
-  document.getElementById('mapBgFile').addEventListener('change', (e) => {
+  document.getElementById('picKind').addEventListener('change', (e) => {
+    ed.picKind = e.target.value;
+    document.getElementById('picUpload').textContent = `⬆ Upload ${ed.picKind === 'object' ? 'an object' : 'a background'}`;
+  });
+  document.getElementById('picUpload').addEventListener('click', () => {
+    const input = document.getElementById('picFile');
+    input.accept = ed.picKind === 'object' ? 'image/png' : 'image/jpeg,image/png,image/webp';
+    input.click();
+  });
+  document.getElementById('picFile').addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) uploadBackground(file);
+    if (file) uploadPicture(file, ed.picKind, document.getElementById('picName').value.trim());
+  });
+  _root.querySelector('.dm-pic-manage')?.addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-pic]');
+    if (del) deletePicture(del.dataset.delPic, del.dataset.label);
   });
   document.getElementById('mapTools').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tool]');
@@ -440,6 +488,7 @@ function wireStatic() {
     ed.tool = b.dataset.tool;
     if (ed.tool !== 'objects') { ed.selectedId = null; ed.editAsset = null; }
     if (ed.tool !== 'creatures') ed.creatureId = null;
+    if (ed.tool !== 'traps') { ed.trapId = null; ed.draftTrap = null; }
     renderToolPanel();
     renderStage();
   });
@@ -475,26 +524,56 @@ function wireStatic() {
   }
 }
 
-/** A background picture from the DM's computer: saved on the Pi with the others (named after the file), then used for
- * this map at once -- and listed for the players' placement screen too. */
-function uploadBackground(file) {
+/** A picture from the DM's computer, saved on the Pi with the others under the name the lists go by (object-<name>.png /
+ * battle-<name>.<ext>, routes_dm.py's save_battle_image -- named after the file unless a name is typed). A background is
+ * used for this map at once (and listed for the players' placement screen too); an object is picked in the Objects tool. */
+function uploadPicture(file, kind, name) {
   const reader = new FileReader();
   reader.onload = async () => {
-    const btn = document.getElementById('mapBgUpload');
+    const btn = document.getElementById('picUpload');
     if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
     try {
-      const bg = await DmAPI.uploadBattleBackground({ name: file.name.replace(/\.[^.]+$/, ''), data: reader.result });
+      const pic = await DmAPI.uploadBattleImage({ kind, name: name || file.name.replace(/\.[^.]+$/, ''), data: reader.result });
       _assets = null;
       await loadAssets();
-      updateSetup(s => { s.map.background = bg.url; });
-      toast(`Background "${bg.label}" uploaded and used for this map.`);
-      renderMapEditor(_root, { onDone: _onDone });
+      if (kind === 'background') {
+        updateSetup(s => { s.map.background = pic.url; });
+        toast(`Background "${pic.label}" uploaded and used for this map.`);
+      } else {
+        ed.tool = 'objects';
+        ed.selectedId = null; ed.editAsset = null;
+        selectObjectKind(pic.key);
+        toast(`Object "${pic.label}" uploaded -- click the map to place it.`);
+      }
+      renderMapEditor(_root, { onDone: _onDone, live: _live });
     } catch (err) {
-      showCombatAlert(err.message, { title: 'Upload a background' });
-      if (btn) { btn.disabled = false; btn.textContent = '⬆ Upload a background'; }
+      showCombatAlert(err.message, { title: kind === 'object' ? 'Upload an object' : 'Upload a background' });
+      if (btn) { btn.disabled = false; btn.textContent = `⬆ Upload ${kind === 'object' ? 'an object' : 'a background'}`; }
     }
   };
   reader.readAsDataURL(file);
+}
+
+/** Deletes one of the pictures from the Pi. A map already using it keeps the spot, the picture just stops showing. */
+async function deletePicture(url, label) {
+  const inUse = getSetup().map.background === url || (getSetup().map.objects || []).some(o => o.url === url);
+  const msg = `Delete "${label}" from the Pi?${inUse ? ' This map is using it -- it disappears from the map too.' : ''} Saved maps and setups that use it lose it as well.`;
+  if (!await showCombatConfirm(msg, { title: 'Delete picture', yesLabel: 'Delete', noLabel: 'Cancel' })) return;
+  try {
+    await DmAPI.deleteBattleImage(url);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Delete picture' });
+    return;
+  }
+  if (inUse) updateSetup(s => {
+    if (s.map.background === url) s.map.background = '';
+    s.map.objects = (s.map.objects || []).filter(o => o.url !== url);
+  });
+  _assets = null;
+  await loadAssets();
+  if (_assets.objects.every(o => o.key !== ed.objectKey)) ed.objectKey = _assets.objects[0]?.key || '';
+  toast(`"${label}" deleted.`);
+  renderMapEditor(_root, { onDone: _onDone, live: _live });
 }
 
 async function leave() {
@@ -572,6 +651,8 @@ function renderToolPanel() {
           <option value="blocked" ${ed.objMark === 'blocked' ? 'selected' : ''}>Blocked</option>
         </select>
       </div>
+      <label class="dm-check"><input type="checkbox" id="objHidden" ${ed.objHidden ? 'checked' : ''}>
+        <span>🙈 Hidden from the players <small>Only you see it (see-through) until you untick this -- its squares aren't difficult / blocked meanwhile.</small></span></label>
       ${editing ? `
       <div class="dm-field"><label>Move it</label>
         <div class="dm-row dm-obj-move">
@@ -605,6 +686,7 @@ function renderToolPanel() {
     document.getElementById('objRotR')?.addEventListener('click', () => turnObject(15));
     document.getElementById('objRot')?.addEventListener('input', (e) => setObjectTurn(Number(e.target.value)));
     document.getElementById('objMark')?.addEventListener('change', (e) => { ed.objMark = e.target.value; if (ed.selectedId) applyEdit(); });
+    document.getElementById('objHidden')?.addEventListener('change', (e) => { ed.objHidden = e.target.checked; if (ed.selectedId) applyEdit(); });
     panel.querySelectorAll('[data-move-obj]').forEach(b => b.addEventListener('click', () => {
       const [dx, dy] = b.dataset.moveObj.split(',').map(Number);
       ed.editCx += dx; ed.editCy += dy;
@@ -626,9 +708,14 @@ function renderToolPanel() {
         <button class="dm-btn" data-cre="turn" data-v="-45" title="Turn left 45°">⟲ 45°</button><button class="dm-btn" data-cre="turn" data-v="45" title="Turn right 45°">⟳ 45°</button></div></div>
       <div class="dm-field"><label>Height</label><div class="dm-row">
         <button class="dm-btn" data-cre="z" data-v="-5" title="5ft lower">▼ 5ft</button><button class="dm-btn" data-cre="z" data-v="5" title="5ft higher">▲ 5ft</button></div></div>
+      <div class="dm-field"><label for="creSize">Size on the map</label>
+        <select class="dm-select" id="creSize">
+          ${SIZES.map(z => `<option value="${z}" ${z.toLowerCase() === String(c.participant?.size || 'Medium').toLowerCase() ? 'selected' : ''}>${z}${{ Large: ' (2×2)', Huge: ' (3×3)', Gigantic: ' (4×4)' }[z] || ' (1 square)'}</option>`).join('')}
+        </select></div>
       <button class="dm-btn wide" data-cre="done">✓ Done with ${escapeHtml(c.name)}</button>`
       : '<div class="dm-hint">Tap a creature on the map -- anyone\'s -- then tap a square to move it there. It doesn\'t use its movement, and it doesn\'t have to be its turn.</div>';
     hint.textContent = c ? `Tap a square to move ${c.name} there · turn it or change its height on the left.` : 'Creatures: tap one to pick it.';
+    document.getElementById('creSize')?.addEventListener('change', (e) => { if (ed.creatureId) liveStore.setTokenSize(ed.creatureId, e.target.value); });
     panel.querySelectorAll('[data-cre]').forEach(b => b.addEventListener('click', () => {
       if (b.dataset.cre === 'done') { ed.creatureId = null; renderToolPanel(); renderStage(); return; }
       const now = getSetup().creatures.find(x => x.id === ed.creatureId);
@@ -636,6 +723,8 @@ function renderToolPanel() {
       const v = Number(b.dataset.v);
       liveStore.placeToken(now.id, b.dataset.cre === 'turn' ? { facing: (((now.position.facing + v) % 360) + 360) % 360 } : { z: Math.max(-500, now.z + v) });
     }));
+  } else if (ed.tool === 'traps') {
+    renderTrapPanel(panel, hint);
   } else if (ed.tool === 'terrain') {
     panel.innerHTML = `
       ${[['difficult', 'Difficult terrain', 'Double movement for creatures on the ground.'], ['blocked', 'Blocked', "Can't be walked through or stood on."], ['clear', 'Clear', 'Back to normal ground.']]
@@ -683,7 +772,8 @@ function renderStage() {
   const m = s.map;
   wrap.innerHTML = mapStageHtml(s, { interactive: true, selectedId: ed.tool === 'creatures' ? ed.creatureId : null });
   const stage = wrap.querySelector('.dm-map-stage');
-  stage.style.width = `min(100%, calc((100vh - 190px) * ${m.rows / m.cols}))`;
+  // Live mode sits in the DM console's Map tab, under its tab bars -- less height to fill.
+  stage.style.width = `min(100%, calc((100vh - ${_live ? 300 : 190}px) * ${m.rows / m.cols}))`;
   stage.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
 
   stage.style.touchAction = 'none'; // a held finger turns / paints instead of scrolling the page
@@ -693,6 +783,7 @@ function renderStage() {
     e.preventDefault();
     const { col, row } = cell;
     if (ed.tool === 'terrain') { startPainting(e); paint(col, row); }
+    else if (ed.tool === 'traps') startTrapStroke(e, col, row);
     else if (ed.tool === 'objects') startObjectPress(e, col, row);
     else if (ed.tool === 'creatures') onCreaturePress(col, row);
     else onCellClick(col, row);
@@ -711,7 +802,7 @@ function renderStage() {
 
 /** Terrain: keeps painting under the pointer until it's let go -- followed on the window, since every painted square
  * redraws the map (and a finger's touch stays tied to the element it started on, which that replaces). */
-function startPainting(e) {
+function startPainting(e, paintFn = paint) {
   ed.painting = true;
   const id = e.pointerId;
   let last = null;
@@ -720,7 +811,7 @@ function startPainting(e) {
     const cell = cellAtPointer(ev);
     if (!cell || (last && last.col === cell.col && last.row === cell.row)) return;
     last = cell;
-    paint(cell.col, cell.row);
+    paintFn(cell.col, cell.row);
   };
   const end = (ev) => {
     if (ev.pointerId !== id) return;
@@ -888,6 +979,118 @@ async function onCellClick(col, row) {
     if (hit) { removeObject(hit); return; } // squares it marked go back to normal unless another object marks them too
     if (m.marks?.[`${col},${row}`]) updateSetup(st => { delete st.map.marks[`${col},${row}`]; });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Traps: squares marked as a trap -- hidden from the players (their screens and the table draw nothing there) until the
+// DM reveals it. map.traps: [{id, name, note, cells: ["col,row", ...], revealed}]. Hidden objects are revealed from here too.
+// ---------------------------------------------------------------------------
+
+function trapsNow() {
+  const traps = getSetup().map.traps || [];
+  return ed.draftTrap && !traps.some(t => t.id === ed.draftTrap.id) ? [...traps, ed.draftTrap] : traps;
+}
+
+/** Changes one trap (`fn` gets it to change) -- a draft until it has squares, on the map from then on. A trap whose last
+ * square is taken off goes back to being a draft (still picked, so squares can be added again). */
+function changeTrap(id, fn) {
+  if (ed.draftTrap?.id === id && !(getSetup().map.traps || []).some(t => t.id === id)) {
+    fn(ed.draftTrap);
+    if (!ed.draftTrap.cells.length) { renderToolPanel(); renderStage(); return; }
+    const t = ed.draftTrap;
+    ed.draftTrap = null;
+    updateSetup(st => { st.map.traps = [...(st.map.traps || []), t]; });
+    return;
+  }
+  updateSetup(st => {
+    const t = (st.map.traps || []).find(x => x.id === id);
+    if (!t) return;
+    fn(t);
+    if (!t.cells.length) { ed.draftTrap = { ...t }; st.map.traps = st.map.traps.filter(x => x.id !== id); }
+  });
+}
+
+function newTrap(cells = []) {
+  ed.draftTrap = { id: newId('trap'), name: `Trap ${trapsNow().length + 1}`, note: '', cells, revealed: false };
+  ed.trapId = ed.draftTrap.id;
+}
+
+/** Traps tool, pointer pressed on (col, row): with no trap picked, a trap's square picks it and an empty square starts a
+ * new one; with one picked, a stroke adds squares to it -- or takes them off, when it starts on one of its own. */
+function startTrapStroke(e, col, row) {
+  const key = `${col},${row}`;
+  const under = trapsNow().find(t => t.cells.includes(key));
+  if (!ed.trapId) {
+    if (under) { ed.trapId = under.id; renderToolPanel(); renderStage(); return; }
+    newTrap();
+  }
+  const id = ed.trapId;
+  const adding = !(under && under.id === id);
+  const stroke = (c, r) => {
+    const k = `${c},${r}`;
+    // A square belongs to one trap: added here, it leaves any other.
+    if (adding) updateSetup(st => { (st.map.traps || []).forEach(t => { if (t.id !== id) t.cells = t.cells.filter(x => x !== k); }); st.map.traps = (st.map.traps || []).filter(t => t.cells.length); });
+    changeTrap(id, t => { t.cells = adding ? [...new Set([...t.cells, k])] : t.cells.filter(x => x !== k); });
+  };
+  startPainting(e, stroke);
+  stroke(col, row);
+  renderToolPanel();
+}
+
+function renderTrapPanel(panel, hint) {
+  const traps = trapsNow();
+  const t = traps.find(x => x.id === ed.trapId);
+  const hiddenObjs = (getSetup().map.objects || []).filter(o => o.hidden);
+  panel.innerHTML = `
+    <div class="dm-trap-list">
+      ${traps.map(tr => `<div class="dm-trap-row${tr.id === ed.trapId ? ' active' : ''}">
+        <button class="dm-trap-pick" data-trap="${tr.id}" data-trap-act="pick" title="${escapeHtml(tr.note || '')}">${tr.revealed ? '⚠' : '🙈'} ${escapeHtml(tr.name)} <small>${tr.cells.length} sq${tr.revealed ? ' · revealed' : ' · hidden'}</small></button>
+        <button class="dm-btn small" data-trap="${tr.id}" data-trap-act="reveal" ${tr.cells.length ? '' : 'disabled'}>${tr.revealed ? 'Hide' : 'Reveal'}</button>
+        <button class="dm-icon-btn danger" data-trap="${tr.id}" data-trap-act="delete" title="Remove the trap">✕</button></div>`).join('') || '<div class="dm-hint">No traps yet.</div>'}
+    </div>
+    <button class="dm-btn wide" id="trapNew" style="margin-top:0.4rem">+ New trap</button>
+    ${t ? `
+    <div class="dm-edit-head" style="margin-top:0.6rem"><b>${escapeHtml(t.name)}</b><small>${t.cells.length ? `${t.cells.length} square(s)` : 'No squares yet -- click the map'}</small></div>
+    <div class="dm-field"><label for="trapName">Name</label><input class="dm-input" id="trapName" value="${escapeHtml(t.name)}" maxlength="60"></div>
+    <div class="dm-field"><label for="trapNote">What it does <small>(only you see this)</small></label><textarea class="dm-input" id="trapNote" rows="2" maxlength="300">${escapeHtml(t.note || '')}</textarea></div>
+    <label class="dm-check"><input type="checkbox" id="trapRevealed" ${t.revealed ? 'checked' : ''} ${t.cells.length ? '' : 'disabled'}>
+      <span>Revealed <small>Shown on the players' screens and the table.</small></span></label>
+    <button class="dm-btn primary wide" id="trapDone">✓ Done with this trap</button>` : ''}
+    ${hiddenObjs.length ? `
+    <div class="dm-card-title" style="margin-top:0.8rem">Hidden objects</div>
+    ${hiddenObjs.map(o => `<div class="dm-trap-row"><span class="dm-trap-pick">🙈 ${escapeHtml(o.label || o.kind || 'Object')}</span>
+      <button class="dm-btn small" data-reveal-obj="${o.id}">Reveal</button></div>`).join('')}` : ''}`;
+  hint.textContent = t
+    ? `${t.name}: click or drag across squares to add them -- start on one of its own squares to take squares off.`
+    : 'Traps: click a square to start a new trap there (or click a trap to pick it). Hidden traps are only on your screen -- you\'re told when a creature walks onto one.';
+  panel.querySelectorAll('[data-trap-act]').forEach(b => b.addEventListener('click', async () => {
+    const id = b.dataset.trap;
+    const act = b.dataset.trapAct;
+    if (act === 'pick') { ed.trapId = ed.trapId === id ? null : id; renderToolPanel(); renderStage(); return; }
+    if (act === 'reveal') { changeTrap(id, tr => { tr.revealed = !tr.revealed; }); renderToolPanel(); return; }
+    const tr = trapsNow().find(x => x.id === id);
+    if (!tr || !await showCombatConfirm(`Remove the trap "${tr.name}"?`, { title: 'Remove trap', yesLabel: 'Remove', noLabel: 'Cancel' })) return;
+    if (ed.draftTrap?.id === id) ed.draftTrap = null;
+    if (ed.trapId === id) ed.trapId = null;
+    updateSetup(st => { st.map.traps = (st.map.traps || []).filter(x => x.id !== id); });
+    renderToolPanel();
+  }));
+  document.getElementById('trapNew').addEventListener('click', () => { newTrap(); renderToolPanel(); });
+  document.getElementById('trapName')?.addEventListener('change', (e) => { changeTrap(t.id, tr => { tr.name = e.target.value.trim() || 'Trap'; }); renderToolPanel(); });
+  document.getElementById('trapNote')?.addEventListener('change', (e) => changeTrap(t.id, tr => { tr.note = e.target.value.trim(); }));
+  document.getElementById('trapRevealed')?.addEventListener('change', (e) => { changeTrap(t.id, tr => { tr.revealed = e.target.checked; }); renderToolPanel(); });
+  document.getElementById('trapDone')?.addEventListener('click', () => { ed.trapId = null; ed.draftTrap = null; renderToolPanel(); renderStage(); });
+  panel.querySelectorAll('[data-reveal-obj]').forEach(b => b.addEventListener('click', () => revealObject(b.dataset.revealObj)));
+}
+
+/** Shows a hidden object to the players -- and its squares become difficult / blocked now, if it marks them. */
+function revealObject(id) {
+  const o = (getSetup().map.objects || []).find(x => x.id === id);
+  if (!o) return;
+  const next = { ...o };
+  delete next.hidden;
+  commitObject(next, o);
+  renderToolPanel();
 }
 
 /** A small read-only picture of the map for the setup overview. */

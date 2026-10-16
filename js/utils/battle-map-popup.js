@@ -93,6 +93,11 @@ function _injectStyles() {
     .bmap-content .bmap-toolbar-slot { margin-bottom: 0.4rem; min-height: 2.6rem; }
     .bmap-content .bmap-legend:empty { display: none; }
     .bmap-content .bmap-legend { margin: 0 0 0.45rem; }
+    /* inline (the DM console's Map tab): the same map filling its tab instead of floating over the page */
+    .combat-popup-overlay.bmap-inline { position: relative; top: auto; left: auto; width: 100%; height: 100%; z-index: auto;
+      background: none; backdrop-filter: none; }
+    .bmap-inline .mz-fullcard { width: 100% !important; height: 100% !important; border-radius: 0; border: none; box-shadow: none; }
+    .bmap-inline .combat-popup-close { display: none; }
     @media (max-width: 520px) { .bmap-content .combat-move-popup-header h2 { font-size: 0.9rem; } }
   `;
   document.head.appendChild(style);
@@ -164,7 +169,7 @@ function _ensureDom() {
     const x = e.target.closest('.bmap-legend-x');
     if (x) CombatAPI.removeFieldZone(x.dataset.key, x.dataset.id).catch(err => showCombatAlert(err.message, { title: 'Error' }));
   });
-  _overlay.addEventListener('click', (e) => { if (e.target === _overlay) _close(); });
+  _overlay.addEventListener('click', (e) => { if (e.target === _overlay && !_overlay.classList.contains('bmap-inline')) _close(); });
   // Line / cone tool: press and drag anywhere on the map to sweep it round (a tap aims it straight at that spot).
   const stage = document.getElementById('bmapStage');
   stage.addEventListener('pointerdown', (e) => {
@@ -197,7 +202,7 @@ function _close() {
  * re-renders against the given session. `selectId` starts with that token
  * already selected (Disengage: straight into moving) -- only when it's the
  * viewer's own token and its turn, the same rule a click follows. */
-export function showBattleMap(session, trainerName, { selectId = null } = {}) {
+export function showBattleMap(session, trainerName, { selectId = null, container = null } = {}) {
   _session = session;
   _ownerName = trainerName;
   const pre = selectId && session.participants?.[selectId];
@@ -205,9 +210,23 @@ export function showBattleMap(session, trainerName, { selectId = null } = {}) {
     && selectId === _activeParticipantId(session) ? selectId : null;
   _stagedDestination = null; _stagedAlt = null;
   _ensureDom();
+  // `container`: shown inside it (the DM console's Map tab) instead of over the page.
+  const host = container || document.body;
+  if (_overlay.parentElement !== host) host.appendChild(_overlay);
+  _overlay.classList.toggle('bmap-inline', !!container);
   _overlay.style.display = 'flex';
   _render();
   _zoom.reset(); // opens on the whole map, fitted to the screen
+}
+
+/** Closes the map -- one shown inside a container goes back to being a popup (hidden) for next time. */
+export function hideBattleMap() {
+  if (!_overlay) return;
+  _close();
+  if (_overlay.classList.contains('bmap-inline')) {
+    _overlay.classList.remove('bmap-inline');
+    document.body.appendChild(_overlay);
+  }
 }
 
 /** Call on every live session push so the popup stays current while open;

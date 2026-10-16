@@ -929,7 +929,9 @@ let _editingStat = null;
 /** HP / VP with its bar. On your own shared battle card the whole thing is a button that opens its editor. */
 function _barHtml(c, key, label, pct, editable) {
   const editing = editable && _editingStat === `${c.id}:${key}`;
-  const inner = `<span class="stat-bar-label">${label}</span><div class="mini-bar"><div class="mini-bar-fill ${key}-bar" style="width:${pct}%"></div></div>`;
+  // The DM's creature with its bar hidden from the players (combat-wip.js's _maskForeignView): an empty, unknown bar.
+  const barHidden = c[`${key}BarHidden`];
+  const inner = `<span class="stat-bar-label">${label}</span><div class="mini-bar${barHidden ? ' mini-bar--unknown' : ''}"><div class="mini-bar-fill ${key}-bar" style="width:${barHidden ? 0 : pct}%"></div></div>`;
   return editable
     ? `<button type="button" class="stat-bar-wrap stat-tile-toggle stat-bar-toggle${editing ? ' editing' : ''}" data-combatant-id="${c.id}" data-stat="${key}" title="Change ${key.toUpperCase()}">${inner}</button>`
     : `<span class="stat-bar-wrap">${inner}</span>`;
@@ -1537,6 +1539,7 @@ function getCombatCSS() {
     .combat-inv-add-qty { width: 80px; }
     .combat-inv-add-confirm { flex: 1; }
     .mini-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .mini-bar.mini-bar--unknown { background: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0 4px, rgba(255,255,255,0.03) 4px 8px); }
     .hp-bar { background: #4CAF50; }
     .vp-bar { background: #2196F3; }
     .combat-card-footer {

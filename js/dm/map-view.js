@@ -1,13 +1,13 @@
 // The DM's setup map, drawn the way the table TV shows it (battle-map.js: board cols run DOWN the screen, board rows
 // run ACROSS it, row 0 at the right edge) -- shared by the map setup (map-editor.js), the battle setup's placement map
 // (creature-setup.js) and the setup overview's preview. Everything in the setup is stored in board coordinates.
-import { mapObjectsHtml, footprintForSize, footprintCells } from '../utils/battle-map-grid.js';
+import { mapObjectsHtml, footprintForSize, footprintCells, trapCellsOf, trapCellClass } from '../utils/battle-map-grid.js';
 import { isLevitating } from '../utils/move-effects.js';
 import { escapeHtml } from './dm-common.js';
 
 export function boardOf(setup) {
   const m = setup.map;
-  return { grid: { cols: m.cols, rows: m.rows }, objects: m.objects || [], marks: m.marks || {}, cells: {}, tokens: {} };
+  return { grid: { cols: m.cols, rows: m.rows }, objects: m.objects || [], marks: m.marks || {}, traps: m.traps || [], cells: {}, tokens: {} };
 }
 
 /** A creature token's footprint on the sideways screen -- battle-map.js's screenCellRect. Its (col, row) anchor is the
@@ -20,11 +20,14 @@ export function tokenScreenRect(m, col, row, size) {
  * have a starting square (`selectedId` highlighted), and an empty ghost layer for previews. */
 export function mapStageHtml(setup, { interactive = false, selectedId = null, preview = false } = {}) {
   const m = setup.map;
+  const traps = trapCellsOf(boardOf(setup), true); // the DM's own screen: hidden traps too
   const cells = [];
   for (let col = 0; col < m.cols; col++) {
     for (let row = m.rows - 1; row >= 0; row--) {
       const mark = m.marks?.[`${col},${row}`];
-      cells.push(`<div class="dm-map-cell${mark ? ` mark-${mark}` : ''}"${interactive ? ` data-cell="${col},${row}"` : ''}></div>`);
+      const trap = trapCellClass(traps, `${col},${row}`);
+      const trapAttr = trap ? ` title="${escapeHtml(trap.title)}"` : '';
+      cells.push(`<div class="dm-map-cell${mark ? ` mark-${mark}` : ''}${trap ? ` ${trap.cls}` : ''}"${trapAttr}${interactive ? ` data-cell="${col},${row}"` : ''}></div>`);
     }
   }
   const tokens = setup.creatures.filter(c => c.position && !c.heldBack).map(c => {
@@ -36,7 +39,7 @@ export function mapStageHtml(setup, { interactive = false, selectedId = null, pr
     <div class="dm-map-stage${preview ? ' dm-map-preview' : ''}${m.background ? ' has-bg' : ''}" style="aspect-ratio:${m.rows} / ${m.cols}">
       <div class="dm-map-bg"${m.background ? ` style="background-image:url('${escapeHtml(m.background)}')"` : ''}></div>
       <div class="dm-map-grid" style="grid-template-columns:repeat(${m.rows},1fr);grid-template-rows:repeat(${m.cols},1fr)">${cells.join('')}</div>
-      <div class="bmap-objects">${mapObjectsHtml(boardOf(setup), { tv: true })}</div>
+      <div class="bmap-objects">${mapObjectsHtml(boardOf(setup), { tv: true, all: true })}</div>
       <div class="dm-map-tokens">${tokens}</div>
       <div class="dm-map-ghost"></div>
     </div>`;

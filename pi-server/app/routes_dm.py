@@ -749,25 +749,57 @@ def save_npc_image(payload):
 _BACKGROUND_TYPES = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp'}
 
 
+def save_battle_image(payload):
+    """POST /api/dm/battle-image: a battle-map picture uploaded from the DM console ({kind: 'object' | 'background', name,
+    data: "data:image/...;base64,..."}), saved in the battle pictures folder under the names the map lists go by --
+    object-<name>.png for an object (PNG only: it needs its see-through background), battle-<name>.<ext> for a background
+    (JPG, PNG or WebP). Returns it the way those lists do: {key, label, url}."""
+    if payload.get('kind') == 'object':
+        return _save_battle_picture(payload, 'object', {'image/png': '.png'}, "An object has to be a PNG picture (with a see-through background)")
+    return save_battle_background(payload)
+
+
+_BATTLE_IMAGE_NAME_RE = re.compile(r'^(?:object-[\w.-]+\.png|battle-[\w.-]+\.(?:png|jpe?g|webp))$', re.IGNORECASE)
+
+
+def delete_battle_image(url):
+    """POST /api/dm/battle-image-delete: removes one of the battle pictures (an object-* or battle-* file) from the Pi. A
+    map already using it keeps the reference, and simply stops showing that picture."""
+    name = os.path.basename(str(url or '').split('?')[0])
+    if not str(url or '').startswith('/battle-images/') or not _BATTLE_IMAGE_NAME_RE.match(name):
+        raise ValueError("That isn't one of the battle map's pictures")
+    path = os.path.join(upstream.BATTLE_IMAGE_DIR, name)
+    if not os.path.isfile(path):
+        raise ValueError('That picture is already gone')
+    os.remove(path)
+
+
 def save_battle_background(payload):
     """POST /api/dm/battle-background: a battle-map background uploaded from the DM console ({name, data: "data:image/
     ...;base64,..."}), saved in the battle pictures folder as battle-<sanitized name>.<ext> -- where Map setup and the
     players' placement screen list their backgrounds (routes_combat._list_backgrounds). A name already there gets -2, -3...
     Returns it as that list does: {key, label, url}."""
+    return _save_battle_picture(payload, 'battle', _BACKGROUND_TYPES, "That isn't a picture the map can use (JPG, PNG or WebP)")
+
+
+def _save_battle_picture(payload, prefix, types, wrong_type):
+    """Saves an uploaded battle picture as <prefix>-<sanitized name><ext> (a name already there gets -2, -3...)."""
     import base64
     m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
-    if not m or m.group(1) not in _BACKGROUND_TYPES:
-        raise ValueError("That isn't a picture the map can use (JPG, PNG or WebP)")
+    if not m or m.group(1) not in types:
+        raise ValueError(wrong_type)
     raw = base64.b64decode(m.group(2))
     if len(raw) > _MAX_IMAGE_BYTES:
         raise ValueError('That picture is too big (15 MB at most)')
-    base = upstream._sanitize_species_name(payload.get('name') or '')[:50].strip('-') or 'background'
+    # A name typed with the prefix already ("object-tree") isn't doubled up.
+    name = re.sub(rf'^{prefix}-', '', str(payload.get('name') or '').strip(), flags=re.IGNORECASE)
+    base = upstream._sanitize_species_name(name)[:50].strip('-') or ('object' if prefix == 'object' else 'background')
     os.makedirs(upstream.BATTLE_IMAGE_DIR, exist_ok=True)
     taken = {os.path.splitext(f)[0].lower() for f in os.listdir(upstream.BATTLE_IMAGE_DIR)}
     key, n = base, 2
-    while f'battle-{key}' in taken:
+    while f'{prefix}-{key}'.lower() in taken:
         key, n = f'{base}-{n}', n + 1
-    filename = f'battle-{key}{_BACKGROUND_TYPES[m.group(1)]}'
+    filename = f'{prefix}-{key}{types[m.group(1)]}'
     with open(os.path.join(upstream.BATTLE_IMAGE_DIR, filename), 'wb') as f:
         f.write(raw)
     return {'key': key, 'label': key.replace('_', ' ').replace('-', ' ').title(), 'url': f'/battle-images/{filename}'}

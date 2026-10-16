@@ -4,17 +4,30 @@
 // player's attack asks of it (a save, a Sturdy roll) pops up here. The panel on the right is the DM's own: the table
 // screens, the encounter in play (its events and notes -- encounters.js), the DM's creatures in the fight (with the
 // capture helper), and reinforcements.
-import { CombatAPI, DmAPI } from '../api.js';
+//
+// After the first playtest (2026-10-16): the battle has two tabs -- Battle (all of the above) and Map (the battle map
+// the players use, moves, cones and lines included, or the live map editor -- objects, hidden objects, traps, the
+// background, any creature moved / turned / resized). The DM can give any creature a turn out of order (Give a turn),
+// and is told when a creature walks onto a trap.
+//
+// The second playtest batch (2026-10-16): the players see nothing of the DM's creatures but the picture until the DM ticks
+// it (the HP / VP bars and their numbers are separate boxes), and 📖 shows them what their Pokedex already knows; a hidden
+// creature (🙈) is on no screen but this one; ✏️ Edit changes anything about a creature mid-battle; and "Hide from the
+// battle log" keeps what the DM does now out of the players' log (still in the DM's).
+import { CombatAPI, DmAPI, GameDataAPI, setHideBattleLog } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { VISIBILITY_DEFAULTS } from '../utils/combat-visibility.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFocusChange } from '../pages/combat-wip.js';
-import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow, natureOptions, openDmModal } from './dm-common.js';
+import { renderCombatWip, attachCombatWipListeners, startDmPlacement, setOnDmFocusChange, setDmMapOpener, focusParticipant, forgetLocalCombatant } from '../pages/combat-wip.js';
+import { showBattleMap, hideBattleMap } from '../utils/battle-map-popup.js';
+import { footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
+import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFromPokemonRow, natureOptions, openDmModal, abilityMod } from './dm-common.js';
 import { getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD, STATUS_CAPTURE_BONUS, captureDc, accuracyDc } from './encounter-rules.js';
 import { getSetup } from './setup-store.js';
 import { renderMapEditor } from './map-editor.js';
 import { setLiveSession } from './live-map-store.js';
+import * as liveMapStore from './live-map-store.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
@@ -27,6 +40,11 @@ let runSaveTimer = null;
 
 export async function mountLive(stageEl, toolsEl, currentSession) {
   session = currentSession;
+  liveTab = 'battle';
+  mapMode = 'play';
+  trapsInside = trapOccupants(session); // whoever already stands on a trap isn't news
+  bindLiveTabs();
+  setDmMapOpener((selectId) => showLiveTab('map', { mode: 'play', selectId }));
   setOnDmFocusChange(renderVisibilityColumn);
   stageEl.innerHTML = await renderCombatWip();
   attachCombatWipListeners();
@@ -40,6 +58,7 @@ export async function mountLive(stageEl, toolsEl, currentSession) {
 export function updateLive(currentSession) {
   session = currentSession;
   setLiveSession(currentSession); // the live map editor, if it's open, follows the battle
+  checkTraps();
   renderCreatures();
   const round = session.started ? Number(session.round) || 1 : null;
   if (round !== null && lastRound !== null && round > lastRound) newRound(round);
@@ -228,7 +247,8 @@ async function openCapture(p) {
 // ---------------------------------------------------------------------------
 
 const VISIBILITY_FIELDS = [
-  ['hp', 'HP numbers', 'The HP bar always shows'], ['vp', 'VP numbers', 'The VP bar always shows'], ['ac', 'AC'], ['stats', 'Other stats', 'STR, DEX, CON, INT, WIS, CHA'],
+  ['hpBar', 'HP bar', 'How full it is'], ['hp', 'HP numbers', 'With the bar'], ['vpBar', 'VP bar', 'How full it is'], ['vp', 'VP numbers', 'With the bar'],
+  ['ac', 'AC'], ['stats', 'Other stats', 'STR, DEX, CON, INT, WIS, CHA'],
   ['name', 'Name'], ['type', 'Type'], ['level', 'Level'], ['abilities', 'Abilities'], ['size', 'Size'],
 ];
 
@@ -246,13 +266,24 @@ function renderVisibilityColumn(focusId, currentSession) {
   el.innerHTML = `
     <div class="dm-vis" data-id="${p.id}">
       <div class="dm-vis-title">Players see</div>
+      <div class="dm-vis-actions">
+        ${p.combatantType === 'pokemon' && p.speciesName ? '<button class="dm-btn small" data-vis-act="pokedex" title="Show what the players\' Pokédex already knows about its species">📖 Pokédex</button>' : ''}
+        <button class="dm-btn small" data-vis-act="none" title="Untick everything -- only its picture shows">Only picture</button>
+        <button class="dm-btn small" data-vis-act="edit" title="Change its level, stats, abilities, moves...">✏️ Edit</button>
+      </div>
       ${VISIBILITY_FIELDS.map(([field, label, sub]) => `
         <label class="dm-vis-row" ${sub ? `title="${sub}"` : ''}>
           <input type="checkbox" data-vis="${field}" ${vis[field] ? 'checked' : ''}>
           <span>${label}${sub ? `<small>${sub}</small>` : ''}</span>
         </label>`).join('')}
-      <div class="dm-vis-note">Its picture and HP / VP bars always show. Moves it uses are shown to the players as it uses them.</div>
+      <div class="dm-vis-note">Its picture always shows. Moves it uses are shown to the players as it uses them.</div>
     </div>`;
+  el.querySelector('[data-vis-act="pokedex"]')?.addEventListener('click', () => showPokedexKnowledge(p));
+  el.querySelector('[data-vis-act="none"]').addEventListener('click', () => {
+    CombatAPI.setVisibilityMany(p.id, Object.fromEntries(Object.keys(VISIBILITY_DEFAULTS).map(f => [f, false])))
+      .catch(err => showCombatAlert(err.message, { title: p.name }));
+  });
+  el.querySelector('[data-vis-act="edit"]').addEventListener('click', () => openEditCreature(session.participants[p.id] || p));
   el.querySelectorAll('[data-vis]').forEach(cb => cb.addEventListener('change', async () => {
     try {
       await CombatAPI.setVisibility(p.id, cb.dataset.vis, cb.checked);
@@ -275,6 +306,7 @@ function renderTools(el) {
         <a class="dm-btn" href="battle-map.html" target="_blank" rel="noopener" title="Opens the table's battle map screen in a new tab">▦ Battle map ↗</a>
         <button class="dm-btn" id="dmEditMap" title="Change the map, move any creature -- any time, whoever's turn it is">✏️ Edit map</button>
       </div>
+      <button class="dm-btn wide" id="dmGiveTurn" style="margin-top:0.5rem" title="Any creature takes a turn now -- then the turn order carries on where it was">🎯 Give a turn…</button>
       <label class="dm-check" style="margin-top:0.5rem"><input type="checkbox" id="dmShowBattle" checked>
         <span>Show the battle on the display screen <small>Untick for the display's regular screen (the Display module's scene) meanwhile -- tick to bring the battle back.</small></span></label>
     </div>
@@ -313,7 +345,7 @@ function renderTools(el) {
           <div class="dm-field"><label for="dmItem">Held item</label><input class="dm-input" id="dmItem" placeholder="None"></div>
           <div class="dm-field"><label for="dmInit">Initiative</label><input class="dm-input" id="dmInit" type="number" placeholder="Roll for me"></div>
         </div>
-        <label class="dm-check"><input type="checkbox" id="dmBench">Held back (not fighting yet)</label>
+        <label class="dm-check"><input type="checkbox" id="dmBench">Hidden (joins later -- only you see it until then)</label>
         <button type="submit" class="dm-btn primary wide" id="dmAddBtn">Send in</button>
       </form>
     </details>`;
@@ -328,7 +360,8 @@ function renderTools(el) {
     if (!startDmPlacement()) showCombatAlert('Everything of yours that is fighting is already on the map.', { title: 'Place on map' });
   });
   document.getElementById('dmCreatures').addEventListener('click', onCreatureAction);
-  document.getElementById('dmEditMap').addEventListener('click', openLiveMapEditor);
+  document.getElementById('dmEditMap').addEventListener('click', () => showLiveTab('map', { mode: 'edit' }));
+  document.getElementById('dmGiveTurn').addEventListener('click', giveTurn);
   // The display screen: this battle on it, or the regular scene (display-scene.js's hideBattle -- just this battle).
   const showBox = document.getElementById('dmShowBattle');
   const syncShowBox = () => { if (showBox.isConnected) showBox.checked = !(getScene().hideBattle && getScene().hideBattle === session?.logFile); };
@@ -339,20 +372,327 @@ function renderTools(el) {
   });
 }
 
-/** The running battle's map in the Map setup editor (live mode, map-editor.js + live-map-store.js), over the battle
- * view until Done / Back. */
-function openLiveMapEditor() {
-  if (!session?.board) { showCombatAlert('No battle map yet.', { title: 'Edit map' }); return; }
-  document.getElementById('dmLiveMapEditor')?.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'dmLiveMapEditor';
-  overlay.className = 'dm-live-map-overlay';
-  const root = document.createElement('div');
-  root.className = 'dm-live-map-root';
-  overlay.appendChild(root);
-  document.body.appendChild(overlay);
-  setLiveSession(session);
-  renderMapEditor(root, { live: true, onDone: () => overlay.remove() });
+// ---------------------------------------------------------------------------
+// The Battle / Map tabs. The Map tab shows either the battle map the players use (battle-map-popup.js, inside the tab:
+// the DM's creatures move, turn and aim cones / lines by the same rules on their turns) or the live map editor
+// (map-editor.js + live-map-store.js -- whoever's turn it is, nothing costs movement).
+// ---------------------------------------------------------------------------
+
+let liveTab = 'battle';
+let mapMode = 'play'; // 'play' | 'edit'
+let liveTabsBound = false;
+
+function bindLiveTabs() {
+  if (liveTabsBound) return;
+  liveTabsBound = true;
+  const bar = document.getElementById('dmLiveTabs');
+  bar?.insertAdjacentHTML('beforeend', `<label class="dm-hidelog" id="dmHideLogLabel" title="While ticked, what you do is still logged, but the players' battle log and screens leave it out -- untick when you're done">
+    <input type="checkbox" id="dmHideLog"><span>🙈 Hide from the battle log</span></label>`);
+  document.getElementById('dmHideLog')?.addEventListener('change', (e) => setHideLog(e.target.checked));
+  document.getElementById('dmLiveTabs')?.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ltab]');
+    if (b) showLiveTab(b.dataset.ltab);
+  });
+}
+
+/** Shows the Battle or the Map tab (the same one again when called without one -- dm-console.js's routing). */
+export function showLiveTab(tab = liveTab, { mode = null, selectId = null } = {}) {
+  const was = liveTab;
+  liveTab = tab;
+  if (mode) mapMode = mode;
+  document.querySelectorAll('#dmLiveTabs [data-ltab]').forEach(b => b.classList.toggle('active', b.dataset.ltab === tab));
+  const battle = document.getElementById('dmLive');
+  const mapEl = document.getElementById('dmLiveMap');
+  if (!battle || !mapEl) return;
+  battle.hidden = tab !== 'battle';
+  mapEl.hidden = tab !== 'map';
+  if (tab !== 'map') { if (was === 'map') hideBattleMap(); return; }
+  if (was === 'map' && !mode && !selectId && mapEl.firstElementChild) return; // already showing
+  renderMapTab(selectId);
+}
+
+/** The battle is over (dm-console.js): the map goes back to being a popup, and the tabs start on Battle next time. */
+export function leaveLive() {
+  hideBattleMap();
+  setHideLog(false);
+  setDmMapOpener(null);
+  liveTab = 'battle';
+  const mapEl = document.getElementById('dmLiveMap');
+  if (mapEl) mapEl.innerHTML = '';
+}
+
+function renderMapTab(selectId = null) {
+  const mapEl = document.getElementById('dmLiveMap');
+  hideBattleMap(); // out of the tab before the tab is redrawn
+  mapEl.innerHTML = `
+    <div class="dm-live-map-head">
+      <div class="dm-seg">
+        <button data-mmode="play" class="${mapMode === 'play' ? 'active' : ''}" title="The map as the players use it -- your creatures move, turn and aim on their turns">▶ Battle map</button>
+        <button data-mmode="edit" class="${mapMode === 'edit' ? 'active' : ''}" title="Objects, traps, the background, and moving / resizing any creature -- any time">✏️ Edit map</button>
+      </div>
+      <span class="dm-hint">${mapMode === 'play'
+        ? 'Your creatures move here on their turns, like the players\' do. Hidden objects and traps show see-through -- only you see them.'
+        : 'Every change shows on the players\' screens and the table at once (except what you hide).'}</span>
+    </div>
+    <div class="dm-live-map-body" id="dmLiveMapBody"></div>`;
+  mapEl.querySelector('.dm-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mmode]');
+    if (b && b.dataset.mmode !== mapMode) { mapMode = b.dataset.mmode; renderMapTab(); }
+  });
+  const body = document.getElementById('dmLiveMapBody');
+  if (!session?.board) { body.innerHTML = '<div class="dm-loading">No battle map yet.</div>'; return; }
+  if (mapMode === 'play') {
+    showBattleMap(session, DM, { container: body, selectId });
+  } else {
+    setLiveSession(session);
+    renderMapEditor(body, { live: true, onDone: () => showLiveTab('battle') });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Give a turn: the DM hands any creature a turn out of order -- it takes the floor like a reaction (without spending
+// one), and its End Turn puts the turn order back where it was (routes_combat.py's _dm_give_turn).
+// ---------------------------------------------------------------------------
+
+async function giveTurn() {
+  if (session?.reactingParticipantId) {
+    const who = session.participants[session.reactingParticipantId]?.name || 'Someone';
+    showCombatAlert(`${who} is taking a reaction or an extra turn right now -- wait until they end it.`, { title: 'Give a turn' });
+    return;
+  }
+  const current = session?.turnOrder?.[session.turnIndex];
+  const list = (session?.turnOrder || []).map(id => session.participants[id])
+    .filter(p => p && p.status === 'participating' && p.id !== current);
+  if (!list.length) { showCombatAlert('Nobody else is in the fight right now.', { title: 'Give a turn' }); return; }
+  const pid = await openDmModal({
+    title: 'Give a turn',
+    html: `<div class="dm-hint" style="margin-bottom:0.6rem">They take a whole turn now (action, bonus action, movement -- not their reaction). When they end it, the turn order carries on from ${escapeHtml(session.participants[current]?.name || 'where it was')}.</div>
+      <div class="dm-turn-pick-list">${list.map(p => `
+        <button class="dm-turn-pick" data-pid="${escapeHtml(p.id)}"><span class="dm-turn-pick-img" data-img="${escapeHtml(p.image || '')}"></span>
+          <span><b>${escapeHtml(p.name)}</b><small>${p.side === 'enemy' ? 'Yours' : escapeHtml(p.owner || '')} · init ${p.initiative ?? '?'}</small></span></button>`).join('')}</div>`,
+    buttons: [{ label: 'Cancel', value: null }],
+    onOpen: (bodyEl, close) => {
+      bodyEl.querySelectorAll('[data-img]').forEach(el => { if (el.dataset.img) patchPortraitMedia(el, el.dataset.img, ''); });
+      bodyEl.addEventListener('click', (e) => { const b = e.target.closest('[data-pid]'); if (b) close(b.dataset.pid); });
+    },
+  });
+  if (!pid) return;
+  try {
+    await CombatAPI.dmGiveTurn(pid);
+    if (session.participants[pid]?.owner === DM) focusParticipant(pid); // the DM's own: straight to its card to play it
+    toast(`${session.participants[pid]?.name || 'They'} take${session.participants[pid] ? 's' : ''} a turn now.`);
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Give a turn' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Traps: tell the DM when a creature walks onto one (map.traps, map-editor.js's Traps tool). A hidden one can be
+// revealed right from the alert.
+// ---------------------------------------------------------------------------
+
+let trapsInside = new Set(); // "trapId:participantId" -- who stood on which trap at the last update
+
+function trapOccupants(s) {
+  const out = new Set();
+  const traps = s?.board?.traps || [];
+  if (!traps.length) return out;
+  Object.entries(s.board.tokens || {}).forEach(([pid, t]) => {
+    const p = s.participants?.[pid];
+    if (!p || p.status !== 'participating' || (t.z || 0) > 0) return; // flying over it doesn't set it off
+    const cells = new Set(footprintCells(t.col, t.row, footprintForSize(p.size)).map(c => `${c.col},${c.row}`));
+    traps.forEach(tr => { if (tr.cells.some(c => cells.has(c))) out.add(`${tr.id}:${pid}`); });
+  });
+  return out;
+}
+
+function checkTraps() {
+  const now = trapOccupants(session);
+  const fresh = [...now].filter(k => !trapsInside.has(k));
+  trapsInside = now;
+  fresh.forEach(async (key) => {
+    const [trapId, pid] = key.split(':');
+    const trap = (session.board.traps || []).find(t => t.id === trapId);
+    const p = session.participants[pid];
+    if (!trap || !p) return;
+    const text = `${p.name} walked onto ${trap.revealed ? 'the trap' : 'the hidden trap'} "${trap.name}".${trap.note ? `\n\n${trap.note}` : ''}`;
+    if (trap.revealed) { showCombatAlert(text, { title: '🪤 Trap' }); return; }
+    if (await showCombatConfirm(text, { title: '🪤 Trap', yesLabel: 'Reveal it', noLabel: 'Keep it hidden' })) {
+      setLiveSession(session);
+      liveMapStore.updateSetup(st => { const t = (st.map.traps || []).find(x => x.id === trapId); if (t) t.revealed = true; });
+    }
+  });
+}
+
+/** The DM's "Hide from the battle log" (api.js adds hideLog to every battle request while it's on). */
+function setHideLog(on) {
+  setHideBattleLog(on);
+  const box = document.getElementById('dmHideLog');
+  if (box) box.checked = on;
+  document.getElementById('dmHideLogLabel')?.classList.toggle('on', on);
+}
+
+// ---------------------------------------------------------------------------
+// 📖 Pokedex: the players see of this creature what their Pokedex already shows of its species (the DM console's Pokedex
+// module decides that) -- its name, types, size, AC, ability scores, abilities. Only ever turns boxes on.
+// ---------------------------------------------------------------------------
+
+async function showPokedexKnowledge(p) {
+  let entry;
+  try {
+    const res = await GameDataAPI.getPlayerPokedex();
+    entry = (res?.data?.species || []).find(s => String(s.name).toLowerCase() === String(p.speciesName).toLowerCase());
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Pokédex' });
+    return;
+  }
+  if (!entry) {
+    showCombatAlert(`${p.speciesName} isn't in the players' Pokédex yet -- they know nothing about it.`, { title: '📖 Pokédex' });
+    return;
+  }
+  const known = { name: 'Name' };
+  if (entry.primaryType || entry.secondaryType) known.type = 'Type';
+  if ((entry.info || []).some(i => i.key === 'charSize')) known.size = 'Size';
+  if ((entry.combat || []).some(c => c.label === 'AC')) known.ac = 'AC';
+  if ((entry.scores || []).length >= 6) known.stats = 'Ability scores';
+  if ((entry.abilities || []).length) known.abilities = 'Abilities';
+  const ok = await showCombatConfirm(`The players' Pokédex knows a ${p.speciesName}'s ${Object.values(known).join(', ')}. Show them that for ${p.name}?`,
+    { title: '📖 Pokédex', yesLabel: 'Show it', noLabel: 'Cancel' });
+  if (!ok) return;
+  try {
+    await CombatAPI.setVisibilityMany(p.id, Object.fromEntries(Object.keys(known).map(f => [f, true])));
+  } catch (err) {
+    showCombatAlert(err.message, { title: p.name });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ✏️ Edit: anything about one of the DM's creatures, mid-battle (routes_combat.py's _dm_update_participant). A Pokemon
+// can also be worked out again from its species at a new level (Recalculate) -- filled into the form to adjust before
+// saving. The card this console holds for it is rebuilt from the new record (combat-wip.js's forgetLocalCombatant).
+// ---------------------------------------------------------------------------
+
+const ALL_TYPES = ['Normal', 'Fire', 'Water', 'Grass', 'Electric', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock',
+  'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy', 'Cosmic'];
+const SIZE_NAMES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
+const SCORE_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+/** "slot:Name;description|Name;description" -> [{slot, name, description}] (slot null when it has none). */
+function parseAbilities(text) {
+  return String(text || '').split('|').map(a => a.trim()).filter(Boolean).map((a) => {
+    const m = a.match(/^(\d+):(.*)$/s);
+    const body = m ? m[2] : a;
+    const [name, ...rest] = body.split(';');
+    return { slot: m ? Number(m[1]) : null, name: name.trim(), description: rest.join(';').trim() };
+  }).filter(a => a.name);
+}
+
+function speedsText(speeds) {
+  return (speeds || []).map(sp => `${sp.type} ${sp.ft}`).join(', ');
+}
+
+function parseSpeeds(text) {
+  return String(text || '').split(',').map(x => x.trim()).filter(Boolean).map((x) => {
+    const m = x.match(/^(.*?)\s*(\d+)\s*(?:ft)?$/i);
+    return m ? { type: m[1].trim() || 'Walking', ft: Number(m[2]) } : null;
+  }).filter(Boolean);
+}
+
+async function openEditCreature(p) {
+  const isMon = p.combatantType === 'pokemon';
+  const sp = isMon ? species.find(s => String(s.name).toLowerCase() === String(p.speciesName).toLowerCase()) : null;
+  const own = parseAbilities(p.abilities);
+  const speciesAbilities = sp?.abilities || [];
+  const custom = own.filter(a => !speciesAbilities.some(s => s.name === a.name));
+  const num = (id, label, value, attrs = '') => `<div class="dm-field"><label for="${id}">${label}</label><input class="dm-input" id="${id}" type="number" value="${value ?? ''}" ${attrs}></div>`;
+  const text = (id, label, value, ph = '') => `<div class="dm-field"><label for="${id}">${label}</label><input class="dm-input" id="${id}" value="${escapeHtml(value ?? '')}" placeholder="${escapeHtml(ph)}"></div>`;
+  const typeSelect = (id, label, value) => `<div class="dm-field"><label for="${id}">${label}</label><select class="dm-select" id="${id}">
+    <option value="">None</option>${ALL_TYPES.map(t => `<option ${t === value ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+  const html = `
+    <div class="dm-edit-form">
+      <div class="dm-row">${text('edName', 'Name', p.name)}${num('edLevel', 'Level', p.level, 'min="1" max="20"')}${num('edInit', 'Initiative', p.initiative)}</div>
+      ${isMon ? `<div class="dm-row">${typeSelect('edType1', 'Type', p.type1)}${typeSelect('edType2', 'Second type', p.type2)}
+        <div class="dm-field"><label for="edSize">Size</label><select class="dm-select" id="edSize">${SIZE_NAMES.map(z => `<option ${String(p.size).toLowerCase() === z.toLowerCase() ? 'selected' : ''}>${z}</option>`).join('')}</select></div></div>` : ''}
+      <div class="dm-row">${num('edHp', 'HP now', p.currentHP)}${num('edMaxHp', 'Max HP', p.maxHP, 'min="1"')}${num('edVp', 'VP now', p.currentVP)}${num('edMaxVp', 'Max VP', p.maxVP, 'min="0"')}</div>
+      <div class="dm-row">${num('edAc', 'AC', p.baseAc ?? p.ac)}${num('edProf', 'Proficiency', p.proficiency)}${isMon ? num('edStab', 'STAB bonus', p.stabBonusValue) : ''}${num('edCrit', 'Crit modifier', p.critMod || 0)}</div>
+      <div class="dm-row dm-edit-scores">${SCORE_KEYS.map(k => num(`ed_${k}`, k.toUpperCase(), p[k], 'min="1" max="30"')).join('')}</div>
+      ${isMon ? `<div class="dm-field"><label>Abilities</label>
+        ${speciesAbilities.map(a => `<label class="dm-check"><input type="checkbox" name="edAbility" value="${a.slot}" ${own.some(o => o.name === a.name) ? 'checked' : ''}>
+          <span>${escapeHtml(a.name)} <small>${escapeHtml(a.description)}</small></span></label>`).join('') || '<div class="dm-hint">Its species lists none.</div>'}
+        <textarea class="dm-input" id="edAbilityOther" rows="2" placeholder="Other abilities -- one per line: Name; what it does">${escapeHtml(custom.map(a => `${a.name}; ${a.description}`).join('\n'))}</textarea>
+      </div>
+      <div class="dm-field"><label for="edMoves">Moves <small class="dm-label-note">comma-separated</small></label><textarea class="dm-input" id="edMoves" rows="2">${escapeHtml((p.moves || []).join(', '))}</textarea></div>` : ''}
+      <div class="dm-row">${text('edItem', 'Held item', p.item, 'None')}${text('edSpeeds', 'Speeds', speedsText(p.speeds), 'Walking 30, Flying 60')}</div>
+      <div class="dm-row">${text('edSaves', 'Saving throws', p.savingThrows, 'e.g. Dexterity, Wisdom')}${text('edSkills', 'Skills', p.skills, 'e.g. Perception, Stealth')}</div>
+      <div class="dm-hint" id="edNote">${isMon ? 'Recalculate works its numbers out again from its species at the level above (abilities and item as ticked; no nature or encounter bonuses) -- check them, then Save.' : ''}</div>
+    </div>`;
+  const val = (body, id) => body.querySelector(`#${id}`)?.value ?? '';
+  const intOf = (body, id) => { const v = parseInt(val(body, id), 10); return Number.isNaN(v) ? null : v; };
+  const buttons = [{ label: 'Cancel', value: null }];
+  if (isMon && p.speciesName) {
+    buttons.push({ label: '🔄 Recalculate', keepOpen: true, onClick: async (body) => {
+      const level = Math.max(1, Math.min(20, intOf(body, 'edLevel') || p.level || 1));
+      const slots = [...body.querySelectorAll('input[name="edAbility"]:checked')].map(cb => Number(cb.value));
+      try {
+        const res = await DmAPI.buildPokemon({ species: p.speciesName, level, abilities: slots.length ? slots : [0], item: val(body, 'edItem').trim(), preview: true });
+        const { participant: np } = participantFromPokemonRow(res.data);
+        const set = (id, v) => { const el = body.querySelector(`#${id}`); if (el && v !== undefined && v !== null) el.value = v; };
+        // HP / VP lost so far stay lost.
+        set('edHp', Math.max(0, np.maxHP - ((p.maxHP || 0) - (p.currentHP || 0))));
+        set('edVp', Math.max(0, np.maxVP - ((p.maxVP || 0) - (p.currentVP || 0))));
+        set('edMaxHp', np.maxHP); set('edMaxVp', np.maxVP); set('edAc', np.baseAc ?? np.ac); set('edProf', np.proficiency); set('edStab', np.stabBonusValue);
+        SCORE_KEYS.forEach(k => set(`ed_${k}`, np[k]));
+        set('edMoves', (np.moves || []).join(', ')); set('edSaves', np.savingThrows); set('edSkills', np.skills); set('edSpeeds', speedsText(np.speeds));
+        set('edType1', np.type1 || ''); set('edType2', np.type2 || '');
+        body.querySelector('#edNote').textContent = `Worked out again for a level ${level} ${p.speciesName} -- check the numbers, then Save.`;
+      } catch (err) {
+        showCombatAlert(err.message, { title: 'Recalculate' });
+      }
+      return false;
+    } });
+  }
+  buttons.push({ label: 'Save', kind: 'primary', keepOpen: true, onClick: async (body) => {
+    const data = {
+      name: val(body, 'edName').trim(), item: val(body, 'edItem').trim(),
+      savingThrows: val(body, 'edSaves').trim(), skills: val(body, 'edSkills').trim(), speeds: parseSpeeds(val(body, 'edSpeeds')),
+    };
+    const ints = { level: 'edLevel', initiative: 'edInit', currentHP: 'edHp', maxHP: 'edMaxHp', currentVP: 'edVp', maxVP: 'edMaxVp',
+      ac: 'edAc', proficiency: 'edProf', critMod: 'edCrit', ...(isMon ? { stabBonusValue: 'edStab' } : {}) };
+    for (const [key, id] of Object.entries(ints)) {
+      const v = intOf(body, id);
+      if (v === null) { showCombatAlert(`${body.querySelector(`label[for="${id}"]`)?.textContent || key} needs a number.`, { title: 'Edit' }); return false; }
+      data[key] = v;
+    }
+    data.baseAc = data.ac;
+    for (const k of SCORE_KEYS) {
+      const v = intOf(body, `ed_${k}`);
+      if (v === null) { showCombatAlert(`${k.toUpperCase()} needs a number.`, { title: 'Edit' }); return false; }
+      data[k] = v;
+      data[`${k}Mod`] = abilityMod(v);
+    }
+    if (isMon) {
+      data.type1 = val(body, 'edType1'); data.type2 = val(body, 'edType2'); data.size = val(body, 'edSize');
+      data.moves = val(body, 'edMoves').split(',').map(m => m.trim()).filter(Boolean);
+      const picked = [...body.querySelectorAll('input[name="edAbility"]:checked')].map(cb => speciesAbilities.find(a => String(a.slot) === cb.value)).filter(Boolean)
+        .map(a => `${a.slot}:${a.name};${a.description}`);
+      const others = val(body, 'edAbilityOther').split('\n').map(l => l.trim()).filter(Boolean).map((l) => {
+        const [name, ...rest] = l.split(';');
+        return `${name.trim()};${rest.join(';').trim()}`;
+      });
+      data.abilities = [...picked, ...others].join('|');
+    }
+    if (!data.name) { showCombatAlert('It needs a name.', { title: 'Edit' }); return false; }
+    try {
+      await CombatAPI.dmUpdateParticipant(p.id, data);
+      forgetLocalCombatant(p.id);
+      toast(`${data.name} changed.`);
+      return true;
+    } catch (err) {
+      showCombatAlert(err.message, { title: 'Edit' });
+      return false;
+    }
+  } });
+  await openDmModal({ title: `✏️ Edit ${p.name}`, html, buttons, wide: true });
 }
 
 function renderSpeciesResults() {
@@ -497,7 +837,7 @@ function renderCreatures() {
     patchPortraitMedia(row.querySelector('.dm-creature-portrait'), p.image, p.name);
     const pct = (cur, max) => (max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0);
     const placed = !!session.board?.tokens?.[p.id];
-    const where = p.status === 'spectating' ? 'held back' : placed ? 'on the map' : 'not on the map';
+    const where = p.status === 'spectating' ? '🙈 hidden' : placed ? 'on the map' : 'not on the map';
     row.querySelector('.dm-creature-info').innerHTML = `
       <div class="dm-creature-name">${escapeHtml(p.name)}</div>
       <div class="dm-creature-sub">Lv ${p.level ?? '?'} · HP ${p.currentHP}/${p.maxHP} · VP ${p.currentVP}/${p.maxVP} · init ${p.initiative ?? '-'} · ${where}</div>
@@ -506,13 +846,14 @@ function renderCreatures() {
     // What the players can see of it is set in the checkbox column left of its card (renderVisibilityColumn).
     row.querySelector('.dm-creature-actions').innerHTML = `
       ${p.combatantType === 'pokemon' ? '<button class="dm-icon-btn" data-act="capture" title="Catch helper -- the capture DC, and mark it caught">🔴</button>' : ''}
-      <button class="dm-icon-btn" data-act="status" title="${p.status === 'spectating' ? 'Send it into the fight' : 'Hold it back (out of the turn order)'}">${p.status === 'spectating' ? '▶' : '⏸'}</button>
+      <button class="dm-icon-btn" data-act="edit" title="Edit -- level, stats, abilities, moves...">✏️</button>
+      <button class="dm-icon-btn" data-act="status" title="${p.status === 'spectating' ? 'Unhide -- it appears and joins the fight' : 'Hide -- out of the turn order and off every screen but yours'}">${p.status === 'spectating' ? '👁' : '🙈'}</button>
       <button class="dm-icon-btn danger" data-act="remove" title="Remove from the battle">✕</button>`;
     if (box.children[index] !== row) box.insertBefore(row, box.children[index] || null);
   });
 }
 
-/** Turn order first, then anyone held back (not in it). */
+/** Turn order first, then anyone hidden (not in it). */
 function orderedParticipants() {
   const order = session.turnOrder || [];
   const rest = Object.keys(session.participants || {}).filter(id => !order.includes(id));
@@ -526,6 +867,7 @@ async function onCreatureAction(e) {
   const p = session.participants?.[id];
   if (!p) return;
   if (btn.dataset.act === 'capture') { openCapture(p); return; }
+  if (btn.dataset.act === 'edit') { openEditCreature(p); return; }
   try {
     if (btn.dataset.act === 'status') {
       await CombatAPI.setStatus(id, p.status === 'spectating' ? 'participating' : 'spectating');

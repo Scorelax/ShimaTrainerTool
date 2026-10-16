@@ -2481,8 +2481,9 @@ function _syncHeaderBar(state) {
   }
   const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
   if (leftBtnEl) {
+    // The DM console has the map as its own tab instead (battle-live.js) -- no Map button here.
     leftBtnEl.innerHTML = state?.active
-      ? '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button></div>'
+      ? (_dmName ? '' : '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button></div>')
       : _dmName ? '' : '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">← Back</button>';
     document.getElementById('battleMapBtn')?.addEventListener('click', () => {
       showBattleMap(session, _currentTrainerName());
@@ -2617,6 +2618,30 @@ let _dmFocusListener = null;
  * its column left of the card (#dmFocusSide) about the participant shown. */
 export function setOnDmFocusChange(fn) {
   _dmFocusListener = fn;
+}
+
+// The DM console's Map tab (battle-live.js): where the DM's "straight onto the map" (Disengage) opens the map.
+let _dmMapOpener = null;
+
+export function setDmMapOpener(fn) {
+  _dmMapOpener = fn;
+}
+
+/** Drops this device's own copy of a combatant (its card's local state), so the next update builds it again from the
+ * participant record -- the DM console's Edit changes the record, and the old local copy would otherwise win (and be
+ * pushed back by the stat sync). Redraws at once. */
+export function forgetLocalCombatant(id) {
+  const local = JSON.parse(sessionStorage.getItem(WIP_COMBAT_STATE_KEY) || 'null');
+  if (local?.combatants) {
+    local.combatants = local.combatants.filter(c => c.id !== id);
+    sessionStorage.setItem(WIP_COMBAT_STATE_KEY, JSON.stringify(local));
+  }
+  if (session?.active) _syncMainFocus(session);
+}
+
+/** Shows `id`'s card in the battle view, as a click on its portrait would (the DM console's Give a turn). */
+export function focusParticipant(id) {
+  if (session?.participants?.[id]) _setFocus(id);
 }
 
 function _setFocus(id) {
@@ -2785,9 +2810,12 @@ function _maskForeignView(v, p) {
   if (!see('name')) v.name = hide;
   if (!see('type')) v.types = [];
   if (!see('level')) v.level = '?';
-  // HP / VP: the bars always show how full they are; unticked, the numbers are ??? (renderCombatCard's hpHidden / vpHidden).
-  if (!see('hp')) { v.hpHidden = true; v.tempHp = 0; }
-  if (!see('vp')) v.vpHidden = true;
+  // HP / VP: the bars (hpBar / vpBar) and the numbers (hp / vp) each have their own box -- unticked, an unknown bar and
+  // ??? (renderCombatCard's hpBarHidden / hpHidden). The numbers would give the bar away, so a hidden bar hides them too.
+  if (!see('hpBar')) v.hpBarHidden = true;
+  if (!see('vpBar')) v.vpBarHidden = true;
+  if (!see('hp') || v.hpBarHidden) { v.hpHidden = true; v.tempHp = 0; }
+  if (!see('vp') || v.vpBarHidden) v.vpHidden = true;
   if (!see('size')) v.size = '';
   v.appliedStatMods = { ...(v.appliedStatMods || {}) }; // the little +1 / -1 beside a value would give a hidden one away
   if (!see('ac')) { v.ac = '?'; v.baseAc = '?'; delete v.appliedStatMods.ac; }
@@ -7236,7 +7264,8 @@ async function _onBasicAction(action, participantId) {
   if (!ok) return;
   try {
     const res = await CombatAPI.disengage(participantId);
-    showBattleMap(res?.data || session, _currentTrainerName(), { selectId: participantId });
+    if (_dmMapOpener) _dmMapOpener(participantId); // the DM console: its Map tab
+    else showBattleMap(res?.data || session, _currentTrainerName(), { selectId: participantId });
   } catch (err) {
     showCombatAlert(err.message, { title: 'Error' });
   }

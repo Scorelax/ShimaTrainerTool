@@ -733,7 +733,7 @@ export function attachContinueJourneyListeners() {
             sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
           });
           if (bundle.registeredList) {
-            sessionStorage.setItem('completePokemonData', JSON.stringify(bundle.registeredList));
+            sessionStorage.setItem('registeredSpecies', JSON.stringify(bundle.registeredList));
           }
           if (bundle.pokedexConfig) {
             sessionStorage.setItem('pokedexConfig', JSON.stringify(bundle.pokedexConfig));
@@ -802,7 +802,7 @@ export function attachContinueJourneyListeners() {
           const t2 = Date.now();
           const completePokemonData = await import('../api.js').then(m => m.PokemonAPI.getRegisteredList());
           if (completePokemonData.status === 'success') {
-            sessionStorage.setItem('completePokemonData', JSON.stringify(completePokemonData.data));
+            sessionStorage.setItem('registeredSpecies', JSON.stringify(completePokemonData.data));
             _log(`Complete Pokemon list cached: ${completePokemonData.data.length} entries in ${Date.now()-t2}ms`);
           } else {
             _warn('Complete Pokemon list — unexpected status:', completePokemonData.status);

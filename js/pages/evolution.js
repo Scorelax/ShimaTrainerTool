@@ -1,5 +1,9 @@
 // Evolution Page - Evolve Pokemon with stat allocation
 
+import {
+  abilityInSlot, baseStat, evolutionText, findSpecies, listText, movementLine, movesText, savedAbility, sensesLine,
+  statTotal, MOVE_LEVELS
+} from '../utils/species.js';
 import { PokemonAPI, GameDataAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { audioManager } from '../utils/audio.js';
@@ -691,7 +695,7 @@ async function loadEvolutionOptions() {
     console.log('[Evolution] Target evolution names:', targetNames);
 
     // Get complete Pokemon data from cache
-    const completePokemonDataStr = sessionStorage.getItem('completePokemonData');
+    const completePokemonDataStr = sessionStorage.getItem('registeredSpecies');
     if (!completePokemonDataStr) {
       console.error('[Evolution] No complete Pokemon data in cache');
       document.getElementById('pokemonList').innerHTML = '<li style="text-align: center; color: #666;">This Pokemon\'s evolution is currently not available in the registered Pokedex.</li>';
@@ -704,13 +708,11 @@ async function loadEvolutionOptions() {
     // Find evolution targets in complete Pokemon data
     evolutionOptions = [];
     for (const targetName of targetNames) {
-      const targetPokemon = completePokemonData.find(p =>
-        p[1].toLowerCase() === targetName.toLowerCase()
-      );
+      const targetPokemon = findSpecies(completePokemonData, targetName);
 
       if (targetPokemon) {
         evolutionOptions.push(targetPokemon);
-        console.log('[Evolution] Found evolution target:', targetPokemon[1]);
+        console.log('[Evolution] Found evolution target:', targetPokemon.name);
       } else {
         console.log('[Evolution] Evolution target not found in registered Pokedex:', targetName);
       }
@@ -724,7 +726,7 @@ async function loadEvolutionOptions() {
       // There are normally only 1-2 options here, so preload both now
       // instead of waiting for a click -- by the time the player picks one,
       // the sprite (MP4 or static) is already sitting in the cache.
-      evolutionOptions.forEach(option => prefetchSprite(option[0]));
+      evolutionOptions.forEach(option => prefetchSprite(option.image));
     }
 
   } catch (error) {
@@ -745,7 +747,7 @@ function displayEvolutionOptions(options) {
 
   options.forEach(pokemon => {
     const listItem = document.createElement('li');
-    listItem.textContent = `#${pokemon[2]} - ${pokemon[1]}`;
+    listItem.textContent = `#${pokemon.dexNumber} - ${pokemon.name}`;
     listItem.addEventListener('click', () => selectEvolution(pokemon, listItem));
     pokemonList.appendChild(listItem);
   });
@@ -754,16 +756,7 @@ function displayEvolutionOptions(options) {
 async function selectEvolution(pokemon, listItem) {
   selectedPokemon = pokemon;
 
-  console.log('[Evolution] Selected Pokemon from API:', {
-    name: pokemon[1],
-    dexEntry: pokemon[2],
-    image: pokemon[0],
-    primaryType: pokemon[4],
-    secondaryType: pokemon[5],
-    hitDice: pokemon[10],
-    vitalityDice: pokemon[12],
-    fullData: pokemon
-  });
+  console.log('[Evolution] Selected Pokemon from API:', pokemon);
 
   // Update selected styling
   document.querySelectorAll('.evolution-list li').forEach(li => li.classList.remove('selected'));
@@ -772,10 +765,10 @@ async function selectEvolution(pokemon, listItem) {
   // Show details + evolve button immediately -- none of this depends on the
   // image, which can be slow to resolve the first time (see below), and
   // there's no reason to make the player wait on it just to see the button.
-  document.getElementById('pokemonName').textContent = pokemon[1];
-  document.getElementById('pokemonDexEntry').textContent = pokemon[2];
+  document.getElementById('pokemonName').textContent = pokemon.name;
+  document.getElementById('pokemonDexEntry').textContent = pokemon.dexNumber;
 
-  const typeText = pokemon[5] ? `${pokemon[4]} / ${pokemon[5]}` : pokemon[4];
+  const typeText = pokemon.types.secondary ? `${pokemon.types.primary} / ${pokemon.types.secondary}` : pokemon.types.primary;
   document.getElementById('pokemonType').textContent = typeText;
 
   document.getElementById('pokemonPlaceholder').style.display = 'none';
@@ -784,10 +777,10 @@ async function selectEvolution(pokemon, listItem) {
   document.getElementById('pokemonDetails').classList.add('visible');
 
   // The Pi sends each species' picture with the list (sprite, else the original picture); none -> the Poke Ball.
-  const imageUrl = pokemon[0] || 'assets/Pokeball.png';
-  if (!pokemon[0]) selectedPokemon[0] = imageUrl;
+  const imageUrl = pokemon.image || 'assets/Pokeball.png';
+  if (!pokemon.image) selectedPokemon.image = imageUrl;
 
-  renderSpriteInto('pokemonImage', imageUrl, pokemon[1]);
+  renderSpriteInto('pokemonImage', imageUrl, pokemon.name);
 }
 
 function evolvePokemon() {
@@ -798,7 +791,7 @@ function evolvePokemon() {
 
   // Calculate available skill points
   const preEvolvedStats = currentPokemon[14];
-  const evolvedStats = selectedPokemon[15];
+  const evolvedStats = statTotal(selectedPokemon);
   availableSkillPoints = evolvedStats - preEvolvedStats;
 
   document.getElementById('availableSkillPoints').textContent = availableSkillPoints;
@@ -825,7 +818,7 @@ async function checkAndPreloadEvolutionVideo() {
   evolutionVideoBlobUrl = null;
   evolutionVideoReady = null;
   try {
-    const result = await PokemonAPI.getEvolutionVideo(currentPokemon[2], selectedPokemon[1]);
+    const result = await PokemonAPI.getEvolutionVideo(currentPokemon[2], selectedPokemon.name);
     if (result.status === 'success' && result.url) {
       evolutionVideoUrl = result.url;
       // Fetch the full clip into memory rather than prefetchSprite()'s
@@ -854,7 +847,6 @@ async function checkAndPreloadEvolutionVideo() {
 }
 
 const STAT_INDEX_MAP = { str: 15, dex: 16, con: 17, int: 18, wis: 19, cha: 20 };
-const EVOLVED_STAT_INDEX_MAP = { str: 16, dex: 17, con: 18, int: 19, wis: 20, cha: 21 };
 const MAX_POINTS_ABOVE_EVOLVED_BASE = 4;
 const STAT_NAME_MAP = { str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' };
 
@@ -876,7 +868,7 @@ function getBaseStatWithoutNature(stat) {
 }
 
 function canAllocateMore(stat, currentAllocated) {
-  const evolvedBaseStat = selectedPokemon[EVOLVED_STAT_INDEX_MAP[stat]];
+  const evolvedBaseStat = baseStat(selectedPokemon, stat);
   const currentBaseStat = getBaseStatWithoutNature(stat);
   const newStatValue = currentBaseStat + currentAllocated + 1;
   const pointsAboveBase = Math.max(0, newStatValue - evolvedBaseStat);
@@ -1179,44 +1171,19 @@ async function evolveOnServer(str, dex, con, int, wis, cha) {
 
   // Combine skills
   let preEvoSkills = currentPokemon[22] ? currentPokemon[22].split(',').map(s => s.trim()) : [];
-  let evoSkills = selectedPokemon[23] ? selectedPokemon[23].split(',').map(s => s.trim()) : [];
+  let evoSkills = selectedPokemon.skills || [];
   let combinedSkills = [...new Set([...preEvoSkills, ...evoSkills])].join(', ');
 
-  // Format movement and senses
-  const movementData = selectedPokemon[31] || {};
-  const sensesData = selectedPokemon[32] || {};
-
-  const movementDataString = [
-    movementData.walking || '-',
-    movementData.climbing || '-',
-    movementData.flying || '-',
-    movementData.hovering || '-',
-    movementData.swimming || '-',
-    movementData.burrowing || '-'
-  ].join(', ');
-
-  const sensesDataString = [
-    sensesData.sight || '-',
-    sensesData.hearing || '-',
-    sensesData.smell || '-',
-    sensesData.tremorsense || '-',
-    sensesData.echolocation || '-',
-    sensesData.telepathy || '-',
-    sensesData.blindsight || '-',
-    sensesData.darkvision || '-',
-    sensesData.truesight || '-'
-  ].join(', ');
+  // Movement and senses, as a saved Pokemon keeps them ('25ft, -, ...')
+  const movementDataString = movementLine(selectedPokemon);
+  const sensesDataString = sensesLine(selectedPokemon);
 
   // Get type effectiveness
-  console.log('[Evolution] Fetching type effectiveness for:', {
-    primaryType: selectedPokemon[4],
-    secondaryType: selectedPokemon[5]
-  });
+  const primaryType = selectedPokemon.types.primary || '';
+  const secondaryType = selectedPokemon.types.secondary || '';
+  console.log('[Evolution] Fetching type effectiveness for:', { primaryType, secondaryType });
 
-  const typeResponse = await GameDataAPI.getTypeEffectiveness(
-    selectedPokemon[4],
-    selectedPokemon[5]
-  );
+  const typeResponse = await GameDataAPI.getTypeEffectiveness(primaryType, secondaryType);
 
   console.log('[Evolution] Type effectiveness response:', typeResponse);
 
@@ -1227,7 +1194,7 @@ async function evolveOnServer(str, dex, con, int, wis, cha) {
 
   // Map abilities from current to evolved Pokemon
   const evolvedAbilities = [];
-  const evolvedPokemonName = selectedPokemon[1]; // Name at index 1
+  const evolvedPokemonName = selectedPokemon.name;
 
   // Support both old format (single field at index 7) and new format (3 fields at indices 7, 8, 9)
   let currentAbilities = [];
@@ -1252,14 +1219,7 @@ async function evolveOnServer(str, dex, con, int, wis, cha) {
 
   if (currentAbilities.length > 0) {
 
-    // Get evolved Pokemon's abilities (pokedex format: "Name, Description")
-    const evolvedPokemonAbilities = [
-      selectedPokemon[6],  // Primary
-      selectedPokemon[7],  // Secondary
-      selectedPokemon[8]   // Hidden
-    ];
-
-    console.log('[Evolution] Evolved Pokemon abilities from Pokedex:', evolvedPokemonAbilities);
+    console.log('[Evolution] Evolved Pokemon abilities from Pokedex:', selectedPokemon.abilityList);
 
     currentAbilities.forEach(abilityData => {
       // Ensure abilityData is a string before calling indexOf
@@ -1280,63 +1240,60 @@ async function evolveOnServer(str, dex, con, int, wis, cha) {
         return; // Skip hidden ability if not visible for evolved Pokemon
       }
 
-      const evolvedAbilityData = evolvedPokemonAbilities[slotIndex];
-      if (evolvedAbilityData) {
-        const parts = evolvedAbilityData.split(',');
-        const abilityName = parts[0].trim();
-        const abilityDescription = parts.slice(1).join(',').trim();
-        evolvedAbilities.push(slotIndex + ':' + abilityName + ';' + abilityDescription);
+      const evolvedAbility = abilityInSlot(selectedPokemon, slotIndex);
+      if (evolvedAbility) {
+        evolvedAbilities.push(savedAbility(evolvedAbility));
       }
     });
   }
 
   // Default to primary ability if no mapping
   if (evolvedAbilities.length === 0) {
-    const primaryAbility = selectedPokemon[6];
+    const primaryAbility = abilityInSlot(selectedPokemon, 0);
     if (primaryAbility) {
-      const parts = primaryAbility.split(',');
-      evolvedAbilities.push('0:' + parts[0].trim() + ';' + parts.slice(1).join(',').trim());
+      evolvedAbilities.push(savedAbility(primaryAbility));
     }
   }
 
   // Combine evolved abilities into single pipe-separated string
   const evolvedAbilitiesString = evolvedAbilities.join('|');
 
-  // Extract Size from evolved Pokemon data (index 34 - at end of array from code.gs)
-  const evolvedSize = selectedPokemon[34] || '';
+  const evolvedSize = selectedPokemon.size || '';
+  const combat = selectedPokemon.combat || {};
+  const moves = MOVE_LEVELS.map(lvl => movesText(selectedPokemon, lvl));
 
   // Build evolved Pokemon data array with placeholders for calculated values
   const evolvedPokemonData = [
     currentPokemon[0],           // 0: Trainer Name
-    selectedPokemon[0],          // 1: Image
-    selectedPokemon[1],          // 2: Name
-    selectedPokemon[2],          // 3: Dex Entry
+    selectedPokemon.image,       // 1: Image
+    selectedPokemon.name,        // 2: Name
+    selectedPokemon.dexNumber,   // 3: Dex Entry
     currentPokemon[4],           // 4: Level
-    selectedPokemon[4],          // 5: Primary Type
-    selectedPokemon[5],          // 6: Secondary Type
+    primaryType,                 // 5: Primary Type
+    secondaryType,               // 6: Secondary Type
     evolvedAbilitiesString,      // 7: Ability (combined with pipes)
-    selectedPokemon[9],          // 8: AC
-    selectedPokemon[10],         // 9: Hit Dice
+    combat.ac,                   // 8: AC
+    combat.hitDie,               // 9: Hit Dice
     '',                          // 10: HP (will be calculated by server)
-    selectedPokemon[12],         // 11: Vitality Dice
+    combat.vitalityDie,          // 11: Vitality Dice
     '',                          // 12: VP (will be calculated by server)
     movementDataString,          // 13: Speed
-    selectedPokemon[15],         // 14: Total Stats
+    statTotal(selectedPokemon),  // 14: Total Stats
     newSTR,                      // 15: Strength
     newDEX,                      // 16: Dexterity
     newCON,                      // 17: Constitution
     newINT,                      // 18: Intelligence
     newWIS,                      // 19: Wisdom
     newCHA,                      // 20: Charisma
-    selectedPokemon[22],         // 21: Saving Throws
+    listText(selectedPokemon.savingThrows), // 21: Saving Throws
     combinedSkills,              // 22: Skills
-    selectedPokemon[24],         // 23: Starting Moves
-    selectedPokemon[25],         // 24: Level 2 Moves
-    selectedPokemon[26],         // 25: Level 6 Moves
-    selectedPokemon[27],         // 26: Level 10 Moves
-    selectedPokemon[28],         // 27: Level 14 Moves
-    selectedPokemon[29],         // 28: Level 18 Moves
-    selectedPokemon[30],         // 29: Evolution Requirement
+    moves[0],                    // 23: Starting Moves
+    moves[1],                    // 24: Level 2 Moves
+    moves[2],                    // 25: Level 6 Moves
+    moves[3],                    // 26: Level 10 Moves
+    moves[4],                    // 27: Level 14 Moves
+    moves[5],                    // 28: Level 18 Moves
+    evolutionText(selectedPokemon), // 29: Evolution Requirement
     '',                          // 30: Initiative (calculated)
     '',                          // 31: Proficiency Bonus (calculated)
     currentPokemon[32],          // 32: Nature
@@ -1359,7 +1316,7 @@ async function evolveOnServer(str, dex, con, int, wis, cha) {
     sensesDataString,            // 49: Senses
     currentPokemon[50] || '',    // 50: Feats
     currentPokemon[51] || '',    // 51: Gear
-    selectedPokemon[33] || '',   // 52: Flavor text
+    selectedPokemon.description || '', // 52: Flavor text
     typematchupsString,          // 53: Type matchups
     currentPokemon[54] || '',    // 54: Current HD
     currentPokemon[55] || '',    // 55: Current VD

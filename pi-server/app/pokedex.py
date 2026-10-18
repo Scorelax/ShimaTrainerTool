@@ -1,76 +1,22 @@
-"""Formatting of the upstream pokemon database rows — ports of
-getCompletePokemonData / formatPokemonData / getRegisteredPokemonList /
-getPokemonAbilities / getEvolutionOptions."""
-from .calculations import format_ability, sanitize_moves
-from .jsutil import js_number, js_parse_int
-from . import upstream
+"""The species lists the player app reads -- pokemon/list, pokemon/registered-list, pokemon/evolution-options (and
+pokemon/abilities) -- built from the species objects (species.py).
+
+Each species goes out as its object from DnD_species.json (with `evolvesFrom` worked out), plus `image` (its picture
+on the Pi) and `abilityList` ([{slot, name, description}], the descriptions from DnD_abilities.json). They were
+Benjakronk's positional rows until 2026-10-18; js/utils/species.js turns an object into the text a player's saved
+Pokemon keeps (the moves, movement, senses and evolution lines)."""
+from .calculations import format_ability
+from . import upstream, species as sp
 
 
-def _row_get(row, i):
-    return row[i] if i < len(row) else None
+def _entry(s, image):
+    """One species as the player app gets it (a copy -- the loaded species stay as they are)."""
+    return {**s, 'image': image, 'abilityList': sp.abilities(s)}
 
 
-def _ability(row, name_idx, desc_idx):
-    name = _row_get(row, name_idx)
-    if not name:
-        return None
-    desc = _row_get(row, desc_idx)
-    return {'name': name, 'description': desc if desc is not None else 'No description available'}
-
-
-def _movement(row):
-    return {
-        'walking': _row_get(row, 65), 'climbing': _row_get(row, 66),
-        'flying': _row_get(row, 67), 'hovering': _row_get(row, 68),
-        'swimming': _row_get(row, 69), 'burrowing': _row_get(row, 70),
-    }
-
-
-def _senses(row):
-    return {
-        'sight': _row_get(row, 71), 'hearing': _row_get(row, 72), 'smell': _row_get(row, 73),
-        'tremorsense': _row_get(row, 74), 'echolocation': _row_get(row, 75),
-        'telepathy': _row_get(row, 76), 'blindsight': _row_get(row, 77),
-        'darkvision': _row_get(row, 78), 'truesight': _row_get(row, 79),
-    }
-
-
-def _format_row(row, image, with_shiny):
-    data = [
-        image,
-        row[2],   # name
-        row[1],   # dex entry
-        row[19],  # level
-        row[7],   # primary type
-        row[8],   # secondary type
-        format_ability(_ability(row, 15, 62)),
-        format_ability(_ability(row, 16, 63)),
-        format_ability(_ability(row, 17, 64)),
-        row[20],  # ac
-        row[21],  # hit dice
-        row[22],  # hp
-        row[23],  # vitality dice
-        row[24],  # vp
-        row[25],  # speed
-        row[26],  # total stats
-        row[27], row[28], row[29], row[30], row[31], row[32],  # STR..CHA
-        row[33],  # saving throws
-        row[34],  # skills
-        sanitize_moves(row[35], 4),
-        sanitize_moves(row[36], 4),
-        sanitize_moves(row[37], 4),
-        sanitize_moves(row[38], 4),
-        sanitize_moves(row[39], 3),
-        sanitize_moves(row[40], 3),
-        row[14],  # evolution requirement
-        _movement(row),
-        _senses(row),
-        row[6],   # flavor text
-        row[9],   # size
-    ]
-    if with_shiny:
-        data.append(_row_get(row, 61))
-    return data
+def _registered(conn):
+    names = {str(n).lower() for n in upstream.registered_pokemon_names(conn)}
+    return [s for s in sp.all_species() if s['name'].lower() in names]
 
 
 def get_complete_pokemon_data(conn):
@@ -79,11 +25,8 @@ def get_complete_pokemon_data(conn):
     is a flat per-species reference, not tied to any one trainer's shiny
     Pokemon), so the evolution-target preview picks up MP4s the same way
     owned Pokemon do, else the original picture on the Pi."""
-    registered = upstream.registered_pokemon_names(conn)
     try:
-        all_data = upstream.fetch_pokemon_db(conn)
-        filtered = [row for row in all_data if row[2] in registered]
-        return [_format_row(row, upstream.pokemon_image_url(row[2], row[1]), with_shiny=False) for row in filtered]
+        return [_entry(s, upstream.pokemon_image_url(s['name'], s.get('dexNumber'))) for s in _registered(conn)]
     except Exception:
         return []
 
@@ -94,13 +37,7 @@ def get_registered_pokemon_list(conn):
     checks), so this list (which feeds completePokemonData, and from there
     the evolution-target preview) never has to look one up itself."""
     try:
-        registered = upstream.registered_pokemon_names(conn)
-        all_data = upstream.fetch_pokemon_db(conn)
-        data = [
-            _format_row(row, upstream.pokemon_image_url(row[2], row[1]), with_shiny=True)
-            for row in all_data if row[2] in registered
-        ]
-        data.sort(key=lambda r: js_number(r[2]))
+        data = [_entry(s, upstream.pokemon_image_url(s['name'], s.get('dexNumber'))) for s in _registered(conn)]
         return {'status': 'success', 'data': data, 'count': len(data)}
     except Exception as e:
         return {'status': 'error', 'message': str(e), 'data': []}
@@ -108,20 +45,14 @@ def get_registered_pokemon_list(conn):
 
 def get_evolution_options(conn, current_dex_entry, limit=20):
     try:
-        registered = upstream.registered_pokemon_names(conn)
-        all_data = upstream.fetch_pokemon_db(conn)
         if current_dex_entry is None:  # parseInt(NaN) in .gs -> no matches
             eligible = []
         else:
-            eligible = [
-                row for row in all_data
-                if row[2] in registered and js_number(row[1]) > current_dex_entry
-            ]
-        eligible.sort(key=lambda r: js_number(r[1]))
+            eligible = [s for s in _registered(conn) if (s.get('dexNumber') or 0) > current_dex_entry]
         eligible = eligible[:limit]
         return {
             'status': 'success',
-            'data': [_format_row(row, None, with_shiny=True) for row in eligible],
+            'data': [_entry(s, None) for s in eligible],
             'totalFound': len(eligible),
         }
     except Exception as e:
@@ -129,18 +60,8 @@ def get_evolution_options(conn, current_dex_entry, limit=20):
 
 
 def get_pokemon_abilities(conn, pokemon_name):
-    try:
-        all_data = upstream.fetch_pokemon_db(conn)
-        pokemon = next((row for row in all_data if row[2] == pokemon_name), None)
-        if not pokemon:
-            return {'status': 'error', 'message': 'Pokemon not found: ' + pokemon_name, 'abilities': []}
-
-        abilities = []
-        for slot, (name_idx, desc_idx) in enumerate([(15, 62), (16, 63), (17, 64)]):
-            if _row_get(pokemon, name_idx):
-                desc = _row_get(pokemon, desc_idx) or 'No description available'
-                abilities.append(f'{slot}:' + format_ability({'name': pokemon[name_idx], 'description': desc}))
-
-        return {'status': 'success', 'pokemonName': pokemon_name, 'abilities': abilities}
-    except Exception as e:
-        return {'status': 'error', 'message': str(e), 'abilities': []}
+    s = sp.get(pokemon_name)
+    if not s or s['name'] != pokemon_name:
+        return {'status': 'error', 'message': 'Pokemon not found: ' + pokemon_name, 'abilities': []}
+    return {'status': 'success', 'pokemonName': pokemon_name,
+            'abilities': [f"{a['slot']}:" + format_ability(a) for a in sp.abilities(s)]}

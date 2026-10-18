@@ -1,5 +1,6 @@
 // Edit Pokemon Page - Modern form for editing Pokemon stats with pre-filled data
 
+import { findSpecies } from '../utils/species.js';
 import { PokemonAPI } from '../api.js';
 import { showSuccess, showError } from '../utils/notifications.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
@@ -1511,20 +1512,15 @@ async function loadAbilities(pokemonData) {
 
   try {
     // First check if we have cached Pokemon data in session storage
-    const cachedDataStr = sessionStorage.getItem('completePokemonData');
+    const cachedDataStr = sessionStorage.getItem('registeredSpecies');
     if (cachedDataStr) {
       try {
-        const completePokemonData = JSON.parse(cachedDataStr);
-        const pokemonInfo = completePokemonData.find(p => p[1] === currentPokemonName);
+        const pokemonInfo = findSpecies(JSON.parse(cachedDataStr), currentPokemonName);
 
         if (pokemonInfo) {
-          // Pokemon found in cache! Use abilities from indices 6, 7, 8
-          // Add slot index prefix before filtering to preserve slot information
-          const abilities = [
-            pokemonInfo[6] ? '0:' + pokemonInfo[6] : '',  // Primary ability (slot 0)
-            pokemonInfo[7] ? '1:' + pokemonInfo[7] : '',  // Secondary ability (slot 1)
-            pokemonInfo[8] ? '2:' + pokemonInfo[8] : ''   // Hidden ability (slot 2)
-          ].filter(a => a && a !== ''); // Remove empty abilities
+          // Pokemon found in cache! "slot:Name, Description" for each ability it has (slot 0 / 1 / 2: primary,
+          // secondary, hidden) -- as pokemon/abilities sends them
+          const abilities = (pokemonInfo.abilityList || []).map(a => `${a.slot}:${a.name}, ${a.description}`);
 
           console.log('[Cache HIT] Using cached abilities for', currentPokemonName);
           populateAbilities(abilities, pokemonData);

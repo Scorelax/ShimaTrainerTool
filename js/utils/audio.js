@@ -87,8 +87,7 @@ class AudioManager {
    * server's shared "when did this track start looping" anchor so every
    * device hears roughly the same point in the loop, instead of everyone
    * starting from 0. Falls back to plain playBg() if sync is disabled, the
-   * track isn't eligible, or the server request fails (e.g. Apps Script
-   * backend, which has no /music route at all).
+   * track isn't eligible, or the server request fails.
    */
   async playBgSynced(trackName) {
     if (this.currentTrack === trackName) return;

@@ -72,6 +72,28 @@ const _details = new Map();
 let _caught = new Set();  // the species the players have ever caught (lowercase) -- kept after a Pokemon evolves
 let _owned = new Set();   // ... and the ones a player has right now
 let _caughtTimer = null;
+// The species the random encounter / random trainer generators leave out (dm_state 'encounter-exclusions', the same list
+// as Encounter setup's 🚫 Exclusions) -- the species page's "Not possible to encounter randomly" box. DM-only: it has
+// nothing to do with what the players' Pokedex shows.
+let _exclusions = [];
+let _exclWired = false;
+
+function isExcluded(name) {
+  return _exclusions.some(n => n.toLowerCase() === String(name).toLowerCase());
+}
+
+async function setExcluded(name, on) {
+  const before = _exclusions;
+  _exclusions = on ? [...before.filter(n => n.toLowerCase() !== name.toLowerCase()), name] : before.filter(n => n.toLowerCase() !== name.toLowerCase());
+  try {
+    await DmAPI.saveState('encounter-exclusions', _exclusions);
+    window.dispatchEvent(new CustomEvent('dm:exclusions-changed', { detail: _exclusions }));
+  } catch (err) {
+    _exclusions = before;
+    showCombatAlert(err.message, { title: 'Random encounters' });
+    renderDetail();
+  }
+}
 
 function setCaughtState(data) {
   if (!data) return;
@@ -96,6 +118,16 @@ export async function renderPokedex(root) {
     });
   }
   root.innerHTML = '<div class="dm-loading">Loading the Pokédex…</div>';
+  if (!_exclWired) {
+    _exclWired = true;
+    window.addEventListener('dm:exclusions-changed', (e) => {
+      if (!Array.isArray(e.detail)) return;
+      _exclusions = e.detail;
+      const cb = document.getElementById('pdxNoRandom');
+      if (cb && _selected) cb.checked = isExcluded(_selected);
+    });
+  }
+  DmAPI.getState('encounter-exclusions').then((x) => { _exclusions = Array.isArray(x) ? x : []; if (_selected) { const cb = document.getElementById('pdxNoRandom'); if (cb) cb.checked = isExcluded(_selected); } }).catch(() => {});
   try {
     const [cfg, species, caught] = await Promise.all([DmAPI.pokedexConfig(), getSpecies(), DmAPI.caughtSpecies().catch(() => null)]);
     _config = cfg.data || {};
@@ -358,6 +390,7 @@ function renderDetail() {
           <div class="dm-pdx-head-row">
             <label class="dm-pdx-reg"><input type="checkbox" id="pdxRegistered" ${isRegistered(name) ? 'checked' : ''}> In the players' Pokédex</label>
             <label class="dm-pdx-reg" id="pdxCaughtBox"><input type="checkbox" id="pdxCaught"> Caught by the players</label>
+            <label class="dm-pdx-reg dm-pdx-dmonly" title="DM only -- not part of the players' Pokédex. A random encounter or random trainer never picks it (Encounter setup's 🚫 Exclusions is the same list)."><input type="checkbox" id="pdxNoRandom" ${isExcluded(name) ? 'checked' : ''}> 🚫 Not possible to encounter randomly</label>
             <span class="dm-pill ${own ? 'ok' : 'todo'}">${own ? 'Own settings' : 'Using the defaults'}</span>
             ${own ? '<button class="dm-btn small" id="pdxBackToDefaults">Back to defaults</button>' : ''}
           </div>`}
@@ -503,6 +536,7 @@ function wireDetail(name, d) {
     refreshListFlags();
     applyFilter();
   });
+  document.getElementById('pdxNoRandom')?.addEventListener('change', e => setExcluded(name, e.target.checked));
   document.getElementById('pdxCaught')?.addEventListener('change', async (e) => {
     const on = e.target.checked;
     const lower = name.toLowerCase();

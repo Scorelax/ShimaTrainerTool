@@ -15,7 +15,6 @@ import httpx
 
 from .calculations import sanitize_string
 
-POKEMON_DATA_URL = 'https://script.google.com/macros/s/AKfycbwIT3OS2bdCv2kkDPh6IjRRirv17iPnuttlPcY47LCHBbpNPuHF_IjVq0mCt7TkkWoW/exec?action=pokemon'
 ITEMS_DATA_URL = 'https://script.google.com/macros/s/AKfycbwIT3OS2bdCv2kkDPh6IjRRirv17iPnuttlPcY47LCHBbpNPuHF_IjVq0mCt7TkkWoW/exec?action=items'
 POKEDEX_CONFIG_URL = 'https://raw.githubusercontent.com/Benjakronk/shima-pokedex/main/pokedex_config.json'
 
@@ -33,10 +32,8 @@ MOVES_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_moves_ca
 ITEMS_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_items.json')
 _items_file_cache = (None, None)  # (the file's mtime, fetch_items' result)
 
-# Every species, the same way: {"columns": {index: what}, "pokemon": [[80 cells by position], ...]} -- the rows exactly
-# as Benjakronk's sheet gave them, so every reader of fetch_pokemon_db is unchanged.
-POKEMON_FILE = os.path.join(os.path.dirname(__file__), '..', 'docs', 'DnD_pokemon.json')
-_pokemon_file_cache = (None, None)  # (the file's mtime, the rows)
+# Every species: docs/DnD_species.json, read by species.py (one object per species -- 2026-10-18; it was Benjakronk's
+# 80-cell rows, fetched from his sheet before that).
 
 # The picture formats of Benjakronk's images, best first (when a picture exists in several, the first one is used).
 IMG_FORMATS = ['png', 'jpg', 'jpeg', 'jfif']
@@ -155,31 +152,6 @@ def _fetch_json(url):
     return resp.json()
 
 
-def fetch_pokemon_db(conn, force=False):
-    """Every species' row (see POKEMON_FILE) -- read from that file, again only when it changes; `force` fetches nothing
-    any more. Only when the file is missing or broken: the snapshot of Benjakronk's sheet in the database (fetched if
-    there's none)."""
-    global _pokemon_file_cache
-    try:
-        mtime = os.path.getmtime(POKEMON_FILE)
-        if _pokemon_file_cache[0] != mtime:
-            with open(POKEMON_FILE, encoding='utf-8') as f:
-                rows = json.load(f)['pokemon']
-            if not isinstance(rows, list):
-                raise ValueError('pokemon must be a list')
-            _pokemon_file_cache = (mtime, rows)
-        return _pokemon_file_cache[1]
-    except (OSError, ValueError, KeyError, TypeError):
-        force = False  # no file: the database's snapshot, never a fetch over it
-    if not force:
-        cached = _cache_get(conn, 'pokemonDB')
-        if cached is not None:
-            return cached
-    data = _fetch_json(POKEMON_DATA_URL)
-    _cache_put(conn, 'pokemonDB', data)
-    return data
-
-
 def fetch_moves(conn, force=False):
     """Reads MOVES_FILE instead of a live fetch -- see that constant's own
     comment. `conn` and `force` only remain in the signature so every
@@ -246,6 +218,9 @@ def fetch_pokedex_config(conn, force=False):
     if not force:
         cached = _cache_get(conn, 'pokedexConfig')
         if cached is not None:
+            from . import species
+            if species.fix_target_spellings(cached):  # once: settings saved under the old misspelled names
+                _cache_put(conn, 'pokedexConfig', cached)
             return cached
     try:
         data = _fetch_json(POKEDEX_CONFIG_URL)
@@ -330,8 +305,9 @@ def warm_upstream(conn):
         finally:
             c.close()
 
-    # (species and items: read from their files, nothing fetched; the pokedex config: never once the DM console owns it)
-    fns = (fetch_pokemon_db, fetch_items, fetch_pokedex_config)
+    # (items: read from its file, nothing fetched; the pokedex config: never once the DM console owns it. Species are
+    # species.py's file.)
+    fns = (fetch_items, fetch_pokedex_config)
     with ThreadPoolExecutor(max_workers=len(fns)) as pool:
         list(pool.map(refresh, fns))
 

@@ -6,18 +6,22 @@ import { audioManager } from '../utils/audio.js';
 import { isFieldVisible, initializeVisibility } from '../utils/visibility.js';
 import { hideLoading, showLoadingWithSprite } from '../utils/splash.js';
 import { prefetchSprite } from '../utils/sprite-media.js';
+import {
+  abilityInSlot, baseStat, evolutionText, listText, movementLine, movesText, savedAbility,
+  sensesLine, statTotal, MOVE_LEVELS
+} from '../utils/species.js';
 
 export function renderPokemonForm() {
   // Load selected Pokemon data from session storage
-  const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
+  const selectedSpecies = JSON.parse(sessionStorage.getItem('selectedSpecies'));
   const natures = JSON.parse(sessionStorage.getItem('natures') || '[]');
   const items = JSON.parse(sessionStorage.getItem('items') || '[]');
 
-  if (!selectedPokemonData) {
+  if (!selectedSpecies) {
     return '<div class="error">No Pokemon selected. Please go back and select a Pokemon.</div>';
   }
 
-  const pokemonName = selectedPokemonData[1] || 'Unknown';
+  const pokemonName = selectedSpecies.name || 'Unknown';
 
   const html = `
     <div class="pokemon-form-page">
@@ -360,19 +364,19 @@ export function renderPokemonForm() {
 }
 
 export async function attachPokemonFormListeners() {
-  const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
+  const selectedSpecies = JSON.parse(sessionStorage.getItem('selectedSpecies'));
 
   // Initialize visibility system
   await initializeVisibility();
 
   // Populate abilities from cache or API (like edit-pokemon does)
-  await populateAbilityOptions(selectedPokemonData);
+  await populateAbilityOptions(selectedSpecies);
 
   // Warm the cache for this Pokemon's sprite (and shiny variant, since the
   // player can toggle the checkbox any time before submitting) while they
   // fill out the rest of the form, so it's ready to display instantly the
   // moment they click Register instead of a generic splash screen.
-  const preloadBaseUrl = selectedPokemonData[0] || '';
+  const preloadBaseUrl = selectedSpecies.image || '';
   if (preloadBaseUrl && preloadBaseUrl !== 'assets/Pokeball.png') {
     prefetchSprite(preloadBaseUrl);
     prefetchSprite(preloadBaseUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1'));
@@ -398,62 +402,41 @@ export async function attachPokemonFormListeners() {
 
     // Show this Pokemon's own sprite (video/image, shiny-aware) in place of
     // generic splash art -- already warmed above, so this is instant.
-    const baseImageUrl = selectedPokemonData[0] || '';
+    const baseImageUrl = selectedSpecies.image || '';
     const shinyChecked = document.getElementById('shiny')?.checked;
     const revealUrl = shinyChecked && baseImageUrl && baseImageUrl !== 'assets/Pokeball.png'
       ? baseImageUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1')
       : baseImageUrl;
     const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-    const captionText = trainerData ? `${trainerData[1]} caught a ${selectedPokemonData[1]}!` : '';
-    showLoadingWithSprite(revealUrl, selectedPokemonData[1], captionText);
+    const captionText = trainerData ? `${trainerData[1]} caught a ${selectedSpecies.name}!` : '';
+    showLoadingWithSprite(revealUrl, selectedSpecies.name, captionText);
 
     await handleFormSubmit();
   });
 }
 
-async function populateAbilityOptions(selectedPokemonData) {
+async function populateAbilityOptions(selectedSpecies) {
   const abilitiesContent = document.getElementById('abilitiesContent');
   if (!abilitiesContent) return;
 
-  const pokemonName = selectedPokemonData[1] || 'Unknown';
+  const pokemonName = selectedSpecies.name || 'Unknown';
   abilitiesContent.innerHTML = '';
 
-  // Get abilities from session storage cache
-  const cachedDataStr = sessionStorage.getItem('completePokemonData');
-  if (!cachedDataStr) {
-    abilitiesContent.innerHTML = '<div style="padding: 1rem; color: #f44336;">No Pokemon data in cache</div>';
-    return;
-  }
+  // The species' abilities, slot 0 / 1 / 2 (primary, secondary, hidden)
+  const abilities = [0, 1, 2].map(slot => abilityInSlot(selectedSpecies, slot));
 
-  const completePokemonData = JSON.parse(cachedDataStr);
-  const pokemonInfo = completePokemonData.find(p => p[1] === pokemonName);
-
-  if (!pokemonInfo) {
-    abilitiesContent.innerHTML = '<div style="padding: 1rem; color: #f44336;">Pokemon not found in cache</div>';
-    return;
-  }
-
-  // Get abilities from indices 6, 7, 8 (format: "Name,Description")
-  const abilities = [
-    pokemonInfo[6],  // Primary ability (slot 0)
-    pokemonInfo[7],  // Secondary ability (slot 1)
-    pokemonInfo[8]   // Hidden ability (slot 2)
-  ];
-
-  console.log('[Pokemon Form] Abilities from cache:', abilities);
+  console.log('[Pokemon Form] Abilities:', abilities);
 
   // Create checkbox for each ability
-  abilities.forEach((abilityData, slotIndex) => {
-    if (!abilityData) return; // Skip empty abilities
+  abilities.forEach((ability, slotIndex) => {
+    if (!ability) return; // Skip empty abilities
 
     // Check if hidden ability should be visible
     if (slotIndex === 2 && !isFieldVisible(pokemonName, 'hiddenAbility')) {
       return;
     }
 
-    // Parse "Name,Description"
-    const parts = abilityData.split(',');
-    const abilityName = parts[0].trim();
+    const abilityName = ability.name;
 
     console.log(`[Pokemon Form] Creating checkbox for ability ${slotIndex}: "${abilityName}"`);
 
@@ -491,9 +474,9 @@ async function populateAbilityOptions(selectedPokemonData) {
 async function handleFormSubmit() {
   const form = document.getElementById('pokemonForm');
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData'));
-  const selectedPokemonData = JSON.parse(sessionStorage.getItem('selectedPokemonData'));
+  const selectedSpecies = JSON.parse(sessionStorage.getItem('selectedSpecies'));
 
-  if (!trainerData || !selectedPokemonData) {
+  if (!trainerData || !selectedSpecies) {
     showError('Missing trainer or Pokemon data');
     return;
   }
@@ -514,26 +497,12 @@ async function handleFormSubmit() {
     const selectedAbilityCheckboxes = Array.from(document.querySelectorAll('input[name="abilities"]:checked'));
     console.log('[Pokemon Form] Selected ability checkboxes:', selectedAbilityCheckboxes.length);
 
-    // Get full ability data from cache
-    const cachedDataStr = sessionStorage.getItem('completePokemonData');
-    const completePokemonData = JSON.parse(cachedDataStr);
-    const pokemonInfo = completePokemonData.find(p => p[1] === selectedPokemonData[1]);
-    const allAbilities = [pokemonInfo[6], pokemonInfo[7], pokemonInfo[8]]; // Name,Description format
-
     // Build abilities string: "slotIndex:Name;Description|slotIndex:Name;Description"
-    const selectedAbilities = selectedAbilityCheckboxes.map(cb => {
-      const abilityName = cb.value; // Just the name
-      const slotIndex = cb.dataset.slotIndex; // 0, 1, or 2
-
-      // Find full ability data (Name,Description)
-      const fullAbilityData = allAbilities[slotIndex];
-      const parts = fullAbilityData.split(',');
-      const name = parts[0].trim();
-      const description = parts.slice(1).join(',').trim();
-
-      // Return formatted: "slotIndex:Name;Description"
-      return `${slotIndex}:${name};${description}`;
-    }).join('|');
+    const selectedAbilities = selectedAbilityCheckboxes
+      .map(cb => abilityInSlot(selectedSpecies, cb.dataset.slotIndex)) // slot 0, 1, or 2
+      .filter(Boolean)
+      .map(savedAbility)
+      .join('|');
 
     console.log('[Pokemon Form] Selected abilities string:', selectedAbilities);
 
@@ -541,20 +510,15 @@ async function handleFormSubmit() {
     document.getElementById('content').innerHTML = '<div class="loading">Registering Pokemon...</div>';
 
     // Nature adjustments are applied by the backend in registerPokemonForTrainer
-    const modifiedPokemonData = [...selectedPokemonData];
+    const stats = Object.fromEntries(['str', 'dex', 'con', 'int', 'wis', 'cha'].map(k => [k, baseStat(selectedSpecies, k)]));
 
     // Apply Ace Trainer Max Potential bonus (Level 9)
     const trainerPath = trainerData[25] || '';
     const maxPotential = trainerData[46] || '';
-    if (trainerPath === 'Ace Trainer' && maxPotential && maxPotential !== '') {
-      if (maxPotential === 'STR') {
-        modifiedPokemonData[16] = (modifiedPokemonData[16] || 10) + 1;
-      } else if (maxPotential === 'DEX') {
-        modifiedPokemonData[17] = (modifiedPokemonData[17] || 10) + 1;
-      } else if (maxPotential === 'CON') {
-        modifiedPokemonData[18] = (modifiedPokemonData[18] || 10) + 1;
-      }
-      // Speed bonus will be applied to movement data below
+    if (trainerPath === 'Ace Trainer' && ['STR', 'DEX', 'CON'].includes(maxPotential)) {
+      const key = maxPotential.toLowerCase();
+      stats[key] = (stats[key] || 10) + 1;
+      // (the Speed bonus goes onto the movement below)
     }
 
     // Apply Commander loyalty bonus (Level 5+)
@@ -563,62 +527,26 @@ async function handleFormSubmit() {
       loyalty = Math.min(loyalty + 1, 10);
     }
 
-    // Format movement and senses data
-    const movementData = selectedPokemonData[31] || {};
-    const sensesData = selectedPokemonData[32] || {};
-
-    // Apply Speed bonus for Max Potential if selected
-    let movementArray = [
-      movementData.walking || '-',
-      movementData.climbing || '-',
-      movementData.flying || '-',
-      movementData.hovering || '-',
-      movementData.swimming || '-',
-      movementData.burrowing || '-'
-    ];
-
-    if (trainerPath === 'Ace Trainer' && maxPotential === 'Speed') {
-      movementArray = movementArray.map(movement => {
-        if (movement === '-') return movement;
-        // Parse movement like "Walk 30 ft"
-        const match = movement.match(/^(.+?)\s+(\d+)\s*(.*)$/);
-        if (match) {
-          const type = match[1];
-          const speed = parseInt(match[2], 10);
-          const unit = match[3] || 'ft';
-          return `${type} ${speed + 10} ${unit}`.trim();
-        }
-        return movement;
-      });
-    }
-
-    const movementDataString = movementArray.join(', ');
-
-    const sensesDataString = [
-      sensesData.sight || '-',
-      sensesData.hearing || '-',
-      sensesData.smell || '-',
-      sensesData.tremorsense || '-',
-      sensesData.echolocation || '-',
-      sensesData.telepathy || '-',
-      sensesData.blindsight || '-',
-      sensesData.darkvision || '-',
-      sensesData.truesight || '-'
-    ].join(', ');
+    // Movement and senses, as a saved Pokemon keeps them ('25ft, -, ...'). Ace Trainer's Max Potential: Speed adds
+    // 10ft to every speed the species has. (It never did with the old rows -- their '25ft' didn't match the
+    // 'Walk 30 ft' this looked for -- fixed with the species objects' plain numbers, 2026-10-18.)
+    const speedBonus = trainerPath === 'Ace Trainer' && maxPotential === 'Speed' ? 10 : 0;
+    const movementDataString = movementLine(selectedSpecies, speedBonus);
+    const sensesDataString = sensesLine(selectedSpecies);
 
     // Get type effectiveness
-    const typeResponse = await GameDataAPI.getTypeEffectiveness(
-      selectedPokemonData[4],
-      selectedPokemonData[5]
-    );
+    const primaryType = selectedSpecies.types.primary || '';
+    const secondaryType = selectedSpecies.types.secondary || '';
+    const typeResponse = await GameDataAPI.getTypeEffectiveness(primaryType, secondaryType);
     const typematchupsString = typeResponse.data ?
       typeResponse.data.join(', ') : '';
 
-    // Extract Size from selectedPokemonData (index 34 - at end of array from code.gs)
-    const pokemonSize = selectedPokemonData[34] || '';
+    const pokemonSize = selectedSpecies.size || '';
+    const combat = selectedSpecies.combat || {};
+    const moves = MOVE_LEVELS.map(lvl => movesText(selectedSpecies, lvl));
 
     // Resolve shiny image URL if needed
-    const baseImageUrl = selectedPokemonData[0] || '';
+    const baseImageUrl = selectedSpecies.image || '';
     const pokemonImageUrl = shiny && baseImageUrl && baseImageUrl !== 'assets/Pokeball.png'
       ? baseImageUrl.replace(/(\.[a-zA-Z]+)$/, '-shiny$1')
       : baseImageUrl;
@@ -627,34 +555,34 @@ async function handleFormSubmit() {
     const newPokemonData = [
       trainerData[1],              // 0: Trainer Name
       pokemonImageUrl,             // 1: Image
-      selectedPokemonData[1],      // 2: Name
-      selectedPokemonData[2],      // 3: Dex Entry
+      selectedSpecies.name,        // 2: Name
+      selectedSpecies.dexNumber,   // 3: Dex Entry
       level,                       // 4: Level
-      selectedPokemonData[4],      // 5: Primary Type
-      selectedPokemonData[5],      // 6: Secondary Type
+      primaryType,                 // 5: Primary Type
+      secondaryType,               // 6: Secondary Type
       selectedAbilities,           // 7: Ability (combined with pipes)
-      selectedPokemonData[9],      // 8: AC
-      selectedPokemonData[10],     // 9: Hit Dice
+      combat.ac,                   // 8: AC
+      combat.hitDie,               // 9: Hit Dice
       '',                          // 10: HP (to be calculated)
-      selectedPokemonData[12],     // 11: Vitality Dice
+      combat.vitalityDie,          // 11: Vitality Dice
       '',                          // 12: VP (to be calculated)
       movementDataString,          // 13: Speed
-      selectedPokemonData[15],     // 14: Total Stats
-      modifiedPokemonData[16],     // 15: Strength
-      modifiedPokemonData[17],     // 16: Dexterity
-      modifiedPokemonData[18],     // 17: Constitution
-      modifiedPokemonData[19],     // 18: Intelligence
-      modifiedPokemonData[20],     // 19: Wisdom
-      modifiedPokemonData[21],     // 20: Charisma
-      selectedPokemonData[22],     // 21: Saving Throws
-      selectedPokemonData[23],     // 22: Skills
-      selectedPokemonData[24],     // 23: Starting Moves
-      selectedPokemonData[25],     // 24: Level 2 Moves
-      selectedPokemonData[26],     // 25: Level 6 Moves
-      selectedPokemonData[27],     // 26: Level 10 Moves
-      selectedPokemonData[28],     // 27: Level 14 Moves
-      selectedPokemonData[29],     // 28: Level 18 Moves
-      selectedPokemonData[30],     // 29: Evolution Requirement
+      statTotal(selectedSpecies),  // 14: Total Stats
+      stats.str,                   // 15: Strength
+      stats.dex,                   // 16: Dexterity
+      stats.con,                   // 17: Constitution
+      stats.int,                   // 18: Intelligence
+      stats.wis,                   // 19: Wisdom
+      stats.cha,                   // 20: Charisma
+      listText(selectedSpecies.savingThrows), // 21: Saving Throws
+      listText(selectedSpecies.skills),       // 22: Skills
+      moves[0],                    // 23: Starting Moves
+      moves[1],                    // 24: Level 2 Moves
+      moves[2],                    // 25: Level 6 Moves
+      moves[3],                    // 26: Level 10 Moves
+      moves[4],                    // 27: Level 14 Moves
+      moves[5],                    // 28: Level 18 Moves
+      evolutionText(selectedSpecies), // 29: Evolution Requirement
       '',                          // 30: Initiative (to be calculated)
       '',                          // 31: Proficiency Bonus (to be calculated)
       nature,                      // 32: Nature
@@ -677,7 +605,7 @@ async function handleFormSubmit() {
       sensesDataString,            // 49: Senses
       '',                          // 50: Feats
       '',                          // 51: Gear
-      selectedPokemonData[33],     // 52: Flavor text
+      selectedSpecies.description || '', // 52: Flavor text
       typematchupsString,          // 53: Type matchups
       '',                          // 54: Current HD
       '',                          // 55: Current VD
@@ -701,7 +629,7 @@ async function handleFormSubmit() {
 
     if (response.status === 'success') {
       // Show success message (keep loading screen visible)
-      showSuccess(`${trainerData[1]} caught a ${selectedPokemonData[1]}!`);
+      showSuccess(`${trainerData[1]} caught a ${selectedSpecies.name}!`);
 
       // register_pokemon_for_trainer() deliberately always returns the
       // static image (never a self-uploaded sprite URL -- see its guard
@@ -727,7 +655,7 @@ async function handleFormSubmit() {
       console.log('[Pokemon Form] - Index 1 (Image):', finalPokemonData[1]);
       console.log('[Pokemon Form] - Index 7 (Abilities):', finalPokemonData[7]);
 
-      sessionStorage.setItem(`pokemon_${selectedPokemonData[1].toLowerCase()}`, JSON.stringify(finalPokemonData));
+      sessionStorage.setItem(`pokemon_${selectedSpecies.name.toLowerCase()}`, JSON.stringify(finalPokemonData));
 
       hideLoading();
       window.dispatchEvent(new CustomEvent('navigate', {

@@ -1,5 +1,5 @@
 // Landing Page (Index) - Continue Journey or Start New Adventure
-import { GameDataAPI, SERVED_BY_PI_SERVER } from '../api.js';
+import { GameDataAPI, ON_OLD_GITHUB_ADDRESS } from '../api.js';
 import { audioManager } from '../utils/audio.js';
 import { getSettings, saveSettings } from '../utils/settings.js';
 
@@ -507,7 +507,7 @@ export function renderIndex() {
         <span>Settings</span>
       </button>
 
-      ${!SERVED_BY_PI_SERVER ? `
+      ${ON_OLD_GITHUB_ADDRESS ? `
         <div class="migration-banner">
           ⚠️ This app has moved to a local server. Please use the new link
           instead — changes made here won't be saved to the actual game.
@@ -532,7 +532,7 @@ export function renderIndex() {
 }
 
 // "Updated 2h ago" from an ISO timestamp; falls back gracefully when unset
-// (e.g. Apps Script backend, which never sends X-Data-Version at all).
+// (no X-Data-Version yet).
 function formatLastUpdate(version) {
   if (!version) return 'unknown';
   // The Pi's data version: "<newest data fetch (ISO)>|<species / item / move files' mtimes (s)>" -- the newest.

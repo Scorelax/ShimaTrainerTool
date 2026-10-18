@@ -13,6 +13,12 @@
 //
 // Who's in the next battle is decided here and only here (Map setup doesn't add anyone), so the two never disagree.
 //
+// Since the 2026-10-16 playtest it's a builder that never starts anything by itself: it's reachable while a battle runs
+// (the running battle's third tab, battle-live.js), an encounter can carry its own map (made here with the map editor --
+// map-store.js), the Battle module imports one (importEncounterDialog: its creatures and its map become the next
+// battle), each wild Pokemon's ℹ️ shows everything its species is known for (species-info.js), and an encounter's NPC
+// opens in the NPC module to change it for good.
+//
 // Post battle: after a PvE battle ends (routes_combat._remember_battle keeps it as 'last-battle'), what happened -- who
 // was defeated, caught or got away -- and what to hand out. Unlike the old tool, which exported files or called the
 // Trainer Tool's API, everything goes straight into the trainers' records here: caught Pokemon into their team, loot
@@ -30,6 +36,10 @@ import {
   encounterPool, generateEncounter, generateTrainer, rangePick, evolutionStage, STAGE_LABEL,
 } from './encounter-rules.js';
 import { xpOrStart } from './xp.js';
+import { mapPreviewHtml, renderMapEditor } from './map-editor.js';
+import { createMapStore } from './map-store.js';
+import { openSpeciesInfo } from './species-info.js';
+import { openNpcFromEncounter } from './npcs.js';
 
 const SLOT_NAMES = ['Primary', 'Secondary', 'Hidden'];
 const EVENT_ICONS = ['⚡', '🎯', '⚠️', '💥', '🔥', '❄️', '🌊', '🌪️', '⏰', '🚪', '👥', '🎭', '🏚️', '🌋'];
@@ -85,19 +95,32 @@ function blankEncounter() {
   };
 }
 
+/** The library and everything it uses, fresh from the Pi. */
+async function loadLibraryData() {
+  const [encs, species, npcs, excl, saved, run] = await Promise.all([
+    DmAPI.encounters(), getSpecies(), DmAPI.npcs(), DmAPI.getState('encounter-exclusions'), DmAPI.getState('saved-pokemon'), DmAPI.getState('encounter-run'),
+  ]);
+  // An encounter being changed here keeps this tab's copy (its save may not be on the Pi yet).
+  _encounters = (encs.data || []).map(e => (_saveTimers.has(e.id) ? _encounters.find(x => x.id === e.id) || e : e));
+  _species = species;
+  _npcs = npcs.data || [];
+  _exclusions = Array.isArray(excl) ? excl : [];
+  _saved = Array.isArray(saved) ? saved : [];
+  _runId = run?.encounterId || null;
+  _runLinked = !!run?.linked;
+}
+
+// The Pokedex module's "not possible to encounter randomly" box changes the same exclusion list.
+window.addEventListener('dm:exclusions-changed', (e) => {
+  _exclusions = Array.isArray(e.detail) ? e.detail : _exclusions;
+  const b = document.getElementById('encExclusions');
+  if (b) b.textContent = `🚫 Exclusions (${_exclusions.length})`;
+});
+
 async function renderLibrary(body) {
   body.innerHTML = '<div class="dm-loading">Loading the encounters…</div>';
   try {
-    const [encs, species, npcs, excl, saved, run] = await Promise.all([
-      DmAPI.encounters(), getSpecies(), DmAPI.npcs(), DmAPI.getState('encounter-exclusions'), DmAPI.getState('saved-pokemon'), DmAPI.getState('encounter-run'),
-    ]);
-    _encounters = encs.data || [];
-    _species = species;
-    _npcs = npcs.data || [];
-    _exclusions = Array.isArray(excl) ? excl : [];
-    _saved = Array.isArray(saved) ? saved : [];
-    _runId = run?.encounterId || null;
-    _runLinked = !!run?.linked;
+    await loadLibraryData();
   } catch (err) {
     body.innerHTML = `<div class="dm-loading">Couldn't load the encounters: ${escapeHtml(err.message)}</div>`;
     return;
@@ -195,14 +218,26 @@ function renderSheet() {
     <div class="dm-enc-head">
       <input class="dm-input dm-enc-name" id="encName" data-f="name" value="${escapeHtml(enc.name)}" placeholder="Encounter name">
       <div class="dm-enc-actions">
+        <button class="dm-btn" id="encSaveBtn" title="Save it on the Pi now (it also saves on its own a moment after each change)">💾 Save encounter</button>
         ${enc.id === _runId
           ? '<span class="dm-enc-live dm-enc-inplay" title="This is the next battle -- changes here go straight into it">● In play</span><button class="dm-btn primary" id="encPlace">📍 Place on the map</button>'
-          : '<button class="dm-btn primary" id="encLoad" title="Make this the next battle -- then place everyone in Map setup">▶ Put in play</button>'}
+          : '<button class="dm-btn primary" id="encLoad" title="Make this the next battle (its creatures and its map) -- the same as Import in the Battle module">▶ Use for the next battle</button>'}
         <button class="dm-btn" id="encDup">Duplicate</button>
         <button class="dm-btn danger" id="encDel">Delete</button>
       </div>
     </div>
     <div class="dm-enc-grid">
+      <div class="dm-card dm-enc-wide dm-enc-mapcard">
+        <div class="dm-card-title"><span>🗺️ Map</span>
+          <span class="dm-row dm-enc-titlebtns">
+            <button class="dm-btn small primary" data-act="map-edit">${enc.map ? '✏️ Edit map' : '+ Make a map'}</button>
+            <button class="dm-btn small" data-act="map-from-setup" title="A copy of the map in the Battle module's Map setup">📋 Copy Map setup's</button>
+            <button class="dm-btn small" data-act="map-from-saved">💾 From saved maps</button>
+            ${enc.map ? '<button class="dm-btn small danger" data-act="map-del">✕ No map</button>' : ''}
+          </span></div>
+        ${enc.map ? `<div class="dm-enc-mapview">${mapPreviewHtml({ map: enc.map, creatures: [] })}</div>`
+          : '<div class="dm-hint">No map of its own -- the battle uses whatever map is in Map setup. Make one here to bring it along when the encounter is imported.</div>'}
+      </div>
       <div class="dm-card dm-enc-wide">
         <div class="dm-card-title"><span>Wild Pokémon (${enc.pokemon.length})</span>
           <span class="dm-row dm-enc-titlebtns">
@@ -224,6 +259,7 @@ function renderSheet() {
           return `<div class="dm-enc-npc" data-npc="${escapeHtml(id)}">
             <span class="dm-enc-thumb" data-img="${escapeHtml(n?.image || '')}"></span>
             <span><strong>${escapeHtml(n?.name || 'Deleted NPC')}</strong><small>${n ? `Lv ${n.level || 1} · ${(n.team || []).filter(t => t.species).map(t => escapeHtml(`${t.nickname || t.species} ${t.level}`)).join(', ') || 'no Pokémon'}` : 'No longer in the NPC library'}</small></span>
+            ${n ? '<button class="dm-icon-btn" data-act="npc-edit" title="Change this NPC in the NPC library (for good -- everywhere it\'s used)">✏️</button>' : ''}
             <button class="dm-icon-btn danger" data-act="npc-del" title="Take out of this encounter">✕</button>
           </div>`;
         }).join('') : '<div class="dm-hint">No NPC trainers. Their Pokémon come with them.</div>'}</div>
@@ -239,6 +275,10 @@ function renderSheet() {
   if (_adding) { renderMonResults(); document.getElementById('encMonSearch')?.focus(); }
   enc.pokemon.filter(p => _customizing.has(p.id)).forEach(loadCalc);
   document.getElementById('encLoad')?.addEventListener('click', () => loadIntoSetup(enc));
+  document.getElementById('encSaveBtn')?.addEventListener('click', async () => {
+    await saveNow(enc); // says so itself if it couldn't
+    if (_saveState !== 'error') toast(`"${enc.name}" saved.`);
+  });
   document.getElementById('encPlace')?.addEventListener('click', async () => {
     await flushEncounter(enc);
     await _syncing;
@@ -313,6 +353,7 @@ function monRowHtml(p) {
         <div class="dm-enc-mon-sum"><span data-sum="abil">✦ ${escapeHtml(abilityNames(p, sp))}</span>${bonuses.length ? `<span class="dm-enc-bonus-sum">${escapeHtml(bonuses.join(' · '))}</span>` : ''}</div>
       </div>
       <div class="dm-enc-mon-btns">
+        <button class="dm-icon-btn" data-act="mon-info" title="Everything about the species -- behaviour, habitat, senses, how to catch it">ℹ️</button>
         <button class="dm-btn small${open ? ' primary' : ''}" data-act="mon-more" title="Abilities and stat bonuses">⚙ Customize</button>
         <button class="dm-icon-btn" data-act="mon-save" title="Save to the Pokémon library, for other encounters">💾</button>
         <button class="dm-icon-btn" data-act="mon-dup" title="One more of these">⧉</button>
@@ -452,7 +493,7 @@ function bindSheet() {
   });
 }
 
-function onAction(e) {
+async function onAction(e) {
   const btn = e.target.closest('[data-act]');
   const enc = current();
   if (!btn || !enc) return;
@@ -473,6 +514,28 @@ function onAction(e) {
     return;
   }
   if (act === 'mon-save') { saveToLibrary(enc.pokemon.find(x => x.id === monId)); return; }
+  if (act === 'mon-info') { openSpeciesInfo(enc.pokemon.find(x => x.id === monId).species); return; }
+  if (act === 'npc-edit') {
+    await flushEncounter(enc);
+    openNpcFromEncounter(btn.closest('[data-npc]').dataset.npc, enc.name);
+    return;
+  }
+  if (act === 'map-edit') { editEncounterMap(enc); return; }
+  if (act === 'map-from-setup') {
+    if (enc.map && !await showCombatConfirm(`Replace "${enc.name}"'s map with a copy of Map setup's?`, { title: 'Map', yesLabel: 'Replace', noLabel: 'Cancel' })) return;
+    const m = getSetup()?.map;
+    if (!m) { showCombatAlert('Map setup has no map yet.', { title: 'Map' }); return; }
+    enc.map = { ...JSON.parse(JSON.stringify(m)), ready: true };
+    changed();
+    return;
+  }
+  if (act === 'map-from-saved') { pickSavedMap(enc); return; }
+  if (act === 'map-del') {
+    if (!await showCombatConfirm(`Take the map off "${enc.name}"? The battle will use Map setup's map instead.`, { title: 'Map', yesLabel: 'Take it off', noLabel: 'Cancel' })) return;
+    enc.map = null;
+    changed();
+    return;
+  }
   if (act === 'npc-add') { pickNpc(enc); return; }
   if (act === 'npc-random') { randomTrainerDialog(enc); return; }
   if (act === 'npc-del') { enc.npcs = enc.npcs.filter(id => id !== btn.closest('[data-npc]').dataset.npc); changed(); return; }
@@ -609,6 +672,7 @@ async function editExclusions() {
       onClick: async (body) => {
         _exclusions = [...body.querySelectorAll('#exclList input:checked')].map(i => i.value);
         try { await DmAPI.saveState('encounter-exclusions', _exclusions); } catch (err) { showCombatAlert(err.message, { title: 'Exclusions' }); return false; }
+        window.dispatchEvent(new CustomEvent('dm:exclusions-changed', { detail: _exclusions })); // the Pokedex module's box follows
         const b = document.getElementById('encExclusions');
         if (b) b.textContent = `🚫 Exclusions (${_exclusions.length})`;
         return true;
@@ -893,6 +957,76 @@ function monConfig(p) {
   };
 }
 
+// ---- An encounter's own map ----
+
+/** The encounter's map in the map editor (a store of its own, map-store.js), over the page until Done / Back. */
+function editEncounterMap(enc) {
+  document.getElementById('encMapEditor')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'encMapEditor';
+  overlay.className = 'dm-live-map-overlay';
+  const root = document.createElement('div');
+  root.className = 'dm-live-map-root';
+  overlay.appendChild(root);
+  document.body.appendChild(overlay);
+  const store = createMapStore(enc.map, (m) => { enc.map = m; return saveNow(enc); });
+  renderMapEditor(root, {
+    store, backLabel: '← Encounter', title: `Map · ${enc.name}`,
+    onDone: () => { enc.map = { ...store.getSetup().map, ready: true }; overlay.remove(); renderSheet(); renderList(); },
+  });
+}
+
+async function pickSavedMap(enc) {
+  const maps = await DmAPI.getState('saved-maps').catch(() => null) || [];
+  if (!maps.length) { showCombatAlert('No saved maps yet -- save one from the map editor (Map setup).', { title: 'Saved maps' }); return; }
+  const id = await openDmModal({
+    title: `A saved map for "${enc.name}"`,
+    html: `<div class="dm-enc-savedmaps">${maps.map(m => `<button class="dm-species-item" data-map="${escapeHtml(m.id)}"><span><span class="dm-species-name">${escapeHtml(m.name)}</span>
+      <span class="dm-species-meta">${m.map?.rows} × ${m.map?.cols} squares · ${(m.map?.objects || []).length} objects</span></span></button>`).join('')}</div>`,
+    buttons: [{ label: 'Cancel', value: null }],
+    onOpen: (body, close) => body.addEventListener('click', (e) => { const b = e.target.closest('[data-map]'); if (b) close(b.dataset.map); }),
+  });
+  const picked = maps.find(m => m.id === id);
+  if (!picked) return;
+  enc.map = { ...JSON.parse(JSON.stringify(picked.map)), ready: true };
+  scheduleSave(enc);
+  renderSheet();
+}
+
+/** The Battle module's Import: pick an encounter, and it becomes the next battle -- its creatures, and its map if it has
+ * one (loadIntoSetup). Works without this tab ever having been opened. */
+export async function importEncounterDialog() {
+  try { await loadLibraryData(); } catch (err) { showCombatAlert(err.message, { title: 'Import encounter' }); return; }
+  if (!_encounters.length) { showCombatAlert('No encounters yet -- build one under Encounter setup.', { title: 'Import encounter' }); return; }
+  const id = await openDmModal({
+    title: '📥 Import an encounter',
+    html: `<input class="dm-input" id="impSearch" placeholder="Search…" autocomplete="off" style="margin-bottom:0.5rem">
+      <div class="dm-enc-savedmaps" id="impList">${_encounters.map(e => `<button class="dm-species-item" data-enc="${escapeHtml(e.id)}" data-search="${escapeHtml(e.name.toLowerCase())}">
+        <span><span class="dm-species-name">${escapeHtml(e.name || 'Unnamed')}${e.id === _runId ? ' · ● in play' : ''}</span>
+        <span class="dm-species-meta">${escapeHtml(summary(e))}${e.map ? ` · 🗺️ its own map (${e.map.rows} × ${e.map.cols})` : ''}</span></span></button>`).join('')}</div>`,
+    buttons: [{ label: 'Cancel', value: null }],
+    onOpen: (body, close) => {
+      body.querySelector('#impSearch').addEventListener('input', (e) => {
+        const q = e.target.value.trim().toLowerCase();
+        body.querySelectorAll('[data-enc]').forEach(b => { b.hidden = !!q && !b.dataset.search.includes(q); });
+      });
+      body.addEventListener('click', (e) => { const b = e.target.closest('[data-enc]'); if (b) close(b.dataset.enc); });
+    },
+  });
+  const enc = _encounters.find(e => e.id === id);
+  if (enc) await loadIntoSetup(enc);
+}
+
+/** A new encounter built around a map (the Adventure module's "Encounter on this map"), opened in Encounter setup. */
+export async function createEncounterWithMap(map, name) {
+  try { await loadLibraryData(); } catch { /* the new one is saved either way */ }
+  const enc = { ...blankEncounter(), name: name || 'New encounter', map: { ...JSON.parse(JSON.stringify(map)), ready: true } };
+  await saveNow(enc);
+  _encounters.unshift(enc);
+  _selectedId = enc.id;
+  return enc;
+}
+
 async function loadIntoSetup(enc) {
   await flushEncounter(enc);
   const state = await CombatAPI.getState().catch(() => null);
@@ -906,12 +1040,17 @@ async function loadIntoSetup(enc) {
     title: `Put "${enc.name}" in play`,
     html: `
       <div class="dm-hint">${summary(enc)} become the next battle -- place them on the map in Map setup and start it. Changes made to this encounter afterwards go into it too.</div>
+      ${enc.map ? `<label class="dm-check" style="margin-top:0.6rem"><input type="checkbox" id="loadMap" checked><span>Use its map <small>Replaces Map setup's map (${enc.map.rows} × ${enc.map.cols} squares)</small></span></label>` : ''}
       ${have ? `<div class="dm-field" style="margin-top:0.7rem">
         <label class="dm-check"><input type="radio" name="loadMode" value="replace" checked><span>Replace who's in the next battle now <small>${have} creature${have === 1 ? '' : 's'} there</small></span></label>
         <label class="dm-check"><input type="radio" name="loadMode" value="add"><span>Add to them</span></label></div>` : ''}`,
     buttons: [{ label: 'Cancel', value: null }, {
       label: 'Put in play', kind: 'primary', keepOpen: true,
-      onClick: (body) => { body.dataset.mode = body.querySelector('input[name="loadMode"]:checked')?.value || 'replace'; return true; },
+      onClick: (body) => {
+        body.dataset.mode = body.querySelector('input[name="loadMode"]:checked')?.value || 'replace';
+        body.dataset.map = body.querySelector('#loadMap')?.checked ? '1' : '';
+        return true;
+      },
       value: 'load',
     }],
     onOpen: (body) => { loadIntoSetup._body = body; },
@@ -922,8 +1061,14 @@ async function loadIntoSetup(enc) {
   try {
     const built = [];
     for (const p of enc.pokemon) built.push(await buildEncounterMon(enc, p, null));
+    const useMap = !!enc.map && body.dataset.map === '1';
     updateSetup((s) => {
       if (replace) s.creatures = [];
+      if (useMap) {
+        // The encounter's own map -- where anyone already stood belonged to the old one.
+        s.map = { ...JSON.parse(JSON.stringify(enc.map)), weather: s.map.weather, ready: true, terrain: enc.map.terrain || s.map.terrain };
+        s.creatures.forEach((c) => { c.position = null; });
+      }
       // Encounters made before terrain and weather moved to Map setup had their own.
       if (enc.terrain && enc.terrain !== 'flat') s.map.terrain = enc.terrain;
       if (enc.weather && enc.weather !== 'world') s.map.weather = enc.weather;

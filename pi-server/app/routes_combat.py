@@ -228,7 +228,8 @@ def _handle(conn, action, params):
         if load_state(conn).get('active'):
             # One battle at a time -- a new one would silently replace the running one. It ends when its last
             # participant leaves (End Battle), so only the people in it can end it.
-            raise ValueError('A battle is already in progress -- join it, or wait until its players end it.')
+            raise ValueError('An adventure is running -- the DM ends it before a battle can start.' if existing_adventure(conn)
+                             else 'A battle is already in progress -- join it, or wait until its players end it.')
         state = copy.deepcopy(_EMPTY_STATE)  # deep: the board below is edited, never the shared template
         state['active'] = True
         state['battleType'] = battle_type
@@ -250,8 +251,11 @@ def _handle(conn, action, params):
         # just stop mid-battle with no closing entry.
         state = load_state(conn)
         if state.get('active'):
-            _log_event(state, 'session-end', text='Battle ended')
-            _remember_battle(conn, state)
+            if state.get('battleType') == 'adventure':
+                _log_event(state, 'session-end', text='Adventure ended')  # nothing was fought -- no Post battle
+            else:
+                _log_event(state, 'session-end', text='Battle ended')
+                _remember_battle(conn, state)
         return _save_and_publish(conn, dict(_EMPTY_STATE))
 
     if action == 'capture':
@@ -746,22 +750,13 @@ def start_prepared_session(conn, setup):
     Pokemon goes through) plus `heldBack`, `initiativeBonus` (rolled d20 + this when no initiative was typed) and an
     optional `position` {col, row, facing}."""
     with _SESSION_LOCK:
-        if load_state(conn).get('active'):
-            raise ValueError('A battle is already in progress -- end it before starting a new one.')
-        m = setup.get('map') or {}
-        cols, rows = js_parse_int(m.get('cols')), js_parse_int(m.get('rows'))
-        if not cols or not rows or not (1 <= cols <= 60 and 1 <= rows <= 60):
-            raise ValueError('The map needs a size between 1 and 60 squares each way')
+        current = load_state(conn)
+        if current.get('active'):
+            raise ValueError('An adventure is running -- end it before starting a battle.' if current.get('battleType') == 'adventure'
+                             else 'A battle is already in progress -- end it before starting a new one.')
         state = copy.deepcopy(_EMPTY_STATE)
         state.update({'active': True, 'battleType': 'pve', 'round': 1, 'log': [], 'logFile': _new_log_filename('pve')})
-        board = state['board']
-        board['grid'] = {'cols': cols, 'rows': rows}
-        bg = m.get('background') or ''
-        board['backgroundImage'] = bg if bg.startswith('/battle-images/') else None
-        board['objects'] = _clean_map_objects(m.get('objects'), cols, rows)
-        board['marks'] = {cell: kind for cell, kind in (m.get('marks') or {}).items()
-                          if kind in MAP_MARK_KINDS and _in_grid(cell, cols, rows)}
-        board['traps'] = _clean_traps(m.get('traps'), cols, rows)
+        _board_from_map(state['board'], setup.get('map') or {})
         _log_event(state, 'session-start', text='Battle started (PVE)')
 
         for creature in setup.get('creatures') or []:
@@ -789,6 +784,43 @@ def _in_grid(cell, cols, rows):
     except ValueError:
         return False
     return 0 <= c < cols and 0 <= r < rows
+
+
+def _board_from_map(board, m):
+    """A battle map from the DM console (Map setup's, an encounter's or an adventure's: {cols, rows, background, objects,
+    marks, traps}) onto a fresh session board, cleaned."""
+    cols, rows = js_parse_int(m.get('cols')), js_parse_int(m.get('rows'))
+    if not cols or not rows or not (1 <= cols <= 60 and 1 <= rows <= 60):
+        raise ValueError('The map needs a size between 1 and 60 squares each way')
+    board['grid'] = {'cols': cols, 'rows': rows}
+    bg = m.get('background') or ''
+    board['backgroundImage'] = bg if bg.startswith('/battle-images/') else None
+    board['objects'] = _clean_map_objects(m.get('objects'), cols, rows)
+    board['marks'] = {cell: kind for cell, kind in (m.get('marks') or {}).items()
+                      if kind in MAP_MARK_KINDS and _in_grid(cell, cols, rows)}
+    board['traps'] = _clean_traps(m.get('traps'), cols, rows)
+
+
+def existing_adventure(conn):
+    state = load_state(conn)
+    return bool(state.get('active')) and state.get('battleType') == 'adventure'
+
+
+def start_adventure(conn, m):
+    """The DM console's Adventure module (the user's ask, 2026-10-16): the table's battle map without a battle -- a
+    session of battleType 'adventure' on the DM's adventure map. The players join with their trainer and, if they like,
+    one Pokemon, and walk around freely: no turns, no initiative, no movement limit (_move_token / _rotate_token). Ending it
+    leaves no Post battle. Only when nothing else is running."""
+    with _SESSION_LOCK:
+        if load_state(conn).get('active'):
+            raise ValueError('A battle is running -- the adventure can start once it has ended.')
+        if not isinstance(m, dict):
+            raise ValueError('Make the adventure map first')
+        state = copy.deepcopy(_EMPTY_STATE)
+        state.update({'active': True, 'battleType': 'adventure', 'round': 0, 'log': [], 'logFile': _new_log_filename('adventure')})
+        _board_from_map(state['board'], m)
+        _log_event(state, 'session-start', text='Adventure started')
+        return _save_and_publish(conn, state)
 
 
 def _clean_map_objects(objects, cols, rows):
@@ -1448,7 +1480,9 @@ def _leave_session(conn, owner):
             state.setdefault('departed', {})[pid] = _battle_memory(state['participants'][pid], left=True)
             state['participants'].pop(pid, None)
             state['board']['tokens'].pop(pid, None)
-        _log_event(state, 'leave', text=f'{owner} left the battle', actorName=owner)
+        _log_event(state, 'leave', text=f"{owner} left the {'adventure' if state.get('battleType') == 'adventure' else 'battle'}", actorName=owner)
+    if state.get('battleType') == 'adventure':
+        return _save_and_publish(conn, state)  # the DM's: it runs until the DM ends it, players or not
     if not any(p.get('owner') and p.get('owner') != DM_OWNER for p in state['participants'].values()):
         _log_event(state, 'session-end', text='Battle ended (all players left)')
         _remember_battle(conn, state)
@@ -1857,6 +1891,9 @@ def _rebuild_turn_order(state):
     first advance-turn) -- before that, turnIndex is always just recomputed
     fresh (index 0 of the current sort), since there's no real turn in
     progress yet to protect."""
+    if state.get('battleType') == 'adventure':
+        state['turnOrder'], state['turnIndex'] = [], 0  # an adventure has no turns (start_adventure)
+        return
     current_id = None
     old_order = list(state['turnOrder'])
     if state.get('started') and state['turnOrder'] and state['turnIndex'] < len(state['turnOrder']):
@@ -4465,15 +4502,10 @@ def _fill_species_size(conn, data):
     token covers the right squares (Large 2x2, Huge 3x3, Gigantic 4x4) instead of falling back to one."""
     if str(data.get('size') or '').strip() or data.get('combatantType') != 'pokemon':
         return
-    species = str(data.get('speciesName') or '').strip().lower()
-    if not species:
-        return
-    try:
-        row = next((r for r in upstream.fetch_pokemon_db(conn) if len(r) > 9 and str(r[2]).strip().lower() == species), None)
-    except Exception:
-        row = None
-    if row and str(row[9] or '').strip():
-        data['size'] = str(row[9]).strip()
+    from . import species as species_data
+    sp = species_data.get(data.get('speciesName'))
+    if sp and sp.get('size'):
+        data['size'] = sp['size']
 
 
 def _dm_set_size(state, pid, size):
@@ -4534,7 +4566,7 @@ def _rotate_token(state, pid, facing):
     but turn-gated exactly like move-token, so only the participant holding the floor can turn."""
     if pid not in state['participants']:
         raise ValueError('Unknown participant: ' + pid)
-    if pid != _active_participant_id(state):
+    if pid != _active_participant_id(state) and state.get('battleType') != 'adventure':  # an adventure has no turns
         raise ValueError("It's not this participant's turn")
     token = state['board']['tokens'].get(pid)
     if not token:
@@ -4650,6 +4682,8 @@ def _move_token(state, pid, col, row, z=None):
     participant = state['participants'].get(pid)
     if not participant:
         raise ValueError('Unknown participant: ' + pid)
+    if state.get('battleType') == 'adventure':
+        return _adventure_move(state, participant, col, row, z)
     if pid != _active_participant_id(state):
         raise ValueError("It's not this participant's turn")
     blocking = next((s for s in _statuses_of(participant)
@@ -4736,6 +4770,26 @@ def _move_token(state, pid, col, row, z=None):
         _open_moved_away_window(state, pid, previous)
     _log_event(state, 'move', text=f"{participant['name']} moved to ({col}, {row})",
                actorId=pid, actorName=participant['name'], col=col, row=row)
+
+
+def _adventure_move(state, participant, col, row, z=None):
+    """An adventure (start_adventure): anyone walks anywhere at any time -- no turn, no movement limit, nothing logged. The
+    map still counts: blocked squares stop a creature on the ground, and the token has to fit on the board."""
+    pid = participant['id']
+    grid = state['board'].get('grid') or {}
+    n = footprint_size(participant.get('size'))
+    if not all(0 <= c < (grid.get('cols') or 0) and 0 <= r < (grid.get('rows') or 0) for c, r in footprint_cells(col, row, n)):
+        raise ValueError(f"{participant['name']} doesn't fit there")
+    current = state['board']['tokens'].get(pid)
+    z1 = (current or {}).get('z', 0) if z is None else z
+    if current and z1 == 0 and not is_levitating(participant):
+        wall = _blocked_cell_on_path(state, current['col'], current['row'], col, row, n)
+        if wall:
+            raise ValueError(f"{participant['name']} can't move through ({wall[0]}, {wall[1]}) -- that square is blocked")
+    facing = _facing_of(state, pid)
+    if current and (col, row) != (current['col'], current['row']):
+        facing = (round(math.degrees(math.atan2(col - current['col'], current['row'] - row)) / 45) * 45) % 360
+    state['board']['tokens'][pid] = {'col': col, 'row': row, 'facing': facing, 'z': z1}
 
 
 def _clear_token_position(state, pid):

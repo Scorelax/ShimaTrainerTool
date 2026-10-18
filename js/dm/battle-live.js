@@ -25,10 +25,11 @@ import { DM, escapeHtml, typeBadges, getSpecies, rollD20, toast, participantFrom
 import { getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD, STATUS_CAPTURE_BONUS, captureDc, accuracyDc } from './encounter-rules.js';
 import { getSetup } from './setup-store.js';
-import { renderMapEditor } from './map-editor.js';
+import { renderMapEditor, editorShownIn } from './map-editor.js';
 import { setLiveSession } from './live-map-store.js';
 import * as liveMapStore from './live-map-store.js';
 import { loadScene, getScene, updateScene, onSceneChange } from './display-store.js';
+import { renderEncounters } from './encounters.js';
 
 let session = { active: false, participants: {}, turnOrder: [] };
 let species = [];
@@ -403,11 +404,16 @@ export function showLiveTab(tab = liveTab, { mode = null, selectId = null } = {}
   document.querySelectorAll('#dmLiveTabs [data-ltab]').forEach(b => b.classList.toggle('active', b.dataset.ltab === tab));
   const battle = document.getElementById('dmLive');
   const mapEl = document.getElementById('dmLiveMap');
+  const encEl = document.getElementById('dmEncView');
   if (!battle || !mapEl) return;
   battle.hidden = tab !== 'battle';
   mapEl.hidden = tab !== 'map';
+  if (encEl) encEl.hidden = tab !== 'encounters';
+  // Encounter setup, while the battle runs: building the next encounter (encounters.js) -- drawn fresh when opened.
+  if (tab === 'encounters' && was !== 'encounters') renderEncounters(encEl, { tab: 'library' });
   if (tab !== 'map') { if (was === 'map') hideBattleMap(); return; }
-  if (was === 'map' && !mode && !selectId && mapEl.firstElementChild) return; // already showing
+  // Already showing (unless the map editor was taken by another screen meanwhile -- map-editor.js draws one at a time).
+  if (was === 'map' && !mode && !selectId && mapEl.firstElementChild && (mapMode !== 'edit' || editorShownIn(mapEl))) return;
   renderMapTab(selectId);
 }
 

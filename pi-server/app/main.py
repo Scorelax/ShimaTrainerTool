@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db, live, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, sprite_previews, upstream
+from . import db, live, routes_pokemon, routes_trainer, routes_gamedata, routes_music, routes_combat, routes_dm, species, sprite_previews, upstream
 
 app = FastAPI(title='Pokemon DnD Trainer Tool API')
 
@@ -101,7 +101,7 @@ def _data_version():
         conn.close()
     files = []
     # (the Pokemon pictures folder too: a picture added for a species shows on every device without waiting)
-    for path in (upstream.POKEMON_FILE, upstream.ITEMS_FILE, upstream.MOVES_FILE, upstream.POKEMON_IMAGE_DIR):
+    for path in (species.SPECIES_FILE, species.ABILITIES_FILE, upstream.ITEMS_FILE, upstream.MOVES_FILE, upstream.POKEMON_IMAGE_DIR):
         try:
             files.append(str(int(os.path.getmtime(path))))
         except OSError:

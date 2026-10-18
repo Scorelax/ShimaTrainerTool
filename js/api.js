@@ -1,5 +1,5 @@
 // API Client for Pokemon D&D Tool
-// Handles all communication with Google Apps Script backend
+// Handles all communication with the pi-server (the same server that serves the app)
 
 import { getSettings } from './utils/settings.js';
 import { commitMove } from './utils/move-commit.js';
@@ -9,23 +9,18 @@ import { redactForViewer } from './utils/combat-visibility.js';
 // CONFIGURATION
 // ============================================================================
 
-// When the app is served by the pi-server itself (localhost test run, or
-// the Raspberry Pi later), talk to that same server. When served from
-// GitHub Pages (the live player-facing version), keep using Google Apps
-// Script until cutover.
-export const SERVED_BY_PI_SERVER = window.location.protocol.startsWith('http')
-  && !window.location.hostname.endsWith('github.io');
+// The app always talks to the pi-server that serves it (the Raspberry Pi, or a localhost test run). The Google Apps
+// Script backend it fell back to when opened from GitHub Pages is gone (2026-10-18) -- opened there, the app only
+// shows the "moved" banner (index.js).
+export const ON_OLD_GITHUB_ADDRESS = window.location.hostname.endsWith('github.io');
 
 const API_CONFIG = {
-  baseUrl: SERVED_BY_PI_SERVER
-    ? `${window.location.origin}/api`
-    : 'https://script.google.com/macros/s/AKfycbwXsojbcIhuqpYeWFVgsMzf74HvwvV7thts7K6VBV49CWHCNFQ5aKBGeMlWpJaG2YzC/exec',
+  baseUrl: `${window.location.origin}/api`,
   timeout: 30000 // 30 seconds
 };
 
-// Server-Sent Events stream for live push notifications (Benjakronk's
-// Pokedex-config pushes) -- pi-server only, Apps Script has no such route.
-export const EVENTS_URL = SERVED_BY_PI_SERVER ? `${window.location.origin}/api/events` : null;
+// Server-Sent Events stream for live push notifications (Pokedex-config pushes, combat, ...).
+export const EVENTS_URL = ON_OLD_GITHUB_ADDRESS ? null : `${window.location.origin}/api/events`;
 
 // ============================================================================
 // CACHE MANAGER
@@ -1369,6 +1364,11 @@ export class DmAPI {
    * (portraits: the NPC pictures, then the players' own, own: true). */
   static async mapAssets() {
     return API.request('dm', 'map-assets', {}, { useCache: false });
+  }
+
+  /** Starts an adventure on the Adventure module's map (dm_state 'adventure-map'): the table's map without a battle. */
+  static async startAdventure() {
+    return API.request('dm', 'start-adventure', {}, { useCache: false, timeout: 30000 });
   }
 
   /** Starts the PvE battle from the saved setup -- only then can the players join. */

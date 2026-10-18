@@ -64,6 +64,7 @@ const SIZES = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gigantic'];
 
 let _root = null;
 let _onDone = null;
+let _opts = {}; // renderMapEditor's options, kept for redrawing it
 let _unsub = null;
 
 /** Loads the object / background lists once per page (they're files on the Pi). */
@@ -233,11 +234,16 @@ function applyEdit() {
 // Render
 // ---------------------------------------------------------------------------
 
-export async function renderMapEditor(root, { onDone, live = false }) {
+/** `store`: another map than Map setup's (map-store.js -- an encounter's, the adventure's); `backLabel` / `title` name it. */
+export async function renderMapEditor(root, { onDone, live = false, store = null, backLabel = null, title = null }) {
+  _opts = { onDone, live, store, backLabel, title };
+  // One editor at a time: it finds its parts by id, so one still drawn somewhere else (another module, a hidden tab)
+  // would be the one it changes. That one is emptied -- its owner draws it again when it's shown (editorShownIn).
+  if (_root && _root !== root && document.body.contains(_root)) { _unsub?.(); _unsub = null; _root.innerHTML = ''; }
   _root = root;
   _onDone = onDone;
   _live = live;
-  _store = live ? liveStore : setupStore;
+  _store = store || (live ? liveStore : setupStore);
   if (!live && ed.tool === 'creatures') ed.tool = 'objects';
   root.innerHTML = '<div class="dm-loading">Loading the map tools…</div>';
   try {
@@ -253,11 +259,11 @@ export async function renderMapEditor(root, { onDone, live = false }) {
     <div class="dm-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head">
-          <button class="dm-btn small" id="mapBack">${_live ? '← Battle' : '← Map setup'}</button>
-          <h2>${_live ? 'Battle map' : 'Map'}</h2>
+          <button class="dm-btn small" id="mapBack">${escapeHtml(backLabel || (_live ? '← Battle' : '← Map setup'))}</button>
+          <h2>${escapeHtml(title || (_live ? 'Battle map' : 'Map'))}</h2>
           <button class="dm-btn primary small" id="mapDone">✓ Done</button>
         </div>
-        ${_live ? '<div class="dm-hint dm-live-note">The running battle\'s map -- every change shows on the players\' screens and the table at once.</div>' : ''}
+        ${_live ? '<div class="dm-hint dm-live-note">The map being played on (the battle\'s or the adventure\'s) -- every change shows on the players\' screens and the table at once.</div>' : ''}
 
         ${_live ? '' : `<div class="dm-card">
           <div class="dm-card-title">Size</div>
@@ -427,7 +433,7 @@ async function loadSavedMap(id) {
     });
   });
   toast(`Loaded "${sm.name}"`);
-  renderMapEditor(_root, { onDone: _onDone }); // the size and background fields show the loaded map
+  renderMapEditor(_root, _opts); // the size and background fields show the loaded map
 }
 
 async function deleteSavedMap(id) {
@@ -545,7 +551,7 @@ function uploadPicture(file, kind, name) {
         selectObjectKind(pic.key);
         toast(`Object "${pic.label}" uploaded -- click the map to place it.`);
       }
-      renderMapEditor(_root, { onDone: _onDone, live: _live });
+      renderMapEditor(_root, _opts);
     } catch (err) {
       showCombatAlert(err.message, { title: kind === 'object' ? 'Upload an object' : 'Upload a background' });
       if (btn) { btn.disabled = false; btn.textContent = `⬆ Upload ${kind === 'object' ? 'an object' : 'a background'}`; }
@@ -573,7 +579,7 @@ async function deletePicture(url, label) {
   await loadAssets();
   if (_assets.objects.every(o => o.key !== ed.objectKey)) ed.objectKey = _assets.objects[0]?.key || '';
   toast(`"${label}" deleted.`);
-  renderMapEditor(_root, { onDone: _onDone, live: _live });
+  renderMapEditor(_root, _opts);
 }
 
 async function leave() {
@@ -1091,6 +1097,11 @@ function revealObject(id) {
   delete next.hidden;
   commitObject(next, o);
   renderToolPanel();
+}
+
+/** Whether the map editor is drawn in `root` right now (another one may have taken its place -- renderMapEditor). */
+export function editorShownIn(root) {
+  return !!root?.querySelector('.dm-editor') && root.contains(document.getElementById('mapWrap'));
 }
 
 /** A small read-only picture of the map for the setup overview. */

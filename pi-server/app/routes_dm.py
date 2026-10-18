@@ -9,7 +9,7 @@ import re
 from datetime import datetime, timezone
 
 from . import routes_combat, upstream
-from .calculations import sanitize_moves, sanitize_string
+from . import species as species_data
 from .jsutil import js_parse_int
 from .routes_gamedata import calculate_type_effectiveness
 from .routes_pokemon import apply_registration_stats
@@ -25,7 +25,8 @@ _CLOCK_KEY = 'world-clock'
 # out of the random generators, what the table TV shows outside the battle (js/dm/display-store.js), and where the
 # region map on the board screen is looking (js/dm/pokenav.js).
 _STATE_KEYS = {'encounter-run', 'last-battle', 'saved-pokemon', 'encounter-exclusions', 'display-scene', 'region-map-view',
-               'pokedex-caught', 'saved-maps'}  # saved-maps: the DM's battle maps kept for reuse (js/dm/map-editor.js)
+               'pokedex-caught', 'saved-maps',  # saved-maps: the DM's battle maps kept for reuse (js/dm/map-editor.js)
+               'adventure-map'}  # the Adventure module's map (js/dm/adventure.js), until the adventure starts
 # The species the players have ever caught (lowercase names) -- see caught_species.
 _CAUGHT_KEY = 'pokedex-caught'
 # The XP each level starts at (the old DM tool's table) -- trainers and Pokemon alike. XP itself is in the trainers' and
@@ -37,12 +38,6 @@ _OLD_XP_LEDGER_KEY = 'xp-ledger'
 # The pictures the DM uploads for the table TV (backgrounds) -- the files in upstream.DISPLAY_IMAGE_DIR, their names here.
 _DISPLAY_IMAGES_KEY = 'display-images'
 _STAT_KEYS = ('str', 'dex', 'con', 'int', 'wis', 'cha')
-
-# Encyclopedia (upstream pokemon DB) row indices used below -- see pokedex.py's _format_row for the full layout.
-_ABILITY_SLOTS = ((15, 62), (16, 63), (17, 64))  # (name, description) for the primary, secondary and hidden ability
-_MOVE_COLUMNS = ((35, 4), (36, 4), (37, 4), (38, 4), (39, 3), (40, 3))  # starting, L2, L6, L10, L14, L18 moves (+ max kept)
-_MOVEMENT_COLUMNS = range(65, 71)  # walking, climbing, flying, hovering, swimming, burrowing
-_SENSE_COLUMNS = range(71, 80)  # sight, hearing, smell, tremorsense, echolocation, telepathy, blindsight, darkvision, truesight
 
 
 def handle(conn, action, params):
@@ -166,53 +161,40 @@ def handle(conn, action, params):
         save_setup(conn, setup)
         return result
 
+    if action == 'start-adventure':
+        return routes_combat.start_adventure(conn, _load_state(conn, 'adventure-map'))
+
     raise ValueError('Unknown dm action: ' + str(action))
 
 
 def _find_species(conn, name):
-    row = next((r for r in upstream.fetch_pokemon_db(conn) if str(_cell(r, 2)).lower() == str(name).lower()), None)
-    if not row:
-        raise ValueError('Unknown species: ' + str(name))
-    return row
+    return species_data.require(name)
 
 
 def species_detail(conn, name):
     """Everything the encyclopedia knows about one species, named -- for the DM console's Pokedex module."""
-    row = _find_species(conn, name)
-    evo = str(_cell(row, 14))
+    sp = _find_species(conn, name)
+    combat = sp.get('combat') or {}
     return {
-        'name': row[2], 'dex': _cell(row, 1), 'classification': _cell(row, 5), 'description': sanitize_string(_cell(row, 6)),
-        'type1': _cell(row, 7), 'type2': _cell(row, 8),
-        'size': _cell(row, 9), 'rarity': _cell(row, 10), 'habitat': _cell(row, 11), 'behavior': _cell(row, 12), 'activity': _cell(row, 13),
-        'evolution': evo, 'evolvesFrom': _evo_part(evo, 'from'), 'evolvesTo': _evo_part(evo, 'evolves'),
-        'catchDifficulty': _cell(row, 18), 'level': js_parse_int(_cell(row, 19)) or 1,
-        'ac': _cell(row, 20), 'hitDice': _cell(row, 21), 'hp': _cell(row, 22), 'vitalityDice': _cell(row, 23), 'vp': _cell(row, 24),
-        'speed': _cell(row, 25), 'movement': dict(zip(('walking', 'climbing', 'flying', 'hovering', 'swimming', 'burrowing'), (_cell(row, i) for i in _MOVEMENT_COLUMNS))),
-        'stats': {k: js_parse_int(_cell(row, i)) for k, i in zip(_STAT_KEYS, range(27, 33))},
-        'savingThrows': _cell(row, 33), 'skills': _cell(row, 34),
-        'abilities': _abilities(row),
-        'moves': {lvl: [m.strip() for m in sanitize_moves(_cell(row, i), keep).split(',') if m.strip()]
-                  for lvl, (i, keep) in zip((1, 2, 6, 10, 14, 18), _MOVE_COLUMNS)},
-        'senses': dict(zip(('sight', 'hearing', 'smell', 'tremorsense', 'echolocation', 'telepathy', 'blindsight', 'darkvision', 'truesight'),
-                           (_cell(row, i) for i in _SENSE_COLUMNS))),
-        'image': upstream.pokemon_image_url(row[2], _cell(row, 1)),
+        'name': sp['name'], 'dex': sp.get('dexNumber'), 'classification': sp.get('classification') or '',
+        'description': sp.get('description') or '',
+        'type1': sp['types'].get('primary') or '', 'type2': sp['types'].get('secondary') or '',
+        'size': sp.get('size') or '', 'rarity': sp.get('rarity') or '', 'habitat': sp.get('habitat') or '',
+        'behavior': sp.get('behavior') or '', 'activity': sp.get('active') or '',
+        'evolution': species_data.evolution_text(sp), 'evolvesFrom': ' + '.join(sp.get('evolvesFrom') or []),
+        'evolvesTo': species_data.evolves_into_names(sp),
+        'catchDifficulty': (sp.get('encounter') or {}).get('catchDifficulty'),
+        'level': (sp.get('encounter') or {}).get('minimumLevel') or 1,
+        'ac': combat.get('ac'), 'hitDice': combat.get('hitDie'), 'hp': combat.get('baseHP'),
+        'vitalityDice': combat.get('vitalityDie'), 'vp': combat.get('baseVP'),
+        'speed': species_data.speed_text(sp), 'movement': species_data.movement_text(sp),
+        'stats': species_data.stats(sp),
+        'savingThrows': species_data.list_text(sp.get('savingThrows')), 'skills': species_data.list_text(sp.get('skills')),
+        'abilities': species_data.abilities(sp),
+        'moves': {lvl: species_data.moves_at(sp, lvl) for lvl in species_data.MOVE_LEVELS},
+        'senses': species_data.senses_text(sp),
+        'image': upstream.pokemon_image_url(sp['name'], sp.get('dexNumber')),
     }
-
-
-def _evo_part(text, which):
-    """'From: Sandit; Evolves: Bedouwara @ Level 14' -> 'Sandit' (which='from') or ['Bedouwara'] (which='evolves').
-    The targets come from every "Evolves:" part (a species can have several), read exactly as the players' Pokedex
-    reads them (player_pokedex.evolution_targets), so the per-target switches match what it shows."""
-    if which == 'evolves':
-        from .player_pokedex import evolution_targets
-        return evolution_targets(text)
-    for part in str(text or '').split(';'):
-        key, _, value = part.partition(':')
-        if key.strip().lower() == which:
-            value = value.strip()
-            return value if value and value != '-' else ''
-    return ''
-
 
 def _owned_species(conn):
     """The species the players have right now (any trainer's Pokemon, lowercase)."""
@@ -280,7 +262,6 @@ def reveal_caught_species(conn, species, pokemon_row=None):
     level shows the moves up to it, its abilities ("0:Name;text|2:Name;text" -- the slot first) show those abilities.
     Nothing is ever switched off. Saved like the DM console's own Pokedex edits, and pushed live."""
     from . import live
-    from .player_pokedex import evolution_targets
     config = json.loads(json.dumps(upstream.fetch_pokedex_config(conn) or {}))
     name = str(species or '').strip()
     key = name.lower()
@@ -293,8 +274,8 @@ def reveal_caught_species(conn, species, pokemon_row=None):
         # No settings of its own yet: start from the defaults, as the players saw it -- including the defaults' single
         # "Evolves into" switch, spelled out per evolution of this species (own settings name each one).
         vis = json.loads(json.dumps(config.get('defaults') or {}))
-        entry = next((r for r in upstream.fetch_pokemon_db(conn) if len(r) > 2 and str(r[2]).lower() == key), None)
-        targets = evolution_targets(entry[14] if entry and len(entry) > 14 else '')
+        entry = species_data.get(key)
+        targets = species_data.evolves_into_names(entry) if entry else []
         vis['evoToTargets'] = {t: bool(vis.get('evoTo')) for t in targets}
     for k in _REVEAL_ON_CATCH:
         vis[k] = True
@@ -707,8 +688,8 @@ def save_pokemon_image(conn, payload):
     005-scorab.png), so every page finds it the same way as his. A species that already has one is refused (nothing is
     overwritten). Returns {image (what the app shows -- a sprite still wins), picture}."""
     import base64
-    row = _find_species(conn, payload.get('species') or '')
-    name, dex = row[2], _cell(row, 1)
+    sp = _find_species(conn, payload.get('species') or '')
+    name, dex = sp['name'], sp.get('dexNumber')
     if upstream.local_pokemon_image_url(name, dex):
         raise ValueError(f'{name} already has a picture')
     m = re.match(r'^data:(image/[a-z+.-]+);base64,(.+)$', str(payload.get('data') or ''), re.S)
@@ -805,50 +786,39 @@ def _save_battle_picture(payload, prefix, types, wrong_type):
     return {'key': key, 'label': key.replace('_', ' ').replace('-', ' ').title(), 'url': f'/battle-images/{filename}'}
 
 
-def _cell(row, i):
-    return row[i] if i < len(row) and row[i] is not None else ''
-
-
-def _abilities(row):
-    out = []
-    for slot, (name_idx, desc_idx) in enumerate(_ABILITY_SLOTS):
-        name = _cell(row, name_idx)
-        if name:
-            out.append({'slot': slot, 'name': str(name).strip(),
-                        'description': sanitize_string(_cell(row, desc_idx)) or 'No description available'})
-    return out
-
-
 def species_list(conn):
     """Compact per-species summary for the DM's enemy picker, sorted by dex number. `image`: the self-uploaded sprite,
     else the original picture (`picture`)."""
     out = []
-    for row in upstream.fetch_pokemon_db(conn):
-        name = _cell(row, 2)
-        if not name:
-            continue
+    for sp in species_data.all_species():
+        name, dex = sp['name'], sp.get('dexNumber')
+        combat = sp.get('combat') or {}
         out.append({
             'name': name,
-            'dex': _cell(row, 1),
-            'classification': _cell(row, 5),
-            'type1': _cell(row, 7), 'type2': _cell(row, 8),
-            'size': _cell(row, 9), 'rarity': _cell(row, 10), 'habitat': _cell(row, 11),
-            'behavior': _cell(row, 12), 'activity': _cell(row, 13),
-            'evolution': _cell(row, 14),  # "From: X; Evolves: Y @ Level 14" -- the encounter generator's stage filter
-            'level': js_parse_int(_cell(row, 19)) or 1,
+            'dex': dex,
+            'classification': sp.get('classification') or '',
+            'type1': sp['types'].get('primary') or '', 'type2': sp['types'].get('secondary') or '',
+            'size': sp.get('size') or '', 'rarity': sp.get('rarity') or '', 'habitat': sp.get('habitat') or '',
+            'behavior': sp.get('behavior') or '', 'activity': sp.get('active') or '',
+            'evolution': species_data.evolution_text(sp),  # "From: X; Evolves: Y @ Level 14" -- the encounter generator's stage filter
+            'level': (sp.get('encounter') or {}).get('minimumLevel') or 1,
             # The encyclopedia's own numbers (before level, nature or anything the DM changes).
             'base': {
-                **{k: js_parse_int(_cell(row, i)) for k, i in zip(_STAT_KEYS, range(27, 33))},
-                'ac': js_parse_int(_cell(row, 20)), 'hitDice': js_parse_int(_cell(row, 21)), 'vitalityDice': js_parse_int(_cell(row, 23)),
-                'speed': _cell(row, 25), 'savingThrows': _cell(row, 33), 'skills': _cell(row, 34),
+                **species_data.stats(sp),
+                'ac': combat.get('ac'), 'hitDice': combat.get('hitDie'), 'vitalityDice': combat.get('vitalityDie'),
+                'speed': species_data.speed_text(sp), 'savingThrows': species_data.list_text(sp.get('savingThrows')),
+                'skills': species_data.list_text(sp.get('skills')),
             },
-            'abilities': _abilities(row),
+            'abilities': species_data.abilities(sp),
             # The still picture (Benjakronk's, on the Pi) -- the Display module offers it beside the animated sprite.
-            'picture': upstream.local_pokemon_image_url(name, _cell(row, 1)) or '',
+            'picture': upstream.local_pokemon_image_url(name, dex) or '',
         })
         out[-1]['image'] = upstream.local_sprite_url(name) or out[-1]['picture']
-    out.sort(key=lambda s: js_parse_int(s['dex']) or 0)
     return out
+
+def _num(v):
+    """A number for the Pokemon row; '' where the encyclopedia has none yet (as its empty cells were)."""
+    return '' if v is None else v
 
 
 def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), nickname='', held_item='', shiny=False,
@@ -862,17 +832,17 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
     them -- `overrides` ({'ac', 'maxHP', 'maxVP'}) are set last, as typed, and `extra_skills` are proficiencies it has on
     top of its species' own. `bonus` (Encounter setup: {'str': 2, 'ac': 1, 'maxHP': 5, ...}) is added to what the
     numbers come out as -- ability-score bonuses before HP/VP and modifiers follow them, AC/HP/VP ones at the end."""
-    row = next((r for r in upstream.fetch_pokemon_db(conn) if str(_cell(r, 2)).lower() == str(species).lower()), None)
-    if not row:
-        raise ValueError('Unknown species: ' + str(species))
-    name = row[2]
-    dex = _cell(row, 1)
-    level = max(1, min(20, level or js_parse_int(_cell(row, 19)) or 1))
+    sp = species_data.require(species)
+    name = sp['name']
+    dex = sp.get('dexNumber')
+    combat = sp.get('combat') or {}
+    base = species_data.stats(sp)
+    level = max(1, min(20, level or (sp.get('encounter') or {}).get('minimumLevel') or 1))
 
     wanted = {str(s).strip() for s in ability_slots}
-    abilities = '|'.join(f"{a['slot']}:{a['name']};{a['description']}" for a in _abilities(row) if str(a['slot']) in wanted)
+    abilities = '|'.join(f"{a['slot']}:{a['name']};{a['description']}" for a in species_data.abilities(sp) if str(a['slot']) in wanted)
 
-    type1, type2 = _cell(row, 7), _cell(row, 8)
+    type1, type2 = sp['types'].get('primary') or '', sp['types'].get('secondary') or ''
     matchups = calculate_type_effectiveness(conn, type1, type2 or None)
 
     data = [
@@ -883,18 +853,18 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
         level,                                                # 4: level
         type1, type2,                                         # 5, 6: types
         abilities,                                            # 7: abilities
-        _cell(row, 20),                                       # 8: AC
-        _cell(row, 21),                                       # 9: hit dice
+        _num(combat.get('ac')),                               # 8: AC
+        _num(combat.get('hitDie')),                           # 9: hit dice
         '',                                                   # 10: HP (calculated)
-        _cell(row, 23),                                       # 11: vitality dice
+        _num(combat.get('vitalityDie')),                      # 11: vitality dice
         '',                                                   # 12: VP (calculated)
-        ', '.join(str(_cell(row, i) or '-') for i in _MOVEMENT_COLUMNS),  # 13: speed
-        _cell(row, 26),                                       # 14: total stats
-        *[_cell(row, i) for i in range(27, 33)],              # 15-20: STR..CHA
-        _cell(row, 33),                                       # 21: saving throws
-        _cell(row, 34),                                       # 22: skills
-        *[sanitize_moves(_cell(row, i), keep) for i, keep in _MOVE_COLUMNS],  # 23-28: moves by level
-        _cell(row, 14),                                       # 29: evolution requirement
+        ', '.join(v or '-' for v in species_data.movement_text(sp).values()),  # 13: speed
+        _num(species_data.stat_total(sp)),                    # 14: total stats
+        *[_num(base[k]) for k in species_data.STAT_KEYS],     # 15-20: STR..CHA
+        species_data.list_text(sp.get('savingThrows')),       # 21: saving throws
+        species_data.list_text(sp.get('skills')),             # 22: skills
+        *[species_data.moves_text(sp, lvl) for lvl in species_data.MOVE_LEVELS],  # 23-28: moves by level
+        species_data.evolution_text(sp),                      # 29: evolution requirement
         '', '',                                               # 30, 31: initiative, proficiency (calculated)
         nature or '',                                         # 32: nature
         0,                                                    # 33: loyalty -- a wild Pokemon has none
@@ -905,12 +875,12 @@ def build_pokemon(conn, species, level=None, nature='', ability_slots=('0',), ni
         '', '', '', '', '', '',                               # 39-44: modifiers (calculated)
         '', '', '',                                           # 45-47: current HP / VP (calculated) / AC
         '',                                                   # 48: comment
-        ', '.join(str(_cell(row, i) or '-') for i in _SENSE_COLUMNS),  # 49: senses
+        ', '.join(species_data.senses_text(sp).values()),   # 49: senses
         '', '',                                               # 50, 51: feats, gear
-        _cell(row, 6),                                        # 52: flavor text
+        sp.get('description') or '',                          # 52: flavor text
         ', '.join(str(v) for v in matchups),                  # 53: type matchups
         '', '', '',                                           # 54-56: current HD, current VD, utility slot
-        _cell(row, 9),                                        # 57: size
+        sp.get('size') or '',                                 # 57: size
         '', '', '',                                           # 58-60: cry, known moves, status condition
         'Y' if shiny else '',                                 # 61: shiny
     ]

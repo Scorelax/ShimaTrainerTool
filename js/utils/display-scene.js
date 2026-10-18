@@ -29,7 +29,8 @@ export function normaliseScene(s) {
 
 /** Whether the display shows `session`'s battle -- running, and not taken off it by the DM (battle-live.js's checkbox). */
 export function battleOnDisplay(scene, session) {
-  return !!session?.active && !(scene?.hideBattle && scene.hideBattle === session.logFile);
+  // An adventure (the DM console's Adventure module) has no battle to show -- it's on the battle-map screen only.
+  return !!session?.active && session.battleType !== 'adventure' && !(scene?.hideBattle && scene.hideBattle === session.logFile);
 }
 
 /** The scene as the TV draws it right now -- during a battle without the placed pictures, unless they're kept on. */

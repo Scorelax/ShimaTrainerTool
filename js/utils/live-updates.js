@@ -28,7 +28,7 @@ let source = null;
 /**
  * Opens the SSE connection once for the whole session -- this app is a real
  * SPA (main.js loads once, pages are innerHTML swaps), so the connection
- * survives every in-app navigation. No-ops on the Apps Script backend
+ * survives every in-app navigation. No-ops on the old GitHub Pages address
  * (EVENTS_URL is null there) and if already initialized.
  */
 export function initLiveUpdates() {
@@ -87,7 +87,7 @@ async function refreshPokedexData() {
 
     const listResult = await PokemonAPI.getCompleteList(true);
     if (listResult.status === 'success') {
-      sessionStorage.setItem('completePokemonData', JSON.stringify(listResult.data));
+      sessionStorage.setItem('registeredSpecies', JSON.stringify(listResult.data));
     }
 
     window.dispatchEvent(new CustomEvent('app:pokedex-updated'));
@@ -116,7 +116,7 @@ async function refreshActiveTrainerData(trainerName) {
       sessionStorage.setItem(`pokemon_${pokemon[2].toLowerCase()}`, JSON.stringify(pokemon));
     });
     if (bundle.registeredList) {
-      sessionStorage.setItem('completePokemonData', JSON.stringify(bundle.registeredList));
+      sessionStorage.setItem('registeredSpecies', JSON.stringify(bundle.registeredList));
     }
     if (bundle.pokedexConfig) {
       setPokedexConfig(bundle.pokedexConfig);

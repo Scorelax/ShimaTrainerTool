@@ -91,7 +91,8 @@ function _injectStyles() {
     .bmap-content .bmap-hint { margin-bottom: 0.4rem; }
     .bmap-content .bmap-move-panel { margin-bottom: 0.45rem; padding: 0.4rem 0.6rem; }
     .bmap-content .bmap-toolbar-slot { margin-bottom: 0.4rem; min-height: 2.6rem; }
-    .bmap-content .bmap-legend:empty { display: none; }
+    .bmap-content .bmap-legend:empty, .bmap-content .bmap-round:empty { display: none; }
+    .bmap-move-panel[hidden] { display: none; }
     .bmap-content .bmap-legend { margin: 0 0 0.45rem; }
     /* inline (the DM console's Map tab): the same map filling its tab instead of floating over the page */
     .combat-popup-overlay.bmap-inline { position: relative; top: auto; left: auto; width: 100%; height: 100%; z-index: auto;
@@ -207,7 +208,7 @@ export function showBattleMap(session, trainerName, { selectId = null, container
   _ownerName = trainerName;
   const pre = selectId && session.participants?.[selectId];
   _selectedTokenId = pre && session.board?.tokens?.[selectId] && pre.owner === trainerName
-    && selectId === _activeParticipantId(session) ? selectId : null;
+    && (_adventure(session) || selectId === _activeParticipantId(session)) ? selectId : null;
   _stagedDestination = null; _stagedAlt = null;
   _ensureDom();
   // `container`: shown inside it (the DM console's Map tab) instead of over the page.
@@ -240,6 +241,12 @@ export function updateBattleMap(session) {
  * reaction, otherwise the normal turn holder. Same definition as
  * routes_combat.py's _active_participant_id, kept in sync manually since
  * there's no shared module between Python and JS for this. */
+/** An adventure (the DM console's Adventure module): no turns and no movement limit -- each player moves their own
+ * tokens whenever they like (routes_combat.py's _adventure_move). */
+function _adventure(session = _session) {
+  return session?.battleType === 'adventure';
+}
+
 function _activeParticipantId(session) {
   if (session.reactingParticipantId) return session.reactingParticipantId;
   if (session.turnOrder && session.turnOrder.length) return session.turnOrder[session.turnIndex];
@@ -250,6 +257,7 @@ function _activeParticipantId(session) {
  * applied (move-effects.js's movementBudget, the same number the server enforces), minus the single shared
  * movementUsed counter (switching between speeds still draws from one pool, 5e's own rule). null with no speeds. */
 function _bestRemainingFt(p) {
+  if (_adventure()) return null; // no movement limit on an adventure
   return movementBudget(p)?.remaining ?? null;
 }
 
@@ -311,6 +319,8 @@ function _render() {
       hint.textContent = `Drag on the map to aim the ${tool} (any angle) · tap the length to switch ${tool} move · turn ${_lineOn ? 'Line' : 'Cone'} off to move again.`;
     } else if (_selectedTokenId) {
       hint.textContent = 'Click a cell to move there · ⟲ ⟳ (or Q / E) to turn · Cone / Line to aim one and see who it would catch.';
+    } else if (_adventure()) {
+      hint.textContent = 'Click one of your tokens (gold ring) to move or turn it -- there are no turns on an adventure.';
     } else {
       const activeId = _activeParticipantId(_session);
       const activeIsMine = !!activeId && _session.participants[activeId]?.owner === _ownerName;
@@ -345,11 +355,13 @@ function _renderMovePanel() {
   const panel = document.getElementById('bmapMovePanel');
   if (!panel) return;
 
-  const activeId = _activeParticipantId(_session);
+  // An adventure moves whichever of the player's own tokens is picked, as far as it likes.
+  const adventure = _adventure();
+  const activeId = adventure ? _selectedTokenId : _activeParticipantId(_session);
   const p = activeId && _session.participants[activeId]?.owner === _ownerName
     ? _session.participants[activeId] : null;
-  const budget = p ? movementBudget(p) : null;
-  if (!budget) { panel.hidden = true; return; }
+  const budget = p ? (adventure ? { speeds: [], remaining: Infinity } : movementBudget(p)) : null;
+  if (!budget || (adventure && !_stagedDestination)) { panel.hidden = true; return; }
   panel.hidden = false;
 
   const ftText = (n) => (Number.isInteger(n) ? n : Math.round(n * 10) / 10);
@@ -522,7 +534,7 @@ function _renderTokens() {
     if (!p) return;
 
     const isMine = !!_ownerName && p.owner === _ownerName;
-    const isMyTurn = isMine && id === activeId;
+    const isMyTurn = isMine && (_adventure() || id === activeId); // an adventure has no turns
     const classes = ['bmap-token', p.side];
     if (isMine) classes.push('mine');
     if (isMyTurn) classes.push('my-turn');

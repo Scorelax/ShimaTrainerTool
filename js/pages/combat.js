@@ -512,7 +512,8 @@ export function renderCombat() {
 // PHASE 1: SETUP
 // ============================================================================
 
-export function renderSetupPhase({ showWipButton = true } = {}) {
+/** `adventure`: joining the DM's adventure (no battle) -- bringing a Pokemon along is optional. */
+export function renderSetupPhase({ showWipButton = true, adventure = false } = {}) {
   const trainerData = JSON.parse(sessionStorage.getItem('trainerData') || '[]');
   const trainerName = trainerData[1] || 'Trainer';
   const trainerImage = trainerData[0] || 'assets/Pokeball.png';
@@ -546,7 +547,7 @@ export function renderSetupPhase({ showWipButton = true } = {}) {
       <style>${COMBAT_CSS}</style>
       <div class="combat-header-bar">
         <button class="combat-back-btn" id="combatBackBtn">← Back</button>
-        <div class="combat-header-title"><img src="assets/VS.png" alt="">Battle Setup</div>
+        <div class="combat-header-title">${adventure ? '🧭 Join the adventure' : '<img src="assets/VS.png" alt="">Battle Setup'}</div>
         ${showWipButton ? '<button class="combat-wip-btn" id="combatWipBtn">🛠️ WIP</button>' : '<div></div>'}
       </div>
       <div class="combat-setup-container">
@@ -558,11 +559,11 @@ export function renderSetupPhase({ showWipButton = true } = {}) {
             <div class="setup-trainer-level">Level ${trainerLevel}</div>
           </div>
         </div>
-        <div class="setup-section-label">SELECT LEAD POKÉMON (1)</div>
+        <div class="setup-section-label">${adventure ? 'BRING A POKÉMON ALONG (optional -- tap again to leave it)' : 'SELECT LEAD POKÉMON (1)'}</div>
         <div class="setup-pokemon-list" id="setupPokemonList">
           ${pokemonCards || '<div class="setup-empty">No active party Pokémon found.</div>'}
         </div>
-        <button class="combat-start-btn" id="startCombatBtn" disabled>Start Battle →</button>
+        <button class="combat-start-btn" id="startCombatBtn" ${adventure ? 'data-optional="1"' : 'disabled'}>${adventure ? 'Join the adventure →' : 'Start Battle →'}</button>
       </div>
     </div>`;
 }
@@ -1895,7 +1896,8 @@ export function attachSetupListeners({ backRoute = 'trainer-card', onStart } = {
       // Deselect all, then select this one (unless it was already selected — toggle off)
       document.querySelectorAll('.setup-pokemon-card').forEach(c => c.classList.remove('selected'));
       if (!wasSelected) card.classList.add('selected');
-      startBtn.disabled = document.querySelectorAll('.setup-pokemon-card.selected').length === 0;
+      // An adventure (data-optional) can be joined without a Pokemon.
+      startBtn.disabled = !startBtn.dataset.optional && document.querySelectorAll('.setup-pokemon-card.selected').length === 0;
     });
   });
 
@@ -1906,8 +1908,8 @@ export function attachSetupListeners({ backRoute = 'trainer-card', onStart } = {
     const allPartyKeys = [...document.querySelectorAll('.setup-pokemon-card')].map(el => el.dataset.pokemonKey);
     const benchKeys = allPartyKeys.filter(k => !selectedKeys.includes(k));
 
-    const activePokemon = buildPokemonCombatant(selectedKeys[0]);
-    activePokemon.hasRolledInitiative = false;
+    const activePokemon = selectedKeys.length ? buildPokemonCombatant(selectedKeys[0]) : null; // none: an adventure, alone
+    if (activePokemon) activePokemon.hasRolledInitiative = false;
     const trainerCombatant = buildTrainerCombatant();
 
     const bench = benchKeys.map(k => {

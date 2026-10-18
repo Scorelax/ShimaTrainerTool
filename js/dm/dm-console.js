@@ -18,14 +18,15 @@ import { enableDmMode } from '../pages/combat-wip.js';
 import { injectBattleMapStyles } from '../utils/battle-map-view.js';
 import { DM, escapeHtml } from './dm-common.js';
 import { loadSetup, getSetup, updateSetup, flushSetup, resetSetup, resetMap, resetBattle, mapReady, battleReady, DEFAULT_BACKGROUND } from './setup-store.js';
-import { renderMapEditor, mapPreviewHtml } from './map-editor.js';
+import { renderMapEditor, mapPreviewHtml, editorShownIn } from './map-editor.js';
 import { renderCreatureSetup } from './creature-setup.js';
 import { mountLive, updateLive, showLiveTab, leaveLive } from './battle-live.js';
 import { renderPokedex, pokedexHasUnsaved } from './pokedex.js';
 import { renderParty } from './party.js';
 import { renderNpcs, npcsHaveUnsaved } from './npcs.js';
 import { renderClock } from './clock.js';
-import { renderEncounters, encountersHaveUnsaved } from './encounters.js';
+import { renderEncounters, encountersHaveUnsaved, importEncounterDialog } from './encounters.js';
+import { renderAdventure, adventureSessionChanged } from './adventure.js';
 import { loadClock, renderTopWidget, tickTurnTimers, getClock, WEATHER } from './world-clock.js';
 import { TERRAIN, WEATHER_ROLL_MOD } from './encounter-rules.js';
 import { renderDisplay, displayAway, displaySessionChanged } from './display.js';
@@ -58,10 +59,17 @@ async function init() {
   if (res?.status === 'success') session = res.data;
   route();
 
-  window.addEventListener('app:combat-updated', (e) => { session = e.detail; route(); displaySessionChanged(session); pokenavSessionChanged(session); });
+  window.addEventListener('app:combat-updated', (e) => { session = e.detail; route(); displaySessionChanged(session); pokenavSessionChanged(session); adventureSessionChanged(session); });
   window.addEventListener('app:live-resync', async () => {
     const r = await CombatAPI.getState().catch(() => null);
-    if (r?.status === 'success') { session = r.data; route(); displaySessionChanged(session); pokenavSessionChanged(session); }
+    if (r?.status === 'success') { session = r.data; route(); displaySessionChanged(session); pokenavSessionChanged(session); adventureSessionChanged(session); }
+  });
+  // Encounter setup, from elsewhere (the NPC module's "Back to the encounter"): its tab -- the running battle's, or the
+  // Battle module's own.
+  window.addEventListener('dm:open-encounters', () => {
+    showModule('battle');
+    if (battleRunning()) showLiveTab('encounters');
+    else showBattleTab('library');
   });
   // The battle screen asks the player app to go back to the trainer card in a few places; there is none here.
   window.addEventListener('navigate', () => { liveMounted = false; route(); });
@@ -98,7 +106,7 @@ async function init() {
 // open last opens again after a reload.
 // ---------------------------------------------------------------------------
 
-const MODULES = { battle: 'dmModuleBattle', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock', pokenav: 'dmModulePokenav', display: 'dmModuleDisplay' };
+const MODULES = { battle: 'dmModuleBattle', adventure: 'dmModuleAdventure', party: 'dmModuleParty', pokedex: 'dmModulePokedex', npcs: 'dmModuleNpcs', clock: 'dmModuleClock', pokenav: 'dmModulePokenav', display: 'dmModuleDisplay' };
 const _moduleOpened = new Set(['battle']);
 const MODULE_KEY = 'dmConsoleModule'; // the module open last, opened again after a reload (this browser only)
 
@@ -116,6 +124,8 @@ function showModule(name) {
   else if (name === 'clock') renderClock(section);
   else if (name === 'display') renderDisplay(section, { session, firstTime: !_moduleOpened.has('display') });
   else if (name === 'pokenav') renderPokenav(section, { session });
+  else if (name === 'adventure') renderAdventure(section, { session });
+  else if (name === 'battle') route(); // an editor drawn elsewhere meanwhile may have taken the map editor from it
   else if (name === 'pokedex' && !_moduleOpened.has('pokedex')) renderPokedex(section);
   else if (name === 'npcs' && !_moduleOpened.has('npcs')) renderNpcs(section);
   _moduleOpened.add(name);
@@ -134,12 +144,12 @@ function setVideosPlaying(section, playing) {
 function showBattleTab(name) {
   battleTab = name;
   document.querySelectorAll('#dmBattleTabs [data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === name));
-  if (session?.active) return; // the running battle fills the module; the tab shows again once it ends
+  if (battleRunning()) return; // the running battle fills the module; the tab shows again once it ends
   const view = document.getElementById('dmView');
   const enc = document.getElementById('dmEncView');
   view.hidden = name !== 'setup';
   enc.hidden = name === 'setup';
-  if (name === 'setup') { if (setupView === 'home' || !view.dataset.view) showSetupView(setupView); } // the map / battle editors keep where the DM was
+  if (name === 'setup') { if (setupView === 'home' || !view.dataset.view || (setupView === 'map' && !editorShownIn(view))) showSetupView(setupView); } // the map / battle editors keep where the DM was
   else renderEncounters(enc, { tab: name });
 }
 
@@ -171,6 +181,11 @@ async function loadGameData() {
   put('skills', d.skillsData?.skills);
 }
 
+/** A battle (PvE or PvP) is running -- an adventure (the Adventure module) isn't one: the Battle module stays on its setup. */
+function battleRunning() {
+  return !!session?.active && session.battleType !== 'adventure';
+}
+
 /** Shows whatever fits the current state: the running battle while there is one, otherwise the setup. */
 function route() {
   watchTurns(session);
@@ -180,12 +195,11 @@ function route() {
   const liveTabs = document.getElementById('dmLiveTabs');
   const tabs = document.getElementById('dmBattleTabs');
   const enc = document.getElementById('dmEncView');
-  if (session?.active) {
+  if (battleRunning()) {
     view.hidden = true;
-    enc.hidden = true;
     tabs.hidden = true;
     liveTabs.hidden = false;
-    showLiveTab(); // the Battle or the Map tab, whichever was open
+    showLiveTab(); // the Battle, Map or Encounter setup tab, whichever was open (it shows / hides Encounter setup too)
     if (!liveMounted) {
       liveMounted = true;
       mountLive(document.getElementById('content'), document.getElementById('dmTools'), session);
@@ -215,7 +229,7 @@ function route() {
   document.querySelectorAll('#dmBattleTabs [data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === 'setup'));
   view.hidden = false;
   enc.hidden = true;
-  if (setupView === 'home' || !view.dataset.view || view.dataset.view !== setupView) showSetupView(setupView);
+  if (setupView === 'home' || !view.dataset.view || view.dataset.view !== setupView || (setupView === 'map' && !editorShownIn(view))) showSetupView(setupView);
 }
 
 function showSetupView(name) {
@@ -236,6 +250,11 @@ function renderStatus() {
   if (!el) return;
   if (!session?.active) {
     el.innerHTML = 'No battle running';
+    return;
+  }
+  if (session.battleType === 'adventure') {
+    const players = new Set(Object.values(session.participants || {}).map(p => p.owner).filter(Boolean));
+    el.innerHTML = `<strong>🧭 Adventure</strong> · ${players.size} player${players.size === 1 ? '' : 's'} on the map`;
     return;
   }
   const activeId = session.reactingParticipantId || session.turnOrder?.[session.turnIndex];
@@ -311,10 +330,11 @@ function renderHome(view) {
             <span class="dm-pill ${okBattle ? 'ok' : 'todo'}">${okBattle ? `✓ ${s.creatures.length} ready` : 'Nobody yet'}</span>
           </div>
           <div class="dm-hint" id="homeEncName"></div>
-          <div class="dm-home-creatures">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">Nobody yet -- put an encounter in play under Encounter setup.</div>'}</div>
+          <div class="dm-home-creatures">${s.creatures.length ? s.creatures.map(line).join('') : '<div class="dm-hint">Nobody yet -- import an encounter (📥), or build one under Encounter setup.</div>'}</div>
           ${unplaced.length && okMap ? `<div class="dm-hint dm-warn">${unplaced.length} not placed on the map yet -- place them here, or from the battle once it starts.</div>` : ''}
           <div class="dm-home-actions">
             <button class="dm-btn primary" id="homeCreatures" ${okMap && okBattle ? '' : 'disabled'} title="${okMap ? '' : 'Set up the map first'}">📍 Place on the map</button>
+            <button class="dm-btn primary" id="homeImport" title="An encounter from Encounter setup becomes the next battle -- its creatures, and its map if it has one">📥 Import encounter</button>
             <button class="dm-btn" id="homeToEnc"><img class="dm-tab-icon" src="assets/VS.png" alt="">Encounter setup</button>
             <button class="dm-btn danger" id="homeResetBattle" ${battleTouched ? '' : 'disabled'} title="Take everyone out of the next battle">Clear</button>
           </div>
@@ -340,6 +360,10 @@ function renderHome(view) {
   document.getElementById('homeWeather').addEventListener('change', (e) => updateSetup((x) => { x.map.weather = e.target.value; }));
   document.getElementById('homeCreatures').addEventListener('click', () => showSetupView('creatures'));
   document.getElementById('homeToEnc').addEventListener('click', () => showBattleTab('library'));
+  document.getElementById('homeImport').addEventListener('click', async () => {
+    await importEncounterDialog(); // brings the DM back here when it's in (dm:show-module)
+    if (battleTab === 'setup' && setupView === 'home') renderHome(view);
+  });
   document.getElementById('homeStart').addEventListener('click', startBattle);
   document.getElementById('homeReset').addEventListener('click', async () => {
     if (!await showCombatConfirm('Reset the map and take everyone out of the next battle? (The encounters themselves stay.)', { title: 'Clear battle', yesLabel: 'Clear it', noLabel: 'Cancel' })) return;
@@ -382,6 +406,11 @@ async function saveNow() {
 
 async function startBattle() {
   if (starting) return;
+  if (session?.active && session.battleType === 'adventure') {
+    // One thing at a time on the table: the adventure ends for the battle (the players join the battle as usual).
+    if (!await showCombatConfirm('An adventure is running. End it and start the battle?', { title: 'Start battle', yesLabel: 'End it and start', noLabel: 'Cancel' })) return;
+    try { await CombatAPI.endSession(); } catch (err) { showCombatAlert(err.message, { title: 'End the adventure' }); return; }
+  }
   starting = true;
   const btn = document.getElementById('homeStart');
   if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }

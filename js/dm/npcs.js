@@ -37,6 +37,18 @@ const _recentSaves = new Map(); // id -> time: this tab's own saves, so their li
 const _previews = new Map(); // team member config key -> built row
 let _saveState = 'saved';
 let _wired = false;
+// Opened from an encounter (Encounter setup's ✏️ on one of its NPCs): which NPC to show, and the encounter to go back to.
+let _pendingSelect = null;
+let _fromEncounter = null;
+
+/** Encounter setup's ✏️: this NPC in the NPC module -- changed here, it's changed for good, in every encounter that has it
+ * -- with a way back to the encounter. */
+export function openNpcFromEncounter(id, encounterName) {
+  _pendingSelect = id;
+  _fromEncounter = encounterName || 'the encounter';
+  window.dispatchEvent(new CustomEvent('dm:show-module', { detail: { name: 'npcs' } }));
+  if (_root && document.getElementById('npcList')) { select(id); _pendingSelect = null; } // already drawn
+}
 
 export async function renderNpcs(root) {
   _root = root;
@@ -77,6 +89,8 @@ export async function renderNpcs(root) {
   });
   bindSheetFields(document.getElementById('npcSheet'));
   setSaveState(_saveState);
+  if (_pendingSelect && _npcs.some(n => n.id === _pendingSelect)) _selectedId = _pendingSelect;
+  _pendingSelect = null;
   renderList();
   renderSheet();
 }
@@ -173,7 +187,12 @@ function renderSheet() {
   const area = (f, label, rows = 3, ph = '') => `<div class="dm-field"><label>${label}</label><textarea class="dm-input" data-f="${f}" rows="${rows}" placeholder="${escapeHtml(ph)}">${escapeHtml(n[f] ?? '')}</textarea></div>`;
   const known = _portraits.some(p => p.url === n.image);
   const hp = trainerHp(Number(n.level) || 1, Number(n.con) || 10); // what an empty Max HP comes out as
-  box.innerHTML = `
+  const back = _fromEncounter ? `
+    <div class="dm-npc-fromenc">
+      <span>✏️ Changes save to the NPC library for good -- in "${escapeHtml(_fromEncounter)}" and everywhere else ${escapeHtml(n.name || 'this NPC')} is used.</span>
+      <button class="dm-btn small primary" id="npcBackToEnc">← Back to the encounter</button>
+    </div>` : '';
+  box.innerHTML = back + `
     <div class="dm-npc-head">
       <span class="dm-npc-portrait" id="npcPortrait"></span>
       <div class="dm-npc-headmain">
@@ -361,6 +380,14 @@ async function refreshPreview(m, i) {
 /** The sheet's typing and ticking, listened to once on the sheet's box (it outlives every redraw of the sheet). */
 function bindSheetFields(box) {
   const changed = (n, redrawList = false) => { scheduleSave(n); if (redrawList) renderList(); };
+  box.addEventListener('click', async (e) => {
+    if (!e.target.closest('#npcBackToEnc')) return;
+    const n = current();
+    if (n) await flushSave(n);
+    _fromEncounter = null;
+    renderSheet();
+    window.dispatchEvent(new CustomEvent('dm:open-encounters'));
+  });
   box.addEventListener('input', (e) => {
     const n = current();
     const el = e.target;

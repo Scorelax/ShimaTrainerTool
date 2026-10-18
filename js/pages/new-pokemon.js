@@ -363,7 +363,7 @@ export async function attachNewPokemonListeners() {
 
 async function loadEncounteredPokemon() {
   // Check for cached data first
-  const cached = sessionStorage.getItem('completePokemonData');
+  const cached = sessionStorage.getItem('registeredSpecies');
   if (cached) {
     try {
       allEncounteredPokemon = JSON.parse(cached);
@@ -380,7 +380,7 @@ async function loadEncounteredPokemon() {
 
     if (response.status === 'success' && response.data) {
       allEncounteredPokemon = response.data;
-      sessionStorage.setItem('completePokemonData', JSON.stringify(response.data));
+      sessionStorage.setItem('registeredSpecies', JSON.stringify(response.data));
       displayPokemonList(allEncounteredPokemon);
     } else {
       showError('Failed to load Pokemon list');
@@ -405,11 +405,11 @@ function displayPokemonList(pokemonList) {
   }
 
   // Sort by dex entry
-  const sortedList = [...pokemonList].sort((a, b) => a[2] - b[2]);
+  const sortedList = [...pokemonList].sort((a, b) => (a.dexNumber || 0) - (b.dexNumber || 0));
 
   sortedList.forEach((pokemon) => {
     const listItem = document.createElement('li');
-    listItem.textContent = `#${pokemon[2]} - ${pokemon[1]}`;
+    listItem.textContent = `#${pokemon.dexNumber} - ${pokemon.name}`;
     listItem.addEventListener('click', () => selectPokemon(pokemon, listItem));
     listElement.appendChild(listItem);
   });
@@ -424,8 +424,8 @@ function handleSearch(e) {
   }
 
   const filtered = allEncounteredPokemon.filter(pokemon => {
-    const name = pokemon[1].toLowerCase();
-    const dexNum = pokemon[2].toString();
+    const name = pokemon.name.toLowerCase();
+    const dexNum = String(pokemon.dexNumber ?? '');
     return name.includes(query) || dexNum.includes(query);
   });
 
@@ -440,23 +440,23 @@ async function selectPokemon(pokemon, listItem) {
   listItem.classList.add('selected');
 
   // Show details (the Pi sends each species' picture with the list; none there -> the Poke Ball)
-  const imageUrl = pokemon[0] || 'assets/Pokeball.png';
+  const imageUrl = pokemon.image || 'assets/Pokeball.png';
 
   // IMPORTANT: Store resolved image URL back into pokemon object
   // so it's available when registering the Pokemon
-  if (!pokemon[0]) {
-    pokemon[0] = imageUrl;
+  if (!pokemon.image) {
+    pokemon.image = imageUrl;
   }
 
-  renderSpriteInto('pokemonImage', imageUrl, pokemon[1]);
-  document.getElementById('pokemonName').textContent = pokemon[1];
-  document.getElementById('pokemonDexEntry').textContent = pokemon[2];
+  renderSpriteInto('pokemonImage', imageUrl, pokemon.name);
+  document.getElementById('pokemonName').textContent = pokemon.name;
+  document.getElementById('pokemonDexEntry').textContent = pokemon.dexNumber;
 
   // Get visibility settings for this Pokemon
-  const pokemonName = pokemon[1];
+  const pokemonName = pokemon.name;
   const visibility = getPokemonVisibility(pokemonName);
-  const primaryType = pokemon[4];
-  const secondaryType = pokemon[5];
+  const primaryType = pokemon.types.primary;
+  const secondaryType = pokemon.types.secondary;
 
   // Create type buttons based on visibility
   const typeContainer = document.getElementById('pokemonType');
@@ -486,8 +486,8 @@ function registerPokemon() {
   }
 
   // Store selected Pokemon data for the registration form
-  sessionStorage.setItem('selectedPokemonData', JSON.stringify(selectedPokemon));
-  sessionStorage.setItem('selectedPokemonName', selectedPokemon[1]);
+  sessionStorage.setItem('selectedSpecies', JSON.stringify(selectedPokemon));
+  sessionStorage.setItem('selectedPokemonName', selectedPokemon.name);
 
   // Navigate to Pokemon form
   window.dispatchEvent(new CustomEvent('navigate', {

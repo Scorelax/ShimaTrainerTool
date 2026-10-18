@@ -192,6 +192,8 @@ const WIP_CSS = `
   /* The DM console's own column of "players can see" checkboxes, left of the focused card (see setOnDmFocusChange). */
   .wip-dm-row { display: flex; gap: 0.9rem; align-items: flex-start; }
   .wip-dm-row > #wipBattlePhase { flex: 1; min-width: 0; }
+  /* An adventure: the map fills the page under the header (battle-map-popup.js inline). */
+  .wip-adventure { height: calc(100vh - 150px); height: calc(100dvh - 150px); min-height: 360px; padding: 0 0.4rem 0.4rem; box-sizing: border-box; }
   .wip-foreign-focus-portrait { width: 140px; height: 140px; margin: 0 auto 0.8rem; }
   .wip-foreign-focus-portrait img, .wip-foreign-focus-portrait video { width: 100%; height: 100%; object-fit: contain; }
   /* Centered both ways within the viewport, not just horizontally --
@@ -674,9 +676,17 @@ function _needsToJoin(state) {
   if (_dmName) return false; // the DM adds creatures from the console, never through the players' join flow
   const name = _currentTrainerName();
   if (!name) return false;
+  // An adventure (the DM console's Adventure module) is joined with the trainer alone, a Pokemon is optional.
+  if (_isAdventure(state)) return !Object.values(state.participants).some(p => p.owner === name);
   // No Pokemon of theirs in it -- not even benched: never joined, or a join that broke after the trainer went in (the
   // join is then offered again, and adds only what's missing).
   return !Object.values(state.participants).some(p => p.owner === name && p.combatantType !== 'trainer');
+}
+
+/** The DM's adventure: the battle map without a battle -- the players walk their trainer (and maybe one Pokemon) around on
+ * it, no turns, no initiative (routes_combat.py's start_adventure). This page shows just the map for it. */
+function _isAdventure(state = session) {
+  return !!state?.active && state.battleType === 'adventure';
 }
 
 let _prefetchedAllBackgrounds = false; // fire the list+warm pass at most once per page load
@@ -743,6 +753,12 @@ function _abilityToast(text) {
 }
 
 function _renderCurrentView() {
+  // An adventure joined earlier but not placed yet (the page was reloaded or left mid-placement): place them first.
+  if (_isAdventure() && !_dmName && !_joinStage && !_spectating) {
+    const me = _currentTrainerName();
+    const unplaced = Object.values(session.participants || {}).filter(p => p.owner === me && !p.placed).map(p => p.id);
+    if (unplaced.length) { _placementQueue = unplaced; _joinStage = 'placement'; }
+  }
   const inJoinFlow = _joinStage === 'setup' || _joinStage === 'initiative' || _joinStage === 'placement';
 
   // Needs-to-join but hasn't picked a side yet (join vs. just watch) --
@@ -767,7 +783,7 @@ function _renderCurrentView() {
     if (_joinStage === 'placement' && _placementQueue.length) {
       return renderPlacementPhase(session, _placementQueue[0]);
     }
-    return renderSetupPhase({ showWipButton: false });
+    return renderSetupPhase({ showWipButton: false, adventure: _isAdventure() });
   }
 
   _joinStage = null;
@@ -807,9 +823,12 @@ function _renderJoinOrSpectateChoice() {
         <button class="combat-wip-btn-secondary" id="joinChoiceBackBtn">← Back</button>
       </div>
       <div class="combat-wip-empty">
+        ${_isAdventure() ? `<h2>🧭 An adventure is on</h2>
+        <p style="color:#a0a0c0;margin-bottom:1.5rem;max-width:340px;">The DM has a map out. Join with your trainer (and a Pokémon if you like) and walk around on it -- no battle, no turns.</p>
+        <button class="combat-wip-btn-primary" id="joinChoiceJoinBtn" style="margin-bottom:0.7rem;">🧭 Join the adventure</button>` : `
         <h2>${session.battleType === 'pvp' ? 'PvP' : 'PvE'} Battle in Progress</h2>
         <p style="color:#a0a0c0;margin-bottom:1.5rem;max-width:340px;">Join in with your own trainer and Pokémon, or just watch the battle.</p>
-        <button class="combat-wip-btn-primary" id="joinChoiceJoinBtn" style="margin-bottom:0.7rem;">⚔ Join Battle</button>
+        <button class="combat-wip-btn-primary" id="joinChoiceJoinBtn" style="margin-bottom:0.7rem;">⚔ Join Battle</button>`}
         <button class="combat-wip-btn-secondary" id="joinChoiceSpectateBtn">👁 Spectate</button>
       </div>
     </div>`;
@@ -2456,6 +2475,9 @@ function renderBody(state) {
       </div>`;
   }
 
+  // An adventure: only the map, filling the page (attachBodyListeners puts it in -- battle-map-popup.js inline).
+  if (_isAdventure(state)) return '<div class="wip-adventure" id="wipAdventure"></div>';
+
   // The DM console puts its "what the players can see" checkboxes in #dmFocusSide, left of the card (see
   // setOnDmFocusChange) -- outside #wipBattlePhase, so the card's in-place updates never touch it.
   if (_dmName) {
@@ -2477,13 +2499,14 @@ function _syncHeaderBar(state) {
     const vsIcon = '<img src="assets/VS.png" alt="">';
     titleEl.innerHTML = !state?.active
       ? `${vsIcon}Battle`
-      : `${vsIcon}${state.battleType === 'pvp' ? 'PvP' : 'PvE'} Battle`;
+      : _isAdventure(state) ? '🧭 Adventure'
+        : `${vsIcon}${state.battleType === 'pvp' ? 'PvP' : 'PvE'} Battle`;
   }
   const leftBtnEl = document.getElementById('wipHeaderLeftBtn');
   if (leftBtnEl) {
     // The DM console has the map as its own tab instead (battle-live.js) -- no Map button here.
     leftBtnEl.innerHTML = state?.active
-      ? (_dmName ? '' : '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button></div>')
+      ? (_dmName || _isAdventure(state) ? '' : '<div class="wip-header-btn-group"><button class="combat-wip-btn-secondary wip-map-btn" id="battleMapBtn">▦ Map</button></div>')
       : _dmName ? '' : '<button class="combat-wip-btn-secondary" id="wipHeaderBackBtn">← Back</button>';
     document.getElementById('battleMapBtn')?.addEventListener('click', () => {
       showBattleMap(session, _currentTrainerName());
@@ -2495,7 +2518,7 @@ function _syncHeaderBar(state) {
   // The battle log opens from a button floating in the bottom-left corner, out of the header.
   const logFab = document.getElementById('wipLogFab');
   if (logFab) {
-    const want = !!state?.active;
+    const want = !!state?.active && !_isAdventure(state); // an adventure keeps no battle log
     if (want && !logFab.firstElementChild) {
       logFab.innerHTML = '<button class="combat-wip-btn-secondary wip-log-btn" id="battleLogBtn">📜 Log</button>';
       document.getElementById('battleLogBtn').addEventListener('click', () => showBattleLog(session));
@@ -2510,7 +2533,7 @@ function _syncHeaderBar(state) {
     // removes this trainer's own participants via leaveSession).
     endBtnEl.innerHTML = !state?.active ? '' : _spectating
       ? '<button class="combat-wip-btn-secondary" id="stopSpectatingBtn">👁 Stop Spectating</button>'
-      : '<button class="combat-wip-btn-danger" id="endSessionBtn">End Battle</button>';
+      : `<button class="combat-wip-btn-danger" id="endSessionBtn">${_isAdventure(state) && !_dmName ? 'Leave' : 'End Battle'}</button>`;
     document.getElementById('endSessionBtn')?.addEventListener('click', async () => {
       if (_dmName) {
         // The DM ends the battle for everyone (players leaving only takes their own creatures out).
@@ -2546,7 +2569,7 @@ function _syncTurnOrderSidebar(state) {
   const el = document.getElementById('wipTurnOrder');
   if (!el) return;
 
-  if (!state || !state.active) {
+  if (!state || !state.active || _isAdventure(state)) { // an adventure has no turns -- the map says who's there
     el.innerHTML = '';
     return;
   }
@@ -3272,6 +3295,13 @@ export function attachCombatWipListeners() {
 
     if (!session.active) { _exitBattleSync(); _spectating = false; }
 
+    // An adventure: the map is already on the page and follows the push itself -- only the header to refresh.
+    if (_isAdventure() && document.getElementById('wipAdventure')?.firstElementChild) {
+      _syncHeaderBar(session);
+      updateBattleMap(session);
+      return;
+    }
+
     if (session.active && document.getElementById('wipBattlePhase')) {
       // Fast path: patch things in place rather than replacing the whole
       // body -- _syncMainFocus already knows how to do this correctly for
@@ -3327,6 +3357,11 @@ export function attachCombatWipListeners() {
     attachSetupListeners({
       backRoute: 'trainer-card', // the old combat page isn't a way back any more -- the trainer card opens this one
       onStart: ({ trainerCombatant, activePokemon }) => {
+        if (_isAdventure()) {
+          // No initiative on an adventure: straight in, then placed on the map.
+          _joinWith([trainerCombatant, activePokemon].filter(Boolean).map(c => ({ ...c, initiativeTotal: null })));
+          return;
+        }
         _joinState = { combatants: [trainerCombatant, activePokemon] };
         _joinStage = 'initiative';
         _rerenderFull();
@@ -3342,48 +3377,7 @@ export function attachCombatWipListeners() {
         _joinState = null;
         _rerenderFull();
       },
-      onComplete: async (combatants) => {
-        if (combatants[1]?.id) _myPokemonKeys.set(combatants[1].name, combatants[1].id);
-        // Each one is tried twice (a phone's connection can drop one request); a trainer already in the battle from a
-        // join that broke halfway isn't sent again (the server ignores a repeat anyway). What still fails is said
-        // plainly -- and written to the battle log, so the reason can be looked up afterwards.
-        const me = _currentTrainerName();
-        const haveTrainer = Object.values(session?.participants || {}).some(p => p.owner === me && p.combatantType === 'trainer');
-        const failed = [];
-        for (const c of combatants) {
-          if (c.type === 'trainer' && haveTrainer) continue;
-          let lastErr = null;
-          for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-              await CombatAPI.addParticipant(_combatantToParticipant(c));
-              lastErr = null;
-              break;
-            } catch (err) {
-              lastErr = err;
-              if (attempt === 0) await new Promise(r => setTimeout(r, 1200));
-            }
-          }
-          if (lastErr) failed.push({ name: c?.name || '?', reason: lastErr?.message || String(lastErr) });
-        }
-        if (failed.length) {
-          const what = failed.map(f => `${f.name} (${f.reason})`).join(', ');
-          showCombatAlert(`Couldn't add ${what} to the battle. Tap Join again -- it only adds what's missing.`, { title: 'Joining the battle' });
-          CombatAPI.logEvent({ type: 'join-error', actorName: me, text: `${me} couldn't join with ${what}` }).catch(() => {});
-        }
-        // Pick up whatever the server now has (including this device's own
-        // just-added participants) before deciding what's next.
-        const result = await CombatAPI.getState();
-        session = result.status === 'success' ? result.data : session;
-        _joinState = null;
-
-        const myName = _currentTrainerName();
-        _placementQueue = Object.values(session.participants)
-          .filter(p => p.owner === myName && !p.placed)
-          .map(p => p.id);
-
-        _joinStage = _placementQueue.length ? 'placement' : null;
-        _rerenderFull();
-      },
+      onComplete: combatants => _joinWith(combatants),
     });
     return;
   }
@@ -3396,7 +3390,56 @@ export function attachCombatWipListeners() {
   attachBodyListeners();
 }
 
+/** Puts this trainer's chosen combatants into the session (the end of the join flow: after initiative in a battle, right
+ * after Setup on an adventure), then on to placing them. */
+async function _joinWith(combatants) {
+  if (combatants[1]?.id) _myPokemonKeys.set(combatants[1].name, combatants[1].id);
+  // Each one is tried twice (a phone's connection can drop one request); a trainer already in the battle from a
+  // join that broke halfway isn't sent again (the server ignores a repeat anyway). What still fails is said
+  // plainly -- and written to the battle log, so the reason can be looked up afterwards.
+  const me = _currentTrainerName();
+  const haveTrainer = Object.values(session?.participants || {}).some(p => p.owner === me && p.combatantType === 'trainer');
+  const failed = [];
+  for (const c of combatants) {
+    if (c.type === 'trainer' && haveTrainer) continue;
+    let lastErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await CombatAPI.addParticipant(_combatantToParticipant(c));
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        if (attempt === 0) await new Promise(r => setTimeout(r, 1200));
+      }
+    }
+    if (lastErr) failed.push({ name: c?.name || '?', reason: lastErr?.message || String(lastErr) });
+  }
+  if (failed.length) {
+    const what = failed.map(f => `${f.name} (${f.reason})`).join(', ');
+    showCombatAlert(`Couldn't add ${what} to the battle. Tap Join again -- it only adds what's missing.`, { title: 'Joining the battle' });
+    CombatAPI.logEvent({ type: 'join-error', actorName: me, text: `${me} couldn't join with ${what}` }).catch(() => {});
+  }
+  // Pick up whatever the server now has (including this device's own
+  // just-added participants) before deciding what's next.
+  const result = await CombatAPI.getState();
+  session = result.status === 'success' ? result.data : session;
+  _joinState = null;
+
+  const myName = _currentTrainerName();
+  _placementQueue = Object.values(session.participants)
+    .filter(p => p.owner === myName && !p.placed)
+    .map(p => p.id);
+
+  _joinStage = _placementQueue.length ? 'placement' : null;
+  _rerenderFull();
+}
+
 function attachBodyListeners() {
+  // An adventure: the battle map, inside the page (battle-map-popup.js's inline mode -- the same map and moving as in
+  // a battle, minus turns and the movement limit).
+  const adv = document.getElementById('wipAdventure');
+  if (adv && !adv.firstElementChild && _isAdventure()) showBattleMap(session, _currentTrainerName(), { container: adv });
   document.getElementById('createSessionBtn')?.addEventListener('click', async () => {
     const battleType = 'pvp'; // PvE battles come from the DM console
     // See _justCreatedSession's own comment -- flags this device (and only this

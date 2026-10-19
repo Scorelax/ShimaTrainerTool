@@ -1405,3 +1405,6 @@ span.dm-trap-pick { cursor: default; }
 .dm-gp-shiny { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.35rem; padding: 0.45rem 0.6rem; border-radius: 9px;
   background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.3); font-size: 0.84rem; }
 .dm-gp-shiny[hidden] { display: none; }
+/* The map editor: Clear objects / Clear terrain at the top, and "saved automatically" in place of Save / Done */
+.dm-editor-clear { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.dm-editor-autosave { margin-left: auto; font-size: 0.75rem; white-space: nowrap; }

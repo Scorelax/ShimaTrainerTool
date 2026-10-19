@@ -8,7 +8,7 @@
 // Region Map (the above) and Adventure Mode (adventure.js: a map the players walk around on). "On the table screen", at
 // the tabs' right, picks which one the board shows; picking the adventure map starts the adventure if it isn't running.
 import { CombatAPI, DmAPI } from '../api.js';
-import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
+import { showCombatAlert } from '../utils/combat-alert.js';
 import { escapeHtml, toast } from './dm-common.js';
 import { renderAdventure, startAdventure } from './adventure.js';
 
@@ -137,10 +137,6 @@ async function pickOnScreen(value) {
     if (running) {
       await CombatAPI.adventureSettings({ onScreen: value });
     } else if (value === 'adventure') {
-      if (!await showCombatConfirm('Put the adventure map on the table screen? The players can place themselves on it once you tick "Allow player placement" (Adventure Mode).', { title: 'Adventure map', yesLabel: 'Put it on', noLabel: 'Cancel' })) {
-        renderStatus();
-        return;
-      }
       await startAdventure({ canJoin: false, onScreen: 'adventure' });
     }
   } catch (err) {

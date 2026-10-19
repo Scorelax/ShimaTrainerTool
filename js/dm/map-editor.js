@@ -289,9 +289,14 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
     <div class="dm-editor">
       <aside class="dm-editor-tools">
         <div class="dm-editor-head">
-          <button class="dm-btn small" id="mapBack">${escapeHtml(backLabel || (_live ? '← Battle' : '← Map setup'))}</button>
+          ${adventure ? '' : `<button class="dm-btn small" id="mapBack">${escapeHtml(backLabel || (_live ? '← Battle' : '← Map setup'))}</button>`}
           <h2>${escapeHtml(title || (_live ? 'Battle map' : 'Map'))}</h2>
-          <button class="dm-btn primary small" id="mapDone">✓ Done</button>
+          ${adventure ? `<span class="dm-hint dm-editor-autosave" title="Every change is kept at once -- there's nothing to save">${_live ? 'Changes show at once' : 'Saved automatically'}</span>`
+            : '<button class="dm-btn primary small" id="mapDone">✓ Done</button>'}
+        </div>
+        <div class="dm-editor-clear">
+          <button class="dm-btn small" id="mapClearObjects" title="Take every object off the map">🧹 Clear objects</button>
+          <button class="dm-btn small" id="mapClearMarks" title="Make every difficult / blocked square normal ground again">🧹 Clear terrain</button>
         </div>
         ${_live ? '<div class="dm-hint dm-live-note">The map being played on (the battle\'s or the adventure\'s) -- every change shows on the players\' screens and the table at once.</div>' : ''}
 
@@ -347,10 +352,6 @@ export async function renderMapEditor(root, { onDone, live = false, store = null
           <div id="mapToolPanel"></div>
         </div>
 
-        <div class="dm-editor-foot">
-          <button class="dm-btn small" id="mapClearObjects">Clear objects</button>
-          <button class="dm-btn small" id="mapClearMarks">Clear terrain</button>
-        </div>
       </aside>
       <section class="dm-editor-canvas">
         <div class="dm-editor-hint" id="mapHint"></div>
@@ -504,7 +505,7 @@ function wireStatic() {
     renderToolPanel();
     renderStage();
   });
-  document.getElementById('mapBack').addEventListener('click', () => leave());
+  document.getElementById('mapBack')?.addEventListener('click', () => leave());
   document.getElementById('mapSave')?.addEventListener('click', saveCurrentMap);
   document.getElementById('mapSaveName')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveCurrentMap(); });
   document.getElementById('mapSavedList')?.addEventListener('click', (e) => {
@@ -513,7 +514,7 @@ function wireStatic() {
     const del = e.target.closest('[data-delete-map]');
     if (del) deleteSavedMap(del.dataset.deleteMap);
   });
-  document.getElementById('mapDone').addEventListener('click', () => {
+  document.getElementById('mapDone')?.addEventListener('click', () => {
     if (!_live) updateSetup(s => { s.map.ready = true; });
     leave();
   });

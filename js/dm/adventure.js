@@ -20,7 +20,7 @@ import { abilityList } from '../utils/battle-lists.js';
 import { renderMapEditor } from './map-editor.js';
 import { createMapStore } from './map-store.js';
 import { setLiveSession } from './live-map-store.js';
-import { updateSetup, flushSetup } from './setup-store.js';
+import { updateSetup, flushSetup, loadSetup, getSetup } from './setup-store.js';
 import { createEncounterWithMap } from './encounters.js';
 import { captureRulesHtml, speciesDetail, openSpeciesInfo, paintSpeciesImages } from './species-info.js';
 import { getClock, WEATHER } from './world-clock.js';
@@ -127,15 +127,14 @@ async function drawSetup() {
       : 'Put Pokémon, NPCs, objects and items on the map ahead of time -- hidden ones only you see.'}</span>
     ${switchesHtml(false, busy)}
     <span class="dm-adv-btns">
-      <button class="dm-btn small" id="advLoad" title="Start from another map">📂 Use another map…</button>
-      <button class="dm-btn small" id="advGuide">🔴 Capture guide</button>
+      <button class="dm-btn small" id="advLoad" title="Replace this map with another one: a saved map, an encounter's map, or the Battle module's Map setup">📂 Load a map…</button>
+      <button class="dm-btn small" id="advGuide" title="How hard each Pokémon is to catch">🔴 Capture guide</button>
+      <button class="dm-btn small" id="advToBattle" title="Put a copy of this map (background, objects, terrain) into the Battle module's Map setup -- the map the next battle you start there is fought on">📋 Copy to Battle setup</button>
       <button class="dm-btn primary" id="advToEnc" title="A new encounter in Encounter setup with this map -- its objects, Pokémon and NPCs where they stand, hidden ones too">⚔️ Start encounter</button>
     </span>`;
   const body = document.getElementById('advBody');
   body.innerHTML = '<div class="dm-adv-editor" id="advEditor"></div>';
-  renderMapEditor(document.getElementById('advEditor'), {
-    store: _store, backLabel: '💾 Save', title: 'Adventure map', adventure: true, onDone: () => toast('The adventure map is saved.'),
-  });
+  renderMapEditor(document.getElementById('advEditor'), { store: _store, title: 'Adventure map', adventure: true });
   document.getElementById('advCanJoin').addEventListener('change', onCanJoin);
   document.getElementById('advLoad').addEventListener('click', loadOtherMap);
   document.getElementById('advToEnc').addEventListener('click', async () => {
@@ -143,6 +142,26 @@ async function drawSetup() {
     encounterOnMap(_store.getSetup().map, _store.getSetup().creatures);
   });
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store.getSetup().map.terrain));
+  document.getElementById('advToBattle').addEventListener('click', async () => {
+    await _store.flushSetup().catch(() => {});
+    copyToBattleSetup(_store.getSetup().map);
+  });
+}
+
+/** "Copy to Battle setup": the Battle module's Map setup (the map the next battle started there is fought on) becomes a
+ * copy of this map -- its background, objects, terrain and traps; the adventure's creatures stay here. */
+async function copyToBattleSetup(map) {
+  if (!await showCombatConfirm("Replace the Battle module's Map setup with a copy of this map (background, objects and terrain)? Creatures already placed there are taken off their squares -- they stay in the battle setup.",
+    { title: 'Copy to Battle setup', yesLabel: 'Copy it', noLabel: 'Cancel' })) return;
+  const { creatures: _ignored, ...plain } = map || {};
+  if (!getSetup()) await loadSetup().catch(() => null); // (the battle setup may not be loaded in this tab yet)
+  updateSetup((s) => { s.map = { ...s.map, ...JSON.parse(JSON.stringify(plain)), weather: s.map.weather, ready: true }; s.creatures.forEach((c) => { c.position = null; }); });
+  try {
+    await flushSetup();
+    toast("Copied -- it's the map in Battle → Map setup now.");
+  } catch (err) {
+    showCombatAlert(err.message, { title: 'Copy to Battle setup' });
+  }
 }
 
 /** Opens the adventure on the saved adventure map (what's being edited here first, its creatures too) -- "Allow player
@@ -191,8 +210,8 @@ function drawRunning() {
     <span class="dm-adv-players" id="advPlayers"></span>
     ${switchesHtml(true, false)}
     <span class="dm-adv-btns">
-      <button class="dm-btn small" id="advGuide">🔴 Capture guide</button>
-      <button class="dm-btn small" id="advToBattle" title="Map setup's map becomes a copy of this one">🗺️ Next battle's map</button>
+      <button class="dm-btn small" id="advGuide" title="How hard each Pokémon is to catch">🔴 Capture guide</button>
+      <button class="dm-btn small" id="advToBattle" title="Put a copy of this map (background, objects, terrain) into the Battle module's Map setup -- the map the next battle you start there is fought on">📋 Copy to Battle setup</button>
       <button class="dm-btn primary" id="advToEnc" title="A new encounter in Encounter setup with this map as it is now -- its objects, your Pokémon and NPCs where they stand, hidden ones too">⚔️ Start encounter</button>
       <button class="dm-btn danger" id="advEnd" title="The players leave the map -- everything you put on it stays for next time">■ Close the map</button>
     </span>`;
@@ -210,18 +229,10 @@ function drawRunning() {
   const body = document.getElementById('advBody');
   body.innerHTML = '<div class="dm-adv-editor" id="advEditor"></div>';
   setLiveSession(_session);
-  renderMapEditor(document.getElementById('advEditor'), {
-    live: true, adventure: true, backLabel: '💾 Save', title: 'The adventure, live', onDone: () => toast('Everything here goes to the table at once -- nothing to save.'),
-  });
+  renderMapEditor(document.getElementById('advEditor'), { live: true, adventure: true, title: 'The adventure, live' });
   document.getElementById('advGuide').addEventListener('click', () => captureGuide(_store?.getSetup().map.terrain));
   document.getElementById('advToEnc').addEventListener('click', () => encounterOnMap(boardAsMap(_session), liveCreatures(_session)));
-  document.getElementById('advToBattle').addEventListener('click', async () => {
-    if (!await showCombatConfirm("Make Map setup's map (the next battle's) a copy of this one? Anyone already placed there is taken off it.", { title: "Next battle's map", yesLabel: 'Copy it', noLabel: 'Cancel' })) return;
-    const map = boardAsMap(_session);
-    updateSetup((s) => { s.map = { ...s.map, ...map, weather: s.map.weather, ready: true }; s.creatures.forEach((c) => { c.position = null; }); });
-    await flushSetup().catch(err => showCombatAlert(err.message, { title: "Next battle's map" }));
-    toast("Copied -- it's Map setup's map now.");
-  });
+  document.getElementById('advToBattle').addEventListener('click', () => copyToBattleSetup(boardAsMap(_session)));
   document.getElementById('advEnd').addEventListener('click', async () => {
     if (!await showCombatConfirm('Close the map? The players leave it. Everything on it -- your Pokémon and NPCs too -- stays as the adventure map for next time.', { title: 'Close the map', yesLabel: 'Close it', noLabel: 'Cancel' })) return;
     try {

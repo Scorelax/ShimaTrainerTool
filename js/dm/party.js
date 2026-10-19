@@ -6,7 +6,7 @@
 import { DmAPI } from '../api.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert } from '../utils/combat-alert.js';
-import { escapeHtml, typeBadges, toast, attachSuggest } from './dm-common.js';
+import { escapeHtml, typeBadges, toast, attachSuggest, stepperHtml } from './dm-common.js';
 import { xpOrStart, xpPanelHtml, xpButtonHtml, giveXpPopup } from './xp.js';
 import { givePokemonPopup } from './give-pokemon.js';
 import { pickMoves } from './move-picker.js';
@@ -259,7 +259,7 @@ function pokemonRowHtml(trainer, p, xp) {
         <div class="dm-tline"><span>Moves</span><span class="dm-move-chips">${movesKnown(p).map(m => ((p.customMoves || []).includes(m)
           ? `<span class="custom" title="Taught on top of its level's moves">${escapeHtml(m)}<button class="dm-chip-x" data-forget-move="${escapeHtml(m)}" data-mon="${escapeHtml(p.name)}" title="Take this move away">×</button></span>`
           : `<span>${escapeHtml(m)}</span>`)).join('') || '—'}
-          <button class="dm-btn small" data-teach="${escapeHtml(p.name)}" title="A move from the list -- or one of your own">＋ Teach a move</button></span></div>
+          <button class="dm-btn small" data-teach="${escapeHtml(p.name)}" title="A move it hasn't learned yet, or can't normally learn">💥 Teach a move</button></span></div>
         ${senses.length ? `<div class="dm-tline"><span>Senses</span><span>${senses.map(([s, v]) => `${s} ${escapeHtml(v)}`).join(' · ')}</span></div>` : ''}
         ${line('Notes', (p.comments || []).join(' · '))}
       </div>
@@ -288,7 +288,7 @@ function moneyAndItemsHtml(t, items) {
     <div class="dm-card-title">Money</div>
     <div class="dm-money">₽${num(t.money).toLocaleString()}</div>
     <div class="dm-row">
-      <input class="dm-input" id="moneyAmount" type="number" min="0" placeholder="Amount">
+      ${stepperHtml({ id: 'moneyAmount', min: 0, step: 100, placeholder: 'Amount', cls: 'dm-money-step' })}
       <button class="dm-btn primary" id="moneyAdd">+ Give</button>
       <button class="dm-btn danger" id="moneyTake">− Take</button>
     </div>
@@ -301,7 +301,7 @@ function moneyAndItemsHtml(t, items) {
     <div data-give-pane="list">
       <div class="dm-row dm-give-item-row">
         <div class="dm-give-item-name"><input class="dm-input" id="giveItemName" placeholder="Item from the list…"></div>
-        <input class="dm-input" id="giveItemQty" type="number" min="1" value="1" style="max-width:70px">
+        ${stepperHtml({ id: 'giveItemQty', min: 1, max: 999, value: 1, cls: 'dm-qty-step' })}
         <button class="dm-btn primary" id="giveItemBtn">Give</button>
       </div>
     </div>
@@ -309,7 +309,7 @@ function moneyAndItemsHtml(t, items) {
       <input class="dm-input" id="customName" placeholder="Name">
       <textarea class="dm-input" id="customDesc" rows="2" placeholder="What it is / does"></textarea>
       <div class="dm-row">
-        <input class="dm-input" id="customQty" type="number" min="1" value="1" style="max-width:70px">
+        ${stepperHtml({ id: 'customQty', min: 1, max: 999, value: 1, cls: 'dm-qty-step' })}
         <button class="dm-btn primary" id="giveCustomBtn">Give custom item</button>
       </div>
     </div>
@@ -348,7 +348,7 @@ function wireTrainer(name, items) {
     e.stopPropagation();
     const mon = _party.find(x => x.trainer.name === name)?.pokemon.find(x => x.name === b.dataset.teach);
     if (!mon) return;
-    const picked = await pickMoves({ title: `✨ Teach ${pokemonName(mon)} a move`, exclude: movesKnown(mon) });
+    const picked = await pickMoves({ title: `💥 Teach ${pokemonName(mon)} a move`, exclude: movesKnown(mon) });
     if (!picked?.length) return;
     run(async () => { for (const m of picked) await DmAPI.giveMove(name, mon.name, m); }, `${pokemonName(mon)} learned ${picked.join(', ')}`);
   }));

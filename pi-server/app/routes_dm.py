@@ -626,7 +626,7 @@ def delete_display_image(conn, img_id):
 def give_pokemon(conn, trainer, cfg):
     """The aftermath's "give to trainer", and the Party module's Give Pokemon: a Pokemon goes straight into that trainer's
     team -- built the way the DM set it up (species, level, nature, abilities, held item, shiny, any ability scores and
-    AC / max HP / max VP the DM gave it),
+    AC / max HP / max VP the DM gave it, moves taught on top: customMoves),
     with the same maths a player's own registration runs, stored with its static picture like register does."""
     from . import live
     tname = (trainers.find(conn, trainer)[1] or {}).get('name')
@@ -644,6 +644,10 @@ def give_pokemon(conn, trainer, cfg):
         held_item=cfg.get('item') or '', shiny=bool(cfg.get('shiny')), stats=cfg.get('stats') or None,
         overrides=cfg.get('overrides') or None, extra_skills=cfg.get('extraSkills') or ())
     pokemon['trainer'] = tname
+    # Moves taught on top (the Give Pokemon popup's "Teach a move"): any move on the move list, kept as its custom moves
+    taught = [m['name'] for m in (gamedata.find_move(x) for x in (cfg.get('customMoves') or [])) if m]
+    if taught:
+        pokemon['customMoves'] = list(dict.fromkeys([*(pokemon.get('customMoves') or []), *taught]))
     first_time = not caught_before(conn, pokemon['name'])
     owned.insert(conn, pokemon)
     record_caught(conn, pokemon['name'], pokemon, first_time)

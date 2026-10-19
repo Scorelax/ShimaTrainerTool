@@ -282,3 +282,35 @@ export function participantFromTrainer(t) {
   };
   return { combatant, participant: dmEnemyParticipant(combatant) };
 }
+
+// ---------------------------------------------------------------------------
+// − / + steppers (the user's call, 2026-10-19: in place of the browser's tiny up / down arrows -- the map editor, the
+// Party module and its popups). One listener for the whole page handles every stepper's buttons.
+// ---------------------------------------------------------------------------
+
+/** A number field with − and + buttons either side. `attrs`: the field's own attributes (an id, data-*...); an empty
+ * field counts from its placeholder when that's a number (a "worked out" value shown grey). */
+export function stepperHtml({ id = '', attrs = '', value = '', min = '', max = '', step = 1, placeholder = '', cls = '' } = {}) {
+  return `<div class="dm-stepper${cls ? ` ${cls}` : ''}"><button type="button" class="dm-btn" data-stepper="-1" tabindex="-1" title="Less">−</button>
+    <input class="dm-input" ${id ? `id="${id}"` : ''} ${attrs} type="number" ${min !== '' ? `min="${min}"` : ''} ${max !== '' ? `max="${max}"` : ''} step="${step}" value="${value}" placeholder="${placeholder}">
+    <button type="button" class="dm-btn" data-stepper="1" tabindex="-1" title="More">+</button></div>`;
+}
+
+if (typeof document !== 'undefined' && !window.__dmSteppers) {
+  window.__dmSteppers = true;
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest?.('.dm-stepper > [data-stepper]');
+    if (!b) return;
+    const input = b.parentElement.querySelector('input');
+    if (!input || input.disabled) return;
+    const step = Number(input.step) || 1;
+    const now = input.value === '' ? (Number(input.placeholder) || 0) : (Number(input.value) || 0);
+    let next = now + Number(b.dataset.stepper) * step;
+    if (input.min !== '') next = Math.max(Number(input.min), next);
+    if (input.max !== '') next = Math.min(Number(input.max), next);
+    if (String(next) === input.value) return;
+    input.value = next;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}

@@ -20,7 +20,7 @@ export async function loadMoves() {
 }
 
 /** Pick moves from the move list -> their names (null: nothing picked). `exclude`: names it already has (left out). */
-export async function pickMoves({ title = '✨ Teach a move', exclude = [], multi = true, hint = '' } = {}) {
+export async function pickMoves({ title = '💥 Teach a move', exclude = [], multi = true, hint = '' } = {}) {
   const moves = await loadMoves();
   const have = new Set(exclude.map(m => String(m).toLowerCase()));
   const res = await openPicker({

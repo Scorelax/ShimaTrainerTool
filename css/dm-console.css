@@ -1385,3 +1385,23 @@ span.dm-trap-pick { cursor: default; }
 .dm-disp-card:hover .dm-disp-tick, .dm-disp-card.picked .dm-disp-tick { opacity: 1; }
 .dm-disp-card.picked .dm-disp-tick { background: #4fc3f7; border-color: #4fc3f7; color: #0b1a26; }
 .dm-disp-card.dragging, .dm-disp-bg.dragging { opacity: 0.45; }
+/* Steppers in the Party module and its popups */
+.dm-stepper.small .dm-btn { min-width: 1.7rem; padding: 0.15rem 0.25rem; font-size: 0.95rem; }
+.dm-stepper.small .dm-input { padding: 0.3rem 0.2rem; }
+.dm-qty-step { flex: none; width: 8.5rem; }
+.dm-money-step { flex: 1; min-width: 9rem; }
+.dm-xp-amount .dm-input { font-size: 1.2rem; font-weight: 700; }
+/* Give Pokemon: the species / held item buttons that open the picker, the shiny note */
+.dm-gp-pick { display: flex; align-items: center; gap: 0.8rem; width: 100%; padding: 0.45rem 0.6rem; text-align: left; cursor: pointer;
+  border: 1px solid var(--dm-line); border-radius: 12px; background: var(--dm-panel-2); color: inherit; font: inherit; }
+.dm-gp-pick:hover { border-color: var(--dm-gold); }
+.dm-gp-pick .dm-cs-head-thumb { width: 56px; height: 56px; flex: none; overflow: hidden; }
+.dm-gp-pick .dm-cs-head-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.dm-gp-pick-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.dm-gp-pick-text b { font-size: 1.05rem; color: var(--dm-gold); }
+.dm-gp-pick-go { opacity: 0.7; }
+.dm-gp-item { display: flex; align-items: center; gap: 0.3rem; }
+.dm-gp-item .dm-btn { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-gp-shiny { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.35rem; padding: 0.45rem 0.6rem; border-radius: 9px;
+  background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.3); font-size: 0.84rem; }
+.dm-gp-shiny[hidden] { display: none; }

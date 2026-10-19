@@ -465,7 +465,7 @@ function drawSpeciesForm(species, redrawList) {
 const CRITERIA = [
   ['level', '📈 Level', 'The level it evolves at'], ['item', '💎 Item', 'An item, from the item list'],
   ['location', '📍 Location', 'Where it has to be'], ['happiness', '💛 Happiness', 'How happy it has to be'],
-  ['time', '🌗 Day / Night', 'A time of day'], ['move', '✨ Move', 'A move it has to know'], ['other', '📝 Other', 'Anything else'],
+  ['time', '🌗 Day / Night', 'A time of day'], ['move', '💥 Move', 'A move it has to know'], ['other', '📝 Other', 'Anything else'],
 ];
 const TIMES = ['morning', 'day', 'evening', 'night'];
 
@@ -539,7 +539,7 @@ async function pickCriterionValue(type) {
   }
   const moves = await loadMoves(); // fresh: the DM's custom moves too
   const res = await openPicker({
-    title: '✨ Pick the move', compact: true, emptyText: 'No move list loaded.',
+    title: '💥 Pick the move', compact: true, emptyText: 'No move list loaded.',
     items: moves.map(m => ({ key: m.name, label: m.name, sub: `${m.type || ''}${m.vpCost ? ` · ${m.vpCost} VP` : ''}` })),
   });
   return res?.keys[0] || '';

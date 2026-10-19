@@ -1,5 +1,6 @@
 // Combat Page — Full encounter tracker with initiative, status effects, and move integration
 
+import { viewerSeesEverything } from '../utils/combat-visibility.js';
 import { abilitiesOf, allCachedPokemon, currentHP, currentVP, displayName, knownMoveNames, pokemonKey } from '../utils/owned-pokemon.js';
 import { PokemonAPI, TrainerAPI, CombatAPI } from '../api.js';
 import { showToast } from '../utils/notifications.js';
@@ -3163,6 +3164,29 @@ async function _handleBideClick(c, move, state, onBideResolve) {
   }
 }
 
+/** {min, avg, max} of `dice` ("2d6 + 1d4", any flat numbers in it count too) plus `flat` and the ability dice rolled on
+ * their own ([{dice}]) -- null when there's nothing to roll. Never below 0. */
+function damageRangeOf(dice, flat = 0, extra = []) {
+  if (!dice) return null;
+  const all = [dice, ...(extra || []).map(d => d?.dice).filter(Boolean)].join(' + ');
+  let min = flat, max = flat, avg = flat, rolled = false;
+  for (const [, sign, term] of all.matchAll(/([+-]?)\s*(\d*d\d+|\d+)/gi)) {
+    const k = sign === '-' ? -1 : 1;
+    const d = term.match(/^(\d*)d(\d+)$/i);
+    if (d) {
+      const n = Number(d[1] || 1), sides = Number(d[2]);
+      min += k * n; max += k * n * sides; avg += k * n * (sides + 1) / 2;
+      rolled = true;
+    } else {
+      const v = k * Number(term);
+      min += v; max += v; avg += v;
+    }
+  }
+  if (!rolled) return null;
+  const round1 = v => Math.round(v * 10) / 10;
+  return { min: Math.max(0, min), avg: Math.max(0, round1(avg)), max: Math.max(0, max) };
+}
+
 /** The shared battle: another combatant's move (another player's creature, or a player's for the DM), in the same popup
  * the owner gets -- its effect and damage worked out from that creature's own stats -- with Use Move switched off.
  * `c` is a combatant in renderCombatCard's shape (combat-wip.js's _moveViewFor). */
@@ -3517,9 +3541,16 @@ async function showCombatMoveDetails(moveName, combatantId, state, { onDamageRes
   const _isMultiHitAoe = moveCategoriesFor(moveName).includes('multi_hit_aoe');
   const _willDeferToMultiHitAoe = _isMultiHitAoe && !!onMultiHitAoe;
 
+  // The DM console only (it sees everything): the least, average and most the move deals right now -- its dice and
+  // flat bonus as they stand after every modifier above (a Rollout streak, Stockpile, Power-Up...) plus any ability dice
+  // rolled on their own; never a critical hit (the user's ask, 2026-10-19).
+  const _damageRange = viewerSeesEverything() && !_isDirectHeal
+    ? damageRangeOf(_zoneDamageDice || _effDice, (computedData.damageBonus || 0) + (_effFlat || 0), computedData.abilityDice) : null;
+
   showMovePopup({
     move,
     computedData,
+    damageRange: _damageRange,
     heldItemsHTML,
     size: c.size,
     critMod: c.critMod,

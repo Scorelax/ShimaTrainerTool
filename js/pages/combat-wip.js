@@ -2928,7 +2928,12 @@ function _maskForeignView(v, p) {
  * if shown, and hideNumbers / hideLevel so the popup puts ??? where a hidden stat, type or level would show through. */
 function _moveViewFor(p) {
   // The weather and zones it stands in change its moves (Weather Ball, Solar Beam...) -- same as its owner's card.
-  const v = { ..._foreignCombatantView(p), activeTerrains: terrainsAffecting(session, p.id), activeWeathers: weathersAffecting(session, p.id) };
+  // ...and its streak (Rollout, Fury Cutter: the damage of the hit it's on now) and the move types it has witnessed
+  // (Archive Blast), worked out from the log the same way as for the viewer's own creatures.
+  const v = {
+    ..._foreignCombatantView(p), activeTerrains: terrainsAffecting(session, p.id), activeWeathers: weathersAffecting(session, p.id),
+    lastHitMoveStreak: _lastHitMoveStreak(session, p.id), witnessedMoveTypes: _witnessedMoveTypesSince(session, p.id),
+  };
   if (!_isDmEnemy(session, p)) return v;
   const see = (field) => visibleToViewer(p, field);
   return {

@@ -35,6 +35,8 @@ function _injectStyles() {
     .combat-move-rolls-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 0.7rem; margin-bottom: 1rem; font-size: 0.88rem; }
     .combat-roll-bonus { font-size: 1.15em; font-weight: bold; }
     .combat-roll-breakdown { font-size: 0.75em; opacity: 0.8; margin-top: 0.2rem; }
+    .combat-roll-range { font-size: 0.78em; font-weight: 700; color: #ffd36b; margin-top: 0.3rem; }
+    .combat-roll-range[hidden] { display: none; }
     .combat-use-move-btn { width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #4CAF50, #45A049); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
     .combat-use-move-btn:disabled { opacity: 0.45; cursor: not-allowed; background: linear-gradient(135deg, #888, #666); }
     .combat-move-held-items { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 0.7rem; font-size: 0.88rem; line-height: 1.5; margin-bottom: 0.6rem; }
@@ -91,6 +93,7 @@ function _createPopupDOM() {
             <strong id="cDiceLabel">Damage Roll:</strong>
             <span id="cDamageBonus" class="combat-roll-bonus"></span>
             <div id="cDamageBreakdown" class="combat-roll-breakdown"></div>
+            <div id="cDamageRange" class="combat-roll-range" hidden></div>
           </div>
         </div>
         <div class="combat-move-held-items" id="cHeldItems" style="display:none;"></div>
@@ -582,7 +585,7 @@ function _renderCommander(trainerData) {
  * @param {boolean} [params.skipConfirm] - Skip the separate "Use MoveName (N VP)? Yes/No" confirm popup entirely -- clicking Use Move directly uses it (the same VP cost is already shown in this popup's own grid, so that confirm step was just a second click for no new information). Defaults to false (legacy behavior: confirm popup shown), so only callers that opt in (combat-wip.js) are affected -- pokemon-card.js's own semi-permanent VP/HP deduction keeps the confirm step.
  * @param {number} [params.vpCostOverride] - Actual VP cost to show/deduct, in place of move.vpCost's base value -- Fury Cutter/Ice Ball/Rollout's own escalating cost per consecutive hit (see combat.js's showCombatMoveDetails). Falls back to move.vpCost when not given, same as before this existed.
  */
-export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, vpCostOverride, spriteUrl, spriteAlt, speciesName, deferAnimation, skipConfirm, noAttackRoll, battleDiceInRolls }) {
+export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod, trainerData, onUseMove, onDrainHeal, onDirectHeal, chargesLeft, disableUse, disableUseMsg, noteText, diceLabel, diceOverride, diceBreakdownOverride, vpCostOverride, spriteUrl, spriteAlt, speciesName, deferAnimation, skipConfirm, noAttackRoll, battleDiceInRolls, damageRange }) {
   _injectStyles();
 
   let popup = document.getElementById('combatMovePopup');
@@ -665,6 +668,14 @@ export function showMovePopup({ move, computedData, heldItemsHTML, size, critMod
   } else {
     document.getElementById('cDamageBonus').textContent = '—';
     document.getElementById('cDamageBreakdown').textContent = '';
+  }
+
+  // The DM console's reference (damageRange: {min, avg, max} -- every modifier in, no critical hit; combat.js)
+  const rangeEl = document.getElementById('cDamageRange');
+  if (rangeEl) {
+    rangeEl.hidden = !damageRange;
+    rangeEl.textContent = damageRange ? `Min ${damageRange.min} · Avg ${damageRange.avg} · Max ${damageRange.max}` : '';
+    rangeEl.title = damageRange ? 'What it can deal now -- every modifier included, without a critical hit' : '';
   }
 
   // Held items

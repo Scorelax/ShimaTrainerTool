@@ -4,7 +4,7 @@
 // level by itself: levelling up has choices the player makes in their app, so the console shows who is ready for it.
 import { DmAPI } from '../api.js';
 import { XP_TO_LEVEL, levelFromXp } from './encounter-rules.js';
-import { escapeHtml, openDmModal, toast } from './dm-common.js';
+import { escapeHtml, openDmModal, toast, stepperHtml } from './dm-common.js';
 
 const QUICK = [50, 100, 250, 500, 1000];
 
@@ -72,7 +72,7 @@ export function giveXpPopup({ label, trainer, pokemon = null, xp, level }) {
           <label class="dm-check"><input type="radio" name="xpMode" value="take"><span>Take away</span></label>
           <label class="dm-check"><input type="radio" name="xpMode" value="set"><span>Set it to exactly</span></label>
         </div>
-        <input class="dm-input dm-xp-amount" id="xpAmount" type="number" min="0" placeholder="XP" autofocus>
+        ${stepperHtml({ id: 'xpAmount', min: 0, step: 50, placeholder: 'XP', cls: 'dm-xp-amount' })}
         <div class="dm-xp-quick">${QUICK.map(q => `<button class="dm-btn small" data-quick="${q}">+${q.toLocaleString()}</button>`).join('')}</div>
         <div class="dm-xp-after" id="xpAfter"></div>
       </div>`,

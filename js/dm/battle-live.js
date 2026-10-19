@@ -358,7 +358,7 @@ function renderVisibilityColumn(focusId, currentSession) {
       <div class="dm-vis" data-id="${p.id}">
         <div class="dm-vis-title">${escapeHtml(p.owner)}'s ${isMon ? 'Pokémon' : 'trainer'}</div>
         <div class="dm-vis-actions">
-          ${isMon ? `<button class="dm-btn small" data-pl-act="teach" title="A move it hasn't learned yet, or can't normally learn -- it keeps it after the battle">✨ Teach a move</button>`
+          ${isMon ? `<button class="dm-btn small" data-pl-act="teach" title="A move it hasn't learned yet, or can't normally learn -- it keeps it after the battle">💥 Teach a move</button>`
             : `<button class="dm-btn small" data-pl-act="item" title="Straight into their bag -- from the item list, or one of your own">🎒 Give an item</button>`}
         </div>
         <div class="dm-vis-note">${isMon ? ((p.dmAddedMoves || []).length ? `Taught in this battle: ${escapeHtml(p.dmAddedMoves.join(', '))}.`
@@ -726,7 +726,7 @@ function parseSpeeds(text) {
  * moves, like Edit Pokemon's -- give-move), and onto its card in this battle at once (dmAddedMoves -- the player's device
  * adds them to its own copy). */
 async function teachPlayerMove(p) {
-  const picked = await pickMoves({ title: `✨ Teach ${p.name} a move`, exclude: p.moves || [] });
+  const picked = await pickMoves({ title: `💥 Teach ${p.name} a move`, exclude: p.moves || [] });
   if (!picked) return;
   try {
     for (const m of picked) await DmAPI.giveMove(p.owner, p.speciesName || p.name, m);
@@ -892,7 +892,7 @@ async function openEditCreature(p) {
       const drop = e.target.closest('[data-drop-move]');
       if (drop) { moves = moves.filter(m => m !== drop.dataset.dropMove); drawMoves(body); return; }
       if (!e.target.closest('#edAddMove')) return;
-      const picked = await pickMoves({ title: `✨ A move for ${p.name}`, exclude: moves });
+      const picked = await pickMoves({ title: `💥 A move for ${p.name}`, exclude: moves });
       if (picked?.length) { moves = [...moves, ...picked.filter(m => !moves.includes(m))]; drawMoves(body); }
     });
     body.querySelector('#edItemPick')?.addEventListener('click', async () => {

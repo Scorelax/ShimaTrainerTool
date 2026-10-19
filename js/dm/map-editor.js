@@ -30,7 +30,7 @@ import { CombatAPI, DmAPI } from '../api.js';
 import { mapObjectHtml, objectScreenRect, objectCells, footprintCells, footprintForSize } from '../utils/battle-map-grid.js';
 import { patchPortraitMedia } from '../utils/sprite-media.js';
 import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
-import { escapeHtml, newId, toast, getSpecies, participantFromPokemon, participantFromTrainer, npcTrainerConfig } from './dm-common.js';
+import { escapeHtml, newId, toast, getSpecies, participantFromPokemon, participantFromTrainer, npcTrainerConfig, stepperHtml as sharedStepper } from './dm-common.js';
 import { creatureSpotProblem } from './map-view.js';
 import { openPicker } from './picker.js';
 import * as setupStore from './setup-store.js';
@@ -82,25 +82,8 @@ const creaturesTool = () => _live || prepCreatures();
 /** One of the DM's own creatures (a player's can be moved, but not hidden or taken off from here). */
 const dmOwned = c => !_live || !c.owner || c.owner === 'DM';
 
-/** A number field with − and + buttons either side (the user's call, 2026-10-19 -- the browser's arrows are tiny). */
-function stepperHtml(id, value, { min = 0, max = 99, step = 1 } = {}) {
-  return `<div class="dm-stepper"><button type="button" class="dm-btn" data-step="${id}" data-d="-${step}" title="Less">−</button>
-    <input class="dm-input" id="${id}" type="number" min="${min}" max="${max}" step="${step}" value="${value}">
-    <button type="button" class="dm-btn" data-step="${id}" data-d="${step}" title="More">+</button></div>`;
-}
-
-/** The − / + buttons: the field's number moves by a step (within its min / max) and it tells its listeners. */
-function wireSteppers(scope) {
-  scope.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
-    const input = scope.querySelector(`#${b.dataset.step}`);
-    if (!input) return;
-    const next = Math.max(Number(input.min), Math.min(Number(input.max), (Number(input.value) || 0) + Number(b.dataset.d)));
-    if (next === Number(input.value)) return;
-    input.value = next;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }));
-}
+/** A number field with − and + buttons either side (dm-common.js's, the user's call, 2026-10-19). */
+const stepperHtml = (id, value, opts = {}) => sharedStepper({ id, value, ...opts });
 
 let _root = null;
 let _onDone = null;
@@ -648,7 +631,6 @@ function renderToolPanel() {
     hint.textContent = editing
       ? 'Picked up: click a square to move it there (or drag it) -- hold it still a moment, then move the pointer around it to turn it. Click it again (or Done) to put it down.'
       : 'Click a square to place the object there -- or hold and move the pointer around to turn it, then let go. Click a placed object to move it, hold it to turn it.';
-    wireSteppers(panel);
     // Editing: every change goes straight onto the object (applyEdit). Placing: it only changes what the next one looks like.
     const changed = () => { if (ed.selectedId) applyEdit(); else renderGhost(); };
     document.getElementById('objPick')?.addEventListener('click', () => (ed.selectedId ? changeObjectPicture() : addToMap('object')));
@@ -687,7 +669,6 @@ function renderToolPanel() {
         <span><button class="dm-btn small" id="queueSkip">Skip</button><button class="dm-btn small" id="queueStop">Stop</button></span></div>
       ${q.kind === 'pokemon' ? `<div class="dm-field"><label for="queueLevel">Its level</label>${stepperHtml('queueLevel', q.level, { min: 1, max: 20 })}</div>` : ''}
       <div class="dm-hint">${q.hidden ? 'Hidden: only you see it until you show it (the Creatures tool).' : prepCreatures() ? 'The players see it once the map is opened to them.' : 'The players see it as soon as it\'s on the map.'}</div>`;
-    wireSteppers(panel);
     hint.textContent = ed.placingCreature ? `Putting ${q.label} on the map…` : `Click a square to put ${q.label} there.`;
     document.getElementById('queueLevel')?.addEventListener('change', (e) => { q.level = Math.max(1, Math.min(20, Number(e.target.value) || q.level)); });
     document.getElementById('queueSkip').addEventListener('click', () => { ed.creatureQueue.shift(); renderToolPanel(); });

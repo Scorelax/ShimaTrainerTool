@@ -274,9 +274,12 @@ async function registerCatch(p) {
       <div class="dm-field"><label for="capNick">Nickname <small>(optional)</small></label>
         <input class="dm-input" id="capNick" maxlength="30" placeholder="${escapeHtml(p.speciesName || p.name)}"></div>
       <div class="dm-hint">It goes into the trainer's team now -- at its level, its abilities and the numbers it was set up with -- and leaves the battle.</div>`,
-    buttons: [{ label: 'Cancel', value: null }, { label: 'Register it', kind: 'primary', value: 'ok', keepOpen: true,
-      onClick: (body) => { picked = { trainer: body.querySelector('#capTrainer').value, nickname: body.querySelector('#capNick').value.trim() }; return true; } }],
+    buttons: [{ label: 'Cancel', value: null },
+      { label: 'Caught -- hand it out later', value: 'later' },
+      { label: 'Register it', kind: 'primary', value: 'ok', keepOpen: true,
+        onClick: (body) => { picked = { trainer: body.querySelector('#capTrainer').value, nickname: body.querySelector('#capNick').value.trim() }; return true; } }],
   });
+  if (answer === 'later') { await captureForLater(p); return; }
   if (answer !== 'ok' || !picked) return;
   const c = getSetup()?.creatures.find(x => x.id === p.id);
   const speciesName = c?.config?.species || p.speciesName || p.name;
@@ -287,7 +290,9 @@ async function registerCatch(p) {
   try {
     await DmAPI.givePokemon(picked.trainer, { ...cfg, nickname: picked.nickname || autoName });
   } catch (err) {
-    showCombatAlert(err.message, { title: `Give ${p.name} to ${picked.trainer}` });
+    // (a trainer already having that species, most likely) -- it can still leave the battle as caught, for Post battle
+    if (await showCombatConfirm(`${err.message} Mark ${p.name} as caught anyway? It leaves the battle, and Post battle lets you hand it out later.`,
+      { title: `Give ${p.name} to ${picked.trainer}`, yesLabel: 'Mark it caught', noLabel: 'Not yet' })) await captureForLater(p);
     return;
   }
   try {
@@ -311,6 +316,16 @@ const VISIBILITY_FIELDS = [
   ['ac', 'AC'], ['stats', 'Other stats', 'STR, DEX, CON, INT, WIS, CHA'],
   ['name', 'Name'], ['type', 'Type'], ['level', 'Level'], ['abilities', 'Abilities'], ['size', 'Size'],
 ];
+
+/** Caught, but not registered yet: it leaves the battle, and Post battle hands it to a trainer. */
+async function captureForLater(p) {
+  try {
+    await CombatAPI.capture(p.id);
+    toast(`${p.name} was caught -- hand it to its trainer in Post battle.`);
+  } catch (err) {
+    showCombatAlert(err.message, { title: `Catch ${p.name}` });
+  }
+}
 
 /** A catchable Pokemon's card gets a Poke Ball at its picture's corner (the DM's screens only) -- the catch popup. */
 function decorateCatchable(p) {

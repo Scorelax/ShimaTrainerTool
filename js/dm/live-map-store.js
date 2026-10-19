@@ -47,7 +47,7 @@ export function getSetup() {
     creatures: Object.entries(b.tokens).filter(([id]) => participants[id]).map(([id, t]) => ({
       id, name: participants[id].name, position: { col: t.col, row: t.row, facing: t.facing || 0 }, z: t.z || 0,
       participant: { size: participants[id].size, image: participants[id].image, speciesName: participants[id].speciesName },
-      hidden: participants[id].status === 'spectating',
+      hidden: participants[id].status === 'spectating', owner: participants[id].owner || '',
     })),
   };
 }

@@ -79,6 +79,8 @@ const HOLD_MS = 350; // a press held this long without moving turns the object; 
 /** The adventure being prepared: its Pokemon and NPCs are the map's own (the store's creatures), not a battle's. */
 const prepCreatures = () => !_live && !!_opts.adventure;
 const creaturesTool = () => _live || prepCreatures();
+/** One of the DM's own creatures (a player's can be moved, but not hidden or taken off from here). */
+const dmOwned = c => !_live || !c.owner || c.owner === 'DM';
 
 /** A number field with − and + buttons either side (the user's call, 2026-10-19 -- the browser's arrows are tiny). */
 function stepperHtml(id, value, { min = 0, max = 99, step = 1 } = {}) {
@@ -694,7 +696,7 @@ function renderToolPanel() {
     const c = getSetup().creatures.find(x => x.id === ed.creatureId);
     panel.innerHTML = c ? `
       <div class="dm-edit-head"><b>${escapeHtml(c.name)}</b><small>Facing ${c.position.facing || 0}° · ${c.z ? `${c.z}ft up` : 'on the ground'}</small></div>
-      <label class="dm-check"><input type="checkbox" id="creHidden" ${c.hidden ? 'checked' : ''}><span>Hidden from the players <small>Only you see it (see-through) until you untick this.</small></span></label>
+      ${dmOwned(c) ? `<label class="dm-check"><input type="checkbox" id="creHidden" ${c.hidden ? 'checked' : ''}><span>Hidden from the players <small>Only you see it (see-through) until you untick this.</small></span></label>` : ''}
       <div class="dm-field"><label>Turn</label><div class="dm-row">
         <button class="dm-btn" data-cre="turn" data-v="-45" title="Turn left 45°">⟲ 45°</button><button class="dm-btn" data-cre="turn" data-v="45" title="Turn right 45°">⟳ 45°</button></div></div>
       <div class="dm-field"><label>Height</label><div class="dm-row">
@@ -703,7 +705,7 @@ function renderToolPanel() {
         <select class="dm-select" id="creSize">
           ${SIZES.map(z => `<option value="${z}" ${z.toLowerCase() === String(c.participant?.size || 'Medium').toLowerCase() ? 'selected' : ''}>${z}${{ Large: ' (2×2)', Huge: ' (3×3)', Gigantic: ' (4×4)' }[z] || ' (1 square)'}</option>`).join('')}
         </select></div>
-      <div class="dm-row"><button class="dm-btn" data-cre="remove">🗑 Take it off the map</button>
+      <div class="dm-row">${dmOwned(c) ? '<button class="dm-btn" data-cre="remove">🗑 Take it off the map</button>' : ''}
         <button class="dm-btn primary" data-cre="done">✓ Done</button></div>`
       : `<div class="dm-hint">${prepCreatures() ? 'Tap a creature on the map, then tap a square to move it there. Add more with Pokémon / NPCs above.'
         : 'Tap a creature on the map -- anyone\'s -- then tap a square to move it there. It doesn\'t use its movement, and it doesn\'t have to be its turn.'}</div>`;

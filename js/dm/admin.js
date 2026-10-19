@@ -11,6 +11,7 @@ import { showCombatAlert, showCombatConfirm } from '../utils/combat-alert.js';
 import { POKEMON_TYPES } from '../utils/pokemon-types.js';
 import { escapeHtml, toast, getSpecies, forgetSpecies, typeBadges, multiSelectHtml, bindMultiSelects, readMultiSelect, attachSuggest, SAVING_THROWS, SKILLS } from './dm-common.js';
 import { prepareImage } from './display.js';
+import { loadMoves } from './move-picker.js';
 import { openPicker } from './picker.js';
 import { forgetMapAssets } from './map-editor.js';
 
@@ -536,8 +537,7 @@ async function pickCriterionValue(type) {
     });
     return res?.keys[0] || '';
   }
-  let moves = [];
-  try { moves = JSON.parse(sessionStorage.getItem('moves') || '[]'); } catch (e) { /* none */ }
+  const moves = await loadMoves(); // fresh: the DM's custom moves too
   const res = await openPicker({
     title: '✨ Pick the move', compact: true, emptyText: 'No move list loaded.',
     items: moves.map(m => ({ key: m.name, label: m.name, sub: `${m.type || ''}${m.vpCost ? ` · ${m.vpCost} VP` : ''}` })),

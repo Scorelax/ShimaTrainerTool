@@ -283,7 +283,7 @@ export function buildTrainerCombatant() {
     proficiency: parseInt(trainerData.combat.proficiency) || computeProficiency(level),
     savingThrows: [...trainerData.savingThrows],
     skills: [...trainerData.skills],
-    expertise: [...trainerData.expertise],
+    expertise: [...(trainerData.expertise || [])],
     str, dex, con, int: int_, wis, cha,
     strMod, dexMod, conMod, intMod, wisMod, chaMod,
     moves: [], types: [], rechargeStates: {},
